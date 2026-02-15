@@ -7,6 +7,7 @@ Synthesize IR2 (forward + backward) from IR1 train-forward:
 - grad-rule driven backward kernel expansion
 - explicit grad accumulation ops for activations and weights
 - fail-fast contracts (optional strict mode)
+- preserve deterministic, IR-derived lowering (no model-family special-cases in emitter)
 """
 
 import argparse
@@ -58,6 +59,56 @@ def _binding_ids(bindings_doc: Dict[str, Any]) -> Dict[str, Any]:
     return dict(bindings_doc.get("bindings", {}))
 
 
+def _shape_numel(shape: Any) -> Optional[int]:
+    if not isinstance(shape, list) or not shape:
+        return None
+    n = 1
+    for d in shape:
+        if not isinstance(d, int) or d <= 0:
+            return None
+        n *= d
+    return int(n)
+
+
+def _cfg_int(config: Dict[str, Any], keys: List[str], default: int) -> int:
+    for k in keys:
+        if k in config:
+            try:
+                v = int(config.get(k))
+                if v > 0:
+                    return v
+            except Exception:
+                pass
+    return int(default)
+
+
+def _default_activation_numel(config: Dict[str, Any]) -> int:
+    d_model = _cfg_int(config, ["embed_dim", "hidden_size", "d_model"], 128)
+    hidden = _cfg_int(config, ["intermediate_size", "hidden_dim"], max(2 * d_model, d_model))
+    vocab = _cfg_int(config, ["vocab_size"], 256)
+    num_heads = _cfg_int(config, ["num_heads"], 1)
+    num_kv_heads = _cfg_int(config, ["num_kv_heads"], num_heads)
+    head_dim = _cfg_int(config, ["head_dim"], max(1, d_model // max(1, num_heads)))
+    q_dim = max(1, num_heads * head_dim)
+    kv_dim = max(1, num_kv_heads * head_dim)
+    return max(1, d_model, hidden, 2 * hidden, vocab, q_dim, kv_dim)
+
+
+def _tensor_numel(tensors: Dict[str, Dict[str, Any]], tensor_id: Optional[str]) -> Optional[int]:
+    if not isinstance(tensor_id, str) or not tensor_id:
+        return None
+    meta = tensors.get(tensor_id)
+    if not isinstance(meta, dict):
+        return None
+    n = meta.get("numel")
+    if isinstance(n, int) and n > 0:
+        return int(n)
+    shape_n = _shape_numel(meta.get("shape"))
+    if isinstance(shape_n, int) and shape_n > 0:
+        return int(shape_n)
+    return None
+
+
 def _last_forward_logits_op(ops: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     for op in reversed(ops):
         if op.get("phase") != "forward":
@@ -91,9 +142,18 @@ def _ensure_tensor(
     kind: str,
     requires_grad: bool,
     persistent: bool,
-    producer: Optional[Dict[str, Any]] = None
+    producer: Optional[Dict[str, Any]] = None,
+    shape: Optional[List[int]] = None,
+    numel: Optional[int] = None,
 ) -> None:
     if tensor_id in tensors:
+        cur = tensors[tensor_id]
+        if shape is not None and "shape" not in cur:
+            cur["shape"] = list(shape)
+        if isinstance(numel, int) and numel > 0:
+            cur_numel = cur.get("numel")
+            if not isinstance(cur_numel, int) or cur_numel <= 0:
+                cur["numel"] = int(numel)
         return
     tensors[tensor_id] = {
         "dtype": dtype,
@@ -101,6 +161,8 @@ def _ensure_tensor(
         "requires_grad": bool(requires_grad),
         "persistent": bool(persistent),
         "producer": producer,
+        "shape": list(shape) if isinstance(shape, list) else None,
+        "numel": int(numel) if isinstance(numel, int) and numel > 0 else None,
     }
 
 
@@ -119,6 +181,8 @@ def synthesize_ir2_backward(
     kernels = _kernel_ids(registry)
     bindings = _binding_ids(bindings_doc)
     rules = grad_rules.get("rules", {}) or {}
+    config = deepcopy(ir1.get("config", {}))
+    activation_default_numel = _default_activation_numel(config)
 
     forward_ops = list(ir1.get("ops", []))
     tensors: Dict[str, Dict[str, Any]] = deepcopy(ir1.get("tensors", {}))
@@ -132,7 +196,9 @@ def synthesize_ir2_backward(
     if forward_ops:
         next_op_id = max(int(o.get("op_id", 0)) for o in forward_ops) + 1
 
+    # Maps forward activation tensor -> canonical accumulated grad tensor (grad.act.*).
     grad_for_tensor: Dict[str, str] = {}
+    # Tracks writers per gradient destination for invariant reporting/debugging.
     grad_writers: Dict[str, List[int]] = {}
 
     def emit_backward_op(op: Dict[str, Any]) -> Dict[str, Any]:
@@ -145,6 +211,9 @@ def synthesize_ir2_backward(
     def canonical_grad_activation(source_tensor: str) -> str:
         safe = _sanitize_tensor_id(source_tensor)
         tid = "grad.act.%s" % safe
+        src_meta = tensors.get(source_tensor) if isinstance(source_tensor, str) else None
+        src_shape = src_meta.get("shape") if isinstance(src_meta, dict) else None
+        src_numel = _tensor_numel(tensors, source_tensor) or activation_default_numel
         _ensure_tensor(
             tensors,
             tensor_id=tid,
@@ -153,12 +222,18 @@ def synthesize_ir2_backward(
             requires_grad=False,
             persistent=True,
             producer=None,
+            shape=src_shape if isinstance(src_shape, list) else None,
+            numel=src_numel,
         )
         return tid
 
     def canonical_grad_weight(param_name: str) -> str:
         safe = _sanitize_tensor_id(param_name)
         tid = "grad.weight.%s" % safe
+        src_tid = "weight.%s" % param_name
+        src_meta = tensors.get(src_tid) if isinstance(src_tid, str) else None
+        src_shape = src_meta.get("shape") if isinstance(src_meta, dict) else None
+        src_numel = _tensor_numel(tensors, src_tid)
         _ensure_tensor(
             tensors,
             tensor_id=tid,
@@ -167,6 +242,8 @@ def synthesize_ir2_backward(
             requires_grad=False,
             persistent=True,
             producer=None,
+            shape=src_shape if isinstance(src_shape, list) else None,
+            numel=src_numel,
         )
         return tid
 
@@ -198,7 +275,8 @@ def synthesize_ir2_backward(
         created = emit_backward_op(op)
         grad_writers.setdefault(dst_tensor, []).append(int(created["op_id"]))
 
-    # Seed backward graph from explicit loss gradient on final logits.
+    # Seed backward graph from explicit CE gradient on final logits.
+    # This is the only non-reverse-traversal entrypoint for gradient flow.
     logits_op = _last_forward_logits_op(forward_ops)
     if logits_op is None:
         msg = "Cannot seed backward graph: no `logits` op found in IR1"
@@ -233,6 +311,8 @@ def synthesize_ir2_backward(
                 requires_grad=False,
                 persistent=False,
                 producer={"op_id": next_op_id, "output_name": "loss_out"},
+                shape=[1],
+                numel=1,
             )
             emit_backward_op(
                 {
@@ -391,6 +471,7 @@ def synthesize_ir2_backward(
                     bwd_inputs[key] = {"tensor": "%s:%s" % (kind, ref), "kind": kind}
 
             if blocked:
+                # We could not materialize the required backward inputs for this spec.
                 unresolved.append(
                     {
                         "forward_op_id": fwd.get("op_id"),
@@ -425,7 +506,12 @@ def synthesize_ir2_backward(
                     src_tensor = inp.get("tensor")
                     if not isinstance(src_tensor, str) or not src_tensor:
                         continue
+                    # Backward kernels write into tmp grads first; accumulation into canonical
+                    # grad.act.* tensors is emitted as explicit separate ops.
                     tmp_tensor = "tmp.grad.act.op%d.%s" % (int(fwd.get("op_id", -1)), _sanitize_tensor_id(target_input))
+                    src_meta = tensors.get(src_tensor) if isinstance(src_tensor, str) else None
+                    src_shape = src_meta.get("shape") if isinstance(src_meta, dict) else None
+                    src_numel = _tensor_numel(tensors, src_tensor) or activation_default_numel
                     _ensure_tensor(
                         tensors,
                         tensor_id=tmp_tensor,
@@ -434,6 +520,8 @@ def synthesize_ir2_backward(
                         requires_grad=False,
                         persistent=False,
                         producer={"op_id": next_op_id, "output_name": out_name},
+                        shape=src_shape if isinstance(src_shape, list) else None,
+                        numel=src_numel,
                     )
                     bwd_outputs[out_name] = {
                         "tensor": tmp_tensor,
@@ -462,6 +550,10 @@ def synthesize_ir2_backward(
                         continue
                     param_name = str(weight_ref.get("name", target_weight))
                     tmp_tensor = "tmp.grad.weight.op%d.%s" % (int(fwd.get("op_id", -1)), _sanitize_tensor_id(target_weight))
+                    src_wtid = str(weight_ref.get("tensor", ""))
+                    src_wmeta = tensors.get(src_wtid) if isinstance(src_wtid, str) else None
+                    src_wshape = src_wmeta.get("shape") if isinstance(src_wmeta, dict) else None
+                    src_wnumel = _tensor_numel(tensors, src_wtid)
                     _ensure_tensor(
                         tensors,
                         tensor_id=tmp_tensor,
@@ -470,6 +562,8 @@ def synthesize_ir2_backward(
                         requires_grad=False,
                         persistent=False,
                         producer={"op_id": next_op_id, "output_name": out_name},
+                        shape=src_wshape if isinstance(src_wshape, list) else None,
+                        numel=src_wnumel,
                     )
                     bwd_outputs[out_name] = {
                         "tensor": tmp_tensor,
@@ -487,6 +581,8 @@ def synthesize_ir2_backward(
                         requires_grad=False,
                         persistent=False,
                         producer={"op_id": next_op_id, "output_name": out_name},
+                        shape=[activation_default_numel],
+                        numel=activation_default_numel,
                     )
                     bwd_outputs[out_name] = {"tensor": aux_tensor, "kind": "aux"}
 
@@ -504,7 +600,8 @@ def synthesize_ir2_backward(
                 }
             )
 
-            # Emit explicit accumulation ops.
+            # Emit explicit accumulation ops so fanout and weight updates remain visible
+            # in IR2 rather than hidden inside fused backward kernels.
             for out_name, out_ref in bwd_outputs.items():
                 if not isinstance(out_ref, dict):
                     continue
@@ -540,6 +637,7 @@ def synthesize_ir2_backward(
                     )
 
     if strict:
+        # Strict mode only escalates unresolved rule coverage when partial mode is off.
         unresolved_ready = [
             x for x in unresolved
             if x.get("reason") in ("grad_rule_not_ready", "grad_rule_not_found", "missing_grad_rule")
@@ -559,7 +657,7 @@ def synthesize_ir2_backward(
         "format": "ir2-train-v7",
         "version": 1,
         "checkpoint_policy": checkpoint_policy,
-        "config": deepcopy(ir1.get("config", {})),
+        "config": config,
         "template_name": ir1.get("template_name"),
         "num_layers": ir1.get("num_layers"),
         "forward": forward_ops,

@@ -1419,8 +1419,552 @@ def _build_train_token_batches(train_text: Optional[str], total_tokens: int, seq
     return batches
 
 
-def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: bool) -> tuple[Path, Path]:
-    """Ensure run_dir has generated runtime C and compiled libtrain.so."""
+
+def _manifest_entries_map(manifest: dict) -> dict[str, dict]:
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("Invalid manifest: missing entries[]")
+    out: dict[str, dict] = {}
+    for e in entries:
+        if isinstance(e, dict) and e.get("name"):
+            out[str(e.get("name"))] = e
+    return out
+
+
+def _build_ck_runtime_init_payload(run_dir: Path, runtime_summary: dict) -> dict:
+    """Build flattened fp32 weight payload for ck_train_init from run_dir bump+manifest."""
+    manifest_path = run_dir / "weights_manifest.json"
+    bump_path = run_dir / "weights.bump"
+    if not manifest_path.exists() or not bump_path.exists():
+        raise RuntimeError(f"Missing run_dir weights artifacts: {manifest_path} / {bump_path}")
+
+    order = runtime_summary.get("init_weight_order") if isinstance(runtime_summary, dict) else None
+    expected_numel = runtime_summary.get("init_weight_numel") if isinstance(runtime_summary, dict) else None
+    if not isinstance(order, list) or not order:
+        raise RuntimeError("generated_train_runtime_summary_v7.json missing init_weight_order")
+    if not isinstance(expected_numel, list):
+        expected_numel = [0] * len(order)
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entries = _manifest_entries_map(manifest)
+    bump_blob = bump_path.read_bytes()
+
+    payload = bytearray()
+    manifest_sizes: list[int] = []
+    loaded: list[dict] = []
+
+    for i, wname_raw in enumerate(order):
+        wname = str(wname_raw)
+        entry = entries.get(wname)
+        if entry is None and ("tiny." + wname) in entries:
+            entry = entries.get("tiny." + wname)
+        if entry is None:
+            raise RuntimeError(f"Runtime init weight not found in manifest: {wname}")
+
+        dtype = str(entry.get("dtype", "")).lower()
+        if dtype not in ("fp32", "f32"):
+            raise RuntimeError(f"Runtime init only supports fp32 weights ({wname}: {dtype})")
+
+        off = int(entry.get("offset", 0) or 0)
+        size = int(entry.get("size", 0) or 0)
+        if off < 0 or size <= 0 or (off + size) > len(bump_blob):
+            raise RuntimeError(f"Invalid bump span for {wname}: off={off} size={size}")
+
+        src_numel = size // 4
+        exp = 0
+        if i < len(expected_numel):
+            try:
+                exp = int(expected_numel[i] or 0)
+            except Exception:
+                exp = 0
+        copy_numel = src_numel
+        if exp > 0:
+            copy_numel = min(src_numel, exp)
+
+        payload.extend(bump_blob[off:off + copy_numel * 4])
+        manifest_sizes.append(int(copy_numel))
+        loaded.append({
+            "weight": wname,
+            "manifest_name": str(entry.get("name", wname)),
+            "src_numel": int(src_numel),
+            "copy_numel": int(copy_numel),
+        })
+
+    total_floats = len(payload) // 4
+    if total_floats <= 0:
+        float_buf = (ctypes.c_float * 1)(0.0)
+    else:
+        float_buf = (ctypes.c_float * total_floats).from_buffer_copy(payload)
+
+    if manifest_sizes:
+        sizes_buf = (ctypes.c_int * len(manifest_sizes))(*manifest_sizes)
+    else:
+        sizes_buf = (ctypes.c_int * 1)(0)
+
+    return {
+        "float_buffer": float_buf,
+        "sizes_buffer": sizes_buf,
+        "num_params": len(manifest_sizes),
+        "total_floats": int(total_floats),
+        "loaded": loaded,
+    }
+
+
+def _decode_memory_diagnostic(diag_rc: int, runtime_summary: dict, diag_meta: Optional[dict] = None) -> dict:
+    # Decode negative diagnostic return codes into a stable, operator-friendly
+    # phase classification. This keeps CLI error reporting deterministic and
+    # allows runbook automation to branch by phase/index/op_id.
+    payload: dict = {
+        "rc": int(diag_rc),
+        "ok": bool(diag_rc >= 0),
+        "phase": "unknown",
+        "index": None,
+    }
+    if diag_rc >= 0:
+        payload["phase"] = "pass"
+        return payload
+
+    idx = None
+    if diag_rc <= -5000:
+        payload["phase"] = "backward_trace_canary"
+    elif diag_rc <= -400:
+        payload["phase"] = "optimizer_canary"
+        idx = -400 - int(diag_rc)
+    elif diag_rc <= -300:
+        payload["phase"] = "backward_canary"
+        idx = -300 - int(diag_rc)
+    elif diag_rc <= -200:
+        payload["phase"] = "weights_readonly"
+        idx = -200 - int(diag_rc)
+    elif diag_rc <= -100:
+        payload["phase"] = "forward_canary"
+        idx = -100 - int(diag_rc)
+    elif diag_rc <= -10:
+        payload["phase"] = "plant_canary"
+        idx = -10 - int(diag_rc)
+    else:
+        payload["phase"] = "runtime_error"
+
+    if idx is not None and idx >= 0:
+        payload["index"] = int(idx)
+
+    canary_ranges = runtime_summary.get("canary_ranges") if isinstance(runtime_summary, dict) else None
+    tensor_slots = runtime_summary.get("tensor_slots") if isinstance(runtime_summary, dict) else None
+
+    if payload["phase"].endswith("canary") and isinstance(idx, int) and idx >= 0:
+        if isinstance(canary_ranges, list) and idx < len(canary_ranges):
+            payload["range"] = canary_ranges[idx]
+        else:
+            tail_len = int(runtime_summary.get("canary_tail_floats", 0) or 0) if isinstance(runtime_summary, dict) else 0
+            tail_idx = idx - (len(canary_ranges) if isinstance(canary_ranges, list) else 0)
+            if tail_len > 0 and tail_idx >= 0:
+                payload["tail_canary"] = {
+                    "tail_index": int(tail_idx),
+                    "tail_length": int(tail_len),
+                }
+
+    if payload["phase"] == "weights_readonly" and isinstance(idx, int) and idx >= 0 and isinstance(tensor_slots, list) and idx < len(tensor_slots):
+        payload["slot"] = tensor_slots[idx]
+
+    if payload["phase"] == "backward_trace_canary" and isinstance(diag_meta, dict):
+        op_id = diag_meta.get("failed_op_id")
+        canary_idx = diag_meta.get("failed_canary_idx")
+        if isinstance(op_id, int) and op_id >= 0:
+            payload["failed_op_id"] = int(op_id)
+            if isinstance(runtime_summary, dict):
+                trace_rows = runtime_summary.get("backward_op_trace")
+                if isinstance(trace_rows, list):
+                    for row in trace_rows:
+                        try:
+                            if int(row.get("op_id", -1)) == int(op_id):
+                                payload["failed_op"] = row
+                                break
+                        except Exception:
+                            continue
+        if isinstance(canary_idx, int) and canary_idx >= 0:
+            payload["index"] = int(canary_idx)
+            if isinstance(canary_ranges, list) and canary_idx < len(canary_ranges):
+                payload["range"] = canary_ranges[canary_idx]
+            else:
+                tail_len = int(runtime_summary.get("canary_tail_floats", 0) or 0) if isinstance(runtime_summary, dict) else 0
+                tail_idx = canary_idx - (len(canary_ranges) if isinstance(canary_ranges, list) else 0)
+                if tail_len > 0 and tail_idx >= 0:
+                    payload["tail_canary"] = {
+                        "tail_index": int(tail_idx),
+                        "tail_length": int(tail_len),
+                    }
+
+    return payload
+
+
+def _compute_parity_check_steps(total_steps: int, profile: str, parity_every: int) -> set[int]:
+    if total_steps <= 0:
+        return set()
+    if parity_every and parity_every > 0:
+        return {s for s in range(1, total_steps + 1) if (s % parity_every) == 0}
+
+    profile = str(profile or "balanced").lower()
+    steps: set[int] = set()
+    if profile == "debug":
+        steps = {s for s in range(1, total_steps + 1) if (s % 10) == 0 or s == 1}
+    elif profile == "light":
+        steps.update({1, 10, 100})
+        steps.update({s for s in range(1, total_steps + 1) if s >= 100 and (s % 500) == 0})
+    else:  # balanced
+        for s in range(1, total_steps + 1):
+            if s <= 100 and (s % 10) == 0:
+                steps.add(s)
+            elif s <= 1000 and (s % 50) == 0:
+                steps.add(s)
+            elif s % 500 == 0:
+                steps.add(s)
+        steps.add(1)
+    return {s for s in steps if 1 <= s <= total_steps}
+
+
+def _run_ck_oracle_reference(args: argparse.Namespace, run_dir: Path, train_text: Optional[str]) -> Optional[dict]:
+    """Run periodic PyTorch oracle reference once and return parsed JSON payload."""
+    train_script = SCRIPTS_DIR / "train_parity_epochs_v7.py"
+    if not train_script.exists():
+        log("  Warning: parity oracle script missing; skipping oracle replay", C_ORANGE)
+        return None
+
+    parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exec = str(parity_python) if parity_python.exists() else sys.executable
+    oracle_json = run_dir / "oracle_reference_latest.json"
+
+    cmd = [
+        python_exec,
+        str(train_script),
+        "--epochs", str(getattr(args, "train_epochs", 3)),
+        "--seq-len", str(getattr(args, "train_seq_len", 16)),
+        "--total-tokens", str(getattr(args, "train_total_tokens", 1024)),
+        "--grad-accum", str(getattr(args, "train_grad_accum", 8)),
+        "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
+        "--lr", str(getattr(args, "train_lr", 1e-3)),
+        "--seed", str(getattr(args, "train_seed", 42)),
+        "--vocab", str(getattr(args, "train_vocab", 256)),
+        "--d-model", str(getattr(args, "train_d_model", 64)),
+        "--hidden", str(getattr(args, "train_hidden", 128)),
+        "--loss-tol", str(getattr(args, "train_loss_tol", 2e-5)),
+        "--param-tol", str(getattr(args, "train_param_tol", 3e-5)),
+        "--json-out", str(oracle_json),
+    ]
+
+    bump = run_dir / "weights.bump"
+    manifest = run_dir / "weights_manifest.json"
+    if bump.exists() and manifest.exists():
+        cmd.extend(["--weights-bump", str(bump), "--weights-manifest", str(manifest)])
+    if train_text:
+        cmd.extend(["--train-text", train_text])
+
+    rc = run_cmd_allow_fail(cmd, cwd=PROJECT_ROOT).returncode
+    if rc != 0 or not oracle_json.exists():
+        log("  Warning: parity oracle replay failed; continuing without oracle data", C_ORANGE)
+        return None
+
+    try:
+        return json.loads(oracle_json.read_text(encoding="utf-8"))
+    except Exception:
+        log("  Warning: failed to parse oracle_reference_latest.json", C_ORANGE)
+        return None
+
+
+def _compile_train_runtime_variant(
+    run_dir: Path,
+    c_src: Path,
+    suffix: str,
+    *,
+    defines: Optional[dict] = None,
+    asan: bool = False,
+) -> Path:
+    out_so = run_dir / f"libtrain_{suffix}.so"
+    cc = os.environ.get("CC") or "gcc"
+    cmd = [
+        cc,
+        "-shared",
+        "-fPIC",
+        "-O1" if asan else "-O3",
+        str(c_src),
+        "-o",
+        str(out_so),
+        "-I",
+        str(PROJECT_ROOT / "include"),
+        "-I",
+        str(PROJECT_ROOT),
+        "-L",
+        str(BUILD_DIR),
+        "-lckernel_engine",
+        "-lm",
+        f"-Wl,-rpath,{BUILD_DIR}",
+    ]
+    if asan:
+        cmd.extend(["-fsanitize=address", "-fno-omit-frame-pointer"])
+    for k, v in sorted((defines or {}).items()):
+        cmd.append(f"-D{k}={int(v)}")
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+    return out_so
+
+
+def _run_ck_memory_diag_direct(lib_path: Path, init_payload: dict) -> dict:
+    lib = ctypes.CDLL(str(lib_path))
+    if not hasattr(lib, "ck_train_init") or not hasattr(lib, "ck_train_memory_diagnostic"):
+        raise RuntimeError(f"Missing diagnostic symbols in {lib_path}")
+
+    lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+    lib.ck_train_init.restype = ctypes.c_int
+    lib.ck_train_memory_diagnostic.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+    lib.ck_train_memory_diagnostic.restype = ctypes.c_int
+
+    has_op = bool(hasattr(lib, "ck_train_get_last_diag_failed_op"))
+    has_canary = bool(hasattr(lib, "ck_train_get_last_diag_failed_canary"))
+    if has_op:
+        lib.ck_train_get_last_diag_failed_op.argtypes = []
+        lib.ck_train_get_last_diag_failed_op.restype = ctypes.c_int
+    if has_canary:
+        lib.ck_train_get_last_diag_failed_canary.argtypes = []
+        lib.ck_train_get_last_diag_failed_canary.restype = ctypes.c_int
+
+    float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
+    size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
+    init_rc = int(lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
+    if init_rc < 0:
+        return {"init_rc": init_rc, "diag_rc": None, "failed_op_id": None, "failed_canary_idx": None}
+
+    diag_rc = int(lib.ck_train_memory_diagnostic(None, None, ctypes.c_float(0.0)))
+    return {
+        "init_rc": init_rc,
+        "diag_rc": diag_rc,
+        "failed_op_id": int(lib.ck_train_get_last_diag_failed_op()) if has_op else None,
+        "failed_canary_idx": int(lib.ck_train_get_last_diag_failed_canary()) if has_canary else None,
+    }
+
+
+def _probe_ck_runtime_loss_curve(lib_path: Path, init_payload: dict, batches: list, steps: int, lr: float) -> dict:
+    lib = ctypes.CDLL(str(lib_path))
+    if not hasattr(lib, "ck_train_step") or not hasattr(lib, "ck_train_init"):
+        raise RuntimeError(f"Missing training symbols in {lib_path}")
+
+    lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+    lib.ck_train_init.restype = ctypes.c_int
+    lib.ck_train_step.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+    lib.ck_train_step.restype = ctypes.c_int
+
+    float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
+    size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
+    init_rc = int(lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
+    out = {"init_rc": init_rc, "step_rcs": [], "losses": []}
+    if init_rc < 0:
+        return out
+
+    limit = max(1, min(int(steps), len(batches)))
+    for i in range(limit):
+        x_vals, y_vals = batches[i]
+        x_buf = (ctypes.c_int32 * len(x_vals))(*x_vals)
+        y_buf = (ctypes.c_int32 * len(y_vals))(*y_vals)
+        loss_out = ctypes.c_float(0.0)
+        rc = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
+        out["step_rcs"].append(int(rc))
+        out["losses"].append(float(loss_out.value))
+        if rc < 0:
+            break
+    return out
+
+
+def _run_asan_diag_subprocess(run_dir: Path, lib_path: Path) -> dict:
+    py = sys.executable
+    script = r'''
+import ctypes, json, pathlib, sys
+run = pathlib.Path(sys.argv[1])
+lib_path = pathlib.Path(sys.argv[2])
+summary = json.loads((run / "generated_train_runtime_summary_v7.json").read_text(encoding="utf-8"))
+manifest = json.loads((run / "weights_manifest.json").read_text(encoding="utf-8"))
+bump_blob = (run / "weights.bump").read_bytes()
+entries = {e.get("name"): e for e in (manifest.get("entries") or []) if isinstance(e, dict) and e.get("name")}
+payload = bytearray()
+sizes = []
+for i, wname in enumerate(summary.get("init_weight_order") or []):
+    e = entries.get(wname) or entries.get("tiny." + str(wname))
+    if not isinstance(e, dict):
+        raise RuntimeError(f"missing manifest entry for {wname}")
+    off = int(e.get("offset", 0) or 0)
+    size = int(e.get("size", 0) or 0)
+    src_numel = size // 4
+    nums = summary.get("init_weight_numel") or []
+    exp = int(nums[i] or 0) if i < len(nums) else src_numel
+    copy_numel = min(src_numel, exp if exp > 0 else src_numel)
+    payload.extend(bump_blob[off:off + copy_numel * 4])
+    sizes.append(copy_numel)
+FloatArray = ctypes.c_float * (len(payload) // 4 if payload else 1)
+float_buf = FloatArray.from_buffer_copy(payload) if payload else FloatArray(0.0)
+IntArray = ctypes.c_int * (len(sizes) if sizes else 1)
+size_buf = IntArray(*sizes) if sizes else IntArray(0)
+lib = ctypes.CDLL(str(lib_path))
+lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+lib.ck_train_init.restype = ctypes.c_int
+lib.ck_train_memory_diagnostic.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+lib.ck_train_memory_diagnostic.restype = ctypes.c_int
+init_rc = int(lib.ck_train_init(ctypes.cast(float_buf, ctypes.POINTER(ctypes.c_float)), ctypes.cast(size_buf, ctypes.POINTER(ctypes.c_int)), ctypes.c_int(len(sizes))))
+diag_rc = int(lib.ck_train_memory_diagnostic(None, None, ctypes.c_float(0.0))) if init_rc >= 0 else -9999
+print(json.dumps({"init_rc": init_rc, "diag_rc": diag_rc}))
+'''
+    env = dict(os.environ)
+    asan_lib = subprocess.check_output(["gcc", "-print-file-name=libasan.so"], text=True).strip()
+    if asan_lib and Path(asan_lib).exists():
+        preload = env.get("LD_PRELOAD", "")
+        env["LD_PRELOAD"] = asan_lib if not preload else f"{asan_lib}:{preload}"
+    env.setdefault("ASAN_OPTIONS", "detect_leaks=0")
+    proc = subprocess.run([py, "-c", script, str(run_dir), str(lib_path)], cwd=PROJECT_ROOT, env=env, capture_output=True, text=True)
+    stderr = (proc.stderr or "")[-4000:]
+    stdout = (proc.stdout or "").strip()
+    parsed = None
+    if stdout:
+        try:
+            parsed = json.loads(stdout.splitlines()[-1])
+        except Exception:
+            parsed = None
+    return {
+        "returncode": int(proc.returncode),
+        "stdout": stdout[-1000:],
+        "stderr": stderr,
+        "parsed": parsed,
+        "asan_detected": ("AddressSanitizer" in stderr) or ("heap-buffer-overflow" in stderr),
+    }
+
+
+def _run_pr37_memory_verification(
+    args: argparse.Namespace,
+    run_dir: Path,
+    c_src: Path,
+    runtime_summary: dict,
+    init_payload: dict,
+    batches: list,
+    lr: float,
+) -> dict:
+    steps = max(1, int(getattr(args, "train_verify_steps", 4) or 4))
+    fault_op = int(getattr(args, "train_verify_fault_op_id", -1) or -1)
+    if fault_op < 0:
+        trace = runtime_summary.get("backward_op_trace") if isinstance(runtime_summary, dict) else None
+        if isinstance(trace, list) and trace:
+            gemm_ops = [
+                int(row.get("op_id", -1) or -1)
+                for row in trace
+                if str(row.get("kernel_id", "")) == "gemm_backward_f32"
+            ]
+            candidates = [x for x in gemm_ops if x >= 0]
+            if not candidates:
+                candidates = [int(row.get("op_id", -1) or -1) for row in trace if int(row.get("op_id", -1) or -1) >= 0]
+            fault_op = max(candidates) if candidates else 1
+        else:
+            fault_op = 1
+
+    report: dict = {
+        "generated_at": _utc_now_iso(),
+        "run_dir": str(run_dir),
+        "steps": steps,
+        "fault_op_id": fault_op,
+        "checks": {},
+    }
+
+    lib_off = _compile_train_runtime_variant(run_dir, c_src, "verify_canary_off", defines={"CK_RUNTIME_CANARY_CHECKS": 0, "CK_RUNTIME_BOUNDS_ASSERT": 1})
+    lib_on = _compile_train_runtime_variant(run_dir, c_src, "verify_canary_on", defines={"CK_RUNTIME_CANARY_CHECKS": 1, "CK_RUNTIME_BOUNDS_ASSERT": 1})
+    probe_off = _probe_ck_runtime_loss_curve(lib_off, init_payload, batches, steps, lr)
+    probe_on = _probe_ck_runtime_loss_curve(lib_on, init_payload, batches, steps, lr)
+    losses_off = probe_off.get("losses") or []
+    losses_on = probe_on.get("losses") or []
+    n = min(len(losses_off), len(losses_on))
+    max_diff = max((abs(float(losses_off[i]) - float(losses_on[i])) for i in range(n)), default=0.0)
+    toggle_ok = (
+        int(probe_off.get("init_rc", -1)) >= 0 and
+        int(probe_on.get("init_rc", -1)) >= 0 and
+        all(int(x) >= 0 for x in (probe_off.get("step_rcs") or [])) and
+        all(int(x) >= 0 for x in (probe_on.get("step_rcs") or [])) and
+        n > 0 and
+        max_diff <= 1e-12
+    )
+    report["checks"]["toggle_diff"] = {
+        "ok": bool(toggle_ok),
+        "max_loss_abs_diff": float(max_diff),
+        "samples_compared": int(n),
+        "off": probe_off,
+        "on": probe_on,
+    }
+
+    lib_fault = _compile_train_runtime_variant(
+        run_dir,
+        c_src,
+        "verify_fault_canary",
+        defines={
+            "CK_RUNTIME_CANARY_CHECKS": 1,
+            "CK_RUNTIME_BOUNDS_ASSERT": 1,
+            "CK_RUNTIME_FAULT_INJECT": 1,
+            "CK_FAULT_INJECT_OP_ID": int(fault_op),
+        },
+    )
+    fault_diag = _run_ck_memory_diag_direct(lib_fault, init_payload)
+    fault_decoded = _decode_memory_diagnostic(int(fault_diag.get("diag_rc") or -9999), runtime_summary, {
+        "failed_op_id": fault_diag.get("failed_op_id"),
+        "failed_canary_idx": fault_diag.get("failed_canary_idx"),
+    })
+    fault_ok = (
+        isinstance(fault_diag.get("diag_rc"), int) and int(fault_diag["diag_rc"]) < 0 and
+        str(fault_decoded.get("phase")) == "backward_trace_canary" and
+        int(fault_decoded.get("failed_op_id", -1)) == int(fault_op)
+    )
+    report["checks"]["intentional_plus1"] = {
+        "ok": bool(fault_ok),
+        "diag": fault_diag,
+        "decoded": fault_decoded,
+    }
+
+    asan_clean = _compile_train_runtime_variant(run_dir, c_src, "verify_asan_clean", defines={"CK_RUNTIME_CANARY_CHECKS": 1, "CK_RUNTIME_BOUNDS_ASSERT": 1}, asan=True)
+    asan_fault = _compile_train_runtime_variant(
+        run_dir,
+        c_src,
+        "verify_asan_fault",
+        defines={
+            "CK_RUNTIME_CANARY_CHECKS": 1,
+            "CK_RUNTIME_BOUNDS_ASSERT": 1,
+            "CK_RUNTIME_FAULT_INJECT": 1,
+            "CK_FAULT_INJECT_OP_ID": int(fault_op),
+        },
+        asan=True,
+    )
+    asan_clean_res = _run_asan_diag_subprocess(run_dir, asan_clean)
+    asan_fault_res = _run_asan_diag_subprocess(run_dir, asan_fault)
+    clean_diag = int((asan_clean_res.get("parsed") or {}).get("diag_rc", -1)) if isinstance(asan_clean_res.get("parsed"), dict) else -1
+    fault_diag = int((asan_fault_res.get("parsed") or {}).get("diag_rc", 1)) if isinstance(asan_fault_res.get("parsed"), dict) else 1
+    asan_ok = (
+        int(asan_clean_res.get("returncode", 1)) == 0 and
+        clean_diag >= 0 and
+        (
+            (int(asan_fault_res.get("returncode", 1)) == 0 and fault_diag < 0) or
+            (int(asan_fault_res.get("returncode", 0)) != 0 and bool(asan_fault_res.get("asan_detected")))
+        )
+    )
+    report["checks"]["asan_agreement"] = {
+        "ok": bool(asan_ok),
+        "clean": asan_clean_res,
+        "fault": asan_fault_res,
+    }
+
+    bounds_present = bool(runtime_summary.get("tensor_slot_count", 0))
+    bounds_ok = bool(bounds_present and int(probe_on.get("init_rc", -1)) >= 0)
+    report["checks"]["bounds_assertions"] = {
+        "ok": bool(bounds_ok),
+        "enabled_in_variants": True,
+        "tensor_slot_count": int(runtime_summary.get("tensor_slot_count", 0) or 0),
+    }
+
+    report["ok"] = all(bool(v.get("ok")) for v in (report.get("checks") or {}).values())
+    return report
+
+
+
+def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: bool, runtime_defines: Optional[dict] = None) -> tuple[Path, Path]:
+    """Ensure run_dir has IR1/IR2/layout/audits and compiled libtrain.so."""
+    # This is the train-runtime artifact chain in one place:
+    # manifest -> IR1 -> IR2 -> invariants -> layout -> layout audit -> codegen -> libtrain.so
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest = run_dir / "weights_manifest.json"
     if not manifest.exists():
@@ -1431,13 +1975,28 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
     ir2 = run_dir / "ir2_train_backward.json"
     ir2_summary = run_dir / "ir2_train_summary.json"
     inv = run_dir / "ir_train_invariants.json"
+    layout_train = run_dir / "layout_train.json"
+    layout_audit = run_dir / "layout_train_audit.json"
     c_src = run_dir / "generated_train_runtime_v7.c"
     c_summary = run_dir / "generated_train_runtime_summary_v7.json"
 
-    if not ir1.exists():
+    build_ir_script = SCRIPTS_DIR / "build_ir_train_v7.py"
+    lower_ir_script = SCRIPTS_DIR / "lower_ir2_backward_v7.py"
+    inv_script = SCRIPTS_DIR / "validate_ir_train_invariants_v7.py"
+    layout_script = SCRIPTS_DIR / "generate_train_layout_v7.py"
+    layout_audit_script = SCRIPTS_DIR / "validate_train_memory_layout_v7.py"
+
+    # Each stage only regenerates when inputs are newer. This keeps CLI reruns fast
+    # while still guaranteeing that libtrain is rebuilt after contract changes.
+    needs_ir1 = (
+        (not ir1.exists())
+        or (manifest.exists() and manifest.stat().st_mtime > ir1.stat().st_mtime)
+        or (build_ir_script.exists() and build_ir_script.stat().st_mtime > ir1.stat().st_mtime)
+    )
+    if needs_ir1:
         cmd = [
             python_exec,
-            str(SCRIPTS_DIR / "build_ir_train_v7.py"),
+            str(build_ir_script),
             "--manifest", str(manifest),
             "--output", str(ir1),
             "--report-out", str(ir1_report),
@@ -1446,10 +2005,16 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             cmd.append("--strict")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
-    if (not ir2.exists()) or strict:
+    needs_ir2 = (
+        (not ir2.exists())
+        or strict
+        or (ir1.exists() and ir1.stat().st_mtime > ir2.stat().st_mtime)
+        or (lower_ir_script.exists() and lower_ir_script.stat().st_mtime > ir2.stat().st_mtime)
+    )
+    if needs_ir2:
         cmd = [
             python_exec,
-            str(SCRIPTS_DIR / "lower_ir2_backward_v7.py"),
+            str(lower_ir_script),
             "--ir1", str(ir1),
             "--output", str(ir2),
             "--summary-out", str(ir2_summary),
@@ -1460,10 +2025,16 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             cmd.append("--allow-partial")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
-    if (not inv.exists()) or strict:
+    needs_inv = (
+        (not inv.exists())
+        or strict
+        or (ir2.exists() and ir2.stat().st_mtime > inv.stat().st_mtime)
+        or (inv_script.exists() and inv_script.stat().st_mtime > inv.stat().st_mtime)
+    )
+    if needs_inv:
         cmd = [
             python_exec,
-            str(SCRIPTS_DIR / "validate_ir_train_invariants_v7.py"),
+            str(inv_script),
             "--ir1", str(ir1),
             "--ir2", str(ir2),
             "--output", str(inv),
@@ -1474,12 +2045,58 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             cmd.append("--allow-partial")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
-    if (not c_src.exists()) or (ir2.exists() and ir2.stat().st_mtime > c_src.stat().st_mtime):
+    needs_layout = (
+        (not layout_train.exists())
+        or (ir2.exists() and ir2.stat().st_mtime > layout_train.stat().st_mtime)
+        or (manifest.exists() and manifest.stat().st_mtime > layout_train.stat().st_mtime)
+        or (layout_script.exists() and layout_script.stat().st_mtime > layout_train.stat().st_mtime)
+    )
+    if needs_layout:
         cmd = [
             python_exec,
-            str(SCRIPTS_DIR / "codegen_train_runtime_v7.py"),
+            str(layout_script),
             "--ir2", str(ir2),
             "--manifest", str(manifest),
+            "--output", str(layout_train),
+            "--align-bytes", "64",
+        ]
+        if strict:
+            cmd.append("--strict")
+        run_cmd(cmd, cwd=PROJECT_ROOT)
+
+    needs_layout_audit = (
+        (not layout_audit.exists())
+        or strict
+        or (layout_train.exists() and layout_train.stat().st_mtime > layout_audit.stat().st_mtime)
+        or (ir2.exists() and ir2.stat().st_mtime > layout_audit.stat().st_mtime)
+        or (layout_audit_script.exists() and layout_audit_script.stat().st_mtime > layout_audit.stat().st_mtime)
+    )
+    if needs_layout_audit:
+        cmd = [
+            python_exec,
+            str(layout_audit_script),
+            "--layout", str(layout_train),
+            "--ir2", str(ir2),
+            "--output", str(layout_audit),
+        ]
+        if strict:
+            cmd.append("--strict")
+        run_cmd(cmd, cwd=PROJECT_ROOT)
+
+    codegen_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
+    regen_codegen = (
+        (not c_src.exists())
+        or (not c_summary.exists())
+        or (ir2.exists() and ir2.stat().st_mtime > c_src.stat().st_mtime)
+        or (codegen_script.exists() and codegen_script.stat().st_mtime > c_src.stat().st_mtime)
+    )
+    if regen_codegen:
+        cmd = [
+            python_exec,
+            str(codegen_script),
+            "--ir2", str(ir2),
+            "--manifest", str(manifest),
+            "--layout", str(layout_train),
             "--output", str(c_src),
             "--summary-out", str(c_summary),
         ]
@@ -1490,7 +2107,10 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
         run_cmd(["make", "--no-print-directory", str(lib_ck)], cwd=PROJECT_ROOT)
 
     libtrain_so = run_dir / "libtrain.so"
+    defines = dict(runtime_defines or {})
     needs_compile = (not libtrain_so.exists()) or (c_src.stat().st_mtime > libtrain_so.stat().st_mtime)
+    if defines:
+        needs_compile = True
     if needs_compile:
         cc = os.environ.get("CC") or "gcc"
         cmd = [
@@ -1511,6 +2131,8 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             "-lm",
             f"-Wl,-rpath,{BUILD_DIR}",
         ]
+        for k, v in sorted(defines.items()):
+            cmd.append(f"-D{k}={int(v)}")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
     return c_src, libtrain_so
@@ -1525,26 +2147,48 @@ def _run_ck_train_runtime(
     train_backend: str,
     profile_meta: dict,
 ) -> Path:
-    """Execute generated training runtime directly via ctypes (PR2 CK backend path)."""
+    """Execute generated training runtime directly via ctypes (PR3 CK backend path)."""
+    # PR3 scope: ck backend executes generated C train step and optional oracle checks.
+    # Full long-run trainer features (rich profiling, real grad telemetry) are still layered on top.
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
 
-    _, libtrain_so = _ensure_train_runtime_artifacts(
+    runtime_defines: dict = {}
+    if bool(getattr(args, "train_runtime_canary_checks", False)):
+        runtime_defines["CK_RUNTIME_CANARY_CHECKS"] = 1
+    if bool(getattr(args, "train_runtime_bounds_assert", False)):
+        runtime_defines["CK_RUNTIME_BOUNDS_ASSERT"] = 1
+    fault_op_id = int(getattr(args, "train_runtime_fault_op_id", -1) or -1)
+    if fault_op_id >= 0:
+        runtime_defines["CK_RUNTIME_FAULT_INJECT"] = 1
+        runtime_defines["CK_FAULT_INJECT_OP_ID"] = int(fault_op_id)
+
+    c_src, libtrain_so = _ensure_train_runtime_artifacts(
         run_dir=run_dir,
         python_exec=python_exec,
         strict=bool(getattr(args, "train_strict", False)),
+        runtime_defines=runtime_defines,
     )
+
+    runtime_summary_path = run_dir / "generated_train_runtime_summary_v7.json"
+    if not runtime_summary_path.exists():
+        raise RuntimeError(f"Missing runtime summary: {runtime_summary_path}")
+    runtime_summary = json.loads(runtime_summary_path.read_text(encoding="utf-8"))
+
+    init_payload = _build_ck_runtime_init_payload(run_dir, runtime_summary)
 
     lib = ctypes.CDLL(str(libtrain_so))
     if not hasattr(lib, "ck_train_step"):
         raise RuntimeError(f"Missing ck_train_step symbol in {libtrain_so}")
+    if not hasattr(lib, "ck_train_init"):
+        raise RuntimeError(f"Missing ck_train_init symbol in {libtrain_so}")
 
-    if hasattr(lib, "ck_train_init"):
-        lib.ck_train_init.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
-        lib.ck_train_init.restype = ctypes.c_int
-        rc = int(lib.ck_train_init(None, None, 0))
-        if rc != 0:
-            raise RuntimeError(f"ck_train_init failed with code {rc}")
+    lib.ck_train_init.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.c_int,
+    ]
+    lib.ck_train_init.restype = ctypes.c_int
 
     lib.ck_train_step.argtypes = [
         ctypes.POINTER(ctypes.c_int32),
@@ -1553,6 +2197,74 @@ def _run_ck_train_runtime(
         ctypes.c_float,
     ]
     lib.ck_train_step.restype = ctypes.c_int
+
+    diag_info = {
+        "available": bool(hasattr(lib, "ck_train_memory_diagnostic")),
+        "ran": False,
+        "rc": None,
+        "strict_only": True,
+    }
+    has_diag_op_getter = bool(hasattr(lib, "ck_train_get_last_diag_failed_op"))
+    has_diag_canary_getter = bool(hasattr(lib, "ck_train_get_last_diag_failed_canary"))
+    if hasattr(lib, "ck_train_memory_diagnostic"):
+        lib.ck_train_memory_diagnostic.argtypes = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_float,
+        ]
+        lib.ck_train_memory_diagnostic.restype = ctypes.c_int
+    if has_diag_op_getter:
+        lib.ck_train_get_last_diag_failed_op.argtypes = []
+        lib.ck_train_get_last_diag_failed_op.restype = ctypes.c_int
+    if has_diag_canary_getter:
+        lib.ck_train_get_last_diag_failed_canary.argtypes = []
+        lib.ck_train_get_last_diag_failed_canary.restype = ctypes.c_int
+
+    float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
+    size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
+    rc = int(lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
+    if rc < 0:
+        raise RuntimeError(f"ck_train_init failed with code {rc}")
+
+    # Strict mode executes memory diagnostics before training micro-steps.
+    # If this fails, we abort early with decoded phase/index/op metadata to
+    # localize corruption before optimizer updates obscure root cause.
+    if bool(getattr(args, "train_strict", False)) and bool(diag_info["available"]):
+        diag_rc = int(lib.ck_train_memory_diagnostic(None, None, ctypes.c_float(0.0)))
+        diag_info["ran"] = True
+        diag_info["rc"] = int(diag_rc)
+        # Optional metadata getters are emitted by generated runtime; when present
+        # they provide first failing op/canary for backward trace localization.
+        diag_meta = {
+            "failed_op_id": int(lib.ck_train_get_last_diag_failed_op()) if has_diag_op_getter else None,
+            "failed_canary_idx": int(lib.ck_train_get_last_diag_failed_canary()) if has_diag_canary_getter else None,
+        }
+        decoded = _decode_memory_diagnostic(diag_rc, runtime_summary, diag_meta=diag_meta)
+        diag_info["decoded"] = decoded
+        diag_path = run_dir / "memory_diagnostic_latest.json"
+        diag_payload = {
+            "generated_at": _utc_now_iso(),
+            "run_dir": str(run_dir),
+            "runtime_summary": str(runtime_summary_path),
+            "diagnostic": decoded,
+            "meta": diag_meta,
+        }
+        diag_path.write_text(json.dumps(diag_payload, indent=2), encoding="utf-8")
+        profile_meta.setdefault("artifacts", []).append({"label": "memory_diagnostic", "path": str(diag_path)})
+        if diag_rc < 0:
+            phase = str(decoded.get("phase", "unknown"))
+            idx = decoded.get("index")
+            bad_op_id = decoded.get("failed_op_id")
+            bad_op = decoded.get("failed_op") if isinstance(decoded.get("failed_op"), dict) else None
+            if isinstance(bad_op, dict):
+                raise RuntimeError(
+                    "ck_train_memory_diagnostic failed "
+                    f"(phase={phase}, index={idx}, op_id={bad_op_id}, op={bad_op.get('op')}, kernel={bad_op.get('kernel_id')}, rc={diag_rc})"
+                )
+            raise RuntimeError(f"ck_train_memory_diagnostic failed (phase={phase}, index={idx}, op_id={bad_op_id}, rc={diag_rc})")
+        rc = int(lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
+        if rc < 0:
+            raise RuntimeError(f"ck_train_init (post-diagnostic) failed with code {rc}")
 
     epochs = int(getattr(args, "train_epochs", 3) or 3)
     seq_len = int(getattr(args, "train_seq_len", 16) or 16)
@@ -1563,7 +2275,47 @@ def _run_ck_train_runtime(
     vocab = int(getattr(args, "train_vocab", 256) or 256)
     optimizer = str(getattr(args, "train_optimizer", "adamw") or "adamw")
 
+    parity_on = bool(getattr(args, "parity_on", False))
+    parity_profile = str(getattr(args, "parity_profile", "balanced") or "balanced")
+    parity_every = int(getattr(args, "parity_every", 50) or 0)
+    train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
+
     batches = _build_train_token_batches(train_text, total_tokens, seq_len, vocab, seed)
+    total_steps = epochs * len(batches)
+
+    if bool(getattr(args, "train_verify_memory", False)):
+        verify_report = _run_pr37_memory_verification(
+            args=args,
+            run_dir=run_dir,
+            c_src=c_src,
+            runtime_summary=runtime_summary,
+            init_payload=init_payload,
+            batches=batches,
+            lr=lr,
+        )
+        verify_path = run_dir / "memory_verification_latest.json"
+        verify_path.write_text(json.dumps(verify_report, indent=2), encoding="utf-8")
+        profile_meta.setdefault("artifacts", []).append({"label": "memory_verification", "path": str(verify_path)})
+        if not bool(verify_report.get("ok")):
+            raise RuntimeError(f"PR3.7 memory verification failed: {verify_path}")
+
+    oracle_payload = None
+    oracle_loss_by_step: dict[int, float] = {}
+    if parity_on:
+        oracle_payload = _run_ck_oracle_reference(args, run_dir, train_text)
+        if isinstance(oracle_payload, dict):
+            for row in oracle_payload.get("loss_curve", []) if isinstance(oracle_payload.get("loss_curve"), list) else []:
+                try:
+                    st = int(row.get("step", 0) or 0)
+                    if st < 1:
+                        continue
+                    loss_pt = float(row.get("loss_pt", row.get("loss_ck", 0.0)) or 0.0)
+                    oracle_loss_by_step[st] = loss_pt
+                except Exception:
+                    continue
+
+    # Oracle checks run at sampled steps to keep parity cost bounded for long runs.
+    check_steps = _compute_parity_check_steps(total_steps, parity_profile, parity_every) if parity_on else set()
 
     step = 0
     micro_steps = 0
@@ -1573,6 +2325,8 @@ def _run_ck_train_runtime(
     parity_steps: list[dict] = []
     grad_steps: list[int] = []
     grad_global: list[float] = []
+    parity_failures: list[dict] = []
+    checked_diffs: list[float] = []
 
     for _ in range(epochs):
         for x_vals, y_vals in batches:
@@ -1593,13 +2347,27 @@ def _run_ck_train_runtime(
             processed_tokens += len(x_vals)
             loss_val = float(loss_out.value)
 
+            oracle_loss = oracle_loss_by_step.get(step)
+            loss_diff = abs(loss_val - oracle_loss) if oracle_loss is not None else 0.0
+            if parity_on and (step in check_steps) and (oracle_loss is not None):
+                checked_diffs.append(loss_diff)
+                if loss_diff > train_loss_tol:
+                    parity_failures.append({
+                        "step": step,
+                        "loss_ck": loss_val,
+                        "loss_oracle": oracle_loss,
+                        "loss_diff": loss_diff,
+                        "threshold": train_loss_tol,
+                    })
+
+            # grad_norm is a placeholder until runtime exports per-step grad telemetry.
             loss_curve.append(
                 {
                     "step": step,
                     "micro_steps": 1,
                     "tokens": len(x_vals),
                     "loss_ck": loss_val,
-                    "loss_pt": loss_val,
+                    "loss_pt": oracle_loss if oracle_loss is not None else loss_val,
                     "lr": lr,
                     "grad_norm": 0.0,
                     "forward_ms": 0.0,
@@ -1615,18 +2383,54 @@ def _run_ck_train_runtime(
             parity_steps.append(
                 {
                     "step": step,
-                    "loss_diff": 0.0,
+                    "loss_diff": loss_diff,
                     "max_param_diff": 0.0,
                     "worst_param": None,
                     "mean_param_diff": 0.0,
+                    "checked": bool(parity_on and (step in check_steps)),
+                    "oracle_available": oracle_loss is not None,
                 }
             )
             grad_steps.append(step)
             grad_global.append(0.0)
 
     final_ck_loss = float(loss_curve[-1]["loss_ck"]) if loss_curve else 0.0
+    final_oracle_loss = float(oracle_loss_by_step.get(step, final_ck_loss)) if step > 0 else final_ck_loss
     train_tok_s = (processed_tokens / (total_ck_ms / 1000.0)) if total_ck_ms > 0 else 0.0
     avg_ck_step_ms = (total_ck_ms / step) if step > 0 else 0.0
+
+    if parity_on and not oracle_loss_by_step:
+        parity_failures.append({
+            "step": 0,
+            "loss_ck": final_ck_loss,
+            "loss_oracle": None,
+            "loss_diff": None,
+            "threshold": train_loss_tol,
+            "reason": "oracle_unavailable",
+        })
+
+    max_loss_abs_diff = max(checked_diffs) if checked_diffs else 0.0
+    mean_loss_abs_diff = (sum(checked_diffs) / len(checked_diffs)) if checked_diffs else 0.0
+    pass_parity = (len(parity_failures) == 0)
+
+    if parity_on and parity_failures and bool(getattr(args, "dump_on_drift", False)):
+        topk = int(getattr(args, "drift_topk", 20) or 20)
+        ranked = sorted(
+            parity_failures,
+            key=lambda r: float(r.get("loss_diff") or 0.0),
+            reverse=True,
+        )
+        drift_report = {
+            "generated_at": _utc_now_iso(),
+            "backend": train_backend,
+            "oracle": str(getattr(args, "oracle", "pytorch") or "pytorch"),
+            "threshold": train_loss_tol,
+            "first_failure": ranked[0] if ranked else None,
+            "failures": ranked[:topk],
+        }
+        drift_path = run_dir / "drift_report.json"
+        drift_path.write_text(json.dumps(drift_report, indent=2), encoding="utf-8")
+        profile_meta.setdefault("artifacts", []).append({"label": "drift_report", "path": str(drift_path)})
 
     summary = {
         "epochs": epochs,
@@ -1638,13 +2442,13 @@ def _run_ck_train_runtime(
         "steps": step,
         "micro_steps": micro_steps,
         "tokens_per_update": seq_len * grad_accum,
-        "max_loss_abs_diff": 0.0,
-        "mean_loss_abs_diff": 0.0,
+        "max_loss_abs_diff": max_loss_abs_diff,
+        "mean_loss_abs_diff": mean_loss_abs_diff,
         "final_ck_loss": final_ck_loss,
-        "final_torch_loss": final_ck_loss,
+        "final_torch_loss": final_oracle_loss,
         "final_param_max_abs_diff": 0.0,
         "final_param_mean_abs_diff": 0.0,
-        "pass_parity": True,
+        "pass_parity": pass_parity,
         "loss_curve": loss_curve,
         "parity_steps": parity_steps,
         "grad_norm_series": {
@@ -1667,13 +2471,36 @@ def _run_ck_train_runtime(
         "backend": train_backend,
         "train_mode": train_mode,
         "source": "ck_runtime_generated",
+        "runtime_init": {
+            "num_params": int(init_payload.get("num_params", 0)),
+            "total_floats": int(init_payload.get("total_floats", 0)),
+            "loaded": init_payload.get("loaded", []),
+            "memory_diagnostic": diag_info,
+        },
+        "oracle": {
+            "enabled": parity_on,
+            "profile": parity_profile,
+            "every": parity_every,
+            "checks": sorted(check_steps),
+            "available": bool(oracle_loss_by_step),
+            "failures": parity_failures,
+        },
     }
 
     json_out.parent.mkdir(parents=True, exist_ok=True)
     json_out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     profile_meta.setdefault("artifacts", []).append({"label": "ck_runtime_lib", "path": str(libtrain_so)})
+    profile_meta.setdefault("artifacts", []).append({"label": "runtime_summary", "path": str(runtime_summary_path)})
     profile_meta.setdefault("artifacts", []).append({"label": "train_summary", "path": str(json_out)})
+    layout_path = run_dir / "layout_train.json"
+    layout_audit_path = run_dir / "layout_train_audit.json"
+    if layout_path.exists():
+        profile_meta.setdefault("artifacts", []).append({"label": "layout_train", "path": str(layout_path)})
+    if layout_audit_path.exists():
+        profile_meta.setdefault("artifacts", []).append({"label": "layout_train_audit", "path": str(layout_audit_path)})
+    if parity_on and (run_dir / "oracle_reference_latest.json").exists():
+        profile_meta.setdefault("artifacts", []).append({"label": "oracle_reference", "path": str(run_dir / "oracle_reference_latest.json")})
 
     return json_out
 
@@ -2074,6 +2901,33 @@ def step_run_train_init(args: argparse.Namespace) -> None:
             inv_cmd.append("--allow-partial")
         run_cmd(inv_cmd, cwd=PROJECT_ROOT)
 
+        layout_script = SCRIPTS_DIR / "generate_train_layout_v7.py"
+        layout_out = out_dir / "layout_train.json"
+        layout_cmd = [
+            python_exec,
+            str(layout_script),
+            "--ir2", str(ir2_out),
+            "--manifest", str(manifest_path),
+            "--output", str(layout_out),
+            "--align-bytes", "64",
+        ]
+        if getattr(args, "strict", False):
+            layout_cmd.append("--strict")
+        run_cmd(layout_cmd, cwd=PROJECT_ROOT)
+
+        layout_audit_script = SCRIPTS_DIR / "validate_train_memory_layout_v7.py"
+        layout_audit_out = out_dir / "layout_train_audit.json"
+        layout_audit_cmd = [
+            python_exec,
+            str(layout_audit_script),
+            "--layout", str(layout_out),
+            "--ir2", str(ir2_out),
+            "--output", str(layout_audit_out),
+        ]
+        if getattr(args, "strict", False):
+            layout_audit_cmd.append("--strict")
+        run_cmd(layout_audit_cmd, cwd=PROJECT_ROOT)
+
         if getattr(args, "generate_runtime", False):
             rt_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
             rt_out = out_dir / "generated_train_runtime_v7.c"
@@ -2083,6 +2937,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
                 str(rt_script),
                 "--ir2", str(ir2_out),
                 "--manifest", str(manifest_path),
+                "--layout", str(layout_out),
                 "--output", str(rt_out),
                 "--summary-out", str(rt_summary),
             ]
@@ -2090,6 +2945,9 @@ def step_run_train_init(args: argparse.Namespace) -> None:
 
         log(f"  Generated train IR: {ir1_out}", C_GREEN)
         log(f"  Generated backward IR: {ir2_out}", C_GREEN)
+        log(f"  Generated training layout: {layout_out}", C_GREEN)
+        log(f"  Training memory audit: {layout_audit_out}", C_GREEN)
+
 
     mode = "pretrain" if getattr(args, "pretraining", False) else str(getattr(args, "train_mode", "pretrain"))
     meta = {
@@ -3425,6 +4283,18 @@ Examples:
                         help='Top-K tensor diffs to include in drift report')
         sp.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log',
                         help='Training analysis checkpoint cadence mode')
+        sp.add_argument('--train-runtime-canary-checks', action='store_true',
+                        help='Compile CK train runtime with CK_RUNTIME_CANARY_CHECKS=1 (step-level canary checks)')
+        sp.add_argument('--train-runtime-bounds-assert', action='store_true',
+                        help='Compile CK train runtime with CK_RUNTIME_BOUNDS_ASSERT=1 (pointer-span assertions)')
+        sp.add_argument('--train-runtime-fault-op-id', type=int, default=-1,
+                        help='Compile CK train runtime with fault injection at op_id (>=0 writes +1 past output)')
+        sp.add_argument('--train-verify-memory', action='store_true',
+                        help='Run PR3.7 memory verification suite (toggle diff, intentional +1, ASan agreement, bounds)')
+        sp.add_argument('--train-verify-steps', type=int, default=4,
+                        help='Number of deterministic steps used in toggle-diff verification')
+        sp.add_argument('--train-verify-fault-op-id', type=int, default=-1,
+                        help='Fault op_id for PR3.7 verification (default: max backward op_id)')
         sp.set_defaults(train_use_init_bump=True)
         sp.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                         help='Do not load tiny parity init from run_dir/weights.bump')
@@ -3498,6 +4368,12 @@ Examples:
     run_parser.add_argument('--dump-on-drift', action='store_true')
     run_parser.add_argument('--drift-topk', type=int, default=20)
     run_parser.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log')
+    run_parser.add_argument('--train-runtime-canary-checks', action='store_true')
+    run_parser.add_argument('--train-runtime-bounds-assert', action='store_true')
+    run_parser.add_argument('--train-runtime-fault-op-id', type=int, default=-1)
+    run_parser.add_argument('--train-verify-memory', action='store_true')
+    run_parser.add_argument('--train-verify-steps', type=int, default=4)
+    run_parser.add_argument('--train-verify-fault-op-id', type=int, default=-1)
     run_parser.set_defaults(train_use_init_bump=True)
     run_parser.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                            help='Do not load tiny parity init from run_dir/weights.bump')

@@ -550,6 +550,9 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "layout_decode",
         "lowered_decode_call",
     ]
+    # Run-directory workflows can be training-only; avoid false missing-required warnings.
+    if run_dir is not None:
+        REQUIRED_FILES = []
     OPTIONAL_FILES = [
         "ir1_prefill",
         "layout_prefill",
@@ -560,6 +563,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "ir2_train",
         "ir_train_invariants",
         "ir2_train_summary",
+        "layout_train",
         "training_loss_curve",
         "training_grad_norms",
         "training_parity",
@@ -606,6 +610,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "ir2_train": model_candidates("ir2_train_backward.json") + model_candidates("ir2_train.json") + [V7_REPORT_PATH / "ir2_train_backward_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_backward_latest.json"],
         "ir_train_invariants": model_candidates("ir_train_invariants.json") + [V7_REPORT_PATH / "ir_train_invariants_latest.json", V7_REPORT_PATH_LEGACY / "ir_train_invariants_latest.json"],
         "ir2_train_summary": model_candidates("ir2_train_summary.json") + [V7_REPORT_PATH / "ir2_train_summary_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_summary_latest.json"],
+        "layout_train": model_candidates("layout_train.json") + model_candidates("layout_train_latest.json") + [V7_REPORT_PATH / "layout_train_latest.json", V7_REPORT_PATH_LEGACY / "layout_train_latest.json"],
         "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_REPORT_PATH / "training_loss_curve_latest.json", V7_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
         "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_REPORT_PATH / "training_grad_norms_latest.json", V7_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
         "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_REPORT_PATH / "training_parity_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_latest.json"],

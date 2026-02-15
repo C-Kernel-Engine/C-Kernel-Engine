@@ -1,5 +1,17 @@
 import { clear, fmt, fmtExp, parseLossSteps, parseParityRows, toNum } from './utils.js';
 
+function formatBytesHuman(bytes) {
+    const n = Number(bytes || 0);
+    if (!Number.isFinite(n) || n <= 0) return '-';
+    const gb = 1024 * 1024 * 1024;
+    const mb = 1024 * 1024;
+    const kb = 1024;
+    if (n >= gb) return `${(n / gb).toFixed(2)} GB`;
+    if (n >= mb) return `${(n / mb).toFixed(2)} MB`;
+    if (n >= kb) return `${(n / kb).toFixed(2)} KB`;
+    return `${Math.round(n)} B`;
+}
+
 function drawLineChart(svgEl, points, key, color, secondaryKey) {
     if (!svgEl || !window.d3 || !Array.isArray(points) || points.length === 0) return;
     const d3 = window.d3;
@@ -129,6 +141,9 @@ export function renderTrainingDashboard(files) {
     const decodeTokS = toNum(profile.decode_tok_s, NaN);
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
     const trainE2E = files.train_e2e || {};
+    const layoutTrain = files.layout_train || {};
+    const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
+    const layoutRegionCount = Array.isArray(layoutTrain.regions) ? layoutTrain.regions.length : 0;
     const runCtx = getRunContext();
 
     const reportCmd = runCtx.runDir
@@ -158,6 +173,8 @@ export function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
+            <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">

@@ -113,6 +113,8 @@ def _int32_ptr(a: np.ndarray) -> ctypes.POINTER(ctypes.c_int32):
 
 
 class CRMSNormFn(torch.autograd.Function):
+    # Custom autograd bridge: forward/backward math is executed by C kernels,
+    # while PyTorch drives graph orchestration for parity validation.
     @staticmethod
     def forward(ctx, x: torch.Tensor, gamma: torch.Tensor, eps: float, lib: ctypes.CDLL):
         if x.device.type != "cpu" or gamma.device.type != "cpu":

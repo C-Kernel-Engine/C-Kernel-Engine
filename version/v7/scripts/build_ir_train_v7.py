@@ -7,6 +7,7 @@ Build IR1 (train-forward) for v7:
 - select training forward kernels (fp32-first)
 - derive save_for_backward from grad rules
 - emit tensor registry with explicit kinds and producers
+- keep IR as source-of-truth: avoid hard-coded model-specific shape logic in codegen
 
 This is intentionally standalone from build_ir_v7.py to avoid inference regressions.
 """
@@ -113,6 +114,8 @@ def _template_sections(template: Dict[str, Any]) -> Tuple[List[str], List[str], 
 
 
 def _manifest_weight_index(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    # Manifest entries are the source of truth for persistent weight tensors.
+    # IR1 should not infer trainable params from template names alone.
     out = {}
     for entry in manifest.get("entries", []):
         name = entry.get("name")
@@ -134,6 +137,120 @@ def _resolve_weight_name(weight_index: Dict[str, Dict[str, Any]], key: str, laye
 
 def _is_trainable_dtype(dtype: str) -> bool:
     return str(dtype).lower() in ("fp32", "bf16")
+
+
+def _shape_numel(shape: Any) -> Optional[int]:
+    if not isinstance(shape, list) or not shape:
+        return None
+    n = 1
+    for d in shape:
+        if not isinstance(d, int) or d <= 0:
+            return None
+        n *= d
+    return int(n)
+
+
+def _entry_numel(entry: Dict[str, Any]) -> Optional[int]:
+    n = _shape_numel(entry.get("shape"))
+    if isinstance(n, int) and n > 0:
+        return n
+    size = entry.get("size")
+    dtype = str(entry.get("dtype", "")).lower()
+    if not isinstance(size, int) or size <= 0:
+        return None
+    if dtype in ("fp32", "f32", "int32", "i32") and (size % 4 == 0):
+        return int(size // 4)
+    if dtype in ("bf16", "bfloat16") and (size % 2 == 0):
+        return int(size // 2)
+    return None
+
+
+def _cfg_int(config: Dict[str, Any], keys: List[str], default: int) -> int:
+    for k in keys:
+        if k in config:
+            try:
+                v = int(config.get(k))
+                if v > 0:
+                    return v
+            except Exception:
+                pass
+    return int(default)
+
+
+def _train_dims(config: Dict[str, Any]) -> Dict[str, int]:
+    d_model = _cfg_int(config, ["embed_dim", "hidden_size", "d_model"], 128)
+    hidden = _cfg_int(config, ["intermediate_size", "hidden_dim"], max(2 * d_model, d_model))
+    vocab = _cfg_int(config, ["vocab_size"], 256)
+    num_heads = _cfg_int(config, ["num_heads"], 1)
+    num_kv_heads = _cfg_int(config, ["num_kv_heads"], num_heads)
+    head_dim = _cfg_int(config, ["head_dim"], max(1, d_model // max(1, num_heads)))
+    # Runtime currently consumes one token per ck_train_step call.
+    token_count = 1
+    q_dim = max(1, num_heads * head_dim)
+    kv_dim = max(1, num_kv_heads * head_dim)
+    gate_up_dim = max(1, 2 * hidden)
+    return {
+        "tokens": token_count,
+        "d_model": d_model,
+        "hidden": hidden,
+        "vocab": vocab,
+        "num_heads": num_heads,
+        "num_kv_heads": num_kv_heads,
+        "head_dim": head_dim,
+        "q_dim": q_dim,
+        "kv_dim": kv_dim,
+        "gate_up_dim": gate_up_dim,
+    }
+
+
+def _infer_output_shape_numel(logical_op: str, out_name: str, config: Dict[str, Any]) -> Tuple[List[int], int]:
+    dims = _train_dims(config)
+    t = dims["tokens"]
+    d_model = dims["d_model"]
+    hidden = dims["hidden"]
+    vocab = dims["vocab"]
+    q_dim = dims["q_dim"]
+    kv_dim = dims["kv_dim"]
+    gate_up_dim = dims["gate_up_dim"]
+
+    if out_name == "rstd_cache":
+        return [t], t
+
+    if logical_op == "dense_embedding_lookup":
+        return [t, d_model], t * d_model
+    if logical_op in ("rmsnorm", "out_proj", "residual_add", "mlp_down"):
+        return [t, d_model], t * d_model
+    if logical_op == "q_proj":
+        return [t, q_dim], t * q_dim
+    if logical_op in ("k_proj", "v_proj"):
+        return [t, kv_dim], t * kv_dim
+    if logical_op in ("qk_norm", "rope_qk"):
+        dim = kv_dim if out_name == "k" else q_dim
+        return [t, dim], t * dim
+    if logical_op in ("attn", "attn_sliding"):
+        return [t, d_model], t * d_model
+    if logical_op == "mlp_gate_up":
+        return [t, gate_up_dim], t * gate_up_dim
+    if logical_op in ("silu_mul", "geglu"):
+        return [t, hidden], t * hidden
+    if logical_op == "logits":
+        return [t, vocab], t * vocab
+    return [t, d_model], t * d_model
+
+
+def _infer_saved_shape_numel(saved_key: str, config: Dict[str, Any]) -> Tuple[List[int], int]:
+    dims = _train_dims(config)
+    t = dims["tokens"]
+    key = str(saved_key).lower()
+    if key in ("rstd", "rrms"):
+        return [t], t
+    if key in ("lse",):
+        n = max(1, dims["num_heads"] * t)
+        return [n], n
+    if key in ("attn_weights",):
+        n = max(1, dims["num_heads"] * t * t)
+        return [dims["num_heads"], t, t], n
+    return [t, dims["d_model"]], max(1, t * dims["d_model"])
 
 
 def _kernel_ids(registry: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -223,14 +340,18 @@ def build_ir1_train(
         "kind": "input",
         "requires_grad": False,
         "persistent": False,
-        "producer": None
+        "producer": None,
+        "shape": [1],
+        "numel": 1,
     }
     tensors["input.targets"] = {
         "dtype": "int32",
         "kind": "input",
         "requires_grad": False,
         "persistent": False,
-        "producer": None
+        "producer": None,
+        "shape": [1],
+        "numel": 1,
     }
 
     def next_instance(op_name: str, layer: int, section: str) -> int:
@@ -245,16 +366,27 @@ def build_ir1_train(
         kind: str,
         requires_grad: bool,
         persistent: bool,
-        producer: Optional[Dict[str, Any]]
+        producer: Optional[Dict[str, Any]],
+        shape: Optional[List[int]] = None,
+        numel: Optional[int] = None,
     ) -> None:
         if tensor_id in tensors:
+            cur = tensors[tensor_id]
+            if shape is not None and "shape" not in cur:
+                cur["shape"] = list(shape)
+            if isinstance(numel, int) and numel > 0:
+                cur_numel = cur.get("numel")
+                if not isinstance(cur_numel, int) or cur_numel <= 0:
+                    cur["numel"] = int(numel)
             return
         tensors[tensor_id] = {
             "dtype": dtype,
             "kind": kind,
             "requires_grad": bool(requires_grad),
             "persistent": bool(persistent),
-            "producer": producer
+            "producer": producer,
+            "shape": list(shape) if isinstance(shape, list) else None,
+            "numel": int(numel) if isinstance(numel, int) and numel > 0 else None,
         }
 
     def resolve_weights_for_op(
@@ -263,6 +395,8 @@ def build_ir1_train(
         section: str,
         rmsnorm_idx: int
     ) -> Dict[str, Dict[str, Any]]:
+        # Resolve template aliases -> concrete manifest tensors.
+        # This keeps IR1 data-driven and avoids model-family conditionals later.
         resolved = {}
         specs = WEIGHTS_BY_LOGICAL_OP.get(logical_op, [])
         for kernel_alias, logical_weight_key, required in specs:
@@ -282,6 +416,8 @@ def build_ir1_train(
                 continue
             entry = weight_index[weight_name]
             dtype = str(entry.get("dtype", "fp32")).lower()
+            shape = entry.get("shape")
+            numel = _entry_numel(entry)
             tensor_id = "weight.%s" % weight_name
             ensure_tensor(
                 tensor_id=tensor_id,
@@ -289,12 +425,16 @@ def build_ir1_train(
                 kind="weight",
                 requires_grad=_is_trainable_dtype(dtype),
                 persistent=True,
-                producer=None
+                producer=None,
+                shape=shape if isinstance(shape, list) else None,
+                numel=numel,
             )
             resolved[kernel_alias] = {
                 "name": weight_name,
                 "tensor": tensor_id,
                 "dtype": dtype,
+                "shape": shape if isinstance(shape, list) else None,
+                "numel": int(numel) if isinstance(numel, int) and numel > 0 else None,
                 "kind": "weight",
                 "requires_grad": _is_trainable_dtype(dtype),
                 "persistent": True,
@@ -308,6 +448,8 @@ def build_ir1_train(
         return resolved
 
     def derive_save_for_backward(op: Dict[str, Any]) -> None:
+        # save_for_backward is derived from grad rules, not handwritten per op.
+        # This keeps forward IR and backward synthesis coupled by one contract.
         grad_rule_name = op.get("grad_rule")
         if not grad_rule_name:
             op["save_for_backward"] = {}
@@ -328,14 +470,18 @@ def build_ir1_train(
                 winfo = op["weights"][key]
                 saved[key] = {
                     "tensor": winfo["tensor"],
-                    "kind": "weight"
+                    "kind": "weight",
+                    "shape": winfo.get("shape"),
+                    "numel": winfo.get("numel"),
                 }
                 continue
             if key in op.get("dataflow", {}).get("inputs", {}):
                 iref = op["dataflow"]["inputs"][key]
                 item = {
                     "tensor": iref.get("tensor"),
-                    "kind": iref.get("kind", "activation")
+                    "kind": iref.get("kind", "activation"),
+                    "shape": iref.get("shape"),
+                    "numel": iref.get("numel"),
                 }
                 if "from_op" in iref:
                     item["from_op"] = iref["from_op"]
@@ -346,12 +492,15 @@ def build_ir1_train(
                 oref = op["dataflow"]["outputs"][key]
                 saved[key] = {
                     "tensor": oref["tensor"],
-                    "kind": oref.get("kind", "activation")
+                    "kind": oref.get("kind", "activation"),
+                    "shape": oref.get("shape"),
+                    "numel": oref.get("numel"),
                 }
                 continue
             unresolved.append(key)
 
         for key in extra_saved:
+            saved_shape, saved_numel = _infer_saved_shape_numel(key, config)
             saved_tensor = _make_saved_tensor_id(op["op_id"], key)
             ensure_tensor(
                 tensor_id=saved_tensor,
@@ -359,12 +508,16 @@ def build_ir1_train(
                 kind="saved_activation",
                 requires_grad=False,
                 persistent=True,
-                producer={"op_id": op["op_id"], "output_name": key}
+                producer={"op_id": op["op_id"], "output_name": key},
+                shape=saved_shape,
+                numel=saved_numel,
             )
             saved[key] = {
                 "tensor": saved_tensor,
                 "kind": "saved_activation",
-                "computed_by_kernel": True
+                "computed_by_kernel": True,
+                "shape": saved_shape,
+                "numel": saved_numel,
             }
 
         op["save_for_backward"] = saved
@@ -402,6 +555,7 @@ def build_ir1_train(
         op_base = _op_base_name(logical_op, layer, instance, section)
         outputs = {}
         for out_name, out_dtype in output_specs.items():
+            out_shape, out_numel = _infer_output_shape_numel(logical_op, out_name, config)
             tensor_id = "act.%s.%s" % (op_base, out_name)
             ensure_tensor(
                 tensor_id=tensor_id,
@@ -409,13 +563,17 @@ def build_ir1_train(
                 kind="activation",
                 requires_grad=True,
                 persistent=False,
-                producer={"op_id": op_id, "output_name": out_name}
+                producer={"op_id": op_id, "output_name": out_name},
+                shape=out_shape,
+                numel=out_numel,
             )
             outputs[out_name] = {
                 "tensor": tensor_id,
                 "dtype": out_dtype,
                 "kind": "activation",
-                "requires_grad": True
+                "requires_grad": True,
+                "shape": out_shape,
+                "numel": out_numel,
             }
 
         # Classify inputs with manifest/dataflow truth.
@@ -425,7 +583,9 @@ def build_ir1_train(
                 "tensor": src.get("tensor"),
                 "dtype": src.get("dtype", "fp32"),
                 "kind": src.get("kind", "activation"),
-                "requires_grad": bool(src.get("requires_grad", True))
+                "requires_grad": bool(src.get("requires_grad", True)),
+                "shape": src.get("shape"),
+                "numel": src.get("numel"),
             }
             if "from_op" in src:
                 item["from_op"] = src["from_op"]
@@ -463,12 +623,14 @@ def build_ir1_train(
                 "dtype": out_obj["dtype"],
                 "kind": "activation",
                 "requires_grad": out_obj["requires_grad"],
+                "shape": out_obj.get("shape"),
+                "numel": out_obj.get("numel"),
                 "from_op": op["op_id"],
                 "from_output": out_name
             }
         return out_refs
 
-    # Header
+    # Header: tokenize/embedding stream setup (single-token training-step contract).
     current_main = None
     for raw_op in header_ops:
         if raw_op in ("bpe_tokenizer", "wordpiece_tokenizer", "tokenizer"):
@@ -512,7 +674,7 @@ def build_ir1_train(
     if current_main is None:
         raise RuntimeError("Header did not produce main activation stream")
 
-    # Body per layer
+    # Body per layer: keep forward order stable so IR2 can reverse-traverse cleanly.
     for layer in range(num_layers):
         rmsnorm_count = 0
         residual_slot = None
@@ -522,6 +684,7 @@ def build_ir1_train(
         for raw_op in body_ops:
             if raw_op == "rmsnorm":
                 if rmsnorm_count in (0, 1):
+                    # Snapshot pre-block activation for both residual additions in layer body.
                     residual_slot = dict(current_main)
                 out = add_op(
                     logical_op="rmsnorm",
@@ -535,6 +698,7 @@ def build_ir1_train(
                 current_main = out["output"]
                 rmsnorm_count += 1
             elif raw_op == "qkv_proj":
+                # Keep q/k/v as explicit ops so backward can map per-projection dW paths.
                 q_out = add_op(
                     logical_op="q_proj",
                     kernel_id=FORWARD_KERNEL_BY_OP["q_proj"],
@@ -662,7 +826,7 @@ def build_ir1_train(
             else:
                 warnings.append("Unsupported body op `%s` ignored for train IR" % raw_op)
 
-    # Footer
+    # Footer: final norm + logits projection used to seed CE backward in IR2.
     for raw_op in footer_ops:
         if raw_op in ("lm_head", "weight_tying"):
             op = {

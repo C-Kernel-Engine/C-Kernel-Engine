@@ -29,6 +29,9 @@ DEFAULT_REGISTRY = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
 
 
 FALLBACK_DECLS: Dict[str, str] = {
+    "gradient_clip_norm_f32": (
+        "float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);"
+    ),
     # Registry currently omits this declaration for some builds.
     "gemm_blocked_serial": (
         "void gemm_blocked_serial(const float *A, const float *B, const float *bias, "
@@ -47,9 +50,138 @@ FALLBACK_FN_BY_KERNEL_ID: Dict[str, str] = {
 }
 
 
+# Training codegen is intentionally strict: layout must provide concrete offsets
+# for every IR2 tensor before we emit any runtime pointer math.
+def _load_train_layout_offsets(
+    layout: Optional[Dict[str, Any]],
+    tensor_numel: Dict[str, int],
+) -> Dict[str, Any]:
+    """
+    Read layout_train.json and return:
+      - total_floats
+      - tensor_offsets_floats[tid] -> offset
+      - optimizer_m_offsets[name]  -> offset
+      - optimizer_v_offsets[name]  -> offset
+      - region_offsets_floats[name] -> (offset, size)
+    """
+    if not isinstance(layout, dict):
+        raise RuntimeError("Missing --layout payload for train runtime codegen")
+
+    total_bytes = layout.get("total_bytes")
+    if not isinstance(total_bytes, int) or total_bytes <= 0:
+        raise RuntimeError("layout_train.json missing positive total_bytes")
+    if (total_bytes % 4) != 0:
+        raise RuntimeError("layout_train.json total_bytes is not float-aligned")
+
+    tensor_offsets: Dict[str, int] = {}
+    opt_m_offsets: Dict[str, int] = {}
+    opt_v_offsets: Dict[str, int] = {}
+
+    tensors = layout.get("tensors")
+    if not isinstance(tensors, list):
+        raise RuntimeError("layout_train.json missing tensors[]")
+
+    for row in tensors:
+        if not isinstance(row, dict):
+            continue
+        tid = row.get("id")
+        off_b = row.get("offset")
+        nbytes = row.get("bytes")
+        if not isinstance(tid, str) or not isinstance(off_b, int) or not isinstance(nbytes, int):
+            continue
+        if (off_b % 4) != 0 or (nbytes % 4) != 0:
+            raise RuntimeError(f"layout tensor `{tid}` has non-float-aligned offset/size")
+
+        off_f = int(off_b // 4)
+        size_f = int(nbytes // 4)
+
+        if tid.startswith("optimizer.m."):
+            name = tid[len("optimizer.m.") :]
+            opt_m_offsets[name] = off_f
+            continue
+        if tid.startswith("optimizer.v."):
+            name = tid[len("optimizer.v.") :]
+            opt_v_offsets[name] = off_f
+            continue
+
+        if tid in tensor_numel:
+            expected = int(tensor_numel[tid])
+            if size_f < expected:
+                raise RuntimeError(
+                    f"layout tensor `{tid}` too small: layout={size_f} expected={expected}"
+                )
+            tensor_offsets[tid] = off_f
+
+    missing_tensors = [tid for tid in sorted(tensor_numel.keys()) if tid not in tensor_offsets]
+    if missing_tensors:
+        raise RuntimeError(
+            "layout_train.json missing offsets for %d IR tensors: %s"
+            % (len(missing_tensors), ", ".join(missing_tensors[:24]))
+        )
+
+    region_offsets: Dict[str, Tuple[int, int]] = {}
+    regions = layout.get("regions")
+    if isinstance(regions, list):
+        for r in regions:
+            if not isinstance(r, dict):
+                continue
+            name = r.get("name")
+            off_b = r.get("offset")
+            size_b = r.get("bytes")
+            if not isinstance(name, str) or not isinstance(off_b, int) or not isinstance(size_b, int):
+                continue
+            if (off_b % 4) != 0 or (size_b % 4) != 0:
+                raise RuntimeError(f"layout region `{name}` has non-float-aligned offset/size")
+            region_offsets[name] = (int(off_b // 4), int(size_b // 4))
+
+    return {
+        "total_floats": int(total_bytes // 4),
+        "tensor_offsets_floats": tensor_offsets,
+        "optimizer_m_offsets": opt_m_offsets,
+        "optimizer_v_offsets": opt_v_offsets,
+        "region_offsets_floats": region_offsets,
+    }
+
+
 def _load_json(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+def _classify_slot_section(tid: str) -> str:
+    t = str(tid)
+    if t.startswith("weight."):
+        return "weights"
+    if t.startswith("grad.weight."):
+        return "grad_weights"
+    if t.startswith("grad.act."):
+        return "grad_activations"
+    if t.startswith("act."):
+        return "activations"
+    if t.startswith("saved."):
+        return "saved"
+    if t.startswith("tmp."):
+        return "temporaries"
+    if t.startswith("aux."):
+        return "aux"
+    if t.startswith("optimizer.m."):
+        return "optimizer_m"
+    if t.startswith("optimizer.v."):
+        return "optimizer_v"
+    return "other"
+
+
+def _slot_writable_flags(tid: str) -> Tuple[int, int]:
+    t = str(tid)
+    if t.startswith("weight."):
+        return (0, 0)
+    if t.startswith("grad.weight.") or t.startswith("grad.act."):
+        return (0, 1)
+    if t.startswith("optimizer.m.") or t.startswith("optimizer.v."):
+        return (0, 0)
+    if t.startswith("tmp."):
+        return (0, 1)
+    return (1, 1)
+
 
 
 def _c_ident(name: str, prefix: str = "t_") -> str:
@@ -71,7 +203,7 @@ def _parse_decl(decl: str) -> Optional[Tuple[str, List[Tuple[str, str]]]]:
     if not isinstance(decl, str) or "(" not in decl or ")" not in decl:
         return None
     one = " ".join(decl.strip().split())
-    m = re.match(r"^void\s+([A-Za-z_]\w*)\s*\((.*)\)\s*;?$", one)
+    m = re.match(r"^(?:void|float|int|size_t)\s+([A-Za-z_]\w*)\s*\((.*)\)\s*;?$", one)
     if not m:
         return None
     fn = m.group(1)
@@ -176,46 +308,23 @@ def _shape_numel(shape: Any) -> Optional[int]:
     return n
 
 
-def _manifest_numel_map(manifest: Optional[Dict[str, Any]]) -> Dict[str, int]:
+def _tensor_numel_map(tensors: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, int], List[str]]:
     out: Dict[str, int] = {}
-    if not isinstance(manifest, dict):
-        return out
-    for e in manifest.get("entries", []) or []:
-        if not isinstance(e, dict):
+    missing: List[str] = []
+    for tid, meta in sorted(tensors.items(), key=lambda x: x[0]):
+        if not isinstance(tid, str):
             continue
-        name = e.get("name")
-        if not isinstance(name, str) or not name:
+        m = meta if isinstance(meta, dict) else {}
+        n = m.get("numel")
+        if isinstance(n, int) and n > 0:
+            out[tid] = int(n)
             continue
-        n = _shape_numel(e.get("shape"))
-        if n is not None:
-            out[name] = n
+        shape_n = _shape_numel(m.get("shape"))
+        if isinstance(shape_n, int) and shape_n > 0:
+            out[tid] = int(shape_n)
             continue
-        # Inference manifests often omit `shape` but include byte `size`.
-        size = e.get("size")
-        dtype = str(e.get("dtype", "")).lower()
-        if isinstance(size, int) and size > 0:
-            if dtype in ("fp32", "f32") and (size % 4 == 0):
-                out[name] = size // 4
-            elif dtype in ("bf16", "bfloat16") and (size % 2 == 0):
-                out[name] = size // 2
-    return out
-
-
-def _ir_weight_numel_map(ops: List[Dict[str, Any]]) -> Dict[str, int]:
-    out: Dict[str, int] = {}
-    for op in ops:
-        if not isinstance(op, dict):
-            continue
-        for _wk, wref in (op.get("weights") or {}).items():
-            if not isinstance(wref, dict):
-                continue
-            name = wref.get("name")
-            if not isinstance(name, str) or not name:
-                continue
-            n = _shape_numel(wref.get("shape"))
-            if n is not None and n > 0:
-                out[name] = n
-    return out
+        missing.append(tid)
+    return out, missing
 
 
 def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
@@ -240,7 +349,7 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
         return "1.0f"
 
     if is_size_t:
-        return "CK_TENSOR_CAP_F32"
+        return "1"
 
     if is_int:
         if "num_heads" in name and "kv" not in name:
@@ -252,7 +361,9 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
         if "vocab" in name:
             return str(int(cfg.get("vocab_size", 256)))
         if "aligned_context_window" in name or "context_window" in name:
-            return str(int(cfg.get("context_len", 128)))
+            # Training runtime currently executes 1-token micro-steps.
+            # Use runtime token count to avoid kernels assuming full-context buffers.
+            return "CK_NUM_TOKENS"
         if "head_dim" in name:
             return str(int(cfg.get("head_dim", 64)))
         if "aligned_embed_dim" in name or "embed_dim" in name or "d_model" in name:
@@ -267,7 +378,7 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
             hd = int(cfg.get("head_dim", 64))
             return str(int(cfg.get("rotary_dim", hd)))
         if "numel" in name:
-            return "CK_TENSOR_CAP_F32"
+            return "1"
         if "num_threads" in name:
             return "1"
         if "add_pos" in name or "pos_offset" in name:
@@ -279,6 +390,63 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
     return "0"
 
 
+
+def _infer_gemm_backward_dims(io_outputs: Dict[str, str], tensor_numel: Dict[str, int], cfg: Dict[str, Any]) -> Dict[str, int]:
+    # NOTE:
+    # gemm_backward_f32 is one of the easiest places to create silent OOB writes if
+    # aligned_in/aligned_out are wrong. Prefer IR-derived tensor sizes first;
+    # use cfg defaults only as a last resort when metadata is missing.
+    d_input_n: Optional[int] = None
+    d_weight_n: Optional[int] = None
+    d_bias_n: Optional[int] = None
+
+    for tid in io_outputs.values():
+        n = tensor_numel.get(tid)
+        if not isinstance(n, int) or n <= 0:
+            continue
+        lt = str(tid).lower()
+        if d_input_n is None and (
+            "d_input" in lt
+            or lt.endswith(".input")
+            or (lt.startswith("tmp.grad.act.") and ".input" in lt)
+        ):
+            d_input_n = int(n)
+        if d_weight_n is None and lt.startswith("tmp.grad.weight.") and lt.endswith(".w"):
+            d_weight_n = int(n)
+        if d_bias_n is None and lt.startswith("tmp.grad.weight.") and lt.endswith(".bias"):
+            d_bias_n = int(n)
+
+    aligned_in = 0
+    aligned_out = 0
+    if isinstance(d_input_n, int) and d_input_n > 0:
+        aligned_in = int(d_input_n)
+    if isinstance(d_weight_n, int) and d_weight_n > 0 and aligned_in > 0 and (d_weight_n % aligned_in == 0):
+        aligned_out = int(d_weight_n // aligned_in)
+    if aligned_out <= 0 and isinstance(d_bias_n, int) and d_bias_n > 0:
+        aligned_out = int(d_bias_n)
+    if aligned_in <= 0 and isinstance(d_weight_n, int) and d_weight_n > 0 and aligned_out > 0 and (d_weight_n % aligned_out == 0):
+        aligned_in = int(d_weight_n // aligned_out)
+
+    if aligned_in <= 0:
+        aligned_in = int(cfg.get("embed_dim", cfg.get("hidden_size", 128)))
+    if aligned_out <= 0:
+        aligned_out = int(cfg.get("hidden_size", cfg.get("embed_dim", 128)))
+
+    return {
+        "aligned_in": int(aligned_in),
+        "aligned_out": int(aligned_out),
+    }
+
+def _sorted_pool_items(pool: Dict[str, str]) -> List[Tuple[str, str]]:
+    def key_fn(item: Tuple[str, str]) -> Tuple[int, int, str]:
+        k = str(item[0])
+        m = re.match(r"^(?:in|out)_(\d+)$", k)
+        if m:
+            return (0, int(m.group(1)), k)
+        return (1, 0, k)
+    return sorted([(k, v) for k, v in pool.items() if isinstance(v, str)], key=key_fn)
+
+
 def _choose_tensor_for_ptr(
     arg_type: str,
     arg_name: str,
@@ -288,60 +456,176 @@ def _choose_tensor_for_ptr(
     tensors: Dict[str, Dict[str, Any]],
     tvars_f32: Dict[str, str],
     tvars_i32: Dict[str, str],
+    fallback_state: Optional[Dict[str, int]] = None,
 ) -> str:
     want_i32 = "int32_t" in arg_type or "int32" in arg_type
     const_ptr = "const" in arg_type
     aname = str(arg_name)
+    lname = aname.lower()
 
-    def pick_tid_by_key(m: Dict[str, str], key: str) -> Optional[str]:
-        tid = m.get(key)
-        if isinstance(tid, str):
-            return tid
+    if (not want_i32) and (not const_ptr) and ("loss" in lname):
+        return "g_loss_scalar"
+
+    def tid_dtype_is_i32(tid: str) -> bool:
+        dtype = str((tensors.get(tid) or {}).get("dtype", "fp32")).lower()
+        return _dtype_is_i32(dtype)
+
+    def tid_to_var(tid: Optional[str]) -> Optional[str]:
+        if not isinstance(tid, str):
+            return None
+        if want_i32:
+            if tid_dtype_is_i32(tid) and tid in tvars_i32:
+                return tvars_i32[tid]
+            return None
+        if (not tid_dtype_is_i32(tid)) and tid in tvars_f32:
+            return tvars_f32[tid]
         return None
 
-    candidates: List[str] = []
+    def find_semantic(pool: Dict[str, str], token: str) -> Optional[str]:
+        for k, tid in _sorted_pool_items(pool):
+            lk = str(k).lower()
+            if lk == token or token == lk:
+                return tid
+            if token and (token in lk or lk in token):
+                return tid
+        return None
+
+    # Exact mapping first by key name.
     for pool in (io_inputs, io_outputs, io_weights):
-        t = pick_tid_by_key(pool, aname)
-        if t:
-            candidates.append(t)
+        var = tid_to_var(pool.get(aname))
+        if var:
+            return var
+
+    # Common backward-core semantic aliases.
+    # IR2 often uses generic keys (in_0/in_1/in_2, d_input/d_weight/d_bias)
+    # while declarations use kernel-specific argument names.
+    if const_ptr:
+        if lname in ("d_output", "grad_output", "dy"):
+            var = tid_to_var(io_inputs.get("in_0"))
+            if var:
+                return var
+        if ("input" in lname) and (not lname.startswith("d_")):
+            var = tid_to_var(io_inputs.get("in_1"))
+            if var:
+                return var
+        if ("weight" in lname) or lname.startswith("w") or ("w_" in lname):
+            var = tid_to_var(io_inputs.get("in_2"))
+            if var:
+                return var
+
+    if not const_ptr:
+        if ("input" in lname) or lname.startswith("dx") or lname.startswith("d_x"):
+            var = tid_to_var(io_outputs.get("d_input"))
+            if var:
+                return var
+        if ("weight" in lname) or lname.startswith("dw") or lname.startswith("d_w") or ("w_" in lname):
+            var = tid_to_var(io_outputs.get("d_weight"))
+            if var:
+                return var
+        if ("bias" in lname) or lname.startswith("db") or lname.startswith("d_b"):
+            var = tid_to_var(io_outputs.get("d_bias"))
+            if var:
+                return var
+
     if aname.startswith("d_"):
         base = aname[2:]
         for pool in (io_outputs, io_inputs, io_weights):
-            t = pick_tid_by_key(pool, base)
-            if t:
-                candidates.append(t)
-    if "_" in aname:
-        short = aname.split("_")[-1]
+            var = tid_to_var(pool.get(base))
+            if var:
+                return var
+
+    # Explicit accumulator semantics.
+    if lname == "dst" or lname.endswith("_dst"):
+        for cand in (io_outputs.get("dst"), io_inputs.get("dst")):
+            var = tid_to_var(cand)
+            if var:
+                return var
+    if lname == "src" or lname.endswith("_src"):
+        for cand in (io_inputs.get("src"), io_outputs.get("src")):
+            var = tid_to_var(cand)
+            if var:
+                return var
+
+    # Input token/target hints.
+    if "target" in lname:
+        for k, tid in _sorted_pool_items(io_inputs):
+            if "target" in str(k).lower():
+                var = tid_to_var(tid)
+                if var:
+                    return var
+    if "token" in lname or "input_id" in lname:
+        for k, tid in _sorted_pool_items(io_inputs):
+            lk = str(k).lower()
+            if "token" in lk or "input" in lk:
+                var = tid_to_var(tid)
+                if var:
+                    return var
+
+    # Semantic fuzzy mapping.
+    if lname.startswith("d_"):
+        token = lname[2:]
+        for pool in (io_outputs, io_inputs, io_weights):
+            tid = find_semantic(pool, token)
+            var = tid_to_var(tid)
+            if var:
+                return var
+    for token in (lname, lname.split("_")[-1] if "_" in lname else ""):
+        if not token:
+            continue
         for pool in (io_inputs, io_outputs, io_weights):
-            t = pick_tid_by_key(pool, short)
-            if t:
-                candidates.append(t)
+            tid = find_semantic(pool, token)
+            var = tid_to_var(tid)
+            if var:
+                return var
 
-    pool_order: List[Dict[str, str]]
-    if const_ptr:
-        pool_order = [io_inputs, io_weights, io_outputs]
-    else:
-        pool_order = [io_outputs, io_inputs, io_weights]
-    for pool in pool_order:
-        for t in pool.values():
-            if isinstance(t, str):
-                candidates.append(t)
+    # Ordered fallback with per-op state, so multiple pointer args map to different buffers.
+    const_tids: List[str] = []
+    for _k, tid in _sorted_pool_items(io_inputs):
+        const_tids.append(tid)
+    for _k, tid in _sorted_pool_items(io_weights):
+        const_tids.append(tid)
+    for _k, tid in _sorted_pool_items(io_outputs):
+        const_tids.append(tid)
 
-    seen = set()
-    ordered: List[str] = []
-    for t in candidates:
-        if t not in seen:
-            seen.add(t)
-            ordered.append(t)
+    mut_tids: List[str] = []
+    for _k, tid in _sorted_pool_items(io_outputs):
+        mut_tids.append(tid)
+    for _k, tid in _sorted_pool_items(io_inputs):
+        mut_tids.append(tid)
 
-    for tid in ordered:
-        dtype = str((tensors.get(tid) or {}).get("dtype", "fp32")).lower()
-        if want_i32 and _dtype_is_i32(dtype):
-            if tid in tvars_i32:
-                return tvars_i32[tid]
-        if not want_i32 and not _dtype_is_i32(dtype):
-            if tid in tvars_f32:
-                return tvars_f32[tid]
+    # Dedup preserve order.
+    def dedup(vals: List[str]) -> List[str]:
+        seen = set()
+        out: List[str] = []
+        for v in vals:
+            if v in seen:
+                continue
+            seen.add(v)
+            out.append(v)
+        return out
+
+    const_tids = dedup(const_tids)
+    mut_tids = dedup(mut_tids)
+
+    def filtered(tids: List[str]) -> List[str]:
+        out: List[str] = []
+        for tid in tids:
+            if want_i32 and tid_dtype_is_i32(tid):
+                out.append(tid)
+            if (not want_i32) and (not tid_dtype_is_i32(tid)):
+                out.append(tid)
+        return out
+
+    pool = filtered(const_tids if const_ptr else mut_tids)
+    if pool:
+        st = fallback_state if isinstance(fallback_state, dict) else {}
+        skey = ("c_" if const_ptr else "m_") + ("i32" if want_i32 else "f32")
+        idx = int(st.get(skey, 0) or 0)
+        pick = pool[idx] if idx < len(pool) else pool[-1]
+        st[skey] = idx + 1
+        var = tid_to_var(pick)
+        if var:
+            return var
 
     if want_i32:
         return "g_dummy_i32"
@@ -377,15 +661,68 @@ def _op_io(
     return io_inputs, io_outputs, io_weights
 
 
-def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+def _choose_numel_expr(
+    arg_name: str,
+    io_inputs: Dict[str, str],
+    io_outputs: Dict[str, str],
+    io_weights: Dict[str, str],
+    tensor_numel: Dict[str, int],
+) -> str:
+    lname = str(arg_name).lower()
+    candidates: List[str] = []
+
+    def add_tid(tid: Optional[str]) -> None:
+        if not isinstance(tid, str):
+            return
+        if tid in tensor_numel and tid not in candidates:
+            candidates.append(tid)
+
+    # Direct key matches first.
+    for pool in (io_outputs, io_inputs, io_weights):
+        add_tid(pool.get(arg_name))
+
+    # Heuristic key matches.
+    for pool in (io_outputs, io_inputs, io_weights):
+        for k, tid in pool.items():
+            lk = str(k).lower()
+            if lk and (lk in lname or lname in lk):
+                add_tid(tid)
+
+    if "dst" in lname:
+        add_tid(io_outputs.get("dst"))
+        add_tid(io_inputs.get("dst"))
+    if "src" in lname:
+        add_tid(io_inputs.get("src"))
+        add_tid(io_outputs.get("src"))
+    if "weight" in lname:
+        for tid in io_weights.values():
+            add_tid(tid)
+
+    # Fall back to first output/input/weight tensor.
+    for pool in (io_outputs, io_inputs, io_weights):
+        for tid in pool.values():
+            add_tid(tid)
+
+    if candidates:
+        return str(int(tensor_numel[candidates[0]]))
+    return "1"
+
+
+def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     cfg = dict(ir2.get("config") or {})
     tensors = _collect_tensors(ir2)
+    tensor_numel, missing_numel = _tensor_numel_map(tensors)
+    if missing_numel:
+        raise RuntimeError(
+            "IR2 tensor layout missing numel metadata for %d tensor(s): %s" % (
+                len(missing_numel), ", ".join(missing_numel[:16])
+            )
+        )
+
     kernel_map = _kernel_registry_map(registry)
     forward_ops = sorted(list(ir2.get("forward") or []), key=lambda o: int(o.get("op_id", 0)))
     backward_ops = sorted(list(ir2.get("backward") or []), key=lambda o: int(o.get("op_id", 0)))
     all_ops = forward_ops + backward_ops
-    ir_weight_numel = _ir_weight_numel_map(all_ops)
-    manifest_numel = _manifest_numel_map(manifest)
     op_by_id = {int(op["op_id"]): op for op in all_ops if isinstance(op, dict) and "op_id" in op}
 
     tvars_f32: Dict[str, str] = {}
@@ -434,59 +771,17 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if resolved is not None:
             used_decl[kid] = resolved
 
-    # Optimizer kernel is required by generated ck_train_optimizer_step
-    # even when IR2 does not carry explicit optimizer ops.
-    if "adamw_update_f32" not in used_decl:
-        resolved = resolve_decl_for_kernel("adamw_update_f32")
-        if resolved is not None:
-            used_decl["adamw_update_f32"] = resolved
-
-    lines: List[str] = []
-    ap = lines.append
-    ap("/*")
-    ap(" * Auto-generated by codegen_train_runtime_v7.py")
-    ap(" *")
-    ap(" * Compile-ready v7 training runtime skeleton.")
-    ap(" * Source: IR2 backward artifact (forward + backward op chains).")
-    ap(" */")
-    ap("")
-    ap("#include <stdint.h>")
-    ap("#include <stddef.h>")
-    ap("#include <string.h>")
-    ap("#include \"ckernel_engine.h\"")
-    ap("")
-    ap("#ifndef CK_NUM_TOKENS")
-    ap("#define CK_NUM_TOKENS 1")
-    ap("#endif")
-    ap("#ifndef CK_TENSOR_CAP_F32")
-    ap("#define CK_TENSOR_CAP_F32 4096")
-    ap("#endif")
-    ap("#ifndef CK_TENSOR_CAP_I32")
-    ap("#define CK_TENSOR_CAP_I32 512")
-    ap("#endif")
-    ap("")
-
-    ap("/* Fallback declarations for kernels with incomplete registry declarations. */")
-    for kid in sorted(used_decl.keys()):
-        fn, args, decl = used_decl[kid]
-        ap("/* %s -> %s */" % (kid, fn))
-        ap(decl if decl.endswith(";") else (decl + ";"))
-    ap("")
-
-    ap("static float g_dummy_f32[CK_TENSOR_CAP_F32];")
-    ap("static int32_t g_dummy_i32[CK_TENSOR_CAP_I32];")
-    ap("static float g_loss_scalar[1];")
-    ap("")
-
-    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
-        ap("static float %s[CK_TENSOR_CAP_F32]; /* %s */" % (var, tid))
-    for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
-        ap("static int32_t %s[CK_TENSOR_CAP_I32]; /* %s */" % (var, tid))
-    ap("")
+    # Optimizer kernels are required by generated ck_train_optimizer_step
+    # even when the current IR2 does not carry explicit optimizer nodes.
+    for opt_kernel in ("adamw_update_f32", "gradient_clip_norm_f32"):
+        if opt_kernel not in used_decl:
+            resolved = resolve_decl_for_kernel(opt_kernel)
+            if resolved is not None:
+                used_decl[opt_kernel] = resolved
 
     # Optimizer state (AdamW moments) for each grad.weight.* tensor.
     # AdamW kernel here is fp32-only, so non-fp32 params are skipped.
-    opt_pairs: List[Tuple[str, str, str, str, str, Optional[int]]] = []
+    opt_pairs: List[Tuple[str, str, str, str, str, int]] = []
     skipped_opt_non_fp32: List[str] = []
     grad_weight_tids = sorted([tid for tid in tensors.keys() if tid.startswith("grad.weight.")])
     for gtid in grad_weight_tids:
@@ -502,66 +797,530 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             continue
         mvar = _c_ident("m." + wname, prefix="m_")
         vvar = _c_ident("v." + wname, prefix="v_")
-        numel = ir_weight_numel.get(wname)
+        numel = tensor_numel.get(gtid)
         if numel is None:
-            numel = manifest_numel.get(wname)
-        opt_pairs.append((wname, gvar, wvar, mvar, vvar, numel))
+            numel = tensor_numel.get(wtid)
+        if not isinstance(numel, int) or numel <= 0:
+            raise RuntimeError("Missing positive numel for optimizer tensor pair: %s" % wname)
+        opt_pairs.append((wname, gvar, wvar, mvar, vvar, int(numel)))
+
+    # Runtime weight hydration order for ck_train_init (flattened fp32 payload).
+    init_weight_specs: List[Tuple[str, str, int]] = []
+    for tid in sorted(tensors.keys()):
+        if not isinstance(tid, str) or (not tid.startswith("weight.")):
+            continue
+        var = tvars_f32.get(tid)
+        if not var:
+            continue
+        wname = tid[len("weight."):]
+        numel = tensor_numel.get(tid)
+        if not isinstance(numel, int) or numel <= 0:
+            raise RuntimeError("Missing positive numel for weight tensor: %s" % tid)
+        init_weight_specs.append((wname, var, int(numel)))
+
+    layout_info = _load_train_layout_offsets(layout, tensor_numel)
+    tensor_offsets = layout_info["tensor_offsets_floats"]
+    region_offsets = layout_info["region_offsets_floats"]
+
+    tensor_offset_macros: Dict[str, str] = {}
+    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        tensor_offset_macros[tid] = "OFF_%s" % var
+
+    opt_m_offset_macros: Dict[str, str] = {}
+    opt_v_offset_macros: Dict[str, str] = {}
+    opt_m_offsets = layout_info["optimizer_m_offsets"]
+    opt_v_offsets = layout_info["optimizer_v_offsets"]
+    for wname, _gvar, _wvar, mvar, vvar, _numel in opt_pairs:
+        if wname not in opt_m_offsets:
+            raise RuntimeError("layout_train.json missing optimizer.m offset for %s" % wname)
+        if wname not in opt_v_offsets:
+            raise RuntimeError("layout_train.json missing optimizer.v offset for %s" % wname)
+        opt_m_offset_macros[mvar] = "OFF_%s" % mvar
+        opt_v_offset_macros[vvar] = "OFF_%s" % vvar
+
+    # Deterministic slot registry used for runtime diagnostics/canary checks.
+    # Keep ordering stable so a failing canary index maps to the same range/slot
+    # across runs and can be decoded consistently in strict mode.
+    slot_rows: List[Dict[str, Any]] = []
+    for tid, _var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        wf, wb = _slot_writable_flags(tid)
+        slot_rows.append({
+            "name": tid,
+            "offset": int(tensor_offsets[tid]),
+            "numel": int(tensor_numel[tid]),
+            "section": _classify_slot_section(tid),
+            "writable_fwd": int(wf),
+            "writable_bwd": int(wb),
+        })
+
+    for wname, _gvar, _wvar, _mvar, _vvar, numel in opt_pairs:
+        wf, wb = _slot_writable_flags("optimizer.m." + wname)
+        slot_rows.append({
+            "name": "optimizer.m." + wname,
+            "offset": int(opt_m_offsets[wname]),
+            "numel": int(numel),
+            "section": "optimizer_m",
+            "writable_fwd": int(wf),
+            "writable_bwd": int(wb),
+        })
+        wf, wb = _slot_writable_flags("optimizer.v." + wname)
+        slot_rows.append({
+            "name": "optimizer.v." + wname,
+            "offset": int(opt_v_offsets[wname]),
+            "numel": int(numel),
+            "section": "optimizer_v",
+            "writable_fwd": int(wf),
+            "writable_bwd": int(wb),
+        })
+
+    slot_rows = sorted(slot_rows, key=lambda r: (int(r["offset"]), str(r["name"])))
+    slot_name_to_idx: Dict[str, int] = {}
+    prev_end = 0
+    for idx, row in enumerate(slot_rows):
+        off = int(row["offset"])
+        numel = int(row["numel"])
+        if numel <= 0:
+            raise RuntimeError("Non-positive slot numel for `%s`" % row["name"])
+        if off < prev_end:
+            raise RuntimeError(
+                "Overlapping train layout slots: `%s` starts at %d before prior end %d"
+                % (row["name"], off, prev_end)
+            )
+        prev_end = max(prev_end, off + numel)
+        slot_name_to_idx[str(row["name"])] = idx
+
+    if prev_end > int(layout_info["total_floats"]):
+        raise RuntimeError(
+            "Slot coverage exceeds layout total floats: end=%d total=%d"
+            % (prev_end, int(layout_info["total_floats"]))
+        )
+
+    canary_ranges: List[Tuple[int, int, int, int]] = []
+    cursor = 0
+    left_idx = -1
+    for idx, row in enumerate(slot_rows):
+        off = int(row["offset"])
+        end = off + int(row["numel"])
+        if off > cursor:
+            canary_ranges.append((cursor, off - cursor, left_idx, idx))
+        cursor = max(cursor, end)
+        left_idx = idx
+    if cursor < int(layout_info["total_floats"]):
+        canary_ranges.append((cursor, int(layout_info["total_floats"]) - cursor, left_idx, -1))
+
+    weight_slot_indices = [
+        idx for idx, row in enumerate(slot_rows)
+        if str(row["name"]).startswith("weight.")
+    ]
+    weight_snapshot_floats = sum(int(slot_rows[idx]["numel"]) for idx in weight_slot_indices)
+
+    lines: List[str] = []
+    ap = lines.append
+    ap("/*")
+    ap(" * Auto-generated by codegen_train_runtime_v7.py")
+    ap(" *")
+    ap(" * Compile-ready v7 training runtime skeleton.")
+    ap(" * Source: IR2 backward artifact (forward + backward op chains).")
+    ap(" */")
+    ap("")
+    ap("#include <stdint.h>")
+    ap("#include <stddef.h>")
+    ap("#include <string.h>")
+    ap("#include <stdlib.h>")
+    ap("#include <math.h>")
+    ap("#include \"ckernel_engine.h\"")
+    ap("")
+    ap("#ifndef CK_NUM_TOKENS")
+    ap("#define CK_NUM_TOKENS 1")
+    ap("#endif")
+    ap("")
+
+    ap("/* Fallback declarations for kernels with incomplete registry declarations. */")
+    for kid in sorted(used_decl.keys()):
+        fn, args, decl = used_decl[kid]
+        ap("/* %s -> %s */" % (kid, fn))
+        ap(decl if decl.endswith(";") else (decl + ";"))
+    ap("")
+
+    ap("#define CK_TRAIN_TOTAL_FLOATS ((size_t)%d)" % int(layout_info["total_floats"]))
+    ap("#define CK_CANARY_TAIL_FLOATS ((size_t)16)")
+    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        ap("#define %s ((size_t)%d)" % (tensor_offset_macros[tid], int(tensor_offsets[tid])))
+    for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
+        ap("#define %s ((size_t)%d)" % (opt_m_offset_macros[mvar], int(opt_m_offsets[_wname])))
+        ap("#define %s ((size_t)%d)" % (opt_v_offset_macros[vvar], int(opt_v_offsets[_wname])))
+    ap("")
+
+    if "grads" in region_offsets:
+        goff, gsize = region_offsets["grads"]
+        ap("#define CK_GRADS_OFFSET ((size_t)%d)" % int(goff))
+        ap("#define CK_GRADS_SIZE   ((size_t)%d)" % int(gsize))
+    else:
+        ap("#define CK_GRADS_OFFSET ((size_t)0)")
+        ap("#define CK_GRADS_SIZE   ((size_t)0)")
+    if "grad_activations" in region_offsets:
+        gaoff, gasize = region_offsets["grad_activations"]
+        ap("#define CK_GRAD_ACT_OFFSET ((size_t)%d)" % int(gaoff))
+        ap("#define CK_GRAD_ACT_SIZE   ((size_t)%d)" % int(gasize))
+    else:
+        ap("#define CK_GRAD_ACT_OFFSET ((size_t)0)")
+        ap("#define CK_GRAD_ACT_SIZE   ((size_t)0)")
+    ap("")
+    ap("typedef struct {")
+    ap("    const char *name;")
+    ap("    size_t offset_floats;")
+    ap("    size_t numel;")
+    ap("    const char *section;")
+    ap("    int writable_fwd;")
+    ap("    int writable_bwd;")
+    ap("} CKTensorSlot;")
+    ap("typedef struct {")
+    ap("    size_t start_floats;")
+    ap("    size_t len_floats;")
+    ap("    int left_slot_idx;")
+    ap("    int right_slot_idx;")
+    ap("} CKCanaryRange;")
+    ap("#define CK_CANARY_VALUE_U32 0xDEADBEEF")
+    ap("#ifndef CK_RUNTIME_CANARY_CHECKS")
+    ap("#define CK_RUNTIME_CANARY_CHECKS 0")
+    ap("#endif")
+    ap("#ifndef CK_RUNTIME_BOUNDS_ASSERT")
+    ap("#define CK_RUNTIME_BOUNDS_ASSERT 0")
+    ap("#endif")
+    ap("#ifndef CK_RUNTIME_FAULT_INJECT")
+    ap("#define CK_RUNTIME_FAULT_INJECT 0")
+    ap("#endif")
+    ap("#ifndef CK_FAULT_INJECT_OP_ID")
+    ap("#define CK_FAULT_INJECT_OP_ID (-1)")
+    ap("#endif")
+    ap("#define CK_TENSOR_SLOT_COUNT %d" % len(slot_rows))
+    ap("static const CKTensorSlot g_tensor_slots[CK_TENSOR_SLOT_COUNT] = {")
+    for row in slot_rows:
+        ap('    {"%s", (size_t)%d, (size_t)%d, "%s", %d, %d},' % (
+            str(row["name"]), int(row["offset"]), int(row["numel"]), str(row["section"]), int(row["writable_fwd"]), int(row["writable_bwd"])
+        ))
+    ap("};")
+    ap("#define CK_CANARY_RANGE_COUNT %d" % len(canary_ranges))
+    ap("static const CKCanaryRange g_canary_ranges[CK_CANARY_RANGE_COUNT > 0 ? CK_CANARY_RANGE_COUNT : 1] = {")
+    if canary_ranges:
+        for start, length, left, right in canary_ranges:
+            ap("    {(size_t)%d, (size_t)%d, %d, %d}," % (int(start), int(length), int(left), int(right)))
+    else:
+        ap("    {(size_t)0, (size_t)0, -1, -1},")
+    ap("};")
+    ap("#define CK_WEIGHT_SLOT_COUNT %d" % len(weight_slot_indices))
+    ap("static const int g_weight_slot_indices[CK_WEIGHT_SLOT_COUNT > 0 ? CK_WEIGHT_SLOT_COUNT : 1] = {")
+    if weight_slot_indices:
+        for idx in weight_slot_indices:
+            ap("    %d," % int(idx))
+    else:
+        ap("    -1,")
+    ap("};")
+    ap("#define CK_WEIGHT_SNAPSHOT_FLOATS ((size_t)%d)" % int(weight_snapshot_floats))
+    ap("")
+
+    ap("static float *g_memory = NULL;")
+    ap("static size_t g_memory_floats = 0;")
+    ap("static float g_dummy_f32[1];")
+    ap("static int32_t g_dummy_i32[1];")
+    ap("static float g_loss_scalar[1];")
+    ap("")
+
+    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        ap("static float *%s; /* %s */" % (var, tid))
+    for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
+        ap("static int32_t %s[%d]; /* %s */" % (var, int(tensor_numel[tid]), tid))
+    ap("")
 
     if opt_pairs:
         ap("/* Optimizer state (AdamW moments) */")
-        seen = set()
+        seen_m = set()
+        seen_v = set()
         for _wname, _gvar, _wvar, mvar, vvar, _numel in opt_pairs:
-            if mvar not in seen:
-                ap("static float %s[CK_TENSOR_CAP_F32];" % mvar)
-                seen.add(mvar)
-            if vvar not in seen:
-                ap("static float %s[CK_TENSOR_CAP_F32];" % vvar)
-                seen.add(vvar)
+            if mvar not in seen_m:
+                ap("static float *%s;" % mvar)
+                seen_m.add(mvar)
+            if vvar not in seen_v:
+                ap("static float *%s;" % vvar)
+                seen_v.add(vvar)
         ap("static int g_opt_step = 0;")
     ap("")
+
+    if init_weight_specs:
+        ap("/* Runtime init hydration order (flattened fp32 payload) */")
+        ap("#define CK_INIT_WEIGHT_COUNT %d" % len(init_weight_specs))
+        ap("static const size_t g_init_weight_offsets[CK_INIT_WEIGHT_COUNT] = {")
+        for _wname, _wvar, _numel in init_weight_specs:
+            tid = "weight.%s" % _wname
+            ap("    %s," % tensor_offset_macros[tid])
+        ap("};")
+        ap("static int g_init_weight_numel[CK_INIT_WEIGHT_COUNT] = {")
+        for _wname, _wvar, _numel in init_weight_specs:
+            ap("    %d," % int(_numel))
+        ap("};")
+        ap("static const char *g_init_weight_names[CK_INIT_WEIGHT_COUNT] = {")
+        for _wname, _wvar, _numel in init_weight_specs:
+            ap('    "%s",' % _wname)
+        ap("};")
+    else:
+        ap("#define CK_INIT_WEIGHT_COUNT 0")
+    ap("")
+
+    ap("int ck_train_alloc(void) {")
+    ap("    if (g_memory != NULL) return 0;")
+    ap("    size_t alloc_floats = CK_TRAIN_TOTAL_FLOATS + CK_CANARY_TAIL_FLOATS;")
+    ap("    g_memory = (float*)calloc(alloc_floats, sizeof(float));")
+    ap("    if (g_memory == NULL) return -1;")
+    ap("    g_memory_floats = alloc_floats;")
+    for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        ap("    %s = g_memory + %s;" % (var, tensor_offset_macros[tid]))
+    for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
+        ap("    %s = g_memory + %s;" % (mvar, opt_m_offset_macros[mvar]))
+        ap("    %s = g_memory + %s;" % (vvar, opt_v_offset_macros[vvar]))
+    ap("    return 0;")
+    ap("}")
+    ap("")
+
+    ap("void ck_train_free(void) {")
+    ap("    if (g_memory != NULL) {")
+    ap("        free(g_memory);")
+    ap("        g_memory = NULL;")
+    ap("    }")
+    ap("    g_memory_floats = 0;")
+    for _tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        ap("    %s = NULL;" % var)
+    for _wname, _gvar, _wvar, mvar, vvar, _numel in sorted(opt_pairs, key=lambda x: x[0]):
+        ap("    %s = NULL;" % mvar)
+        ap("    %s = NULL;" % vvar)
+    ap("}")
+    ap("")
+    ap("int ck_train_forward_step(void);")
+    ap("int ck_train_backward_step(void);")
+    ap("int ck_train_backward_step_trace(int *failed_op_id, int *first_corrupt_idx);")
+    ap("int ck_train_optimizer_step(float lr);")
+    ap("")
+
+    ap("static inline float ck_canary_value_f32(void) {")
+    ap("    union { uint32_t u; float f; } v;")
+    ap("    v.u = (uint32_t)CK_CANARY_VALUE_U32;")
+    ap("    return v.f;")
+    ap("}")
+    ap("")
+    ap("static int g_diag_failed_op_id = -1;")
+    ap("static int g_diag_failed_canary_idx = -1;")
+    ap("int ck_train_get_last_diag_failed_op(void) { return g_diag_failed_op_id; }")
+    ap("int ck_train_get_last_diag_failed_canary(void) { return g_diag_failed_canary_idx; }")
+    ap("")
+    ap("static int ck_bounds_check_span_f32(const float *ptr, size_t need_numel) {")
+    ap("    if (!CK_RUNTIME_BOUNDS_ASSERT) return 0;")
+    ap("    if (g_memory == NULL || ptr == NULL) return -1;")
+    ap("    if (ptr < g_memory) return -2;")
+    ap("    const size_t off = (size_t)(ptr - g_memory);")
+    ap("    if (off > CK_TRAIN_TOTAL_FLOATS) return -3;")
+    ap("    if (need_numel > CK_TRAIN_TOTAL_FLOATS) return -4;")
+    ap("    if ((off + need_numel) > CK_TRAIN_TOTAL_FLOATS) return -5;")
+    ap("    return 0;")
+    ap("}")
+    ap("")
+    ap("static int ck_train_snapshot_weights(float *dst, size_t dst_numel) {")
+    ap("    if (g_memory == NULL || dst == NULL) return -1;")
+    ap("    if (dst_numel < CK_WEIGHT_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_WEIGHT_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_weight_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        memcpy(dst + cursor, g_memory + s->offset_floats, s->numel * sizeof(float));")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("void ck_train_plant_canaries(void) {")
+    ap("    if (g_memory == NULL) return;")
+    ap("    const float cv = ck_canary_value_f32();")
+    ap("    for (int i = 0; i < CK_CANARY_RANGE_COUNT; ++i) {")
+    ap("        const CKCanaryRange *r = &g_canary_ranges[i];")
+    ap("        for (size_t j = 0; j < r->len_floats; ++j) {")
+    ap("            g_memory[r->start_floats + j] = cv;")
+    ap("        }")
+    ap("    }")
+    ap("    for (size_t j = 0; j < CK_CANARY_TAIL_FLOATS; ++j) {")
+    ap("        g_memory[CK_TRAIN_TOTAL_FLOATS + j] = cv;")
+    ap("    }")
+    ap("}")
+    ap("")
+    ap("int ck_train_check_canaries(const char *phase_name, int *first_corrupt_idx) {")
+    ap("    (void)phase_name;")
+    ap("    if (first_corrupt_idx != NULL) *first_corrupt_idx = -1;")
+    ap("    if (g_memory == NULL) return -1;")
+    ap("    const uint32_t expected = (uint32_t)CK_CANARY_VALUE_U32;")
+    ap("    for (int i = 0; i < CK_CANARY_RANGE_COUNT; ++i) {")
+    ap("        const CKCanaryRange *r = &g_canary_ranges[i];")
+    ap("        for (size_t j = 0; j < r->len_floats; ++j) {")
+    ap("            uint32_t got = 0u;")
+    ap("            memcpy(&got, g_memory + r->start_floats + j, sizeof(uint32_t));")
+    ap("            if (got != expected) {")
+    ap("                if (first_corrupt_idx != NULL) *first_corrupt_idx = i;")
+    ap("                return 1;")
+    ap("            }")
+    ap("        }")
+    ap("    }")
+    ap("    for (size_t j = 0; j < CK_CANARY_TAIL_FLOATS; ++j) {")
+    ap("        uint32_t got = 0u;")
+    ap("        memcpy(&got, g_memory + CK_TRAIN_TOTAL_FLOATS + j, sizeof(uint32_t));")
+    ap("        if (got != expected) {")
+    ap("            if (first_corrupt_idx != NULL) *first_corrupt_idx = CK_CANARY_RANGE_COUNT + (int)j;")
+    ap("            return 2;")
+    ap("        }")
+    ap("    }")
+    ap("    return 0;")
+    ap("}")
+    ap("")
+    ap("int ck_train_check_weights_readonly(const float *weight_snapshot, int *first_corrupt_idx) {")
+    ap("    if (first_corrupt_idx != NULL) *first_corrupt_idx = -1;")
+    ap("    if (g_memory == NULL || weight_snapshot == NULL) return -1;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_WEIGHT_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_weight_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        const float *cur = g_memory + s->offset_floats;")
+    ap("        const float *ref = weight_snapshot + cursor;")
+    ap("        for (size_t j = 0; j < s->numel; ++j) {")
+    ap("            if (cur[j] != ref[j]) {")
+    ap("                if (first_corrupt_idx != NULL) *first_corrupt_idx = slot_idx;")
+    ap("                return 1;")
+    ap("            }")
+    ap("        }")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return 0;")
+    ap("}")
+    ap("")
+    ap("int ck_train_memory_diagnostic(const float *oracle_acts, const float *oracle_grads, float tolerance) {")
+    ap("    (void)oracle_acts;")
+    ap("    (void)oracle_grads;")
+    ap("    (void)tolerance;")
+    ap("    if (g_memory == NULL) return -1;")
+    ap("    g_diag_failed_op_id = -1;")
+    ap("    g_diag_failed_canary_idx = -1;")
+    ap("    int first = -1;")
+    ap("    ck_train_plant_canaries();")
+    ap("    if (ck_train_check_canaries(\"after_plant\", &first) != 0) return -10 - first;")
+    ap("    float *snap = NULL;")
+    ap("    if (CK_WEIGHT_SNAPSHOT_FLOATS > 0) {")
+    ap("        snap = (float*)malloc(CK_WEIGHT_SNAPSHOT_FLOATS * sizeof(float));")
+    ap("        if (snap == NULL) return -2;")
+    ap("        if (ck_train_snapshot_weights(snap, CK_WEIGHT_SNAPSHOT_FLOATS) < 0) { free(snap); return -3; }")
+    ap("    }")
+    ap("    int fwd = ck_train_forward_step();")
+    ap("    if (ck_train_check_canaries(\"after_forward\", &first) != 0) { if (snap) free(snap); return -100 - first; }")
+    ap("    if (snap != NULL && ck_train_check_weights_readonly(snap, &first) != 0) { free(snap); return -200 - first; }")
+    ap("    int failed_op = -1;")
+    ap("    int failed_canary = -1;")
+    ap("    int bwd = ck_train_backward_step_trace(&failed_op, &failed_canary);")
+    ap("    if (bwd < 0) {")
+    ap("        g_diag_failed_op_id = failed_op;")
+    ap("        g_diag_failed_canary_idx = failed_canary;")
+    ap("        if (snap) free(snap);")
+    ap("        return -5000;")
+    ap("    }")
+    ap("    if (ck_train_check_canaries(\"after_backward\", &first) != 0) { if (snap) free(snap); return -300 - first; }")
+    ap("    int opt = ck_train_optimizer_step(1e-3f);")
+    ap("    if (ck_train_check_canaries(\"after_optimizer\", &first) != 0) { if (snap) free(snap); return -400 - first; }")
+    ap("    if (snap != NULL) free(snap);")
+    ap("    return fwd + bwd + opt;")
+    ap("}")
+    ap("")
+
+    token_input_i32_vars: List[str] = []
+    target_input_i32_vars: List[str] = []
+    for tid, var in sorted(tvars_i32.items(), key=lambda x: x[1]):
+        lt = str(tid).lower()
+        if "token" in lt and "target" not in lt:
+            token_input_i32_vars.append(var)
+        if "target" in lt:
+            target_input_i32_vars.append(var)
 
     grad_vars_f32: List[str] = []
     for tid, var in sorted(tvars_f32.items(), key=lambda x: x[1]):
         if isinstance(tid, str) and tid.startswith("grad."):
             grad_vars_f32.append(var)
-
     ap("void ck_train_reset_buffers(void) {")
-    for var in sorted(set(tvars_f32.values())):
-        ap("    memset(%s, 0, sizeof(%s));" % (var, var))
+    ap("    if (g_memory != NULL && g_memory_floats > 0) {")
+    ap("        memset(g_memory, 0, g_memory_floats * sizeof(float));")
+    ap("    }")
     for var in sorted(set(tvars_i32.values())):
         ap("    memset(%s, 0, sizeof(%s));" % (var, var))
     if opt_pairs:
-        seen = set()
-        for _wname, _gvar, _wvar, mvar, vvar, _numel in opt_pairs:
-            if mvar not in seen:
-                ap("    memset(%s, 0, sizeof(%s));" % (mvar, mvar))
-                seen.add(mvar)
-            if vvar not in seen:
-                ap("    memset(%s, 0, sizeof(%s));" % (vvar, vvar))
-                seen.add(vvar)
         ap("    g_opt_step = 0;")
     ap("    g_loss_scalar[0] = 0.0f;")
     ap("}")
     ap("")
     ap("int ck_train_init(const float *bump, const int *manifest_sizes, int num_params) {")
-    ap("    (void)bump;")
-    ap("    (void)manifest_sizes;")
-    ap("    (void)num_params;")
+    ap("    int alloc_rc = ck_train_alloc();")
+    ap("    if (alloc_rc != 0) { return alloc_rc; }")
     ap("    ck_train_reset_buffers();")
-    ap("    return 0;")
+    ap("    if (CK_INIT_WEIGHT_COUNT == 0) {")
+    ap("        return 0;")
+    ap("    }")
+    ap("    if (bump == NULL) {")
+    ap("        return -1;")
+    ap("    }")
+    ap("    if (num_params < CK_INIT_WEIGHT_COUNT) {")
+    ap("        return -2;")
+    ap("    }")
+    ap("    const float *cursor = bump;")
+    ap("    for (int i = 0; i < CK_INIT_WEIGHT_COUNT; ++i) {")
+    ap("        int expected = g_init_weight_numel[i];")
+    ap("        int src_n = expected;")
+    ap("        int copy_n = expected;")
+    ap("        if (manifest_sizes != NULL && manifest_sizes[i] > 0) {")
+    ap("            src_n = manifest_sizes[i];")
+    ap("            if (src_n < copy_n) copy_n = src_n;")
+    ap("        }")
+    ap("        if (copy_n > 0) {")
+    ap("            memcpy(g_memory + g_init_weight_offsets[i], cursor, (size_t)copy_n * sizeof(float));")
+    ap("        }")
+    ap("        if (copy_n < expected) {")
+    ap("            memset(g_memory + g_init_weight_offsets[i] + copy_n, 0, (size_t)(expected - copy_n) * sizeof(float));")
+    ap("        }")
+    ap("        cursor += (src_n > 0 ? src_n : expected);")
+    ap("    }")
+    ap("    return CK_INIT_WEIGHT_COUNT;")
     ap("}")
     ap("")
     ap("void ck_zero_grad(void) {")
-    if grad_vars_f32:
-        for var in sorted(set(grad_vars_f32)):
-            ap("    memset(%s, 0, sizeof(%s));" % (var, var))
-    else:
-        ap("    /* No grad.* tensors found in IR; zero-grad is a no-op. */")
+    ap("    if (g_memory == NULL) return;")
+    ap("    if (CK_GRADS_SIZE > 0) {")
+    ap("        memset(g_memory + CK_GRADS_OFFSET, 0, CK_GRADS_SIZE * sizeof(float));")
+    ap("    }")
+    ap("    if (CK_GRAD_ACT_SIZE > 0) {")
+    ap("        memset(g_memory + CK_GRAD_ACT_OFFSET, 0, CK_GRAD_ACT_SIZE * sizeof(float));")
+    ap("    }")
     ap("}")
     ap("")
 
-    def emit_ops(fn_name: str, ops: List[Dict[str, Any]], phase: str) -> None:
-        ap("int %s(void) {" % fn_name)
+    f32_ptr_numel: Dict[str, int] = {}
+    for tid, var in tvars_f32.items():
+        n = int(tensor_numel.get(tid, 0) or 0)
+        if n > 0:
+            f32_ptr_numel[var] = n
+    for _wname, _gvar, _wvar, mvar, vvar, _numel in opt_pairs:
+        n = int(_numel)
+        if n > 0:
+            f32_ptr_numel[mvar] = n
+            f32_ptr_numel[vvar] = n
+
+    def emit_ops(fn_name: str, ops: List[Dict[str, Any]], phase: str, *, trace_canary: bool = False) -> None:
+        if trace_canary:
+            ap("int %s(int *failed_op_id, int *first_corrupt_idx) {" % fn_name)
+            ap("    if (failed_op_id != NULL) *failed_op_id = -1;")
+            ap("    if (first_corrupt_idx != NULL) *first_corrupt_idx = -1;")
+            ap("    int first = -1;")
+        else:
+            ap("int %s(void) {" % fn_name)
         ap("    /* %s ops: %d */" % (phase, len(ops)))
         ap("    int call_count = 0;")
         for op in ops:
@@ -581,21 +1340,67 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
             fn, args, _decl = resolved
             io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
+            # gemm_backward_f32 uses op-local inferred dims from IR tensor sizes.
+            # Avoid generic defaults here: wrong aligned_out can corrupt
+            # tmp.grad.weight.* and trip canary/heap checks.
+            gemm_dims = _infer_gemm_backward_dims(io_outputs, tensor_numel, cfg) if kid == "gemm_backward_f32" else None
 
             call_args: List[str] = []
+            ptr_fallback_state: Dict[str, int] = {}
+            bounds_checks: List[Tuple[str, int]] = []
             for atype, aname in args:
                 is_ptr = "*" in atype
                 if is_ptr:
                     expr = _choose_tensor_for_ptr(
-                        atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32
+                        atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                        fallback_state=ptr_fallback_state,
                     )
                     call_args.append(expr)
+                    if ("float" in atype) and ("*" in atype):
+                        n = f32_ptr_numel.get(expr)
+                        if isinstance(n, int) and n > 0:
+                            bounds_checks.append((expr, int(n)))
                 else:
-                    call_args.append(_arg_scalar_expr(atype, aname, cfg))
+                    lname = str(aname).lower()
+                    if ("numel" in lname) or ("size_t" in atype):
+                        call_args.append(_choose_numel_expr(aname, io_inputs, io_outputs, io_weights, tensor_numel))
+                    elif gemm_dims is not None and "aligned_in" in lname:
+                        call_args.append(str(int(gemm_dims.get("aligned_in", 1))))
+                    elif gemm_dims is not None and "aligned_out" in lname:
+                        call_args.append(str(int(gemm_dims.get("aligned_out", 1))))
+                    else:
+                        call_args.append(_arg_scalar_expr(atype, aname, cfg))
 
             ap("    /* op_id=%s op=%s kernel_id=%s */" % (op_id, op_name, kid))
+            seen_bounds: set[str] = set()
+            for expr, n in bounds_checks:
+                if expr in seen_bounds:
+                    continue
+                seen_bounds.add(expr)
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (expr, int(n), op_id))
             ap("    %s(%s);" % (fn, ", ".join(call_args)))
+            if phase.startswith("backward"):
+                inj_tid: Optional[str] = None
+                for _k, _tid in _sorted_pool_items(io_outputs):
+                    if isinstance(_tid, str) and _tid in tvars_f32 and int(tensor_numel.get(_tid, 0) or 0) > 0:
+                        inj_tid = _tid
+                        break
+                if inj_tid is not None:
+                    inj_var = tvars_f32[inj_tid]
+                    inj_numel = int(tensor_numel.get(inj_tid, 0) or 0)
+                    ap("#if CK_RUNTIME_FAULT_INJECT")
+                    ap("    if ((CK_RUNTIME_FAULT_INJECT != 0) && (CK_FAULT_INJECT_OP_ID == %s)) {" % op_id)
+                    ap("        /* Deliberate +1 write for diagnostics: hit tail canary deterministically. */")
+                    ap("        g_memory[CK_TRAIN_TOTAL_FLOATS] = 123.0f;")
+                    ap("    }")
+                    ap("#endif")
             ap("    call_count++;")
+            if trace_canary:
+                ap("    if (ck_train_check_canaries(\"trace_after_op_%s\", &first) != 0) {" % op_id)
+                ap("        if (failed_op_id != NULL) *failed_op_id = %s;" % op_id)
+                ap("        if (first_corrupt_idx != NULL) *first_corrupt_idx = first;")
+                ap("        return -2;")
+                ap("    }")
 
         ap("    return call_count;")
         ap("}")
@@ -603,6 +1408,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     emit_ops("ck_train_forward_step", forward_ops, "forward")
     emit_ops("ck_train_backward_step", backward_ops, "backward")
+    emit_ops("ck_train_backward_step_trace", backward_ops, "backward_trace", trace_canary=True)
 
     ap("int ck_train_optimizer_step(float lr) {")
     if "adamw_update_f32" not in used_decl:
@@ -618,13 +1424,16 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    const float beta2 = 0.999f;")
         ap("    const float eps = 1e-8f;")
         ap("    const float weight_decay = 0.01f;")
+        ap("    const float max_grad_norm = 1.0f;")
         ap("    int call_count = 0;")
         ap("    g_opt_step += 1;")
         if skipped_opt_non_fp32:
             ap("    /* skipped non-fp32 optimizer params: %d */" % len(skipped_opt_non_fp32))
         for wname, gvar, wvar, mvar, vvar, numel in opt_pairs:
-            n_expr = str(numel) if isinstance(numel, int) and numel > 0 else "CK_TENSOR_CAP_F32"
+            n_expr = str(int(numel))
             ap("    /* AdamW update: %s */" % wname)
+            if "gradient_clip_norm_f32" in used_decl:
+                ap("    gradient_clip_norm_f32(%s, (size_t)%s, max_grad_norm);" % (gvar, n_expr))
             ap("    adamw_update_f32(%s, %s, %s, %s, (size_t)%s, lr, beta1, beta2, eps, weight_decay, g_opt_step);" % (
                 gvar, wvar, mvar, vvar, n_expr
             ))
@@ -636,14 +1445,27 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
     ap("    ck_zero_grad();")
     ap("    if (token_ids != NULL) {")
-    ap("        memcpy(g_dummy_i32, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);")
+    if token_input_i32_vars:
+        for var in sorted(set(token_input_i32_vars)):
+            ap("        memcpy(%s, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);" % var)
+    else:
+        ap("        memcpy(g_dummy_i32, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);")
     ap("    }")
     ap("    if (targets != NULL) {")
-    ap("        memcpy(g_dummy_i32, targets, sizeof(int32_t) * CK_NUM_TOKENS);")
+    if target_input_i32_vars:
+        for var in sorted(set(target_input_i32_vars)):
+            ap("        memcpy(%s, targets, sizeof(int32_t) * CK_NUM_TOKENS);" % var)
+    else:
+        ap("        memcpy(g_dummy_i32, targets, sizeof(int32_t) * CK_NUM_TOKENS);")
     ap("    }")
+    ap("    int first = -1;")
+    ap("    if (CK_RUNTIME_CANARY_CHECKS) ck_train_plant_canaries();")
     ap("    int fwd = ck_train_forward_step();")
+    ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_forward\", &first) != 0) return -1000 - first;")
     ap("    int bwd = ck_train_backward_step();")
+    ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_backward\", &first) != 0) return -1100 - first;")
     ap("    int opt = ck_train_optimizer_step(lr);")
+    ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_optimizer\", &first) != 0) return -1200 - first;")
     ap("    if (loss_out != NULL) {")
     ap("        *loss_out = g_loss_scalar[0];")
     ap("    }")
@@ -657,6 +1479,48 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "callable_kernels": len(used_decl),
         "optimizer_pairs": len(opt_pairs),
         "optimizer_skipped_non_fp32": skipped_opt_non_fp32,
+        "init_weight_count": len(init_weight_specs),
+        "init_weight_order": [wname for (wname, _wvar, _numel) in init_weight_specs],
+        "init_weight_numel": [int(_numel) for (_wname, _wvar, _numel) in init_weight_specs],
+        "tensor_numel_count": len(tensor_numel),
+        "memory_total_floats": int(layout_info["total_floats"]),
+        "memory_regions": sorted(list(region_offsets.keys())),
+        "tensor_slot_count": len(slot_rows),
+        "canary_range_count": len(canary_ranges),
+        "canary_tail_floats": 16,
+        "weight_snapshot_floats": int(weight_snapshot_floats),
+        "tensor_slots": [
+            {
+                "index": int(i),
+                "name": str(row["name"]),
+                "offset": int(row["offset"]),
+                "numel": int(row["numel"]),
+                "section": str(row["section"]),
+                "writable_fwd": int(row["writable_fwd"]),
+                "writable_bwd": int(row["writable_bwd"]),
+            }
+            for i, row in enumerate(slot_rows)
+        ],
+        "canary_ranges": [
+            {
+                "index": int(i),
+                "start": int(start),
+                "length": int(length),
+                "left_slot_idx": int(left),
+                "right_slot_idx": int(right),
+                "left_slot": (str(slot_rows[left]["name"]) if (left >= 0 and left < len(slot_rows)) else None),
+                "right_slot": (str(slot_rows[right]["name"]) if (right >= 0 and right < len(slot_rows)) else None),
+            }
+            for i, (start, length, left, right) in enumerate(canary_ranges)
+        ],
+        "backward_op_trace": [
+            {
+                "op_id": int(op.get("op_id", -1)),
+                "op": str(op.get("op", "")),
+                "kernel_id": str(op.get("kernel_id", "")),
+            }
+            for op in backward_ops
+        ],
         "skipped_ops": skipped_ops,
     }
     return ("\n".join(lines), summary)
@@ -667,6 +1531,7 @@ def main() -> int:
     p.add_argument("--ir2", type=Path, required=True, help="Path to ir2_train_backward_*.json")
     p.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY, help="Kernel registry JSON path")
     p.add_argument("--manifest", type=Path, default=None, help="Optional weights manifest for exact optimizer numel mapping")
+    p.add_argument("--layout", type=Path, required=True, help="Path to layout_train.json (authoritative offsets)")
     p.add_argument("--output", type=Path, required=True, help="Output C file path")
     p.add_argument("--summary-out", type=Path, default=None, help="Optional summary JSON")
     args = p.parse_args()
@@ -674,7 +1539,8 @@ def main() -> int:
     ir2 = _load_json(args.ir2)
     reg = _load_json(args.registry)
     manifest = _load_json(args.manifest) if args.manifest is not None else None
-    c_src, summary = generate_c(ir2, reg, manifest=manifest)
+    layout = _load_json(args.layout) if args.layout is not None else None
+    c_src, summary = generate_c(ir2, reg, manifest=manifest, layout=layout)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(c_src, encoding="utf-8")

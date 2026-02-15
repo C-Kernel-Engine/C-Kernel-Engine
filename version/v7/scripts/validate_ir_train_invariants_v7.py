@@ -47,6 +47,8 @@ def _binding_ids(bindings_doc: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def validate(ir1: Dict[str, Any], ir2: Dict[str, Any], strict_unresolved: bool, allow_partial: bool) -> Dict[str, Any]:
+    # Invariants are the hard contract between IR synthesis and runtime codegen.
+    # If these fail, training artifacts should not proceed to code generation.
     rows: List[Dict[str, Any]] = []
     failures: List[str] = []
     warnings: List[str] = []
@@ -161,6 +163,30 @@ def validate(ir1: Dict[str, Any], ir2: Dict[str, Any], strict_unresolved: bool, 
             "name": "unresolved_policy",
             "status": unresolved_status,
             "count": unresolved_count,
+        }
+    )
+
+    # Invariant 5: all tensors must carry explicit positive numel metadata.
+    missing_numel = []
+    non_positive_numel = []
+    for tname, tmeta in (ir2.get("tensors", {}) or {}).items():
+        if not isinstance(tmeta, dict):
+            missing_numel.append(str(tname))
+            continue
+        n = tmeta.get("numel")
+        if n is None:
+            missing_numel.append(str(tname))
+            continue
+        if not isinstance(n, int) or n <= 0:
+            non_positive_numel.append(str(tname))
+    if missing_numel or non_positive_numel:
+        failures.append("tensor_numel_metadata")
+    rows.append(
+        {
+            "name": "tensor_numel_metadata",
+            "status": "PASS" if not (missing_numel or non_positive_numel) else "FAIL",
+            "missing_numel": missing_numel,
+            "non_positive_numel": non_positive_numel,
         }
     )
 
