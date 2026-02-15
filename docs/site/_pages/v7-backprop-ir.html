@@ -1,0 +1,423 @@
+<!-- TITLE: v7 Backprop IR -->
+<!-- NAV: research -->
+
+<h1>v7 Backprop IR Pipeline (Operator Guide)</h1>
+
+<p>This page explains how v7 training works end to end, with a focus on what is generated from IR, what is layout/codegen output, where logic lives, and how to debug correctness quickly.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>One important clarification</strong><br>
+    There is no <code>ck_run_v7.c</code>. The operator entrypoint is <code>version/v7/scripts/ck_run_v7.py</code> (and wrapper <code>version/v7/scripts/cks-v7-run</code>). It orchestrates generation and execution of generated C runtimes.
+  </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="v7 IR Backprop Stack">
+  <img src="assets/v7-backprop-ir-stack.svg" alt="v7 training flow from init to IR1 to IR2 to layout and codegen">
+</div>
+
+<h2>What Runs in C vs Python</h2>
+
+<table>
+  <tr>
+    <th>Layer</th>
+    <th>Primary Runtime</th>
+    <th>Why It Exists</th>
+    <th>Current Operator Command</th>
+  </tr>
+  <tr>
+    <td>Orchestration and run management</td>
+    <td><strong>Python</strong></td>
+    <td>Build artifacts, launch gates, collect reports, drive strict checks</td>
+    <td><code>cks-v7-run init|train|sanity|parity|profile</code></td>
+  </tr>
+  <tr>
+    <td>Forward and backward kernel math</td>
+    <td><strong>C kernels</strong></td>
+    <td>Deterministic numeric core, SIMD paths, parity-tested primitives</td>
+    <td><code>make test</code>, <code>make v7-gate-train</code></td>
+  </tr>
+  <tr>
+    <td>Generated training runtime</td>
+    <td><strong>C (generated)</strong></td>
+    <td>Dumb emitter executes IR-lowered plan and memory offsets</td>
+    <td><code>generated_train_runtime_v7.c</code>, <code>libtrain.so</code></td>
+  </tr>
+  <tr>
+    <td>Oracle parity and drift localization</td>
+    <td><strong>Python + PyTorch</strong></td>
+    <td>Reference implementation for step-level and slot-level checks</td>
+    <td><code>--backend both</code>, <code>--parity-on</code></td>
+  </tr>
+  <tr>
+    <td>IR report rendering</td>
+    <td><strong>Python + HTML/JS</strong></td>
+    <td>Load run artifacts and present explainable diagnostics</td>
+    <td><code>open_ir_visualizer.py --generate --run ...</code></td>
+  </tr>
+</table>
+
+<h2>Mental Model: What Is Smart and What Is Dumb</h2>
+
+<div class="grid grid-2">
+  <div class="card card-accent">
+    <h3 style="margin-top: 0;">Smart Stages</h3>
+    <ul>
+      <li><strong>Template selection</strong>: architecture op sequence and flags</li>
+      <li><strong>IR1</strong>: forward op graph with typed tensors and kernel IDs</li>
+      <li><strong>IR2</strong>: backward synthesis, fanout accumulation, grad edges</li>
+      <li><strong>Layout generation</strong>: contiguous offsets, sections, canary map</li>
+      <li><strong>Validation</strong>: invariants, memory audit, parity, drift checks</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top: 0;">Dumb Stage</h3>
+    <ul>
+      <li><strong>Codegen</strong> only emits what lowered IR and layout already decided</li>
+      <li>No architecture guessing in emitter</li>
+      <li>No hidden model-family conditionals in runtime glue</li>
+      <li>If behavior is wrong, root cause is usually upstream in IR/lowering/layout</li>
+    </ul>
+  </div>
+</div>
+
+<h2>From Init to Train</h2>
+
+<ol>
+  <li><strong>Initialize run</strong>: choose init policy, dimensions, dtype policy, and template.</li>
+  <li><strong>Emit weights</strong>: write <code>weights.bump</code> and <code>weights_manifest.json</code>.</li>
+  <li><strong>Build IR1</strong>: forward graph and typed tensor registry.</li>
+  <li><strong>Lower IR2</strong>: backward graph from IR1 + grad rules, with explicit accumulations.</li>
+  <li><strong>Generate layout</strong>: contiguous memory map with sections and canary ranges.</li>
+  <li><strong>Codegen runtime</strong>: emit train runtime C and compile to <code>libtrain.so</code>.</li>
+  <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
+</ol>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Template Flexibility</h3>
+  <p style="margin-top: 0;">You can use built-ins (<code>qwen3</code>, <code>qwen2</code>, <code>gemma3</code>) or a custom template file. If a template op has kernel coverage and bindings, it can be stitched automatically.</p>
+  <pre># Built-in
+version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp1 \
+  --template qwen3 \
+  --init xavier_uniform \
+  --generate-ir --generate-runtime --strict
+
+# Custom template
+version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp_custom \
+  --template my_arch \
+  --template-file /absolute/path/to/my_template.json \
+  --init xavier_uniform \
+  --generate-ir --generate-runtime --strict</pre>
+</div>
+
+<h2>IR1, IR2, Layout, Codegen Responsibilities</h2>
+
+<table>
+  <tr>
+    <th>Stage</th>
+    <th>Input</th>
+    <th>Output</th>
+    <th>Core Responsibility</th>
+  </tr>
+  <tr>
+    <td><strong>IR1 (train-forward)</strong></td>
+    <td>template + manifest + kernel registry + grad rules</td>
+    <td><code>ir1_train_forward.json</code></td>
+    <td>Build forward graph, classify weight vs activation tensors, attach save-for-backward contract</td>
+  </tr>
+  <tr>
+    <td><strong>IR2 (backward)</strong></td>
+    <td>IR1 + grad rules + bindings</td>
+    <td><code>ir2_train_backward.json</code></td>
+    <td>Synthesize backward ops, add gradient fanout accumulation, preserve producer-consumer chain</td>
+  </tr>
+  <tr>
+    <td><strong>Layout + Audit (memory-lowered)</strong></td>
+    <td>IR2 + manifest</td>
+    <td><code>layout_train.json</code>, <code>layout_train_audit.json</code></td>
+    <td>Finalize contiguous offsets, section ownership, canary layout, bounds/overlap validation</td>
+  </tr>
+  <tr>
+    <td><strong>Codegen</strong></td>
+    <td>IR2 + layout</td>
+    <td><code>generated_train_runtime_v7.c</code>, <code>generated_train_runtime_summary_v7.json</code></td>
+    <td>Emit deterministic C calls and memory references only</td>
+  </tr>
+</table>
+
+<h2>How Residual, GQA, and Splits Stitch Backward</h2>
+
+<p>The forward graph can branch. IR2 makes the reverse merge explicit by emitting accumulation ops where gradients meet.</p>
+
+<div class="img-container svg-viewer" data-title="Residual and GQA Backward Routing">
+  <img src="assets/v7-residual-gqa-backward.svg" alt="Forward residual and GQA split with backward gradient accumulation routing">
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Key Rule</h3>
+  <p style="margin: 0;">If one forward tensor feeds multiple consumers, IR2 inserts explicit gradient accumulation in backward. This is where residual and attention branch merges stay correct.</p>
+</div>
+
+<h2>Memory Layout and Canary Diagnostics</h2>
+
+<p>Training layout is contiguous and sectioned. Canary guards and runtime checks detect out-of-bounds writes and readonly violations.</p>
+
+<div class="img-container svg-viewer" data-title="Training Memory and Canary Map">
+  <img src="assets/v7-train-memory-canary.svg" alt="Contiguous train memory layout with canary guards and diagnostics phases">
+</div>
+
+<table>
+  <tr>
+    <th>Section</th>
+    <th>Examples</th>
+    <th>Written In</th>
+  </tr>
+  <tr>
+    <td>weights</td>
+    <td><code>weight.layer.*</code></td>
+    <td>optimizer step (not forward)</td>
+  </tr>
+  <tr>
+    <td>activations + saved</td>
+    <td><code>act.*</code>, <code>saved.*</code></td>
+    <td>forward</td>
+  </tr>
+  <tr>
+    <td>grad_activations</td>
+    <td><code>grad.act.*</code></td>
+    <td>backward</td>
+  </tr>
+  <tr>
+    <td>grad_weights</td>
+    <td><code>grad.weight.*</code>, <code>tmp.grad.weight.*</code></td>
+    <td>backward</td>
+  </tr>
+  <tr>
+    <td>optimizer state</td>
+    <td>AdamW <code>m</code>, <code>v</code></td>
+    <td>optimizer step</td>
+  </tr>
+  <tr>
+    <td>temporaries + aux</td>
+    <td>scratch, loss buffers, diagnostics</td>
+    <td>multi-phase</td>
+  </tr>
+</table>
+
+<h2>Runbook: End-to-End Commands</h2>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">1) Initialize and generate IR/runtime</h3>
+  <pre>version/v7/scripts/cks-v7-run init \
+  --run /tmp/v7_exp1 \
+  --template qwen3 \
+  --init xavier_uniform \
+  --layers 2 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 \
+  --generate-ir --generate-runtime --strict</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">2) CK-only training (generated C runtime path)</h3>
+  <pre>version/v7/scripts/cks-v7-run train \
+  --run /tmp/v7_exp1 \
+  --backend ck \
+  --prompt "hello" \
+  --train-epochs 3 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
+  --train-strict</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">3) CK + PyTorch oracle parity</h3>
+  <pre>version/v7/scripts/cks-v7-run train \
+  --run /tmp/v7_exp1 \
+  --backend both \
+  --prompt "hello" \
+  --train-epochs 1 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
+  --parity-on --parity-profile balanced --dump-on-drift --drift-topk 8</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">4) Generate visual report from run directory</h3>
+  <pre>python3 version/v7/tools/open_ir_visualizer.py \
+  --generate --run /tmp/v7_exp1 --html-only</pre>
+  <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
+</div>
+
+
+<h2>Verification Matrix: Epoch 1 to 10 + Checkpoints + Oracle</h2>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Use <code>.venv/bin/python</code> for strict PyTorch snapshot oracle</strong><br>
+    If you use system <code>python3</code> without torch, training falls back to tiny reference telemetry instead of strict slot-level snapshot checks.
+  </div>
+</div>
+
+<pre># 0) init
+.venv/bin/python version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/v7_oracle_10ep \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# 1) epoch-1 strict oracle (every step) + replay + periodic checkpoints
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --parity-on --oracle pytorch --parity-profile debug --parity-every 1 \
+  --parity-replay-on-check --train-save-every 4
+
+# 2) epoch-10 sweep strict oracle + replay + checkpoint cadence
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 10 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --parity-on --oracle pytorch --parity-profile balanced --parity-every 1 \
+  --parity-replay-on-check --train-save-every 20
+
+# 3) memory verification suite (canary toggle + fault injection + ASan agreement)
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-verify-memory --train-verify-steps 4</pre>
+
+<table>
+  <tr>
+    <th>Artifact</th>
+    <th>Expected</th>
+    <th>Location</th>
+  </tr>
+  <tr>
+    <td>train summary</td>
+    <td><code>pass_parity: true</code>, strict oracle source + replay checks</td>
+    <td><code>/tmp/v7_oracle_10ep/train_e2e_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>checkpoints</td>
+    <td><code>weights_step_*.bump</code> + per-step manifest</td>
+    <td><code>/tmp/v7_oracle_10ep/checkpoints/</code></td>
+  </tr>
+  <tr>
+    <td>memory verification</td>
+    <td><code>ok: true</code> (toggle diff, intentional +1 catch, ASan agreement, bounds)</td>
+    <td><code>/tmp/v7_oracle_10ep/memory_verification_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>viewer report</td>
+    <td>training tabs populated from run-dir artifacts</td>
+    <td><code>/tmp/v7_oracle_10ep/ir_report.html</code></td>
+  </tr>
+</table>
+
+<h2>PR4.5 Throughput Track</h2>
+
+<ul>
+  <li>Add explicit threaded GEMM dispatch for v7 training runtime (not serial-only blocked calls).</li>
+  <li>Compile runtime with consistent parallel flags and deterministic thread control.</li>
+  <li>Prepack/plan GEMM weight access to reduce cache misses.</li>
+  <li>Reduce backward buffer traffic hotspots (<code>grad_accumulate</code>, <code>memset</code>, <code>memmove</code>).</li>
+  <li>Keep strict parity tolerances unchanged while optimizing.</li>
+</ul>
+
+<h2>Performance Workflow (After Parity Is Green)</h2>
+
+<ol>
+  <li>Run CK baseline without oracle: <code>--backend ck --parity-on=false</code>.</li>
+  <li>Run reference harness timing: <code>--backend both</code> (captures CK vs torch step metrics).</li>
+  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts.</li>
+  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>).</li>
+  <li>Use ASan for bounds/UB; use Valgrind when you need slower but deeper leak/use-after-free analysis.</li>
+</ol>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Threading Sanity</h3>
+  <p style="margin-top: 0;">Before optimization work, confirm CK runtime is saturating cores and not running in an accidental single-thread path. Use train step timing plus profiler traces to validate threadpool/OpenMP utilization, then optimize kernel hotspots (usually GEMM backward and attention backward first).</p>
+</div>
+
+<h2>How You Know It Is Actually Training</h2>
+
+<ul>
+  <li><code>train_e2e_latest.json</code> shows loss curve with decreasing trend</li>
+  <li><code>training_loss_curve.json</code> and <code>training_grad_norms.json</code> are populated</li>
+  <li><code>training_parity.json</code> reports PASS for oracle checkpoints (when enabled)</li>
+  <li><code>layout_train_audit.json</code> and memory diagnostics show no bounds/overlap/canary failures</li>
+  <li>Generated runtime summary includes expected forward/backward/optimizer kernel calls</li>
+</ul>
+
+<h2>Debug Fast: First-Divergence and Memory Safety</h2>
+
+<table>
+  <tr>
+    <th>Symptom</th>
+    <th>First Artifact</th>
+    <th>Likely Root</th>
+  </tr>
+  <tr>
+    <td>Parity drift appears after a few steps</td>
+    <td><code>drift_report.json</code></td>
+    <td>Specific op mismatch, accumulation edge, or dimension binding issue</td>
+  </tr>
+  <tr>
+    <td>Crash or invalid pointer in CK backend</td>
+    <td><code>memory_diagnostic_latest.json</code></td>
+    <td>Out-of-bounds write, incorrect slot size/offset, or bad kernel args</td>
+  </tr>
+  <tr>
+    <td>Layout audit fails</td>
+    <td><code>layout_train_audit.json</code></td>
+    <td>Overlap, section bounds error, alignment or ownership mismatch</td>
+  </tr>
+  <tr>
+    <td>Generated runtime compiles but output is unstable</td>
+    <td><code>generated_train_runtime_summary_v7.json</code></td>
+    <td>Wrong kernel binding or call-order mismatch from upstream IR</td>
+  </tr>
+</table>
+
+<h2>What Changes for Backprop vs Inference</h2>
+
+<div class="card">
+  <ul>
+    <li>Inference complexity is dominated by quantized weight paths and decode-time KV behavior.</li>
+    <li>Backprop complexity is dominated by memory pressure and graph bookkeeping: saved activations, gradient routing, accumulation, optimizer state.</li>
+    <li>Training usually runs float paths (fp32/bf16 policy) rather than quantized weight formats.</li>
+    <li>Keeping training pipeline partially separated while contracts stabilize is a pragmatic step, not architectural drift.</li>
+  </ul>
+</div>
+
+<h2>Artifact Checklist in a Healthy Run Directory</h2>
+
+<pre>/tmp/v7_exp1/
+  weights.bump
+  weights_manifest.json
+  ir1_train_forward.json
+  ir2_train_backward.json
+  ir_train_invariants.json
+  layout_train.json
+  layout_train_audit.json
+  generated_train_runtime_v7.c
+  generated_train_runtime_summary_v7.json
+  libtrain.so
+  train_e2e_latest.json
+  training_loss_curve.json
+  training_grad_norms.json
+  training_parity.json
+  memory_diagnostic_latest.json
+  ir_report.html</pre>
+
+<p>Use this page as the operator baseline: if these artifacts line up and the gates pass, your v7 backprop pipeline is stitched correctly.</p>

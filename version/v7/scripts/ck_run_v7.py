@@ -19,6 +19,7 @@ Usage:
 import argparse
 import ctypes
 import json
+import math
 import os
 import random
 import shutil
@@ -1320,10 +1321,16 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         "external_profiles": profile_meta or {},
     }
 
+    ckpt_info = s.get("checkpoints") if isinstance(s.get("checkpoints"), dict) else {}
     training_checkpoint_policy = {
-        "policy": "none",
+        "policy": "step_interval" if bool(ckpt_info.get("enabled")) else "none",
         "source": "train_e2e",
-        "checkpointing": False,
+        "checkpointing": bool(ckpt_info.get("enabled", False)),
+        "save_every": int(ckpt_info.get("save_every", 0) or 0),
+        "save_final": bool(ckpt_info.get("save_final", False)),
+        "count": int(ckpt_info.get("count", 0) or 0),
+        "latest_step": int(ckpt_info.get("latest_step", 0) or 0),
+        "files": ckpt_info.get("files", []),
     }
 
     payloads = {
@@ -1622,7 +1629,12 @@ def _compute_parity_check_steps(total_steps: int, profile: str, parity_every: in
     return {s for s in steps if 1 <= s <= total_steps}
 
 
-def _run_ck_oracle_reference(args: argparse.Namespace, run_dir: Path, train_text: Optional[str]) -> Optional[dict]:
+def _run_ck_oracle_reference(
+    args: argparse.Namespace,
+    run_dir: Path,
+    train_text: Optional[str],
+    max_steps: Optional[int] = None,
+) -> Optional[dict]:
     """Run periodic PyTorch oracle reference once and return parsed JSON payload."""
     train_script = SCRIPTS_DIR / "train_parity_epochs_v7.py"
     if not train_script.exists():
@@ -1651,6 +1663,9 @@ def _run_ck_oracle_reference(args: argparse.Namespace, run_dir: Path, train_text
         "--json-out", str(oracle_json),
     ]
 
+    if max_steps is not None and int(max_steps) > 0:
+        cmd.extend(["--max-steps", str(int(max_steps))])
+
     bump = run_dir / "weights.bump"
     manifest = run_dir / "weights_manifest.json"
     if bump.exists() and manifest.exists():
@@ -1668,6 +1683,358 @@ def _run_ck_oracle_reference(args: argparse.Namespace, run_dir: Path, train_text
     except Exception:
         log("  Warning: failed to parse oracle_reference_latest.json", C_ORANGE)
         return None
+
+
+def _ck_export_runtime_weight_snapshot(lib: ctypes.CDLL) -> Optional[tuple[object, int]]:
+    """Export current CK runtime weights into a contiguous float snapshot buffer."""
+    if not hasattr(lib, "ck_train_get_weight_snapshot_numel") or not hasattr(lib, "ck_train_export_weight_snapshot"):
+        return None
+    try:
+        numel = int(lib.ck_train_get_weight_snapshot_numel())
+    except Exception:
+        return None
+    if numel <= 0 or numel > (1 << 30):
+        return None
+    buf = (ctypes.c_float * numel)()
+    try:
+        wrote = int(lib.ck_train_export_weight_snapshot(buf, ctypes.c_int(numel)))
+    except Exception:
+        return None
+    if wrote <= 0:
+        return None
+    if wrote < numel:
+        # Keep deterministic sizing for import/replay: truncate to returned size.
+        trunc = (ctypes.c_float * wrote)()
+        ctypes.memmove(ctypes.addressof(trunc), ctypes.addressof(buf), wrote * ctypes.sizeof(ctypes.c_float))
+        return trunc, int(wrote)
+    return buf, int(numel)
+
+
+def _ck_import_runtime_weight_snapshot(lib: ctypes.CDLL, snapshot_buf: object, snapshot_numel: int) -> int:
+    """Import a previously exported CK runtime weight snapshot."""
+    if not hasattr(lib, "ck_train_import_weight_snapshot"):
+        return -1
+    try:
+        return int(lib.ck_train_import_weight_snapshot(snapshot_buf, ctypes.c_int(int(snapshot_numel))))
+    except Exception:
+        return -2
+
+
+def _ck_export_runtime_activation_snapshot(lib: ctypes.CDLL) -> Optional[tuple[object, int]]:
+    """Export current runtime activations/saved tensors snapshot."""
+    if not hasattr(lib, "ck_train_get_activation_snapshot_numel") or not hasattr(lib, "ck_train_export_activation_snapshot"):
+        return None
+    try:
+        numel = int(lib.ck_train_get_activation_snapshot_numel())
+    except Exception:
+        return None
+    if numel <= 0 or numel > (1 << 30):
+        return None
+    buf = (ctypes.c_float * numel)()
+    try:
+        wrote = int(lib.ck_train_export_activation_snapshot(buf, ctypes.c_int(numel)))
+    except Exception:
+        return None
+    if wrote <= 0:
+        return None
+    if wrote < numel:
+        trunc = (ctypes.c_float * wrote)()
+        ctypes.memmove(ctypes.addressof(trunc), ctypes.addressof(buf), wrote * ctypes.sizeof(ctypes.c_float))
+        return trunc, int(wrote)
+    return buf, int(numel)
+
+
+def _write_ck_weight_snapshot_artifact(
+    run_dir: Path,
+    step: int,
+    snapshot_buf: object,
+    snapshot_numel: int,
+    *,
+    reason: str,
+) -> Optional[Path]:
+    """Persist CK weight snapshot for drift/replay triage."""
+    try:
+        snap_dir = run_dir / "oracle_ck_snapshots"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        bin_path = snap_dir / f"step_{int(step):08d}.f32bin"
+        meta_path = snap_dir / f"step_{int(step):08d}.json"
+        raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
+        bin_path.write_bytes(raw)
+        meta = {
+            "generated_at": _utc_now_iso(),
+            "step": int(step),
+            "numel": int(snapshot_numel),
+            "bytes": int(len(raw)),
+            "reason": str(reason),
+            "file": str(bin_path),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        return bin_path
+    except Exception:
+        return None
+
+
+def _write_ck_activation_snapshot_artifact(
+    run_dir: Path,
+    step: int,
+    snapshot_buf: object,
+    snapshot_numel: int,
+    *,
+    reason: str,
+) -> Optional[Path]:
+    """Persist CK activation snapshot for drift/replay triage."""
+    try:
+        snap_dir = run_dir / "oracle_ck_activations"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        bin_path = snap_dir / f"step_{int(step):08d}.f32bin"
+        meta_path = snap_dir / f"step_{int(step):08d}.json"
+        raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
+        bin_path.write_bytes(raw)
+        meta = {
+            "generated_at": _utc_now_iso(),
+            "step": int(step),
+            "numel": int(snapshot_numel),
+            "bytes": int(len(raw)),
+            "reason": str(reason),
+            "file": str(bin_path),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        return bin_path
+    except Exception:
+        return None
+
+
+
+
+def _write_ck_weight_checkpoint_bump(
+    run_dir: Path,
+    runtime_summary: dict,
+    snapshot_buf: object,
+    snapshot_numel: int,
+    *,
+    step: int,
+    reason: str,
+) -> Optional[dict]:
+    """Write a resumable weights checkpoint (.bump + manifest) from runtime snapshot."""
+    try:
+        init_order = runtime_summary.get("init_weight_order") if isinstance(runtime_summary, dict) else None
+        init_numel = runtime_summary.get("init_weight_numel") if isinstance(runtime_summary, dict) else None
+        if not isinstance(init_order, list) or not isinstance(init_numel, list):
+            return None
+        if len(init_order) != len(init_numel) or len(init_order) == 0:
+            return None
+
+        expected_total = 0
+        for n in init_numel:
+            expected_total += int(n or 0)
+        if expected_total <= 0 or int(snapshot_numel) < expected_total:
+            return None
+
+        raw = ctypes.string_at(
+            ctypes.addressof(snapshot_buf),
+            int(snapshot_numel) * ctypes.sizeof(ctypes.c_float),
+        )
+        if len(raw) < expected_total * 4:
+            return None
+
+        src_manifest = {}
+        src_manifest_path = run_dir / "weights_manifest.json"
+        if src_manifest_path.exists():
+            try:
+                src_manifest = json.loads(src_manifest_path.read_text(encoding="utf-8"))
+            except Exception:
+                src_manifest = {}
+        src_entries = src_manifest.get("entries") if isinstance(src_manifest, dict) else None
+        src_entry_by_name: dict[str, dict] = {}
+        if isinstance(src_entries, list):
+            for row in src_entries:
+                if not isinstance(row, dict):
+                    continue
+                name = str(row.get("name", "") or "")
+                if name:
+                    src_entry_by_name[name] = row
+
+        ckpt_dir = run_dir / "checkpoints"
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"weights_step_{int(step):08d}"
+        bump_path = ckpt_dir / f"{stem}.bump"
+        manifest_path = ckpt_dir / f"{stem}_manifest.json"
+
+        blob = bytearray()
+        entries = []
+        cursor_bytes = 0
+        for idx, wname in enumerate(init_order):
+            numel = int(init_numel[idx] or 0)
+            if numel <= 0:
+                continue
+            nbytes = numel * 4
+            if cursor_bytes + nbytes > len(raw):
+                return None
+            offset = _align_up(len(blob), 64)
+            if offset > len(blob):
+                blob.extend(b"\x00" * (offset - len(blob)))
+            blob.extend(raw[cursor_bytes:cursor_bytes + nbytes])
+            cursor_bytes += nbytes
+
+            src = src_entry_by_name.get(str(wname), {})
+            entry = {
+                "name": str(wname),
+                "offset": int(offset),
+                "size": int(nbytes),
+                "dtype": str(src.get("dtype", "fp32") or "fp32"),
+            }
+            shape = src.get("shape")
+            if isinstance(shape, list) and shape:
+                entry["shape"] = shape
+            else:
+                entry["shape"] = [int(numel)]
+            entries.append(entry)
+
+        manifest_out = {
+            "version": 1,
+            "format": "weights_manifest_v7_runtime_checkpoint",
+            "source": "ck_runtime_snapshot",
+            "step": int(step),
+            "reason": str(reason),
+            "entries": entries,
+        }
+        if isinstance(src_manifest, dict):
+            if isinstance(src_manifest.get("config"), dict):
+                manifest_out["config"] = src_manifest["config"]
+            if isinstance(src_manifest.get("template"), dict):
+                manifest_out["template"] = src_manifest["template"]
+
+        bump_path.write_bytes(bytes(blob))
+        manifest_path.write_text(json.dumps(manifest_out, indent=2), encoding="utf-8")
+        return {
+            "step": int(step),
+            "reason": str(reason),
+            "bump": str(bump_path),
+            "manifest": str(manifest_path),
+            "weights": int(len(entries)),
+            "floats": int(expected_total),
+            "bytes": int(len(blob)),
+        }
+    except Exception:
+        return None
+
+def _extract_activation_slots_ordered(
+    runtime_summary: dict,
+    snapshot: object,
+    snapshot_numel: int,
+):
+    """Decode flattened activation snapshot into ordered slot payloads."""
+    try:
+        import numpy as _np
+    except Exception:
+        return None
+
+    rows = runtime_summary.get("tensor_slots") if isinstance(runtime_summary, dict) else None
+    if not isinstance(rows, list):
+        return None
+
+    act_rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        # Keep strict slot comparison scoped to forward activation tensors only.
+        # saved.* and aux.* are intentionally excluded because they are not stable
+        # forward-equivalent observability surfaces across kernels/backends.
+        if str(row.get("section", "")) not in ("activations",):
+            continue
+        try:
+            act_rows.append({
+                "name": str(row.get("name", "")),
+                "offset": int(row.get("offset", 0) or 0),
+                "numel": int(row.get("numel", 0) or 0),
+            })
+        except Exception:
+            continue
+    act_rows.sort(key=lambda r: (r["offset"], r["name"]))
+
+    snap_np = _np.ctypeslib.as_array(snapshot, shape=(int(snapshot_numel),)).astype(_np.float32, copy=False)
+
+    cursor = 0
+    out = []
+    for row in act_rows:
+        numel = int(row.get("numel", 0))
+        if numel <= 0:
+            continue
+        if cursor + numel > snap_np.size:
+            return None
+        out.append(
+            {
+                "name": str(row.get("name", "")),
+                "offset": int(row.get("offset", 0)),
+                "numel": int(numel),
+                "flat": snap_np[cursor:cursor + numel].copy(),
+            }
+        )
+        cursor += numel
+    return out
+
+
+def _extract_activation_slot_flat(
+    runtime_summary: dict,
+    snapshot: object,
+    snapshot_numel: int,
+    *,
+    slot_name_exact: str,
+    slot_name_contains: Optional[str] = None,
+):
+    """Extract one activation tensor from flattened activation snapshot order."""
+    rows = _extract_activation_slots_ordered(runtime_summary, snapshot, snapshot_numel)
+    if not isinstance(rows, list):
+        return None, None
+
+    for row in rows:
+        name = str(row.get("name", ""))
+        hit = (name == slot_name_exact)
+        if not hit and slot_name_contains:
+            hit = slot_name_contains in name
+        if hit:
+            return row.get("flat"), name
+    return None, None
+
+
+def _slot_op_hint_from_name(name: str) -> str:
+    """Best-effort op hint from activation slot name."""
+    try:
+        m = re.match(r"^act\.L(\d+)\.([^.]+)\.", str(name))
+        if m:
+            return f"layer_{int(m.group(1))}:{m.group(2)}"
+        m = re.match(r"^act\.S([^.]+)\.([^.]+)\.", str(name))
+        if m:
+            return f"stage_{m.group(1).lower()}:{m.group(2)}"
+        m = re.match(r"^saved\.op(\d+)\.([^.]+)", str(name))
+        if m:
+            return f"op{int(m.group(1))}:{m.group(2)}"
+    except Exception:
+        pass
+    return str(name)
+
+
+def _infer_runtime_num_tokens(runtime_summary: dict, d_model_hint: int, vocab_hint: int) -> int:
+    """Infer compile-time CK_NUM_TOKENS from activation slot shapes."""
+    rows = runtime_summary.get("tensor_slots") if isinstance(runtime_summary, dict) else None
+    if not isinstance(rows, list):
+        return 1
+
+    d_model = max(1, int(d_model_hint or 0))
+    vocab = max(1, int(vocab_hint or 0))
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name", ""))
+        numel = int(row.get("numel", 0) or 0)
+        if numel <= 0:
+            continue
+        if name == "act.Sheader.dense_embedding_lookup.0.out" and (numel % d_model) == 0:
+            return max(1, numel // d_model)
+        if name == "act.Sfooter.logits.0.y" and (numel % vocab) == 0:
+            return max(1, numel // vocab)
+    return 1
 
 
 def _compile_train_runtime_variant(
@@ -2206,6 +2573,11 @@ def _run_ck_train_runtime(
     }
     has_diag_op_getter = bool(hasattr(lib, "ck_train_get_last_diag_failed_op"))
     has_diag_canary_getter = bool(hasattr(lib, "ck_train_get_last_diag_failed_canary"))
+    has_snapshot_numel = bool(hasattr(lib, "ck_train_get_weight_snapshot_numel"))
+    has_snapshot_export = bool(hasattr(lib, "ck_train_export_weight_snapshot"))
+    has_snapshot_import = bool(hasattr(lib, "ck_train_import_weight_snapshot"))
+    has_act_snapshot_numel = bool(hasattr(lib, "ck_train_get_activation_snapshot_numel"))
+    has_act_snapshot_export = bool(hasattr(lib, "ck_train_export_activation_snapshot"))
     if hasattr(lib, "ck_train_memory_diagnostic"):
         lib.ck_train_memory_diagnostic.argtypes = [
             ctypes.POINTER(ctypes.c_float),
@@ -2219,6 +2591,21 @@ def _run_ck_train_runtime(
     if has_diag_canary_getter:
         lib.ck_train_get_last_diag_failed_canary.argtypes = []
         lib.ck_train_get_last_diag_failed_canary.restype = ctypes.c_int
+    if has_snapshot_numel:
+        lib.ck_train_get_weight_snapshot_numel.argtypes = []
+        lib.ck_train_get_weight_snapshot_numel.restype = ctypes.c_int
+    if has_snapshot_export:
+        lib.ck_train_export_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_export_weight_snapshot.restype = ctypes.c_int
+    if has_snapshot_import:
+        lib.ck_train_import_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_import_weight_snapshot.restype = ctypes.c_int
+    if has_act_snapshot_numel:
+        lib.ck_train_get_activation_snapshot_numel.argtypes = []
+        lib.ck_train_get_activation_snapshot_numel.restype = ctypes.c_int
+    if has_act_snapshot_export:
+        lib.ck_train_export_activation_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_export_activation_snapshot.restype = ctypes.c_int
 
     float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
     size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
@@ -2279,6 +2666,15 @@ def _run_ck_train_runtime(
     parity_profile = str(getattr(args, "parity_profile", "balanced") or "balanced")
     parity_every = int(getattr(args, "parity_every", 50) or 0)
     train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
+    activation_tol = max(train_loss_tol * 10.0, 1e-5)
+    parity_replay_on_check = bool(getattr(args, "parity_replay_on_check", False))
+    parity_replay_tol = float(getattr(args, "parity_replay_tol", 1e-7) or 1e-7)
+    replay_weight_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
+    train_save_every = int(getattr(args, "train_save_every", 0) or 0)
+    train_save_final = bool(getattr(args, "train_save_final", True))
+    replay_auto_enabled = False
+    has_weight_snapshot_api = bool(has_snapshot_numel and has_snapshot_export and has_snapshot_import)
+    runtime_num_tokens = _infer_runtime_num_tokens(runtime_summary, d_model_hint=int(getattr(args, "train_d_model", 0) or 0), vocab_hint=vocab)
 
     batches = _build_train_token_batches(train_text, total_tokens, seq_len, vocab, seed)
     total_steps = epochs * len(batches)
@@ -2299,23 +2695,119 @@ def _run_ck_train_runtime(
         if not bool(verify_report.get("ok")):
             raise RuntimeError(f"PR3.7 memory verification failed: {verify_path}")
 
-    oracle_payload = None
-    oracle_loss_by_step: dict[int, float] = {}
-    if parity_on:
-        oracle_payload = _run_ck_oracle_reference(args, run_dir, train_text)
-        if isinstance(oracle_payload, dict):
-            for row in oracle_payload.get("loss_curve", []) if isinstance(oracle_payload.get("loss_curve"), list) else []:
-                try:
-                    st = int(row.get("step", 0) or 0)
-                    if st < 1:
-                        continue
-                    loss_pt = float(row.get("loss_pt", row.get("loss_ck", 0.0)) or 0.0)
-                    oracle_loss_by_step[st] = loss_pt
-                except Exception:
-                    continue
-
     # Oracle checks run at sampled steps to keep parity cost bounded for long runs.
     check_steps = _compute_parity_check_steps(total_steps, parity_profile, parity_every) if parity_on else set()
+
+    oracle_payload = None
+    oracle_loss_by_step: dict[int, float] = {}
+    oracle_max_steps_used = 0
+    oracle_source = "none"
+    snapshot_oracle_error = None
+    snapshot_oracle_enabled = False
+    snapshot_oracle_fn = None
+    oracle_strict = False
+
+    if parity_on:
+        grad_accum_for_oracle = max(1, int(getattr(args, "train_grad_accum", 1) or 1))
+        oracle_max_steps = max(check_steps) if check_steps else 0
+        if oracle_max_steps > 0 and grad_accum_for_oracle > 1:
+            oracle_max_steps = int(math.ceil(float(oracle_max_steps) / float(grad_accum_for_oracle)))
+        oracle_max_steps_used = int(oracle_max_steps)
+
+        if has_weight_snapshot_api:
+            try:
+                import oracle_snapshot_torch_v7 as _snapshot_oracle_mod
+                from oracle_snapshot_torch_v7 import compute_loss_logits_and_slots_from_snapshot_array
+
+                if getattr(_snapshot_oracle_mod, "torch", None) is None:
+                    raise RuntimeError("torch is required for snapshot oracle")
+                snapshot_oracle_fn = compute_loss_logits_and_slots_from_snapshot_array
+                snapshot_oracle_enabled = True
+                oracle_source = "torch_snapshot_step"
+                oracle_strict = True
+            except Exception as e:
+                snapshot_oracle_error = str(e)
+                snapshot_oracle_enabled = False
+
+        # Fallback reference only when snapshot-step oracle is unavailable.
+        if not snapshot_oracle_enabled:
+            oracle_payload = _run_ck_oracle_reference(
+                args,
+                run_dir,
+                train_text,
+                max_steps=oracle_max_steps if oracle_max_steps > 0 else None,
+            )
+            if isinstance(oracle_payload, dict):
+                oracle_source = "tiny_reference_harness"
+                for row in oracle_payload.get("loss_curve", []) if isinstance(oracle_payload.get("loss_curve"), list) else []:
+                    try:
+                        st = int(row.get("step", 0) or 0)
+                        if st < 1:
+                            continue
+                        loss_pt = float(row.get("loss_pt", row.get("loss_ck", 0.0)) or 0.0)
+                        # Optimizer-step index (native to train_parity_epochs_v7.py).
+                        oracle_loss_by_step[st] = loss_pt
+                        # Micro-step index used by CK runtime path when grad_accum > 1.
+                        oracle_loss_by_step[st * grad_accum_for_oracle] = loss_pt
+                    except Exception:
+                        continue
+
+    # When strict snapshot-oracle is active, force replay checks so parity
+    # covers full CK step determinism (backward + optimizer + weight update),
+    # not just forward activation/logit comparisons.
+    if parity_on and snapshot_oracle_enabled and has_weight_snapshot_api and not parity_replay_on_check:
+        parity_replay_on_check = True
+        replay_auto_enabled = True
+
+    replay_lib = None
+    replay_runtime_error = None
+    replay_has_forward_api = False
+    replay_has_set_batch_api = False
+    replay_has_act_snapshot_api = False
+    if (parity_replay_on_check or snapshot_oracle_enabled) and has_weight_snapshot_api:
+        try:
+            replay_so = run_dir / "libtrain_replay.so"
+            shutil.copy2(libtrain_so, replay_so)
+            replay_lib = ctypes.CDLL(str(replay_so))
+            if not hasattr(replay_lib, "ck_train_step") or not hasattr(replay_lib, "ck_train_init"):
+                raise RuntimeError("missing ck_train_step/ck_train_init in replay runtime")
+            if not hasattr(replay_lib, "ck_train_import_weight_snapshot"):
+                raise RuntimeError("missing ck_train_import_weight_snapshot in replay runtime")
+
+            replay_lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+            replay_lib.ck_train_init.restype = ctypes.c_int
+            replay_lib.ck_train_step.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+            replay_lib.ck_train_step.restype = ctypes.c_int
+            replay_lib.ck_train_import_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+            replay_lib.ck_train_import_weight_snapshot.restype = ctypes.c_int
+
+            replay_has_forward_api = bool(hasattr(replay_lib, "ck_train_forward_step"))
+            replay_has_set_batch_api = bool(hasattr(replay_lib, "ck_train_set_batch"))
+            replay_has_act_snapshot_api = bool(
+                hasattr(replay_lib, "ck_train_get_activation_snapshot_numel")
+                and hasattr(replay_lib, "ck_train_export_activation_snapshot")
+            )
+            if replay_has_forward_api:
+                replay_lib.ck_train_forward_step.argtypes = []
+                replay_lib.ck_train_forward_step.restype = ctypes.c_int
+            if replay_has_set_batch_api:
+                replay_lib.ck_train_set_batch.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32)]
+                replay_lib.ck_train_set_batch.restype = ctypes.c_int
+            if replay_has_act_snapshot_api:
+                replay_lib.ck_train_get_activation_snapshot_numel.argtypes = []
+                replay_lib.ck_train_get_activation_snapshot_numel.restype = ctypes.c_int
+                replay_lib.ck_train_export_activation_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                replay_lib.ck_train_export_activation_snapshot.restype = ctypes.c_int
+
+            replay_init_rc = int(replay_lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
+            if replay_init_rc < 0:
+                raise RuntimeError(f"replay ck_train_init failed with code {replay_init_rc}")
+        except Exception as e:
+            replay_runtime_error = str(e)
+            replay_lib = None
+            replay_has_forward_api = False
+            replay_has_set_batch_api = False
+            replay_has_act_snapshot_api = False
 
     step = 0
     micro_steps = 0
@@ -2326,7 +2818,14 @@ def _run_ck_train_runtime(
     grad_steps: list[int] = []
     grad_global: list[float] = []
     parity_failures: list[dict] = []
+    replay_failures: list[dict] = []
     checked_diffs: list[float] = []
+    snapshot_artifacts: list[str] = []
+    activation_snapshot_artifacts: list[str] = []
+    checkpoint_artifacts: list[dict] = []
+    last_checkpoint_step = 0
+    oracle_points = 0
+    last_oracle_loss = None
 
     for _ in range(epochs):
         for x_vals, y_vals in batches:
@@ -2336,6 +2835,22 @@ def _run_ck_train_runtime(
             y_buf = (ctypes.c_int32 * len(y_vals))(*y_vals)
             loss_out = ctypes.c_float(0.0)
 
+            need_check_snapshot = bool(
+                parity_on
+                and (step in check_steps)
+                and (
+                    snapshot_oracle_enabled
+                    or parity_replay_on_check
+                    or bool(getattr(args, "dump_on_drift", False))
+                )
+            )
+            pre_snapshot = None
+            pre_snapshot_numel = 0
+            if need_check_snapshot and has_weight_snapshot_api:
+                snap = _ck_export_runtime_weight_snapshot(lib)
+                if snap is not None:
+                    pre_snapshot, pre_snapshot_numel = snap
+
             t0 = time.perf_counter()
             calls = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
             t1 = time.perf_counter()
@@ -2344,21 +2859,306 @@ def _run_ck_train_runtime(
 
             step_ms = (t1 - t0) * 1000.0
             total_ck_ms += step_ms
-            processed_tokens += len(x_vals)
+            processed_tokens += min(len(x_vals), int(runtime_num_tokens))
             loss_val = float(loss_out.value)
 
-            oracle_loss = oracle_loss_by_step.get(step)
-            loss_diff = abs(loss_val - oracle_loss) if oracle_loss is not None else 0.0
-            if parity_on and (step in check_steps) and (oracle_loss is not None):
-                checked_diffs.append(loss_diff)
-                if loss_diff > train_loss_tol:
-                    parity_failures.append({
+            post_snapshot = None
+            post_snapshot_numel = 0
+            if parity_replay_on_check and (step in check_steps) and has_weight_snapshot_api:
+                post_snap = _ck_export_runtime_weight_snapshot(lib)
+                if post_snap is not None:
+                    post_snapshot, post_snapshot_numel = post_snap
+
+            if has_weight_snapshot_api and train_save_every > 0 and (step % train_save_every) == 0:
+                ckpt_snap = (post_snapshot, post_snapshot_numel) if (post_snapshot is not None and post_snapshot_numel > 0) else _ck_export_runtime_weight_snapshot(lib)
+                if ckpt_snap is not None:
+                    ckpt_buf, ckpt_numel = ckpt_snap
+                    ckpt_meta = _write_ck_weight_checkpoint_bump(
+                        run_dir,
+                        runtime_summary,
+                        ckpt_buf,
+                        int(ckpt_numel),
+                        step=step,
+                        reason="periodic",
+                    )
+                    if isinstance(ckpt_meta, dict):
+                        checkpoint_artifacts.append(ckpt_meta)
+                        last_checkpoint_step = int(step)
+
+            replay_loss = None
+            replay_diff = None
+            replay_ok = None
+            replay_weight_max_abs_diff = None
+            replay_weight_mean_abs_diff = None
+            replay_weight_error = None
+            if parity_replay_on_check and (step in check_steps):
+                if replay_lib is None:
+                    replay_failures.append({
                         "step": step,
                         "loss_ck": loss_val,
-                        "loss_oracle": oracle_loss,
-                        "loss_diff": loss_diff,
-                        "threshold": train_loss_tol,
+                        "loss_replay": None,
+                        "replay_diff": None,
+                        "threshold": parity_replay_tol,
+                        "weight_max_abs_diff": None,
+                        "weight_mean_abs_diff": None,
+                        "weight_threshold": replay_weight_tol,
+                        "weight_error": "replay_runtime_unavailable",
+                        "reason": f"replay_runtime_unavailable:{replay_runtime_error}",
                     })
+                elif pre_snapshot is not None and pre_snapshot_numel > 0:
+                    import_rc = _ck_import_runtime_weight_snapshot(replay_lib, pre_snapshot, pre_snapshot_numel)
+                    if import_rc >= 0:
+                        replay_loss_out = ctypes.c_float(0.0)
+                        replay_calls = int(replay_lib.ck_train_step(x_buf, y_buf, ctypes.byref(replay_loss_out), ctypes.c_float(lr)))
+                        if replay_calls < 0:
+                            raise RuntimeError(f"ck_train_step replay failed at step {step} (calls={replay_calls})")
+                        replay_loss = float(replay_loss_out.value)
+                        replay_diff = abs(replay_loss - loss_val)
+
+                        if post_snapshot is not None and post_snapshot_numel > 0:
+                            replay_post = _ck_export_runtime_weight_snapshot(replay_lib)
+                            if replay_post is not None:
+                                replay_post_buf, replay_post_numel = replay_post
+                                if int(replay_post_numel) == int(post_snapshot_numel):
+                                    try:
+                                        import numpy as _np
+                                        ck_post_np = _np.ctypeslib.as_array(post_snapshot, shape=(int(post_snapshot_numel),)).astype(_np.float32, copy=False)
+                                        replay_post_np = _np.ctypeslib.as_array(replay_post_buf, shape=(int(replay_post_numel),)).astype(_np.float32, copy=False)
+                                        delta_np = _np.abs(ck_post_np - replay_post_np)
+                                        replay_weight_max_abs_diff = float(_np.max(delta_np)) if delta_np.size else 0.0
+                                        replay_weight_mean_abs_diff = float(_np.mean(delta_np)) if delta_np.size else 0.0
+                                    except Exception as e:
+                                        replay_weight_error = f"replay_weight_compare_failed:{e}"
+                                else:
+                                    replay_weight_error = f"replay_post_snapshot_size_mismatch:{replay_post_numel}!={post_snapshot_numel}"
+                            else:
+                                replay_weight_error = "replay_post_snapshot_unavailable"
+                        else:
+                            replay_weight_error = "post_snapshot_unavailable"
+
+                        replay_ok = bool(
+                            (replay_diff is not None)
+                            and (replay_diff <= parity_replay_tol)
+                            and (replay_weight_error is None)
+                            and (replay_weight_max_abs_diff is not None)
+                            and (float(replay_weight_max_abs_diff) <= float(replay_weight_tol))
+                        )
+                        if not replay_ok:
+                            replay_failures.append({
+                                "step": step,
+                                "loss_ck": loss_val,
+                                "loss_replay": replay_loss,
+                                "replay_diff": replay_diff,
+                                "threshold": parity_replay_tol,
+                                "weight_max_abs_diff": replay_weight_max_abs_diff,
+                                "weight_mean_abs_diff": replay_weight_mean_abs_diff,
+                                "weight_threshold": replay_weight_tol,
+                                "weight_error": replay_weight_error,
+                            })
+                    else:
+                        replay_failures.append({
+                            "step": step,
+                            "loss_ck": loss_val,
+                            "loss_replay": None,
+                            "replay_diff": None,
+                            "threshold": parity_replay_tol,
+                            "weight_max_abs_diff": None,
+                            "weight_mean_abs_diff": None,
+                            "weight_threshold": replay_weight_tol,
+                            "weight_error": "snapshot_import_failed",
+                            "reason": f"snapshot_import_failed:{import_rc}",
+                        })
+                else:
+                    replay_failures.append({
+                        "step": step,
+                        "loss_ck": loss_val,
+                        "loss_replay": None,
+                        "replay_diff": None,
+                        "threshold": parity_replay_tol,
+                        "weight_max_abs_diff": None,
+                        "weight_mean_abs_diff": None,
+                        "weight_threshold": replay_weight_tol,
+                        "weight_error": "snapshot_unavailable",
+                        "reason": "snapshot_unavailable",
+                    })
+
+            oracle_loss = None
+            oracle_error = None
+            oracle_logits_max_abs_diff = None
+            oracle_logits_slot = None
+            oracle_first_bad_tensor = None
+            oracle_first_bad_diff = None
+            oracle_first_bad_op = None
+            oracle_slots_compared = 0
+            oracle_slots_matched = 0
+            if parity_on and (step in check_steps) and snapshot_oracle_enabled and snapshot_oracle_fn is not None:
+                if pre_snapshot is not None and pre_snapshot_numel > 0:
+                    try:
+                        import numpy as _np
+                        snap_np = _np.ctypeslib.as_array(pre_snapshot, shape=(int(pre_snapshot_numel),)).astype(_np.float32, copy=True)
+                        oracle_x_vals = list(x_vals[: int(runtime_num_tokens)]) if int(runtime_num_tokens) > 0 else list(x_vals)
+                        oracle_y_vals = list(y_vals[: int(runtime_num_tokens)]) if int(runtime_num_tokens) > 0 else list(y_vals)
+                        oracle_loss_val, _oracle_logits, oracle_slot_map = snapshot_oracle_fn(
+                            run_dir,
+                            runtime_summary,
+                            snap_np,
+                            oracle_x_vals,
+                            oracle_y_vals,
+                        )
+                        oracle_loss = float(oracle_loss_val)
+
+                        ck_slot_rows = None
+                        if replay_lib is not None and replay_has_forward_api and replay_has_set_batch_api and replay_has_act_snapshot_api:
+                            import_rc = _ck_import_runtime_weight_snapshot(replay_lib, pre_snapshot, pre_snapshot_numel)
+                            if import_rc < 0:
+                                oracle_error = f"snapshot_import_failed:{import_rc}"
+                            else:
+                                set_rc = int(replay_lib.ck_train_set_batch(x_buf, y_buf))
+                                if set_rc < 0:
+                                    oracle_error = f"replay_set_batch_failed:{set_rc}"
+                                else:
+                                    fwd_rc = int(replay_lib.ck_train_forward_step())
+                                    if fwd_rc < 0:
+                                        oracle_error = f"replay_forward_failed:{fwd_rc}"
+                                    else:
+                                        act_numel = int(replay_lib.ck_train_get_activation_snapshot_numel())
+                                        if act_numel > 0:
+                                            act_buf = (ctypes.c_float * act_numel)()
+                                            wrote = int(replay_lib.ck_train_export_activation_snapshot(act_buf, ctypes.c_int(act_numel)))
+                                            if wrote > 0:
+                                                ck_slot_rows = _extract_activation_slots_ordered(runtime_summary, act_buf, int(wrote))
+                                            else:
+                                                oracle_error = f"replay_activation_export_failed:{wrote}"
+                                        else:
+                                            oracle_error = "replay_activation_numel_invalid"
+                        elif has_act_snapshot_export:
+                            act_snap = _ck_export_runtime_activation_snapshot(lib)
+                            if act_snap is not None:
+                                act_buf, act_numel = act_snap
+                                ck_slot_rows = _extract_activation_slots_ordered(runtime_summary, act_buf, act_numel)
+                            else:
+                                oracle_error = "activation_snapshot_unavailable"
+
+                        if isinstance(ck_slot_rows, list):
+                            for row in ck_slot_rows:
+                                name = str(row.get("name", ""))
+                                ck_flat = _np.asarray(row.get("flat"), dtype=_np.float32).reshape(-1)
+                                oracle_flat = oracle_slot_map.get(name)
+                                if oracle_flat is None:
+                                    continue
+                                oracle_slots_compared += 1
+                                ref = _np.asarray(oracle_flat, dtype=_np.float32).reshape(-1)
+                                if ck_flat.size != ref.size:
+                                    diff = float("inf")
+                                elif ck_flat.size == 0:
+                                    diff = 0.0
+                                else:
+                                    diff = float(_np.max(_np.abs(ck_flat - ref)))
+                                    oracle_slots_matched += 1
+
+                                if name == "act.Sfooter.logits.0.y" or ".logits." in name:
+                                    oracle_logits_max_abs_diff = diff
+                                    oracle_logits_slot = name
+
+                                if (oracle_first_bad_tensor is None) and (diff > float(activation_tol)):
+                                    oracle_first_bad_tensor = name
+                                    oracle_first_bad_diff = diff
+                                    oracle_first_bad_op = _slot_op_hint_from_name(name)
+
+                            if oracle_logits_max_abs_diff is None:
+                                maybe_logits = oracle_slot_map.get("act.Sfooter.logits.0.y")
+                                if maybe_logits is not None:
+                                    oracle_logits_slot = "act.Sfooter.logits.0.y"
+                                    oracle_logits_max_abs_diff = None
+                        elif oracle_error is None:
+                            oracle_error = "activation_slot_decode_failed"
+                    except Exception as e:
+                        oracle_error = str(e)
+                else:
+                    oracle_error = "snapshot_unavailable"
+
+            if oracle_loss is None:
+                oracle_loss = oracle_loss_by_step.get(step)
+
+            if oracle_loss is not None:
+                oracle_points += 1
+                last_oracle_loss = float(oracle_loss)
+
+            loss_diff = abs(loss_val - oracle_loss) if oracle_loss is not None else 0.0
+            snapshot_path = None
+            activation_snapshot_path = None
+            if parity_on and (step in check_steps):
+                if oracle_loss is not None:
+                    checked_diffs.append(loss_diff)
+                    fail_loss = bool(oracle_strict and (loss_diff > train_loss_tol))
+                    fail_logits = bool(
+                        oracle_strict
+                        and oracle_logits_max_abs_diff is not None
+                        and float(oracle_logits_max_abs_diff) > float(activation_tol)
+                    )
+                    fail_slots = bool(
+                        oracle_strict
+                        and oracle_first_bad_tensor is not None
+                        and oracle_first_bad_diff is not None
+                        and float(oracle_first_bad_diff) > float(activation_tol)
+                    )
+                    if fail_loss or fail_logits or fail_slots:
+                        if bool(getattr(args, "dump_on_drift", False)) and pre_snapshot is not None and pre_snapshot_numel > 0:
+                            snap_path = _write_ck_weight_snapshot_artifact(
+                                run_dir,
+                                step,
+                                pre_snapshot,
+                                pre_snapshot_numel,
+                                reason="parity_drift",
+                            )
+                            if snap_path is not None:
+                                snapshot_path = str(snap_path)
+                                snapshot_artifacts.append(snapshot_path)
+                        if bool(getattr(args, "dump_on_drift", False)) and has_act_snapshot_export:
+                            act_snap = _ck_export_runtime_activation_snapshot(lib)
+                            if act_snap is not None:
+                                act_buf, act_numel = act_snap
+                                act_path = _write_ck_activation_snapshot_artifact(
+                                    run_dir,
+                                    step,
+                                    act_buf,
+                                    act_numel,
+                                    reason="parity_drift",
+                                )
+                                if act_path is not None:
+                                    activation_snapshot_path = str(act_path)
+                                    activation_snapshot_artifacts.append(activation_snapshot_path)
+                        parity_failures.append({
+                            "step": step,
+                            "loss_ck": loss_val,
+                            "loss_oracle": oracle_loss,
+                            "loss_diff": loss_diff,
+                            "threshold": train_loss_tol,
+                            "logits_max_abs_diff": oracle_logits_max_abs_diff,
+                            "logits_threshold": activation_tol,
+                            "logits_slot": oracle_logits_slot,
+                            "first_bad_tensor": oracle_first_bad_tensor,
+                            "first_bad_diff": oracle_first_bad_diff,
+                            "first_bad_op": oracle_first_bad_op,
+                            "activation_threshold": activation_tol,
+                            "slots_compared": oracle_slots_compared,
+                            "slots_matched": oracle_slots_matched,
+                            "snapshot": snapshot_path,
+                            "activation_snapshot": activation_snapshot_path,
+                            "oracle_error": oracle_error,
+                        })
+                else:
+                    if oracle_strict:
+                        parity_failures.append({
+                            "step": step,
+                            "loss_ck": loss_val,
+                            "loss_oracle": None,
+                            "loss_diff": None,
+                            "threshold": train_loss_tol,
+                            "snapshot": None,
+                            "activation_snapshot": None,
+                            "reason": oracle_error or "oracle_unavailable",
+                        })
 
             # grad_norm is a placeholder until runtime exports per-step grad telemetry.
             loss_curve.append(
@@ -2368,6 +3168,13 @@ def _run_ck_train_runtime(
                     "tokens": len(x_vals),
                     "loss_ck": loss_val,
                     "loss_pt": oracle_loss if oracle_loss is not None else loss_val,
+                    "logits_max_abs_diff": oracle_logits_max_abs_diff,
+                    "logits_slot": oracle_logits_slot,
+                    "first_bad_tensor": oracle_first_bad_tensor,
+                    "first_bad_diff": oracle_first_bad_diff,
+                    "first_bad_op": oracle_first_bad_op,
+                    "slots_compared": oracle_slots_compared,
+                    "slots_matched": oracle_slots_matched,
                     "lr": lr,
                     "grad_norm": 0.0,
                     "forward_ms": 0.0,
@@ -2384,34 +3191,80 @@ def _run_ck_train_runtime(
                 {
                     "step": step,
                     "loss_diff": loss_diff,
-                    "max_param_diff": 0.0,
+                    "max_param_diff": float(replay_weight_max_abs_diff or 0.0),
                     "worst_param": None,
-                    "mean_param_diff": 0.0,
-                    "checked": bool(parity_on and (step in check_steps)),
+                    "mean_param_diff": float(replay_weight_mean_abs_diff or 0.0),
+                    "checked": bool(parity_on and (step in check_steps) and (oracle_loss is not None)),
                     "oracle_available": oracle_loss is not None,
+                    "oracle_source": oracle_source,
+                    "oracle_error": oracle_error,
+                    "logits_max_abs_diff": oracle_logits_max_abs_diff,
+                    "logits_threshold": activation_tol,
+                    "logits_slot": oracle_logits_slot,
+                    "first_bad_tensor": oracle_first_bad_tensor,
+                    "first_bad_diff": oracle_first_bad_diff,
+                    "first_bad_op": oracle_first_bad_op,
+                    "slots_compared": oracle_slots_compared,
+                    "slots_matched": oracle_slots_matched,
+                    "replay_enabled": bool(parity_replay_on_check),
+                    "replay_available": bool(pre_snapshot is not None and pre_snapshot_numel > 0),
+                    "replay_loss": replay_loss,
+                    "replay_diff": replay_diff,
+                    "replay_ok": replay_ok,
+                    "replay_weight_max_abs_diff": replay_weight_max_abs_diff,
+                    "replay_weight_mean_abs_diff": replay_weight_mean_abs_diff,
+                    "replay_weight_threshold": replay_weight_tol,
+                    "replay_weight_error": replay_weight_error,
                 }
             )
             grad_steps.append(step)
             grad_global.append(0.0)
 
+    if has_weight_snapshot_api and train_save_final and step > 0 and int(last_checkpoint_step) != int(step):
+        final_snap = _ck_export_runtime_weight_snapshot(lib)
+        if final_snap is not None:
+            final_buf, final_numel = final_snap
+            final_ckpt = _write_ck_weight_checkpoint_bump(
+                run_dir,
+                runtime_summary,
+                final_buf,
+                int(final_numel),
+                step=step,
+                reason="final",
+            )
+            if isinstance(final_ckpt, dict):
+                checkpoint_artifacts.append(final_ckpt)
+                last_checkpoint_step = int(step)
+
+    replay_weight_max_values = [
+        float(row.get("replay_weight_max_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_weight_max_abs_diff") is not None
+    ]
+    replay_weight_mean_values = [
+        float(row.get("replay_weight_mean_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_weight_mean_abs_diff") is not None
+    ]
+
     final_ck_loss = float(loss_curve[-1]["loss_ck"]) if loss_curve else 0.0
-    final_oracle_loss = float(oracle_loss_by_step.get(step, final_ck_loss)) if step > 0 else final_ck_loss
+    final_oracle_loss = float(last_oracle_loss) if last_oracle_loss is not None else final_ck_loss
     train_tok_s = (processed_tokens / (total_ck_ms / 1000.0)) if total_ck_ms > 0 else 0.0
     avg_ck_step_ms = (total_ck_ms / step) if step > 0 else 0.0
 
-    if parity_on and not oracle_loss_by_step:
+    if parity_on and oracle_points == 0:
         parity_failures.append({
             "step": 0,
             "loss_ck": final_ck_loss,
             "loss_oracle": None,
             "loss_diff": None,
             "threshold": train_loss_tol,
-            "reason": "oracle_unavailable",
+            "reason": snapshot_oracle_error or "oracle_unavailable",
         })
 
     max_loss_abs_diff = max(checked_diffs) if checked_diffs else 0.0
     mean_loss_abs_diff = (sum(checked_diffs) / len(checked_diffs)) if checked_diffs else 0.0
-    pass_parity = (len(parity_failures) == 0)
+    pass_parity = (len(parity_failures) == 0) and (not parity_replay_on_check or len(replay_failures) == 0)
 
     if parity_on and parity_failures and bool(getattr(args, "dump_on_drift", False)):
         topk = int(getattr(args, "drift_topk", 20) or 20)
@@ -2424,9 +3277,14 @@ def _run_ck_train_runtime(
             "generated_at": _utc_now_iso(),
             "backend": train_backend,
             "oracle": str(getattr(args, "oracle", "pytorch") or "pytorch"),
+            "oracle_source": oracle_source,
             "threshold": train_loss_tol,
+            "logits_threshold": activation_tol,
             "first_failure": ranked[0] if ranked else None,
             "failures": ranked[:topk],
+            "replay_failures": replay_failures[:topk],
+            "snapshot_files": snapshot_artifacts[:topk],
+            "activation_snapshot_files": activation_snapshot_artifacts[:topk],
         }
         drift_path = run_dir / "drift_report.json"
         drift_path.write_text(json.dumps(drift_report, indent=2), encoding="utf-8")
@@ -2446,8 +3304,8 @@ def _run_ck_train_runtime(
         "mean_loss_abs_diff": mean_loss_abs_diff,
         "final_ck_loss": final_ck_loss,
         "final_torch_loss": final_oracle_loss,
-        "final_param_max_abs_diff": 0.0,
-        "final_param_mean_abs_diff": 0.0,
+        "final_param_max_abs_diff": float(max(replay_weight_max_values) if replay_weight_max_values else 0.0),
+        "final_param_mean_abs_diff": float((sum(replay_weight_mean_values) / len(replay_weight_mean_values)) if replay_weight_mean_values else 0.0),
         "pass_parity": pass_parity,
         "loss_curve": loss_curve,
         "parity_steps": parity_steps,
@@ -2474,16 +3332,41 @@ def _run_ck_train_runtime(
         "runtime_init": {
             "num_params": int(init_payload.get("num_params", 0)),
             "total_floats": int(init_payload.get("total_floats", 0)),
+            "runtime_num_tokens": int(runtime_num_tokens),
             "loaded": init_payload.get("loaded", []),
             "memory_diagnostic": diag_info,
+        },
+        "checkpoints": {
+            "enabled": bool(has_weight_snapshot_api and (train_save_every > 0 or train_save_final)),
+            "save_every": int(train_save_every),
+            "save_final": bool(train_save_final),
+            "count": int(len(checkpoint_artifacts)),
+            "latest_step": int(last_checkpoint_step),
+            "files": checkpoint_artifacts,
         },
         "oracle": {
             "enabled": parity_on,
             "profile": parity_profile,
             "every": parity_every,
             "checks": sorted(check_steps),
-            "available": bool(oracle_loss_by_step),
+            "max_steps": int(oracle_max_steps_used),
+            "source": oracle_source,
+            "strict": bool(oracle_strict),
+            "available": bool(oracle_points > 0),
+            "snapshot_torch_enabled": bool(snapshot_oracle_enabled),
+            "snapshot_torch_error": snapshot_oracle_error,
             "failures": parity_failures,
+            "replay_on_check": bool(parity_replay_on_check),
+            "replay_auto_enabled": bool(replay_auto_enabled),
+            "replay_tol": float(parity_replay_tol),
+            "replay_weight_tol": float(replay_weight_tol),
+            "logits_tol": float(activation_tol),
+            "replay_failures": replay_failures,
+            "snapshot_api_available": bool(has_weight_snapshot_api),
+            "activation_snapshot_api_available": bool(has_act_snapshot_numel and has_act_snapshot_export),
+            "replay_runtime_error": replay_runtime_error,
+            "snapshot_files": snapshot_artifacts,
+            "activation_snapshot_files": activation_snapshot_artifacts,
         },
     }
 
@@ -2501,6 +3384,12 @@ def _run_ck_train_runtime(
         profile_meta.setdefault("artifacts", []).append({"label": "layout_train_audit", "path": str(layout_audit_path)})
     if parity_on and (run_dir / "oracle_reference_latest.json").exists():
         profile_meta.setdefault("artifacts", []).append({"label": "oracle_reference", "path": str(run_dir / "oracle_reference_latest.json")})
+    if snapshot_artifacts:
+        profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_snapshots", "path": str(run_dir / "oracle_ck_snapshots")})
+    if activation_snapshot_artifacts:
+        profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_activations", "path": str(run_dir / "oracle_ck_activations")})
+    if checkpoint_artifacts:
+        profile_meta.setdefault("artifacts", []).append({"label": "train_checkpoints", "path": str(run_dir / "checkpoints")})
 
     return json_out
 
@@ -2561,11 +3450,24 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         "decode_tok_s": float(step_profile.get("decode_tok_s", step_profile.get("train_tok_s", 0.0)) or 0.0),
     }
 
+    ckpt_info = s.get("checkpoints") if isinstance(s.get("checkpoints"), dict) else {}
+    training_checkpoint_policy = {
+        "policy": "step_interval" if bool(ckpt_info.get("enabled")) else "none",
+        "source": "train_e2e",
+        "checkpointing": bool(ckpt_info.get("enabled", False)),
+        "save_every": int(ckpt_info.get("save_every", 0) or 0),
+        "save_final": bool(ckpt_info.get("save_final", False)),
+        "count": int(ckpt_info.get("count", 0) or 0),
+        "latest_step": int(ckpt_info.get("latest_step", 0) or 0),
+        "files": ckpt_info.get("files", []),
+    }
+
     payloads = {
         "training_loss_curve.json": training_loss_curve,
         "training_parity.json": training_parity,
         "training_grad_norms.json": training_grad_norms,
         "training_step_profile.json": training_step_profile,
+        "training_checkpoint_policy.json": training_checkpoint_policy,
     }
     for name, payload in payloads.items():
         (run_dir / name).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -2684,6 +3586,8 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     parity_every = int(getattr(args, "parity_every", 50) or 0)
     oracle = str(getattr(args, "oracle", "pytorch") or "pytorch")
     analysis_mode = str(getattr(args, "analysis_checkpoints", "log") or "log")
+    train_save_every = int(getattr(args, "train_save_every", 0) or 0)
+    train_save_final = bool(getattr(args, "train_save_final", True))
     if parity_on:
         cadence = f"every={parity_every}" if parity_every > 0 else f"profile={parity_profile}"
         log(f"  parity oracle: on ({oracle}, {cadence})", C_DIM)
@@ -2691,6 +3595,10 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         log("  parity oracle: off", C_DIM)
     if bool(getattr(args, "dump_on_drift", False)):
         log(f"  drift dumps: on (topk={int(getattr(args, 'drift_topk', 20) or 20)})", C_DIM)
+    if train_save_every > 0 or train_save_final:
+        cadence = f"every={train_save_every}" if train_save_every > 0 else "off"
+        final_txt = "on" if train_save_final else "off"
+        log(f"  runtime checkpoints: cadence={cadence}, final={final_txt}", C_DIM)
     log(f"  analysis checkpoints: {analysis_mode}", C_DIM)
 
     profile_mode = str(getattr(args, "profile_train", "none") or "none").lower()
@@ -2713,6 +3621,8 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "dump_on_drift": bool(getattr(args, "dump_on_drift", False)),
         "drift_topk": int(getattr(args, "drift_topk", 20) or 20),
         "analysis_checkpoints": analysis_mode,
+        "train_save_every": train_save_every,
+        "train_save_final": train_save_final,
         "artifacts": [],
     }
 
@@ -2836,7 +3746,11 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         "--context-len", str(getattr(args, "context_len", 128)),
         "--rope-theta", str(getattr(args, "rope_theta", 1_000_000.0)),
         "--kernel-policy", str(getattr(args, "kernel_policy", "fp32_reference_first")),
+        "--template", str(getattr(args, "template", "qwen3")),
     ]
+    template_file = getattr(args, "template_file", None)
+    if template_file:
+        cmd.extend(["--template-file", str(template_file)])
     run_cmd(cmd, cwd=PROJECT_ROOT)
 
     # Run-dir aliases for operator workflows.
@@ -2954,6 +3868,8 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         "generated_at": _utc_now_iso(),
         "mode": mode,
         "init": str(getattr(args, "init", "normal_0p02")),
+        "template": str(getattr(args, "template", "qwen3")),
+        "template_file": str(getattr(args, "template_file", "") or ""),
         "paths": {
             "run_dir": str(out_dir),
             "weights": str(out_dir / "weights.bump"),
@@ -4277,12 +5193,21 @@ Examples:
                         help='Parity cadence profile (debug/balanced/light)')
         sp.add_argument('--parity-every', type=int, default=50,
                         help='Fixed parity cadence in steps (<=0 keeps profile-driven cadence)')
+        sp.add_argument('--parity-replay-on-check', action='store_true',
+                        help='Replay checked CK steps from exported weight snapshots to verify one-step determinism')
+        sp.add_argument('--parity-replay-tol', type=float, default=1e-7,
+                        help='Allowed absolute loss delta for CK replay-on-check')
         sp.add_argument('--dump-on-drift', action='store_true',
                         help='On parity mismatch, dump drift artifacts for triage')
         sp.add_argument('--drift-topk', type=int, default=20,
                         help='Top-K tensor diffs to include in drift report')
         sp.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log',
                         help='Training analysis checkpoint cadence mode')
+        sp.add_argument('--train-save-every', type=int, default=0,
+                        help='Write runtime weight checkpoints every N train steps (0 disables)')
+        sp.set_defaults(train_save_final=True)
+        sp.add_argument('--no-train-save-final', dest='train_save_final', action='store_false',
+                        help='Do not write final runtime weight checkpoint at end of training')
         sp.add_argument('--train-runtime-canary-checks', action='store_true',
                         help='Compile CK train runtime with CK_RUNTIME_CANARY_CHECKS=1 (step-level canary checks)')
         sp.add_argument('--train-runtime-bounds-assert', action='store_true',
@@ -4365,6 +5290,8 @@ Examples:
     run_parser.add_argument('--oracle', choices=['pytorch'], default='pytorch')
     run_parser.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced')
     run_parser.add_argument('--parity-every', type=int, default=50)
+    run_parser.add_argument('--parity-replay-on-check', action='store_true')
+    run_parser.add_argument('--parity-replay-tol', type=float, default=1e-7)
     run_parser.add_argument('--dump-on-drift', action='store_true')
     run_parser.add_argument('--drift-topk', type=int, default=20)
     run_parser.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log')
@@ -4499,6 +5426,10 @@ Examples:
     init_parser.add_argument('--context-len', type=int, default=128)
     init_parser.add_argument('--rope-theta', type=float, default=1_000_000.0)
     init_parser.add_argument('--kernel-policy', default='fp32_reference_first')
+    init_parser.add_argument('--template', default='qwen3',
+                             help='Training graph template name (built-ins: qwen3, qwen2, gemma3)')
+    init_parser.add_argument('--template-file', default=None,
+                             help='Optional custom template JSON path (embedded into weights_manifest.json)')
     init_parser.add_argument('--generate-ir', action='store_true',
                              help='Also generate train IR artifacts (IR1 + IR2 + invariants)')
     init_parser.add_argument('--generate-runtime', action='store_true',
