@@ -1,0 +1,62 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg { fill: #121417; }
+      .panel { fill: #1a1f26; stroke: #3a4552; stroke-width: 2; rx: 12; }
+      .title { fill: #f5f7fa; font-family: Inter, Arial, sans-serif; font-size: 32px; font-weight: 700; }
+      .subtitle { fill: #c7d1dc; font-family: Inter, Arial, sans-serif; font-size: 20px; font-weight: 600; }
+      .body { fill: #aeb7c2; font-family: Inter, Arial, sans-serif; font-size: 18px; }
+      .good { fill: #6dd29a; }
+      .warn { fill: #f2b550; }
+      .bad { fill: #ef6a6a; }
+      .chip { fill: #26303b; stroke: #4b5a6b; stroke-width: 1.5; rx: 8; }
+      .chipText { fill: #e8eef6; font-family: JetBrains Mono, monospace; font-size: 16px; }
+      .arrow { stroke: #8ea1b5; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+    </style>
+    <marker id="arrowHead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8ea1b5" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="760" class="bg"/>
+  <text x="60" y="64" class="title">v7 Grad-Accum Schedule: Before vs After</text>
+  <text x="60" y="100" class="body">Why early drift moved from ~step 65 to much later in stress runs.</text>
+
+  <rect x="60" y="140" width="620" height="560" class="panel"/>
+  <text x="90" y="188" class="subtitle bad">Before (drift-prone order)</text>
+  <text x="90" y="218" class="body">Optimizer timing could desynchronize from the intended accumulation window.</text>
+
+  <rect x="90" y="248" width="560" height="88" class="chip"/>
+  <text x="112" y="302" class="chipText">microstep 1: zero_grad - fwd - bwd - maybe_opt</text>
+
+  <path d="M370 338 L370 366" class="arrow"/>
+
+  <rect x="90" y="374" width="560" height="88" class="chip"/>
+  <text x="112" y="428" class="chipText">microstep 2..N: fwd - bwd - maybe_opt</text>
+
+  <path d="M370 464 L370 492" class="arrow"/>
+
+  <rect x="90" y="500" width="560" height="88" class="chip"/>
+  <text x="112" y="554" class="chipText bad">update may occur before true window boundary</text>
+
+  <text x="90" y="632" class="body">Effect: early optimizer-state skew, error amplifies quickly.</text>
+
+  <rect x="720" y="140" width="620" height="560" class="panel"/>
+  <text x="750" y="188" class="subtitle good">After (PyTorch-window aligned)</text>
+  <text x="750" y="218" class="body">Exactly one optimizer step per accumulation window.</text>
+
+  <rect x="750" y="248" width="560" height="88" class="chip"/>
+  <text x="772" y="302" class="chipText">if g_accum_step == 0: zero_grad()</text>
+
+  <path d="M1030 338 L1030 366" class="arrow"/>
+
+  <rect x="750" y="374" width="560" height="88" class="chip"/>
+  <text x="772" y="428" class="chipText">fwd - bwd ; g_accum_step += 1</text>
+
+  <path d="M1030 464 L1030 492" class="arrow"/>
+
+  <rect x="750" y="500" width="560" height="88" class="chip"/>
+  <text x="772" y="554" class="chipText good">if g_accum_step &gt;= CK_GRAD_ACCUM_STEPS: optimizer_step(); g_accum_step=0</text>
+
+  <text x="750" y="632" class="body">Effect: early drift removed; remaining drift is slower and easier to localize.</text>
+</svg>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> | C-Kernel-Engine</title>
+    <title>GEMMOptimization | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -927,14 +927,8 @@
         </nav>
     </header>
     <main>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GEMM Optimization | C-Kernel-Engine</title>
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-    <style>
+
+<style>
         :root {
             /* Antsand Brand Colors - Lightened */
             --orange: #ffb400;
@@ -1501,91 +1495,7 @@
             border-radius: 4px;
         }
     </style>
-</head>
-<body>
-    <!-- Header -->
-    <header class="site-header">
-        <a href="index.html" class="header-brand">
-            <div class="header-logo">CK</div>
-            <div>
-                <div class="header-title">C-Kernel-Engine</div>
-                <div class="header-subtitle">High-Performance ML Kernels</div>
-            </div>
-        </a>
-        <nav class="site-nav">
-            <a href="index.html">Home</a>
-            <a href="quickstart.html">Getting Started</a>
-            <a href="developer-guide.html">Developer Guide</a>
-            <a href="scaling.html">Scaling</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">Architecture</span>
-                <div class="nav-dropdown-menu">
-                    <a href="architecture.html">
-                        System Overview
-                        <small>IR, Codegen, Kernels</small>
-                    </a>
-                    <a href="kernels.html">
-                        Kernel Reference
-                        <small>All forward/backward kernels</small>
-                    </a>
-                    <a href="gemm-optimization.html" class="active">
-                        GEMM Optimization
-                        <small>AVX, MKL, blocking strategies</small>
-                    </a>
-                    <a href="quantization.html">
-                        Quantization
-                        <small>INT8, FP16, mixed precision</small>
-                    </a>
-                    <a href="simd-architecture.html">
-                        SIMD Architecture
-                        <small>AVX-512, VNNI, AMX deep dive</small>
-                    </a>
-                    <a href="codegen.html">
-                        Code Generation
-                        <small>IR to C compilation</small>
-                    </a>
-                    <a href="memory-safety.html">
-                        Memory Safety
-                        <small>Bump allocator, canaries, verification</small>
-                    </a>
-                    <a href="profiling.html">
-                        Profiling Guide
-                        <small>Valgrind, perf, flamegraphs</small>
-                    </a>
-                    <a href="concepts.html">
-                        Deep Dive Concepts
-                        <small>RoPE, Flash Attention, GQA</small>
-                    </a>
-                    <a href="testing.html">
-                        Testing Methodology
-                        <small>Numerical parity verification</small>
-                    </a>
-                </div>
-            </div>
-            <a href="pytorch-parity.html">PyTorch Parity</a>
-            <a href="research.html">Research</a>
-            <div class="nav-dropdown">
-                <span class="nav-trigger">API & Docs</span>
-                <div class="nav-dropdown-menu">
-                    <a href="api.html">
-                        API Reference
-                        <small>Function signatures & usage</small>
-                    </a>
-                    <a href="doxygen/index.html">
-                        Doxygen Docs
-                        <small>Full source documentation</small>
-                    </a>
-                    <a href="doxygen/files.html">
-                        Source Files
-                        <small>Browse kernel source code</small>
-                    </a>
-                </div>
-            </div>
-        </nav>
-    </header>
 
-    <main>
-        <!-- Hero -->
         <section class="hero">
             <h1>GEMM Optimization Deep Dive</h1>
             <p>How we built a high-performance matrix multiplication kernel that beats Intel MKL, inspired by oneDNN, BLIS, and decades of HPC research.</p>
@@ -2113,6 +2023,90 @@
         </div>
 
         <!-- Code Example -->
+        <h2 id="v7-threadpool-playbook">v7 Training Threadpool Dispatch Playbook</h2>
+        <p>Inference v6.6 and training v7 should both use lowered execution plans. For v7 training, IR2 defines gradient math, while IR3 must define <strong>parallel execution</strong> and <strong>reduction ownership</strong>.</p>
+
+        <div class="grid-3">
+            <div class="card">
+                <h3>IR1</h3>
+                <p>Forward op graph from template + manifest (what to compute).</p>
+            </div>
+            <div class="card">
+                <h3>IR2</h3>
+                <p>Backward synthesis and explicit gradient fanout/fanin accumulation (chain rule routing).</p>
+            </div>
+            <div class="card card-accent">
+                <h3>IR3 / Exec Plan</h3>
+                <p>Memory layout + dispatch policy (split axis, tiles, threads, reduction order, barriers).</p>
+            </div>
+        </div>
+
+        <h3>Dispatch policy by workload shape</h3>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Workload</th>
+                    <th>Preferred split</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>M = B*S</code> large GEMM</td>
+                    <td><code>split M</code></td>
+                    <td>Best cache locality and zero reduction overhead for independent rows.</td>
+                </tr>
+                <tr>
+                    <td>Tiny-<code>M</code> GEMM (decode-like)</td>
+                    <td><code>split N</code></td>
+                    <td>Improves core utilization when row-parallel work is too small.</td>
+                </tr>
+                <tr>
+                    <td>Backward <code>dW</code> GEMM</td>
+                    <td><code>split K</code> + explicit partial reduce</td>
+                    <td>Good parallelism, but requires deterministic reduction tree.</td>
+                </tr>
+                <tr>
+                    <td>Elementwise ops</td>
+                    <td>Contiguous range chunks</td>
+                    <td>Simple scheduling and stable memory throughput.</td>
+                </tr>
+                <tr>
+                    <td>Attention</td>
+                    <td>Head split, then token block split</td>
+                    <td>Natural independence across heads, then balanced token work.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Execution-plan JSON consumed by codegen</h3>
+        <pre><code>{
+  "schema": "ck.train.exec.v1",
+  "runtime": {"threads": 12, "simd": "avx2", "mode": "deterministic"},
+  "ops": [
+    {
+      "op_id": 37,
+      "phase": "forward",
+      "kernel_id": "gemm_fwd_f32",
+      "shape": {"m": 16, "n": 1024, "k": 1024},
+      "dispatch": {"split_axis": "m", "tile_m": 4, "tile_n": 128, "threads": 12}
+    },
+    {
+      "op_id": 109,
+      "phase": "backward",
+      "kernel_id": "gemm_backward_f32",
+      "shape": {"m": 1024, "n": 1024, "k": 16},
+      "dispatch": {"split_axis": "k", "threads": 12},
+      "reduction": {"type": "sum", "order": "fixed_tree", "target": "grad.weight.layer.0.wq"}
+    }
+  ],
+  "barriers": [{"after_op": 109, "reason": "grad_accum_boundary"}]
+}</code></pre>
+
+        <div class="card" style="border-left: 4px solid var(--orange);">
+            <h3 style="margin-top: 0;">Rule for maintainability</h3>
+            <p>Codegen should remain dumb. It should emit calls from <code>train_exec_plan.json</code> directly, not infer split/reduction policy ad hoc. This keeps parity, determinism, and performance tuning auditable.</p>
+        </div>
         <h2>Using the Microkernel</h2>
 
         <pre><code>#include "ckernel_engine.h"
@@ -2173,18 +2167,6 @@ gemm_microkernel_packed(A, B, C, M, N, K);</code></pre>
                 <p><code>flame.cs.utexas.edu/~flame/web/</code></p>
             </div>
         </div>
-
-    </main>
-
-    <!-- Footer -->
-    <footer class="site-footer">
-        <p>C-Kernel-Engine &copy; <span id="copyright-year"></span> | High-Performance ML Kernels in Pure C</p>
-    </footer>
-    <script>
-        document.getElementById('copyright-year').textContent = new Date().getFullYear();
-    </script>
-</body>
-</html>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
