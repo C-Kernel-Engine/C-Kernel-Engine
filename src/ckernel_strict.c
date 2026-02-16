@@ -67,6 +67,9 @@ int ck_get_physical_cores(void)
         logical_cores = 1;
     }
 
+    int cpu_cores_hint = 0;
+    int siblings_hint = 0;
+
     // Read from /proc/cpuinfo (Linux) and count unique (physical id, core id) pairs.
     FILE *f = fopen("/proc/cpuinfo", "r");
     if (f) {
@@ -121,6 +124,14 @@ int ck_get_physical_cores(void)
                 core_id = val;
                 continue;
             }
+            if (sscanf(line, "cpu cores : %d", &val) == 1) {
+                if (val > cpu_cores_hint) cpu_cores_hint = val;
+                continue;
+            }
+            if (sscanf(line, "siblings : %d", &val) == 1) {
+                if (val > siblings_hint) siblings_hint = val;
+                continue;
+            }
         }
         fclose(f);
 
@@ -132,9 +143,22 @@ int ck_get_physical_cores(void)
         physical_cores = seen_count;
     }
 
-    // If we couldn't reliably detect physical cores (common in containers),
-    // fall back to logical CPUs instead of incorrectly forcing single-thread execution.
+    // Fallback: infer threads-per-core from siblings/cpu cores when pair data
+    // is missing (common in containers/VMs).
     if (physical_cores <= 1 && logical_cores > 1) {
+        int threads_per_core = 0;
+        if (siblings_hint > 0 && cpu_cores_hint > 0 && siblings_hint >= cpu_cores_hint) {
+            threads_per_core = siblings_hint / cpu_cores_hint;
+        }
+        if (threads_per_core > 1) {
+            int inferred_physical = logical_cores / threads_per_core;
+            if (inferred_physical > 1) {
+                return inferred_physical;
+            }
+        }
+        if (cpu_cores_hint > 1 && cpu_cores_hint <= logical_cores) {
+            return cpu_cores_hint;
+        }
         return logical_cores;
     }
 

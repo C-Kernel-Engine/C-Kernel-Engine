@@ -1477,6 +1477,18 @@ test: $(LIB) test-libs
 	else \
 		echo "Skipping v7 long-horizon drift smoke (set CK_TEST_WITH_V7_LONG_HORIZON=1 to enable)"; \
 	fi
+	@echo ""
+	@if [ "$(CK_TEST_WITH_V7_PERF)" = "1" ]; then \
+		echo "Running v7 perf gate (optional)..."; \
+		$(MAKE) --no-print-directory v7-perf-gate \
+			V7_MODEL="$(CK_TEST_V7_PERF_MODEL)" \
+			V7_PERF_RUNTIME=cli \
+			V7_PREP_WITH_PYTHON=0 \
+			V7_WITH_VTUNE=$(CK_TEST_V7_WITH_VTUNE) \
+			V7_VTUNE_DEEP=$(CK_TEST_V7_VTUNE_DEEP); \
+	else \
+		echo "Skipping v7 perf gate (set CK_TEST_WITH_V7_PERF=1 to enable)"; \
+	fi
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -3301,6 +3313,10 @@ V7_GATE_WITH_LONG_HORIZON_PARITY ?= 1
 V7_GATE_WITH_BPE_TRAIN_PARITY ?= 1
 V7_BPE_TRAIN_PARITY_JSON ?= $(V7_REPORT_DIR)/v7_bpe_train_parity_latest.json
 CK_TEST_WITH_V7_LONG_HORIZON ?= 1
+CK_TEST_WITH_V7_PERF ?= 0
+CK_TEST_V7_WITH_VTUNE ?= 0
+CK_TEST_V7_VTUNE_DEEP ?= 0
+CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
 
 .PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
