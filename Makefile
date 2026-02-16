@@ -305,7 +305,8 @@ SRCS    := src/backend_native.c \
 	           src/kernels/axpy_kernels.c \
 	           src/kernels/fused/rmsnorm_qkv.c \
 	           src/kernels/fused/attention_mlp_fused.c \
-	           src/ck_threadpool.c
+	           src/ck_threadpool.c \
+           src/ck_parallel_train.c
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so
@@ -1469,6 +1470,13 @@ test: $(LIB) test-libs
 	@echo ""
 	@echo "Running GEMM AVX vs scalar benchmark (quick)..."
 	@$(MAKE) --no-print-directory test-gemm-avx-bench-quick
+	@echo ""
+	@if [ "$(CK_TEST_WITH_V7_LONG_HORIZON)" = "1" ]; then \
+		echo "Running v7 long-horizon drift smoke..."; \
+		$(MAKE) --no-print-directory v7-train-parity-drift-smoke; \
+	else \
+		echo "Skipping v7 long-horizon drift smoke (set CK_TEST_WITH_V7_LONG_HORIZON=1 to enable)"; \
+	fi
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -2536,6 +2544,7 @@ CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
 CK_CLI_V7 := version/v7/src/ck_cli_v7.c
+CK_BPE_TRAIN_V7 := version/v7/src/ck_bpe_train.c
 
 # Main orchestrator (ck run, ck list, etc.)
 # Suppress format-truncation warnings - paths are validated at runtime
@@ -2622,6 +2631,16 @@ ck-cli-v7: $(BUILD_DIR)/ck-cli-v7
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --model qwen"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --list"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 <model.so> <weights.bump>"
+	@echo ""
+
+$(BUILD_DIR)/ck-bpe-train: $(CK_BPE_TRAIN_V7)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_BPE_TRAIN_V7) -lpthread -lm
+
+ck-bpe-train: $(BUILD_DIR)/ck-bpe-train
+	@echo ""
+	@echo "  $(C_CYAN)ck-bpe-train$(C_RESET)"
+	@echo "  Usage: ./$(BUILD_DIR)/ck-bpe-train --corpus-dir <dir> --out tokenizer.json [--binary-out-dir <dir>]"
 	@echo ""
 
 # v4 CLI (Python wrapper for IR v4 pipeline) - LEGACY: use ck-cli-v5 instead
@@ -3065,7 +3084,8 @@ report-md:
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
-.PHONY: ck-cli-v7
+.PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
+.PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
@@ -3251,9 +3271,40 @@ V7_GATE_WITH_KERNEL_PARITY ?= 1
 V7_KERNEL_PARITY_QK_STRICT_ISA ?= 0
 V7_KERNEL_PARITY_QK_JSON ?= $(V7_REPORT_DIR)/qk_norm_backward_parity_isa_latest.json
 V7_KERNEL_PARITY_QK_JSON_STRICT ?= $(V7_REPORT_DIR)/qk_norm_backward_parity_isa_strict_latest.json
+V7_TRAIN_LONG_HORIZON_EPOCHS ?= 3
+V7_TRAIN_LONG_HORIZON_SEQ_LEN ?= 8
+V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS ?= 4096
+V7_TRAIN_LONG_HORIZON_GRAD_ACCUM ?= 8
+V7_TRAIN_LONG_HORIZON_VOCAB ?= 1024
+V7_TRAIN_LONG_HORIZON_D_MODEL ?= 256
+V7_TRAIN_LONG_HORIZON_HIDDEN ?= 1024
+V7_TRAIN_LONG_HORIZON_LR ?= 5e-4
+V7_TRAIN_LONG_HORIZON_SEED ?= 42
+V7_TRAIN_LONG_HORIZON_TEXT ?= Hello!
+V7_TRAIN_LONG_HORIZON_LOSS_TOL ?= 2e-5
+V7_TRAIN_LONG_HORIZON_PARAM_TOL ?= 3e-5
+V7_TRAIN_LONG_HORIZON_DIAG_EVERY ?= 10
+V7_TRAIN_LONG_HORIZON_JSON ?= $(V7_REPORT_DIR)/train_parity_long_horizon_latest.json
+V7_TRAIN_DRIFT_SMOKE_STEPS ?= 70
+V7_TRAIN_DRIFT_SMOKE_JSON ?= $(V7_REPORT_DIR)/train_parity_drift_smoke_latest.json
+V7_TRAIN_DRIFT_LOCALIZE_STEP ?= 65
+V7_TRAIN_DRIFT_LOCALIZE_TOL ?= 1e-6
+V7_TRAIN_DRIFT_LOCALIZE_SOURCE ?= ck
+V7_TRAIN_DRIFT_LOCALIZE_MAX_STEPS ?= 80
+V7_TRAIN_DRIFT_LOCALIZE_JSON ?= $(V7_REPORT_DIR)/train_parity_drift_localize_latest.json
+V7_TRAIN_REALISTIC_STEPS ?= 320
+V7_TRAIN_REALISTIC_TEXT ?= The quick brown fox jumps over the lazy dog. In optimization practice, stable gradients and careful clipping matter. Diverse token windows reduce periodic aliasing and expose long-horizon drift sooner.
+V7_TRAIN_REALISTIC_JSON ?= $(V7_REPORT_DIR)/train_parity_realistic_long_horizon_latest.json
+V7_BACKPROP_LONG_EPOCH_MODE ?= smoke
+V7_BACKPROP_LONG_EPOCH_NIGHTLY_MODE ?= smoke
+V7_GATE_WITH_LONG_HORIZON_PARITY ?= 1
+V7_GATE_WITH_BPE_TRAIN_PARITY ?= 1
+V7_BPE_TRAIN_PARITY_JSON ?= $(V7_REPORT_DIR)/v7_bpe_train_parity_latest.json
+CK_TEST_WITH_V7_LONG_HORIZON ?= 1
 
 .PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
-	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke
+	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
+	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic v7-backprop-long-epoch v7-backprop-long-epoch-nightly test-v7-bpe-train-parity
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -3282,6 +3333,13 @@ v7-help:
 	@echo "  make v7-replay"
 	@echo "  make v7-train-parity-3"
 	@echo "  make v7-train-parity-5"
+	@echo "  make test-v7-bpe-train-parity"
+	@echo "  make v7-train-parity-drift-smoke"
+	@echo "  make v7-train-parity-drift-localize"
+	@echo "  make v7-train-parity-long-horizon"
+	@echo "  make v7-train-parity-long-horizon-realistic"
+	@echo "  make v7-backprop-long-epoch"
+	@echo "  make v7-backprop-long-epoch-nightly"
 	@echo "  make v7-gate-train"
 	@echo "  make v7-gate"
 	@echo "  make v7"
@@ -3299,6 +3357,8 @@ v7-help:
 	@echo "  - default is strict: V7_TRAIN_STRICT_UNRESOLVED=1 and V7_TRAIN_ALLOW_PARTIAL=0"
 	@echo "  - v7-kernel-parity-train uses ISA matrix by default; set V7_KERNEL_PARITY_QK_STRICT_ISA=1 for strict ISA fallback failures"
 	@echo "  - set V7_TRAIN_ALLOW_PARTIAL=1 only while iterating unfinished grad-rules"
+	@echo "  - long-horizon drift smoke is enforced in v7-gate-train by default (V7_GATE_WITH_LONG_HORIZON_PARITY=1)"
+	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
 
 v7-sync-inference:
 	@$(PYTHON) version/v7/scripts/sync_v7_inference_baseline.py
@@ -3346,6 +3406,107 @@ v7-train-parity-3:
 
 v7-train-parity-5:
 	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py --epochs 5 --json-out $(V7_REPORT_DIR)/train_parity_epochs_5_latest.json
+
+
+v7-train-parity-drift-smoke:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py \
+		--epochs $(V7_TRAIN_LONG_HORIZON_EPOCHS) \
+		--seq-len $(V7_TRAIN_LONG_HORIZON_SEQ_LEN) \
+		--total-tokens $(V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS) \
+		--grad-accum $(V7_TRAIN_LONG_HORIZON_GRAD_ACCUM) \
+		--optimizer adamw \
+		--lr $(V7_TRAIN_LONG_HORIZON_LR) \
+		--seed $(V7_TRAIN_LONG_HORIZON_SEED) \
+		--vocab $(V7_TRAIN_LONG_HORIZON_VOCAB) \
+		--d-model $(V7_TRAIN_LONG_HORIZON_D_MODEL) \
+		--hidden $(V7_TRAIN_LONG_HORIZON_HIDDEN) \
+		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-steps $(V7_TRAIN_DRIFT_SMOKE_STEPS) \
+		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
+		--json-out "$(V7_TRAIN_DRIFT_SMOKE_JSON)"
+
+
+v7-train-parity-drift-localize:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py \
+		--epochs $(V7_TRAIN_LONG_HORIZON_EPOCHS) \
+		--seq-len $(V7_TRAIN_LONG_HORIZON_SEQ_LEN) \
+		--total-tokens $(V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS) \
+		--grad-accum $(V7_TRAIN_LONG_HORIZON_GRAD_ACCUM) \
+		--optimizer adamw \
+		--lr $(V7_TRAIN_LONG_HORIZON_LR) \
+		--seed $(V7_TRAIN_LONG_HORIZON_SEED) \
+		--vocab $(V7_TRAIN_LONG_HORIZON_VOCAB) \
+		--d-model $(V7_TRAIN_LONG_HORIZON_D_MODEL) \
+		--hidden $(V7_TRAIN_LONG_HORIZON_HIDDEN) \
+		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-steps $(V7_TRAIN_DRIFT_LOCALIZE_MAX_STEPS) \
+		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
+		--ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c \
+		--drift-localize-step $(V7_TRAIN_DRIFT_LOCALIZE_STEP) \
+		--drift-localize-tol $(V7_TRAIN_DRIFT_LOCALIZE_TOL) \
+		--drift-localize-source $(V7_TRAIN_DRIFT_LOCALIZE_SOURCE) \
+		--json-out "$(V7_TRAIN_DRIFT_LOCALIZE_JSON)"
+
+v7-train-parity-long-horizon:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py \
+		--epochs $(V7_TRAIN_LONG_HORIZON_EPOCHS) \
+		--seq-len $(V7_TRAIN_LONG_HORIZON_SEQ_LEN) \
+		--total-tokens $(V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS) \
+		--grad-accum $(V7_TRAIN_LONG_HORIZON_GRAD_ACCUM) \
+		--optimizer adamw \
+		--lr $(V7_TRAIN_LONG_HORIZON_LR) \
+		--seed $(V7_TRAIN_LONG_HORIZON_SEED) \
+		--vocab $(V7_TRAIN_LONG_HORIZON_VOCAB) \
+		--d-model $(V7_TRAIN_LONG_HORIZON_D_MODEL) \
+		--hidden $(V7_TRAIN_LONG_HORIZON_HIDDEN) \
+		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
+		--json-out "$(V7_TRAIN_LONG_HORIZON_JSON)"
+
+
+v7-train-parity-long-horizon-realistic:
+	@$(PYTHON) version/v7/scripts/train_parity_epochs_v7.py \
+		--epochs $(V7_TRAIN_LONG_HORIZON_EPOCHS) \
+		--seq-len $(V7_TRAIN_LONG_HORIZON_SEQ_LEN) \
+		--total-tokens $(V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS) \
+		--grad-accum $(V7_TRAIN_LONG_HORIZON_GRAD_ACCUM) \
+		--optimizer adamw \
+		--lr $(V7_TRAIN_LONG_HORIZON_LR) \
+		--seed $(V7_TRAIN_LONG_HORIZON_SEED) \
+		--vocab $(V7_TRAIN_LONG_HORIZON_VOCAB) \
+		--d-model $(V7_TRAIN_LONG_HORIZON_D_MODEL) \
+		--hidden $(V7_TRAIN_LONG_HORIZON_HIDDEN) \
+		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-steps $(V7_TRAIN_REALISTIC_STEPS) \
+		--train-text "$(V7_TRAIN_REALISTIC_TEXT)" \
+		--json-out "$(V7_TRAIN_REALISTIC_JSON)"
+
+v7-backprop-long-epoch:
+	@if [ "$(V7_BACKPROP_LONG_EPOCH_MODE)" = "full" ]; then \
+		echo "v7-backprop-long-epoch: full horizon"; \
+		$(MAKE) --no-print-directory v7-train-parity-long-horizon; \
+	else \
+		echo "v7-backprop-long-epoch: drift smoke"; \
+		$(MAKE) --no-print-directory v7-train-parity-drift-smoke; \
+	fi
+
+v7-backprop-long-epoch-nightly:
+	@set -e; \
+	echo "v7-backprop-long-epoch-nightly: realistic long-horizon blocker"; \
+	$(MAKE) --no-print-directory v7-train-parity-long-horizon-realistic; \
+	echo "v7-backprop-long-epoch-nightly: hello stress monitor (non-blocking)"; \
+	if ! $(MAKE) --no-print-directory v7-train-parity-drift-smoke; then \
+		echo "WARNING: hello stress monitor failed (non-blocking nightly signal)"; \
+	fi
+
 
 v7-train-ir-smoke:
 	@set -e; \
@@ -3441,6 +3602,9 @@ v7-grad-fd:
 v7-replay:
 	@$(PYTHON) version/v7/scripts/check_replay_determinism_v7.py --json-out $(V7_REPORT_DIR)/replay_determinism_latest.json
 
+test-v7-bpe-train-parity: tokenizer ck-bpe-train
+	@$(PYTHON) version/v7/scripts/test_bpe_train_parity_v7.py --json-out "$(V7_BPE_TRAIN_PARITY_JSON)"
+
 v7-gate-train:
 	@$(MAKE) --no-print-directory v7-inference-smoke
 	@$(MAKE) --no-print-directory v7-validate-contracts
@@ -3450,11 +3614,23 @@ v7-gate-train:
 	@$(MAKE) --no-print-directory v7-parity-1tok
 	@$(MAKE) --no-print-directory v7-grad-fd
 	@$(MAKE) --no-print-directory v7-train-parity-3
+	@if [ "$(V7_GATE_WITH_LONG_HORIZON_PARITY)" = "1" ]; then \
+		echo "v7-gate-train: running long-horizon drift smoke"; \
+		$(MAKE) --no-print-directory v7-train-parity-drift-smoke; \
+	else \
+		echo "v7-gate-train: skip long-horizon drift smoke (set V7_GATE_WITH_LONG_HORIZON_PARITY=1 to enable)"; \
+	fi
 	@if [ "$(V7_GATE_WITH_KERNEL_PARITY)" = "1" ]; then \
 		echo "v7-gate-train: running training-kernel parity suite"; \
 		$(MAKE) --no-print-directory v7-kernel-parity-train; \
 	else \
 		echo "v7-gate-train: skip training-kernel parity suite (set V7_GATE_WITH_KERNEL_PARITY=1 to enable)"; \
+	fi
+	@if [ "$(V7_GATE_WITH_BPE_TRAIN_PARITY)" = "1" ]; then \
+		echo "v7-gate-train: running bpe-train parity gate"; \
+		$(MAKE) --no-print-directory test-v7-bpe-train-parity; \
+	else \
+		echo "v7-gate-train: skip bpe-train parity gate (set V7_GATE_WITH_BPE_TRAIN_PARITY=1 to enable)"; \
 	fi
 	@$(MAKE) --no-print-directory v7-replay
 

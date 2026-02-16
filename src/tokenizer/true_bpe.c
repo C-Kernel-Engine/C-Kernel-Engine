@@ -635,11 +635,16 @@ int ck_true_bpe_load_binary(CKTrueBPE *bpe,
     return 0;
 }
 
-int32_t ck_true_bpe_lookup(const CKTrueBPE *bpe, const char *token) {
+static int32_t lookup_token_exact(const CKTrueBPE *bpe, const char *token) {
     if (!bpe || !token) return -1;
-
     BPETokenInfo *info = (BPETokenInfo *)ck_tokenizer_hash_table_lookup(bpe->vocab, token);
-    return info ? info->id : bpe->unk_id;
+    return info ? info->id : -1;
+}
+
+int32_t ck_true_bpe_lookup(const CKTrueBPE *bpe, const char *token) {
+    int32_t id = lookup_token_exact(bpe, token);
+    if (id >= 0) return id;
+    return bpe ? bpe->unk_id : -1;
 }
 
 const char *ck_true_bpe_id_to_token(const CKTrueBPE *bpe, int32_t id) {
@@ -1133,7 +1138,7 @@ static int init_tokens_from_text(CKTrueBPE *bpe, CKBPETokenList *list, const cha
         memcpy(char_buf, text + pos, char_len);
         char_buf[char_len] = '\0';
 
-        int32_t id = ck_true_bpe_lookup(bpe, char_buf);
+        int32_t id = lookup_token_exact(bpe, char_buf);
 
         if (token_list_append(list, char_buf, char_len, id) != 0) {
             return -1;
@@ -1219,7 +1224,7 @@ static int encode_chunk(CKTrueBPE *bpe, const char *chunk, int chunk_len,
     if (chunk_len < (int)sizeof(chunk_buf)) {
         memcpy(chunk_buf, chunk, chunk_len);
         chunk_buf[chunk_len] = '\0';
-        int32_t chunk_id = ck_true_bpe_lookup(bpe, chunk_buf);
+        int32_t chunk_id = lookup_token_exact(bpe, chunk_buf);
         if (chunk_id >= 0) {
             /* Entire chunk is a single token */
             if (max_ids >= 1) {
@@ -1248,9 +1253,25 @@ static int encode_chunk(CKTrueBPE *bpe, const char *chunk, int chunk_len,
             if (bpe->config.byte_fallback) {
                 /* Output each byte as separate token (byte fallback) */
                 for (size_t j = 0; j < list->tokens[i].len && out_idx < max_ids; j++) {
+                    unsigned char raw_b = (unsigned char)list->tokens[i].str[j];
+
+                    /*
+                     * Keep legacy <0xHH> fallback for older tokenizers,
+                     * then try GPT-2 byte-level piece fallback for modern BPE vocabs.
+                     */
                     char byte_token[8];
-                    snprintf(byte_token, sizeof(byte_token), "<0x%02X>", (unsigned char)list->tokens[i].str[j]);
-                    int32_t byte_id = ck_true_bpe_lookup(bpe, byte_token);
+                    snprintf(byte_token, sizeof(byte_token), "<0x%02X>", raw_b);
+                    int32_t byte_id = lookup_token_exact(bpe, byte_token);
+
+                    if (byte_id < 0) {
+                        char mapped[8];
+                        int mapped_len = byte_to_gpt2(raw_b, mapped);
+                        if (mapped_len > 0 && mapped_len < (int)sizeof(mapped)) {
+                            mapped[mapped_len] = '\0';
+                            byte_id = lookup_token_exact(bpe, mapped);
+                        }
+                    }
+
                     ids[out_idx++] = (byte_id >= 0) ? byte_id : bpe->unk_id;
                 }
             } else {
