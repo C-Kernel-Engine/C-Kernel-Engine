@@ -32,6 +32,11 @@ FALLBACK_DECLS: Dict[str, str] = {
     "gradient_clip_norm_f32": (
         "float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);"
     ),
+    "adamw_clip_update_multi_f32": (
+        "void adamw_clip_update_multi_f32(float *const *grads, float *const *weights, "
+        "float *const *m_states, float *const *v_states, const size_t *numels, int tensor_count, "
+        "float lr, float beta1, float beta2, float eps, float weight_decay, float max_grad_norm, int step);"
+    ),
     # Registry currently omits this declaration for some builds.
     "gemm_blocked_serial": (
         "void gemm_blocked_serial(const float *A, const float *B, const float *bias, "
@@ -141,6 +146,74 @@ def _load_train_layout_offsets(
         "optimizer_v_offsets": opt_v_offsets,
         "region_offsets_floats": region_offsets,
     }
+
+
+def _load_train_exec_plan(exec_plan: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    by_op: Dict[int, Dict[str, Any]] = {}
+    if isinstance(exec_plan, dict):
+        for row in (exec_plan.get("ops") or []):
+            if not isinstance(row, dict):
+                continue
+            op_id = row.get("op_id")
+            if not isinstance(op_id, int):
+                try:
+                    op_id = int(op_id)
+                except Exception:
+                    continue
+            by_op[int(op_id)] = row
+    return {
+        "by_op_id": by_op,
+        "runtime": (exec_plan.get("runtime") if isinstance(exec_plan, dict) else {}),
+        "schema": (exec_plan.get("schema") if isinstance(exec_plan, dict) else None),
+    }
+
+
+def _exec_plan_shape_mnk(op_plan: Optional[Dict[str, Any]]) -> Optional[Tuple[int, int, int]]:
+    if not isinstance(op_plan, dict):
+        return None
+    shape = op_plan.get("shape")
+    if not isinstance(shape, dict):
+        return None
+    try:
+        m = int(shape.get("m", 0) or 0)
+        n = int(shape.get("n", 0) or 0)
+        k = int(shape.get("k", 0) or 0)
+    except Exception:
+        return None
+    if m <= 0 or n <= 0 or k <= 0:
+        return None
+    return (m, n, k)
+
+
+def _exec_plan_gemm_backward_dims(op_plan: Optional[Dict[str, Any]]) -> Optional[Dict[str, int]]:
+    if not isinstance(op_plan, dict):
+        return None
+    shape = op_plan.get("shape")
+    if not isinstance(shape, dict):
+        return None
+    try:
+        aligned_in = int(shape.get("aligned_in", 0) or 0)
+        aligned_out = int(shape.get("aligned_out", 0) or 0)
+    except Exception:
+        return None
+    if aligned_in <= 0 or aligned_out <= 0:
+        return None
+    return {"aligned_in": aligned_in, "aligned_out": aligned_out}
+
+
+def _exec_plan_dispatch_comment(op_plan: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not isinstance(op_plan, dict):
+        return None
+    disp = op_plan.get("dispatch")
+    if not isinstance(disp, dict):
+        return None
+    strategy = str(disp.get("strategy", "none") or "none")
+    split_axis = str(disp.get("split_axis", "none") or "none")
+    threads = disp.get("threads", 1)
+    schedule = str(disp.get("schedule", "static") or "static")
+    tile_m = disp.get("tile_m")
+    tile_n = disp.get("tile_n")
+    return f"strategy={strategy} split_axis={split_axis} threads={threads} schedule={schedule} tile_m={tile_m} tile_n={tile_n}"
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
@@ -380,7 +453,7 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
         if "numel" in name:
             return "1"
         if "num_threads" in name:
-            return "1"
+            return "ck_get_num_threads()"
         if "add_pos" in name or "pos_offset" in name:
             return "0"
         return "1"
@@ -391,14 +464,58 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
 
 
 
-def _infer_gemm_backward_dims(io_outputs: Dict[str, str], tensor_numel: Dict[str, int], cfg: Dict[str, Any]) -> Dict[str, int]:
+def _infer_gemm_backward_dims(
+    io_inputs: Dict[str, str],
+    io_outputs: Dict[str, str],
+    tensors: Dict[str, Dict[str, Any]],
+    tensor_numel: Dict[str, int],
+    cfg: Dict[str, Any],
+) -> Dict[str, int]:
     # NOTE:
     # gemm_backward_f32 is one of the easiest places to create silent OOB writes if
-    # aligned_in/aligned_out are wrong. Prefer IR-derived tensor sizes first;
+    # aligned_in/aligned_out are wrong. Prefer IR-derived tensor shapes first;
     # use cfg defaults only as a last resort when metadata is missing.
     d_input_n: Optional[int] = None
     d_weight_n: Optional[int] = None
     d_bias_n: Optional[int] = None
+    d_output_n: Optional[int] = None
+
+    d_input_w: Optional[int] = None
+    d_weight_in_w: Optional[int] = None
+    d_weight_out_w: Optional[int] = None
+    d_output_w: Optional[int] = None
+    d_bias_w: Optional[int] = None
+
+    def _shape2(tid: Optional[str]) -> Optional[Tuple[int, int]]:
+        if not isinstance(tid, str):
+            return None
+        meta = tensors.get(tid) or {}
+        sh = meta.get("shape")
+        if not isinstance(sh, list) or len(sh) < 2:
+            return None
+        try:
+            a = int(sh[-2])
+            b = int(sh[-1])
+        except Exception:
+            return None
+        if a <= 0 or b <= 0:
+            return None
+        return (a, b)
+
+    for tid in io_inputs.values():
+        n = tensor_numel.get(tid)
+        if not isinstance(n, int) or n <= 0:
+            continue
+        lt = str(tid).lower()
+        if d_output_n is None and (
+            "d_output" in lt
+            or "grad_output" in lt
+            or lt.startswith("grad.act.")
+        ):
+            d_output_n = int(n)
+            sh = _shape2(tid)
+            if sh is not None:
+                d_output_w = int(sh[1])
 
     for tid in io_outputs.values():
         n = tensor_numel.get(tid)
@@ -411,19 +528,49 @@ def _infer_gemm_backward_dims(io_outputs: Dict[str, str], tensor_numel: Dict[str
             or (lt.startswith("tmp.grad.act.") and ".input" in lt)
         ):
             d_input_n = int(n)
+            sh = _shape2(tid)
+            if sh is not None:
+                d_input_w = int(sh[1])
         if d_weight_n is None and lt.startswith("tmp.grad.weight.") and lt.endswith(".w"):
             d_weight_n = int(n)
+            sh = _shape2(tid)
+            if sh is not None:
+                d_weight_out_w = int(sh[0])
+                d_weight_in_w = int(sh[1])
         if d_bias_n is None and lt.startswith("tmp.grad.weight.") and lt.endswith(".bias"):
             d_bias_n = int(n)
+            d_bias_w = int(n)
+        if d_bias_n is None and ("d_bias" in lt or lt.endswith(".bias")):
+            d_bias_n = int(n)
+            d_bias_w = int(n)
 
     aligned_in = 0
     aligned_out = 0
-    if isinstance(d_input_n, int) and d_input_n > 0:
-        aligned_in = int(d_input_n)
-    if isinstance(d_weight_n, int) and d_weight_n > 0 and aligned_in > 0 and (d_weight_n % aligned_in == 0):
+
+    # Prefer explicit shape-derived widths first; this avoids token-flattened
+    # numel mismatches when CK_NUM_TOKENS > 1.
+    if isinstance(d_input_w, int) and d_input_w > 0:
+        aligned_in = int(d_input_w)
+    elif isinstance(d_weight_in_w, int) and d_weight_in_w > 0:
+        aligned_in = int(d_weight_in_w)
+    elif isinstance(d_input_n, int) and d_input_n > 0:
+        tok = max(1, int(cfg.get("train_tokens", cfg.get("tokens", 1)) or 1))
+        if d_input_n % tok == 0:
+            aligned_in = int(d_input_n // tok)
+        else:
+            aligned_in = int(d_input_n)
+
+    if isinstance(d_weight_out_w, int) and d_weight_out_w > 0:
+        aligned_out = int(d_weight_out_w)
+    elif isinstance(d_output_w, int) and d_output_w > 0:
+        aligned_out = int(d_output_w)
+    elif isinstance(d_bias_w, int) and d_bias_w > 0:
+        aligned_out = int(d_bias_w)
+    elif isinstance(d_weight_n, int) and d_weight_n > 0 and aligned_in > 0 and (d_weight_n % aligned_in == 0):
         aligned_out = int(d_weight_n // aligned_in)
-    if aligned_out <= 0 and isinstance(d_bias_n, int) and d_bias_n > 0:
+    elif isinstance(d_bias_n, int) and d_bias_n > 0:
         aligned_out = int(d_bias_n)
+
     if aligned_in <= 0 and isinstance(d_weight_n, int) and d_weight_n > 0 and aligned_out > 0 and (d_weight_n % aligned_out == 0):
         aligned_in = int(d_weight_n // aligned_out)
 
@@ -756,7 +903,7 @@ def _choose_numel_expr(
     return "1"
 
 
-def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     cfg = dict(ir2.get("config") or {})
     tensors = _collect_tensors(ir2)
     tensor_numel, missing_numel = _tensor_numel_map(tensors)
@@ -772,6 +919,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     backward_ops = sorted(list(ir2.get("backward") or []), key=lambda o: int(o.get("op_id", 0)))
     all_ops = forward_ops + backward_ops
     op_by_id = {int(op["op_id"]): op for op in all_ops if isinstance(op, dict) and "op_id" in op}
+    exec_plan_info = _load_train_exec_plan(exec_plan)
+    exec_plan_by_op = exec_plan_info["by_op_id"]
     # rope_forward_qk expects precomputed cos/sin caches. If present in IR,
     # ck_train_init must seed deterministic caches before the first forward call.
     has_rope_forward_qk = any(str(op.get("kernel_id", "")) == "rope_forward_qk" for op in forward_ops)
@@ -824,7 +973,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     # Optimizer kernels are required by generated ck_train_optimizer_step
     # even when the current IR2 does not carry explicit optimizer nodes.
-    for opt_kernel in ("adamw_update_f32", "gradient_clip_norm_f32"):
+    for opt_kernel in ("adamw_update_f32", "gradient_clip_norm_f32", "adamw_clip_update_multi_f32"):
         if opt_kernel not in used_decl:
             resolved = resolve_decl_for_kernel(opt_kernel)
             if resolved is not None:
@@ -992,8 +1141,22 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#ifndef CK_NUM_TOKENS")
     ap("#define CK_NUM_TOKENS 1")
     ap("#endif")
+    ap("#ifndef CK_GRAD_ACCUM_STEPS")
+    ap("#define CK_GRAD_ACCUM_STEPS 1")
+    ap("#endif")
+    ap("#if (CK_GRAD_ACCUM_STEPS < 1)")
+    ap("#undef CK_GRAD_ACCUM_STEPS")
+    ap("#define CK_GRAD_ACCUM_STEPS 1")
+    ap("#endif")
+    ap("#ifndef CK_MAX_GRAD_NORM")
+    ap("#define CK_MAX_GRAD_NORM 0.0f")
+    ap("#endif")
     ap("")
 
+    ap("/* Training GEMM wrapper (threadpool dispatch + serial fallback). */")
+    ap("void gemm_blocked_serial_train_parallel_dispatch(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);")
+    ap("void gemm_backward_f32_train_parallel_dispatch(const float *d_output, const float *input, const float *W, float *d_input, float *d_W, float *d_b, int T, int aligned_in, int aligned_out, int num_threads);")
+    ap("void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output, const float *input, const float *W, float *d_input, float *d_W, float *d_b, int T, int aligned_in, int aligned_out, int num_threads);")
     ap("/* Fallback declarations for kernels with incomplete registry declarations. */")
     for kid in sorted(used_decl.keys()):
         fn, args, decl = used_decl[kid]
@@ -1125,7 +1288,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             if vvar not in seen_v:
                 ap("static float *%s;" % vvar)
                 seen_v.add(vvar)
-        ap("static int g_opt_step = 0;")
+    ap("static int g_opt_step = 0;")
+    ap("static int g_accum_step = 0;")
     ap("")
 
     if init_weight_specs:
@@ -1180,6 +1344,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_backward_step(void);")
     ap("int ck_train_backward_step_trace(int *failed_op_id, int *first_corrupt_idx);")
     ap("int ck_train_optimizer_step(float lr);")
+    ap("int ck_train_flush_optimizer(float lr);")
+    ap("int ck_train_get_accum_counter(void);")
+    ap("int ck_train_get_accum_steps(void);")
+    ap("int ck_train_set_accum_counter(int accum_step);")
+    ap("int ck_train_get_opt_step(void);")
+    ap("int ck_train_set_opt_step(int opt_step);")
     ap("")
 
     ap("static inline float ck_canary_value_f32(void) {")
@@ -1326,6 +1496,36 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    return 0;")
     ap("}")
     ap("")
+    ap("/*")
+    ap(" * Layout bridge helpers (token-major <-> head-major).")
+    ap(" *")
+    ap(" * IR tensors for q/k/v/attn are modeled token-major [T, H*Dh].")
+    ap(" * Attention/RoPE kernels here consume head-major [H, T, aligned_Dh].")
+    ap(" * Keep this conversion explicit in codegen to avoid silent contract drift.")
+    ap(" */")
+    ap("static inline void ck_reorder_token_to_head_major(const float *src, float *dst, int tokens, int heads, int head_dim, int aligned_head_dim) {")
+    ap("    if (src == NULL || dst == NULL || tokens <= 0 || heads <= 0 || head_dim <= 0 || aligned_head_dim <= 0) return;")
+    ap("    for (int h = 0; h < heads; ++h) {")
+    ap("        for (int t = 0; t < tokens; ++t) {")
+    ap("            const size_t src_base = ((size_t)t * (size_t)heads + (size_t)h) * (size_t)head_dim;")
+    ap("            const size_t dst_base = ((size_t)h * (size_t)tokens + (size_t)t) * (size_t)aligned_head_dim;")
+    ap("            for (int d = 0; d < head_dim; ++d) dst[dst_base + (size_t)d] = src[src_base + (size_t)d];")
+    ap("            for (int d = head_dim; d < aligned_head_dim; ++d) dst[dst_base + (size_t)d] = 0.0f;")
+    ap("        }")
+    ap("    }")
+    ap("}")
+    ap("")
+    ap("static inline void ck_reorder_head_to_token_major(const float *src, float *dst, int tokens, int heads, int head_dim, int aligned_head_dim) {")
+    ap("    if (src == NULL || dst == NULL || tokens <= 0 || heads <= 0 || head_dim <= 0 || aligned_head_dim <= 0) return;")
+    ap("    for (int t = 0; t < tokens; ++t) {")
+    ap("        for (int h = 0; h < heads; ++h) {")
+    ap("            const size_t src_base = ((size_t)h * (size_t)tokens + (size_t)t) * (size_t)aligned_head_dim;")
+    ap("            const size_t dst_base = ((size_t)t * (size_t)heads + (size_t)h) * (size_t)head_dim;")
+    ap("            for (int d = 0; d < head_dim; ++d) dst[dst_base + (size_t)d] = src[src_base + (size_t)d];")
+    ap("        }")
+    ap("    }")
+    ap("}")
+    ap("")
     ap("int ck_train_memory_diagnostic(const float *oracle_acts, const float *oracle_grads, float tolerance) {")
     ap("    (void)oracle_acts;")
     ap("    (void)oracle_grads;")
@@ -1383,6 +1583,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    memset(%s, 0, sizeof(%s));" % (var, var))
     if opt_pairs:
         ap("    g_opt_step = 0;")
+    ap("    g_accum_step = 0;")
     ap("    g_loss_scalar[0] = 0.0f;")
     ap("}")
     ap("")
@@ -1448,6 +1649,28 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             f32_ptr_numel[mvar] = n
             f32_ptr_numel[vvar] = n
 
+    tmp_float_pool: List[Tuple[str, str, int]] = []
+    for _tid, _var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        if not str(_tid).startswith("tmp."):
+            continue
+        _n = int(tensor_numel.get(_tid, 0) or 0)
+        if _n > 0:
+            tmp_float_pool.append((_tid, _var, _n))
+
+    def _pick_tmp_scratch_var(min_numel: int, banned_vars: set[str]) -> Optional[str]:
+        if min_numel <= 0:
+            return None
+        best: Optional[Tuple[int, str]] = None
+        for _tid, _var, _n in tmp_float_pool:
+            if _var in banned_vars:
+                continue
+            if _n < min_numel:
+                continue
+            cand = (_n, _var)
+            if best is None or cand < best:
+                best = cand
+        return best[1] if best is not None else None
+
     def emit_ops(fn_name: str, ops: List[Dict[str, Any]], phase: str, *, trace_canary: bool = False) -> None:
         if trace_canary:
             ap("int %s(int *failed_op_id, int *first_corrupt_idx) {" % fn_name)
@@ -1507,8 +1730,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    call_count++;")
                 continue
 
-            # rope_forward_qk is also in-place and requires cos/sin cache pointers.
-            # IR models explicit q/k outputs, so stage into output buffers first.
+            # rope_forward_qk is in-place and head-major, while IR tensors are token-major.
+            # Keep IR-visible tensors token-major by converting around kernel invocation.
             if kid == "rope_forward_qk":
                 q_in_tid = io_inputs.get("q")
                 k_in_tid = io_inputs.get("k")
@@ -1521,36 +1744,164 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 q_numel = int(tensor_numel.get(q_out_tid or q_in_tid or "", 0) or 0)
                 k_numel = int(tensor_numel.get(k_out_tid or k_in_tid or "", 0) or 0)
 
-                ap("    /* op_id=%s op=%s kernel_id=%s (IR out-of-place -> kernel in-place) */" % (op_id, op_name, kid))
+                banned: set[str] = {q_in_var, k_in_var, q_out_var, k_out_var}
+                q_scratch = _pick_tmp_scratch_var(q_numel, banned)
+                if q_scratch is not None:
+                    banned.add(q_scratch)
+                k_scratch = _pick_tmp_scratch_var(k_numel, banned)
+
+                ap("    /* op_id=%s op=%s kernel_id=%s (IR token-major <-> kernel head-major bridge) */" % (op_id, op_name, kid))
                 if q_numel > 0 and q_out_var != q_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
                 if k_numel > 0 and k_out_var != k_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
-                if q_numel > 0:
-                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
-                if k_numel > 0:
-                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
-                    q_out_var, k_out_var
-                ))
+
+                if q_scratch and k_scratch:
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
+                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                        q_scratch, k_scratch
+                    ))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                else:
+                    ap("    /* missing tmp.* scratch for RoPE bridge; fallback direct call */")
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                        q_out_var, k_out_var
+                    ))
                 ap("    call_count++;")
                 continue
 
+            # attention_forward_* kernels in this runtime are head-major contracts.
+            # IR tensors are token-major, so bridge layouts explicitly here.
+            if kid == "attention_forward_causal_head_major_gqa_flash_strided":
+                q_tid = io_inputs.get("q")
+                k_tid = io_inputs.get("k")
+                v_tid = io_inputs.get("v")
+                y_tid = io_outputs.get("out") or io_outputs.get("output") or io_outputs.get("y")
+                q_var = tvars_f32.get(q_tid or "", "g_dummy_f32")
+                k_var = tvars_f32.get(k_tid or "", "g_dummy_f32")
+                v_var = tvars_f32.get(v_tid or "", "g_dummy_f32")
+                y_var = tvars_f32.get(y_tid or "", "g_dummy_f32")
+                q_numel = int(tensor_numel.get(q_tid or "", 0) or 0)
+                k_numel = int(tensor_numel.get(k_tid or "", 0) or 0)
+                v_numel = int(tensor_numel.get(v_tid or "", 0) or 0)
+                y_numel = int(tensor_numel.get(y_tid or "", 0) or 0)
+
+                banned: set[str] = {q_var, k_var, v_var, y_var}
+                q_scratch = _pick_tmp_scratch_var(q_numel, banned)
+                if q_scratch is not None:
+                    banned.add(q_scratch)
+                k_scratch = _pick_tmp_scratch_var(k_numel, banned)
+                if k_scratch is not None:
+                    banned.add(k_scratch)
+                v_scratch = _pick_tmp_scratch_var(v_numel, banned)
+                if v_scratch is not None:
+                    banned.add(v_scratch)
+                y_scratch = _pick_tmp_scratch_var(y_numel, banned)
+
+                if q_scratch and k_scratch and v_scratch and y_scratch:
+                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR -> head-major kernel bridge) */" % (op_id, op_name, kid))
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_var, int(q_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_var, int(k_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
+                    if v_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_var, int(v_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_scratch, int(v_numel), op_id))
+                    if y_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_var, int(y_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_scratch, int(y_numel), op_id))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
+                    ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                        q_scratch, k_scratch, v_scratch, y_scratch
+                    ))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (y_scratch, y_var))
+                    ap("    call_count++;")
+                    continue
+                else:
+                    ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
+
+            op_plan = exec_plan_by_op.get(int(op_id)) if isinstance(op_id, int) else None
             # gemm_backward_f32 uses op-local inferred dims from IR tensor sizes.
             # Avoid generic defaults here: wrong aligned_out can corrupt
             # tmp.grad.weight.* and trip canary/heap checks.
-            gemm_dims = _infer_gemm_backward_dims(io_outputs, tensor_numel, cfg) if kid == "gemm_backward_f32" else None
-            gemm_fwd_mnk = _infer_gemm_forward_mnk(op, cfg) if kid == "gemm_blocked_serial" else None
+            gemm_dims = None
+            if kid == "gemm_backward_f32":
+                # Keep backward dims sourced from IR tensor numel map only.
+                # Plan metadata is advisory for dispatch, not numeric kernel contracts.
+                gemm_dims = _infer_gemm_backward_dims(io_inputs, io_outputs, tensors, tensor_numel, cfg)
+            gemm_fwd_mnk = None
+            if kid == "gemm_blocked_serial":
+                gemm_fwd_mnk = _exec_plan_shape_mnk(op_plan) or _infer_gemm_forward_mnk(op, cfg)
             swiglu_dim: Optional[int] = None
             if kid in ("swiglu_forward", "swiglu_forward_exact", "swiglu_backward", "swiglu_backward_exact"):
+                # swiglu kernels expect `dim` as per-token hidden width (D), where
+                # input is [T, 2D], output/grad_output is [T, D], d_input is [T, 2D].
+                tok = int(cfg.get("train_tokens", cfg.get("tokens", 1)) or 1)
+                tok = max(1, tok)
+
+                def _num(tid: Optional[str]) -> int:
+                    if not isinstance(tid, str):
+                        return 0
+                    return int(tensor_numel.get(tid, 0) or 0)
+
                 cands: List[int] = []
-                for pool in (io_outputs, io_inputs):
-                    for tid in pool.values():
-                        n = int(tensor_numel.get(tid, 0) or 0)
-                        if n > 0:
-                            cands.append(n)
+
+                if kid in ("swiglu_forward", "swiglu_forward_exact"):
+                    # Forward: prefer output [T,D], fallback to input [T,2D].
+                    for key in ("out", "y"):
+                        n = _num(io_outputs.get(key))
+                        if n > 0 and (n % tok) == 0:
+                            cands.append(n // tok)
+                    for key in ("input", "x", "in_0"):
+                        n = _num(io_inputs.get(key))
+                        denom = 2 * tok
+                        if n > 0 and denom > 0 and (n % denom) == 0:
+                            cands.append(n // denom)
+                else:
+                    # Backward: prefer grad_output [T,D], fallback to d_input/input [T,2D].
+                    for key in ("d_output", "grad_output", "dy", "in_0"):
+                        n = _num(io_inputs.get(key))
+                        if n > 0 and (n % tok) == 0:
+                            cands.append(n // tok)
+                    for key in ("input", "x", "in_1"):
+                        n = _num(io_inputs.get(key))
+                        denom = 2 * tok
+                        if n > 0 and denom > 0 and (n % denom) == 0:
+                            cands.append(n // denom)
+                    for key in ("d_input", "dx"):
+                        n = _num(io_outputs.get(key))
+                        denom = 2 * tok
+                        if n > 0 and denom > 0 and (n % denom) == 0:
+                            cands.append(n // denom)
+
+                cands = [int(v) for v in cands if int(v) > 0]
                 if cands:
                     swiglu_dim = int(min(cands))
+                else:
+                    # Legacy fallback for unusual IR wiring.
+                    raw: List[int] = []
+                    for tid in list(io_outputs.values()) + list(io_inputs.values()):
+                        n = _num(tid)
+                        if n > 0:
+                            raw.append(n)
+                    if raw:
+                        swiglu_dim = int(min(raw))
 
             call_args: List[str] = []
             ptr_fallback_state: Dict[str, int] = {}
@@ -1572,6 +1923,34 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                                 mapped = "NULL"
                         elif lname in ("c", "y", "out", "output", "dst"):
                             mapped = tvars_f32.get(io_outputs.get("y", ""))
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
+                    elif kid in ("attention_backward_causal_head_major_gqa", "attention_backward_causal_head_major"):
+                        lname = str(aname).lower()
+                        mapped: Optional[str] = None
+                        if lname in ("d_output", "grad_output", "dy"):
+                            mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                        elif lname == "q":
+                            mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                        elif lname == "k":
+                            mapped = tvars_f32.get(io_inputs.get("in_2", ""))
+                        elif lname == "v":
+                            mapped = tvars_f32.get(io_inputs.get("in_3", ""))
+                        elif lname in ("attn_weights", "weights", "softmax_weights"):
+                            mapped = tvars_f32.get(io_inputs.get("in_4", ""))
+                        elif lname in ("d_q", "dq"):
+                            mapped = tvars_f32.get(io_outputs.get("d_q", ""))
+                        elif lname in ("d_k", "dk"):
+                            mapped = tvars_f32.get(io_outputs.get("d_k", ""))
+                        elif lname in ("d_v", "dv"):
+                            mapped = tvars_f32.get(io_outputs.get("d_v", ""))
+                        elif lname in ("d_scores", "dscores"):
+                            mapped = tvars_f32.get(io_outputs.get("d_scores", ""))
                         if mapped is not None:
                             expr = mapped
                         else:
@@ -1615,13 +1994,21 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         call_args.append(_arg_scalar_expr(atype, aname, cfg))
 
             ap("    /* op_id=%s op=%s kernel_id=%s */" % (op_id, op_name, kid))
+            disp_note = _exec_plan_dispatch_comment(op_plan)
+            if disp_note:
+                ap("    /* dispatch_plan: %s */" % disp_note)
             seen_bounds: set[str] = set()
             for expr, n in bounds_checks:
                 if expr in seen_bounds:
                     continue
                 seen_bounds.add(expr)
                 ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (expr, int(n), op_id))
-            ap("    %s(%s);" % (fn, ", ".join(call_args)))
+            call_fn = fn
+            if kid == "gemm_blocked_serial":
+                call_fn = "gemm_blocked_serial_train_parallel_dispatch"
+            elif kid == "gemm_backward_f32":
+                call_fn = "gemm_backward_f32_train_parallel_dispatch_v2"
+            ap("    %s(%s);" % (call_fn, ", ".join(call_args)))
             if phase.startswith("backward"):
                 inj_tid: Optional[str] = None
                 for _k, _tid in _sorted_pool_items(io_outputs):
@@ -1667,21 +2054,55 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    const float beta2 = 0.999f;")
         ap("    const float eps = 1e-8f;")
         ap("    const float weight_decay = 0.01f;")
-        ap("    const float max_grad_norm = 1.0f;")
+        ap("    const float max_grad_norm = (float)CK_MAX_GRAD_NORM;")
         ap("    int call_count = 0;")
         ap("    g_opt_step += 1;")
         if skipped_opt_non_fp32:
             ap("    /* skipped non-fp32 optimizer params: %d */" % len(skipped_opt_non_fp32))
-        for wname, gvar, wvar, mvar, vvar, numel in opt_pairs:
-            n_expr = str(int(numel))
-            ap("    /* AdamW update: %s */" % wname)
-            if "gradient_clip_norm_f32" in used_decl:
-                ap("    gradient_clip_norm_f32(%s, (size_t)%s, max_grad_norm);" % (gvar, n_expr))
-            ap("    adamw_update_f32(%s, %s, %s, %s, (size_t)%s, lr, beta1, beta2, eps, weight_decay, g_opt_step);" % (
-                gvar, wvar, mvar, vvar, n_expr
-            ))
-            ap("    call_count++;")
+
+        if "adamw_clip_update_multi_f32" in used_decl and len(opt_pairs) > 0:
+            ap("    /* Fused multi-tensor AdamW + per-tensor norm clip update. */")
+            ap("    float *grads[%d] = {%s};" % (len(opt_pairs), ", ".join([gvar for (_wname, gvar, _wvar, _mvar, _vvar, _numel) in opt_pairs])))
+            ap("    float *weights[%d] = {%s};" % (len(opt_pairs), ", ".join([wvar for (_wname, _gvar, wvar, _mvar, _vvar, _numel) in opt_pairs])))
+            ap("    float *m_states[%d] = {%s};" % (len(opt_pairs), ", ".join([mvar for (_wname, _gvar, _wvar, mvar, _vvar, _numel) in opt_pairs])))
+            ap("    float *v_states[%d] = {%s};" % (len(opt_pairs), ", ".join([vvar for (_wname, _gvar, _wvar, _mvar, vvar, _numel) in opt_pairs])))
+            ap("    size_t numels[%d] = {%s};" % (len(opt_pairs), ", ".join(["(size_t)%d" % int(numel) for (_wname, _gvar, _wvar, _mvar, _vvar, numel) in opt_pairs])))
+            ap("    adamw_clip_update_multi_f32(grads, weights, m_states, v_states, numels, %d, lr, beta1, beta2, eps, weight_decay, max_grad_norm, g_opt_step);" % len(opt_pairs))
+            ap("    call_count += %d;" % len(opt_pairs))
+        else:
+            for wname, gvar, wvar, mvar, vvar, numel in opt_pairs:
+                n_expr = str(int(numel))
+                ap("    /* AdamW update: %s */" % wname)
+                if "gradient_clip_norm_f32" in used_decl:
+                    ap("    gradient_clip_norm_f32(%s, (size_t)%s, max_grad_norm);" % (gvar, n_expr))
+                ap("    adamw_update_f32(%s, %s, %s, %s, (size_t)%s, lr, beta1, beta2, eps, weight_decay, g_opt_step);" % (
+                    gvar, wvar, mvar, vvar, n_expr
+                ))
+                ap("    call_count++;")
         ap("    return call_count;")
+    ap("}")
+    ap("")
+    ap("int ck_train_flush_optimizer(float lr) {")
+    ap("    if (g_accum_step <= 0) return 0;")
+    ap("    int opt = ck_train_optimizer_step(lr);")
+    ap("    g_accum_step = 0;")
+    ap("    ck_zero_grad();")
+    ap("    return opt;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_accum_counter(void) { return g_accum_step; }")
+    ap("int ck_train_get_accum_steps(void) { return CK_GRAD_ACCUM_STEPS; }")
+    ap("int ck_train_set_accum_counter(int accum_step) {")
+    ap("    if (accum_step < 0) accum_step = 0;")
+    ap("    if (CK_GRAD_ACCUM_STEPS > 0) accum_step = accum_step % CK_GRAD_ACCUM_STEPS;")
+    ap("    g_accum_step = accum_step;")
+    ap("    return g_accum_step;")
+    ap("}")
+    ap("int ck_train_get_opt_step(void) { return g_opt_step; }")
+    ap("int ck_train_set_opt_step(int opt_step) {")
+    ap("    if (opt_step < 0) opt_step = 0;")
+    ap("    g_opt_step = opt_step;")
+    ap("    return g_opt_step;")
     ap("}")
     ap("")
 
@@ -1705,16 +2126,31 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("")
 
     ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
-    ap("    ck_zero_grad();")
     ap("    ck_train_set_batch(token_ids, targets);")
+    ap("    /*")
+    ap("     * Grad-accum window contract (must match PyTorch):")
+    ap("     * - zero grads once at window start")
+    ap("     * - accumulate forward/backward across micro-steps")
+    ap("     * - run optimizer exactly at accumulation boundary")
+    ap("     */")
+    ap("    if (g_accum_step <= 0) {")
+    ap("        /* Window start: clear gradients before first micro-step. */")
+    ap("        ck_zero_grad();")
+    ap("    }")
     ap("    int first = -1;")
     ap("    if (CK_RUNTIME_CANARY_CHECKS) ck_train_plant_canaries();")
     ap("    int fwd = ck_train_forward_step();")
     ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_forward\", &first) != 0) return -1000 - first;")
     ap("    int bwd = ck_train_backward_step();")
     ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_backward\", &first) != 0) return -1100 - first;")
-    ap("    int opt = ck_train_optimizer_step(lr);")
-    ap("    if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_optimizer\", &first) != 0) return -1200 - first;")
+    ap("    g_accum_step += 1;")
+    ap("    int opt = 0;")
+    ap("    if (g_accum_step >= CK_GRAD_ACCUM_STEPS) {")
+    ap("        /* Boundary reached: apply one optimizer update per window. */")
+    ap("        opt = ck_train_optimizer_step(lr);")
+    ap("        g_accum_step = 0;")
+    ap("        if (CK_RUNTIME_CANARY_CHECKS && ck_train_check_canaries(\"step_optimizer\", &first) != 0) return -1200 - first;")
+    ap("    }")
     ap("    if (loss_out != NULL) {")
     ap("        *loss_out = g_loss_scalar[0];")
     ap("    }")
@@ -1737,6 +2173,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "tensor_slot_count": len(slot_rows),
         "canary_range_count": len(canary_ranges),
         "canary_tail_floats": 16,
+        "exec_plan_schema": exec_plan_info.get("schema"),
+        "exec_plan_runtime": exec_plan_info.get("runtime"),
+        "exec_plan_ops": len(exec_plan_by_op),
         "weight_snapshot_floats": int(weight_snapshot_floats),
         "activation_snapshot_floats": int(activation_snapshot_floats),
         "tensor_slots": [
@@ -1782,6 +2221,7 @@ def main() -> int:
     p.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY, help="Kernel registry JSON path")
     p.add_argument("--manifest", type=Path, default=None, help="Optional weights manifest for exact optimizer numel mapping")
     p.add_argument("--layout", type=Path, required=True, help="Path to layout_train.json (authoritative offsets)")
+    p.add_argument("--exec-plan", type=Path, default=None, help="Optional train_exec_plan.json (dispatch metadata)")
     p.add_argument("--output", type=Path, required=True, help="Output C file path")
     p.add_argument("--summary-out", type=Path, default=None, help="Optional summary JSON")
     args = p.parse_args()
@@ -1790,7 +2230,8 @@ def main() -> int:
     reg = _load_json(args.registry)
     manifest = _load_json(args.manifest) if args.manifest is not None else None
     layout = _load_json(args.layout) if args.layout is not None else None
-    c_src, summary = generate_c(ir2, reg, manifest=manifest, layout=layout)
+    exec_plan = _load_json(args.exec_plan) if args.exec_plan is not None else None
+    c_src, summary = generate_c(ir2, reg, manifest=manifest, layout=layout, exec_plan=exec_plan)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(c_src, encoding="utf-8")
