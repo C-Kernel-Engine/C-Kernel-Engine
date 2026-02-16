@@ -10,6 +10,7 @@ var dir_68267d1309a1af8e8297ef4c3efbcdba =
     [ "v6.6", "dir_266047a2070d5244a2b4cc3825bbd8cc.html", "dir_266047a2070d5244a2b4cc3825bbd8cc" ],
     [ "backend_native.c", "backend__native_8c.html", "backend__native_8c" ],
     [ "ck_cli_v5.c", "ck__cli__v5_8c.html", "ck__cli__v5_8c" ],
+    [ "ck_parallel_train.c", "ck__parallel__train_8c.html", "ck__parallel__train_8c" ],
     [ "ck_parity_api.c", "ck__parity__api_8c.html", "ck__parity__api_8c" ],
     [ "ck_threadpool.c", "ck__threadpool_8c.html", "ck__threadpool_8c" ],
     [ "ck_tokenizer.c", "ck__tokenizer_8c.html", "ck__tokenizer_8c" ],

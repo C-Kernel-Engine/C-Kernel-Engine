@@ -11,6 +11,7 @@ var gemm__kernels_8c =
     [ "gemm_nn_blocked", "gemm__kernels_8c.html#afd447dc190bd77241a42d8972f9c5fba", null ],
     [ "gemm_nn_parallel", "gemm__kernels_8c.html#a3549b849a914ea46c5d51c7d485fecec", null ],
     [ "gemm_nn_serial_double", "gemm__kernels_8c.html#a2731fd00008f7e887e94ec03af77325d", null ],
+    [ "gemm_nn_simd", "gemm__kernels_8c.html#aa2ce07d3575e9c3e87bc8e0f28d43762", null ],
     [ "gemm_nt_matvec_parallel", "gemm__kernels_8c.html#a44c450ce25774bb9d5fab4e5fd172e98", null ],
     [ "gemm_tn_avx512", "gemm__kernels_8c.html#afe5bf17f909def227c3e25b0c4338f93", null ],
     [ "gemm_tn_blocked", "gemm__kernels_8c.html#ae3bc36ea7b8562f9121e527f0f408b43", null ],

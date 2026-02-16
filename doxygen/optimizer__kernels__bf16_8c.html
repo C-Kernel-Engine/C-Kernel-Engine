@@ -148,13 +148,11 @@ Functions</h2></td></tr>
 <tr class="memdesc:a04594793ece43bcbd8669ff6d0e0029b"><td class="mdescLeft">&#160;</td><td class="mdescRight">AdamW optimizer update (bf16 weights/gradients, fp32 optimizer state)  <br /></td></tr>
 <tr class="separator:a04594793ece43bcbd8669ff6d0e0029b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac1a9ed01c15286fc6e3be73f96371d76" id="r_ac1a9ed01c15286fc6e3be73f96371d76"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#ac1a9ed01c15286fc6e3be73f96371d76">adamw_update_f32</a> (const float *grad, float *weight, float *m, float *v, size_t numel, float lr, float beta1, float beta2, float eps, float weight_decay, int step)</td></tr>
-<tr class="memdesc:ac1a9ed01c15286fc6e3be73f96371d76"><td class="mdescLeft">&#160;</td><td class="mdescRight">AdamW optimizer update (fp32 version)  <br /></td></tr>
 <tr class="separator:ac1a9ed01c15286fc6e3be73f96371d76"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5d7c00758ea2a984dc6610c2df452b78" id="r_a5d7c00758ea2a984dc6610c2df452b78"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#a5d7c00758ea2a984dc6610c2df452b78">gradient_accumulate_bf16</a> (uint16_t *dst, const uint16_t *src, size_t numel)</td></tr>
 <tr class="memdesc:a5d7c00758ea2a984dc6610c2df452b78"><td class="mdescLeft">&#160;</td><td class="mdescRight">Accumulate gradients: dst += src (bf16)  <br /></td></tr>
 <tr class="separator:a5d7c00758ea2a984dc6610c2df452b78"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac43e9094fbc4956d450b5f6deb5ae899" id="r_ac43e9094fbc4956d450b5f6deb5ae899"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#ac43e9094fbc4956d450b5f6deb5ae899">gradient_accumulate_f32</a> (float *dst, const float *src, size_t numel)</td></tr>
-<tr class="memdesc:ac43e9094fbc4956d450b5f6deb5ae899"><td class="mdescLeft">&#160;</td><td class="mdescRight">Accumulate gradients: dst += src (fp32)  <br /></td></tr>
 <tr class="separator:ac43e9094fbc4956d450b5f6deb5ae899"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3b775fa9d57eebd6e004caa317f1b9e3" id="r_a3b775fa9d57eebd6e004caa317f1b9e3"><td class="memItemLeft" align="right" valign="top">float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#a3b775fa9d57eebd6e004caa317f1b9e3">gradient_clip_norm_bf16</a> (uint16_t *grad, size_t numel, float max_norm)</td></tr>
 <tr class="memdesc:a3b775fa9d57eebd6e004caa317f1b9e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip gradient norm (bf16)  <br /></td></tr>
@@ -163,7 +161,6 @@ Functions</h2></td></tr>
 <tr class="memdesc:a6a19ebe41c76f7394ecdc70784f0d449"><td class="mdescLeft">&#160;</td><td class="mdescRight">Scale gradients: grad *= scale (bf16)  <br /></td></tr>
 <tr class="separator:a6a19ebe41c76f7394ecdc70784f0d449"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab615ca5560d68ed2f098960cd81acfc2" id="r_ab615ca5560d68ed2f098960cd81acfc2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#ab615ca5560d68ed2f098960cd81acfc2">gradient_scale_f32</a> (float *grad, size_t numel, float scale)</td></tr>
-<tr class="memdesc:ab615ca5560d68ed2f098960cd81acfc2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Scale gradients by a constant: grad *= scale (fp32)  <br /></td></tr>
 <tr class="separator:ab615ca5560d68ed2f098960cd81acfc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a83c7cc71f8975e4b7c83ac26229e203f" id="r_a83c7cc71f8975e4b7c83ac26229e203f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="optimizer__kernels__bf16_8c.html#a83c7cc71f8975e4b7c83ac26229e203f">sgd_momentum_update_bf16</a> (const uint16_t *grad, uint16_t *weight, float *velocity, size_t numel, float lr, float momentum, float weight_decay)</td></tr>
 <tr class="memdesc:a83c7cc71f8975e4b7c83ac26229e203f"><td class="mdescLeft">&#160;</td><td class="mdescRight">SGD with momentum (bf16 weights/gradients)  <br /></td></tr>
@@ -474,212 +471,41 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p>AdamW optimizer update (fp32 version) </p>
-<p>Updates weights in-place using the AdamW algorithm. Momentum (m) and variance (v) are stored in fp32 for numerical stability.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">grad</td><td>Gradient tensor (fp32) [numel] </td></tr>
-    <tr><td class="paramname">weight</td><td>Weight tensor to update (fp32, in-place) [numel] </td></tr>
-    <tr><td class="paramname">m</td><td>First moment (momentum) buffer (fp32, in-place) [numel] </td></tr>
-    <tr><td class="paramname">v</td><td>Second moment (variance) buffer (fp32, in-place) [numel] </td></tr>
-    <tr><td class="paramname">numel</td><td>Number of elements </td></tr>
-    <tr><td class="paramname">lr</td><td>Learning rate </td></tr>
-    <tr><td class="paramname">beta1</td><td>Exponential decay rate for first moment (typically 0.9) </td></tr>
-    <tr><td class="paramname">beta2</td><td>Exponential decay rate for second moment (typically 0.999) </td></tr>
-    <tr><td class="paramname">eps</td><td>Small constant for numerical stability (typically 1e-8) </td></tr>
-    <tr><td class="paramname">weight_decay</td><td>Weight decay coefficient (typically 0.01) </td></tr>
-    <tr><td class="paramname">step</td><td>Current step number (1-indexed for bias correction) </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00053">53</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   65</span>{</div>
-<div class="line"><span class="lineno">   66</span>    <span class="keywordflow">if</span> (!grad || !weight || !m || !v || numel == 0) {</div>
-<div class="line"><span class="lineno">   67</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">   68</span>    }</div>
-<div class="line"><span class="lineno">   69</span> </div>
-<div class="line"><span class="lineno">   70</span>    <span class="comment">// Bias correction terms</span></div>
-<div class="line"><span class="lineno">   71</span>    <span class="keywordtype">float</span> bias_correction1 = 1.0f - powf(beta1, (<span class="keywordtype">float</span>)step);</div>
-<div class="line"><span class="lineno">   72</span>    <span class="keywordtype">float</span> bias_correction2 = 1.0f - powf(beta2, (<span class="keywordtype">float</span>)step);</div>
-<div class="line"><span class="lineno">   73</span> </div>
-<div class="line"><span class="lineno">   74</span>    <span class="comment">// Precompute constants</span></div>
-<div class="line"><span class="lineno">   75</span>    <span class="keywordtype">float</span> one_minus_beta1 = 1.0f - beta1;</div>
-<div class="line"><span class="lineno">   76</span>    <span class="keywordtype">float</span> one_minus_beta2 = 1.0f - beta2;</div>
-<div class="line"><span class="lineno">   77</span> </div>
-<div class="line"><span class="lineno">   78</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">   79</span>    <span class="comment">// AVX-512 path: process 16 floats at a time</span></div>
-<div class="line"><span class="lineno">   80</span>    __m512 v_beta1 = _mm512_set1_ps(beta1);</div>
-<div class="line"><span class="lineno">   81</span>    __m512 v_beta2 = _mm512_set1_ps(beta2);</div>
-<div class="line"><span class="lineno">   82</span>    __m512 v_one_minus_beta1 = _mm512_set1_ps(one_minus_beta1);</div>
-<div class="line"><span class="lineno">   83</span>    __m512 v_one_minus_beta2 = _mm512_set1_ps(one_minus_beta2);</div>
-<div class="line"><span class="lineno">   84</span>    __m512 v_lr = _mm512_set1_ps(lr);</div>
-<div class="line"><span class="lineno">   85</span>    __m512 v_eps = _mm512_set1_ps(eps);</div>
-<div class="line"><span class="lineno">   86</span>    __m512 v_weight_decay = _mm512_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">   87</span>    __m512 v_bc1_inv = _mm512_set1_ps(1.0f / bias_correction1);</div>
-<div class="line"><span class="lineno">   88</span>    __m512 v_bc2_inv = _mm512_set1_ps(1.0f / bias_correction2);</div>
-<div class="line"><span class="lineno">   89</span> </div>
-<div class="line"><span class="lineno">   90</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">   91</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= numel; i += 16) {</div>
-<div class="line"><span class="lineno">   92</span>        __m512 g = _mm512_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">   93</span>        __m512 w = _mm512_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">   94</span>        __m512 m_val = _mm512_loadu_ps(&amp;m[i]);</div>
-<div class="line"><span class="lineno">   95</span>        __m512 v_val = _mm512_loadu_ps(&amp;v[i]);</div>
-<div class="line"><span class="lineno">   96</span> </div>
-<div class="line"><span class="lineno">   97</span>        <span class="comment">// m = beta1 * m + (1 - beta1) * g</span></div>
-<div class="line"><span class="lineno">   98</span>        m_val = _mm512_fmadd_ps(v_beta1, m_val, _mm512_mul_ps(v_one_minus_beta1, g));</div>
-<div class="line"><span class="lineno">   99</span> </div>
-<div class="line"><span class="lineno">  100</span>        <span class="comment">// v = beta2 * v + (1 - beta2) * g^2</span></div>
-<div class="line"><span class="lineno">  101</span>        __m512 g_sq = _mm512_mul_ps(g, g);</div>
-<div class="line"><span class="lineno">  102</span>        v_val = _mm512_fmadd_ps(v_beta2, v_val, _mm512_mul_ps(v_one_minus_beta2, g_sq));</div>
-<div class="line"><span class="lineno">  103</span> </div>
-<div class="line"><span class="lineno">  104</span>        <span class="comment">// Bias-corrected estimates</span></div>
-<div class="line"><span class="lineno">  105</span>        __m512 m_hat = _mm512_mul_ps(m_val, v_bc1_inv);</div>
-<div class="line"><span class="lineno">  106</span>        __m512 v_hat = _mm512_mul_ps(v_val, v_bc2_inv);</div>
-<div class="line"><span class="lineno">  107</span> </div>
-<div class="line"><span class="lineno">  108</span>        <span class="comment">// w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)</span></div>
-<div class="line"><span class="lineno">  109</span>        __m512 denom = _mm512_add_ps(_mm512_sqrt_ps(v_hat), v_eps);</div>
-<div class="line"><span class="lineno">  110</span>        __m512 update = _mm512_div_ps(m_hat, denom);</div>
-<div class="line"><span class="lineno">  111</span>        update = _mm512_fmadd_ps(v_weight_decay, w, update);</div>
-<div class="line"><span class="lineno">  112</span>        w = _mm512_fnmadd_ps(v_lr, update, w);</div>
-<div class="line"><span class="lineno">  113</span> </div>
-<div class="line"><span class="lineno">  114</span>        _mm512_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  115</span>        _mm512_storeu_ps(&amp;m[i], m_val);</div>
-<div class="line"><span class="lineno">  116</span>        _mm512_storeu_ps(&amp;v[i], v_val);</div>
-<div class="line"><span class="lineno">  117</span>    }</div>
-<div class="line"><span class="lineno">  118</span> </div>
-<div class="line"><span class="lineno">  119</span>    <span class="comment">// Scalar tail</span></div>
-<div class="line"><span class="lineno">  120</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordtype">float</span> g = grad[i];</div>
-<div class="line"><span class="lineno">  122</span>        <span class="keywordtype">float</span> w = weight[i];</div>
-<div class="line"><span class="lineno">  123</span>        m[i] = beta1 * m[i] + one_minus_beta1 * g;</div>
-<div class="line"><span class="lineno">  124</span>        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;</div>
-<div class="line"><span class="lineno">  125</span>        <span class="keywordtype">float</span> m_hat = m[i] / bias_correction1;</div>
-<div class="line"><span class="lineno">  126</span>        <span class="keywordtype">float</span> v_hat = v[i] / bias_correction2;</div>
-<div class="line"><span class="lineno">  127</span>        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);</div>
-<div class="line"><span class="lineno">  128</span>    }</div>
-<div class="line"><span class="lineno">  129</span> </div>
-<div class="line"><span class="lineno">  130</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  131</span>    <span class="comment">// AVX path: process 8 floats at a time (no FMA on older CPUs like Ivy Bridge)</span></div>
-<div class="line"><span class="lineno">  132</span>    __m256 v_beta1 = _mm256_set1_ps(beta1);</div>
-<div class="line"><span class="lineno">  133</span>    __m256 v_beta2 = _mm256_set1_ps(beta2);</div>
-<div class="line"><span class="lineno">  134</span>    __m256 v_one_minus_beta1 = _mm256_set1_ps(one_minus_beta1);</div>
-<div class="line"><span class="lineno">  135</span>    __m256 v_one_minus_beta2 = _mm256_set1_ps(one_minus_beta2);</div>
-<div class="line"><span class="lineno">  136</span>    __m256 v_lr = _mm256_set1_ps(lr);</div>
-<div class="line"><span class="lineno">  137</span>    __m256 v_eps = _mm256_set1_ps(eps);</div>
-<div class="line"><span class="lineno">  138</span>    __m256 v_weight_decay = _mm256_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">  139</span>    __m256 v_bc1_inv = _mm256_set1_ps(1.0f / bias_correction1);</div>
-<div class="line"><span class="lineno">  140</span>    __m256 v_bc2_inv = _mm256_set1_ps(1.0f / bias_correction2);</div>
-<div class="line"><span class="lineno">  141</span> </div>
-<div class="line"><span class="lineno">  142</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  143</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= numel; i += 8) {</div>
-<div class="line"><span class="lineno">  144</span>        __m256 g = _mm256_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  145</span>        __m256 w = _mm256_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">  146</span>        __m256 m_val = _mm256_loadu_ps(&amp;m[i]);</div>
-<div class="line"><span class="lineno">  147</span>        __m256 v_val = _mm256_loadu_ps(&amp;v[i]);</div>
-<div class="line"><span class="lineno">  148</span> </div>
-<div class="line"><span class="lineno">  149</span>        <span class="comment">// m = beta1 * m + (1 - beta1) * g</span></div>
-<div class="line"><span class="lineno">  150</span>        m_val = _mm256_add_ps(_mm256_mul_ps(v_beta1, m_val),</div>
-<div class="line"><span class="lineno">  151</span>                              _mm256_mul_ps(v_one_minus_beta1, g));</div>
-<div class="line"><span class="lineno">  152</span> </div>
-<div class="line"><span class="lineno">  153</span>        <span class="comment">// v = beta2 * v + (1 - beta2) * g^2</span></div>
-<div class="line"><span class="lineno">  154</span>        __m256 g_sq = _mm256_mul_ps(g, g);</div>
-<div class="line"><span class="lineno">  155</span>        v_val = _mm256_add_ps(_mm256_mul_ps(v_beta2, v_val),</div>
-<div class="line"><span class="lineno">  156</span>                              _mm256_mul_ps(v_one_minus_beta2, g_sq));</div>
-<div class="line"><span class="lineno">  157</span> </div>
-<div class="line"><span class="lineno">  158</span>        <span class="comment">// Bias-corrected estimates</span></div>
-<div class="line"><span class="lineno">  159</span>        __m256 m_hat = _mm256_mul_ps(m_val, v_bc1_inv);</div>
-<div class="line"><span class="lineno">  160</span>        __m256 v_hat = _mm256_mul_ps(v_val, v_bc2_inv);</div>
-<div class="line"><span class="lineno">  161</span> </div>
-<div class="line"><span class="lineno">  162</span>        <span class="comment">// w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)</span></div>
-<div class="line"><span class="lineno">  163</span>        __m256 denom = _mm256_add_ps(_mm256_sqrt_ps(v_hat), v_eps);</div>
-<div class="line"><span class="lineno">  164</span>        __m256 update = _mm256_div_ps(m_hat, denom);</div>
-<div class="line"><span class="lineno">  165</span>        update = _mm256_add_ps(update, _mm256_mul_ps(v_weight_decay, w));</div>
-<div class="line"><span class="lineno">  166</span>        w = _mm256_sub_ps(w, _mm256_mul_ps(v_lr, update));</div>
-<div class="line"><span class="lineno">  167</span> </div>
-<div class="line"><span class="lineno">  168</span>        _mm256_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  169</span>        _mm256_storeu_ps(&amp;m[i], m_val);</div>
-<div class="line"><span class="lineno">  170</span>        _mm256_storeu_ps(&amp;v[i], v_val);</div>
-<div class="line"><span class="lineno">  171</span>    }</div>
-<div class="line"><span class="lineno">  172</span> </div>
-<div class="line"><span class="lineno">  173</span>    <span class="comment">// Scalar tail</span></div>
-<div class="line"><span class="lineno">  174</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  175</span>        <span class="keywordtype">float</span> g = grad[i];</div>
-<div class="line"><span class="lineno">  176</span>        <span class="keywordtype">float</span> w = weight[i];</div>
-<div class="line"><span class="lineno">  177</span>        m[i] = beta1 * m[i] + one_minus_beta1 * g;</div>
-<div class="line"><span class="lineno">  178</span>        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;</div>
-<div class="line"><span class="lineno">  179</span>        <span class="keywordtype">float</span> m_hat = m[i] / bias_correction1;</div>
-<div class="line"><span class="lineno">  180</span>        <span class="keywordtype">float</span> v_hat = v[i] / bias_correction2;</div>
-<div class="line"><span class="lineno">  181</span>        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);</div>
-<div class="line"><span class="lineno">  182</span>    }</div>
-<div class="line"><span class="lineno">  183</span> </div>
-<div class="line"><span class="lineno">  184</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
-<div class="line"><span class="lineno">  185</span>    <span class="comment">// SSE2 path: process 4 floats at a time</span></div>
-<div class="line"><span class="lineno">  186</span>    __m128 v_beta1 = _mm_set1_ps(beta1);</div>
-<div class="line"><span class="lineno">  187</span>    __m128 v_beta2 = _mm_set1_ps(beta2);</div>
-<div class="line"><span class="lineno">  188</span>    __m128 v_one_minus_beta1 = _mm_set1_ps(one_minus_beta1);</div>
-<div class="line"><span class="lineno">  189</span>    __m128 v_one_minus_beta2 = _mm_set1_ps(one_minus_beta2);</div>
-<div class="line"><span class="lineno">  190</span>    __m128 v_lr = _mm_set1_ps(lr);</div>
-<div class="line"><span class="lineno">  191</span>    __m128 v_eps = _mm_set1_ps(eps);</div>
-<div class="line"><span class="lineno">  192</span>    __m128 v_weight_decay = _mm_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">  193</span>    __m128 v_bc1_inv = _mm_set1_ps(1.0f / bias_correction1);</div>
-<div class="line"><span class="lineno">  194</span>    __m128 v_bc2_inv = _mm_set1_ps(1.0f / bias_correction2);</div>
-<div class="line"><span class="lineno">  195</span> </div>
-<div class="line"><span class="lineno">  196</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  197</span>    <span class="keywordflow">for</span> (; i + 4 &lt;= numel; i += 4) {</div>
-<div class="line"><span class="lineno">  198</span>        __m128 g = _mm_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  199</span>        __m128 w = _mm_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">  200</span>        __m128 m_val = _mm_loadu_ps(&amp;m[i]);</div>
-<div class="line"><span class="lineno">  201</span>        __m128 v_val = _mm_loadu_ps(&amp;v[i]);</div>
-<div class="line"><span class="lineno">  202</span> </div>
-<div class="line"><span class="lineno">  203</span>        <span class="comment">// m = beta1 * m + (1 - beta1) * g</span></div>
-<div class="line"><span class="lineno">  204</span>        m_val = _mm_add_ps(_mm_mul_ps(v_beta1, m_val),</div>
-<div class="line"><span class="lineno">  205</span>                           _mm_mul_ps(v_one_minus_beta1, g));</div>
-<div class="line"><span class="lineno">  206</span> </div>
-<div class="line"><span class="lineno">  207</span>        <span class="comment">// v = beta2 * v + (1 - beta2) * g^2</span></div>
-<div class="line"><span class="lineno">  208</span>        __m128 g_sq = _mm_mul_ps(g, g);</div>
-<div class="line"><span class="lineno">  209</span>        v_val = _mm_add_ps(_mm_mul_ps(v_beta2, v_val),</div>
-<div class="line"><span class="lineno">  210</span>                           _mm_mul_ps(v_one_minus_beta2, g_sq));</div>
-<div class="line"><span class="lineno">  211</span> </div>
-<div class="line"><span class="lineno">  212</span>        <span class="comment">// Bias-corrected estimates</span></div>
-<div class="line"><span class="lineno">  213</span>        __m128 m_hat = _mm_mul_ps(m_val, v_bc1_inv);</div>
-<div class="line"><span class="lineno">  214</span>        __m128 v_hat = _mm_mul_ps(v_val, v_bc2_inv);</div>
-<div class="line"><span class="lineno">  215</span> </div>
-<div class="line"><span class="lineno">  216</span>        <span class="comment">// w = w - lr * (m_hat / (sqrt(v_hat) + eps) + weight_decay * w)</span></div>
-<div class="line"><span class="lineno">  217</span>        __m128 denom = _mm_add_ps(_mm_sqrt_ps(v_hat), v_eps);</div>
-<div class="line"><span class="lineno">  218</span>        __m128 update = _mm_div_ps(m_hat, denom);</div>
-<div class="line"><span class="lineno">  219</span>        update = _mm_add_ps(update, _mm_mul_ps(v_weight_decay, w));</div>
-<div class="line"><span class="lineno">  220</span>        w = _mm_sub_ps(w, _mm_mul_ps(v_lr, update));</div>
-<div class="line"><span class="lineno">  221</span> </div>
-<div class="line"><span class="lineno">  222</span>        _mm_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  223</span>        _mm_storeu_ps(&amp;m[i], m_val);</div>
-<div class="line"><span class="lineno">  224</span>        _mm_storeu_ps(&amp;v[i], v_val);</div>
-<div class="line"><span class="lineno">  225</span>    }</div>
-<div class="line"><span class="lineno">  226</span> </div>
-<div class="line"><span class="lineno">  227</span>    <span class="comment">// Scalar tail</span></div>
-<div class="line"><span class="lineno">  228</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  229</span>        <span class="keywordtype">float</span> g = grad[i];</div>
-<div class="line"><span class="lineno">  230</span>        <span class="keywordtype">float</span> w = weight[i];</div>
-<div class="line"><span class="lineno">  231</span>        m[i] = beta1 * m[i] + one_minus_beta1 * g;</div>
-<div class="line"><span class="lineno">  232</span>        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;</div>
-<div class="line"><span class="lineno">  233</span>        <span class="keywordtype">float</span> m_hat = m[i] / bias_correction1;</div>
-<div class="line"><span class="lineno">  234</span>        <span class="keywordtype">float</span> v_hat = v[i] / bias_correction2;</div>
-<div class="line"><span class="lineno">  235</span>        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);</div>
-<div class="line"><span class="lineno">  236</span>    }</div>
-<div class="line"><span class="lineno">  237</span> </div>
-<div class="line"><span class="lineno">  238</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  239</span>    <span class="comment">// Scalar path</span></div>
-<div class="line"><span class="lineno">  240</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  241</span>        <span class="keywordtype">float</span> g = grad[i];</div>
-<div class="line"><span class="lineno">  242</span>        <span class="keywordtype">float</span> w = weight[i];</div>
-<div class="line"><span class="lineno">  243</span>        m[i] = beta1 * m[i] + one_minus_beta1 * g;</div>
-<div class="line"><span class="lineno">  244</span>        v[i] = beta2 * v[i] + one_minus_beta2 * g * g;</div>
-<div class="line"><span class="lineno">  245</span>        <span class="keywordtype">float</span> m_hat = m[i] / bias_correction1;</div>
-<div class="line"><span class="lineno">  246</span>        <span class="keywordtype">float</span> v_hat = v[i] / bias_correction2;</div>
-<div class="line"><span class="lineno">  247</span>        weight[i] = w - lr * (m_hat / (sqrtf(v_hat) + eps) + weight_decay * w);</div>
-<div class="line"><span class="lineno">  248</span>    }</div>
-<div class="line"><span class="lineno">  249</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  250</span>}</div>
+<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00497">497</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  509</span>{</div>
+<div class="line"><span class="lineno">  510</span>    <span class="keywordflow">if</span> (!grad || !weight || !m || !v || numel == 0) {</div>
+<div class="line"><span class="lineno">  511</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  512</span>    }</div>
+<div class="line"><span class="lineno">  513</span> </div>
+<div class="line"><span class="lineno">  514</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  515</span>    <span class="keywordtype">int</span> nth = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  516</span>    <span class="keywordflow">if</span> (!pool || nth &lt;= 1 || nth &gt; <a class="code hl_define" href="optimizer__kernels_8c.html#adb28b128f8218c37a63961ddc726db93">CK_OPT_PAR_MAX_THREADS</a> || numel &lt; <a class="code hl_define" href="optimizer__kernels_8c.html#a62fd0a2d854973891c609fe9f7654a98">CK_OPT_PAR_MIN_NUMEL</a>) {</div>
+<div class="line"><span class="lineno">  517</span>        <a class="code hl_function" href="optimizer__kernels_8c.html#a1b5c89658044de1c75abb8822b2ac8a5">adamw_update_f32_impl</a>(grad, weight, m, v, numel, lr, beta1, beta2, eps, weight_decay, step);</div>
+<div class="line"><span class="lineno">  518</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  519</span>    }</div>
+<div class="line"><span class="lineno">  520</span> </div>
+<div class="line"><span class="lineno">  521</span>    ck_adamw_parallel_args_t args = {</div>
+<div class="line"><span class="lineno">  522</span>        .grad = grad,</div>
+<div class="line"><span class="lineno">  523</span>        .weight = weight,</div>
+<div class="line"><span class="lineno">  524</span>        .m = m,</div>
+<div class="line"><span class="lineno">  525</span>        .v = v,</div>
+<div class="line"><span class="lineno">  526</span>        .numel = numel,</div>
+<div class="line"><span class="lineno">  527</span>        .lr = lr,</div>
+<div class="line"><span class="lineno">  528</span>        .beta1 = beta1,</div>
+<div class="line"><span class="lineno">  529</span>        .beta2 = beta2,</div>
+<div class="line"><span class="lineno">  530</span>        .eps = eps,</div>
+<div class="line"><span class="lineno">  531</span>        .weight_decay = weight_decay,</div>
+<div class="line"><span class="lineno">  532</span>        .step = step,</div>
+<div class="line"><span class="lineno">  533</span>    };</div>
+<div class="line"><span class="lineno">  534</span>    <a class="code hl_function" href="ck__threadpool_8h.html#abf4adc5451a56f39e5630dc42c07e330">ck_threadpool_dispatch</a>(pool, <a class="code hl_function" href="optimizer__kernels_8c.html#abde072e262515d74d1e14d7a4c2562c2">ck_adamw_parallel_work</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  535</span>}</div>
+<div class="ttc" id="ack__threadpool_8h_html_a4597badcb0a5a6c31549f2b6bc6a88a7"><div class="ttname"><a href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a></div><div class="ttdeci">ck_threadpool_t * ck_threadpool_global(void)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00383">ck_threadpool.c:383</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_abf4adc5451a56f39e5630dc42c07e330"><div class="ttname"><a href="ck__threadpool_8h.html#abf4adc5451a56f39e5630dc42c07e330">ck_threadpool_dispatch</a></div><div class="ttdeci">void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00271">ck_threadpool.c:271</a></div></div>
+<div class="ttc" id="ack__threadpool_8h_html_aef9103ab0a271feb7fdc74c915a78d10"><div class="ttname"><a href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a></div><div class="ttdeci">int ck_threadpool_n_threads(const ck_threadpool_t *pool)</div><div class="ttdef"><b>Definition</b> <a href="ck__threadpool_8c_source.html#l00351">ck_threadpool.c:351</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_a1b5c89658044de1c75abb8822b2ac8a5"><div class="ttname"><a href="optimizer__kernels_8c.html#a1b5c89658044de1c75abb8822b2ac8a5">adamw_update_f32_impl</a></div><div class="ttdeci">static void adamw_update_f32_impl(const float *grad, float *weight, float *m, float *v, size_t numel, float lr, float beta1, float beta2, float eps, float weight_decay, int step)</div><div class="ttdoc">AdamW optimizer update (fp32 version)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00260">optimizer_kernels.c:260</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_a62fd0a2d854973891c609fe9f7654a98"><div class="ttname"><a href="optimizer__kernels_8c.html#a62fd0a2d854973891c609fe9f7654a98">CK_OPT_PAR_MIN_NUMEL</a></div><div class="ttdeci">#define CK_OPT_PAR_MIN_NUMEL</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00037">optimizer_kernels.c:37</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_abde072e262515d74d1e14d7a4c2562c2"><div class="ttname"><a href="optimizer__kernels_8c.html#abde072e262515d74d1e14d7a4c2562c2">ck_adamw_parallel_work</a></div><div class="ttdeci">static void ck_adamw_parallel_work(int ith, int nth, void *argp)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00105">optimizer_kernels.c:105</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_adb28b128f8218c37a63961ddc726db93"><div class="ttname"><a href="optimizer__kernels_8c.html#adb28b128f8218c37a63961ddc726db93">CK_OPT_PAR_MAX_THREADS</a></div><div class="ttdeci">#define CK_OPT_PAR_MAX_THREADS</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00038">optimizer_kernels.c:38</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -788,62 +614,28 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p>Accumulate gradients: dst += src (fp32) </p>
-<p>Used for gradient accumulation across micro-batches.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">dst</td><td>Destination gradient buffer (in-place) [numel] </td></tr>
-    <tr><td class="paramname">src</td><td>Source gradient buffer [numel] </td></tr>
-    <tr><td class="paramname">numel</td><td>Number of elements </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00392">392</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  393</span>{</div>
-<div class="line"><span class="lineno">  394</span>    <span class="keywordflow">if</span> (!dst || !src || numel == 0) {</div>
-<div class="line"><span class="lineno">  395</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  396</span>    }</div>
-<div class="line"><span class="lineno">  397</span> </div>
-<div class="line"><span class="lineno">  398</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  399</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  400</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= numel; i += 16) {</div>
-<div class="line"><span class="lineno">  401</span>        __m512 d = _mm512_loadu_ps(&amp;dst[i]);</div>
-<div class="line"><span class="lineno">  402</span>        __m512 s = _mm512_loadu_ps(&amp;src[i]);</div>
-<div class="line"><span class="lineno">  403</span>        _mm512_storeu_ps(&amp;dst[i], _mm512_add_ps(d, s));</div>
-<div class="line"><span class="lineno">  404</span>    }</div>
-<div class="line"><span class="lineno">  405</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  406</span>        dst[i] += src[i];</div>
-<div class="line"><span class="lineno">  407</span>    }</div>
-<div class="line"><span class="lineno">  408</span> </div>
-<div class="line"><span class="lineno">  409</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  410</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  411</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= numel; i += 8) {</div>
-<div class="line"><span class="lineno">  412</span>        __m256 d = _mm256_loadu_ps(&amp;dst[i]);</div>
-<div class="line"><span class="lineno">  413</span>        __m256 s = _mm256_loadu_ps(&amp;src[i]);</div>
-<div class="line"><span class="lineno">  414</span>        _mm256_storeu_ps(&amp;dst[i], _mm256_add_ps(d, s));</div>
-<div class="line"><span class="lineno">  415</span>    }</div>
-<div class="line"><span class="lineno">  416</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  417</span>        dst[i] += src[i];</div>
-<div class="line"><span class="lineno">  418</span>    }</div>
-<div class="line"><span class="lineno">  419</span> </div>
-<div class="line"><span class="lineno">  420</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
-<div class="line"><span class="lineno">  421</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  422</span>    <span class="keywordflow">for</span> (; i + 4 &lt;= numel; i += 4) {</div>
-<div class="line"><span class="lineno">  423</span>        __m128 d = _mm_loadu_ps(&amp;dst[i]);</div>
-<div class="line"><span class="lineno">  424</span>        __m128 s = _mm_loadu_ps(&amp;src[i]);</div>
-<div class="line"><span class="lineno">  425</span>        _mm_storeu_ps(&amp;dst[i], _mm_add_ps(d, s));</div>
-<div class="line"><span class="lineno">  426</span>    }</div>
-<div class="line"><span class="lineno">  427</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  428</span>        dst[i] += src[i];</div>
-<div class="line"><span class="lineno">  429</span>    }</div>
-<div class="line"><span class="lineno">  430</span> </div>
-<div class="line"><span class="lineno">  431</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  432</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  433</span>        dst[i] += src[i];</div>
-<div class="line"><span class="lineno">  434</span>    }</div>
-<div class="line"><span class="lineno">  435</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  436</span>}</div>
+<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00801">801</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  802</span>{</div>
+<div class="line"><span class="lineno">  803</span>    <span class="keywordflow">if</span> (!dst || !src || numel == 0) {</div>
+<div class="line"><span class="lineno">  804</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  805</span>    }</div>
+<div class="line"><span class="lineno">  806</span> </div>
+<div class="line"><span class="lineno">  807</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  808</span>    <span class="keywordtype">int</span> nth = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  809</span>    <span class="keywordflow">if</span> (!pool || nth &lt;= 1 || nth &gt; <a class="code hl_define" href="optimizer__kernels_8c.html#adb28b128f8218c37a63961ddc726db93">CK_OPT_PAR_MAX_THREADS</a> || numel &lt; <a class="code hl_define" href="optimizer__kernels_8c.html#a62fd0a2d854973891c609fe9f7654a98">CK_OPT_PAR_MIN_NUMEL</a>) {</div>
+<div class="line"><span class="lineno">  810</span>        <a class="code hl_function" href="optimizer__kernels_8c.html#aee22d3d7aa1487e535d06671dd921d8d">gradient_accumulate_f32_impl</a>(dst, src, numel);</div>
+<div class="line"><span class="lineno">  811</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  812</span>    }</div>
+<div class="line"><span class="lineno">  813</span> </div>
+<div class="line"><span class="lineno">  814</span>    ck_accum_parallel_args_t args = {</div>
+<div class="line"><span class="lineno">  815</span>        .dst = dst,</div>
+<div class="line"><span class="lineno">  816</span>        .src = src,</div>
+<div class="line"><span class="lineno">  817</span>        .numel = numel,</div>
+<div class="line"><span class="lineno">  818</span>    };</div>
+<div class="line"><span class="lineno">  819</span>    <a class="code hl_function" href="ck__threadpool_8h.html#abf4adc5451a56f39e5630dc42c07e330">ck_threadpool_dispatch</a>(pool, <a class="code hl_function" href="optimizer__kernels_8c.html#afe3fc98bce4b7a987ef5625790670202">ck_accum_parallel_work</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  820</span>}</div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_aee22d3d7aa1487e535d06671dd921d8d"><div class="ttname"><a href="optimizer__kernels_8c.html#aee22d3d7aa1487e535d06671dd921d8d">gradient_accumulate_f32_impl</a></div><div class="ttdeci">static void gradient_accumulate_f32_impl(float *dst, const float *src, size_t numel)</div><div class="ttdoc">Accumulate gradients: dst += src (fp32)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00754">optimizer_kernels.c:754</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_afe3fc98bce4b7a987ef5625790670202"><div class="ttname"><a href="optimizer__kernels_8c.html#afe3fc98bce4b7a987ef5625790670202">ck_accum_parallel_work</a></div><div class="ttdeci">static void ck_accum_parallel_work(int ith, int nth, void *argp)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00134">optimizer_kernels.c:134</a></div></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1029,64 +821,30 @@ CK-ENGINE KERNEL RULES:</h1>
 </table>
 </div><div class="memdoc">
 
-<p>Scale gradients by a constant: grad *= scale (fp32) </p>
-<p>Used for averaging gradients after accumulation: grad /= batch_size</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">grad</td><td>Gradient tensor to scale (in-place) [numel] </td></tr>
-    <tr><td class="paramname">numel</td><td>Number of elements </td></tr>
-    <tr><td class="paramname">scale</td><td>Scale factor (typically 1.0 / batch_size) </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00448">448</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  449</span>{</div>
-<div class="line"><span class="lineno">  450</span>    <span class="keywordflow">if</span> (!grad || numel == 0) {</div>
-<div class="line"><span class="lineno">  451</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  452</span>    }</div>
-<div class="line"><span class="lineno">  453</span> </div>
-<div class="line"><span class="lineno">  454</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  455</span>    __m512 v_scale = _mm512_set1_ps(scale);</div>
-<div class="line"><span class="lineno">  456</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  457</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= numel; i += 16) {</div>
-<div class="line"><span class="lineno">  458</span>        __m512 g = _mm512_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  459</span>        _mm512_storeu_ps(&amp;grad[i], _mm512_mul_ps(g, v_scale));</div>
-<div class="line"><span class="lineno">  460</span>    }</div>
-<div class="line"><span class="lineno">  461</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  462</span>        grad[i] *= scale;</div>
-<div class="line"><span class="lineno">  463</span>    }</div>
-<div class="line"><span class="lineno">  464</span> </div>
-<div class="line"><span class="lineno">  465</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  466</span>    __m256 v_scale = _mm256_set1_ps(scale);</div>
-<div class="line"><span class="lineno">  467</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  468</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= numel; i += 8) {</div>
-<div class="line"><span class="lineno">  469</span>        __m256 g = _mm256_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  470</span>        _mm256_storeu_ps(&amp;grad[i], _mm256_mul_ps(g, v_scale));</div>
-<div class="line"><span class="lineno">  471</span>    }</div>
-<div class="line"><span class="lineno">  472</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  473</span>        grad[i] *= scale;</div>
-<div class="line"><span class="lineno">  474</span>    }</div>
-<div class="line"><span class="lineno">  475</span> </div>
-<div class="line"><span class="lineno">  476</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
-<div class="line"><span class="lineno">  477</span>    __m128 v_scale = _mm_set1_ps(scale);</div>
-<div class="line"><span class="lineno">  478</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  479</span>    <span class="keywordflow">for</span> (; i + 4 &lt;= numel; i += 4) {</div>
-<div class="line"><span class="lineno">  480</span>        __m128 g = _mm_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  481</span>        _mm_storeu_ps(&amp;grad[i], _mm_mul_ps(g, v_scale));</div>
-<div class="line"><span class="lineno">  482</span>    }</div>
-<div class="line"><span class="lineno">  483</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  484</span>        grad[i] *= scale;</div>
-<div class="line"><span class="lineno">  485</span>    }</div>
-<div class="line"><span class="lineno">  486</span> </div>
-<div class="line"><span class="lineno">  487</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  488</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  489</span>        grad[i] *= scale;</div>
-<div class="line"><span class="lineno">  490</span>    }</div>
-<div class="line"><span class="lineno">  491</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  492</span>}</div>
+<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00879">879</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  880</span>{</div>
+<div class="line"><span class="lineno">  881</span>    <span class="keywordflow">if</span> (!grad || numel == 0) {</div>
+<div class="line"><span class="lineno">  882</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  883</span>    }</div>
+<div class="line"><span class="lineno">  884</span> </div>
+<div class="line"><span class="lineno">  885</span>    ck_threadpool_t *pool = <a class="code hl_function" href="ck__threadpool_8h.html#a4597badcb0a5a6c31549f2b6bc6a88a7">ck_threadpool_global</a>();</div>
+<div class="line"><span class="lineno">  886</span>    <span class="keywordtype">int</span> nth = pool ? <a class="code hl_function" href="ck__threadpool_8h.html#aef9103ab0a271feb7fdc74c915a78d10">ck_threadpool_n_threads</a>(pool) : 1;</div>
+<div class="line"><span class="lineno">  887</span>    <span class="keywordflow">if</span> (!pool || nth &lt;= 1 || nth &gt; <a class="code hl_define" href="optimizer__kernels_8c.html#adb28b128f8218c37a63961ddc726db93">CK_OPT_PAR_MAX_THREADS</a> || numel &lt; <a class="code hl_define" href="optimizer__kernels_8c.html#a62fd0a2d854973891c609fe9f7654a98">CK_OPT_PAR_MIN_NUMEL</a>) {</div>
+<div class="line"><span class="lineno">  888</span>        <a class="code hl_function" href="optimizer__kernels_8c.html#ab32c3fa8d265f54261c4ce219313aa9a">gradient_scale_f32_impl</a>(grad, numel, scale);</div>
+<div class="line"><span class="lineno">  889</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  890</span>    }</div>
+<div class="line"><span class="lineno">  891</span> </div>
+<div class="line"><span class="lineno">  892</span>    ck_scale_parallel_args_t args = {</div>
+<div class="line"><span class="lineno">  893</span>        .grad = grad,</div>
+<div class="line"><span class="lineno">  894</span>        .numel = numel,</div>
+<div class="line"><span class="lineno">  895</span>        .scale = scale,</div>
+<div class="line"><span class="lineno">  896</span>    };</div>
+<div class="line"><span class="lineno">  897</span>    <a class="code hl_function" href="ck__threadpool_8h.html#abf4adc5451a56f39e5630dc42c07e330">ck_threadpool_dispatch</a>(pool, <a class="code hl_function" href="optimizer__kernels_8c.html#a47011358c2861776076ba39710b34455">ck_scale_parallel_work</a>, &amp;args);</div>
+<div class="line"><span class="lineno">  898</span>}</div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_a47011358c2861776076ba39710b34455"><div class="ttname"><a href="optimizer__kernels_8c.html#a47011358c2861776076ba39710b34455">ck_scale_parallel_work</a></div><div class="ttdeci">static void ck_scale_parallel_work(int ith, int nth, void *argp)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00152">optimizer_kernels.c:152</a></div></div>
+<div class="ttc" id="aoptimizer__kernels_8c_html_ab32c3fa8d265f54261c4ce219313aa9a"><div class="ttname"><a href="optimizer__kernels_8c.html#ab32c3fa8d265f54261c4ce219313aa9a">gradient_scale_f32_impl</a></div><div class="ttdeci">static void gradient_scale_f32_impl(float *grad, size_t numel, float scale)</div><div class="ttdoc">Scale gradients by a constant: grad *= scale (fp32)</div><div class="ttdef"><b>Definition</b> <a href="optimizer__kernels_8c_source.html#l00832">optimizer_kernels.c:832</a></div></div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00505">gradient_clip_norm_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="optimizer__kernels_8c_source.html#l00970">gradient_clip_norm_f32()</a>.</p>
 
 </div>
 </div>
@@ -1274,98 +1032,98 @@ CK-ENGINE KERNEL RULES:</h1>
   </dd>
 </dl>
 
-<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00267">267</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  275</span>{</div>
-<div class="line"><span class="lineno">  276</span>    <span class="keywordflow">if</span> (!grad || !weight || !velocity || numel == 0) {</div>
-<div class="line"><span class="lineno">  277</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  278</span>    }</div>
-<div class="line"><span class="lineno">  279</span> </div>
-<div class="line"><span class="lineno">  280</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
-<div class="line"><span class="lineno">  281</span>    <span class="comment">// AVX-512 path: process 16 floats at a time</span></div>
-<div class="line"><span class="lineno">  282</span>    __m512 v_lr = _mm512_set1_ps(lr);</div>
-<div class="line"><span class="lineno">  283</span>    __m512 v_momentum = _mm512_set1_ps(momentum);</div>
-<div class="line"><span class="lineno">  284</span>    __m512 v_weight_decay = _mm512_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">  285</span> </div>
-<div class="line"><span class="lineno">  286</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  287</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= numel; i += 16) {</div>
-<div class="line"><span class="lineno">  288</span>        __m512 g = _mm512_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  289</span>        __m512 w = _mm512_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">  290</span>        __m512 vel = _mm512_loadu_ps(&amp;velocity[i]);</div>
-<div class="line"><span class="lineno">  291</span> </div>
-<div class="line"><span class="lineno">  292</span>        vel = _mm512_fmadd_ps(v_momentum, vel, g);</div>
-<div class="line"><span class="lineno">  293</span>        __m512 update = _mm512_fmadd_ps(v_weight_decay, w, vel);</div>
-<div class="line"><span class="lineno">  294</span>        w = _mm512_fnmadd_ps(v_lr, update, w);</div>
-<div class="line"><span class="lineno">  295</span> </div>
-<div class="line"><span class="lineno">  296</span>        _mm512_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  297</span>        _mm512_storeu_ps(&amp;velocity[i], vel);</div>
-<div class="line"><span class="lineno">  298</span>    }</div>
-<div class="line"><span class="lineno">  299</span> </div>
-<div class="line"><span class="lineno">  300</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  301</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
-<div class="line"><span class="lineno">  302</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
-<div class="line"><span class="lineno">  303</span>    }</div>
-<div class="line"><span class="lineno">  304</span> </div>
-<div class="line"><span class="lineno">  305</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
-<div class="line"><span class="lineno">  306</span>    <span class="comment">// AVX path: process 8 floats at a time</span></div>
-<div class="line"><span class="lineno">  307</span>    __m256 v_lr = _mm256_set1_ps(lr);</div>
-<div class="line"><span class="lineno">  308</span>    __m256 v_momentum = _mm256_set1_ps(momentum);</div>
-<div class="line"><span class="lineno">  309</span>    __m256 v_weight_decay = _mm256_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">  310</span> </div>
-<div class="line"><span class="lineno">  311</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  312</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= numel; i += 8) {</div>
-<div class="line"><span class="lineno">  313</span>        __m256 g = _mm256_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  314</span>        __m256 w = _mm256_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">  315</span>        __m256 vel = _mm256_loadu_ps(&amp;velocity[i]);</div>
-<div class="line"><span class="lineno">  316</span> </div>
-<div class="line"><span class="lineno">  317</span>        <span class="comment">// v = momentum * v + g</span></div>
-<div class="line"><span class="lineno">  318</span>        vel = _mm256_add_ps(_mm256_mul_ps(v_momentum, vel), g);</div>
-<div class="line"><span class="lineno">  319</span> </div>
-<div class="line"><span class="lineno">  320</span>        <span class="comment">// w = w - lr * (v + weight_decay * w)</span></div>
-<div class="line"><span class="lineno">  321</span>        __m256 update = _mm256_add_ps(vel, _mm256_mul_ps(v_weight_decay, w));</div>
-<div class="line"><span class="lineno">  322</span>        w = _mm256_sub_ps(w, _mm256_mul_ps(v_lr, update));</div>
-<div class="line"><span class="lineno">  323</span> </div>
-<div class="line"><span class="lineno">  324</span>        _mm256_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  325</span>        _mm256_storeu_ps(&amp;velocity[i], vel);</div>
-<div class="line"><span class="lineno">  326</span>    }</div>
-<div class="line"><span class="lineno">  327</span> </div>
-<div class="line"><span class="lineno">  328</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  329</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
-<div class="line"><span class="lineno">  330</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
-<div class="line"><span class="lineno">  331</span>    }</div>
-<div class="line"><span class="lineno">  332</span> </div>
-<div class="line"><span class="lineno">  333</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
-<div class="line"><span class="lineno">  334</span>    <span class="comment">// SSE2 path: process 4 floats at a time</span></div>
-<div class="line"><span class="lineno">  335</span>    __m128 v_lr = _mm_set1_ps(lr);</div>
-<div class="line"><span class="lineno">  336</span>    __m128 v_momentum = _mm_set1_ps(momentum);</div>
-<div class="line"><span class="lineno">  337</span>    __m128 v_weight_decay = _mm_set1_ps(weight_decay);</div>
-<div class="line"><span class="lineno">  338</span> </div>
-<div class="line"><span class="lineno">  339</span>    <span class="keywordtype">size_t</span> i = 0;</div>
-<div class="line"><span class="lineno">  340</span>    <span class="keywordflow">for</span> (; i + 4 &lt;= numel; i += 4) {</div>
-<div class="line"><span class="lineno">  341</span>        __m128 g = _mm_loadu_ps(&amp;grad[i]);</div>
-<div class="line"><span class="lineno">  342</span>        __m128 w = _mm_loadu_ps(&amp;weight[i]);</div>
-<div class="line"><span class="lineno">  343</span>        __m128 vel = _mm_loadu_ps(&amp;velocity[i]);</div>
-<div class="line"><span class="lineno">  344</span> </div>
-<div class="line"><span class="lineno">  345</span>        vel = _mm_add_ps(_mm_mul_ps(v_momentum, vel), g);</div>
-<div class="line"><span class="lineno">  346</span>        __m128 update = _mm_add_ps(vel, _mm_mul_ps(v_weight_decay, w));</div>
-<div class="line"><span class="lineno">  347</span>        w = _mm_sub_ps(w, _mm_mul_ps(v_lr, update));</div>
-<div class="line"><span class="lineno">  348</span> </div>
-<div class="line"><span class="lineno">  349</span>        _mm_storeu_ps(&amp;weight[i], w);</div>
-<div class="line"><span class="lineno">  350</span>        _mm_storeu_ps(&amp;velocity[i], vel);</div>
-<div class="line"><span class="lineno">  351</span>    }</div>
-<div class="line"><span class="lineno">  352</span> </div>
-<div class="line"><span class="lineno">  353</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  354</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
-<div class="line"><span class="lineno">  355</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
-<div class="line"><span class="lineno">  356</span>    }</div>
-<div class="line"><span class="lineno">  357</span> </div>
-<div class="line"><span class="lineno">  358</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">  359</span>    <span class="comment">// Scalar path</span></div>
-<div class="line"><span class="lineno">  360</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; numel; ++i) {</div>
-<div class="line"><span class="lineno">  361</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
-<div class="line"><span class="lineno">  362</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
-<div class="line"><span class="lineno">  363</span>    }</div>
-<div class="line"><span class="lineno">  364</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">  365</span>}</div>
+<p class="definition">Definition at line <a class="el" href="optimizer__kernels_8c_source.html#l00629">629</a> of file <a class="el" href="optimizer__kernels_8c_source.html">optimizer_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  637</span>{</div>
+<div class="line"><span class="lineno">  638</span>    <span class="keywordflow">if</span> (!grad || !weight || !velocity || numel == 0) {</div>
+<div class="line"><span class="lineno">  639</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  640</span>    }</div>
+<div class="line"><span class="lineno">  641</span> </div>
+<div class="line"><span class="lineno">  642</span><span class="preprocessor">#if defined(__AVX512F__)</span></div>
+<div class="line"><span class="lineno">  643</span>    <span class="comment">// AVX-512 path: process 16 floats at a time</span></div>
+<div class="line"><span class="lineno">  644</span>    __m512 v_lr = _mm512_set1_ps(lr);</div>
+<div class="line"><span class="lineno">  645</span>    __m512 v_momentum = _mm512_set1_ps(momentum);</div>
+<div class="line"><span class="lineno">  646</span>    __m512 v_weight_decay = _mm512_set1_ps(weight_decay);</div>
+<div class="line"><span class="lineno">  647</span> </div>
+<div class="line"><span class="lineno">  648</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><span class="lineno">  649</span>    <span class="keywordflow">for</span> (; i + 16 &lt;= numel; i += 16) {</div>
+<div class="line"><span class="lineno">  650</span>        __m512 g = _mm512_loadu_ps(&amp;grad[i]);</div>
+<div class="line"><span class="lineno">  651</span>        __m512 w = _mm512_loadu_ps(&amp;weight[i]);</div>
+<div class="line"><span class="lineno">  652</span>        __m512 vel = _mm512_loadu_ps(&amp;velocity[i]);</div>
+<div class="line"><span class="lineno">  653</span> </div>
+<div class="line"><span class="lineno">  654</span>        vel = _mm512_fmadd_ps(v_momentum, vel, g);</div>
+<div class="line"><span class="lineno">  655</span>        __m512 update = _mm512_fmadd_ps(v_weight_decay, w, vel);</div>
+<div class="line"><span class="lineno">  656</span>        w = _mm512_fnmadd_ps(v_lr, update, w);</div>
+<div class="line"><span class="lineno">  657</span> </div>
+<div class="line"><span class="lineno">  658</span>        _mm512_storeu_ps(&amp;weight[i], w);</div>
+<div class="line"><span class="lineno">  659</span>        _mm512_storeu_ps(&amp;velocity[i], vel);</div>
+<div class="line"><span class="lineno">  660</span>    }</div>
+<div class="line"><span class="lineno">  661</span> </div>
+<div class="line"><span class="lineno">  662</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
+<div class="line"><span class="lineno">  663</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
+<div class="line"><span class="lineno">  664</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
+<div class="line"><span class="lineno">  665</span>    }</div>
+<div class="line"><span class="lineno">  666</span> </div>
+<div class="line"><span class="lineno">  667</span><span class="preprocessor">#elif defined(__AVX__)</span></div>
+<div class="line"><span class="lineno">  668</span>    <span class="comment">// AVX path: process 8 floats at a time</span></div>
+<div class="line"><span class="lineno">  669</span>    __m256 v_lr = _mm256_set1_ps(lr);</div>
+<div class="line"><span class="lineno">  670</span>    __m256 v_momentum = _mm256_set1_ps(momentum);</div>
+<div class="line"><span class="lineno">  671</span>    __m256 v_weight_decay = _mm256_set1_ps(weight_decay);</div>
+<div class="line"><span class="lineno">  672</span> </div>
+<div class="line"><span class="lineno">  673</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><span class="lineno">  674</span>    <span class="keywordflow">for</span> (; i + 8 &lt;= numel; i += 8) {</div>
+<div class="line"><span class="lineno">  675</span>        __m256 g = _mm256_loadu_ps(&amp;grad[i]);</div>
+<div class="line"><span class="lineno">  676</span>        __m256 w = _mm256_loadu_ps(&amp;weight[i]);</div>
+<div class="line"><span class="lineno">  677</span>        __m256 vel = _mm256_loadu_ps(&amp;velocity[i]);</div>
+<div class="line"><span class="lineno">  678</span> </div>
+<div class="line"><span class="lineno">  679</span>        <span class="comment">// v = momentum * v + g</span></div>
+<div class="line"><span class="lineno">  680</span>        vel = _mm256_add_ps(_mm256_mul_ps(v_momentum, vel), g);</div>
+<div class="line"><span class="lineno">  681</span> </div>
+<div class="line"><span class="lineno">  682</span>        <span class="comment">// w = w - lr * (v + weight_decay * w)</span></div>
+<div class="line"><span class="lineno">  683</span>        __m256 update = _mm256_add_ps(vel, _mm256_mul_ps(v_weight_decay, w));</div>
+<div class="line"><span class="lineno">  684</span>        w = _mm256_sub_ps(w, _mm256_mul_ps(v_lr, update));</div>
+<div class="line"><span class="lineno">  685</span> </div>
+<div class="line"><span class="lineno">  686</span>        _mm256_storeu_ps(&amp;weight[i], w);</div>
+<div class="line"><span class="lineno">  687</span>        _mm256_storeu_ps(&amp;velocity[i], vel);</div>
+<div class="line"><span class="lineno">  688</span>    }</div>
+<div class="line"><span class="lineno">  689</span> </div>
+<div class="line"><span class="lineno">  690</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
+<div class="line"><span class="lineno">  691</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
+<div class="line"><span class="lineno">  692</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
+<div class="line"><span class="lineno">  693</span>    }</div>
+<div class="line"><span class="lineno">  694</span> </div>
+<div class="line"><span class="lineno">  695</span><span class="preprocessor">#elif defined(__SSE2__)</span></div>
+<div class="line"><span class="lineno">  696</span>    <span class="comment">// SSE2 path: process 4 floats at a time</span></div>
+<div class="line"><span class="lineno">  697</span>    __m128 v_lr = _mm_set1_ps(lr);</div>
+<div class="line"><span class="lineno">  698</span>    __m128 v_momentum = _mm_set1_ps(momentum);</div>
+<div class="line"><span class="lineno">  699</span>    __m128 v_weight_decay = _mm_set1_ps(weight_decay);</div>
+<div class="line"><span class="lineno">  700</span> </div>
+<div class="line"><span class="lineno">  701</span>    <span class="keywordtype">size_t</span> i = 0;</div>
+<div class="line"><span class="lineno">  702</span>    <span class="keywordflow">for</span> (; i + 4 &lt;= numel; i += 4) {</div>
+<div class="line"><span class="lineno">  703</span>        __m128 g = _mm_loadu_ps(&amp;grad[i]);</div>
+<div class="line"><span class="lineno">  704</span>        __m128 w = _mm_loadu_ps(&amp;weight[i]);</div>
+<div class="line"><span class="lineno">  705</span>        __m128 vel = _mm_loadu_ps(&amp;velocity[i]);</div>
+<div class="line"><span class="lineno">  706</span> </div>
+<div class="line"><span class="lineno">  707</span>        vel = _mm_add_ps(_mm_mul_ps(v_momentum, vel), g);</div>
+<div class="line"><span class="lineno">  708</span>        __m128 update = _mm_add_ps(vel, _mm_mul_ps(v_weight_decay, w));</div>
+<div class="line"><span class="lineno">  709</span>        w = _mm_sub_ps(w, _mm_mul_ps(v_lr, update));</div>
+<div class="line"><span class="lineno">  710</span> </div>
+<div class="line"><span class="lineno">  711</span>        _mm_storeu_ps(&amp;weight[i], w);</div>
+<div class="line"><span class="lineno">  712</span>        _mm_storeu_ps(&amp;velocity[i], vel);</div>
+<div class="line"><span class="lineno">  713</span>    }</div>
+<div class="line"><span class="lineno">  714</span> </div>
+<div class="line"><span class="lineno">  715</span>    <span class="keywordflow">for</span> (; i &lt; numel; ++i) {</div>
+<div class="line"><span class="lineno">  716</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
+<div class="line"><span class="lineno">  717</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
+<div class="line"><span class="lineno">  718</span>    }</div>
+<div class="line"><span class="lineno">  719</span> </div>
+<div class="line"><span class="lineno">  720</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">  721</span>    <span class="comment">// Scalar path</span></div>
+<div class="line"><span class="lineno">  722</span>    <span class="keywordflow">for</span> (<span class="keywordtype">size_t</span> i = 0; i &lt; numel; ++i) {</div>
+<div class="line"><span class="lineno">  723</span>        velocity[i] = momentum * velocity[i] + grad[i];</div>
+<div class="line"><span class="lineno">  724</span>        weight[i] = weight[i] - lr * (velocity[i] + weight_decay * weight[i]);</div>
+<div class="line"><span class="lineno">  725</span>    }</div>
+<div class="line"><span class="lineno">  726</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">  727</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>

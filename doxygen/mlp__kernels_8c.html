@@ -248,14 +248,14 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  181</span>    <span class="comment">// Using gemm_nn: C[M,N] = A[M,K] @ B[K,N]</span></div>
 <div class="line"><span class="lineno">  182</span>    <span class="comment">// A = d_output [T, out], B = W [out, in], C = d_input [T, in]</span></div>
 <div class="line"><span class="lineno">  183</span>    <span class="comment">// M = T, N = aligned_in, K = aligned_out</span></div>
-<div class="line"><span class="lineno">  184</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a91c10e18555ecb27791d5405c8dc3ae4">gemm_nn_avx512</a>(d_output, W_fc1, NULL, d_input,</div>
+<div class="line"><span class="lineno">  184</span>    <a class="code hl_function" href="ckernel__engine_8h.html#aa2ce07d3575e9c3e87bc8e0f28d43762">gemm_nn_simd</a>(d_output, W_fc1, NULL, d_input,</div>
 <div class="line"><span class="lineno">  185</span>                   T, aligned_in, aligned_out);</div>
 <div class="line"><span class="lineno">  186</span> </div>
 <div class="line"><span class="lineno">  187</span>    <span class="comment">// 2. d_W[out, in] = d_output[T, out].T @ fc1_input[T, in]</span></div>
 <div class="line"><span class="lineno">  188</span>    <span class="comment">// Using gemm_tn: C[M,N] = A[K,M].T @ B[K,N]</span></div>
 <div class="line"><span class="lineno">  189</span>    <span class="comment">// A = d_output [T, out] (stored as [K=T, M=out]), B = fc1_input [T, in]</span></div>
 <div class="line"><span class="lineno">  190</span>    <span class="comment">// C = d_W [out, in], M = aligned_out, N = aligned_in, K = T</span></div>
-<div class="line"><span class="lineno">  191</span>    <a class="code hl_function" href="ckernel__engine_8h.html#afe5bf17f909def227c3e25b0c4338f93">gemm_tn_avx512</a>(d_output, fc1_input, NULL, d_W_fc1,</div>
+<div class="line"><span class="lineno">  191</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a84ce00fad7103b550ea75b52a21a98f7">gemm_tn_parallel</a>(d_output, fc1_input, NULL, d_W_fc1,</div>
 <div class="line"><span class="lineno">  192</span>                   aligned_out, aligned_in, T);</div>
 <div class="line"><span class="lineno">  193</span> </div>
 <div class="line"><span class="lineno">  194</span>    <span class="comment">// 3. d_b_fc1 = sum_over_T(d_output)</span></div>
@@ -268,10 +268,10 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  201</span>        d_b_fc1[out_idx] += bias_grad;</div>
 <div class="line"><span class="lineno">  202</span>    }</div>
 <div class="line"><span class="lineno">  203</span>}</div>
-<div class="ttc" id="ackernel__engine_8h_html_a91c10e18555ecb27791d5405c8dc3ae4"><div class="ttname"><a href="ckernel__engine_8h.html#a91c10e18555ecb27791d5405c8dc3ae4">gemm_nn_avx512</a></div><div class="ttdeci">void gemm_nn_avx512(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00339">gemm_kernels.c:339</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_afe5bf17f909def227c3e25b0c4338f93"><div class="ttname"><a href="ckernel__engine_8h.html#afe5bf17f909def227c3e25b0c4338f93">gemm_tn_avx512</a></div><div class="ttdeci">void gemm_tn_avx512(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00521">gemm_kernels.c:521</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_a84ce00fad7103b550ea75b52a21a98f7"><div class="ttname"><a href="ckernel__engine_8h.html#a84ce00fad7103b550ea75b52a21a98f7">gemm_tn_parallel</a></div><div class="ttdeci">void gemm_tn_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00512">gemm_kernels.c:512</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_aa2ce07d3575e9c3e87bc8e0f28d43762"><div class="ttname"><a href="ckernel__engine_8h.html#aa2ce07d3575e9c3e87bc8e0f28d43762">gemm_nn_simd</a></div><div class="ttdeci">void gemm_nn_simd(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00406">gemm_kernels.c:406</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00339">gemm_nn_avx512()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00521">gemm_tn_avx512()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00406">gemm_nn_simd()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00512">gemm_tn_parallel()</a>.</p>
 
 <p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l02713">ck_layer_backward_rmsnorm_swiglu()</a>.</p>
 
@@ -359,7 +359,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  132</span>    <span class="comment">// Using gemm_nn: C[M,N] = A[M,K] @ B[K,N]</span></div>
 <div class="line"><span class="lineno">  133</span>    <span class="comment">// A = d_output [T, out], B = W [out, in], C = d_input [T, in]</span></div>
 <div class="line"><span class="lineno">  134</span>    <span class="comment">// M = T, N = aligned_in, K = aligned_out</span></div>
-<div class="line"><span class="lineno">  135</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a91c10e18555ecb27791d5405c8dc3ae4">gemm_nn_avx512</a>(d_output, W_fc2, NULL, d_input,</div>
+<div class="line"><span class="lineno">  135</span>    <a class="code hl_function" href="ckernel__engine_8h.html#aa2ce07d3575e9c3e87bc8e0f28d43762">gemm_nn_simd</a>(d_output, W_fc2, NULL, d_input,</div>
 <div class="line"><span class="lineno">  136</span>                   T, aligned_in, aligned_out);</div>
 <div class="line"><span class="lineno">  137</span> </div>
 <div class="line"><span class="lineno">  138</span>    <span class="comment">// 2. d_W[out, in] = d_output[T, out].T @ fc2_input[T, in]</span></div>
@@ -368,7 +368,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  141</span>    <span class="comment">// C = d_W [out, in], M = aligned_out, N = aligned_in, K = T</span></div>
 <div class="line"><span class="lineno">  142</span>    <span class="comment">// Note: gemm_tn overwrites, so we need to save and add if accumulating</span></div>
 <div class="line"><span class="lineno">  143</span>    <span class="comment">// For now, assume d_W starts zeroed (gradient accumulation handled at higher level)</span></div>
-<div class="line"><span class="lineno">  144</span>    <a class="code hl_function" href="ckernel__engine_8h.html#afe5bf17f909def227c3e25b0c4338f93">gemm_tn_avx512</a>(d_output, fc2_input, NULL, d_W_fc2,</div>
+<div class="line"><span class="lineno">  144</span>    <a class="code hl_function" href="ckernel__engine_8h.html#a84ce00fad7103b550ea75b52a21a98f7">gemm_tn_parallel</a>(d_output, fc2_input, NULL, d_W_fc2,</div>
 <div class="line"><span class="lineno">  145</span>                   aligned_out, aligned_in, T);</div>
 <div class="line"><span class="lineno">  146</span> </div>
 <div class="line"><span class="lineno">  147</span>    <span class="comment">// 3. d_b_fc2 = sum_over_T(d_output)</span></div>
@@ -382,9 +382,9 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  155</span>    }</div>
 <div class="line"><span class="lineno">  156</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00339">gemm_nn_avx512()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00521">gemm_tn_avx512()</a>.</p>
+<p class="reference">References <a class="el" href="gemm__kernels_8c_source.html#l00406">gemm_nn_simd()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00512">gemm_tn_parallel()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00800">ck_attention_project_head_major_backward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02713">ck_layer_backward_rmsnorm_swiglu()</a>, and <a class="el" href="ckernel__orchestration_8c_source.html#l00856">ck_qkv_project_head_major_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ckernel__orchestration_8c_source.html#l00800">ck_attention_project_head_major_backward()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l02713">ck_layer_backward_rmsnorm_swiglu()</a>, <a class="el" href="ckernel__orchestration_8c_source.html#l00856">ck_qkv_project_head_major_backward()</a>, <a class="el" href="ck__parallel__train_8c_source.html#l00345">gemm_backward_f32_train_parallel_dispatch()</a>, and <a class="el" href="ck__parallel__train_8c_source.html#l00465">gemm_backward_f32_train_parallel_dispatch_v2()</a>.</p>
 
 </div>
 </div>
@@ -486,9 +486,9 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">   71</span>                        fourD); <span class="comment">// K</span></div>
 <div class="line"><span class="lineno">   72</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_abc5977fca1e95c2406a779657c4d2365"><div class="ttname"><a href="ckernel__engine_8h.html#abc5977fca1e95c2406a779657c4d2365">gelu_fast_inplace</a></div><div class="ttdeci">void gelu_fast_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00128">gelu_kernels.c:128</a></div></div>
-<div class="ttc" id="ackernel__engine_8h_html_af4f0e756d3ac00b45ce2c7a296b61ae3"><div class="ttname"><a href="ckernel__engine_8h.html#af4f0e756d3ac00b45ce2c7a296b61ae3">gemm_blocked_serial</a></div><div class="ttdeci">void gemm_blocked_serial(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00661">gemm_kernels.c:661</a></div></div>
+<div class="ttc" id="ackernel__engine_8h_html_af4f0e756d3ac00b45ce2c7a296b61ae3"><div class="ttname"><a href="ckernel__engine_8h.html#af4f0e756d3ac00b45ce2c7a296b61ae3">gemm_blocked_serial</a></div><div class="ttdeci">void gemm_blocked_serial(const float *A, const float *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels_8c_source.html#l00674">gemm_kernels.c:674</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gelu__kernels_8c_source.html#l00128">gelu_fast_inplace()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00661">gemm_blocked_serial()</a>.</p>
+<p class="reference">References <a class="el" href="gelu__kernels_8c_source.html#l00128">gelu_fast_inplace()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00674">gemm_blocked_serial()</a>.</p>
 
 </div>
 </div>
@@ -591,7 +591,7 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">  107</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a315f43ac44656b5d77360d9879c5f122"><div class="ttname"><a href="ckernel__engine_8h.html#a315f43ac44656b5d77360d9879c5f122">gelu_exact_inplace</a></div><div class="ttdeci">void gelu_exact_inplace(float *data, size_t n)</div><div class="ttdef"><b>Definition</b> <a href="gelu__kernels_8c_source.html#l00442">gelu_kernels.c:442</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="gelu__kernels_8c_source.html#l00442">gelu_exact_inplace()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00661">gemm_blocked_serial()</a>.</p>
+<p class="reference">References <a class="el" href="gelu__kernels_8c_source.html#l00442">gelu_exact_inplace()</a>, and <a class="el" href="gemm__kernels_8c_source.html#l00674">gemm_blocked_serial()</a>.</p>
 
 </div>
 </div>
