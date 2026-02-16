@@ -99,6 +99,8 @@ def _apply_head_rms_norm(x: "torch.Tensor", gamma: Optional["torch.Tensor"], eps
 
 def _apply_rope(q: "torch.Tensor", k: "torch.Tensor", theta: float) -> Tuple["torch.Tensor", "torch.Tensor"]:
     # q/k: [B,H,T,Dh]
+    # IMPORTANT: match CK rope_kernels.c semantics (split-half rotation), not
+    # interleaved even/odd pair rotation.
     dh = int(q.shape[-1])
     if dh < 2:
         return q, k
@@ -121,11 +123,11 @@ def _apply_rope(q: "torch.Tensor", k: "torch.Tensor", theta: float) -> Tuple["to
     def _rope_one(x: "torch.Tensor") -> "torch.Tensor":
         x_rot = x[..., :rotary_dim]
         x_pass = x[..., rotary_dim:]
-        x_even = x_rot[..., 0::2]
-        x_odd = x_rot[..., 1::2]
-        ro_even = (x_even * cos) - (x_odd * sin)
-        ro_odd = (x_even * sin) + (x_odd * cos)
-        out_rot = torch.stack([ro_even, ro_odd], dim=-1).flatten(-2)
+        x0 = x_rot[..., :half]
+        x1 = x_rot[..., half:rotary_dim]
+        r0 = (x0 * cos) - (x1 * sin)
+        r1 = (x0 * sin) + (x1 * cos)
+        out_rot = torch.cat([r0, r1], dim=-1)
         return torch.cat([out_rot, x_pass], dim=-1)
 
     return _rope_one(q), _rope_one(k)

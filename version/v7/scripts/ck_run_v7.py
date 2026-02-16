@@ -133,6 +133,19 @@ def run_cmd_allow_fail(cmd: list, cwd: Path = None) -> subprocess.CompletedProce
     return subprocess.run(cmd, cwd=cwd)
 
 
+def _path_to_make_target(path: Path) -> str:
+    """
+    Convert an absolute filesystem path to a Make target string.
+
+    Make targets in this repo are declared relative to PROJECT_ROOT (e.g. build/libx.so),
+    so passing absolute paths can produce "No rule to make target ..." failures.
+    """
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except Exception:
+        return str(path)
+
+
 def _sync_runtime_lib(src: Path, dst: Path, label: str) -> None:
     """Copy runtime shared library into model dir, overwriting stale copies."""
     if not src.exists():
@@ -146,18 +159,24 @@ def _sync_runtime_lib(src: Path, dst: Path, label: str) -> None:
 
 
 def _detect_default_ck_threads() -> int:
-    """Best-effort physical core count with sensible fallback."""
-    logical = None
+    """Best-effort physical core count; prefer physical cores on HT systems."""
     try:
         logical = len(os.sched_getaffinity(0))
     except Exception:
         logical = os.cpu_count() or 1
+    logical = max(1, int(logical or 1))
 
     physical = 0
+    threads_per_core = 0
+
+    # 1) Linux /proc/cpuinfo (best source when available)
     try:
         pairs = set()
+        sockets = set()
         phys_id = None
         core_id = None
+        cpu_cores_hint = 0
+        siblings_hint = 0
         with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
             for raw in f:
                 line = raw.strip()
@@ -169,20 +188,57 @@ def _detect_default_ck_threads() -> int:
                     continue
                 if line.startswith("physical id"):
                     phys_id = int(line.split(":", 1)[1].strip())
+                    sockets.add(phys_id)
                 elif line.startswith("core id"):
                     core_id = int(line.split(":", 1)[1].strip())
+                elif line.startswith("cpu cores"):
+                    cpu_cores_hint = max(cpu_cores_hint, int(line.split(":", 1)[1].strip()))
+                elif line.startswith("siblings"):
+                    siblings_hint = max(siblings_hint, int(line.split(":", 1)[1].strip()))
         if phys_id is not None and core_id is not None:
             pairs.add((phys_id, core_id))
+
         physical = len(pairs)
+        if siblings_hint > 0 and cpu_cores_hint > 0 and siblings_hint >= cpu_cores_hint:
+            threads_per_core = max(1, siblings_hint // cpu_cores_hint)
+
+        if physical <= 1 and cpu_cores_hint > 0:
+            if sockets:
+                physical = cpu_cores_hint * max(1, len(sockets))
+            elif threads_per_core > 1:
+                physical = max(1, logical // threads_per_core)
     except Exception:
         physical = 0
 
-    # Match C-side behavior: if physical core detection is unreliable, use logical.
-    if physical <= 1 and (logical or 1) > 1:
-        return int(logical)
+    # 2) lscpu fallback (works on many container/VM setups)
+    if physical <= 1:
+        try:
+            out = subprocess.check_output(["lscpu"], text=True, stderr=subprocess.DEVNULL)
+            kv = {}
+            for raw in out.splitlines():
+                if ":" not in raw:
+                    continue
+                k, v = raw.split(":", 1)
+                kv[k.strip().lower()] = v.strip()
+
+            sockets = int(kv.get("socket(s)", "0") or 0)
+            cores_per_socket = int(kv.get("core(s) per socket", "0") or 0)
+            tpc = int(kv.get("thread(s) per core", "0") or 0)
+            if tpc > 0 and threads_per_core <= 0:
+                threads_per_core = tpc
+
+            if sockets > 0 and cores_per_socket > 0:
+                physical = max(1, sockets * cores_per_socket)
+            elif tpc > 1:
+                physical = max(1, logical // tpc)
+        except Exception:
+            pass
+
     if physical > 1:
-        return min(int(physical), int(logical or physical))
-    return int(logical or 1)
+        return min(int(physical), int(logical))
+    if threads_per_core > 1:
+        return max(1, int(logical) // int(threads_per_core))
+    return int(logical)
 
 
 def load_manifest_non_fp_dtypes(manifest_path: Path) -> set[str]:
@@ -913,7 +969,8 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         missing_targets.append(str(tokenizer_lib))
     if missing_targets:
         log(f"  Building missing runtime libs: {', '.join(Path(t).name for t in missing_targets)}", C_DIM)
-        run_cmd(["make"] + missing_targets, cwd=PROJECT_ROOT)
+        make_targets = [_path_to_make_target(Path(t)) for t in missing_targets]
+        run_cmd(["make"] + make_targets, cwd=PROJECT_ROOT)
         still_missing = [t for t in missing_targets if not Path(t).exists()]
         if still_missing:
             log(f"  Missing required runtime libs after build: {', '.join(Path(t).name for t in still_missing)}", C_RED)
@@ -2328,7 +2385,7 @@ def _run_pr37_memory_verification(
 
 
 
-def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: bool, runtime_defines: Optional[dict] = None) -> tuple[Path, Path]:
+def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: bool, runtime_defines: Optional[dict] = None, train_tokens: int = 1) -> tuple[Path, Path]:
     """Ensure run_dir has IR1/IR2/layout/audits and compiled libtrain.so."""
     # This is the train-runtime artifact chain in one place:
     # manifest -> IR1 -> IR2 -> invariants -> layout -> layout audit -> codegen -> libtrain.so
@@ -2344,6 +2401,7 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
     inv = run_dir / "ir_train_invariants.json"
     layout_train = run_dir / "layout_train.json"
     layout_audit = run_dir / "layout_train_audit.json"
+    exec_plan = run_dir / "train_exec_plan.json"
     c_src = run_dir / "generated_train_runtime_v7.c"
     c_summary = run_dir / "generated_train_runtime_summary_v7.json"
 
@@ -2352,13 +2410,45 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
     inv_script = SCRIPTS_DIR / "validate_ir_train_invariants_v7.py"
     layout_script = SCRIPTS_DIR / "generate_train_layout_v7.py"
     layout_audit_script = SCRIPTS_DIR / "validate_train_memory_layout_v7.py"
+    exec_plan_script = SCRIPTS_DIR / "generate_train_exec_plan_v7.py"
+
+    desired_tokens = max(1, int(train_tokens or 1))
+
+    def _read_ir1_tokens(path: Path) -> Optional[int]:
+        if not path.exists():
+            return None
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            tensors = doc.get("tensors") if isinstance(doc, dict) else None
+            if isinstance(tensors, dict):
+                for tid, meta in tensors.items():
+                    if not isinstance(tid, str) or not tid.startswith("act.Sheader.dense_embedding_lookup"):
+                        continue
+                    if isinstance(meta, dict):
+                        shape = meta.get("shape")
+                        if isinstance(shape, list) and shape:
+                            tok = int(shape[0])
+                            if tok > 0:
+                                return tok
+            cfg = doc.get("config") if isinstance(doc, dict) else None
+            if isinstance(cfg, dict):
+                tok = cfg.get("train_tokens", cfg.get("tokens"))
+                if tok is not None:
+                    tok = int(tok)
+                    if tok > 0:
+                        return tok
+        except Exception:
+            return None
+        return None
 
     # Each stage only regenerates when inputs are newer. This keeps CLI reruns fast
     # while still guaranteeing that libtrain is rebuilt after contract changes.
+    existing_ir1_tokens = _read_ir1_tokens(ir1)
     needs_ir1 = (
         (not ir1.exists())
         or (manifest.exists() and manifest.stat().st_mtime > ir1.stat().st_mtime)
         or (build_ir_script.exists() and build_ir_script.stat().st_mtime > ir1.stat().st_mtime)
+        or (existing_ir1_tokens is not None and int(existing_ir1_tokens) != int(desired_tokens))
     )
     if needs_ir1:
         cmd = [
@@ -2367,6 +2457,7 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             "--manifest", str(manifest),
             "--output", str(ir1),
             "--report-out", str(ir1_report),
+            "--tokens", str(desired_tokens),
         ]
         if strict:
             cmd.append("--strict")
@@ -2450,11 +2541,27 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             cmd.append("--strict")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
+    needs_exec_plan = (
+        (not exec_plan.exists())
+        or (ir2.exists() and ir2.stat().st_mtime > exec_plan.stat().st_mtime)
+        or (exec_plan_script.exists() and exec_plan_script.stat().st_mtime > exec_plan.stat().st_mtime)
+    )
+    if needs_exec_plan:
+        cmd = [
+            python_exec,
+            str(exec_plan_script),
+            "--ir2", str(ir2),
+            "--output", str(exec_plan),
+            "--mode", "deterministic",
+        ]
+        run_cmd(cmd, cwd=PROJECT_ROOT)
+
     codegen_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
     regen_codegen = (
         (not c_src.exists())
         or (not c_summary.exists())
         or (ir2.exists() and ir2.stat().st_mtime > c_src.stat().st_mtime)
+        or (exec_plan.exists() and exec_plan.stat().st_mtime > c_src.stat().st_mtime)
         or (codegen_script.exists() and codegen_script.stat().st_mtime > c_src.stat().st_mtime)
     )
     if regen_codegen:
@@ -2464,6 +2571,7 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             "--ir2", str(ir2),
             "--manifest", str(manifest),
             "--layout", str(layout_train),
+            "--exec-plan", str(exec_plan),
             "--output", str(c_src),
             "--summary-out", str(c_summary),
         ]
@@ -2499,7 +2607,17 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             f"-Wl,-rpath,{BUILD_DIR}",
         ]
         for k, v in sorted(defines.items()):
-            cmd.append(f"-D{k}={int(v)}")
+            if isinstance(v, bool):
+                dval = "1" if v else "0"
+            elif isinstance(v, int):
+                dval = str(v)
+            elif isinstance(v, float):
+                dval = f"{v:.9g}"
+                if ("." not in dval) and ("e" not in dval.lower()):
+                    dval += ".0"
+            else:
+                dval = str(v)
+            cmd.append(f"-D{k}={dval}")
         run_cmd(cmd, cwd=PROJECT_ROOT)
 
     return c_src, libtrain_so
@@ -2520,7 +2638,15 @@ def _run_ck_train_runtime(
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
 
-    runtime_defines: dict = {}
+    seq_len = int(getattr(args, "train_seq_len", 16) or 16)
+    grad_accum = max(1, int(getattr(args, "train_grad_accum", 8) or 8))
+
+    runtime_defines: dict = {
+        "CK_NUM_TOKENS": max(1, int(seq_len)),
+        "CK_GRAD_ACCUM_STEPS": int(grad_accum),
+    }
+    max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
+    runtime_defines["CK_MAX_GRAD_NORM"] = f"{max_grad_norm:.9g}"
     if bool(getattr(args, "train_runtime_canary_checks", False)):
         runtime_defines["CK_RUNTIME_CANARY_CHECKS"] = 1
     if bool(getattr(args, "train_runtime_bounds_assert", False)):
@@ -2535,6 +2661,7 @@ def _run_ck_train_runtime(
         python_exec=python_exec,
         strict=bool(getattr(args, "train_strict", False)),
         runtime_defines=runtime_defines,
+        train_tokens=seq_len,
     )
 
     runtime_summary_path = run_dir / "generated_train_runtime_summary_v7.json"
@@ -2549,6 +2676,18 @@ def _run_ck_train_runtime(
         raise RuntimeError(f"Missing ck_train_step symbol in {libtrain_so}")
     if not hasattr(lib, "ck_train_init"):
         raise RuntimeError(f"Missing ck_train_init symbol in {libtrain_so}")
+
+    def _set_runtime_strict_parity(lib_handle, enabled: bool) -> bool:
+        """Best-effort strict kernel parity toggle for generated runtime."""
+        if not hasattr(lib_handle, "ck_set_strict_parity"):
+            return False
+        try:
+            lib_handle.ck_set_strict_parity.argtypes = [ctypes.c_int]
+            lib_handle.ck_set_strict_parity.restype = None
+            lib_handle.ck_set_strict_parity(1 if enabled else 0)
+            return True
+        except Exception:
+            return False
 
     lib.ck_train_init.argtypes = [
         ctypes.POINTER(ctypes.c_float),
@@ -2578,6 +2717,10 @@ def _run_ck_train_runtime(
     has_snapshot_import = bool(hasattr(lib, "ck_train_import_weight_snapshot"))
     has_act_snapshot_numel = bool(hasattr(lib, "ck_train_get_activation_snapshot_numel"))
     has_act_snapshot_export = bool(hasattr(lib, "ck_train_export_activation_snapshot"))
+    has_flush_optimizer_api = bool(hasattr(lib, "ck_train_flush_optimizer"))
+    has_accum_counter_api = bool(hasattr(lib, "ck_train_get_accum_counter"))
+    has_accum_steps_api = bool(hasattr(lib, "ck_train_get_accum_steps"))
+    has_opt_step_getter_api = bool(hasattr(lib, "ck_train_get_opt_step"))
     if hasattr(lib, "ck_train_memory_diagnostic"):
         lib.ck_train_memory_diagnostic.argtypes = [
             ctypes.POINTER(ctypes.c_float),
@@ -2606,6 +2749,18 @@ def _run_ck_train_runtime(
     if has_act_snapshot_export:
         lib.ck_train_export_activation_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
         lib.ck_train_export_activation_snapshot.restype = ctypes.c_int
+    if has_flush_optimizer_api:
+        lib.ck_train_flush_optimizer.argtypes = [ctypes.c_float]
+        lib.ck_train_flush_optimizer.restype = ctypes.c_int
+    if has_accum_counter_api:
+        lib.ck_train_get_accum_counter.argtypes = []
+        lib.ck_train_get_accum_counter.restype = ctypes.c_int
+    if has_accum_steps_api:
+        lib.ck_train_get_accum_steps.argtypes = []
+        lib.ck_train_get_accum_steps.restype = ctypes.c_int
+    if has_opt_step_getter_api:
+        lib.ck_train_get_opt_step.argtypes = []
+        lib.ck_train_get_opt_step.restype = ctypes.c_int
 
     float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
     size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
@@ -2654,9 +2809,7 @@ def _run_ck_train_runtime(
             raise RuntimeError(f"ck_train_init (post-diagnostic) failed with code {rc}")
 
     epochs = int(getattr(args, "train_epochs", 3) or 3)
-    seq_len = int(getattr(args, "train_seq_len", 16) or 16)
     total_tokens = int(getattr(args, "train_total_tokens", 1024) or 1024)
-    grad_accum = int(getattr(args, "train_grad_accum", 8) or 8)
     lr = float(getattr(args, "train_lr", 1e-3) or 1e-3)
     seed = int(getattr(args, "train_seed", 42) or 42)
     vocab = int(getattr(args, "train_vocab", 256) or 256)
@@ -2675,6 +2828,7 @@ def _run_ck_train_runtime(
     replay_auto_enabled = False
     has_weight_snapshot_api = bool(has_snapshot_numel and has_snapshot_export and has_snapshot_import)
     runtime_num_tokens = _infer_runtime_num_tokens(runtime_summary, d_model_hint=int(getattr(args, "train_d_model", 0) or 0), vocab_hint=vocab)
+    runtime_grad_accum_steps = int(lib.ck_train_get_accum_steps()) if has_accum_steps_api else int(grad_accum)
 
     batches = _build_train_token_batches(train_text, total_tokens, seq_len, vocab, seed)
     total_steps = epochs * len(batches)
@@ -2698,6 +2852,11 @@ def _run_ck_train_runtime(
     # Oracle checks run at sampled steps to keep parity cost bounded for long runs.
     check_steps = _compute_parity_check_steps(total_steps, parity_profile, parity_every) if parity_on else set()
 
+    # For oracle parity runs, force strict kernel math by default.
+    # Can also be enabled explicitly for non-oracle CK runs via --kernel-strict-math.
+    strict_runtime_enabled = bool(parity_on or bool(getattr(args, "kernel_strict_math", False)))
+    strict_runtime_bound = _set_runtime_strict_parity(lib, strict_runtime_enabled)
+
     oracle_payload = None
     oracle_loss_by_step: dict[int, float] = {}
     oracle_max_steps_used = 0
@@ -2708,7 +2867,7 @@ def _run_ck_train_runtime(
     oracle_strict = False
 
     if parity_on:
-        grad_accum_for_oracle = max(1, int(getattr(args, "train_grad_accum", 1) or 1))
+        grad_accum_for_oracle = max(1, int(runtime_grad_accum_steps))
         oracle_max_steps = max(check_steps) if check_steps else 0
         if oracle_max_steps > 0 and grad_accum_for_oracle > 1:
             oracle_max_steps = int(math.ceil(float(oracle_max_steps) / float(grad_accum_for_oracle)))
@@ -2752,10 +2911,16 @@ def _run_ck_train_runtime(
                     except Exception:
                         continue
 
-    # When strict snapshot-oracle is active, force replay checks so parity
-    # covers full CK step determinism (backward + optimizer + weight update),
-    # not just forward activation/logit comparisons.
-    if parity_on and snapshot_oracle_enabled and has_weight_snapshot_api and not parity_replay_on_check:
+    # Auto-enable replay checks only for grad_accum=1. For grad_accum>1,
+    # replaying a single step from weights-only snapshot is insufficient
+    # because accumulated gradient buffers are not part of the snapshot yet.
+    if (
+        parity_on
+        and snapshot_oracle_enabled
+        and has_weight_snapshot_api
+        and (not parity_replay_on_check)
+        and int(runtime_grad_accum_steps) <= 1
+    ):
         parity_replay_on_check = True
         replay_auto_enabled = True
 
@@ -2764,11 +2929,16 @@ def _run_ck_train_runtime(
     replay_has_forward_api = False
     replay_has_set_batch_api = False
     replay_has_act_snapshot_api = False
+    replay_has_set_accum_counter_api = False
+    replay_has_get_opt_step_api = False
+    replay_has_set_opt_step_api = False
     if (parity_replay_on_check or snapshot_oracle_enabled) and has_weight_snapshot_api:
         try:
             replay_so = run_dir / "libtrain_replay.so"
             shutil.copy2(libtrain_so, replay_so)
             replay_lib = ctypes.CDLL(str(replay_so))
+            if strict_runtime_bound:
+                _set_runtime_strict_parity(replay_lib, strict_runtime_enabled)
             if not hasattr(replay_lib, "ck_train_step") or not hasattr(replay_lib, "ck_train_init"):
                 raise RuntimeError("missing ck_train_step/ck_train_init in replay runtime")
             if not hasattr(replay_lib, "ck_train_import_weight_snapshot"):
@@ -2787,6 +2957,9 @@ def _run_ck_train_runtime(
                 hasattr(replay_lib, "ck_train_get_activation_snapshot_numel")
                 and hasattr(replay_lib, "ck_train_export_activation_snapshot")
             )
+            replay_has_set_accum_counter_api = bool(hasattr(replay_lib, "ck_train_set_accum_counter"))
+            replay_has_get_opt_step_api = bool(hasattr(replay_lib, "ck_train_get_opt_step"))
+            replay_has_set_opt_step_api = bool(hasattr(replay_lib, "ck_train_set_opt_step"))
             if replay_has_forward_api:
                 replay_lib.ck_train_forward_step.argtypes = []
                 replay_lib.ck_train_forward_step.restype = ctypes.c_int
@@ -2798,6 +2971,15 @@ def _run_ck_train_runtime(
                 replay_lib.ck_train_get_activation_snapshot_numel.restype = ctypes.c_int
                 replay_lib.ck_train_export_activation_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
                 replay_lib.ck_train_export_activation_snapshot.restype = ctypes.c_int
+            if replay_has_set_accum_counter_api:
+                replay_lib.ck_train_set_accum_counter.argtypes = [ctypes.c_int]
+                replay_lib.ck_train_set_accum_counter.restype = ctypes.c_int
+            if replay_has_get_opt_step_api:
+                replay_lib.ck_train_get_opt_step.argtypes = []
+                replay_lib.ck_train_get_opt_step.restype = ctypes.c_int
+            if replay_has_set_opt_step_api:
+                replay_lib.ck_train_set_opt_step.argtypes = [ctypes.c_int]
+                replay_lib.ck_train_set_opt_step.restype = ctypes.c_int
 
             replay_init_rc = int(replay_lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
             if replay_init_rc < 0:
@@ -2808,9 +2990,13 @@ def _run_ck_train_runtime(
             replay_has_forward_api = False
             replay_has_set_batch_api = False
             replay_has_act_snapshot_api = False
+            replay_has_set_accum_counter_api = False
+            replay_has_get_opt_step_api = False
+            replay_has_set_opt_step_api = False
 
     step = 0
     micro_steps = 0
+    optimizer_steps = 0
     processed_tokens = 0
     total_ck_ms = 0.0
     loss_curve: list[dict] = []
@@ -2844,6 +3030,8 @@ def _run_ck_train_runtime(
                     or bool(getattr(args, "dump_on_drift", False))
                 )
             )
+            pre_replay_accum_counter = int(lib.ck_train_get_accum_counter()) if has_accum_counter_api else None
+            pre_replay_opt_step = int(lib.ck_train_get_opt_step()) if has_opt_step_getter_api else None
             pre_snapshot = None
             pre_snapshot_numel = 0
             if need_check_snapshot and has_weight_snapshot_api:
@@ -2856,6 +3044,13 @@ def _run_ck_train_runtime(
             t1 = time.perf_counter()
             if calls < 0:
                 raise RuntimeError(f"ck_train_step failed at step {step} (calls={calls})")
+
+            if has_accum_counter_api:
+                accum_now = int(lib.ck_train_get_accum_counter())
+                if accum_now == 0:
+                    optimizer_steps += 1
+            elif (micro_steps % grad_accum) == 0:
+                optimizer_steps += 1
 
             step_ms = (t1 - t0) * 1000.0
             total_ck_ms += step_ms
@@ -2908,6 +3103,10 @@ def _run_ck_train_runtime(
                 elif pre_snapshot is not None and pre_snapshot_numel > 0:
                     import_rc = _ck_import_runtime_weight_snapshot(replay_lib, pre_snapshot, pre_snapshot_numel)
                     if import_rc >= 0:
+                        if replay_has_set_accum_counter_api and pre_replay_accum_counter is not None:
+                            _ = int(replay_lib.ck_train_set_accum_counter(ctypes.c_int(int(pre_replay_accum_counter))))
+                        if replay_has_set_opt_step_api and pre_replay_opt_step is not None:
+                            _ = int(replay_lib.ck_train_set_opt_step(ctypes.c_int(int(pre_replay_opt_step))))
                         replay_loss_out = ctypes.c_float(0.0)
                         replay_calls = int(replay_lib.ck_train_step(x_buf, y_buf, ctypes.byref(replay_loss_out), ctypes.c_float(lr)))
                         if replay_calls < 0:
@@ -3103,6 +3302,21 @@ def _run_ck_train_runtime(
                         and float(oracle_first_bad_diff) > float(activation_tol)
                     )
                     if fail_loss or fail_logits or fail_slots:
+                        failure_modes = []
+                        if fail_loss:
+                            failure_modes.append("loss")
+                        if fail_logits:
+                            failure_modes.append("logits")
+                        if fail_slots:
+                            failure_modes.append("slots")
+                        if fail_loss and (not fail_logits) and (not fail_slots):
+                            drift_signature = "loss_only"
+                        elif fail_logits and (not fail_slots):
+                            drift_signature = "logits"
+                        elif fail_slots:
+                            drift_signature = "tensor_slot"
+                        else:
+                            drift_signature = "mixed"
                         if bool(getattr(args, "dump_on_drift", False)) and pre_snapshot is not None and pre_snapshot_numel > 0:
                             snap_path = _write_ck_weight_snapshot_artifact(
                                 run_dir,
@@ -3146,6 +3360,8 @@ def _run_ck_train_runtime(
                             "snapshot": snapshot_path,
                             "activation_snapshot": activation_snapshot_path,
                             "oracle_error": oracle_error,
+                            "failure_modes": failure_modes,
+                            "drift_signature": drift_signature,
                         })
                 else:
                     if oracle_strict:
@@ -3219,6 +3435,20 @@ def _run_ck_train_runtime(
             )
             grad_steps.append(step)
             grad_global.append(0.0)
+
+    pending_accum = int(lib.ck_train_get_accum_counter()) if has_accum_counter_api else int(micro_steps % grad_accum)
+    if pending_accum > 0:
+        if not has_flush_optimizer_api:
+            raise RuntimeError(
+                f"ck_train runtime ended with pending grad accumulation ({pending_accum}) but ck_train_flush_optimizer is unavailable"
+            )
+        t0 = time.perf_counter()
+        flush_calls = int(lib.ck_train_flush_optimizer(ctypes.c_float(lr)))
+        t1 = time.perf_counter()
+        if flush_calls < 0:
+            raise RuntimeError(f"ck_train_flush_optimizer failed after step {step} (calls={flush_calls})")
+        optimizer_steps += 1
+        total_ck_ms += (t1 - t0) * 1000.0
 
     if has_weight_snapshot_api and train_save_final and step > 0 and int(last_checkpoint_step) != int(step):
         final_snap = _ck_export_runtime_weight_snapshot(lib)
@@ -3299,6 +3529,7 @@ def _run_ck_train_runtime(
         "lr": lr,
         "steps": step,
         "micro_steps": micro_steps,
+        "optimizer_steps": optimizer_steps,
         "tokens_per_update": seq_len * grad_accum,
         "max_loss_abs_diff": max_loss_abs_diff,
         "mean_loss_abs_diff": mean_loss_abs_diff,
@@ -3317,6 +3548,7 @@ def _run_ck_train_runtime(
         "step_profile": {
             "steps": step,
             "micro_steps": micro_steps,
+            "optimizer_steps": optimizer_steps,
             "tokens_per_update": seq_len * grad_accum,
             "processed_tokens": processed_tokens,
             "ck_total_ms": total_ck_ms,
@@ -3333,6 +3565,7 @@ def _run_ck_train_runtime(
             "num_params": int(init_payload.get("num_params", 0)),
             "total_floats": int(init_payload.get("total_floats", 0)),
             "runtime_num_tokens": int(runtime_num_tokens),
+            "runtime_grad_accum_steps": int(runtime_grad_accum_steps),
             "loaded": init_payload.get("loaded", []),
             "memory_diagnostic": diag_info,
         },
@@ -3352,6 +3585,7 @@ def _run_ck_train_runtime(
             "max_steps": int(oracle_max_steps_used),
             "source": oracle_source,
             "strict": bool(oracle_strict),
+            "runtime_strict_math": bool(strict_runtime_bound and strict_runtime_enabled),
             "available": bool(oracle_points > 0),
             "snapshot_torch_enabled": bool(snapshot_oracle_enabled),
             "snapshot_torch_error": snapshot_oracle_error,
@@ -3593,6 +3827,8 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         log(f"  parity oracle: on ({oracle}, {cadence})", C_DIM)
     else:
         log("  parity oracle: off", C_DIM)
+    if bool(getattr(args, "kernel_strict_math", False)):
+        log("  kernel strict math: on", C_DIM)
     if bool(getattr(args, "dump_on_drift", False)):
         log(f"  drift dumps: on (topk={int(getattr(args, 'drift_topk', 20) or 20)})", C_DIM)
     if train_save_every > 0 or train_save_final:
@@ -3842,6 +4078,17 @@ def step_run_train_init(args: argparse.Namespace) -> None:
             layout_audit_cmd.append("--strict")
         run_cmd(layout_audit_cmd, cwd=PROJECT_ROOT)
 
+        exec_plan_script = SCRIPTS_DIR / "generate_train_exec_plan_v7.py"
+        exec_plan_out = out_dir / "train_exec_plan.json"
+        exec_plan_cmd = [
+            python_exec,
+            str(exec_plan_script),
+            "--ir2", str(ir2_out),
+            "--output", str(exec_plan_out),
+            "--mode", "deterministic",
+        ]
+        run_cmd(exec_plan_cmd, cwd=PROJECT_ROOT)
+
         if getattr(args, "generate_runtime", False):
             rt_script = SCRIPTS_DIR / "codegen_train_runtime_v7.py"
             rt_out = out_dir / "generated_train_runtime_v7.c"
@@ -3852,6 +4099,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
                 "--ir2", str(ir2_out),
                 "--manifest", str(manifest_path),
                 "--layout", str(layout_out),
+                "--exec-plan", str(exec_plan_out),
                 "--output", str(rt_out),
                 "--summary-out", str(rt_summary),
             ]
@@ -3861,6 +4109,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         log(f"  Generated backward IR: {ir2_out}", C_GREEN)
         log(f"  Generated training layout: {layout_out}", C_GREEN)
         log(f"  Training memory audit: {layout_audit_out}", C_GREEN)
+        log(f"  Generated train exec plan: {exec_plan_out}", C_GREEN)
 
 
     mode = "pretrain" if getattr(args, "pretraining", False) else str(getattr(args, "train_mode", "pretrain"))
@@ -5187,6 +5436,8 @@ Examples:
                         help='Enable strict training preflight checks before running training commands')
         sp.add_argument('--parity-on', action='store_true',
                         help='Enable scheduled oracle parity checks (metadata/config for training pipeline)')
+        sp.add_argument('--kernel-strict-math', action='store_true',
+                        help='Force strict kernel math in CK runtime (exact sigmoid/SwiGLU + strict parity math paths)')
         sp.add_argument('--oracle', choices=['pytorch'], default='pytorch',
                         help='Oracle backend used for parity checks (default: pytorch)')
         sp.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced',
@@ -5230,6 +5481,8 @@ Examples:
         sp.add_argument('--train-grad-accum', type=int, default=8)
         sp.add_argument('--train-optimizer', choices=['adamw', 'sgd'], default='adamw')
         sp.add_argument('--train-lr', type=float, default=1e-3)
+        sp.add_argument('--train-max-grad-norm', type=float, default=0.0,
+                        help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
         sp.add_argument('--train-seed', type=int, default=42)
 
         sp.add_argument('--train-vocab', type=int, default=256,
@@ -5287,6 +5540,8 @@ Examples:
                            help='Enable strict training preflight checks before --train-e2e')
     run_parser.add_argument('--parity-on', action='store_true',
                            help='Enable scheduled oracle parity checks metadata for --train-e2e')
+    run_parser.add_argument('--kernel-strict-math', action='store_true',
+                           help='Force strict kernel math in CK runtime (exact sigmoid/SwiGLU + strict parity math paths)')
     run_parser.add_argument('--oracle', choices=['pytorch'], default='pytorch')
     run_parser.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced')
     run_parser.add_argument('--parity-every', type=int, default=50)
@@ -5316,6 +5571,8 @@ Examples:
                            help='Optimizer for --train-e2e (default: adamw)')
     run_parser.add_argument('--train-lr', type=float, default=1e-3,
                            help='Learning rate for --train-e2e (default: 1e-3)')
+    run_parser.add_argument('--train-max-grad-norm', type=float, default=0.0,
+                           help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
     run_parser.add_argument('--train-seed', type=int, default=42,
                            help='Random seed for --train-e2e (default: 42)')
     run_parser.add_argument('--train-vocab', type=int, default=256)

@@ -16,6 +16,7 @@ Scope:
 from __future__ import annotations
 
 import argparse
+import copy
 import ctypes
 import json
 import math
@@ -228,13 +229,14 @@ class CCrossEntropyFn(torch.autograd.Function):
             ctypes.byref(loss_c),
         )
 
-        ctx.dlogits = torch.from_numpy(dlogits_np)
-        return torch.tensor(loss_c.value, dtype=torch.float32)
+        # Own the gradient buffer to avoid any NumPy allocator alias/lifetime surprises.
+        ctx.dlogits = torch.from_numpy(dlogits_np.copy())
+        return logits.new_tensor(loss_c.value)
 
     @staticmethod
     def backward(ctx, grad_out: torch.Tensor):
         # dL/dlogits was already produced for mean CE; scale by upstream scalar.
-        return ctx.dlogits * grad_out, None, None
+        return ctx.dlogits * grad_out.to(dtype=ctx.dlogits.dtype), None, None
 
 
 def c_rmsnorm(x: torch.Tensor, gamma: torch.Tensor, eps: float, lib: ctypes.CDLL) -> torch.Tensor:
@@ -250,13 +252,24 @@ def c_cross_entropy(logits: torch.Tensor, targets: torch.Tensor, lib: ctypes.CDL
 
 
 class TinyCKModel(nn.Module):
-    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float, lib: ctypes.CDLL):
+    def __init__(
+        self,
+        vocab: int,
+        d_model: int,
+        hidden: int,
+        eps: float,
+        lib: ctypes.CDLL,
+        use_c_rmsnorm: bool = True,
+        use_c_swiglu: bool = True,
+    ):
         super().__init__()
         self.vocab = vocab
         self.d_model = d_model
         self.hidden = hidden
         self.eps = eps
         self.lib = lib
+        self.use_c_rmsnorm = bool(use_c_rmsnorm)
+        self.use_c_swiglu = bool(use_c_swiglu)
 
         self.embedding = nn.Embedding(vocab, d_model)
         self.rms_gamma = nn.Parameter(torch.ones(d_model, dtype=torch.float32))
@@ -266,9 +279,18 @@ class TinyCKModel(nn.Module):
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         # input_ids: [B, T] -> logits: [B*T, V]
         x = self.embedding(input_ids).reshape(-1, self.d_model)
-        x = c_rmsnorm(x, self.rms_gamma, self.eps, self.lib)
+        if self.use_c_rmsnorm:
+            x = c_rmsnorm(x, self.rms_gamma, self.eps, self.lib)
+        else:
+            var = x.pow(2).mean(dim=-1, keepdim=True)
+            rstd = (var + self.eps).rsqrt()
+            x = x * rstd * self.rms_gamma
         x = self.fc1(x)
-        x = c_swiglu(x, self.lib)
+        if self.use_c_swiglu:
+            x = c_swiglu(x, self.lib)
+        else:
+            gate, up = x[:, : self.hidden], x[:, self.hidden :]
+            x = F.silu(gate) * up
         logits = self.fc2(x)
         return logits
 
@@ -455,6 +477,366 @@ def _state_dict_diff_stats(
     return max_diff, mean_diff, worst
 
 
+def _topk_state_dict_diffs(
+    ck_state: Dict[str, torch.Tensor],
+    torch_state: Dict[str, torch.Tensor],
+    k: int,
+) -> list[dict]:
+    rows: list[dict] = []
+    topk = max(1, int(k))
+    for name, p_ck in ck_state.items():
+        p_t = torch_state.get(name)
+        if p_t is None:
+            continue
+        d = (p_ck - p_t).abs()
+        dmax = float(d.max().item()) if d.numel() else 0.0
+        dmean = float(d.mean().item()) if d.numel() else 0.0
+        dl2 = float(torch.norm(d.float()).item()) if d.numel() else 0.0
+        rows.append(
+            {
+                "name": name,
+                "max_abs_diff": dmax,
+                "mean_abs_diff": dmean,
+                "l2_diff": dl2,
+            }
+        )
+    rows.sort(key=lambda r: float(r["max_abs_diff"]), reverse=True)
+    return rows[:topk]
+
+
+def _named_tensor_diff_stats(
+    ck_named: Iterable[Tuple[str, torch.Tensor]],
+    torch_named: Iterable[Tuple[str, torch.Tensor]],
+) -> Tuple[float, float, str]:
+    max_diff = 0.0
+    mean_acc = 0.0
+    count = 0
+    worst = "n/a"
+    for (name_ck, t_ck), (name_t, t_t) in zip(ck_named, torch_named):
+        if name_ck != name_t:
+            raise RuntimeError(f"Tensor name mismatch: {name_ck} vs {name_t}")
+        d = (t_ck - t_t).abs()
+        dmax = float(d.max().item()) if d.numel() else 0.0
+        dmean = float(d.mean().item()) if d.numel() else 0.0
+        if dmax > max_diff:
+            max_diff = dmax
+            worst = name_ck
+        mean_acc += dmean
+        count += 1
+    mean_diff = mean_acc / count if count > 0 else 0.0
+    return max_diff, mean_diff, worst
+
+
+def _optimizer_state_diff_stats(
+    model_ck: nn.Module,
+    model_torch: nn.Module,
+    opt_ck: torch.optim.Optimizer,
+    opt_torch: torch.optim.Optimizer,
+) -> dict:
+    name_to_p_ck = {name: p for name, p in model_ck.named_parameters()}
+    name_to_p_t = {name: p for name, p in model_torch.named_parameters()}
+    max_exp_avg_diff = 0.0
+    max_exp_avg_sq_diff = 0.0
+    worst_exp_avg = "n/a"
+    worst_exp_avg_sq = "n/a"
+    for name, p_ck in name_to_p_ck.items():
+        p_t = name_to_p_t.get(name)
+        if p_t is None:
+            continue
+        state_ck = opt_ck.state.get(p_ck, {})
+        state_t = opt_torch.state.get(p_t, {})
+        m_ck = state_ck.get("exp_avg")
+        m_t = state_t.get("exp_avg")
+        if m_ck is not None and m_t is not None:
+            d = (m_ck.detach() - m_t.detach()).abs()
+            dmax = float(d.max().item()) if d.numel() else 0.0
+            if dmax > max_exp_avg_diff:
+                max_exp_avg_diff = dmax
+                worst_exp_avg = name
+        v_ck = state_ck.get("exp_avg_sq")
+        v_t = state_t.get("exp_avg_sq")
+        if v_ck is not None and v_t is not None:
+            d = (v_ck.detach() - v_t.detach()).abs()
+            dmax = float(d.max().item()) if d.numel() else 0.0
+            if dmax > max_exp_avg_sq_diff:
+                max_exp_avg_sq_diff = dmax
+                worst_exp_avg_sq = name
+    return {
+        "max_exp_avg_diff": max_exp_avg_diff,
+        "max_exp_avg_sq_diff": max_exp_avg_sq_diff,
+        "worst_exp_avg_param": worst_exp_avg,
+        "worst_exp_avg_sq_param": worst_exp_avg_sq,
+    }
+
+
+_STAGE_ORDER = ["embedding", "rmsnorm", "fc1", "swiglu", "logits", "loss"]
+_BWD_STAGE_ORDER = ["logits", "swiglu", "fc1", "rmsnorm", "embedding"]
+
+
+def _forward_stages_ck(
+    model_ck: TinyCKModel,
+    x: torch.Tensor,
+    targets: torch.Tensor,
+    eps: float,
+    lib: ctypes.CDLL,
+    ck_loss_backend: str,
+) -> dict[str, torch.Tensor]:
+    stages: dict[str, torch.Tensor] = {}
+    emb = model_ck.embedding(x).reshape(-1, model_ck.d_model)
+    stages["embedding"] = emb
+
+    if model_ck.use_c_rmsnorm:
+        rms = c_rmsnorm(emb, model_ck.rms_gamma, eps, lib)
+    else:
+        var = emb.pow(2).mean(dim=-1, keepdim=True)
+        rstd = (var + eps).rsqrt()
+        rms = emb * rstd * model_ck.rms_gamma
+    stages["rmsnorm"] = rms
+
+    fc1 = model_ck.fc1(rms)
+    stages["fc1"] = fc1
+
+    if model_ck.use_c_swiglu:
+        sw = c_swiglu(fc1, lib)
+    else:
+        gate, up = fc1[:, : model_ck.hidden], fc1[:, model_ck.hidden :]
+        sw = F.silu(gate) * up
+    stages["swiglu"] = sw
+
+    logits = model_ck.fc2(sw)
+    stages["logits"] = logits
+
+    if str(ck_loss_backend).lower() == "c":
+        loss = c_cross_entropy(logits, targets, lib)
+    else:
+        loss = F.cross_entropy(logits, targets, reduction="mean")
+    stages["loss"] = loss
+    return stages
+
+
+def _forward_stages_torch(
+    model_torch: TinyTorchModel,
+    x: torch.Tensor,
+    targets: torch.Tensor,
+    eps: float,
+) -> dict[str, torch.Tensor]:
+    stages: dict[str, torch.Tensor] = {}
+    emb = model_torch.embedding(x).reshape(-1, model_torch.d_model)
+    stages["embedding"] = emb
+
+    var = emb.pow(2).mean(dim=-1, keepdim=True)
+    rstd = (var + eps).rsqrt()
+    rms = emb * rstd * model_torch.rms_gamma
+    stages["rmsnorm"] = rms
+
+    fc1 = model_torch.fc1(rms)
+    stages["fc1"] = fc1
+
+    gate, up = fc1[:, : model_torch.hidden], fc1[:, model_torch.hidden :]
+    sw = F.silu(gate) * up
+    stages["swiglu"] = sw
+
+    logits = model_torch.fc2(sw)
+    stages["logits"] = logits
+    stages["loss"] = F.cross_entropy(logits, targets, reduction="mean")
+    return stages
+
+
+def _scalar_or_max_abs_diff(a: torch.Tensor, b: torch.Tensor) -> float:
+    if a.ndim == 0 and b.ndim == 0:
+        return abs(float(a.item()) - float(b.item()))
+    d = (a.detach() - b.detach()).abs()
+    return float(d.max().item()) if d.numel() else 0.0
+
+
+def _localize_step_divergence(
+    lib: ctypes.CDLL,
+    window_samples: list[tuple[torch.Tensor, torch.Tensor]],
+    vocab: int,
+    d_model: int,
+    hidden: int,
+    eps: float,
+    optimizer: str,
+    lr: float,
+    grad_accum: int,
+    ck_rmsnorm_backend: str,
+    ck_swiglu_backend: str,
+    ck_loss_backend: str,
+    pre_ck_model_state: Dict[str, torch.Tensor],
+    pre_ck_opt_state: dict,
+    pre_torch_model_state: Dict[str, torch.Tensor],
+    pre_torch_opt_state: dict,
+    source: str,
+    tol: float,
+) -> dict:
+    report: dict = {
+        "same_state_source": str(source),
+        "tol": float(tol),
+        "micro_steps": int(len(window_samples)),
+        "stage_order": list(_STAGE_ORDER),
+    }
+
+    if not window_samples:
+        report["error"] = "no_window_samples"
+        return report
+
+    ck_probe = TinyCKModel(
+        vocab=vocab,
+        d_model=d_model,
+        hidden=hidden,
+        eps=eps,
+        lib=lib,
+        use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
+        use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+    )
+    torch_probe = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
+
+    opt_ck_probe = _make_optimizer(optimizer, ck_probe.parameters(), lr=lr)
+    opt_torch_probe = _make_optimizer(optimizer, torch_probe.parameters(), lr=lr)
+
+    try:
+        if str(source).lower() == "torch":
+            base_model_state = copy.deepcopy(pre_torch_model_state)
+            base_opt_state = copy.deepcopy(pre_torch_opt_state)
+        else:
+            base_model_state = copy.deepcopy(pre_ck_model_state)
+            base_opt_state = copy.deepcopy(pre_ck_opt_state)
+
+        ck_probe.load_state_dict(base_model_state, strict=True)
+        torch_probe.load_state_dict(base_model_state, strict=True)
+
+        opt_ck_probe.load_state_dict(copy.deepcopy(base_opt_state))
+        opt_torch_probe.load_state_dict(copy.deepcopy(base_opt_state))
+    except Exception as e:
+        report["error"] = f"state_restore_failed: {e}"
+        return report
+
+    ck_probe.train()
+    torch_probe.train()
+    opt_ck_probe.zero_grad(set_to_none=True)
+    opt_torch_probe.zero_grad(set_to_none=True)
+
+    stage_max_global = {name: 0.0 for name in _STAGE_ORDER}
+    stage_grad_max_global = {name: 0.0 for name in _BWD_STAGE_ORDER}
+    per_micro: list[dict] = []
+
+    for idx, (x_i, targets_i) in enumerate(window_samples, start=1):
+        stages_ck = _forward_stages_ck(ck_probe, x_i, targets_i, eps, lib, ck_loss_backend)
+        stages_torch = _forward_stages_torch(torch_probe, x_i, targets_i, eps)
+
+        stage_diffs: dict[str, float] = {}
+        first_stage_over_tol = "none"
+        for stage in _STAGE_ORDER:
+            diff = _scalar_or_max_abs_diff(stages_ck[stage], stages_torch[stage])
+            stage_diffs[stage] = float(diff)
+            if diff > stage_max_global[stage]:
+                stage_max_global[stage] = float(diff)
+            if first_stage_over_tol == "none" and diff > tol:
+                first_stage_over_tol = stage
+
+        for stage in _BWD_STAGE_ORDER:
+            t_ck = stages_ck.get(stage)
+            t_torch = stages_torch.get(stage)
+            if isinstance(t_ck, torch.Tensor) and t_ck.requires_grad:
+                t_ck.retain_grad()
+            if isinstance(t_torch, torch.Tensor) and t_torch.requires_grad:
+                t_torch.retain_grad()
+
+        (stages_ck["loss"] / float(grad_accum)).backward()
+        (stages_torch["loss"] / float(grad_accum)).backward()
+
+        stage_grad_diffs: dict[str, float] = {}
+        first_grad_stage_over_tol = "none"
+        for stage in _BWD_STAGE_ORDER:
+            t_ck = stages_ck.get(stage)
+            t_torch = stages_torch.get(stage)
+            g_ck = t_ck.grad if isinstance(t_ck, torch.Tensor) else None
+            g_torch = t_torch.grad if isinstance(t_torch, torch.Tensor) else None
+            if g_ck is None and g_torch is None:
+                diff = 0.0
+            elif g_ck is None or g_torch is None:
+                diff = float("inf")
+            else:
+                diff = _scalar_or_max_abs_diff(g_ck, g_torch)
+            stage_grad_diffs[stage] = float(diff)
+            if diff > stage_grad_max_global[stage]:
+                stage_grad_max_global[stage] = float(diff)
+            if first_grad_stage_over_tol == "none" and diff > tol:
+                first_grad_stage_over_tol = stage
+
+        per_micro.append(
+            {
+                "micro_step": int(idx),
+                "first_stage_over_tol": first_stage_over_tol,
+                "stage_max_diffs": stage_diffs,
+                "first_grad_stage_over_tol": first_grad_stage_over_tol,
+                "stage_grad_max_diffs": stage_grad_diffs,
+            }
+        )
+
+    grad_max, grad_mean, worst_grad = _named_tensor_diff_stats(
+        ((name, p.grad.detach()) for name, p in ck_probe.named_parameters() if p.grad is not None),
+        ((name, p.grad.detach()) for name, p in torch_probe.named_parameters() if p.grad is not None),
+    )
+
+    pre_param_max, pre_param_mean, pre_worst = _state_dict_diff_stats(
+        ck_probe.state_dict(), torch_probe.state_dict()
+    )
+    pre_opt_diag = _optimizer_state_diff_stats(ck_probe, torch_probe, opt_ck_probe, opt_torch_probe)
+
+    opt_ck_probe.step()
+    opt_torch_probe.step()
+    opt_ck_probe.zero_grad(set_to_none=True)
+    opt_torch_probe.zero_grad(set_to_none=True)
+
+    post_param_max, post_param_mean, post_worst = _state_dict_diff_stats(
+        ck_probe.state_dict(), torch_probe.state_dict()
+    )
+    post_opt_diag = _optimizer_state_diff_stats(ck_probe, torch_probe, opt_ck_probe, opt_torch_probe)
+
+    first_stage_global = "none"
+    for stage in _STAGE_ORDER:
+        if float(stage_max_global.get(stage, 0.0)) > tol:
+            first_stage_global = stage
+            break
+
+    first_grad_stage_global = "none"
+    for stage in _BWD_STAGE_ORDER:
+        if float(stage_grad_max_global.get(stage, 0.0)) > tol:
+            first_grad_stage_global = stage
+            break
+
+    report.update(
+        {
+            "first_stage_over_tol": first_stage_global,
+            "first_grad_stage_over_tol": first_grad_stage_global,
+            "stage_order": list(_STAGE_ORDER),
+            "stage_grad_order": list(_BWD_STAGE_ORDER),
+            "stage_max_global": stage_max_global,
+            "stage_grad_max_global": stage_grad_max_global,
+            "grad_window": {
+                "max_grad_diff": float(grad_max),
+                "mean_grad_diff": float(grad_mean),
+                "worst_grad_param": worst_grad,
+            },
+            "pre_step_same_state": {
+                "max_param_diff": float(pre_param_max),
+                "mean_param_diff": float(pre_param_mean),
+                "worst_param": pre_worst,
+                **pre_opt_diag,
+            },
+            "post_step_same_state": {
+                "max_param_diff": float(post_param_max),
+                "mean_param_diff": float(post_param_mean),
+                "worst_param": post_worst,
+                **post_opt_diag,
+            },
+            "per_micro": per_micro,
+        }
+    )
+    return report
+
+
 @dataclass
 class RunStats:
     epochs: int
@@ -477,6 +859,8 @@ class RunStats:
     parity_steps: list[dict]
     grad_norm_series: dict
     step_profile: dict
+    drift_diagnostics: dict
+    epoch_snapshots: list[dict]
 
 
 def run_training_parity(
@@ -497,10 +881,27 @@ def run_training_parity(
     train_text: str | None = None,
     init_state: Dict[str, torch.Tensor] | None = None,
     max_steps: int | None = None,
+    diag_every: int = 1,
+    ck_rmsnorm_backend: str = "c",
+    ck_swiglu_backend: str = "c",
+    ck_loss_backend: str = "c",
+    drift_localize_step: int = 0,
+    drift_localize_tol: float = 1e-6,
+    drift_localize_source: str = "ck",
+    epoch_snapshot_every: int = 1,
+    epoch_snapshot_topk: int = 8,
 ) -> RunStats:
     _seed_all(seed)
 
-    model_ck = TinyCKModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps, lib=lib)
+    model_ck = TinyCKModel(
+        vocab=vocab,
+        d_model=d_model,
+        hidden=hidden,
+        eps=eps,
+        lib=lib,
+        use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
+        use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+    )
     model_torch = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
     if init_state is not None:
         model_ck.load_state_dict(init_state, strict=True)
@@ -532,6 +933,7 @@ def run_training_parity(
     win_loss_ck_sum = 0.0
     win_loss_t_sum = 0.0
     win_loss_diff_max = 0.0
+    win_logit_diff_max = 0.0
     win_tokens = 0
     win_ck_forward_ms = 0.0
     win_ck_backward_ms = 0.0
@@ -545,16 +947,72 @@ def run_training_parity(
     grad_steps: list[int] = []
     grad_global: list[float] = []
     grad_params: Dict[str, list[float]] = {}
+    diag_steps: list[dict] = []
+    epoch_snapshots: list[dict] = []
+    window_samples: list[tuple[torch.Tensor, torch.Tensor]] = []
+    localized_step_report: dict | None = None
 
     def _flush_optimizer_step() -> None:
         nonlocal step_count
-        nonlocal win_micro, win_loss_ck_sum, win_loss_t_sum, win_loss_diff_max, win_tokens
+        nonlocal win_micro, win_loss_ck_sum, win_loss_t_sum, win_loss_diff_max, win_logit_diff_max, win_tokens
         nonlocal win_ck_forward_ms, win_ck_backward_ms, win_ck_opt_ms
         nonlocal win_torch_forward_ms, win_torch_backward_ms, win_torch_opt_ms
         nonlocal total_ck_ms, total_torch_ms
+        nonlocal window_samples, localized_step_report
         if win_micro == 0:
             return
 
+        target_step = int(step_count + 1)
+        pre_param_max, pre_param_mean, pre_worst_param = _state_dict_diff_stats(
+            model_ck.state_dict(), model_torch.state_dict()
+        )
+        pre_opt_state_diag = _optimizer_state_diff_stats(model_ck, model_torch, opt_ck, opt_torch)
+        pre_opt_state_diag_prefixed = {
+            f"pre_{k}": (float(v) if isinstance(v, (int, float)) else v)
+            for k, v in pre_opt_state_diag.items()
+        }
+
+        if (
+            int(drift_localize_step or 0) > 0
+            and target_step == int(drift_localize_step)
+            and localized_step_report is None
+        ):
+            pre_ck_model_state = copy.deepcopy(model_ck.state_dict())
+            pre_torch_model_state = copy.deepcopy(model_torch.state_dict())
+            pre_ck_opt_state = copy.deepcopy(opt_ck.state_dict())
+            pre_torch_opt_state = copy.deepcopy(opt_torch.state_dict())
+            localized_step_report = _localize_step_divergence(
+                lib=lib,
+                window_samples=window_samples,
+                vocab=vocab,
+                d_model=d_model,
+                hidden=hidden,
+                eps=eps,
+                optimizer=optimizer,
+                lr=lr,
+                grad_accum=grad_accum,
+                ck_rmsnorm_backend=ck_rmsnorm_backend,
+                ck_swiglu_backend=ck_swiglu_backend,
+                ck_loss_backend=ck_loss_backend,
+                pre_ck_model_state=pre_ck_model_state,
+                pre_ck_opt_state=pre_ck_opt_state,
+                pre_torch_model_state=pre_torch_model_state,
+                pre_torch_opt_state=pre_torch_opt_state,
+                source=drift_localize_source,
+                tol=float(drift_localize_tol),
+            )
+            localized_step_report["target_step"] = target_step
+            localized_step_report["trajectory_pre_step"] = {
+                "max_param_diff": float(pre_param_max),
+                "mean_param_diff": float(pre_param_mean),
+                "worst_param": pre_worst_param,
+                **pre_opt_state_diag,
+            }
+
+        grad_max, grad_mean, worst_grad_param = _named_tensor_diff_stats(
+            ((name, p.grad.detach()) for name, p in model_ck.named_parameters() if p.grad is not None),
+            ((name, p.grad.detach()) for name, p in model_torch.named_parameters() if p.grad is not None),
+        )
         grad_norm = _global_grad_norm(model_ck.parameters())
         per_param = _param_grad_norms(model_ck.named_parameters())
 
@@ -575,6 +1033,7 @@ def run_training_parity(
         param_max, param_mean, worst_param = _state_dict_diff_stats(
             model_ck.state_dict(), model_torch.state_dict()
         )
+        opt_state_diag = _optimizer_state_diff_stats(model_ck, model_torch, opt_ck, opt_torch)
         step_loss_ck = win_loss_ck_sum / float(win_micro)
         step_loss_t = win_loss_t_sum / float(win_micro)
         lr_now = float(opt_ck.param_groups[0].get("lr", lr))
@@ -607,11 +1066,36 @@ def run_training_parity(
             {
                 "step": step_count,
                 "loss_diff": win_loss_diff_max,
+                "max_logit_diff": win_logit_diff_max,
+                "max_grad_diff": grad_max,
+                "mean_grad_diff": grad_mean,
+                "worst_grad_param": worst_grad_param,
                 "max_param_diff": param_max,
                 "worst_param": worst_param,
                 "mean_param_diff": param_mean,
+                "pre_max_param_diff": pre_param_max,
+                "pre_mean_param_diff": pre_param_mean,
+                "pre_worst_param": pre_worst_param,
+                **pre_opt_state_diag_prefixed,
+                **opt_state_diag,
             }
         )
+        if diag_every > 0 and (step_count % diag_every == 0):
+            diag_steps.append(
+                {
+                    "step": step_count,
+                    "loss_diff": win_loss_diff_max,
+                    "max_logit_diff": win_logit_diff_max,
+                    "max_grad_diff": grad_max,
+                    "worst_grad_param": worst_grad_param,
+                    "max_param_diff": param_max,
+                    "worst_param": worst_param,
+                    "pre_max_param_diff": pre_param_max,
+                    "pre_worst_param": pre_worst_param,
+                    **pre_opt_state_diag_prefixed,
+                    **opt_state_diag,
+                }
+            )
         grad_steps.append(step_count)
         grad_global.append(grad_norm)
         for name, value in per_param.items():
@@ -621,6 +1105,7 @@ def run_training_parity(
         win_loss_ck_sum = 0.0
         win_loss_t_sum = 0.0
         win_loss_diff_max = 0.0
+        win_logit_diff_max = 0.0
         win_tokens = 0
         win_ck_forward_ms = 0.0
         win_ck_backward_ms = 0.0
@@ -628,6 +1113,48 @@ def run_training_parity(
         win_torch_forward_ms = 0.0
         win_torch_backward_ms = 0.0
         win_torch_opt_ms = 0.0
+        window_samples = []
+
+    def _record_epoch_snapshot(epoch_idx: int, step_begin: int) -> None:
+        ck_state = model_ck.state_dict()
+        torch_state = model_torch.state_dict()
+        param_max, param_mean, worst_param = _state_dict_diff_stats(ck_state, torch_state)
+        opt_diag = _optimizer_state_diff_stats(model_ck, model_torch, opt_ck, opt_torch)
+        step_slice = parity_steps[int(step_begin) : int(step_count)]
+        loss_slice = loss_curve[int(step_begin) : int(step_count)]
+        epoch_snapshots.append(
+            {
+                "epoch": int(epoch_idx),
+                "optimizer_step_start": int(step_begin + 1) if step_count > step_begin else int(step_begin),
+                "optimizer_step_end": int(step_count),
+                "optimizer_steps_in_epoch": int(max(0, step_count - step_begin)),
+                "loss_ck_last": float(last_ck) if not math.isnan(last_ck) else math.nan,
+                "loss_torch_last": float(last_t) if not math.isnan(last_t) else math.nan,
+                "loss_abs_diff_last": (
+                    abs(float(last_ck) - float(last_t))
+                    if not (math.isnan(last_ck) or math.isnan(last_t))
+                    else math.nan
+                ),
+                "max_loss_diff_in_epoch": max((float(s["loss_diff"]) for s in step_slice), default=0.0),
+                "max_logit_diff_in_epoch": max((float(s.get("max_logit_diff", 0.0)) for s in step_slice), default=0.0),
+                "max_grad_diff_in_epoch": max((float(s.get("max_grad_diff", 0.0)) for s in step_slice), default=0.0),
+                "mean_ck_step_ms_in_epoch": (
+                    sum(float(s.get("step_ms", 0.0)) for s in loss_slice) / len(loss_slice)
+                    if loss_slice
+                    else 0.0
+                ),
+                "mean_torch_step_ms_in_epoch": (
+                    sum(float(s.get("torch_step_ms", 0.0)) for s in loss_slice) / len(loss_slice)
+                    if loss_slice
+                    else 0.0
+                ),
+                "max_param_diff": float(param_max),
+                "mean_param_diff": float(param_mean),
+                "worst_param": worst_param,
+                **opt_diag,
+                "top_param_diffs": _topk_state_dict_diffs(ck_state, torch_state, k=epoch_snapshot_topk),
+            }
+        )
 
     opt_ck.zero_grad(set_to_none=True)
     opt_torch.zero_grad(set_to_none=True)
@@ -635,17 +1162,23 @@ def run_training_parity(
     step_limit = int(max_steps or 0)
 
     for _epoch in range(epochs):
+        epoch_step_start = int(step_count)
         for x, y in batches:
             targets = y.reshape(-1)
+            window_samples.append((x.detach().clone(), targets.detach().clone()))
 
             t_ck_fwd_0 = time.perf_counter()
             logits_ck = model_ck(x)
-            loss_ck = c_cross_entropy(logits_ck, targets, lib)
+            if str(ck_loss_backend).lower() == "c":
+                loss_ck = c_cross_entropy(logits_ck, targets, lib)
+            else:
+                loss_ck = F.cross_entropy(logits_ck, targets, reduction="mean")
             t_ck_fwd_1 = time.perf_counter()
 
             t_t_fwd_0 = time.perf_counter()
             logits_t = model_torch(x)
             loss_t = F.cross_entropy(logits_t, targets, reduction="mean")
+            logit_diff = float((logits_ck.detach() - logits_t.detach()).abs().max().item())
             t_t_fwd_1 = time.perf_counter()
 
             last_ck = float(loss_ck.item())
@@ -668,6 +1201,7 @@ def run_training_parity(
             win_loss_ck_sum += last_ck
             win_loss_t_sum += last_t
             win_loss_diff_max = max(win_loss_diff_max, loss_diff)
+            win_logit_diff_max = max(win_logit_diff_max, logit_diff)
             win_ck_forward_ms += (t_ck_fwd_1 - t_ck_fwd_0) * 1000.0
             win_torch_forward_ms += (t_t_fwd_1 - t_t_fwd_0) * 1000.0
             win_ck_backward_ms += (t_ck_bwd_1 - t_ck_bwd_0) * 1000.0
@@ -677,11 +1211,15 @@ def run_training_parity(
                 _flush_optimizer_step()
                 if step_limit > 0 and step_count >= step_limit:
                     break
+        if epoch_snapshot_every > 0 and ((_epoch + 1) % epoch_snapshot_every == 0):
+            _record_epoch_snapshot(epoch_idx=_epoch + 1, step_begin=epoch_step_start)
         if step_limit > 0 and step_count >= step_limit:
             break
 
     if micro_count % grad_accum != 0 and (step_limit <= 0 or step_count < step_limit):
         _flush_optimizer_step()
+    if epoch_snapshot_every > 0 and len(epoch_snapshots) == 0 and step_count > 0:
+        _record_epoch_snapshot(epoch_idx=epochs, step_begin=0)
 
     param_diffs: list[float] = []
     for (name_ck, p_ck), (name_t, p_t) in zip(model_ck.state_dict().items(), model_torch.state_dict().items()):
@@ -699,6 +1237,10 @@ def run_training_parity(
     train_tok_s = (processed_tokens / (total_ck_ms / 1000.0)) if total_ck_ms > 0 else 0.0
     avg_ck_step_ms = (total_ck_ms / step_count) if step_count > 0 else 0.0
     avg_torch_step_ms = (total_torch_ms / step_count) if step_count > 0 else 0.0
+    first_loss_fail_step = next((int(s["step"]) for s in parity_steps if float(s["loss_diff"]) > float(loss_tol)), None)
+    first_param_fail_step = next((int(s["step"]) for s in parity_steps if float(s["max_param_diff"]) > float(param_tol)), None)
+    max_logit_abs_diff = max((float(s.get("max_logit_diff", 0.0)) for s in parity_steps), default=0.0)
+    max_grad_abs_diff = max((float(s.get("max_grad_diff", 0.0)) for s in parity_steps), default=0.0)
 
     return RunStats(
         epochs=epochs,
@@ -737,6 +1279,15 @@ def run_training_parity(
             # Keep this alias for existing dashboard card compatibility.
             "decode_tok_s": train_tok_s,
         },
+        drift_diagnostics={
+            "first_loss_fail_step": first_loss_fail_step,
+            "first_param_fail_step": first_param_fail_step,
+            "max_logit_abs_diff": max_logit_abs_diff,
+            "max_grad_abs_diff": max_grad_abs_diff,
+            "steps": diag_steps,
+            "localize_step_report": localized_step_report,
+        },
+        epoch_snapshots=epoch_snapshots,
     )
 
 
@@ -768,6 +1319,36 @@ def main() -> int:
         default=0,
         help="Optional cap on optimizer steps (0 = run full epochs).",
     )
+    parser.add_argument(
+        "--diag-every",
+        type=int,
+        default=1,
+        help="Emit drift diagnostics every N optimizer steps (0 disables detailed step list).",
+    )
+    parser.add_argument("--ck-rmsnorm-backend", choices=["c", "torch"], default="c",
+                        help="CK model RMSNorm path for parity harness (default: c)")
+    parser.add_argument("--ck-swiglu-backend", choices=["c", "torch"], default="c",
+                        help="CK model SwiGLU path for parity harness (default: c)")
+    parser.add_argument("--ck-loss-backend", choices=["c", "torch"], default="c",
+                        help="CK model loss path for parity harness (default: c)")
+    parser.add_argument("--drift-localize-step", type=int, default=0,
+                        help="If >0, capture paired/same-state localization report at this optimizer step")
+    parser.add_argument("--drift-localize-tol", type=float, default=1e-6,
+                        help="Stage diff threshold used by same-state localizer")
+    parser.add_argument("--drift-localize-source", choices=["ck", "torch"], default="ck",
+                        help="Same-state replay base for localization (ck or torch pre-step state)")
+    parser.add_argument(
+        "--epoch-snapshot-every",
+        type=int,
+        default=1,
+        help="Emit epoch-level CK-vs-Torch snapshots every N epochs (0 disables).",
+    )
+    parser.add_argument(
+        "--epoch-snapshot-topk",
+        type=int,
+        default=8,
+        help="Top-K parameter diff rows to keep in each epoch snapshot.",
+    )
     args = parser.parse_args()
 
     if args.epochs < 1:
@@ -781,6 +1362,21 @@ def main() -> int:
         return 2
     if args.max_steps < 0:
         print("ERROR: --max-steps must be >= 0", file=sys.stderr)
+        return 2
+    if args.diag_every < 0:
+        print("ERROR: --diag-every must be >= 0", file=sys.stderr)
+        return 2
+    if args.drift_localize_step < 0:
+        print("ERROR: --drift-localize-step must be >= 0", file=sys.stderr)
+        return 2
+    if args.drift_localize_tol < 0:
+        print("ERROR: --drift-localize-tol must be >= 0", file=sys.stderr)
+        return 2
+    if args.epoch_snapshot_every < 0:
+        print("ERROR: --epoch-snapshot-every must be >= 0", file=sys.stderr)
+        return 2
+    if args.epoch_snapshot_topk < 1:
+        print("ERROR: --epoch-snapshot-topk must be >= 1", file=sys.stderr)
         return 2
     init_state = None
     if (args.weights_bump is None) != (args.weights_manifest is None):
@@ -826,6 +1422,15 @@ def main() -> int:
         train_text=args.train_text,
         init_state=init_state,
         max_steps=args.max_steps if args.max_steps > 0 else None,
+        diag_every=args.diag_every,
+        ck_rmsnorm_backend=args.ck_rmsnorm_backend,
+        ck_swiglu_backend=args.ck_swiglu_backend,
+        ck_loss_backend=args.ck_loss_backend,
+        drift_localize_step=args.drift_localize_step,
+        drift_localize_tol=args.drift_localize_tol,
+        drift_localize_source=args.drift_localize_source,
+        epoch_snapshot_every=args.epoch_snapshot_every,
+        epoch_snapshot_topk=args.epoch_snapshot_topk,
     )
 
     print("=" * 100)
@@ -833,11 +1438,40 @@ def main() -> int:
     print("=" * 100)
     print(f"epochs={stats.epochs} seq_len={stats.seq_len} total_tokens={stats.total_tokens} "
           f"grad_accum={stats.grad_accum} optimizer={stats.optimizer} lr={stats.lr}")
+    print(
+        f"ck-kernel-backends: rmsnorm={args.ck_rmsnorm_backend} "
+        f"swiglu={args.ck_swiglu_backend} loss={args.ck_loss_backend}"
+    )
     print(f"micro_steps={stats.micro_steps} optimizer_steps={stats.steps} tokens_per_update={stats.tokens_per_update}")
     print(f"max_loss_abs_diff={stats.max_loss_abs_diff:.3e} mean_loss_abs_diff={stats.mean_loss_abs_diff:.3e}")
     print(f"final_ck_loss={stats.final_ck_loss:.6f} final_torch_loss={stats.final_torch_loss:.6f}")
     print(f"final_param_max_abs_diff={stats.final_param_max_abs_diff:.3e} "
           f"final_param_mean_abs_diff={stats.final_param_mean_abs_diff:.3e}")
+    if stats.drift_diagnostics:
+        print(
+            "drift: "
+            f"first_loss_fail_step={stats.drift_diagnostics.get('first_loss_fail_step')} "
+            f"first_param_fail_step={stats.drift_diagnostics.get('first_param_fail_step')} "
+            f"max_logit_abs_diff={stats.drift_diagnostics.get('max_logit_abs_diff', 0.0):.3e} "
+            f"max_grad_abs_diff={stats.drift_diagnostics.get('max_grad_abs_diff', 0.0):.3e}"
+        )
+        localize = stats.drift_diagnostics.get("localize_step_report")
+        if isinstance(localize, dict) and localize:
+            stage_max = localize.get("stage_max_global") if isinstance(localize.get("stage_max_global"), dict) else {}
+            top_stage = None
+            top_val = -1.0
+            for k, v in stage_max.items():
+                fv = float(v)
+                if fv > top_val:
+                    top_stage = k
+                    top_val = fv
+            print(
+                "localize: "
+                f"step={localize.get('target_step')} "
+                f"source={localize.get('same_state_source')} "
+                f"first_stage_over_tol={localize.get('first_stage_over_tol')} "
+                f"top_stage={top_stage}({max(top_val, 0.0):.3e})"
+            )
     print("PARITY:", "PASS" if stats.pass_parity else "FAIL")
     print("=" * 100)
 

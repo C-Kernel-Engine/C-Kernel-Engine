@@ -187,8 +187,8 @@ def _train_dims(config: Dict[str, Any]) -> Dict[str, int]:
     num_heads = _cfg_int(config, ["num_heads"], 1)
     num_kv_heads = _cfg_int(config, ["num_kv_heads"], num_heads)
     head_dim = _cfg_int(config, ["head_dim"], max(1, d_model // max(1, num_heads)))
-    # Runtime currently consumes one token per ck_train_step call.
-    token_count = 1
+    # Runtime token count is compile-time today; default 1 for legacy parity.
+    token_count = _cfg_int(config, ["train_tokens", "tokens", "seq_len"], 1)
     q_dim = max(1, num_heads * head_dim)
     kv_dim = max(1, num_kv_heads * head_dim)
     gate_up_dim = max(1, 2 * hidden)
@@ -323,6 +323,8 @@ def build_ir1_train(
     if num_layers <= 0:
         raise RuntimeError("Invalid num_layers in manifest/config")
 
+    token_count = int(_train_dims(config).get("tokens", 1) or 1)
+
     template = _choose_template(manifest, explicit_template=None)
     header_ops, body_ops, footer_ops = _template_sections(template)
     weight_index = _manifest_weight_index(manifest)
@@ -344,8 +346,8 @@ def build_ir1_train(
         "requires_grad": False,
         "persistent": False,
         "producer": None,
-        "shape": [1],
-        "numel": 1,
+        "shape": [token_count],
+        "numel": token_count,
     }
     tensors["input.targets"] = {
         "dtype": "int32",
@@ -353,8 +355,8 @@ def build_ir1_train(
         "requires_grad": False,
         "persistent": False,
         "producer": None,
-        "shape": [1],
-        "numel": 1,
+        "shape": [token_count],
+        "numel": token_count,
     }
 
     def next_instance(op_name: str, layer: int, section: str) -> int:
@@ -902,6 +904,7 @@ def main() -> int:
     ap.add_argument("--output", required=True, help="Output ir1_train_forward.json")
     ap.add_argument("--grad-rules", default=str(DEFAULT_GRAD_RULES_PATH), help="grad_rules_v7.json path")
     ap.add_argument("--max-layers", type=int, default=None, help="Optional cap for fast smoke runs")
+    ap.add_argument("--tokens", type=int, default=1, help="Compile-time token count for train IR/runtime (default: 1)")
     ap.add_argument("--strict", action="store_true", help="Fail on unresolved weights/save-for-backward")
     ap.add_argument("--report-out", default=None, help="Optional report JSON path")
     args = ap.parse_args()
@@ -911,6 +914,9 @@ def main() -> int:
     grad_rules_path = Path(args.grad_rules)
 
     manifest = _load_json(manifest_path)
+    if not isinstance(manifest.get("config"), dict):
+        manifest["config"] = {}
+    manifest["config"]["train_tokens"] = max(1, int(args.tokens or 1))
     registry = _load_json(KERNEL_REGISTRY_PATH)
     bindings_doc = _load_json(KERNEL_BINDINGS_PATH)
     grad_rules = _load_json(grad_rules_path)

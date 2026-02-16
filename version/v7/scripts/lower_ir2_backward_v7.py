@@ -576,6 +576,24 @@ def synthesize_ir2_backward(
                     }
                 else:
                     aux_tensor = str(w.get("tensor") or ("aux.op%d.%s" % (int(fwd.get("op_id", -1)), out_name)))
+                    aux_shape: Optional[List[int]] = [activation_default_numel]
+                    aux_numel = activation_default_numel
+                    # Attention backward uses d_scores scratch with the same logical
+                    # footprint as saved attention weights [H, T, aligned_context_window].
+                    # Keep this sizing contract in IR2 so layout/codegen stay consistent.
+                    if out_name in ("d_scores", "dscores"):
+                        saved_attn = save_for_backward.get("attn_weights")
+                        if isinstance(saved_attn, dict):
+                            saved_tid = saved_attn.get("tensor")
+                            if isinstance(saved_tid, str) and saved_tid:
+                                saved_meta = tensors.get(saved_tid)
+                                if isinstance(saved_meta, dict):
+                                    saved_shape = saved_meta.get("shape")
+                                    if isinstance(saved_shape, list) and saved_shape:
+                                        aux_shape = saved_shape
+                                saved_numel = _tensor_numel(tensors, saved_tid)
+                                if isinstance(saved_numel, int) and saved_numel > 0:
+                                    aux_numel = saved_numel
                     _ensure_tensor(
                         tensors,
                         tensor_id=aux_tensor,
@@ -584,8 +602,8 @@ def synthesize_ir2_backward(
                         requires_grad=False,
                         persistent=False,
                         producer={"op_id": next_op_id, "output_name": out_name},
-                        shape=[activation_default_numel],
-                        numel=activation_default_numel,
+                        shape=aux_shape,
+                        numel=aux_numel,
                     )
                     bwd_outputs[out_name] = {"tensor": aux_tensor, "kind": "aux"}
 
