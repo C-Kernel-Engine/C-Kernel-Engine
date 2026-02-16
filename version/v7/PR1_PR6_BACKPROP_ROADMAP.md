@@ -171,6 +171,11 @@ Scope:
 - Reduce backward buffer traffic hot spots (`grad_accumulate`, `memset`, `memmove`) without changing math.
 - Keep parity tolerances and gates unchanged during all optimization work.
 
+Incremental status (2026-02-15):
+- Step 1 scaffold landed: `train_exec_plan.json` is now generated from IR2 (`generate_train_exec_plan_v7.py`).
+- Codegen consumes `--exec-plan` and records per-op dispatch metadata in generated C comments/summary.
+- Numeric kernel contracts remain IR-driven (plan metadata is advisory; not allowed to override backward GEMM contract dims).
+
 Exit criteria:
 - CK throughput improves on the same train config with parity still passing.
 - `--backend ck --parity-on --parity-replay-on-check` remains green.
@@ -200,6 +205,57 @@ Goal: complete operator workflow from run-dir only.
 Exit criteria:
 - One command sequence: init/train/parity/profile/generate report from same run-dir.
 - Viewer tabs show populated training artifacts without manual copying.
+
+---
+
+
+## PR7 - C-First Operator Runtime (CK Dominant Path)
+Goal: make native CK runtime the default control plane for inference + training + profiling, with Python reduced to setup/oracle utilities.
+
+Operator direction:
+- Primary runtime path is native C (`ck-cli-v7` + generated runtimes).
+- Same run-dir contract for inference and training artifacts.
+- Python remains for:
+  - model download/conversion/bootstrap,
+  - IR generation/codegen orchestration,
+  - optional PyTorch oracle parity path.
+
+Scope:
+- Add native CLI subcommands for operator workflows:
+  - `init` (run-dir creation + IR/codegen trigger),
+  - `infer` (native inference),
+  - `train` (native CK training runtime),
+  - `profile` (perf/vtune/advisor capture),
+  - `report-index` (emit artifact manifest for viewer).
+- Emit canonical `run_index.json` from native path with stable artifact pointers.
+- Keep `open_ir_visualizer.py` as optional pack/render helper; do not require it to run workloads.
+- Keep parity and safety gates intact (`--train-strict`, canary/memory diagnostics, replay checks).
+
+C-direct profiling lane (required):
+- Add native `ck-train-v7` (or `ck-cli-v7 train`) runtime entry that executes generated `libtrain.so` directly from a run-dir.
+- Profile this native entry with `perf`/`vtune`/`advisor` (target process must be C runtime, not Python wrapper).
+- Keep Python for prepare/oracle only (download/convert/IR/codegen/oracle replay), not hot-loop execution profiling.
+
+Exit criteria:
+- End-to-end inference and CK training can be launched without Python runtime loops.
+- Profiling artifacts (perf/flamegraph/vtune/advisor summaries) are generated from native operator commands.
+- Viewer can load a run via `run_index.json` with no manual file copying.
+- Python is no longer in the critical serving/training execution path (except optional oracle checks).
+- VTune/Advisor reference commands point at native CK train/infer binaries directly.
+
+Non-goal for this PR:
+- Removing Python from model download/format conversion and IR/codegen utilities.
+
+PR7 Checklist (Operator-Centric):
+
+| Item | Owner | Status | Target Command | Primary Artifact |
+|---|---|---|---|---|
+| Native `ck-cli-v7 train` subcommand (run-dir + libtrain) | v7 runtime | pending | `./build/ck-cli-v7 train --run /tmp/v7_run ...` | `train_e2e_latest.json` |
+| Native `ck-cli-v7 profile` subcommand | v7 perf | pending | `./build/ck-cli-v7 profile --run /tmp/v7_run --tool perf` | `profile_summary.json`, `perf_stat_summary.json` |
+| Native `ck-cli-v7 init` subcommand glue (prepare + validate run-dir) | v7 tooling | pending | `./build/ck-cli-v7 init --run /tmp/v7_run ...` | `run_index.json` |
+| Canonical `run_index.json` producer from native path | v7 runtime | pending | `./build/ck-cli-v7 report-index --run /tmp/v7_run` | `run_index.json` |
+| Viewer first-load from `run_index.json` (primary contract) | v7 viewer | pending | `open_ir_visualizer.py --generate --run /tmp/v7_run --html-only` | `ir_report.html` |
+| C-direct VTune/Advisor runbook commands in docs | docs/perf | in_progress | `vtune ... ./build/ck-cli-v7 train ...` | docs page updates |
 
 ---
 
@@ -253,3 +309,165 @@ PR4.5 Throughput Track (next):
   - fallback source: `tiny_reference_harness` (telemetry-only, non-blocking).
 - Parity telemetry now records oracle source/strictness, logits slot metadata, and activation snapshot artifact paths.
 - Drift reports now include both weight snapshot and activation snapshot artifact links when dumps are enabled.
+
+### PR3.6 Update (Accumulation Scheduling)
+
+- CK runtime now compiles with explicit `CK_GRAD_ACCUM_STEPS` from CLI `--train-grad-accum`.
+- Generated `ck_train_step()` runs forward/backward every micro-step, but optimizer update only on accumulation boundary.
+- Runtime wrapper flushes pending accumulation at end-of-run (`ck_train_flush_optimizer`) so final checkpoints/metrics reflect all micro-steps.
+- Summary now reports both `micro_steps` and `optimizer_steps` to make schedule mismatches visible.
+- `gemm_backward_f32` runtime-call dims are now shape-derived (`[T,D]`, `[O,I]`) instead of numel-derived flattening; this fixes T>1 full-C crashes caused by wrong `aligned_in/aligned_out` contracts.
+
+## PR3.6 Drift Diagnostics Status (2026-02-16)
+
+Implemented now:
+- `train_parity_epochs_v7.py` emits optimizer-step diagnostics in JSON:
+  - `max_logit_diff`, `max_grad_diff`, `worst_grad_param`
+  - `max_exp_avg_diff`, `max_exp_avg_sq_diff`
+  - `first_loss_fail_step`, `first_param_fail_step` in `drift_diagnostics`
+- Kernel-isolation toggles are available in parity harness:
+  - `--ck-rmsnorm-backend {c,torch}`
+  - `--ck-swiglu-backend {c,torch}`
+  - `--ck-loss-backend {c,torch}`
+
+Measured attribution (AdamW, seq=8, total_tokens=4096, grad_accum=8, max_steps=70):
+- all C (`rmsnorm=c, swiglu=c, loss=c`): first loss fail at step ~65
+- only `swiglu` in C: largest drift contribution (earliest fail / highest grad+logit drift)
+- only `rmsnorm` in C: smaller but still non-zero contribution
+- all torch reference: exact parity (0 drift)
+
+Current caveats:
+- Long-horizon AdamW parity for full C micro-stack is not yet within strict tolerance at large-step windows.
+- Full automatic first-divergence localization to IR op ID in the *PyTorch parity harness* is still partial.
+- Snapshot-oracle + generated runtime path has stronger diagnostics, but cross-harness convergence criteria still need unification.
+
+PR3.6 gate wiring update (2026-02-16):
+- Added `make v7-train-parity-drift-smoke` (default max_steps=70) for deterministic long-horizon drift detection.
+- Added `make v7-train-parity-long-horizon` for full-run parity drift checks.
+- `v7-gate-train` now runs drift-smoke by default (`V7_GATE_WITH_LONG_HORIZON_PARITY=1`).
+- `make test` now runs drift-smoke by default (`CK_TEST_WITH_V7_LONG_HORIZON=1`).
+- Current expected status: drift-smoke FAIL at ~step 65 on full C micro-stack until remaining long-horizon drift is fixed.
+
+---
+
+## PR8 - Long-Horizon Parity Gate Strategy (Stress + Realistic)
+Goal: make long-horizon parity actionable by separating pathological stress from realistic blocker gates.
+
+Why this PR:
+- `Hello!` repeated-token stress reveals worst-case accumulation behavior quickly (first drift around step ~65 in AdamW `lr=1e-3`).
+- Realistic/diverse text tracks production behavior better and already runs significantly longer before drift (loss parity can remain clean to 1000 steps).
+
+Scope:
+- Keep two explicit long-horizon tracks:
+  - `stress_hello`: repeated tiny-text stress; expected to be harsh and non-blocking at first.
+  - `realistic_long`: diverse text corpus; main blocking nightly gate.
+- Add stable run configs in Make variables for both tracks (text, step budget, tolerances).
+- Record both loss and parameter first-fail steps in artifacts:
+  - `first_loss_fail_step`
+  - `first_param_fail_step`
+- Emit a compact verdict matrix in report JSON:
+  - `stress_hello`: pass/warn/fail
+  - `realistic_long`: pass/fail (blocking)
+
+Proposed gate policy:
+- Nightly BLOCKER:
+  - `realistic_long` at >=300 steps must pass.
+- Nightly NON-BLOCKING monitor:
+  - `stress_hello` (track first-fail movement trend).
+- Promotion target:
+  - raise blocker from 300 -> 600 -> 1000 as drift is reduced.
+
+Measured baseline (2026-02-16):
+- `Hello!`, AdamW, `lr=1e-3`: loss drift starts ~65.
+- Diverse text, AdamW, `lr=1e-3`, 300 steps: pass.
+- Diverse text, AdamW, `lr=1e-3`, 1000 steps: loss passes, param drift first fails at ~468.
+
+Exit criteria:
+- Realistic blocker gate is green at configured horizon (initially 300).
+- Stress gate is tracked with trendline and does not block merges.
+- CI/nightly artifacts include both first-fail metrics and max diffs.
+
+Status (2026-02-16):
+- Implemented in `Makefile`:
+  - `v7-train-parity-long-horizon-realistic` (realistic text, `max-steps=320` blocker)
+  - `v7-backprop-long-epoch-nightly` now runs:
+    1) realistic blocker (blocking)
+    2) hello stress monitor (non-blocking)
+- Verified pass at stable config (`lr=5e-4`):
+  - realistic blocker: PASS
+  - hello stress monitor: PASS
+
+---
+
+## PR9 - Full-C Cross-Entropy Tightening (Long-Run Drift)
+Goal: eliminate or push out long-horizon parameter drift caused by full-C CE path under strict parity.
+
+Why this PR:
+- With all-C kernels on diverse text at `lr=1e-3`, 1000-step run can fail on parameter tolerance around step ~468.
+- Replacing only CE path with torch (`--ck-loss-backend torch`) passes full 1000-step loss+param parity.
+- This isolates remaining long-run drift primarily to the C CE/autograd integration path.
+
+Scope:
+- Tighten `CCrossEntropyFn` and CE gradient ownership/lifetime semantics in parity harness.
+- Tighten `softmax_cross_entropy_loss` numerical path to match Torch reduction/order semantics as closely as possible.
+- Add CE-focused long-horizon diagnostics:
+  - per-step CE loss delta trend,
+  - CE gradient max/mean delta trend,
+  - worst-token CE contribution diff.
+- Add CE stress unit/integration coverage:
+  - extreme logit ranges,
+  - repeated-token windows,
+  - long-horizon optimizer windows.
+
+Implementation notes:
+- Preserve existing kernel API; prefer strict-mode branch refinements before introducing new kernels.
+- Keep codegen dumb; CE math/order fixes belong in kernel + harness contract, not in generated scheduling logic.
+
+Exit criteria:
+- Full-C path (`rmsnorm=c, swiglu=c, loss=c`) passes realistic 1000-step parity at current tolerances.
+- `first_param_fail_step` is eliminated (or moved beyond configured long-horizon gate target).
+- CE-specific diagnostics are emitted and stable in nightly.
+
+Status (2026-02-16):
+- Re-verified isolation matrix at `lr=1e-3` (`Hello!`, 192 optimizer steps):
+  - all torch: exact PASS
+  - all C: FAIL in stress window (`first_loss_fail_step` typically ~65-114, `first_param_fail_step` ~177)
+  - mixed backends can fail earlier than all-C, indicating cumulative-path sensitivity
+    rather than a single isolated CE-only defect.
+- Current priority remains long-run numerical tightening across strict C path; keep
+  realistic blocker green while tracking stress trend movement.
+- Added `make v7-train-parity-drift-localize` to emit same-state stage localization
+  around target step (`drift-localize-step`, default 65) for reproducible root-cause triage.
+
+---
+
+## Near-Term Command Matrix (PR8/PR9)
+
+```bash
+# Stress monitor (non-blocking)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 6 --seq-len 8 --total-tokens 32768 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --train-text "Hello!" \
+  --max-steps 300 --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c
+
+# Realistic blocker (initially 300)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 6 --seq-len 8 --total-tokens 32768 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 \
+  --train-text "the quick brown fox jumps over the lazy dog. this is a longer corpus line for parity stability checks." \
+  --max-steps 300 --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c
+
+# CE isolation proof (target state reference)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 8 --seq-len 8 --total-tokens 131072 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 \
+  --train-text "the quick brown fox jumps over the lazy dog. this is a longer corpus line for parity stability checks." \
+  --max-steps 1000 --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend torch
+```
+
+### PR9 Progress Update (2026-02-16, later run)
+- Re-ran stress localization with strict kernels: early step-65 drift no longer reproduces.
+- Current stress signature moved right: `first_param_fail_step ~= 800` (`Hello!`, AdamW, `lr=1e-3`, 1000 steps), with `first_loss_fail_step=None`.
+- Same run with only `--ck-loss-backend torch` passes to 1000 steps at current tolerances.
+- Same run with SGD (all-C kernels) passes to 1000 steps.
+- Added per-epoch parity snapshots (`epoch_snapshots`) in `train_parity_epochs_v7.py` to track drift growth trends and top-K parameter deltas across horizon.

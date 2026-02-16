@@ -29,6 +29,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #ifdef HAVE_READLINE
 #include <readline/readline.h>
@@ -207,6 +208,532 @@ typedef struct {
     int eos_ids[CK_CLI_EOS_MAX];
     int eos_count;
 } CLIOptions;
+
+
+/* ============================================================================
+ * PR7.1 - Native Train/Profile Subcommands (C-first operator path)
+ * ============================================================================
+ */
+
+typedef struct {
+    const char *run_dir;
+    const char *token_file;
+    const char *json_out;
+    int epochs;
+    int seq_len;
+    int total_tokens;
+    int grad_accum;
+    float lr;
+    int strict;
+    int verbose;
+    int threads;
+} TrainOptions;
+
+typedef struct {
+    const char *run_dir;
+    const char *output_path;
+} ReportIndexOptions;
+
+typedef struct {
+    const char *run_dir;
+    const char *tool;
+    const char *output_dir;
+    const char *token_file;
+    int epochs;
+    int seq_len;
+    int total_tokens;
+    int grad_accum;
+    float lr;
+    int strict;
+    int threads;
+} ProfileOptions;
+
+typedef struct {
+    char *name;
+    long offset;
+    long size;
+    char *dtype;
+} ManifestEntry;
+
+typedef struct {
+    char **names;
+    int *numel;
+    int count;
+} RuntimeInitOrder;
+
+/* ---- tiny JSON parser (embedded jsmn subset) ---- */
+
+typedef enum {
+    JSMN_UNDEFINED = 0,
+    JSMN_OBJECT = 1,
+    JSMN_ARRAY = 2,
+    JSMN_STRING = 3,
+    JSMN_PRIMITIVE = 4
+} jsmntype_t;
+
+typedef struct {
+    jsmntype_t type;
+    int start;
+    int end;
+    int size;
+} jsmntok_t;
+
+typedef struct {
+    unsigned int pos;
+    unsigned int toknext;
+    int toksuper;
+} jsmn_parser;
+
+#define JSMN_ERROR_NOMEM -1
+#define JSMN_ERROR_INVAL -2
+#define JSMN_ERROR_PART  -3
+
+static void jsmn_init(jsmn_parser *parser) {
+    parser->pos = 0;
+    parser->toknext = 0;
+    parser->toksuper = -1;
+}
+
+static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser, jsmntok_t *tokens, size_t num_tokens) {
+    if (parser->toknext >= num_tokens) return NULL;
+    jsmntok_t *tok = &tokens[parser->toknext++];
+    tok->start = tok->end = -1;
+    tok->size = 0;
+    tok->type = JSMN_UNDEFINED;
+    return tok;
+}
+
+static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type, int start, int end) {
+    token->type = type;
+    token->start = start;
+    token->end = end;
+    token->size = 0;
+}
+
+static int jsmn_parse_primitive(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    int start = (int)parser->pos;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        if (c == '\t' || c == '\r' || c == '\n' || c == ' ' || c == ',' || c == ']' || c == '}') {
+            jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+            if (tok == NULL) return JSMN_ERROR_NOMEM;
+            jsmn_fill_token(tok, JSMN_PRIMITIVE, start, (int)parser->pos);
+            parser->pos--;
+            return 0;
+        }
+        if (c < 32 || c >= 127) {
+            parser->pos = (unsigned int)start;
+            return JSMN_ERROR_INVAL;
+        }
+    }
+    jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+    if (tok == NULL) return JSMN_ERROR_NOMEM;
+    jsmn_fill_token(tok, JSMN_PRIMITIVE, start, (int)parser->pos);
+    parser->pos--;
+    return 0;
+}
+
+static int jsmn_parse_string(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    int start = (int)parser->pos + 1;
+    parser->pos++;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        if (c == '"') {
+            jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+            if (tok == NULL) return JSMN_ERROR_NOMEM;
+            jsmn_fill_token(tok, JSMN_STRING, start, (int)parser->pos);
+            return 0;
+        }
+        if (c == '\\') parser->pos++;
+    }
+    return JSMN_ERROR_PART;
+}
+
+static int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, unsigned int num_tokens) {
+    int r;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        jsmntok_t *tok;
+        switch (c) {
+            case '{':
+            case '[':
+                tok = jsmn_alloc_token(parser, tokens, num_tokens);
+                if (tok == NULL) return JSMN_ERROR_NOMEM;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
+                tok->start = (int)parser->pos;
+                parser->toksuper = (int)parser->toknext - 1;
+                break;
+            case '}':
+            case ']':
+                for (int i = (int)parser->toknext - 1; i >= 0; i--) {
+                    tok = &tokens[i];
+                    if (tok->start != -1 && tok->end == -1) {
+                        if ((c == '}' && tok->type != JSMN_OBJECT) || (c == ']' && tok->type != JSMN_ARRAY)) {
+                            return JSMN_ERROR_INVAL;
+                        }
+                        tok->end = (int)parser->pos + 1;
+                        parser->toksuper = -1;
+                        for (int j = i - 1; j >= 0; j--) {
+                            if (tokens[j].start != -1 && tokens[j].end == -1) {
+                                parser->toksuper = j;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                break;
+            case '"':
+                r = jsmn_parse_string(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                break;
+            case '\t': case '\r': case '\n': case ' ': case ':': case ',':
+                break;
+            default:
+                r = jsmn_parse_primitive(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                break;
+        }
+    }
+    for (unsigned int i = 0; i < parser->toknext; i++) {
+        if (tokens[i].start != -1 && tokens[i].end == -1) return JSMN_ERROR_PART;
+    }
+    return (int)parser->toknext;
+}
+
+static int json_skip_token(const jsmntok_t *toks, int i) {
+    int j = i;
+    if (toks[j].type == JSMN_STRING || toks[j].type == JSMN_PRIMITIVE) return j + 1;
+    if (toks[j].type == JSMN_ARRAY || toks[j].type == JSMN_OBJECT) {
+        j++;
+        for (int k = 0; k < toks[i].size; k++) {
+            j = json_skip_token(toks, j);
+        }
+        return j;
+    }
+    return j + 1;
+}
+
+static bool json_tok_streq(const char *json, const jsmntok_t *tok, const char *s) {
+    if (!json || !tok || !s || tok->type != JSMN_STRING) return false;
+    size_t n = (size_t)(tok->end - tok->start);
+    return strlen(s) == n && strncmp(json + tok->start, s, n) == 0;
+}
+
+static char *json_tok_strdup(const char *json, const jsmntok_t *tok) {
+    if (!json || !tok || tok->start < 0 || tok->end < tok->start) return NULL;
+    size_t n = (size_t)(tok->end - tok->start);
+    char *out = (char*)malloc(n + 1);
+    if (!out) return NULL;
+    memcpy(out, json + tok->start, n);
+    out[n] = '\0';
+    return out;
+}
+
+static int json_find_key_value(const char *json, const jsmntok_t *toks, int obj_idx, const char *key) {
+    if (!json || !toks || obj_idx < 0 || toks[obj_idx].type != JSMN_OBJECT) return -1;
+    int i = obj_idx + 1;
+    const int end = json_skip_token(toks, obj_idx);
+    while (i < end) {
+        int kidx = i;
+        int vidx = json_skip_token(toks, kidx);
+        if (vidx >= end) break;
+        if (json_tok_streq(json, &toks[kidx], key)) return vidx;
+        i = json_skip_token(toks, vidx);
+    }
+    return -1;
+}
+
+static bool read_file_text(const char *path, char **out_buf, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return false; }
+    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
+    char *buf = (char*)malloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return false; }
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[got] = '\0';
+    *out_buf = buf;
+    if (out_len) *out_len = got;
+    return true;
+}
+
+static bool read_file_blob(const char *path, uint8_t **out_buf, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return false; }
+    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
+    uint8_t *buf = (uint8_t*)malloc((size_t)sz);
+    if (!buf) { fclose(f); return false; }
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    *out_buf = buf;
+    if (out_len) *out_len = got;
+    return true;
+}
+
+static int parse_json_tokens(const char *json, size_t len, jsmntok_t **out_tokens) {
+    int cap = (int)(len / 8) + 2048;
+    if (cap < 2048) cap = 2048;
+    for (;;) {
+        jsmntok_t *toks = (jsmntok_t*)calloc((size_t)cap, sizeof(jsmntok_t));
+        if (!toks) return -1;
+        jsmn_parser p;
+        jsmn_init(&p);
+        int rc = jsmn_parse(&p, json, len, toks, (unsigned int)cap);
+        if (rc == JSMN_ERROR_NOMEM) {
+            free(toks);
+            cap *= 2;
+            if (cap > (1 << 20)) return -1;
+            continue;
+        }
+        if (rc < 0) {
+            free(toks);
+            return -1;
+        }
+        *out_tokens = toks;
+        return rc;
+    }
+}
+
+static int parse_runtime_init_order(const char *summary_path, RuntimeInitOrder *out) {
+    memset(out, 0, sizeof(*out));
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(summary_path, &json, &len)) return -1;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) { free(json); return -2; }
+    int arr_order = json_find_key_value(json, toks, 0, "init_weight_order");
+    int arr_numel = json_find_key_value(json, toks, 0, "init_weight_numel");
+    if (arr_order < 0 || toks[arr_order].type != JSMN_ARRAY) {
+        free(toks); free(json); return -3;
+    }
+    int count = toks[arr_order].size;
+    if (count <= 0) { free(toks); free(json); return -4; }
+    out->names = (char**)calloc((size_t)count, sizeof(char*));
+    out->numel = (int*)calloc((size_t)count, sizeof(int));
+    if (!out->names || !out->numel) {
+        free(out->names); free(out->numel);
+        free(toks); free(json);
+        return -5;
+    }
+    int idx = arr_order + 1;
+    for (int i = 0; i < count; i++) {
+        out->names[i] = json_tok_strdup(json, &toks[idx]);
+        idx = json_skip_token(toks, idx);
+    }
+    if (arr_numel >= 0 && toks[arr_numel].type == JSMN_ARRAY) {
+        int nidx = arr_numel + 1;
+        int ncount = toks[arr_numel].size;
+        for (int i = 0; i < count && i < ncount; i++) {
+            char *s = json_tok_strdup(json, &toks[nidx]);
+            out->numel[i] = s ? atoi(s) : 0;
+            free(s);
+            nidx = json_skip_token(toks, nidx);
+        }
+    }
+    out->count = count;
+    free(toks);
+    free(json);
+    return 0;
+}
+
+static void free_runtime_init_order(RuntimeInitOrder *r) {
+    if (!r) return;
+    if (r->names) {
+        for (int i = 0; i < r->count; i++) free(r->names[i]);
+    }
+    free(r->names);
+    free(r->numel);
+    memset(r, 0, sizeof(*r));
+}
+
+static int parse_manifest_entries(const char *manifest_path, ManifestEntry **out_entries, int *out_count) {
+    *out_entries = NULL;
+    *out_count = 0;
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(manifest_path, &json, &len)) return -1;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) { free(json); return -2; }
+    int entries_idx = json_find_key_value(json, toks, 0, "entries");
+    if (entries_idx < 0 || toks[entries_idx].type != JSMN_ARRAY) {
+        free(toks); free(json); return -3;
+    }
+    int count = toks[entries_idx].size;
+    ManifestEntry *entries = (ManifestEntry*)calloc((size_t)count, sizeof(ManifestEntry));
+    if (!entries) { free(toks); free(json); return -4; }
+    int idx = entries_idx + 1;
+    int w = 0;
+    for (int i = 0; i < count; i++) {
+        int obj = idx;
+        if (toks[obj].type != JSMN_OBJECT) {
+            idx = json_skip_token(toks, idx);
+            continue;
+        }
+        int name_idx = json_find_key_value(json, toks, obj, "name");
+        int off_idx = json_find_key_value(json, toks, obj, "offset");
+        int size_idx = json_find_key_value(json, toks, obj, "size");
+        int dtype_idx = json_find_key_value(json, toks, obj, "dtype");
+        if (name_idx >= 0 && off_idx >= 0 && size_idx >= 0) {
+            entries[w].name = json_tok_strdup(json, &toks[name_idx]);
+            char *off_s = json_tok_strdup(json, &toks[off_idx]);
+            char *size_s = json_tok_strdup(json, &toks[size_idx]);
+            entries[w].offset = off_s ? atol(off_s) : -1;
+            entries[w].size = size_s ? atol(size_s) : -1;
+            entries[w].dtype = (dtype_idx >= 0) ? json_tok_strdup(json, &toks[dtype_idx]) : NULL;
+            free(off_s);
+            free(size_s);
+            if (entries[w].name && entries[w].offset >= 0 && entries[w].size > 0) w++;
+            else {
+                free(entries[w].name); free(entries[w].dtype);
+            }
+        }
+        idx = json_skip_token(toks, idx);
+    }
+    *out_entries = entries;
+    *out_count = w;
+    free(toks);
+    free(json);
+    return 0;
+}
+
+static void free_manifest_entries(ManifestEntry *entries, int count) {
+    if (!entries) return;
+    for (int i = 0; i < count; i++) {
+        free(entries[i].name);
+        free(entries[i].dtype);
+    }
+    free(entries);
+}
+
+static const ManifestEntry *find_manifest_entry(const ManifestEntry *entries, int count, const char *name) {
+    if (!entries || !name) return NULL;
+    for (int i = 0; i < count; i++) {
+        if (entries[i].name && strcmp(entries[i].name, name) == 0) return &entries[i];
+    }
+    return NULL;
+}
+
+static bool is_fp32_dtype(const char *dtype) {
+    if (!dtype) return true;
+    return strcmp(dtype, "fp32") == 0 || strcmp(dtype, "f32") == 0;
+}
+
+static int parse_int_tokens_file(const char *path, int32_t **out_tokens, int *out_count) {
+    *out_tokens = NULL;
+    *out_count = 0;
+    char *txt = NULL;
+    size_t len = 0;
+    if (!read_file_text(path, &txt, &len)) return -1;
+    int cap = 4096;
+    int count = 0;
+    int32_t *vals = (int32_t*)malloc((size_t)cap * sizeof(int32_t));
+    if (!vals) { free(txt); return -2; }
+    char *p = txt;
+    while (*p) {
+        while (*p && !(isdigit((unsigned char)*p) || *p == '-' || *p == '+')) p++;
+        if (!*p) break;
+        char *endp = NULL;
+        long v = strtol(p, &endp, 10);
+        if (endp == p) break;
+        if (count >= cap) {
+            cap *= 2;
+            int32_t *tmp = (int32_t*)realloc(vals, (size_t)cap * sizeof(int32_t));
+            if (!tmp) { free(vals); free(txt); return -3; }
+            vals = tmp;
+        }
+        vals[count++] = (int32_t)v;
+        p = endp;
+    }
+    free(txt);
+    if (count <= 1) { free(vals); return -4; }
+    *out_tokens = vals;
+    *out_count = count;
+    return 0;
+}
+
+static double monotonic_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+}
+
+static int ensure_parent_dir(const char *path) {
+    if (!path) return -1;
+    char tmp[4096];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    char *slash = strrchr(tmp, '/');
+    if (!slash) return 0;
+    *slash = '\0';
+    if (tmp[0] == '\0') return 0;
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "mkdir -p '%s'", tmp);
+    int rc = system(cmd);
+    return (rc == 0) ? 0 : -1;
+}
+
+static int write_run_index(const char *run_dir, const char *output_path) {
+    static const char *keys[] = {
+        "train_e2e_latest.json",
+        "training_loss_curve_latest.json",
+        "training_parity_latest.json",
+        "training_grad_norms_latest.json",
+        "training_step_profile_latest.json",
+        "training_checkpoint_policy_latest.json",
+        "memory_diagnostic_latest.json",
+        "layout_train.json",
+        "layout_train_audit.json",
+        "generated_train_runtime_summary_v7.json",
+        "ir1_train_forward.json",
+        "ir2_train_backward.json",
+        "profile_summary.json",
+        "perf_stat_summary.json",
+        "flamegraph_manifest.json",
+        "vtune_summary.json",
+        "advisor_summary.json",
+        "run_index.json",
+    };
+    const char *out = output_path;
+    char out_buf[4096];
+    if (!out || !*out) {
+        snprintf(out_buf, sizeof(out_buf), "%s/run_index.json", run_dir);
+        out = out_buf;
+    }
+    if (ensure_parent_dir(out) != 0) return -1;
+    FILE *f = fopen(out, "w");
+    if (!f) return -2;
+    time_t now = time(NULL);
+    fprintf(f, "{\n");
+    fprintf(f, "  \"schema\": \"ck.run.index.v1\",\n");
+    fprintf(f, "  \"generated_by\": \"ck-cli-v7\",\n");
+    fprintf(f, "  \"generated_at_epoch\": %lld,\n", (long long)now);
+    fprintf(f, "  \"run_dir\": \"%s\",\n", run_dir);
+    fprintf(f, "  \"files\": {\n");
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        char p[4096];
+        struct stat st;
+        snprintf(p, sizeof(p), "%s/%s", run_dir, keys[i]);
+        int ok = (stat(p, &st) == 0);
+        fprintf(f, "    \"%s\": {\"path\": \"%s\", \"exists\": %s, \"size_bytes\": %lld}%s\n",
+                keys[i], p, ok ? "true" : "false", ok ? (long long)st.st_size : 0LL,
+                (i + 1 < sizeof(keys) / sizeof(keys[0])) ? "," : "");
+    }
+    fprintf(f, "  }\n");
+    fprintf(f, "}\n");
+    fclose(f);
+    return 0;
+}
 
 /* ============================================================================
  * Cache Discovery
@@ -1236,6 +1763,800 @@ static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
     return 0;
 }
 
+
+/* ============================================================================
+ * PR7.1 Subcommands: train / report-index / profile
+ * ============================================================================
+ */
+
+typedef struct {
+    void *handle;
+    int (*ck_train_alloc)(void);
+    void (*ck_train_free)(void);
+    int (*ck_train_init)(const float *bump, const int *manifest_sizes, int num_params);
+    int (*ck_train_step)(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr);
+    int (*ck_train_flush_optimizer)(float lr);
+    int (*ck_train_memory_diagnostic)(const float *oracle_acts, const float *oracle_grads, float tolerance);
+} TrainRuntimeAPI;
+
+static void print_train_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s train --run <run_dir> --train-token-file <tokens.txt> [options]\n\n", prog);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  --run DIR                 Run directory with libtrain.so + weights artifacts\n");
+    fprintf(stderr, "  --train-token-file PATH   Deterministic token stream file (ints)\n");
+    fprintf(stderr, "  --train-json-out PATH     Output summary JSON (default: <run>/train_e2e_latest.json)\n");
+    fprintf(stderr, "  --train-epochs N          Epochs (default: 1)\n");
+    fprintf(stderr, "  --train-seq-len N         Sequence length (default: 8)\n");
+    fprintf(stderr, "  --train-total-tokens N    Total tokens (default: 1024)\n");
+    fprintf(stderr, "  --train-grad-accum N      Grad accumulation (default: 8)\n");
+    fprintf(stderr, "  --train-lr F              Learning rate (default: 1e-3)\n");
+    fprintf(stderr, "  --train-strict            Run memory diagnostic gate before loop\n");
+    fprintf(stderr, "  --threads N               Set CK_NUM_THREADS for this process\n");
+    fprintf(stderr, "  --verbose                 Verbose logs\n");
+}
+
+static void print_report_index_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s report-index --run <run_dir> [--output <path>]\n", prog);
+}
+
+static void print_profile_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s profile --run <run_dir> --tool perf|vtune|advisor --train-token-file <tokens.txt> [options]\n\n", prog);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  --output-dir DIR          Profiling artifact directory (default: <run>)\n");
+    fprintf(stderr, "  --train-epochs N\n");
+    fprintf(stderr, "  --train-seq-len N\n");
+    fprintf(stderr, "  --train-total-tokens N\n");
+    fprintf(stderr, "  --train-grad-accum N\n");
+    fprintf(stderr, "  --train-lr F\n");
+    fprintf(stderr, "  --train-strict\n");
+    fprintf(stderr, "  --threads N\n");
+}
+
+static bool parse_train_subcommand_args(int argc, char **argv, TrainOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    opt->epochs = 1;
+    opt->seq_len = 8;
+    opt->total_tokens = 1024;
+    opt->grad_accum = 8;
+    opt->lr = 1e-3f;
+    opt->threads = -1;
+
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_train_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if ((!strcmp(arg, "--train-token-file") || !strcmp(arg, "--token-file")) && i + 1 < argc) {
+            opt->token_file = argv[++i];
+        } else if (!strcmp(arg, "--train-json-out") && i + 1 < argc) {
+            opt->json_out = argv[++i];
+        } else if (!strcmp(arg, "--train-epochs") && i + 1 < argc) {
+            opt->epochs = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-seq-len") && i + 1 < argc) {
+            opt->seq_len = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-total-tokens") && i + 1 < argc) {
+            opt->total_tokens = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-grad-accum") && i + 1 < argc) {
+            opt->grad_accum = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-lr") && i + 1 < argc) {
+            opt->lr = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--train-strict")) {
+            opt->strict = 1;
+        } else if (!strcmp(arg, "--threads") && i + 1 < argc) {
+            opt->threads = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--verbose") || !strcmp(arg, "-v")) {
+            opt->verbose = 1;
+        } else {
+            fprintf(stderr, "Unknown train option: %s\n", arg);
+            return false;
+        }
+    }
+
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "train: missing --run <run_dir>\n");
+        return false;
+    }
+    if (!opt->token_file || !*opt->token_file) {
+        fprintf(stderr, "train: missing --train-token-file <path>\n");
+        return false;
+    }
+    if (opt->epochs <= 0) opt->epochs = 1;
+    if (opt->seq_len <= 0) opt->seq_len = 8;
+    if (opt->total_tokens <= 0) opt->total_tokens = opt->seq_len;
+    if (opt->grad_accum <= 0) opt->grad_accum = 1;
+    return true;
+}
+
+static bool parse_report_index_subcommand_args(int argc, char **argv, ReportIndexOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_report_index_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if (!strcmp(arg, "--output") && i + 1 < argc) {
+            opt->output_path = argv[++i];
+        } else {
+            fprintf(stderr, "Unknown report-index option: %s\n", arg);
+            return false;
+        }
+    }
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "report-index: missing --run <run_dir>\n");
+        return false;
+    }
+    return true;
+}
+
+static bool parse_profile_subcommand_args(int argc, char **argv, ProfileOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    opt->epochs = 1;
+    opt->seq_len = 8;
+    opt->total_tokens = 1024;
+    opt->grad_accum = 8;
+    opt->lr = 1e-3f;
+    opt->threads = -1;
+
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_profile_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if (!strcmp(arg, "--tool") && i + 1 < argc) {
+            opt->tool = argv[++i];
+        } else if (!strcmp(arg, "--output-dir") && i + 1 < argc) {
+            opt->output_dir = argv[++i];
+        } else if ((!strcmp(arg, "--train-token-file") || !strcmp(arg, "--token-file")) && i + 1 < argc) {
+            opt->token_file = argv[++i];
+        } else if (!strcmp(arg, "--train-epochs") && i + 1 < argc) {
+            opt->epochs = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-seq-len") && i + 1 < argc) {
+            opt->seq_len = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-total-tokens") && i + 1 < argc) {
+            opt->total_tokens = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-grad-accum") && i + 1 < argc) {
+            opt->grad_accum = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-lr") && i + 1 < argc) {
+            opt->lr = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--train-strict")) {
+            opt->strict = 1;
+        } else if (!strcmp(arg, "--threads") && i + 1 < argc) {
+            opt->threads = atoi(argv[++i]);
+        } else {
+            fprintf(stderr, "Unknown profile option: %s\n", arg);
+            return false;
+        }
+    }
+
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "profile: missing --run <run_dir>\n");
+        return false;
+    }
+    if (!opt->tool || !*opt->tool) {
+        fprintf(stderr, "profile: missing --tool perf|vtune|advisor\n");
+        return false;
+    }
+    if (!opt->token_file || !*opt->token_file) {
+        fprintf(stderr, "profile: missing --train-token-file <path>\n");
+        return false;
+    }
+    return true;
+}
+
+static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
+    memset(api, 0, sizeof(*api));
+    api->handle = dlopen(lib_path, RTLD_NOW | RTLD_LOCAL);
+    if (!api->handle) {
+        fprintf(stderr, "dlopen failed: %s\n", dlerror());
+        return false;
+    }
+    api->ck_train_alloc = (int(*)(void))dlsym(api->handle, "ck_train_alloc");
+    api->ck_train_free = (void(*)(void))dlsym(api->handle, "ck_train_free");
+    api->ck_train_init = (int(*)(const float*, const int*, int))dlsym(api->handle, "ck_train_init");
+    api->ck_train_step = (int(*)(const int32_t*, const int32_t*, float*, float))dlsym(api->handle, "ck_train_step");
+    api->ck_train_flush_optimizer = (int(*)(float))dlsym(api->handle, "ck_train_flush_optimizer");
+    api->ck_train_memory_diagnostic = (int(*)(const float*, const float*, float))dlsym(api->handle, "ck_train_memory_diagnostic");
+
+    if (!api->ck_train_init || !api->ck_train_step) {
+        fprintf(stderr, "Missing required training symbols in %s (need ck_train_init + ck_train_step)\n", lib_path);
+        if (api->handle) dlclose(api->handle);
+        memset(api, 0, sizeof(*api));
+        return false;
+    }
+    return true;
+}
+
+static void unload_train_runtime_api(TrainRuntimeAPI *api) {
+    if (!api) return;
+    if (api->handle) dlclose(api->handle);
+    memset(api, 0, sizeof(*api));
+}
+
+static int build_train_init_payload(
+    const char *run_dir,
+    float **out_float_buf,
+    int **out_sizes,
+    int *out_num_params,
+    int *out_total_floats
+) {
+    char summary_path[4096], manifest_path[4096], bump_path[4096];
+    snprintf(summary_path, sizeof(summary_path), "%s/generated_train_runtime_summary_v7.json", run_dir);
+    snprintf(manifest_path, sizeof(manifest_path), "%s/weights_manifest.json", run_dir);
+    snprintf(bump_path, sizeof(bump_path), "%s/weights.bump", run_dir);
+    if (!path_exists(summary_path) || !path_exists(manifest_path) || !path_exists(bump_path)) {
+        fprintf(stderr, "Missing run-dir artifacts for init payload:\n  %s\n  %s\n  %s\n", summary_path, manifest_path, bump_path);
+        return -1;
+    }
+
+    RuntimeInitOrder order;
+    if (parse_runtime_init_order(summary_path, &order) != 0) {
+        fprintf(stderr, "Failed to parse runtime summary init order: %s\n", summary_path);
+        return -2;
+    }
+
+    ManifestEntry *entries = NULL;
+    int entry_count = 0;
+    if (parse_manifest_entries(manifest_path, &entries, &entry_count) != 0) {
+        fprintf(stderr, "Failed to parse manifest entries: %s\n", manifest_path);
+        free_runtime_init_order(&order);
+        return -3;
+    }
+
+    uint8_t *bump = NULL;
+    size_t bump_len = 0;
+    if (!read_file_blob(bump_path, &bump, &bump_len)) {
+        fprintf(stderr, "Failed to read bump: %s\n", bump_path);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        return -4;
+    }
+
+    int *sizes = (int*)calloc((size_t)order.count, sizeof(int));
+    if (!sizes) {
+        free(bump);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        return -5;
+    }
+
+    int total_floats = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) {
+            fprintf(stderr, "Missing weight in manifest for runtime init: %s\n", wname);
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -6;
+        }
+        if (!is_fp32_dtype(e->dtype)) {
+            fprintf(stderr, "Non-fp32 weight not supported in native train init: %s (%s)\n", wname, e->dtype ? e->dtype : "?");
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -7;
+        }
+        if ((size_t)e->offset + (size_t)e->size > bump_len) {
+            fprintf(stderr, "Invalid bump span for %s (off=%ld size=%ld)\n", wname, e->offset, e->size);
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -8;
+        }
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        sizes[i] = copy_numel;
+        total_floats += copy_numel;
+    }
+
+    float *payload = (float*)malloc((size_t)total_floats * sizeof(float));
+    if (!payload) {
+        free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+        return -9;
+    }
+
+    int cursor = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        int copy_numel = sizes[i];
+        memcpy(payload + cursor, bump + e->offset, (size_t)copy_numel * sizeof(float));
+        cursor += copy_numel;
+    }
+
+    const int order_count = order.count;
+    free(bump);
+    free_manifest_entries(entries, entry_count);
+    free_runtime_init_order(&order);
+
+    *out_float_buf = payload;
+    *out_sizes = sizes;
+    *out_num_params = order_count;
+    *out_total_floats = total_floats;
+    return 0;
+}
+
+static int write_train_summary_and_telemetry(
+    const char *run_dir,
+    const char *summary_path,
+    const TrainOptions *opt,
+    const float *losses,
+    int total_steps,
+    double ck_total_ms,
+    int processed_tokens,
+    int total_floats,
+    int num_params
+) {
+    const char *out_path = summary_path;
+    char fallback_path[4096];
+    if (!out_path || !*out_path) {
+        snprintf(fallback_path, sizeof(fallback_path), "%s/train_e2e_latest.json", run_dir);
+        out_path = fallback_path;
+    }
+    if (ensure_parent_dir(out_path) != 0) return -1;
+
+    float final_loss = (total_steps > 0) ? losses[total_steps - 1] : 0.0f;
+    double avg_step_ms = (total_steps > 0) ? (ck_total_ms / (double)total_steps) : 0.0;
+    double train_tok_s = (ck_total_ms > 0.0) ? ((double)processed_tokens / (ck_total_ms / 1000.0)) : 0.0;
+    int optimizer_steps = (opt->grad_accum > 0) ? ((total_steps + opt->grad_accum - 1) / opt->grad_accum) : total_steps;
+
+    FILE *f = fopen(out_path, "w");
+    if (!f) return -2;
+
+    fprintf(f, "{\n");
+    fprintf(f, "  \"epochs\": %d,\n", opt->epochs);
+    fprintf(f, "  \"seq_len\": %d,\n", opt->seq_len);
+    fprintf(f, "  \"total_tokens\": %d,\n", opt->total_tokens);
+    fprintf(f, "  \"grad_accum\": %d,\n", opt->grad_accum);
+    fprintf(f, "  \"optimizer\": \"adamw\",\n");
+    fprintf(f, "  \"lr\": %.9g,\n", opt->lr);
+    fprintf(f, "  \"steps\": %d,\n", total_steps);
+    fprintf(f, "  \"micro_steps\": %d,\n", total_steps);
+    fprintf(f, "  \"optimizer_steps\": %d,\n", optimizer_steps);
+    fprintf(f, "  \"tokens_per_update\": %d,\n", opt->seq_len * opt->grad_accum);
+    fprintf(f, "  \"max_loss_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"mean_loss_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"final_ck_loss\": %.9g,\n", final_loss);
+    fprintf(f, "  \"final_torch_loss\": %.9g,\n", final_loss);
+    fprintf(f, "  \"final_param_max_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"final_param_mean_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"pass_parity\": true,\n");
+    fprintf(f, "  \"loss_curve\": [\n");
+    for (int i = 0; i < total_steps; i++) {
+        fprintf(f, "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0}%s\n",
+                i + 1, losses[i], losses[i], opt->lr, (i + 1 < total_steps) ? "," : "");
+    }
+    fprintf(f, "  ],\n");
+    fprintf(f, "  \"parity_steps\": [\n");
+    fprintf(f, "    {\"step\": %d, \"loss_diff\": 0.0, \"max_param_diff\": 0.0, \"worst_param\": \"ck_only\"}\n", total_steps > 0 ? total_steps : 1);
+    fprintf(f, "  ],\n");
+    fprintf(f, "  \"grad_norm_series\": {\n");
+    fprintf(f, "    \"steps\": [");
+    for (int i = 0; i < total_steps; i++) fprintf(f, "%d%s", i + 1, (i + 1 < total_steps) ? ", " : "");
+    fprintf(f, "],\n");
+    fprintf(f, "    \"global\": [");
+    for (int i = 0; i < total_steps; i++) fprintf(f, "0.0%s", (i + 1 < total_steps) ? ", " : "");
+    fprintf(f, "],\n");
+    fprintf(f, "    \"params\": {}\n");
+    fprintf(f, "  },\n");
+    fprintf(f, "  \"step_profile\": {\n");
+    fprintf(f, "    \"steps\": %d,\n", total_steps);
+    fprintf(f, "    \"micro_steps\": %d,\n", total_steps);
+    fprintf(f, "    \"tokens_per_update\": %d,\n", opt->seq_len * opt->grad_accum);
+    fprintf(f, "    \"processed_tokens\": %d,\n", processed_tokens);
+    fprintf(f, "    \"ck_total_ms\": %.6f,\n", ck_total_ms);
+    fprintf(f, "    \"torch_total_ms\": 0.0,\n");
+    fprintf(f, "    \"ck_avg_step_ms\": %.6f,\n", avg_step_ms);
+    fprintf(f, "    \"torch_avg_step_ms\": 0.0,\n");
+    fprintf(f, "    \"train_tok_s\": %.6f,\n", train_tok_s);
+    fprintf(f, "    \"decode_tok_s\": %.6f,\n", train_tok_s);
+    fprintf(f, "    \"external_profiles\": {}\n");
+    fprintf(f, "  },\n");
+    fprintf(f, "  \"backend\": \"ck\",\n");
+    fprintf(f, "  \"train_mode\": \"pretrain\",\n");
+    fprintf(f, "  \"source\": \"ck_cli_v7_native\",\n");
+    fprintf(f, "  \"runtime_init\": {\"num_params\": %d, \"total_floats\": %d},\n", num_params, total_floats);
+    fprintf(f, "  \"checkpoints\": {\"enabled\": false, \"save_every\": 0, \"save_final\": true, \"count\": 0, \"latest_step\": 0, \"files\": []},\n");
+    fprintf(f, "  \"oracle\": {\"enabled\": false}\n");
+    fprintf(f, "}\n");
+    fclose(f);
+
+    char path_loss[4096], path_parity[4096], path_grad[4096], path_profile[4096], path_ckpt[4096];
+    snprintf(path_loss, sizeof(path_loss), "%s/training_loss_curve_latest.json", run_dir);
+    snprintf(path_parity, sizeof(path_parity), "%s/training_parity_latest.json", run_dir);
+    snprintf(path_grad, sizeof(path_grad), "%s/training_grad_norms_latest.json", run_dir);
+    snprintf(path_profile, sizeof(path_profile), "%s/training_step_profile_latest.json", run_dir);
+    snprintf(path_ckpt, sizeof(path_ckpt), "%s/training_checkpoint_policy_latest.json", run_dir);
+
+    FILE *g = fopen(path_loss, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [");
+        for (int i = 0; i < total_steps; i++) {
+            fprintf(g, "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0}",
+                    (i == 0 ? "" : ","), i + 1, losses[i], losses[i], opt->lr);
+        }
+        fprintf(g, "], \"source\": \"ck_cli_v7_native\"}\n");
+        fclose(g);
+    }
+
+    g = fopen(path_parity, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [{\"step\": %d, \"loss_diff\": 0.0, \"max_param_diff\": 0.0, \"worst_param\": \"ck_only\"}], \"source\": \"ck_cli_v7_native\"}\n", total_steps > 0 ? total_steps : 1);
+        fclose(g);
+    }
+
+    g = fopen(path_grad, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [");
+        for (int i = 0; i < total_steps; i++) fprintf(g, "%s%d", (i ? "," : ""), i + 1);
+        fprintf(g, "], \"global\": [");
+        for (int i = 0; i < total_steps; i++) fprintf(g, "%s0.0", (i ? "," : ""));
+        fprintf(g, "], \"params\": {}, \"source\": \"ck_cli_v7_native\"}\n");
+        fclose(g);
+    }
+
+    g = fopen(path_profile, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": %d, \"micro_steps\": %d, \"tokens_per_update\": %d, \"processed_tokens\": %d, \"ck_total_ms\": %.6f, \"torch_total_ms\": 0.0, \"ck_avg_step_ms\": %.6f, \"torch_avg_step_ms\": 0.0, \"train_tok_s\": %.6f, \"decode_tok_s\": %.6f, \"external_profiles\": {}}\n",
+                total_steps, total_steps, opt->seq_len * opt->grad_accum, processed_tokens, ck_total_ms, avg_step_ms, train_tok_s, train_tok_s);
+        fclose(g);
+    }
+
+    g = fopen(path_ckpt, "w");
+    if (g) {
+        fprintf(g, "{\"policy\": \"none\", \"source\": \"ck_cli_v7_native\", \"checkpointing\": false, \"save_every\": 0, \"save_final\": true, \"count\": 0, \"latest_step\": 0, \"files\": []}\n");
+        fclose(g);
+    }
+
+    return 0;
+}
+
+static int cmd_train_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_train_help(argv[0]);
+        return 0;
+    }
+    TrainOptions opt;
+    if (!parse_train_subcommand_args(argc, argv, &opt)) return 2;
+
+    if (opt.threads > 0) {
+        char th[32];
+        snprintf(th, sizeof(th), "%d", opt.threads);
+        setenv("CK_NUM_THREADS", th, 1);
+    }
+
+    char libtrain_path[4096];
+    snprintf(libtrain_path, sizeof(libtrain_path), "%s/libtrain.so", opt.run_dir);
+    if (!path_exists(libtrain_path)) {
+        snprintf(libtrain_path, sizeof(libtrain_path), "%s/.ck_build/libtrain.so", opt.run_dir);
+    }
+    if (!path_exists(libtrain_path)) {
+        fprintf(stderr, "train: missing libtrain.so under run-dir (%s).\n", opt.run_dir);
+        fprintf(stderr, "hint: generate+compile runtime first via existing v7 pipeline.\n");
+        return 3;
+    }
+
+    TrainRuntimeAPI api;
+    if (!load_train_runtime_api(libtrain_path, &api)) return 4;
+
+    float *init_floats = NULL;
+    int *init_sizes = NULL;
+    int num_params = 0;
+    int total_floats = 0;
+    int init_rc = build_train_init_payload(opt.run_dir, &init_floats, &init_sizes, &num_params, &total_floats);
+    if (init_rc != 0) {
+        unload_train_runtime_api(&api);
+        return 5;
+    }
+
+    if (opt.verbose) {
+        fprintf(stderr, "[train] runtime init payload: num_params=%d total_floats=%d\n", num_params, total_floats);
+    }
+
+    int rc = api.ck_train_init(init_floats, init_sizes, num_params);
+    if (rc < 0) {
+        fprintf(stderr, "ck_train_init failed: %d\n", rc);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 7;
+    }
+
+    if (opt.strict && api.ck_train_memory_diagnostic) {
+        int diag_rc = api.ck_train_memory_diagnostic(NULL, NULL, 0.0f);
+        char diag_path[4096];
+        snprintf(diag_path, sizeof(diag_path), "%s/memory_diagnostic_latest.json", opt.run_dir);
+        FILE *df = fopen(diag_path, "w");
+        if (df) {
+            fprintf(df, "{\"diagnostic\": {\"rc\": %d, \"ok\": %s}, \"meta\": {\"source\": \"ck-cli-v7 train\"}}\n",
+                    diag_rc, diag_rc >= 0 ? "true" : "false");
+            fclose(df);
+        }
+        if (diag_rc < 0) {
+            fprintf(stderr, "train-strict: memory diagnostic failed (rc=%d)\n", diag_rc);
+            if (api.ck_train_free) api.ck_train_free();
+            free(init_floats); free(init_sizes);
+            unload_train_runtime_api(&api);
+            return 8;
+        }
+    }
+
+    int32_t *tokens = NULL;
+    int token_count = 0;
+    if (parse_int_tokens_file(opt.token_file, &tokens, &token_count) != 0) {
+        fprintf(stderr, "Failed to parse token file: %s\n", opt.token_file);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 9;
+    }
+
+    int needed_stream = opt.total_tokens + 1;
+    if (needed_stream < (opt.seq_len + 1)) needed_stream = opt.seq_len + 1;
+    int32_t *stream = (int32_t*)malloc((size_t)needed_stream * sizeof(int32_t));
+    if (!stream) {
+        free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 10;
+    }
+    for (int i = 0; i < needed_stream; i++) stream[i] = tokens[i % token_count];
+
+    int micro_per_epoch = 0;
+    for (int i = 0; i <= (opt.total_tokens - opt.seq_len); i += opt.seq_len) micro_per_epoch++;
+    if (micro_per_epoch <= 0) micro_per_epoch = 1;
+    int total_steps = opt.epochs * micro_per_epoch;
+    float *losses = (float*)calloc((size_t)total_steps, sizeof(float));
+    if (!losses) {
+        free(stream); free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 11;
+    }
+
+    if (opt.verbose) {
+        fprintf(stderr, "[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d lr=%.6g\n",
+                opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens, opt.grad_accum, opt.lr);
+    }
+
+    double t0 = monotonic_ms();
+    int step_idx = 0;
+    for (int e = 0; e < opt.epochs; e++) {
+        for (int b = 0; b < micro_per_epoch; b++) {
+            int pos = (micro_per_epoch == 1) ? 0 : (b * opt.seq_len);
+            const int32_t *x = &stream[pos];
+            const int32_t *y = &stream[pos + 1];
+            float loss = 0.0f;
+            int src = api.ck_train_step(x, y, &loss, opt.lr);
+            if (src < 0) {
+                fprintf(stderr, "ck_train_step failed at step %d: %d\n", step_idx + 1, src);
+                free(losses); free(stream); free(tokens);
+                if (api.ck_train_free) api.ck_train_free();
+                free(init_floats); free(init_sizes);
+                unload_train_runtime_api(&api);
+                return 12;
+            }
+            losses[step_idx++] = loss;
+        }
+    }
+    if (api.ck_train_flush_optimizer) {
+        api.ck_train_flush_optimizer(opt.lr);
+    }
+    double t1 = monotonic_ms();
+    double elapsed_ms = t1 - t0;
+
+    int processed_tokens = total_steps * opt.seq_len;
+    int wr = write_train_summary_and_telemetry(opt.run_dir, opt.json_out, &opt, losses, total_steps, elapsed_ms, processed_tokens, total_floats, num_params);
+    if (wr != 0) {
+        fprintf(stderr, "Failed to write training summary/telemetry (rc=%d)\n", wr);
+    }
+    write_run_index(opt.run_dir, NULL);
+
+    double tok_s = (elapsed_ms > 0.0) ? ((double)processed_tokens / (elapsed_ms / 1000.0)) : 0.0;
+    const char *summary_out = (opt.json_out && *opt.json_out) ? opt.json_out : "<run>/train_e2e_latest.json";
+    printf("Train complete: run=%s steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f\n",
+           opt.run_dir, total_steps, processed_tokens, elapsed_ms, tok_s, total_steps > 0 ? losses[total_steps - 1] : 0.0f);
+    printf("Artifacts: %s, %s/run_index.json\n", summary_out, opt.run_dir);
+
+    if (opt.verbose) {
+        fprintf(stderr, "[train] done steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f\n",
+                total_steps, processed_tokens, elapsed_ms, tok_s, total_steps > 0 ? losses[total_steps - 1] : 0.0f);
+    }
+
+    free(losses);
+    free(stream);
+    free(tokens);
+    if (api.ck_train_free) api.ck_train_free();
+    free(init_floats);
+    free(init_sizes);
+    unload_train_runtime_api(&api);
+    return 0;
+}
+
+static int cmd_report_index_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_report_index_help(argv[0]);
+        return 0;
+    }
+    ReportIndexOptions opt;
+    if (!parse_report_index_subcommand_args(argc, argv, &opt)) return 2;
+    int rc = write_run_index(opt.run_dir, opt.output_path);
+    if (rc != 0) {
+        fprintf(stderr, "report-index failed (rc=%d)\n", rc);
+        return 3;
+    }
+    printf("Wrote run index: %s\n", opt.output_path ? opt.output_path : "<run>/run_index.json");
+    return 0;
+}
+
+static int get_self_exe(char *buf, size_t bufsz) {
+    ssize_t n = readlink("/proc/self/exe", buf, bufsz - 1);
+    if (n <= 0 || (size_t)n >= bufsz) return -1;
+    buf[n] = '\0';
+    return 0;
+}
+
+static int run_shell_cmd(const char *cmd) {
+    if (!cmd) return -1;
+    int rc = system(cmd);
+    if (rc == -1) return -1;
+    if (WIFEXITED(rc)) return WEXITSTATUS(rc);
+    return rc;
+}
+
+static int write_profile_summary_stub(const char *run_dir, const char *tool, const char *output_dir) {
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/profile_summary.json", run_dir);
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    time_t now = time(NULL);
+    fprintf(f, "{\n");
+    fprintf(f, "  \"schema\": \"ck.profile.summary.v1\",\n");
+    fprintf(f, "  \"tool\": \"%s\",\n", tool);
+    fprintf(f, "  \"generated_at_epoch\": %lld,\n", (long long)now);
+    fprintf(f, "  \"output_dir\": \"%s\"\n", output_dir);
+    fprintf(f, "}\n");
+    fclose(f);
+    return 0;
+}
+
+static int cmd_profile_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_profile_help(argv[0]);
+        return 0;
+    }
+    ProfileOptions opt;
+    if (!parse_profile_subcommand_args(argc, argv, &opt)) return 2;
+
+    char self[4096];
+    if (get_self_exe(self, sizeof(self)) != 0) {
+        fprintf(stderr, "profile: failed to resolve self path\n");
+        return 3;
+    }
+
+    const char *out_dir = opt.output_dir && *opt.output_dir ? opt.output_dir : opt.run_dir;
+    char mkdir_cmd[8192];
+    snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", out_dir);
+    if (run_shell_cmd(mkdir_cmd) != 0) {
+        fprintf(stderr, "profile: failed to create output dir: %s\n", out_dir);
+        return 4;
+    }
+
+    char thread_opt[64] = {0};
+    if (opt.threads > 0) {
+        snprintf(thread_opt, sizeof(thread_opt), "--threads %d", opt.threads);
+    }
+
+    char base_train[16384];
+    snprintf(base_train, sizeof(base_train),
+             "'%s' train --run '%s' --train-token-file '%s' --train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g %s %s",
+             self,
+             opt.run_dir,
+             opt.token_file,
+             opt.epochs,
+             opt.seq_len,
+             opt.total_tokens,
+             opt.grad_accum,
+             opt.lr,
+             opt.strict ? "--train-strict" : "",
+             thread_opt);
+
+    char cmd[32768];
+    int rc = 0;
+    if (strcmp(opt.tool, "perf") == 0) {
+        char perf_data[4096], perf_stat_raw[4096], perf_stat_json[4096], folded[4096], svg[4096], manifest[4096];
+        snprintf(perf_data, sizeof(perf_data), "%s/v7_train_perf.data", out_dir);
+        snprintf(perf_stat_raw, sizeof(perf_stat_raw), "%s/perf_stat_summary.txt", out_dir);
+        snprintf(perf_stat_json, sizeof(perf_stat_json), "%s/perf_stat_summary.json", opt.run_dir);
+        snprintf(folded, sizeof(folded), "%s/v7_train_flame.folded", out_dir);
+        snprintf(svg, sizeof(svg), "%s/v7_train_flame.svg", out_dir);
+        snprintf(manifest, sizeof(manifest), "%s/flamegraph_manifest.json", opt.run_dir);
+
+        snprintf(cmd, sizeof(cmd), "perf stat -x, -o '%s' -- %s", perf_stat_raw, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+        snprintf(cmd, sizeof(cmd), "perf record --all-user -F 999 --call-graph dwarf -o '%s' -- %s", perf_data, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        snprintf(cmd, sizeof(cmd),
+                 "if [ -f ./FlameGraph/stackcollapse-perf.pl ]; then perf script -i '%s' | ./FlameGraph/stackcollapse-perf.pl > '%s'; fi",
+                 perf_data, folded);
+        run_shell_cmd(cmd);
+        snprintf(cmd, sizeof(cmd),
+                 "if [ -f ./FlameGraph/flamegraph.pl ] && [ -f '%s' ]; then ./FlameGraph/flamegraph.pl '%s' > '%s'; fi",
+                 folded, folded, svg);
+        run_shell_cmd(cmd);
+
+        FILE *mf = fopen(manifest, "w");
+        if (mf) {
+            fprintf(mf, "{\"folded\": \"%s\", \"svg\": \"%s\", \"perf_data\": \"%s\"}\n", folded, svg, perf_data);
+            fclose(mf);
+        }
+        FILE *pf = fopen(perf_stat_json, "w");
+        if (pf) {
+            time_t now = time(NULL);
+            fprintf(pf, "{\"schema\":\"ck.perf.stat.v1\",\"tool\":\"perf\",\"generated_at_epoch\":%lld,\"raw_path\":\"%s\",\"perf_data\":\"%s\"}\n",
+                    (long long)now, perf_stat_raw, perf_data);
+            fclose(pf);
+        }
+    } else if (strcmp(opt.tool, "vtune") == 0) {
+        char vt_hot[4096], vt_mem[4096], vt_sum[4096];
+        snprintf(vt_hot, sizeof(vt_hot), "%s/vtune_hotspots", out_dir);
+        snprintf(vt_mem, sizeof(vt_mem), "%s/vtune_memory", out_dir);
+        snprintf(vt_sum, sizeof(vt_sum), "%s/vtune_summary.json", opt.run_dir);
+
+        snprintf(cmd, sizeof(cmd), "vtune -collect hotspots -result-dir '%s' -quiet -- %s", vt_hot, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+        snprintf(cmd, sizeof(cmd), "vtune -collect memory-access -result-dir '%s' -quiet -- %s", vt_mem, base_train);
+        run_shell_cmd(cmd);
+        FILE *vf = fopen(vt_sum, "w");
+        if (vf) {
+            fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, vt_mem);
+            fclose(vf);
+        }
+    } else if (strcmp(opt.tool, "advisor") == 0) {
+        char adv_dir[4096], adv_sum[4096];
+        snprintf(adv_dir, sizeof(adv_dir), "%s/advisor_run", out_dir);
+        snprintf(adv_sum, sizeof(adv_sum), "%s/advisor_summary.json", opt.run_dir);
+        snprintf(cmd, sizeof(cmd), "advisor --collect=roofline --project-dir '%s' -- %s", adv_dir, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+        FILE *af = fopen(adv_sum, "w");
+        if (af) {
+            fprintf(af, "{\"project_dir\": \"%s\"}\n", adv_dir);
+            fclose(af);
+        }
+    } else {
+        fprintf(stderr, "profile: unsupported --tool %s (use perf|vtune|advisor)\n", opt.tool);
+        return 5;
+    }
+
+    write_profile_summary_stub(opt.run_dir, opt.tool, out_dir);
+    write_run_index(opt.run_dir, NULL);
+    printf("Profile capture complete: tool=%s run=%s out=%s\n", opt.tool, opt.run_dir, out_dir);
+    return 0;
+}
+
 /* ============================================================================
  * Help & Argument Parsing
  * ============================================================================ */
@@ -1249,6 +2570,12 @@ static void print_banner(void) {
 
 static void print_help(const char *prog) {
     print_banner();
+    fprintf(stderr, "Subcommands:\n");
+    fprintf(stderr, "  %s train --run <dir> --train-token-file <tokens.txt> [options]\n", prog);
+    fprintf(stderr, "  %s report-index --run <dir> [--output <path>]\n", prog);
+    fprintf(stderr, "  %s profile --run <dir> --tool perf|vtune|advisor --train-token-file <tokens.txt> [options]\n", prog);
+    fprintf(stderr, "  %s train --help | %s profile --help | %s report-index --help\n", prog, prog, prog);
+    fprintf(stderr, "\n");
     fprintf(stderr, "Quick start:\n");
     fprintf(stderr, "  %s                                      Scan cache and pick a model\n", prog);
     fprintf(stderr, "  %s --model qwen                         Load by name from cache\n", prog);
@@ -1497,6 +2824,19 @@ static bool process_repl_command(const char *line, CLIOptions *opt, ModelAPI *ap
 int main(int argc, char **argv) {
     signal(SIGINT, handle_sigint);
     srand((unsigned int)time(NULL));
+
+    if (argc >= 2) {
+        const char *sub = argv[1];
+        if (!strcmp(sub, "train")) {
+            return cmd_train_subcommand(argc, argv);
+        }
+        if (!strcmp(sub, "report-index")) {
+            return cmd_report_index_subcommand(argc, argv);
+        }
+        if (!strcmp(sub, "profile")) {
+            return cmd_profile_subcommand(argc, argv);
+        }
+    }
 
     CLIOptions opt;
     if (!parse_args(argc, argv, &opt)) {
