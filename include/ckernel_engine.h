@@ -83,6 +83,72 @@ void gemm_fine_grained_parallel(const float *A,
 	                         float *C,
 	                         int M, int N, int K);
 
+	/* Training dispatch wrapper: same contract as gemm_blocked_serial.
+	 * Uses CK threadpool for row/column partitioning and falls back to serial. */
+	void gemm_blocked_serial_train_parallel_dispatch(const float *A,
+	                                               const float *B,
+	                                               const float *bias,
+	                                               float *C,
+	                                               int M, int N, int K);
+
+	/* Training backward GEMM dispatch wrapper.
+	 * Contract matches fc2_backward_kernel/fc1_backward_kernel and uses
+	 * CK threadpool for deterministic row/column partitioning. */
+	void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
+	                                             const float *input,
+	                                             const float *W,
+	                                             float *d_input,
+	                                             float *d_W,
+	                                             float *d_b,
+	                                             int T,
+	                                             int aligned_in,
+	                                             int aligned_out,
+	                                             int num_threads);
+
+	/* v2 wrapper: more aggressive threadpool dispatch for training backward GEMM
+	 * (especially T=1 microstep shapes). Keeps kernel math unchanged. */
+	void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
+	                                               const float *input,
+	                                               const float *W,
+	                                               float *d_input,
+	                                               float *d_W,
+	                                               float *d_b,
+	                                               int T,
+	                                               int aligned_in,
+	                                               int aligned_out,
+	                                               int num_threads);
+
+/* Optimizer / gradient update kernels used by v7 train runtime. */
+void adamw_update_f32(const float *grad,
+                      float *weight,
+                      float *m,
+                      float *v,
+                      size_t numel,
+                      float lr,
+                      float beta1,
+                      float beta2,
+                      float eps,
+                      float weight_decay,
+                      int step);
+
+void adamw_clip_update_multi_f32(float *const *grads,
+                                 float *const *weights,
+                                 float *const *m_states,
+                                 float *const *v_states,
+                                 const size_t *numels,
+                                 int tensor_count,
+                                 float lr,
+                                 float beta1,
+                                 float beta2,
+                                 float eps,
+                                 float weight_decay,
+                                 float max_grad_norm,
+                                 int step);
+
+void gradient_accumulate_f32(float *dst, const float *src, size_t numel);
+void gradient_scale_f32(float *grad, size_t numel, float scale);
+float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);
+
 	// Reference BF16 GEMM (A/B/bias in BF16, output BF16).
 void gemm_blocked_serial_bf16(const uint16_t *A,
                               const uint16_t *B,
@@ -289,6 +355,13 @@ void gemm_nn_avx512(const float *A,
                     const float *bias,
                     float *C,
                     int M, int N, int K);
+
+/* ISA-neutral wrapper (dispatches to the best compiled SIMD path). */
+void gemm_nn_simd(const float *A,
+                  const float *B,
+                  const float *bias,
+                  float *C,
+                  int M, int N, int K);
 
 void gemm_nn_blocked(const float *A,
                      const float *B,

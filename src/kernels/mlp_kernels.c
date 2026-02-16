@@ -132,7 +132,7 @@ void fc2_backward_kernel(const float *d_output,
     // Using gemm_nn: C[M,N] = A[M,K] @ B[K,N]
     // A = d_output [T, out], B = W [out, in], C = d_input [T, in]
     // M = T, N = aligned_in, K = aligned_out
-    gemm_nn_avx512(d_output, W_fc2, NULL, d_input,
+    gemm_nn_simd(d_output, W_fc2, NULL, d_input,
                    T, aligned_in, aligned_out);
 
     // 2. d_W[out, in] = d_output[T, out].T @ fc2_input[T, in]
@@ -141,7 +141,7 @@ void fc2_backward_kernel(const float *d_output,
     // C = d_W [out, in], M = aligned_out, N = aligned_in, K = T
     // Note: gemm_tn overwrites, so we need to save and add if accumulating
     // For now, assume d_W starts zeroed (gradient accumulation handled at higher level)
-    gemm_tn_avx512(d_output, fc2_input, NULL, d_W_fc2,
+    gemm_tn_parallel(d_output, fc2_input, NULL, d_W_fc2,
                    aligned_out, aligned_in, T);
 
     // 3. d_b_fc2 = sum_over_T(d_output)
@@ -181,14 +181,14 @@ void fc1_backward_kernel(const float *d_output,
     // Using gemm_nn: C[M,N] = A[M,K] @ B[K,N]
     // A = d_output [T, out], B = W [out, in], C = d_input [T, in]
     // M = T, N = aligned_in, K = aligned_out
-    gemm_nn_avx512(d_output, W_fc1, NULL, d_input,
+    gemm_nn_simd(d_output, W_fc1, NULL, d_input,
                    T, aligned_in, aligned_out);
 
     // 2. d_W[out, in] = d_output[T, out].T @ fc1_input[T, in]
     // Using gemm_tn: C[M,N] = A[K,M].T @ B[K,N]
     // A = d_output [T, out] (stored as [K=T, M=out]), B = fc1_input [T, in]
     // C = d_W [out, in], M = aligned_out, N = aligned_in, K = T
-    gemm_tn_avx512(d_output, fc1_input, NULL, d_W_fc1,
+    gemm_tn_parallel(d_output, fc1_input, NULL, d_W_fc1,
                    aligned_out, aligned_in, T);
 
     // 3. d_b_fc1 = sum_over_T(d_output)

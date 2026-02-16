@@ -399,6 +399,19 @@ void gemm_nn_avx512(const float *A,
 #endif
 }
 
+/* Keep legacy symbol name for ABI stability.
+ * Actual ISA path is selected at compile time in gemm_nn_avx512().
+ * This wrapper avoids ISA-specific naming at call sites and in new code.
+ */
+void gemm_nn_simd(const float *A,
+                  const float *B,
+                  const float *bias,
+                  float *C,
+                  int M, int N, int K)
+{
+    gemm_nn_avx512(A, B, bias, C, M, N, K);
+}
+
 void gemm_nn_blocked(const float *A,
                      const float *B,
                      const float *bias,

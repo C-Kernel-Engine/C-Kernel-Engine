@@ -22,6 +22,17 @@
 #include <immintrin.h>
 #endif
 
+/* Numerically stable sigmoid variant for strict parity paths. */
+static inline float sigmoid_scalar_stable(float x)
+{
+    if (x >= 0.0f) {
+        float z = expf(-x);
+        return 1.0f / (1.0f + z);
+    }
+    float z = expf(x);
+    return z / (1.0f + z);
+}
+
 /* ========================================================================== */
 /* Fast exp approximation for SIMD                                            */
 /* ========================================================================== */
@@ -133,6 +144,11 @@ void swiglu_forward(const float *input,
                     int tokens,
                     int dim)
 {
+    if (ck_strict_parity_enabled()) {
+        swiglu_forward_exact(input, output, tokens, dim);
+        return;
+    }
+
     int T = tokens;
     int D = dim;
 
@@ -218,6 +234,11 @@ void swiglu_backward(const float *input,
                      int tokens,
                      int dim)
 {
+    if (ck_strict_parity_enabled()) {
+        swiglu_backward_exact(input, d_output, d_input, tokens, dim);
+        return;
+    }
+
     int T = tokens;
     int D = dim;
 
@@ -310,9 +331,9 @@ void swiglu_backward(const float *input,
             float dy = dy_row[d];
 
             float s = sigmoid_scalar(a);               // sigmoid(a)
-            float silu = a * s;                       // silu(a)
-            float s_prime = s * (1.0f - s);           // sigmoid'(a)
-            float silu_prime = s + a * s_prime;       // silu'(a)
+            float silu = a * s;                        // silu(a)
+            float s_prime = s * (1.0f - s);            // sigmoid'(a)
+            float silu_prime = s + a * s_prime;        // silu'(a)
 
             float dA = dy * b * silu_prime;
             float dB = dy * silu;
@@ -322,7 +343,6 @@ void swiglu_backward(const float *input,
         }
     }
 }
-
 // ============================================================================
 // Exact versions using standard library expf (slower but accurate)
 // ============================================================================
@@ -352,11 +372,12 @@ void swiglu_forward_exact(const float *input,
             float a = row[d];       // gate
             float b = row[D + d];   // value
 
-            // Use standard library expf via sigmoid_scalar
-            float s = sigmoid_scalar(a);         // sigmoid(a) = 1/(1+expf(-a))
-            float silu = a * s;                  // silu(a) = a * sigmoid(a)
+            double ad = (double)a;
+            double bd = (double)b;
+            double s = (double)sigmoid_scalar_stable(a); // sigmoid(a)
+            double silu = ad * s;                        // silu(a)
 
-            out_row[d] = silu * b;
+            out_row[d] = (float)(silu * bd);
         }
     }
 }
@@ -389,17 +410,19 @@ void swiglu_backward_exact(const float *input,
             float b = row[D + d];   // value
             float dy = dy_row[d];
 
-            // Use standard library expf via sigmoid_scalar
-            float s = sigmoid_scalar(a);               // sigmoid(a)
-            float silu = a * s;                       // silu(a)
-            float s_prime = s * (1.0f - s);           // sigmoid'(a)
-            float silu_prime = s + a * s_prime;       // silu'(a)
+            double ad = (double)a;
+            double bd = (double)b;
+            double dyd = (double)dy;
+            double s = (double)sigmoid_scalar_stable(a); // sigmoid(a)
+            double silu = ad * s;                        // silu(a)
+            double s_prime = s * (1.0 - s);              // sigmoid'(a)
+            double silu_prime = s + ad * s_prime;        // silu'(a)
 
-            float dA = dy * b * silu_prime;
-            float dB = dy * silu;
+            double dA = dyd * bd * silu_prime;
+            double dB = dyd * silu;
 
-            dx_row[d] = dA;
-            dx_row[D + d] = dB;
+            dx_row[d] = (float)dA;
+            dx_row[D + d] = (float)dB;
         }
     }
 }

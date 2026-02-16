@@ -26,11 +26,218 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include "ck_threadpool.h"
+#include "ckernel_engine.h"
 
 /* Include SIMD headers based on available instruction sets */
 #if defined(__AVX512F__) || defined(__AVX__) || defined(__SSE2__)
 #include <immintrin.h>
 #endif
+
+#define CK_OPT_PAR_MIN_NUMEL ((size_t)262144)
+#define CK_OPT_PAR_MAX_THREADS 256
+
+typedef struct {
+    const float *grad;
+    float *weight;
+    float *m;
+    float *v;
+    size_t numel;
+    float lr;
+    float beta1;
+    float beta2;
+    float eps;
+    float weight_decay;
+    int step;
+} ck_adamw_parallel_args_t;
+
+typedef struct {
+    float *dst;
+    const float *src;
+    size_t numel;
+} ck_accum_parallel_args_t;
+
+typedef struct {
+    float *grad;
+    size_t numel;
+    float scale;
+} ck_scale_parallel_args_t;
+
+typedef struct {
+    const float *grad;
+    size_t numel;
+    double partial[CK_OPT_PAR_MAX_THREADS];
+} ck_sum_sq_parallel_args_t;
+
+typedef struct {
+    float *const *grads;
+    float *const *weights;
+    float *const *m_states;
+    float *const *v_states;
+    const size_t *numels;
+    int tensor_count;
+    float lr;
+    float beta1;
+    float beta2;
+    float eps;
+    float weight_decay;
+    float max_grad_norm;
+    int step;
+} ck_adamw_multi_parallel_args_t;
+
+static void adamw_update_f32_impl(
+    const float *grad,
+    float *weight,
+    float *m,
+    float *v,
+    size_t numel,
+    float lr,
+    float beta1,
+    float beta2,
+    float eps,
+    float weight_decay,
+    int step);
+
+static void gradient_accumulate_f32_impl(float *dst, const float *src, size_t numel);
+static void gradient_scale_f32_impl(float *grad, size_t numel, float scale);
+static double gradient_sum_sq_f32_impl(const float *grad, size_t numel);
+
+static void ck_adamw_parallel_work(int ith, int nth, void *argp)
+{
+    ck_adamw_parallel_args_t *a = (ck_adamw_parallel_args_t *)argp;
+    if (!a || !a->grad || !a->weight || !a->m || !a->v || a->numel == 0) {
+        return;
+    }
+    size_t chunk = (a->numel + (size_t)nth - 1u) / (size_t)nth;
+    size_t start = (size_t)ith * chunk;
+    if (start >= a->numel) {
+        return;
+    }
+    size_t end = start + chunk;
+    if (end > a->numel) {
+        end = a->numel;
+    }
+    adamw_update_f32_impl(
+        a->grad + start,
+        a->weight + start,
+        a->m + start,
+        a->v + start,
+        end - start,
+        a->lr,
+        a->beta1,
+        a->beta2,
+        a->eps,
+        a->weight_decay,
+        a->step);
+}
+
+static void ck_accum_parallel_work(int ith, int nth, void *argp)
+{
+    ck_accum_parallel_args_t *a = (ck_accum_parallel_args_t *)argp;
+    if (!a || !a->dst || !a->src || a->numel == 0) {
+        return;
+    }
+    size_t chunk = (a->numel + (size_t)nth - 1u) / (size_t)nth;
+    size_t start = (size_t)ith * chunk;
+    if (start >= a->numel) {
+        return;
+    }
+    size_t end = start + chunk;
+    if (end > a->numel) {
+        end = a->numel;
+    }
+    gradient_accumulate_f32_impl(a->dst + start, a->src + start, end - start);
+}
+
+static void ck_scale_parallel_work(int ith, int nth, void *argp)
+{
+    ck_scale_parallel_args_t *a = (ck_scale_parallel_args_t *)argp;
+    if (!a || !a->grad || a->numel == 0) {
+        return;
+    }
+    size_t chunk = (a->numel + (size_t)nth - 1u) / (size_t)nth;
+    size_t start = (size_t)ith * chunk;
+    if (start >= a->numel) {
+        return;
+    }
+    size_t end = start + chunk;
+    if (end > a->numel) {
+        end = a->numel;
+    }
+    gradient_scale_f32_impl(a->grad + start, end - start, a->scale);
+}
+
+static void ck_sum_sq_parallel_work(int ith, int nth, void *argp)
+{
+    ck_sum_sq_parallel_args_t *a = (ck_sum_sq_parallel_args_t *)argp;
+    if (!a || !a->grad || a->numel == 0 || ith < 0 || ith >= CK_OPT_PAR_MAX_THREADS) {
+        return;
+    }
+    size_t chunk = (a->numel + (size_t)nth - 1u) / (size_t)nth;
+    size_t start = (size_t)ith * chunk;
+    if (start >= a->numel) {
+        a->partial[ith] = 0.0;
+        return;
+    }
+    size_t end = start + chunk;
+    if (end > a->numel) {
+        end = a->numel;
+    }
+    a->partial[ith] = gradient_sum_sq_f32_impl(a->grad + start, end - start);
+}
+
+static void ck_adamw_multi_parallel_work(int ith, int nth, void *argp)
+{
+    ck_adamw_multi_parallel_args_t *a = (ck_adamw_multi_parallel_args_t *)argp;
+    if (!a || !a->grads || !a->weights || !a->m_states || !a->v_states || !a->numels ||
+        a->tensor_count <= 0) {
+        return;
+    }
+
+    const int per = (a->tensor_count + nth - 1) / nth;
+    const int t0 = per * ith;
+    int t1 = t0 + per;
+    if (t0 >= a->tensor_count) {
+        return;
+    }
+    if (t1 > a->tensor_count) {
+        t1 = a->tensor_count;
+    }
+
+    for (int ti = t0; ti < t1; ++ti) {
+        float *g = a->grads[ti];
+        float *w = a->weights[ti];
+        float *m = a->m_states[ti];
+        float *v = a->v_states[ti];
+        size_t n = a->numels[ti];
+        if (!g || !w || !m || !v || n == 0) {
+            continue;
+        }
+
+        if (a->max_grad_norm > 0.0f) {
+            double sum_sq = gradient_sum_sq_f32_impl(g, n);
+            float norm = sqrtf((float)sum_sq);
+            if (norm > a->max_grad_norm) {
+                float scale = a->max_grad_norm / norm;
+                gradient_scale_f32_impl(g, n, scale);
+            }
+        }
+
+        adamw_update_f32_impl(
+            g,
+            w,
+            m,
+            v,
+            n,
+            a->lr,
+            a->beta1,
+            a->beta2,
+            a->eps,
+            a->weight_decay,
+            a->step);
+    }
+}
+
 
 /**
  * @brief AdamW optimizer update (fp32 version)
@@ -50,7 +257,7 @@
  * @param weight_decay Weight decay coefficient (typically 0.01)
  * @param step       Current step number (1-indexed for bias correction)
  */
-void adamw_update_f32(
+static void adamw_update_f32_impl(
     const float *grad,
     float *weight,
     float *m,
@@ -74,6 +281,43 @@ void adamw_update_f32(
     // Precompute constants
     float one_minus_beta1 = 1.0f - beta1;
     float one_minus_beta2 = 1.0f - beta2;
+
+    if (ck_strict_parity_enabled()) {
+        const double beta1_d = (double)beta1;
+        const double beta2_d = (double)beta2;
+        const double one_minus_beta1_d = 1.0 - beta1_d;
+        const double one_minus_beta2_d = 1.0 - beta2_d;
+        const double lr_d = (double)lr;
+        const double eps_d = (double)eps;
+        const double wd_d = (double)weight_decay;
+
+        const double bc1 = 1.0 - pow(beta1_d, (double)step);
+        const double bc2 = 1.0 - pow(beta2_d, (double)step);
+        const double step_size = lr_d / bc1;
+        const double bc2_sqrt = sqrt(bc2);
+        const double wd_scale = 1.0 - lr_d * wd_d;
+
+        for (size_t i = 0; i < numel; ++i) {
+            double g = (double)grad[i];
+            double w = (double)weight[i];
+            double m_i = (double)m[i];
+            double v_i = (double)v[i];
+
+            m_i = beta1_d * m_i + one_minus_beta1_d * g;
+            v_i = beta2_d * v_i + one_minus_beta2_d * g * g;
+
+            // Match PyTorch AdamW op order: decoupled weight decay first.
+            w *= wd_scale;
+
+            double denom = sqrt(v_i) / bc2_sqrt + eps_d;
+            w -= step_size * (m_i / denom);
+
+            m[i] = (float)m_i;
+            v[i] = (float)v_i;
+            weight[i] = (float)w;
+        }
+        return;
+    }
 
 #if defined(__AVX512F__)
     // AVX-512 path: process 16 floats at a time
@@ -250,6 +494,124 @@ void adamw_update_f32(
 }
 
 
+void adamw_update_f32(
+    const float *grad,
+    float *weight,
+    float *m,
+    float *v,
+    size_t numel,
+    float lr,
+    float beta1,
+    float beta2,
+    float eps,
+    float weight_decay,
+    int step)
+{
+    if (!grad || !weight || !m || !v || numel == 0) {
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || nth <= 1 || nth > CK_OPT_PAR_MAX_THREADS || numel < CK_OPT_PAR_MIN_NUMEL) {
+        adamw_update_f32_impl(grad, weight, m, v, numel, lr, beta1, beta2, eps, weight_decay, step);
+        return;
+    }
+
+    ck_adamw_parallel_args_t args = {
+        .grad = grad,
+        .weight = weight,
+        .m = m,
+        .v = v,
+        .numel = numel,
+        .lr = lr,
+        .beta1 = beta1,
+        .beta2 = beta2,
+        .eps = eps,
+        .weight_decay = weight_decay,
+        .step = step,
+    };
+    ck_threadpool_dispatch(pool, ck_adamw_parallel_work, &args);
+}
+
+
+void adamw_clip_update_multi_f32(
+    float *const *grads,
+    float *const *weights,
+    float *const *m_states,
+    float *const *v_states,
+    const size_t *numels,
+    int tensor_count,
+    float lr,
+    float beta1,
+    float beta2,
+    float eps,
+    float weight_decay,
+    float max_grad_norm,
+    int step)
+{
+    if (!grads || !weights || !m_states || !v_states || !numels || tensor_count <= 0) {
+        return;
+    }
+
+    size_t total_numel = 0;
+    int valid_tensors = 0;
+    for (int i = 0; i < tensor_count; ++i) {
+        if (grads[i] && weights[i] && m_states[i] && v_states[i] && numels[i] > 0) {
+            total_numel += numels[i];
+            valid_tensors += 1;
+        }
+    }
+    if (valid_tensors == 0 || total_numel == 0) {
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+
+    if (!pool || nth <= 1 || nth > CK_OPT_PAR_MAX_THREADS ||
+        total_numel < CK_OPT_PAR_MIN_NUMEL || valid_tensors < 2) {
+        for (int i = 0; i < tensor_count; ++i) {
+            float *g = grads[i];
+            float *w = weights[i];
+            float *m = m_states[i];
+            float *v = v_states[i];
+            size_t n = numels[i];
+            if (!g || !w || !m || !v || n == 0) {
+                continue;
+            }
+            if (max_grad_norm > 0.0f) {
+                double sum_sq = gradient_sum_sq_f32_impl(g, n);
+                float norm = sqrtf((float)sum_sq);
+                if (norm > max_grad_norm) {
+                    float scale = max_grad_norm / norm;
+                    gradient_scale_f32_impl(g, n, scale);
+                }
+            }
+            adamw_update_f32_impl(g, w, m, v, n, lr, beta1, beta2, eps, weight_decay, step);
+        }
+        return;
+    }
+
+    ck_adamw_multi_parallel_args_t args = {
+        .grads = grads,
+        .weights = weights,
+        .m_states = m_states,
+        .v_states = v_states,
+        .numels = numels,
+        .tensor_count = tensor_count,
+        .lr = lr,
+        .beta1 = beta1,
+        .beta2 = beta2,
+        .eps = eps,
+        .weight_decay = weight_decay,
+        .max_grad_norm = max_grad_norm,
+        .step = step,
+    };
+    ck_threadpool_dispatch(pool, ck_adamw_multi_parallel_work, &args);
+}
+
+
 /**
  * @brief SGD with momentum optimizer update (fp32 version)
  *
@@ -389,7 +751,7 @@ void zero_gradients_f32(float *grad, size_t numel)
  * @param src   Source gradient buffer [numel]
  * @param numel Number of elements
  */
-void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
+static void gradient_accumulate_f32_impl(float *dst, const float *src, size_t numel)
 {
     if (!dst || !src || numel == 0) {
         return;
@@ -436,6 +798,28 @@ void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
 }
 
 
+void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
+{
+    if (!dst || !src || numel == 0) {
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || nth <= 1 || nth > CK_OPT_PAR_MAX_THREADS || numel < CK_OPT_PAR_MIN_NUMEL) {
+        gradient_accumulate_f32_impl(dst, src, numel);
+        return;
+    }
+
+    ck_accum_parallel_args_t args = {
+        .dst = dst,
+        .src = src,
+        .numel = numel,
+    };
+    ck_threadpool_dispatch(pool, ck_accum_parallel_work, &args);
+}
+
+
 /**
  * @brief Scale gradients by a constant: grad *= scale (fp32)
  *
@@ -445,7 +829,7 @@ void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
  * @param numel Number of elements
  * @param scale Scale factor (typically 1.0 / batch_size)
  */
-void gradient_scale_f32(float *grad, size_t numel, float scale)
+static void gradient_scale_f32_impl(float *grad, size_t numel, float scale)
 {
     if (!grad || numel == 0) {
         return;
@@ -492,6 +876,87 @@ void gradient_scale_f32(float *grad, size_t numel, float scale)
 }
 
 
+void gradient_scale_f32(float *grad, size_t numel, float scale)
+{
+    if (!grad || numel == 0) {
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || nth <= 1 || nth > CK_OPT_PAR_MAX_THREADS || numel < CK_OPT_PAR_MIN_NUMEL) {
+        gradient_scale_f32_impl(grad, numel, scale);
+        return;
+    }
+
+    ck_scale_parallel_args_t args = {
+        .grad = grad,
+        .numel = numel,
+        .scale = scale,
+    };
+    ck_threadpool_dispatch(pool, ck_scale_parallel_work, &args);
+}
+
+static double gradient_sum_sq_f32_impl(const float *grad, size_t numel)
+{
+    if (!grad || numel == 0) {
+        return 0.0;
+    }
+
+    double sum_sq = 0.0;
+#if defined(__AVX512F__)
+    __m512 acc = _mm512_setzero_ps();
+    size_t i = 0;
+    for (; i + 16 <= numel; i += 16) {
+        __m512 g = _mm512_loadu_ps(&grad[i]);
+        acc = _mm512_fmadd_ps(g, g, acc);
+    }
+    sum_sq = _mm512_reduce_add_ps(acc);
+    for (; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+#elif defined(__AVX__)
+    __m256 acc = _mm256_setzero_ps();
+    size_t i = 0;
+    for (; i + 8 <= numel; i += 8) {
+        __m256 g = _mm256_loadu_ps(&grad[i]);
+        acc = _mm256_add_ps(acc, _mm256_mul_ps(g, g));
+    }
+    __m128 hi = _mm256_extractf128_ps(acc, 1);
+    __m128 lo = _mm256_castps256_ps128(acc);
+    __m128 sum4 = _mm_add_ps(lo, hi);
+    __m128 shuf = _mm_movehdup_ps(sum4);
+    __m128 sums = _mm_add_ps(sum4, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    sum_sq = _mm_cvtss_f32(sums);
+    for (; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+#elif defined(__SSE2__)
+    __m128 acc = _mm_setzero_ps();
+    size_t i = 0;
+    for (; i + 4 <= numel; i += 4) {
+        __m128 g = _mm_loadu_ps(&grad[i]);
+        acc = _mm_add_ps(acc, _mm_mul_ps(g, g));
+    }
+    __m128 shuf = _mm_shuffle_ps(acc, acc, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 sums = _mm_add_ps(acc, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    sum_sq = _mm_cvtss_f32(sums);
+    for (; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+#else
+    for (size_t i = 0; i < numel; ++i) {
+        sum_sq += (double)grad[i] * (double)grad[i];
+    }
+#endif
+    return sum_sq;
+}
+
+
 /**
  * @brief Clip gradient norm (fp32)
  *
@@ -508,70 +973,29 @@ float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm)
         return 0.0f;
     }
 
-    // Compute L2 norm
     double sum_sq = 0.0;
-#if defined(__AVX512F__)
-    __m512 acc = _mm512_setzero_ps();
-    size_t i = 0;
-    for (; i + 16 <= numel; i += 16) {
-        __m512 g = _mm512_loadu_ps(&grad[i]);
-        acc = _mm512_fmadd_ps(g, g, acc);
-    }
-    sum_sq = _mm512_reduce_add_ps(acc);
-    for (; i < numel; ++i) {
-        sum_sq += (double)grad[i] * (double)grad[i];
-    }
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
 
-#elif defined(__AVX__)
-    __m256 acc = _mm256_setzero_ps();
-    size_t i = 0;
-    for (; i + 8 <= numel; i += 8) {
-        __m256 g = _mm256_loadu_ps(&grad[i]);
-        acc = _mm256_add_ps(acc, _mm256_mul_ps(g, g));
+    if (pool && nth > 1 && nth <= CK_OPT_PAR_MAX_THREADS && numel >= CK_OPT_PAR_MIN_NUMEL) {
+        ck_sum_sq_parallel_args_t args;
+        args.grad = grad;
+        args.numel = numel;
+        for (int i = 0; i < CK_OPT_PAR_MAX_THREADS; ++i) {
+            args.partial[i] = 0.0;
+        }
+        ck_threadpool_dispatch(pool, ck_sum_sq_parallel_work, &args);
+        for (int i = 0; i < nth; ++i) {
+            sum_sq += args.partial[i];
+        }
+    } else {
+        sum_sq = gradient_sum_sq_f32_impl(grad, numel);
     }
-    // Horizontal sum of 8 floats in acc
-    __m128 hi = _mm256_extractf128_ps(acc, 1);
-    __m128 lo = _mm256_castps256_ps128(acc);
-    __m128 sum4 = _mm_add_ps(lo, hi);
-    __m128 shuf = _mm_movehdup_ps(sum4);
-    __m128 sums = _mm_add_ps(sum4, shuf);
-    shuf = _mm_movehl_ps(shuf, sums);
-    sums = _mm_add_ss(sums, shuf);
-    sum_sq = _mm_cvtss_f32(sums);
-    for (; i < numel; ++i) {
-        sum_sq += (double)grad[i] * (double)grad[i];
-    }
-
-#elif defined(__SSE2__)
-    __m128 acc = _mm_setzero_ps();
-    size_t i = 0;
-    for (; i + 4 <= numel; i += 4) {
-        __m128 g = _mm_loadu_ps(&grad[i]);
-        acc = _mm_add_ps(acc, _mm_mul_ps(g, g));
-    }
-    // Horizontal sum of 4 floats in acc
-    __m128 shuf = _mm_shuffle_ps(acc, acc, _MM_SHUFFLE(2, 3, 0, 1));
-    __m128 sums = _mm_add_ps(acc, shuf);
-    shuf = _mm_movehl_ps(shuf, sums);
-    sums = _mm_add_ss(sums, shuf);
-    sum_sq = _mm_cvtss_f32(sums);
-    for (; i < numel; ++i) {
-        sum_sq += (double)grad[i] * (double)grad[i];
-    }
-
-#else
-    for (size_t i = 0; i < numel; ++i) {
-        sum_sq += (double)grad[i] * (double)grad[i];
-    }
-#endif
 
     float norm = sqrtf((float)sum_sq);
-
-    // Clip if necessary
     if (norm > max_norm) {
         float scale = max_norm / norm;
         gradient_scale_f32(grad, numel, scale);
     }
-
     return norm;
 }

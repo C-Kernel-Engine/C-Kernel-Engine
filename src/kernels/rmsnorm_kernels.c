@@ -14,6 +14,7 @@
  * RMSNorm: y[i] = gamma[i] * x[i] / sqrt(mean(x^2) + eps)
  */
 
+#include "ckernel_engine.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -34,6 +35,90 @@ static inline float hsum256_ps_rmsnorm(__m256 v) {
     return _mm_cvtss_f32(sum128);
 }
 #endif
+static void rmsnorm_forward_strict_scalar(const float *input,
+                                          const float *gamma,
+                                          float *output,
+                                          float *rstd_cache,
+                                          int tokens,
+                                          int d_model,
+                                          int aligned_embed_dim,
+                                          float eps)
+{
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+        float *y = output + (size_t)t * (size_t)aligned_embed_dim;
+
+        double sum_sq = 0.0;
+        for (int d = 0; d < d_model; ++d) {
+            const double v = (double)x[d];
+            sum_sq += v * v;
+        }
+        const double mean_sq = sum_sq / (double)d_model;
+        const double rstd64 = 1.0 / sqrt(mean_sq + (double)eps);
+        const float rstd = (float)rstd64;
+        if (rstd_cache) {
+            rstd_cache[t] = rstd;
+        }
+
+        for (int d = 0; d < d_model; ++d) {
+            y[d] = (float)(((double)x[d]) * ((double)gamma[d]) * rstd64);
+        }
+        for (int d = d_model; d < aligned_embed_dim; ++d) {
+            y[d] = 0.0f;
+        }
+    }
+}
+
+static void rmsnorm_backward_strict_scalar(const float *d_output,
+                                           const float *input,
+                                           const float *gamma,
+                                           const float *rstd_cache,
+                                           float *d_input,
+                                           float *d_gamma,
+                                           int tokens,
+                                           int d_model,
+                                           int aligned_embed_dim)
+{
+    for (int d = 0; d < d_model; ++d) {
+        d_gamma[d] = 0.0f;
+    }
+
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+        const float *dY = d_output + (size_t)t * (size_t)aligned_embed_dim;
+        float *dX = d_input + (size_t)t * (size_t)aligned_embed_dim;
+        const double rstd = (double)rstd_cache[t];
+
+        double sum_dY_g_xhat = 0.0;
+        for (int d = 0; d < d_model; ++d) {
+            const double x_hat = (double)x[d] * rstd;
+            sum_dY_g_xhat += (double)dY[d] * (double)gamma[d] * x_hat;
+        }
+        const double m = sum_dY_g_xhat / (double)d_model;
+
+        for (int d = 0; d < d_model; ++d) {
+            const double x_hat = (double)x[d] * rstd;
+            const double dy = (double)dY[d];
+            dX[d] = (float)(rstd * (dy * (double)gamma[d] - x_hat * m));
+        }
+        for (int d = d_model; d < aligned_embed_dim; ++d) {
+            dX[d] = 0.0f;
+        }
+    }
+
+    for (int d = 0; d < d_model; ++d) {
+        double acc = 0.0;
+        for (int t = 0; t < tokens; ++t) {
+            const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+            const float *dY = d_output + (size_t)t * (size_t)aligned_embed_dim;
+            const double rstd = (double)rstd_cache[t];
+            const double x_hat = (double)x[d] * rstd;
+            acc += (double)dY[d] * x_hat;
+        }
+        d_gamma[d] = (float)acc;
+    }
+}
+
 
 /**
  * RMSNorm forward pass
@@ -59,6 +144,11 @@ void rmsnorm_forward(const float *input,
     int T = tokens;
     int D = d_model;
     int aligned = aligned_embed_dim;
+
+    if (ck_strict_parity_enabled()) {
+        rmsnorm_forward_strict_scalar(input, gamma, output, rstd_cache, T, D, aligned, eps);
+        return;
+    }
 
     for (int t = 0; t < T; ++t) {
         const float *x = input + (size_t)t * aligned;
@@ -194,6 +284,11 @@ void rmsnorm_backward(const float *d_output,
     int T = tokens;
     int D = d_model;
     int aligned = aligned_embed_dim;
+
+    if (ck_strict_parity_enabled()) {
+        rmsnorm_backward_strict_scalar(d_output, input, gamma, rstd_cache, d_input, d_gamma, T, D, aligned);
+        return;
+    }
 
     // Zero parameter gradients
 #if defined(__AVX512F__)
