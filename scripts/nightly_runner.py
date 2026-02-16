@@ -331,6 +331,12 @@ MAKE_TARGETS = {
         "target": "v6.6-validate-matrix",
         "timeout_sec": 2400,
     },
+    "v7_backprop_long_epoch_nightly": {
+        "name": "v7 Backprop Long-Epoch Drift",
+        "category": "training",
+        "target": "v7-backprop-long-epoch-nightly",
+        "timeout_sec": 2400,
+    },
 }
 
 # Benchmark targets with perf extraction
