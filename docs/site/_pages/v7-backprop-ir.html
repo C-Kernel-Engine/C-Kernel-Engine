@@ -96,6 +96,50 @@
   <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
 </ol>
 
+<h2>Why Drift Moved From ~Step 65 to ~Step 800</h2>
+
+<p>Yes, execution order changed in an important way. The generated train runtime now enforces accumulation-window semantics so optimizer updates only happen at the true boundary of <code>CK_GRAD_ACCUM_STEPS</code> micro-steps.</p>
+
+<div class="img-container svg-viewer" data-title="Grad-Accum Window Schedule">
+  <img src="assets/v7-grad-accum-window.svg" alt="Before and after schedule for gradient accumulation and optimizer boundary">
+</div>
+
+<ul>
+  <li><strong>Before</strong>: optimizer timing could drift relative to the intended accumulation window.</li>
+  <li><strong>Now</strong>: each window does <code>zero_grad</code> once, accumulates grads over micro-steps, then applies one optimizer step at boundary.</li>
+  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift appears much later and is smaller.</li>
+</ul>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Current Numeric Status</h3>
+  <ul style="margin-bottom: 0;">
+    <li>Stress config (<code>Hello!</code>, AdamW, <code>lr=1e-3</code>) can still show late parameter drift near ~800 steps in full-C mode.</li>
+    <li>Switching only loss backend to torch (<code>--ck-loss-backend torch</code>) passes the same 1000-step stress run.</li>
+    <li>This points to remaining long-horizon cumulative error in C-loss + AdamW interaction, not the old early scheduling bug.</li>
+  </ul>
+</div>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Schedule Pseudocode (Expected)</h3>
+  <pre>if g_accum_step == 0: zero_grad()
+forward()
+backward()
+g_accum_step += 1
+if g_accum_step >= CK_GRAD_ACCUM_STEPS:
+    optimizer_step()
+    g_accum_step = 0</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Cross-Entropy Semantics</h3>
+  <p style="margin: 0;">C cross-entropy now uses log-sum-exp style loss accumulation to match PyTorch semantics and avoid probability-clamp artifacts. This tightened early parity, but long-horizon stress still needs final numeric tightening before claiming full production readiness for long custom pretraining runs.</p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Production Readiness Guidance</h3>
+  <p style="margin: 0;">For current work, treat v7 training as <strong>good for controlled experiments and parity-driven bring-up</strong>. For long from-scratch production training, keep oracle checks enabled and use the realistic long-horizon gate as the blocker until the remaining late drift is eliminated.</p>
+</div>
+
 <div class="card">
   <h3 style="margin-top: 0;">Template Flexibility</h3>
   <p style="margin-top: 0;">You can use built-ins (<code>qwen3</code>, <code>qwen2</code>, <code>gemma3</code>) or a custom template file. If a template op has kernel coverage and bindings, it can be stitched automatically.</p>
@@ -149,6 +193,17 @@ version/v7/scripts/cks-v7-run init \
     <td>Emit deterministic C calls and memory references only</td>
   </tr>
 </table>
+
+<h2>Why Train Builder Is Separate From Inference Builder (For Now)</h2>
+
+<ul>
+  <li>Inference IR is decode/prefill-oriented and optimized around quantized runtime contracts.</li>
+  <li>Training IR adds backward-only semantics: grad fanout merges, loss seed ops, optimizer state, clip/update boundaries.</li>
+  <li>Training layout needs persistent regions inference does not own (<code>grad.weight.*</code>, <code>optimizer.m.*</code>, <code>optimizer.v.*</code>).</li>
+  <li>Current policy: keep inference pipeline stable, iterate training pipeline quickly, then unify once parity + diagnostics are robust.</li>
+</ul>
+
+<p>So today: inference uses <code>build_ir_v7.py</code>; training uses <code>build_ir_train_v7.py</code> + <code>lower_ir2_backward_v7.py</code>. Both share IR types and kernel registry contracts.</p>
 
 <h2>How Residual, GQA, and Splits Stitch Backward</h2>
 

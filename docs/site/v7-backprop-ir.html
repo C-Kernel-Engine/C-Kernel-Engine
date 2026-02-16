@@ -1023,6 +1023,50 @@
   <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
 </ol>
 
+<h2>Why Drift Moved From ~Step 65 to ~Step 800</h2>
+
+<p>Yes, execution order changed in an important way. The generated train runtime now enforces accumulation-window semantics so optimizer updates only happen at the true boundary of <code>CK_GRAD_ACCUM_STEPS</code> micro-steps.</p>
+
+<div class="img-container svg-viewer" data-title="Grad-Accum Window Schedule">
+  <img src="assets/v7-grad-accum-window.svg" alt="Before and after schedule for gradient accumulation and optimizer boundary">
+</div>
+
+<ul>
+  <li><strong>Before</strong>: optimizer timing could drift relative to the intended accumulation window.</li>
+  <li><strong>Now</strong>: each window does <code>zero_grad</code> once, accumulates grads over micro-steps, then applies one optimizer step at boundary.</li>
+  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift appears much later and is smaller.</li>
+</ul>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Current Numeric Status</h3>
+  <ul style="margin-bottom: 0;">
+    <li>Stress config (<code>Hello!</code>, AdamW, <code>lr=1e-3</code>) can still show late parameter drift near ~800 steps in full-C mode.</li>
+    <li>Switching only loss backend to torch (<code>--ck-loss-backend torch</code>) passes the same 1000-step stress run.</li>
+    <li>This points to remaining long-horizon cumulative error in C-loss + AdamW interaction, not the old early scheduling bug.</li>
+  </ul>
+</div>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Schedule Pseudocode (Expected)</h3>
+  <pre>if g_accum_step == 0: zero_grad()
+forward()
+backward()
+g_accum_step += 1
+if g_accum_step >= CK_GRAD_ACCUM_STEPS:
+    optimizer_step()
+    g_accum_step = 0</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Cross-Entropy Semantics</h3>
+  <p style="margin: 0;">C cross-entropy now uses log-sum-exp style loss accumulation to match PyTorch semantics and avoid probability-clamp artifacts. This tightened early parity, but long-horizon stress still needs final numeric tightening before claiming full production readiness for long custom pretraining runs.</p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Production Readiness Guidance</h3>
+  <p style="margin: 0;">For current work, treat v7 training as <strong>good for controlled experiments and parity-driven bring-up</strong>. For long from-scratch production training, keep oracle checks enabled and use the realistic long-horizon gate as the blocker until the remaining late drift is eliminated.</p>
+</div>
+
 <div class="card">
   <h3 style="margin-top: 0;">Template Flexibility</h3>
   <p style="margin-top: 0;">You can use built-ins (<code>qwen3</code>, <code>qwen2</code>, <code>gemma3</code>) or a custom template file. If a template op has kernel coverage and bindings, it can be stitched automatically.</p>
@@ -1076,6 +1120,17 @@ version/v7/scripts/cks-v7-run init \
     <td>Emit deterministic C calls and memory references only</td>
   </tr>
 </table>
+
+<h2>Why Train Builder Is Separate From Inference Builder (For Now)</h2>
+
+<ul>
+  <li>Inference IR is decode/prefill-oriented and optimized around quantized runtime contracts.</li>
+  <li>Training IR adds backward-only semantics: grad fanout merges, loss seed ops, optimizer state, clip/update boundaries.</li>
+  <li>Training layout needs persistent regions inference does not own (<code>grad.weight.*</code>, <code>optimizer.m.*</code>, <code>optimizer.v.*</code>).</li>
+  <li>Current policy: keep inference pipeline stable, iterate training pipeline quickly, then unify once parity + diagnostics are robust.</li>
+</ul>
+
+<p>So today: inference uses <code>build_ir_v7.py</code>; training uses <code>build_ir_train_v7.py</code> + <code>lower_ir2_backward_v7.py</code>. Both share IR types and kernel registry contracts.</p>
 
 <h2>How Residual, GQA, and Splits Stitch Backward</h2>
 
@@ -1174,6 +1229,106 @@ version/v7/scripts/cks-v7-run init \
   <pre>python3 version/v7/tools/open_ir_visualizer.py \
   --generate --run /tmp/v7_exp1 --html-only</pre>
   <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
+</div>
+
+
+<h2>Verification Matrix: Epoch 1 to 10 + Checkpoints + Oracle</h2>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Use <code>.venv/bin/python</code> for strict PyTorch snapshot oracle</strong><br>
+    If you use system <code>python3</code> without torch, training falls back to tiny reference telemetry instead of strict slot-level snapshot checks.
+  </div>
+</div>
+
+<pre># 0) init
+.venv/bin/python version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/v7_oracle_10ep \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# 1) epoch-1 strict oracle (every step) + replay + periodic checkpoints
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --parity-on --oracle pytorch --parity-profile debug --parity-every 1 \
+  --parity-replay-on-check --train-save-every 4
+
+# 2) epoch-10 sweep strict oracle + replay + checkpoint cadence
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 10 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --parity-on --oracle pytorch --parity-profile balanced --parity-every 1 \
+  --parity-replay-on-check --train-save-every 20
+
+# 3) memory verification suite (canary toggle + fault injection + ASan agreement)
+.venv/bin/python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_oracle_10ep \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-verify-memory --train-verify-steps 4</pre>
+
+<table>
+  <tr>
+    <th>Artifact</th>
+    <th>Expected</th>
+    <th>Location</th>
+  </tr>
+  <tr>
+    <td>train summary</td>
+    <td><code>pass_parity: true</code>, strict oracle source + replay checks</td>
+    <td><code>/tmp/v7_oracle_10ep/train_e2e_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>checkpoints</td>
+    <td><code>weights_step_*.bump</code> + per-step manifest</td>
+    <td><code>/tmp/v7_oracle_10ep/checkpoints/</code></td>
+  </tr>
+  <tr>
+    <td>memory verification</td>
+    <td><code>ok: true</code> (toggle diff, intentional +1 catch, ASan agreement, bounds)</td>
+    <td><code>/tmp/v7_oracle_10ep/memory_verification_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>viewer report</td>
+    <td>training tabs populated from run-dir artifacts</td>
+    <td><code>/tmp/v7_oracle_10ep/ir_report.html</code></td>
+  </tr>
+</table>
+
+<h2>PR4.5 Throughput Track</h2>
+
+<ul>
+  <li>Add explicit threaded GEMM dispatch for v7 training runtime (not serial-only blocked calls).</li>
+  <li>Compile runtime with consistent parallel flags and deterministic thread control.</li>
+  <li>Prepack/plan GEMM weight access to reduce cache misses.</li>
+  <li>Reduce backward buffer traffic hotspots (<code>grad_accumulate</code>, <code>memset</code>, <code>memmove</code>).</li>
+  <li>Keep strict parity tolerances unchanged while optimizing.</li>
+</ul>
+
+<h2>Performance Workflow (After Parity Is Green)</h2>
+
+<ol>
+  <li>Run CK baseline without oracle: <code>--backend ck --parity-on=false</code>.</li>
+  <li>Run reference harness timing: <code>--backend both</code> (captures CK vs torch step metrics).</li>
+  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts.</li>
+  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>).</li>
+  <li>Use ASan for bounds/UB; use Valgrind when you need slower but deeper leak/use-after-free analysis.</li>
+</ol>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Threading Sanity</h3>
+  <p style="margin-top: 0;">Before optimization work, confirm CK runtime is saturating cores and not running in an accidental single-thread path. Use train step timing plus profiler traces to validate threadpool/OpenMP utilization, then optimize kernel hotspots (usually GEMM backward and attention backward first).</p>
 </div>
 
 <h2>How You Know It Is Actually Training</h2>

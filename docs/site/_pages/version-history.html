@@ -152,15 +152,15 @@
   </p>
 
   <div class="arch-timeline">
-    <div class="arch-node current">
+    <div class="arch-node done">
       <div class="arch-node-badge arch-v66">v6.6</div>
-      <div class="arch-node-label">IR-Driven</div>
+      <div class="arch-node-label">IR + Tooling</div>
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
-    <div class="arch-node">
+    <div class="arch-node current">
       <div class="arch-node-badge arch-v7">v7</div>
-      <div class="arch-node-label">Training</div>
+      <div class="arch-node-label">Training Build</div>
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
@@ -215,6 +215,13 @@
       gap: 0.5rem;
       min-width: 70px;
     }
+    .arch-node.done .arch-node-badge {
+      box-shadow: 0 0 0 2px rgba(71, 180, 117, 0.35);
+    }
+    .arch-node.done .arch-node-dot {
+      background: #47b475;
+      box-shadow: 0 0 6px rgba(71, 180, 117, 0.5);
+    }
     .arch-node.current .arch-node-badge {
       box-shadow: 0 0 0 3px rgba(255, 180, 0, 0.4);
     }
@@ -256,9 +263,11 @@
   </style>
 
   <!-- IR Evolution Accordion -->
-  <h2>IR Evolution: From Hardcoded to Graph-Driven</h2>
+  <h2>IR Evolution: v6.x Orchestrator -> v6.6 Inference IR -> v7 Training IR</h2>
   <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-    See how v6.6 achieves true IR-driven code generation, eliminating hardcoded paths.
+    The progression is explicit: v6.x hardcoded orchestration, v6.5 generated-hybrid paths,
+    v6.6 pure IR-driven inference, and v7 IR-driven training lowering with backward synthesis,
+    contiguous training layout, and runtime safety diagnostics.
   </p>
 
   <style>
@@ -294,6 +303,7 @@
     .ir-version-badge.v6-0 { background: #555; color: white; }
     .ir-version-badge.v6-5 { background: #666; color: white; }
     .ir-version-badge.v6-6 { background: #ffb400; color: var(--dark); }
+    .ir-version-badge.v7 { background: #47b475; color: white; }
     .ir-title {
       flex: 1;
       font-weight: 500;
@@ -308,6 +318,8 @@
     .ir-badge-hardcoded { background: #e74c3c; color: white; }
     .ir-badge-hybrid { background: #f39c12; color: white; }
     .ir-badge-ir { background: #47b475; color: white; }
+    .ir-badge-released { background: #2e8b57; color: white; }
+    .ir-badge-building { background: #ffb400; color: var(--dark); }
     .ir-toggle {
       color: var(--text-muted);
       font-size: 1.25rem;
@@ -519,14 +531,11 @@
     </div>
 
     <!-- v6.6 - Pure IR-Driven -->
-    <div class="ir-accordion-item open">
-      <div class="ir-accordion-header current" onclick="toggleIrAccordion(this)">
+    <div class="ir-accordion-item">
+      <div class="ir-accordion-header" onclick="toggleIrAccordion(this)">
         <span class="ir-version-badge v6-6">v6.6</span>
-        <span class="ir-title">
-          <span class="current-indicator"></span>
-          Pure IR-Driven: Core Inference Flow
-        </span>
-        <span class="ir-badge ir-badge-ir">Current</span>
+        <span class="ir-title">Pure IR-Driven Inference (Released)</span>
+        <span class="ir-badge ir-badge-released">Released</span>
         <span class="ir-toggle">▼</span>
       </div>
       <div class="ir-accordion-content">
@@ -598,6 +607,86 @@
         </div>
       </div>
     </div>
+
+    <!-- v7 - IR-Driven Training Runtime -->
+    <div class="ir-accordion-item open">
+      <div class="ir-accordion-header current" onclick="toggleIrAccordion(this)">
+        <span class="ir-version-badge v7">v7</span>
+        <span class="ir-title">
+          <span class="current-indicator"></span>
+          IR-Driven Training Runtime (Building)
+        </span>
+        <span class="ir-badge ir-badge-building">Current Build</span>
+        <span class="ir-toggle">▼</span>
+      </div>
+      <div class="ir-accordion-content">
+        <div class="ir-details">
+          <p style="color: var(--text-secondary);">
+            <strong>v7</strong> keeps the same IR-first architecture and adds training-specific lowering:
+            IR1 train-forward, IR2 backward synthesis with explicit gradient accumulation,
+            contiguous training memory layout, generated C runtime, and canary/layout diagnostics.
+          </p>
+          <p style="margin-top: 0.75rem;">
+            See <a href="v7-backprop-ir.html">v7 Backprop IR Pipeline</a> for the full visual walk-through.
+          </p>
+          <div class="ir-comparison">
+            <div class="ir-column">
+              <h4>Lowered Artifacts</h4>
+              <ul class="ir-feature-list">
+                <li><span class="yes">✓</span> <code>ir1_train_forward.json</code></li>
+                <li><span class="yes">✓</span> <code>ir2_train_backward.json</code></li>
+                <li><span class="yes">✓</span> <code>layout_train.json</code></li>
+                <li><span class="yes">✓</span> <code>generated_train_runtime_v7.c</code></li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>Safety + Diagnostics</h4>
+              <ul class="ir-feature-list">
+                <li><span class="yes">✓</span> canary checks by phase</li>
+                <li><span class="yes">✓</span> layout audit report</li>
+                <li><span class="yes">✓</span> first-divergence tracing</li>
+                <li><span class="yes">✓</span> CK vs PyTorch parity gates</li>
+              </ul>
+            </div>
+            <div class="ir-column">
+              <h4>Next Lowering Steps</h4>
+              <ul class="ir-feature-list">
+                <li>Execution-plan JSON (<code>train_exec_plan.json</code>)</li>
+                <li>Threaded GEMM split policy (M/N/K)</li>
+                <li>Deterministic reduction contracts</li>
+                <li>One-command operator train gate</li>
+              </ul>
+            </div>
+          </div>
+          <div class="ir-stats">
+            <div class="ir-stat">
+              <div class="ir-stat-value">IR1+IR2</div>
+              <div class="ir-stat-label">Training Graph</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">Contiguous</div>
+              <div class="ir-stat-label">Train Memory</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">Canary</div>
+              <div class="ir-stat-label">Runtime Safety</div>
+            </div>
+            <div class="ir-stat">
+              <div class="ir-stat-value">Oracle</div>
+              <div class="ir-stat-label">Parity Tracking</div>
+            </div>
+          </div>
+          <div class="ir-example">
+            // v7 style: training lowering pipeline
+            ir1 = build_ir_train_forward(template, manifest)
+            ir2 = synthesize_backward(ir1, grad_rules)
+            layout = plan_train_memory(ir2)             // layout_train.json
+            code = generate_train_runtime(ir2, layout)  // generated_train_runtime_v7.c
+            // diagnostics + parity gates validate execution
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -635,20 +724,27 @@
         <td>IR Fusion + Parallel</td>
         <td>IR-driven fusion kernels, OpenMP parallelization, MEGA kernels</td>
         <td>Base</td>
-        <td><span class="version-status status-current">Current</span></td>
+        <td><span class="version-status status-released">Released</span></td>
       </tr>
       <tr>
         <td><strong>v7.0</strong></td>
-        <td>Training Forward</td>
-        <td>IR extend to backward, all kernels get grad() support, toy-model parity (fwd+bwd)</td>
+        <td>Training IR Foundation</td>
+        <td>IR1 train-forward + IR2 backward synthesis, training kernel-map parity, v7 init/train/parity CLI flow</td>
         <td>v6.6</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
       <tr>
-        <td><strong>v7.x</strong></td>
-        <td>Training Loop</td>
-        <td>Optimizer kernels (AdamW, SGD), LR schedulers, gradient accumulation</td>
+        <td><strong>v7.1</strong></td>
+        <td>Runtime Safety + Diagnostics</td>
+        <td>Contiguous train memory layout, canary diagnostics, layout audit, first-divergence tracing against oracle</td>
         <td>v7.0</td>
+        <td><span class="version-status status-building">Building</span></td>
+      </tr>
+      <tr>
+        <td><strong>v7.2</strong></td>
+        <td>Threaded Training Runtime</td>
+        <td>IR3 execution plan for dispatch, threaded GEMM policy (split M/N/K), deterministic reductions</td>
+        <td>v7.1</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
@@ -713,38 +809,117 @@
       <div class="version-content">
         <div class="version-header">
           <span class="version-status status-building">Building</span>
-          <span class="version-date">Target: ~2 months</span>
+          <span class="version-date">Current sprint track</span>
         </div>
-        <p class="version-tagline">"Training Forward" - Extend IR to support backward pass</p>
+        <p class="version-tagline">"Training IR Runtime" - From parity-first training to fully lowered train execution</p>
         <ul class="milestone-list">
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>PR1:</strong> v7 CLI contracts + strict validation + inference smoke gate</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>PR2:</strong> Generated train runtime path wired (ck backend callable)</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>PR3:</strong> Contiguous train layout + canary diagnostics + strict first-divergence tracing</span>
+          </li>
           <li class="milestone current">
             <span class="milestone-icon building">▶</span>
-            <span class="milestone-text">IR v3: Add gradient tensor semantics to IR</span>
+            <span class="milestone-text"><strong>PR4 (current):</strong> Oracle cadence + drift triage artifacts + deterministic replay hardening</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">All kernels get backward() implementation</span>
+            <span class="milestone-text"><strong>PR5:</strong> Threaded GEMM dispatch lowered from IR3 execution plan</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">Autodiff engine for IR graph traversal</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">make test-training target</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">Parity gate: forward+backward on toy model (Karpathy llm)</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-icon planned">○</span>
-            <span class="milestone-text">Train small Qwen-style model end-to-end (inference-compatible)</span>
+            <span class="milestone-text"><strong>PR6:</strong> Run-dir artifact unification + one-command v7 train gate</span>
           </li>
         </ul>
       </div>
     </div>
   </div>
+
+  <h2>v7 PR Progress (As of 2026-02-15)</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+    Snapshot of current v7 workstream in this repository. Status is based on implemented PR slices and current gate behavior.
+  </p>
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>PR</th>
+        <th>Scope</th>
+        <th>Status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>PR1</strong></td>
+        <td>v7 CLI contracts + strict preflight + inference smoke</td>
+        <td><span class="version-status status-released">Done</span></td>
+        <td class="dep-cell">Foundation for safe training iteration</td>
+      </tr>
+      <tr>
+        <td><strong>PR2</strong></td>
+        <td>Generated runtime callable via <code>--backend ck</code></td>
+        <td><span class="version-status status-released">Done</span></td>
+        <td class="dep-cell">CK runtime path executes train step loop</td>
+      </tr>
+      <tr>
+        <td><strong>PR3</strong></td>
+        <td>Contiguous train layout, canary diagnostics, layout audit, drift localization</td>
+        <td><span class="version-status status-released">Done</span></td>
+        <td class="dep-cell">Major safety/stability milestone for v7 runtime</td>
+      </tr>
+      <tr>
+        <td><strong>PR4</strong></td>
+        <td>Oracle cadence + drift triage + replay determinism</td>
+        <td><span class="version-status status-building">Building</span></td>
+        <td class="dep-cell">Tighten parity and first-divergence operator diagnostics</td>
+      </tr>
+      <tr>
+        <td><strong>PR5</strong></td>
+        <td>IR3-lowered threaded GEMM dispatch</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+        <td class="dep-cell">Primary performance milestone (split M/N/K policy)</td>
+      </tr>
+      <tr>
+        <td><strong>PR6</strong></td>
+        <td>Run-dir unification + single v7 train gate command</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+        <td class="dep-cell">Operator-grade end-to-end workflow</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>v7 Commit Progression (Recent)</h3>
+  <p style="color: var(--text-secondary); margin-bottom: 0.75rem;">
+    Recent v7 commits on this branch that map to the PR progression above:
+  </p>
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>Commit</th>
+        <th>Summary</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>40a3b221</code></td><td>land training-oracle runtime updates + regenerated docs</td></tr>
+      <tr><td><code>20b7fcbe</code></td><td>runtime checkpoints + PR4.5 roadmap/docs</td></tr>
+      <tr><td><code>c3041b1a</code></td><td>train IR/layout/codegen runtime + parity-visible tooling</td></tr>
+      <tr><td><code>db570fe5</code></td><td>train layout audit + default training kernel parity gates</td></tr>
+      <tr><td><code>f2e30342</code></td><td>execute generated C runtime for <code>--backend ck</code></td></tr>
+      <tr><td><code>e7b81c56</code></td><td>strict train CLI + inference smoke gate</td></tr>
+      <tr><td><code>115143a6</code></td><td>run-dir training viewer + PyTorch oracle parity scaffolding</td></tr>
+      <tr><td><code>9b98139d</code></td><td>initial v7 backprop foundation</td></tr>
+    </tbody>
+  </table>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+    Full log command: <code>git log --oneline -- version/v7</code>
+  </p>
 
   <!-- v6.6 (Current) -->
   <div class="version-timeline">
@@ -755,7 +930,7 @@
           <span class="version-status status-released">Released</span>
           <span class="version-date">2026-01-15</span>
         </div>
-        <p class="version-tagline">"IR Fusion" - IR-driven kernel fusion and parallelization</p>
+        <p class="version-tagline">"IR Fusion + Operator Tooling" - shipped with profiler-integrated diagnostics</p>
         <ul class="milestone-list">
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
@@ -767,11 +942,11 @@
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">OpenMP parallelization in generated code</span>
+            <span class="milestone-text done">Thread pool for parallel prefill/decode</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
-            <span class="milestone-text done">Thread pool for parallel prefill/decode</span>
+            <span class="milestone-text done">IR visualizer with perf gate artifacts (perf/flamegraph/VTune integration)</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
@@ -781,9 +956,9 @@
             <span class="milestone-icon done">✓</span>
             <span class="milestone-text done">Sliding-window attention contract test integrated into make/nightly parity flow</span>
           </li>
-          <li class="milestone current">
-            <span class="milestone-icon building">▶</span>
-            <span class="milestone-text">make llamacpp-parity-full (all kernels) -- in progress</span>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done">llama.cpp parity flow completed in prepared environments (torch + llama parity lib available)</span>
           </li>
         </ul>
       </div>
@@ -832,7 +1007,7 @@
     <ul class="milestone-list">
       <li class="milestone">
         <span class="milestone-icon done">✓</span>
-        <span class="milestone-text">Backwards compatibility: v7 training uses same IR as v6 inference</span>
+        <span class="milestone-text">IR continuity: v7 training reuses the same IR-first architecture, with train-specific layout and execution artifacts</span>
       </li>
       <li class="milestone">
         <span class="milestone-icon done">✓</span>
@@ -906,14 +1081,15 @@ const versionData = {
   next: {
     major: 7,
     minor: 0,
-    phase: "training_forward",
-    target: "2026-03-15",
-    milestones_planned: 4
+    phase: "training_ir_runtime",
+    target: "2026-04-15",
+    milestones_planned: 6
   },
   roadmap: [
     { major: 6, minor: 6, phase: "IR Fusion + Parallel", done: true },
-    { major: 7, minor: 0, phase: "Training Forward", building: true },
-    { major: 7, minor: 5, phase: "Training Complete", planned: true },
+    { major: 7, minor: 0, phase: "Training IR Foundation", building: true },
+    { major: 7, minor: 1, phase: "Runtime Safety + Diagnostics", building: true },
+    { major: 7, minor: 2, phase: "Threaded Train Runtime", planned: true },
     { major: 8, minor: 0, phase: "MoE Architecture", planned: true },
     { major: 9, minor: 0, phase: "MoE Backward", planned: true },
     { major: 10, minor: 0, phase: "LoRA / QLoRA", planned: true },
