@@ -876,6 +876,7 @@
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
                         <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -897,6 +898,7 @@
                         <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -1023,7 +1025,7 @@
   <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
 </ol>
 
-<h2>Why Drift Moved From ~Step 65 to ~Step 800</h2>
+<h2>Drift Timeline: Early Schedule Bug to CE Numeric Tightening</h2>
 
 <p>Yes, execution order changed in an important way. The generated train runtime now enforces accumulation-window semantics so optimizer updates only happen at the true boundary of <code>CK_GRAD_ACCUM_STEPS</code> micro-steps.</p>
 
@@ -1034,15 +1036,15 @@
 <ul>
   <li><strong>Before</strong>: optimizer timing could drift relative to the intended accumulation window.</li>
   <li><strong>Now</strong>: each window does <code>zero_grad</code> once, accumulates grads over micro-steps, then applies one optimizer step at boundary.</li>
-  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift appears much later and is smaller.</li>
+  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift moved to much later horizons and required CE semantic/numeric tightening.</li>
 </ul>
 
 <div class="card">
   <h3 style="margin-top: 0;">Current Numeric Status</h3>
   <ul style="margin-bottom: 0;">
-    <li>Stress config (<code>Hello!</code>, AdamW, <code>lr=1e-3</code>) can still show late parameter drift near ~800 steps in full-C mode.</li>
-    <li>Switching only loss backend to torch (<code>--ck-loss-backend torch</code>) passes the same 1000-step stress run.</li>
-    <li>This points to remaining long-horizon cumulative error in C-loss + AdamW interaction, not the old early scheduling bug.</li>
+    <li>Historical baseline showed late drift in full-C stress; CE parity fixes now remove that trigger in the 850-step repro.</li>
+    <li>All three loss backends (<code>c</code>, <code>c_ptref</code>, <code>torch</code>) pass the same deterministic 850-step parity run.</li>
+    <li>Training-side production gates (drift smoke, realistic long-horizon, optimizer parity, FD-grad, replay) are now passing in this validation pass.</li>
   </ul>
 </div>
 
@@ -1059,12 +1061,12 @@ if g_accum_step >= CK_GRAD_ACCUM_STEPS:
 
 <div class="card">
   <h3 style="margin-top: 0;">Cross-Entropy Semantics</h3>
-  <p style="margin: 0;">C cross-entropy now uses log-sum-exp style loss accumulation to match PyTorch semantics and avoid probability-clamp artifacts. This tightened early parity, but long-horizon stress still needs final numeric tightening before claiming full production readiness for long custom pretraining runs.</p>
+  <p style="margin: 0;">C cross-entropy uses stable log-sum-exp loss math and PyTorch-aligned index-target mean reduction semantics. For the full CE derivation (<code>p - one_hot</code>), ignore-index denominator details, and long-horizon repro data, read <a href="v7-cross-entropy-parity.html"><code>v7-cross-entropy-parity.html</code></a>.</p>
 </div>
 
 <div class="card">
   <h3 style="margin-top: 0;">Production Readiness Guidance</h3>
-  <p style="margin: 0;">For current work, treat v7 training as <strong>good for controlled experiments and parity-driven bring-up</strong>. For long from-scratch production training, keep oracle checks enabled and use the realistic long-horizon gate as the blocker until the remaining late drift is eliminated.</p>
+  <p style="margin: 0;">For v7 training backprop, keep production safety enabled (<code>--max-grad-norm</code>, enforced LR guardrails) and retain long-horizon parity gates as blockers. This now gives a production-grade path for the validated v7 harness profile while preserving reproducibility checks.</p>
 </div>
 
 <div class="card">
@@ -1321,8 +1323,8 @@ version/v7/scripts/cks-v7-run init \
 <ol>
   <li>Run CK baseline without oracle: <code>--backend ck --parity-on=false</code>.</li>
   <li>Run reference harness timing: <code>--backend both</code> (captures CK vs torch step metrics).</li>
-  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts.</li>
-  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>).</li>
+  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts (see <a href="v7-profiling.html"><code>v7-profiling.html</code></a>).</li>
+  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>), and Advisor for roofline analysis.</li>
   <li>Use ASan for bounds/UB; use Valgrind when you need slower but deeper leak/use-after-free analysis.</li>
 </ol>
 
@@ -1589,6 +1591,25 @@ version/v7/scripts/cks-v7-run init \
     })();
     </script>
 
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
     <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
         <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
             <div>
@@ -1612,7 +1633,7 @@ version/v7/scripts/cks-v7-run init \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-16</p>
             </div>
         </div>
     </footer>

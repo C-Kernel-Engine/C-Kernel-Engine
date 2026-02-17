@@ -135,6 +135,36 @@
     </tbody>
 </table>
 
+<h2>5. Loss & Training Kernels</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>softmax_cross_entropy_loss</code></td>
+            <td><code>loss_kernels.c</code></td>
+            <td>Fused softmax + CE loss/gradient kernel used by v7 training parity harness.</td>
+        </tr>
+        <tr>
+            <td><code>softmax_cross_entropy_loss_ptref</code></td>
+            <td><code>loss_kernels.c</code></td>
+            <td>Strict PyTorch-reference CE variant for parity experiments and drift diagnostics.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Cross-Entropy Deep Dive (v7)</h3>
+    <p>For full derivation (<code>p - one_hot</code>), PyTorch reduction semantics (<code>ignore_index</code>, denominator rules), and long-horizon drift-fix evidence, see:</p>
+    <p><a href="v7-cross-entropy-parity.html"><strong>v7 Cross-Entropy Parity</strong></a></p>
+</div>
+
 <h2>Memory Layouts</h2>
 
 <p>Most kernels assume <strong>Row-Major</strong> contiguous memory unless specified otherwise.</p>
