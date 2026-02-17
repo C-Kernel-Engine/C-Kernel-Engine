@@ -96,7 +96,7 @@
   <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
 </ol>
 
-<h2>Why Drift Moved From ~Step 65 to ~Step 800</h2>
+<h2>Drift Timeline: Early Schedule Bug to CE Numeric Tightening</h2>
 
 <p>Yes, execution order changed in an important way. The generated train runtime now enforces accumulation-window semantics so optimizer updates only happen at the true boundary of <code>CK_GRAD_ACCUM_STEPS</code> micro-steps.</p>
 
@@ -107,15 +107,15 @@
 <ul>
   <li><strong>Before</strong>: optimizer timing could drift relative to the intended accumulation window.</li>
   <li><strong>Now</strong>: each window does <code>zero_grad</code> once, accumulates grads over micro-steps, then applies one optimizer step at boundary.</li>
-  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift appears much later and is smaller.</li>
+  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift moved to much later horizons and required CE semantic/numeric tightening.</li>
 </ul>
 
 <div class="card">
   <h3 style="margin-top: 0;">Current Numeric Status</h3>
   <ul style="margin-bottom: 0;">
-    <li>Stress config (<code>Hello!</code>, AdamW, <code>lr=1e-3</code>) can still show late parameter drift near ~800 steps in full-C mode.</li>
-    <li>Switching only loss backend to torch (<code>--ck-loss-backend torch</code>) passes the same 1000-step stress run.</li>
-    <li>This points to remaining long-horizon cumulative error in C-loss + AdamW interaction, not the old early scheduling bug.</li>
+    <li>Historical baseline showed late drift in full-C stress; CE parity fixes now remove that trigger in the 850-step repro.</li>
+    <li>All three loss backends (<code>c</code>, <code>c_ptref</code>, <code>torch</code>) pass the same deterministic 850-step parity run.</li>
+    <li>Training-side production gates (drift smoke, realistic long-horizon, optimizer parity, FD-grad, replay) are now passing in this validation pass.</li>
   </ul>
 </div>
 
@@ -132,12 +132,12 @@ if g_accum_step >= CK_GRAD_ACCUM_STEPS:
 
 <div class="card">
   <h3 style="margin-top: 0;">Cross-Entropy Semantics</h3>
-  <p style="margin: 0;">C cross-entropy now uses log-sum-exp style loss accumulation to match PyTorch semantics and avoid probability-clamp artifacts. This tightened early parity, but long-horizon stress still needs final numeric tightening before claiming full production readiness for long custom pretraining runs.</p>
+  <p style="margin: 0;">C cross-entropy uses stable log-sum-exp loss math and PyTorch-aligned index-target mean reduction semantics. For the full CE derivation (<code>p - one_hot</code>), ignore-index denominator details, and long-horizon repro data, read <a href="v7-cross-entropy-parity.html"><code>v7-cross-entropy-parity.html</code></a>.</p>
 </div>
 
 <div class="card">
   <h3 style="margin-top: 0;">Production Readiness Guidance</h3>
-  <p style="margin: 0;">For current work, treat v7 training as <strong>good for controlled experiments and parity-driven bring-up</strong>. For long from-scratch production training, keep oracle checks enabled and use the realistic long-horizon gate as the blocker until the remaining late drift is eliminated.</p>
+  <p style="margin: 0;">For v7 training backprop, keep production safety enabled (<code>--max-grad-norm</code>, enforced LR guardrails) and retain long-horizon parity gates as blockers. This now gives a production-grade path for the validated v7 harness profile while preserving reproducibility checks.</p>
 </div>
 
 <div class="card">
@@ -394,8 +394,8 @@ version/v7/scripts/cks-v7-run init \
 <ol>
   <li>Run CK baseline without oracle: <code>--backend ck --parity-on=false</code>.</li>
   <li>Run reference harness timing: <code>--backend both</code> (captures CK vs torch step metrics).</li>
-  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts.</li>
-  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>).</li>
+  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts (see <a href="v7-profiling.html"><code>v7-profiling.html</code></a>).</li>
+  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>), and Advisor for roofline analysis.</li>
   <li>Use ASan for bounds/UB; use Valgrind when you need slower but deeper leak/use-after-free analysis.</li>
 </ol>
 

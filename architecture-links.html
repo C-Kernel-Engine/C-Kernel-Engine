@@ -876,6 +876,7 @@
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
                         <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -897,6 +898,7 @@
                         <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -942,6 +944,8 @@
                 <span class="subtitle">Templates → IR1 → IR2 → Lowering</span></li>
             <li><a href="v7-backprop-ir.html">v7 Backprop IR Pipeline</a>
                 <span class="subtitle">Init → IR1 → IR2 → Layout → Codegen + canary diagnostics</span></li>
+            <li><a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity</a>
+                <span class="subtitle">p - one_hot derivation, PyTorch semantics, long-horizon drift fixes</span></li>
             <li><a href="model-kernel-matrix.html">Model + Kernel Matrix</a>
                 <span class="subtitle">Qwen2/Qwen3/Gemma + kernel coverage</span></li>
             <li><a href="tokenizer.html">Tokenizer</a>
@@ -1002,6 +1006,8 @@
                 <span class="subtitle">RDMA, interpretability</span></li>
             <li><a href="profiling.html">Profiling Guide</a>
                 <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
+            <li><a href="v7-profiling.html">v7 Profiling Runbook</a>
+                <span class="subtitle">VTune + Advisor + perf/flamegraph on train kernels</span></li>
             <li><a href="testing.html">Testing</a>
                 <span class="subtitle">Numerical parity verification</span></li>
         </ul>
@@ -1045,7 +1051,7 @@
         </tr>
         <tr>
             <td><strong>Understanding the system</strong></td>
-            <td><a href="architecture.html">System Overview</a>, <a href="concepts.html">Concepts</a>, <a href="v7-backprop-ir.html">v7 Backprop IR</a></td>
+            <td><a href="architecture.html">System Overview</a>, <a href="concepts.html">Concepts</a>, <a href="v7-backprop-ir.html">v7 Backprop IR</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity</a></td>
         </tr>
         <tr>
             <td><strong>Implementing new kernels</strong></td>
@@ -1061,7 +1067,7 @@
         </tr>
         <tr>
             <td><strong>Debugging & profiling</strong></td>
-            <td><a href="profiling.html">Profiling</a>, <a href="testing.html">Testing</a></td>
+            <td><a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a></td>
         </tr>
     </table>
 </div>
@@ -1251,6 +1257,25 @@
     })();
     </script>
 
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
     <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
         <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
             <div>
@@ -1274,7 +1299,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-17</p>
             </div>
         </div>
     </footer>

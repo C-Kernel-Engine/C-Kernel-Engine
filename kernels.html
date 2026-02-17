@@ -876,6 +876,7 @@
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
                         <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -897,6 +898,7 @@
                         <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -1061,6 +1063,36 @@
         </tr>
     </tbody>
 </table>
+
+<h2>5. Loss & Training Kernels</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Kernel</th>
+            <th>Source File</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>softmax_cross_entropy_loss</code></td>
+            <td><code>loss_kernels.c</code></td>
+            <td>Fused softmax + CE loss/gradient kernel used by v7 training parity harness.</td>
+        </tr>
+        <tr>
+            <td><code>softmax_cross_entropy_loss_ptref</code></td>
+            <td><code>loss_kernels.c</code></td>
+            <td>Strict PyTorch-reference CE variant for parity experiments and drift diagnostics.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Cross-Entropy Deep Dive (v7)</h3>
+    <p>For full derivation (<code>p - one_hot</code>), PyTorch reduction semantics (<code>ignore_index</code>, denominator rules), and long-horizon drift-fix evidence, see:</p>
+    <p><a href="v7-cross-entropy-parity.html"><strong>v7 Cross-Entropy Parity</strong></a></p>
+</div>
 
 <h2>Memory Layouts</h2>
 
@@ -1256,6 +1288,25 @@
     })();
     </script>
 
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
     <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
         <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
             <div>
@@ -1279,7 +1330,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-17</p>
             </div>
         </div>
     </footer>

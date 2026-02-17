@@ -1,0 +1,218 @@
+<!-- TITLE: v7 Cross-Entropy Parity -->
+<!-- NAV: research -->
+
+<h1>v7 Cross-Entropy Parity: Why Small Math Choices Matter</h1>
+
+<p>This page explains the v7 cross-entropy (CE) kernel in detail: the <code>p - one_hot</code> gradient, PyTorch reduction semantics, long-horizon drift behavior, and the concrete changes that moved CE from fragile to production-grade for the v7 training harness.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Executive Summary</strong><br>
+    CE looked simple, but long-horizon behavior was sensitive to tiny semantic and numeric details. Matching PyTorch on reduction/ignore behavior and using stable log-sum-exp loss math removed the drift trigger in the 850-step v7 repro.
+  </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="v7 CE Parity Roadmap">
+  <img src="assets/v7-cross-entropy-parity-map.svg" alt="v7 cross-entropy parity map from math derivation to production gates">
+</div>
+
+<h2>The Core Gradient: Why It Is <code>p - one_hot</code></h2>
+
+<p>For one token with logits <code>z</code> and target class <code>y</code>:</p>
+
+<p>\[
+p_i = \frac{e^{z_i}}{\sum_j e^{z_j}}, \quad
+\mathcal{L} = -\log(p_y)
+\]</p>
+
+<p>\[
+\frac{\partial \mathcal{L}}{\partial z_i}
+= p_i - \mathbf{1}[i = y]
+\]</p>
+
+<p>So each row gradient is:</p>
+
+<p>\[
+\nabla_{z}\mathcal{L} = p - \text{one\_hot}(y)
+\]</p>
+
+<p>For mean reduction over <code>N_valid</code> targets:</p>
+
+<p>\[
+\nabla_{z}\mathcal{L}_{\text{mean}}
+= \frac{p - \text{one\_hot}(y)}{N_{\text{valid}}}
+\]</p>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Why This Matters</h3>
+  <p style="margin: 0;">The gradient formula itself is standard. Most long-horizon mismatch comes from <em>how</em> we compute softmax/log-loss and <em>which denominator</em> we use for reduction, not from the symbolic derivative.</p>
+</div>
+
+<h2>What Can Go Wrong in Practice</h2>
+
+<table>
+  <tr>
+    <th>Subtle CE Choice</th>
+    <th>Short-Run Effect</th>
+    <th>Long-Run Effect</th>
+  </tr>
+  <tr>
+    <td><code>-log(prob + eps)</code> clamp for loss</td>
+    <td>Looks stable and safe</td>
+    <td>Can cap loss and bias scalar trajectory under extreme logits</td>
+  </tr>
+  <tr>
+    <td>Different reduction denominator</td>
+    <td>Tiny scalar mismatch</td>
+    <td>Persistent optimizer state drift (AdamW moments integrate it)</td>
+  </tr>
+  <tr>
+    <td>Ignore-index mismatch</td>
+    <td>Only appears on masked rows</td>
+    <td>Periodic but cumulative parameter divergence</td>
+  </tr>
+  <tr>
+    <td>Mixed fp32/double operation ordering differences</td>
+    <td>Often below tolerance early</td>
+    <td>Can cross tolerance threshold at later steps</td>
+  </tr>
+</table>
+
+<h2>PyTorch CE Semantics We Matched</h2>
+
+<ul>
+  <li><code>F.cross_entropy(...)</code> routes to <code>torch._C._nn.cross_entropy_loss</code>.</li>
+  <li>Index-target path is effectively <code>log_softmax + nll_loss</code>.</li>
+  <li>Default <code>ignore_index = -100</code> for index targets.</li>
+  <li>Mean reduction divides by non-ignored target count (or summed target weights if class weights are used): \(\frac{\sum \ell_t}{N_{\text{valid}}}\).</li>
+  <li>All targets ignored with mean reduction returns <code>NaN</code> loss; gradients are zero.</li>
+</ul>
+
+<p>Primary source files in local PyTorch checkout:</p>
+<ul>
+  <li><code>pytorch/torch/nn/functional.py</code> (<code>cross_entropy</code> entrypoint)</li>
+  <li><code>pytorch/aten/src/ATen/native/native_functions.yaml</code> (<code>cross_entropy_loss</code> dispatch)</li>
+  <li><code>pytorch/aten/src/ATen/native/LossNLL.cpp</code> (CPU reduction/backward semantics)</li>
+</ul>
+
+<h2>CK v7 CE Variants (Current)</h2>
+
+<table>
+  <tr>
+    <th>Variant</th>
+    <th>Function</th>
+    <th>Behavior</th>
+    <th>Purpose</th>
+  </tr>
+  <tr>
+    <td>Default CE</td>
+    <td><code>softmax_cross_entropy_loss</code></td>
+    <td>Legacy all-valid fast path; PyTorch-style fallback when ignore/invalid targets appear</td>
+    <td>Stable baseline + semantic correctness where needed</td>
+  </tr>
+  <tr>
+    <td>PyTorch-reference CE</td>
+    <td><code>softmax_cross_entropy_loss_ptref</code></td>
+    <td>Always strict index-target mean semantics, strict math path</td>
+    <td>Reference-style parity experiments</td>
+  </tr>
+  <tr>
+    <td>Shared strict index-target impl</td>
+    <td><code>softmax_cross_entropy_loss_index_mean_impl</code></td>
+    <td><code>ignore_index=-100</code>, <code>N_valid</code> denominator, all-ignored <code>NaN</code></td>
+    <td>Semantics parity with PyTorch index-target CE</td>
+  </tr>
+</table>
+
+<p>Implementation: <code>src/kernels/loss_kernels.c</code></p>
+
+<h2>Change Log: What We Improved</h2>
+
+<ol>
+  <li>Switched CE loss calculation to stable log-sum-exp form to avoid probability-clamp artifacts.</li>
+  <li>Added explicit PyTorch-style index-target mean reduction semantics with <code>ignore_index=-100</code>.</li>
+  <li>Added a strict reference CE entrypoint (<code>softmax_cross_entropy_loss_ptref</code>) for parity A/B.</li>
+  <li>Added guarded default routing to preserve all-valid long-horizon stability while handling ignore/invalid targets correctly.</li>
+  <li>Expanded CE unit tests to include mixed-ignore and all-ignored behavior checks.</li>
+</ol>
+
+<h2>Production Evidence (v7 Harness)</h2>
+
+<table>
+  <tr>
+    <th>Run</th>
+    <th>Status</th>
+    <th>Key Drift Metrics</th>
+  </tr>
+  <tr>
+    <td><code>/tmp/v7_ce_semantics_c_850.json</code> (older baseline)</td>
+    <td>FAIL</td>
+    <td><code>first_param_fail_step=117</code>, <code>first_loss_fail_step=64</code></td>
+  </tr>
+  <tr>
+    <td><code>/tmp/v7_ce_semantics_c_850_postfix.json</code></td>
+    <td>PASS</td>
+    <td><code>first_*_fail_step=None</code>, <code>max_loss_abs_diff=9.54e-07</code></td>
+  </tr>
+  <tr>
+    <td><code>/tmp/v7_ce_semantics_c_ptref_850_postfix.json</code></td>
+    <td>PASS</td>
+    <td><code>first_*_fail_step=None</code>, strict CE path also stable</td>
+  </tr>
+  <tr>
+    <td><code>/tmp/v7_ce_semantics_torch_850_postfix.json</code></td>
+    <td>PASS</td>
+    <td>Control run with PyTorch CE also passes same horizon</td>
+  </tr>
+</table>
+
+<p>Additional training gates run clean in this validation pass:</p>
+<ul>
+  <li><code>version/v7/.cache/reports/train_parity_drift_smoke_latest.json</code> (PASS)</li>
+  <li><code>version/v7/.cache/reports/train_parity_realistic_long_horizon_latest.json</code> (PASS)</li>
+  <li><code>version/v7/.cache/reports/optimizer_parity_latest.json</code> (PASS)</li>
+  <li><code>version/v7/.cache/reports/fd_gradients_latest.json</code> (PASS)</li>
+  <li><code>version/v7/.cache/reports/replay_determinism_latest.json</code> (PASS)</li>
+</ul>
+
+<h2>What We Still Do Not Match (Yet)</h2>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Known Scope Gaps vs Full PyTorch CE API</h3>
+  <ul style="margin-bottom: 0;">
+    <li>Label smoothing path is not implemented in CK CE kernel.</li>
+    <li>Per-class weighting parity path is not implemented in CK CE kernel.</li>
+    <li>Probability-target CE (dense target distributions) is not supported in CK CE kernel.</li>
+    <li>CK fused CE is focused on training mean-reduction path used in v7 harness.</li>
+  </ul>
+</div>
+
+<h2>How To Reproduce and Validate</h2>
+
+<pre># CE unit tests (includes ignore_index and all-ignored semantics)
+source .venv/bin/activate
+python unittest/test_cross_entropy.py
+
+# Long-horizon parity stress (850 steps)
+source .venv/bin/activate
+CK_NUM_THREADS=8 python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 8 --seq-len 8 --total-tokens 131072 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 --max-steps 850 \
+  --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c \
+  --json-out /tmp/v7_ce_semantics_c_850_postfix.json
+
+# A/B against strict CE reference path
+source .venv/bin/activate
+CK_NUM_THREADS=8 python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 8 --seq-len 8 --total-tokens 131072 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 --max-steps 850 \
+  --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c_ptref \
+  --json-out /tmp/v7_ce_semantics_c_ptref_850_postfix.json</pre>
+
+<div class="card card-green">
+  <h3 style="margin-top: 0;">Bottom Line</h3>
+  <p style="margin: 0;">CE is not just a textbook formula in production. Matching PyTorch semantics and numeric behavior at the reduction boundary is enough to decide whether long-horizon training stays within tolerance or diverges. In v7, those subtle CE corrections were necessary to make backprop robust.</p>
+</div>

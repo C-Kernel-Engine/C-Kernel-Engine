@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">v7 Cross-Entropy Parity Roadmap</title>
+  <desc id="desc">Diagram showing CE math derivation, PyTorch semantics, CK implementation variants, and production gate outcomes.</desc>
+
+  <defs>
+    <style>
+      .bg { fill: #1f1f1f; }
+      .panel { fill: #2b2b2b; stroke: #4a4a4a; stroke-width: 2; rx: 14; }
+      .panel-accent { fill: #2f2a1f; stroke: #ffb400; stroke-width: 2; rx: 14; }
+      .title { fill: #f5f5f5; font: 700 28px Inter, Arial, sans-serif; }
+      .subtitle { fill: #ffb400; font: 600 17px Inter, Arial, sans-serif; }
+      .body { fill: #d8d8d8; font: 15px "JetBrains Mono", Consolas, monospace; }
+      .label { fill: #f0f0f0; font: 600 16px Inter, Arial, sans-serif; }
+      .small { fill: #bbbbbb; font: 13px Inter, Arial, sans-serif; }
+      .ok { fill: #47b475; font: 700 15px Inter, Arial, sans-serif; }
+      .warn { fill: #f5c15d; font: 700 15px Inter, Arial, sans-serif; }
+      .bad { fill: #ff7b7b; font: 700 15px Inter, Arial, sans-serif; }
+      .arrow { stroke: #ffb400; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .arrow-soft { stroke: #6f6f6f; stroke-width: 2; fill: none; marker-end: url(#arrowheadSoft); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ffb400" />
+    </marker>
+    <marker id="arrowheadSoft" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#6f6f6f" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="760" />
+
+  <text class="title" x="36" y="52">v7 Cross-Entropy Parity Map</text>
+  <text class="small" x="36" y="80">From p - one_hot math to long-horizon production gates</text>
+
+  <rect class="panel-accent" x="30" y="108" width="390" height="288" />
+  <text class="subtitle" x="52" y="140">1) Gradient Derivation</text>
+  <text class="body" x="52" y="176">p_i = exp(z_i) / sum_j exp(z_j)</text>
+  <text class="body" x="52" y="204">L = -log(p_y)</text>
+  <text class="body" x="52" y="240">dL/dz_i = p_i - 1{i = y}</text>
+  <text class="body" x="52" y="276">row_grad = p; row_grad[y] -= 1</text>
+  <text class="body" x="52" y="312">mean reduction: row_grad /= N_valid</text>
+  <text class="small" x="52" y="350">Symbolic gradient is easy. Numeric semantics are not.</text>
+  <text class="small" x="52" y="372">Most drift comes from loss/reduction details.</text>
+
+  <rect class="panel" x="448" y="108" width="390" height="288" />
+  <text class="subtitle" x="470" y="140">2) PyTorch Semantics to Match</text>
+  <text class="body" x="470" y="176">F.cross_entropy -&gt; _C._nn.cross_entropy_loss</text>
+  <text class="body" x="470" y="204">index-target path: log_softmax + nll_loss</text>
+  <text class="body" x="470" y="232">ignore_index = -100</text>
+  <text class="body" x="470" y="260">mean denominator = non-ignored targets</text>
+  <text class="body" x="470" y="288">all ignored + mean = NaN loss, zero grad</text>
+  <text class="small" x="470" y="326">Source: torch/nn/functional.py + aten/native/LossNLL.cpp</text>
+  <text class="small" x="470" y="348">Parity needs reduction and ignore semantics, not only formula.</text>
+
+  <rect class="panel" x="866" y="108" width="384" height="288" />
+  <text class="subtitle" x="888" y="140">3) CK v7 Implementation</text>
+  <text class="label" x="888" y="176">Default CE</text>
+  <text class="small" x="888" y="196">legacy all-valid path + guarded strict fallback</text>
+  <text class="label" x="888" y="232">PT Reference CE</text>
+  <text class="small" x="888" y="252">softmax_cross_entropy_loss_ptref</text>
+  <text class="small" x="888" y="272">always strict index-target mean semantics</text>
+  <text class="label" x="888" y="308">Shared strict impl</text>
+  <text class="small" x="888" y="328">ignore_index=-100, valid-count denominator, all-ignored NaN</text>
+  <text class="small" x="888" y="350">file: src/kernels/loss_kernels.c</text>
+
+  <path class="arrow" d="M420 250 L446 250" />
+  <path class="arrow" d="M838 250 L864 250" />
+
+  <rect class="panel-accent" x="30" y="438" width="570" height="286" />
+  <text class="subtitle" x="52" y="470">4) Drift Story (Long Horizon)</text>
+  <text class="body bad" x="52" y="504">Before: /tmp/v7_ce_semantics_c_850.json  FAIL</text>
+  <text class="body" x="52" y="530">first_loss_fail_step=64</text>
+  <text class="body" x="52" y="556">first_param_fail_step=117</text>
+  <text class="body" x="52" y="582">max_loss_abs_diff=2.61e-02</text>
+  <text class="small" x="52" y="616">After CE semantic + numeric alignment:</text>
+  <text class="body ok" x="52" y="642">/tmp/v7_ce_semantics_c_850_postfix.json  PASS</text>
+  <text class="body" x="52" y="668">first_*_fail_step=None, max_loss_abs_diff=9.54e-07</text>
+  <text class="small" x="52" y="696">c, c_ptref, and torch CE backends all pass this repro.</text>
+
+  <rect class="panel" x="628" y="438" width="622" height="286" />
+  <text class="subtitle" x="650" y="470">5) Production-Gate Outcomes</text>
+  <text class="body ok" x="650" y="504">PASS: 1-token parity, FD gradients, replay determinism</text>
+  <text class="body ok" x="650" y="532">PASS: train parity 3-epoch + drift smoke + realistic long-horizon</text>
+  <text class="body ok" x="650" y="560">PASS: optimizer parity, QK-norm parity, GEMM backward sweep</text>
+  <text class="body ok" x="650" y="588">PASS: BPE-train parity gate</text>
+  <text class="body warn" x="650" y="626">Note: full v7-backprop-production-ready can fail if model download/network fails.</text>
+  <text class="small" x="650" y="656">Training-side backprop readiness validated independently of external download availability.</text>
+  <text class="small" x="650" y="682">Remaining future parity scope: class weights, label smoothing, probability targets.</text>
+
+  <path class="arrow-soft" d="M1020 396 L1020 434" />
+  <path class="arrow-soft" d="M310 396 L310 434" />
+</svg>

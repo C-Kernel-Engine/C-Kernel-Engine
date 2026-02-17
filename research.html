@@ -876,6 +876,7 @@
                         <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
                         <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
                         <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
                         <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
                     </div>
                     <div class="menu-section">
@@ -897,6 +898,7 @@
                         <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -947,6 +949,14 @@
         <h3 style="margin-top: 0;">New: Deep Training Intuition Playbook</h3>
         <p>An infographic roadmap for gradient intuition: checkpoint-efficient logging, failure pattern triage, and a 12-experiment curriculum from tiny models to Qwen-scale runs.</p>
         <div class="card-arrow">Open training-intuition.html -></div>
+    </div>
+</a>
+
+<a href="v7-cross-entropy-parity.html" class="card-link">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">New: v7 Cross-Entropy Parity Deep Dive</h3>
+        <p>Detailed CE math and production numerics: <code>p - one_hot</code> derivation, PyTorch reduction semantics, ignore-index behavior, long-horizon drift history, and final stabilization changes.</p>
+        <div class="card-arrow">Open v7-cross-entropy-parity.html -></div>
     </div>
 </a>
 
@@ -1563,6 +1573,25 @@ K = [K_rope (with position), K_nope (from latent)]</pre>
     })();
     </script>
 
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
     <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
         <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
             <div>
@@ -1586,7 +1615,7 @@ K = [K_rope (with position), K_nope (from latent)]</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-15</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-17</p>
             </div>
         </div>
     </footer>

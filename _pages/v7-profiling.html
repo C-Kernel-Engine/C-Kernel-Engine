@@ -1,0 +1,276 @@
+<!-- TITLE: v7 Profiling -->
+<!-- NAV: research -->
+
+<h1>v7 Profiling and Performance Runbook</h1>
+
+<p>This page documents the actual profiling workflow we use for v7 training kernels: <code>perf</code>, flamegraphs, Intel VTune, and Intel Advisor.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Scope</strong><br>
+    This is the v7 training-focused profiling page. For generic memory/debug profiling (<code>valgrind</code>, cachegrind basics), see <a href="profiling.html"><code>profiling.html</code></a>.
+  </div>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ul>
+    <li><a href="#why-performance-matters">Why Performance Matters</a></li>
+    <li><a href="#tool-map">Tool Map</a></li>
+    <li><a href="#direct-training-capture">Direct Training Capture</a></li>
+    <li><a href="#makefile-workflow">Makefile Workflow (Repeatable)</a></li>
+    <li><a href="#native-cli-workflow">Native C-First Workflow</a></li>
+    <li><a href="#artifact-contract">Artifact Contract</a></li>
+    <li><a href="#how-we-analyze-results">How We Analyze Results</a></li>
+    <li><a href="#regression-loop">Regression Loop</a></li>
+  </ul>
+</nav>
+
+<h2 id="why-performance-matters">Why Performance Matters</h2>
+
+<p>Kernel performance is not a cosmetic metric in v7. It directly controls:</p>
+<ul>
+  <li><strong>Training throughput</strong>: tokens/second and wall-clock to convergence.</li>
+  <li><strong>Hardware efficiency</strong>: IPC, cache behavior, and branch quality.</li>
+  <li><strong>Scalability</strong>: thread utilization and memory-bandwidth headroom.</li>
+  <li><strong>Optimization priority</strong>: where to spend kernel engineering time first.</li>
+</ul>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Rule of Operation</h3>
+  <p style="margin: 0;">We optimize only after parity/memory correctness is green. Performance work without correctness gates is treated as invalid.</p>
+</div>
+
+<h2 id="tool-map">Tool Map</h2>
+
+<table>
+  <tr>
+    <th>Tool</th>
+    <th>Primary Question</th>
+    <th>Typical Outputs</th>
+  </tr>
+  <tr>
+    <td><code>perf stat</code></td>
+    <td>Are we using CPU efficiently (IPC, miss rates)?</td>
+    <td><code>perf_stat_summary.txt</code>, <code>perf_stat_summary.json</code></td>
+  </tr>
+  <tr>
+    <td><code>perf record</code> + FlameGraph</td>
+    <td>Which functions dominate runtime?</td>
+    <td><code>*.data</code>, <code>*.folded</code>, <code>*.svg</code>, <code>flamegraph_manifest.json</code></td>
+  </tr>
+  <tr>
+    <td>VTune (<code>hotspots</code>, <code>memory-access</code>, <code>uarch-exploration</code>)</td>
+    <td>Where are microarchitectural and memory bottlenecks?</td>
+    <td><code>vtune_summary.json</code> + result directories</td>
+  </tr>
+  <tr>
+    <td>Advisor (roofline)</td>
+    <td>Are kernels compute-bound or memory-bound by roofline model?</td>
+    <td><code>advisor_summary.json</code> + Advisor project dir</td>
+  </tr>
+</table>
+
+<h2 id="direct-training-capture">Direct Training Capture</h2>
+
+<p>This is the direct style you are already using around <code>ck_run_v7.py train</code>.</p>
+
+<div class="card">
+  <h3 style="margin-top: 0;">VTune memory-access on train loop</h3>
+  <pre>CK_NUM_THREADS=8 vtune -collect memory-access -result-dir /tmp/v7_vtune_mem -quiet -- \
+  python3 version/v7/scripts/ck_run_v7.py train \
+    --run /tmp/v7_ht_threads --backend ck \
+    --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 \
+    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none \
+    --train-json-out /tmp/v7_vtune_mem_train.json</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">perf record + folded stacks for flamegraph</h3>
+  <pre>CK_NUM_THREADS=8 perf record --all-user -F 999 --call-graph dwarf -o /tmp/v7_train_perf.data -- \
+  python3 version/v7/scripts/ck_run_v7.py train \
+    --run /tmp/v7_ht_threads --backend ck \
+    --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 \
+    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none \
+    --train-json-out /tmp/v7_perf_train.json
+
+perf script -i /tmp/v7_train_perf.data | ./FlameGraph/stackcollapse-perf.pl > /tmp/v7_train_flame.folded
+./FlameGraph/flamegraph.pl /tmp/v7_train_flame.folded > /tmp/v7_train_flame.svg</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">VTune GUI</h3>
+  <pre>vtune-gui /tmp/v7_vtune_mem
+# Example historical runs:
+# vtune-gui /tmp/v7_gui/vtune_hotspots
+# vtune-gui /tmp/v7_gui/vtune_memory</pre>
+</div>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Advisor Roofline</h3>
+  <pre>CK_NUM_THREADS=8 advisor --collect=roofline --project-dir /tmp/v7_advisor_roofline -- \
+  python3 version/v7/scripts/ck_run_v7.py train \
+    --run /tmp/v7_ht_threads --backend ck \
+    --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 \
+    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+
+# Some installs expose "advixe-cl" instead of "advisor".</pre>
+</div>
+
+<h2 id="makefile-workflow">Makefile Workflow (Repeatable)</h2>
+
+<p>For CI-like reproducibility and normalized artifacts, use the built-in v7 profiling targets.</p>
+
+<div class="card">
+  <pre># Decode/prefill profile + perf counters + flamegraph + VTune (+ deep analyses)
+make --no-print-directory profile-v7-full
+
+# Or run the perf gate sequence (perf stat + flamegraph + VTune + budget evaluation)
+make --no-print-directory v7-perf-gate</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Important knobs</h3>
+  <pre># Runtime mode for profile targets
+V7_PERF_RUNTIME=cli|python      # default: cli
+
+# VTune controls
+V7_WITH_VTUNE=1|0               # default: 1
+V7_VTUNE_DEEP=1|0               # default: 1 (hotspots + memory-access + uarch-exploration)</pre>
+</div>
+
+<h2 id="native-cli-workflow">Native C-First Workflow</h2>
+
+<p><code>ck-cli-v7</code> also exposes direct profile capture for <code>perf</code>, <code>vtune</code>, and <code>advisor</code>.</p>
+
+<div class="card">
+  <pre># Build native CLI
+make --no-print-directory ck-cli-v7
+
+# Example token file (space-separated ints)
+printf '1 2 3 4 5 6 7 8 9 10 11 12\n' > /tmp/v7_tokens.txt
+
+# perf / vtune / advisor capture from native train subcommand
+./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool perf \
+  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
+  --train-total-tokens 2048 --train-grad-accum 8 --threads 8
+
+./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool vtune \
+  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
+  --train-total-tokens 2048 --train-grad-accum 8 --threads 8
+
+./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool advisor \
+  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
+  --train-total-tokens 2048 --train-grad-accum 8 --threads 8</pre>
+</div>
+
+<p>This path updates <code>run_index.json</code> and the canonical profiling artifacts in the run directory.</p>
+
+<h2 id="artifact-contract">Artifact Contract</h2>
+
+<table>
+  <tr>
+    <th>Artifact</th>
+    <th>What It Represents</th>
+    <th>Produced By</th>
+  </tr>
+  <tr>
+    <td><code>profile_summary.json</code></td>
+    <td>Top-level profile metadata / decode throughput context</td>
+    <td><code>ck_run_v7.py --profile</code>, <code>ck-cli-v7 profile</code></td>
+  </tr>
+  <tr>
+    <td><code>perf_stat_summary.json</code></td>
+    <td>Parsed counters and derived metrics (<code>ipc</code>, miss rates)</td>
+    <td><code>version/v7/scripts/perf_artifacts_v7.py</code></td>
+  </tr>
+  <tr>
+    <td><code>flamegraph_manifest.json</code></td>
+    <td>Links to <code>perf.data</code>, folded stacks, flamegraph SVG, top symbols</td>
+    <td><code>version/v7/scripts/perf_artifacts_v7.py</code></td>
+  </tr>
+  <tr>
+    <td><code>vtune_summary.json</code></td>
+    <td>VTune reports (hotspots + optional memory/uarch summaries)</td>
+    <td><code>version/v7/scripts/vtune_artifacts_v7.py</code></td>
+  </tr>
+  <tr>
+    <td><code>advisor_summary.json</code></td>
+    <td>Advisor project pointer for roofline analysis</td>
+    <td><code>ck-cli-v7 profile --tool advisor</code></td>
+  </tr>
+  <tr>
+    <td><code>perf_gate_report.json</code></td>
+    <td>Budget pass/fail status for throughput + hardware metrics</td>
+    <td><code>version/v7/scripts/perf_gate_v7.py</code></td>
+  </tr>
+</table>
+
+<div class="card card-green">
+  <h3 style="margin-top: 0;">Viewer Integration</h3>
+  <pre># Render existing artifacts
+python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_ht_threads --html-only
+
+# Active probe flow (perf + VTune + native run-dir Advisor when available)
+python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_ht_threads --with-probes --advisor --vtune</pre>
+  <p style="margin: 0;"><code>open_ir_visualizer.py</code> consumes <code>profile_summary.json</code>, <code>perf_stat_summary.json</code>, <code>flamegraph_manifest.json</code>, <code>vtune_summary.json</code>, <code>advisor_summary.json</code>, and <code>perf_gate_report.json</code> when present.</p>
+</div>
+
+<h2 id="how-we-analyze-results">How We Analyze Results</h2>
+
+<table>
+  <tr>
+    <th>Signal</th>
+    <th>What It Means</th>
+    <th>Typical Action</th>
+  </tr>
+  <tr>
+    <td><code>train_tok_s</code> drop</td>
+    <td>Regression in end-to-end train step throughput</td>
+    <td>Open flamegraph + VTune hotspots and isolate new wide stacks</td>
+  </tr>
+  <tr>
+    <td>Low IPC</td>
+    <td>Poor retirement efficiency (stalls/speculation/memory)</td>
+    <td>Use VTune uarch summary to split frontend/backend/speculation issues</td>
+  </tr>
+  <tr>
+    <td>High cache miss rate</td>
+    <td>Bandwidth/locality pressure in hot kernels</td>
+    <td>Improve layout blocking, prepack strategy, and memory reuse</td>
+  </tr>
+  <tr>
+    <td>Memory Bound high in VTune</td>
+    <td>Kernel limited by memory subsystem, not arithmetic</td>
+    <td>Target data movement reduction before instruction-level tuning</td>
+  </tr>
+  <tr>
+    <td>Hotspots outside expected GEMM/attention path</td>
+    <td>Unexpected overhead in runtime glue or copies</td>
+    <td>Inspect call chains and remove avoidable copies/dispatch overhead</td>
+  </tr>
+</table>
+
+<h2 id="regression-loop">Regression Loop</h2>
+
+<ol>
+  <li>Pin workload and thread count (<code>CK_NUM_THREADS</code>, same run config).</li>
+  <li>Capture baseline artifacts (<code>perf</code> + flamegraph + VTune + optional Advisor).</li>
+  <li>Make one kernel/runtime change.</li>
+  <li>Re-capture with same command line.</li>
+  <li>Compare: throughput, IPC/miss rates, and hotspot width changes.</li>
+  <li>Update notes and keep artifacts linked in run dir for reproducibility.</li>
+</ol>
+
+<div class="alert alert-warning">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </div>
+  <div>
+    <strong>Prerequisites</strong><br>
+    VTune/Advisor need oneAPI tooling installed (often via <code>source /opt/intel/oneapi/setvars.sh</code>). Non-root <code>perf</code> may also require kernel <code>perf_event_paranoid</code> tuning.
+  </div>
+</div>
