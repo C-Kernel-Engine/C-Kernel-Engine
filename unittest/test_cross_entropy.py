@@ -43,6 +43,21 @@ def ptr_int32(arr: np.ndarray):
     return arr.ctypes.data_as(ctypes.POINTER(ctypes.c_int32))
 
 
+def run_c_cross_entropy(logits_np: np.ndarray, targets_np: np.ndarray):
+    """Run CK CE kernel and return (loss, d_logits)."""
+    t, v = logits_np.shape
+    dlogits_np = np.zeros_like(logits_np, dtype=np.float32)
+    loss_c = ctypes.c_float(0.0)
+    lib.softmax_cross_entropy_loss(
+        numpy_to_ptr(logits_np),
+        ptr_int32(targets_np),
+        ctypes.c_int(t), ctypes.c_int(v),
+        numpy_to_ptr(dlogits_np),
+        ctypes.byref(loss_c),
+    )
+    return float(loss_c.value), dlogits_np
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tests
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -54,14 +69,6 @@ def run_tests(T=128, V=1000, warmup=10, iterations=1000):
     # Pre-allocate numpy arrays
     logits_np = np.random.randn(T, V).astype(np.float32)
     targets_np = np.random.randint(0, V, (T,), dtype=np.int32)
-    dlogits_np = np.zeros_like(logits_np)
-    loss_c = ctypes.c_float(0.0)
-
-    # Get pointers
-    logits_ptr = numpy_to_ptr(logits_np)
-    targets_ptr = ptr_int32(targets_np)
-    dlogits_ptr = numpy_to_ptr(dlogits_np)
-
     # Torch tensors
     logits = torch.from_numpy(logits_np.copy())
     targets = torch.from_numpy(targets_np).long()
@@ -89,15 +96,11 @@ def run_tests(T=128, V=1000, warmup=10, iterations=1000):
 
     # C kernel (fused forward + backward)
     def c_cross_entropy():
-        lib.softmax_cross_entropy_loss(
-            logits_ptr, targets_ptr,
-            ctypes.c_int(T), ctypes.c_int(V),
-            dlogits_ptr, ctypes.byref(loss_c)
-        )
+        run_c_cross_entropy(logits_np, targets_np)
 
     # Run once for accuracy
-    c_cross_entropy()
-    loss_diff = abs(loss_c.value - float(loss_ref))
+    loss_c_val, dlogits_np = run_c_cross_entropy(logits_np, targets_np)
+    loss_diff = abs(loss_c_val - float(loss_ref.detach()))
     dlogits_c = torch.from_numpy(dlogits_np.copy())
     grad_diff = max_diff(dlogits_c, dlogits_ref)
 
@@ -137,6 +140,91 @@ def run_tests(T=128, V=1000, warmup=10, iterations=1000):
     return report
 
 
+def run_ignore_index_semantics_tests(T=96, V=503, warmup=10, iterations=500):
+    """Validate PyTorch ignore_index mean-reduction semantics."""
+    np.random.seed(1234)
+
+    logits_np = np.random.randn(T, V).astype(np.float32)
+    targets_np = np.random.randint(0, V, (T,), dtype=np.int32)
+    ignore_mask = np.random.rand(T) < 0.2
+    targets_np[ignore_mask] = -100
+
+    logits = torch.from_numpy(logits_np.copy()).requires_grad_(True)
+    targets = torch.from_numpy(targets_np.astype(np.int64))
+    loss_ref = F.cross_entropy(logits, targets, reduction="mean", ignore_index=-100)
+    loss_ref.backward()
+    dlogits_ref = logits.grad
+
+    loss_c_val, dlogits_c_np = run_c_cross_entropy(logits_np, targets_np)
+    dlogits_c = torch.from_numpy(dlogits_c_np.copy())
+
+    report = TestReport(
+        test_name="Cross-Entropy ignore_index semantics",
+        dtype="fp32",
+        shape=f"T={T}, V={V}",
+        cpu_info=get_cpu_info(),
+    )
+
+    loss_diff = abs(loss_c_val - float(loss_ref.detach()))
+    grad_diff = max_diff(dlogits_c, dlogits_ref)
+    report.add_result(TestResult(
+        name="Loss (ignore_index=-100)",
+        passed=loss_diff <= 1e-5,
+        max_diff=loss_diff,
+        tolerance=1e-5,
+        pytorch_time=time_function(
+            lambda: F.cross_entropy(logits.detach(), targets, reduction="mean", ignore_index=-100),
+            warmup=warmup,
+            iterations=iterations,
+            name="PyTorch Fwd",
+        ),
+        kernel_time=time_function(
+            lambda: run_c_cross_entropy(logits_np, targets_np),
+            warmup=warmup,
+            iterations=iterations,
+            name="C Kernel",
+        ),
+    ))
+    report.add_result(TestResult(
+        name="d_logits (ignore_index=-100)",
+        passed=grad_diff <= 1e-5,
+        max_diff=grad_diff,
+        tolerance=1e-5,
+        pytorch_time=None,
+        kernel_time=None,
+    ))
+
+    # All targets ignored: PyTorch mean reduction returns NaN and zero gradients.
+    targets_all_ignored_np = np.full((T,), -100, dtype=np.int32)
+    loss_c_all, dlogits_c_all_np = run_c_cross_entropy(logits_np, targets_all_ignored_np)
+
+    logits_all = torch.from_numpy(logits_np.copy()).requires_grad_(True)
+    targets_all = torch.from_numpy(targets_all_ignored_np.astype(np.int64))
+    loss_ref_all = F.cross_entropy(logits_all, targets_all, reduction="mean", ignore_index=-100)
+    loss_ref_all.backward()
+
+    both_nan = bool(np.isnan(loss_c_all) and torch.isnan(loss_ref_all).item())
+    all_grad_diff = max_diff(torch.from_numpy(dlogits_c_all_np.copy()), logits_all.grad)
+    report.add_result(TestResult(
+        name="Loss (all ignored => NaN)",
+        passed=both_nan,
+        max_diff=0.0 if both_nan else float("inf"),
+        tolerance=0.0,
+        pytorch_time=None,
+        kernel_time=None,
+    ))
+    report.add_result(TestResult(
+        name="d_logits (all ignored => zeros)",
+        passed=all_grad_diff <= 1e-7,
+        max_diff=all_grad_diff,
+        tolerance=1e-7,
+        pytorch_time=None,
+        kernel_time=None,
+    ))
+
+    return report
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -150,6 +238,9 @@ if __name__ == "__main__":
 
     large_report = run_tests(T=128, V=1000, warmup=10, iterations=500)
     large_report.print_report()
+
+    ignore_report = run_ignore_index_semantics_tests(T=96, V=503, warmup=10, iterations=300)
+    ignore_report.print_report()
 
     # Print detailed timing breakdown for the larger test
     if hasattr(large_report, 'timing_breakdown'):
@@ -165,5 +256,5 @@ if __name__ == "__main__":
         print()
 
     # Exit with error if any tests failed
-    if not small_report.all_passed() or not large_report.all_passed():
+    if not small_report.all_passed() or not large_report.all_passed() or not ignore_report.all_passed():
         exit(1)

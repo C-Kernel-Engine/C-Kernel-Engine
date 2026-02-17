@@ -1873,6 +1873,12 @@ void embedding_forward_q8_0(const int32_t *token_ids,
 	                                int vocab_size,
 	                                float *d_logits,
 	                                float *loss_out);
+	void softmax_cross_entropy_loss_ptref(const float *logits,
+	                                      const int32_t *targets,
+	                                      int tokens,
+	                                      int vocab_size,
+	                                      float *d_logits,
+	                                      float *loss_out);
 
 	/* BF16 softmax cross-entropy loss - caller provides scratch buffers */
 	void softmax_cross_entropy_loss_bf16(const uint16_t *logits,

@@ -28,7 +28,7 @@
       "shape": [
         "T"
       ],
-      "desc": "Target token ids [tokens]"
+      "desc": "Target token ids [tokens]; ignore_index = -100"
     }
   ],
   "outputs": [
@@ -47,7 +47,7 @@
       "shape": [
         "1"
       ],
-      "desc": "Scalar mean loss output"
+      "desc": "Scalar mean loss output over non-ignored targets"
     }
   ],
   "scratch": [],
@@ -100,6 +100,5 @@
       }
     ]
   },
-  "notes": "Softmax cross-entropy forward + dlogits kernel for v7 training."
+  "notes": "Softmax cross-entropy forward + dlogits kernel for v7 training (index-target mean reduction aligned to PyTorch ignore_index semantics)."
 }
-
