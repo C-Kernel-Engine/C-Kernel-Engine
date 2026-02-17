@@ -330,6 +330,102 @@ def normalize_weight_dtype(weight_dtype: Optional[str], manifest_path: Optional[
     return dtype
 
 
+def _as_positive_int(value: object) -> Optional[int]:
+    """Best-effort integer parse that returns None for non-positive/invalid values."""
+    try:
+        iv = int(value)
+    except Exception:
+        return None
+    return iv if iv > 0 else None
+
+
+def _load_train_dims_from_run_manifest(run_dir: Optional[Path]) -> Optional[dict]:
+    """Extract training dims from run_dir/weights_manifest.json when available."""
+    if run_dir is None:
+        return None
+    manifest_path = run_dir / "weights_manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    cfg = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    training_cfg = cfg.get("training") if isinstance(cfg.get("training"), dict) else {}
+    tiny_cfg = (
+        training_cfg.get("tiny_parity")
+        if isinstance(training_cfg.get("tiny_parity"), dict)
+        else {}
+    )
+
+    dims: dict[str, object] = {"manifest": str(manifest_path)}
+    vocab = _as_positive_int(cfg.get("vocab_size")) or _as_positive_int(tiny_cfg.get("vocab"))
+    d_model = (
+        _as_positive_int(cfg.get("embed_dim"))
+        or _as_positive_int(cfg.get("hidden_size"))
+        or _as_positive_int(tiny_cfg.get("d_model"))
+    )
+    hidden = (
+        _as_positive_int(cfg.get("intermediate_size"))
+        or _as_positive_int(tiny_cfg.get("hidden"))
+    )
+    num_layers = (
+        _as_positive_int(cfg.get("num_layers"))
+        or _as_positive_int(cfg.get("num_hidden_layers"))
+        or _as_positive_int(tiny_cfg.get("num_layers"))
+    )
+
+    if vocab is not None:
+        dims["vocab"] = int(vocab)
+    if d_model is not None:
+        dims["d_model"] = int(d_model)
+    if hidden is not None:
+        dims["hidden"] = int(hidden)
+    if num_layers is not None:
+        dims["num_layers"] = int(num_layers)
+
+    if len(dims) <= 1:
+        return None
+    return dims
+
+
+def _resolve_train_dims_for_run(args: argparse.Namespace, run_dir: Optional[Path]) -> dict:
+    """Resolve requested vs effective train dims, preferring run-dir manifest values."""
+    requested = {
+        "vocab": int(getattr(args, "train_vocab", 256) or 256),
+        "d_model": int(getattr(args, "train_d_model", 64) or 64),
+        "hidden": int(getattr(args, "train_hidden", 128) or 128),
+        "num_layers": int(getattr(args, "num_layers", 1) or 1),
+    }
+    effective = dict(requested)
+    source = "cli"
+    manifest_path = None
+
+    manifest_dims = _load_train_dims_from_run_manifest(run_dir)
+    if isinstance(manifest_dims, dict):
+        for key in ("vocab", "d_model", "hidden", "num_layers"):
+            val = _as_positive_int(manifest_dims.get(key))
+            if val is not None:
+                effective[key] = int(val)
+        manifest_path = manifest_dims.get("manifest")
+        source = "run_manifest"
+
+    mismatches = {
+        key: {"requested": int(requested[key]), "effective": int(effective[key])}
+        for key in ("vocab", "d_model", "hidden", "num_layers")
+        if int(requested[key]) != int(effective[key])
+    }
+
+    return {
+        "requested": requested,
+        "effective": effective,
+        "source": source,
+        "manifest": manifest_path,
+        "mismatches": mismatches,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Input Detection
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1743,6 +1839,10 @@ def _run_ck_oracle_reference(
     run_dir: Path,
     train_text: Optional[str],
     max_steps: Optional[int] = None,
+    train_vocab: Optional[int] = None,
+    train_d_model: Optional[int] = None,
+    train_hidden: Optional[int] = None,
+    train_num_layers: Optional[int] = None,
 ) -> Optional[dict]:
     """Run periodic PyTorch oracle reference once and return parsed JSON payload."""
     train_script = SCRIPTS_DIR / "train_parity_epochs_v7.py"
@@ -1754,6 +1854,15 @@ def _run_ck_oracle_reference(
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
     oracle_json = run_dir / "oracle_reference_latest.json"
 
+    resolved_vocab = int(train_vocab) if _as_positive_int(train_vocab) is not None else int(getattr(args, "train_vocab", 256))
+    resolved_d_model = int(train_d_model) if _as_positive_int(train_d_model) is not None else int(getattr(args, "train_d_model", 64))
+    resolved_hidden = int(train_hidden) if _as_positive_int(train_hidden) is not None else int(getattr(args, "train_hidden", 128))
+    resolved_num_layers = (
+        int(train_num_layers)
+        if _as_positive_int(train_num_layers) is not None
+        else int(getattr(args, "num_layers", 1) or 1)
+    )
+
     cmd = [
         python_exec,
         str(train_script),
@@ -1764,9 +1873,10 @@ def _run_ck_oracle_reference(
         "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
         "--lr", str(getattr(args, "train_lr", 1e-3)),
         "--seed", str(getattr(args, "train_seed", 42)),
-        "--vocab", str(getattr(args, "train_vocab", 256)),
-        "--d-model", str(getattr(args, "train_d_model", 64)),
-        "--hidden", str(getattr(args, "train_hidden", 128)),
+        "--vocab", str(resolved_vocab),
+        "--d-model", str(resolved_d_model),
+        "--hidden", str(resolved_hidden),
+        "--num-layers", str(resolved_num_layers),
         "--loss-tol", str(getattr(args, "train_loss_tol", 2e-5)),
         "--param-tol", str(getattr(args, "train_param_tol", 3e-5)),
         "--json-out", str(oracle_json),
@@ -1825,6 +1935,86 @@ def _ck_import_runtime_weight_snapshot(lib: ctypes.CDLL, snapshot_buf: object, s
         return -1
     try:
         return int(lib.ck_train_import_weight_snapshot(snapshot_buf, ctypes.c_int(int(snapshot_numel))))
+    except Exception:
+        return -2
+
+
+def _ck_export_runtime_optimizer_state_snapshot(lib: ctypes.CDLL) -> Optional[tuple[object, int]]:
+    """Export current CK runtime AdamW moment-state snapshot buffer."""
+    if (
+        not hasattr(lib, "ck_train_get_optimizer_state_snapshot_numel")
+        or not hasattr(lib, "ck_train_export_optimizer_state_snapshot")
+    ):
+        return None
+    try:
+        numel = int(lib.ck_train_get_optimizer_state_snapshot_numel())
+    except Exception:
+        return None
+    if numel <= 0 or numel > (1 << 30):
+        return None
+    buf = (ctypes.c_float * numel)()
+    try:
+        wrote = int(lib.ck_train_export_optimizer_state_snapshot(buf, ctypes.c_int(numel)))
+    except Exception:
+        return None
+    if wrote <= 0:
+        return None
+    if wrote < numel:
+        trunc = (ctypes.c_float * wrote)()
+        ctypes.memmove(ctypes.addressof(trunc), ctypes.addressof(buf), wrote * ctypes.sizeof(ctypes.c_float))
+        return trunc, int(wrote)
+    return buf, int(numel)
+
+
+def _ck_import_runtime_optimizer_state_snapshot(lib: ctypes.CDLL, snapshot_buf: object, snapshot_numel: int) -> int:
+    """Import a previously exported CK runtime AdamW moment-state snapshot."""
+    if not hasattr(lib, "ck_train_import_optimizer_state_snapshot"):
+        return -1
+    try:
+        return int(lib.ck_train_import_optimizer_state_snapshot(snapshot_buf, ctypes.c_int(int(snapshot_numel))))
+    except Exception:
+        return -2
+
+
+def _ck_export_runtime_accum_snapshot(lib: ctypes.CDLL) -> Optional[tuple[object, int]]:
+    """Export current CK runtime accumulation buffers (grad + grad_act)."""
+    if (
+        not hasattr(lib, "ck_train_get_accum_snapshot_numel")
+        or not hasattr(lib, "ck_train_export_accum_snapshot")
+    ):
+        return None
+    try:
+        numel = int(lib.ck_train_get_accum_snapshot_numel())
+    except Exception:
+        return None
+    if numel < 0 or numel > (1 << 30):
+        return None
+    if numel == 0:
+        return ((ctypes.c_float * 1)(), 0)
+    buf = (ctypes.c_float * numel)()
+    try:
+        wrote = int(lib.ck_train_export_accum_snapshot(buf, ctypes.c_int(numel)))
+    except Exception:
+        return None
+    if wrote < 0:
+        return None
+    if wrote == 0 and numel == 0:
+        return ((ctypes.c_float * 1)(), 0)
+    if wrote == 0 and numel > 0:
+        return None
+    if wrote < numel:
+        trunc = (ctypes.c_float * wrote)()
+        ctypes.memmove(ctypes.addressof(trunc), ctypes.addressof(buf), wrote * ctypes.sizeof(ctypes.c_float))
+        return trunc, int(wrote)
+    return buf, int(numel)
+
+
+def _ck_import_runtime_accum_snapshot(lib: ctypes.CDLL, snapshot_buf: object, snapshot_numel: int) -> int:
+    """Import CK runtime accumulation buffers (grad + grad_act)."""
+    if not hasattr(lib, "ck_train_import_accum_snapshot"):
+        return -1
+    try:
+        return int(lib.ck_train_import_accum_snapshot(snapshot_buf, ctypes.c_int(int(snapshot_numel))))
     except Exception:
         return -2
 
@@ -2767,6 +2957,12 @@ def _run_ck_train_runtime(
     has_snapshot_numel = bool(hasattr(lib, "ck_train_get_weight_snapshot_numel"))
     has_snapshot_export = bool(hasattr(lib, "ck_train_export_weight_snapshot"))
     has_snapshot_import = bool(hasattr(lib, "ck_train_import_weight_snapshot"))
+    has_opt_state_snapshot_numel = bool(hasattr(lib, "ck_train_get_optimizer_state_snapshot_numel"))
+    has_opt_state_snapshot_export = bool(hasattr(lib, "ck_train_export_optimizer_state_snapshot"))
+    has_opt_state_snapshot_import = bool(hasattr(lib, "ck_train_import_optimizer_state_snapshot"))
+    has_accum_snapshot_numel = bool(hasattr(lib, "ck_train_get_accum_snapshot_numel"))
+    has_accum_snapshot_export = bool(hasattr(lib, "ck_train_export_accum_snapshot"))
+    has_accum_snapshot_import = bool(hasattr(lib, "ck_train_import_accum_snapshot"))
     has_act_snapshot_numel = bool(hasattr(lib, "ck_train_get_activation_snapshot_numel"))
     has_act_snapshot_export = bool(hasattr(lib, "ck_train_export_activation_snapshot"))
     has_flush_optimizer_api = bool(hasattr(lib, "ck_train_flush_optimizer"))
@@ -2795,6 +2991,24 @@ def _run_ck_train_runtime(
     if has_snapshot_import:
         lib.ck_train_import_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
         lib.ck_train_import_weight_snapshot.restype = ctypes.c_int
+    if has_opt_state_snapshot_numel:
+        lib.ck_train_get_optimizer_state_snapshot_numel.argtypes = []
+        lib.ck_train_get_optimizer_state_snapshot_numel.restype = ctypes.c_int
+    if has_opt_state_snapshot_export:
+        lib.ck_train_export_optimizer_state_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_export_optimizer_state_snapshot.restype = ctypes.c_int
+    if has_opt_state_snapshot_import:
+        lib.ck_train_import_optimizer_state_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_import_optimizer_state_snapshot.restype = ctypes.c_int
+    if has_accum_snapshot_numel:
+        lib.ck_train_get_accum_snapshot_numel.argtypes = []
+        lib.ck_train_get_accum_snapshot_numel.restype = ctypes.c_int
+    if has_accum_snapshot_export:
+        lib.ck_train_export_accum_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_export_accum_snapshot.restype = ctypes.c_int
+    if has_accum_snapshot_import:
+        lib.ck_train_import_accum_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+        lib.ck_train_import_accum_snapshot.restype = ctypes.c_int
     if has_act_snapshot_numel:
         lib.ck_train_get_activation_snapshot_numel.argtypes = []
         lib.ck_train_get_activation_snapshot_numel.restype = ctypes.c_int
@@ -2864,7 +3078,25 @@ def _run_ck_train_runtime(
     total_tokens = int(getattr(args, "train_total_tokens", 1024) or 1024)
     lr = float(getattr(args, "train_lr", 1e-3) or 1e-3)
     seed = int(getattr(args, "train_seed", 42) or 42)
-    vocab = int(getattr(args, "train_vocab", 256) or 256)
+    resolved_train_dims = _resolve_train_dims_for_run(args, run_dir)
+    requested_train_dims = dict(resolved_train_dims.get("requested") or {})
+    effective_train_dims = dict(resolved_train_dims.get("effective") or {})
+    if resolved_train_dims.get("mismatches"):
+        mismatch_txt = ", ".join(
+            f"{k}:{v.get('requested')}->{v.get('effective')}"
+            for k, v in (resolved_train_dims.get("mismatches") or {}).items()
+            if isinstance(v, dict)
+        )
+        manifest_src = str(resolved_train_dims.get("manifest") or "")
+        log(
+            f"  ck runtime train dims: using run-dir manifest ({mismatch_txt})"
+            + (f" [{manifest_src}]" if manifest_src else ""),
+            C_ORANGE,
+        )
+    vocab = int(effective_train_dims.get("vocab", 256) or 256)
+    d_model_hint = int(effective_train_dims.get("d_model", 64) or 64)
+    hidden_hint = int(effective_train_dims.get("hidden", 128) or 128)
+    train_num_layers = int(effective_train_dims.get("num_layers", 1) or 1)
     optimizer = str(getattr(args, "train_optimizer", "adamw") or "adamw")
 
     parity_on = bool(getattr(args, "parity_on", False))
@@ -2879,7 +3111,17 @@ def _run_ck_train_runtime(
     train_save_final = bool(getattr(args, "train_save_final", True))
     replay_auto_enabled = False
     has_weight_snapshot_api = bool(has_snapshot_numel and has_snapshot_export and has_snapshot_import)
-    runtime_num_tokens = _infer_runtime_num_tokens(runtime_summary, d_model_hint=int(getattr(args, "train_d_model", 0) or 0), vocab_hint=vocab)
+    has_optimizer_state_snapshot_api = bool(
+        has_opt_state_snapshot_numel and has_opt_state_snapshot_export and has_opt_state_snapshot_import
+    )
+    has_accum_snapshot_api = bool(
+        has_accum_snapshot_numel and has_accum_snapshot_export and has_accum_snapshot_import
+    )
+    runtime_num_tokens = _infer_runtime_num_tokens(
+        runtime_summary,
+        d_model_hint=int(d_model_hint),
+        vocab_hint=vocab,
+    )
     runtime_grad_accum_steps = int(lib.ck_train_get_accum_steps()) if has_accum_steps_api else int(grad_accum)
 
     batches = _build_train_token_batches(train_text, total_tokens, seq_len, vocab, seed)
@@ -2947,6 +3189,10 @@ def _run_ck_train_runtime(
                 run_dir,
                 train_text,
                 max_steps=oracle_max_steps if oracle_max_steps > 0 else None,
+                train_vocab=vocab,
+                train_d_model=d_model_hint,
+                train_hidden=hidden_hint,
+                train_num_layers=train_num_layers,
             )
             if isinstance(oracle_payload, dict):
                 oracle_source = "tiny_reference_harness"
@@ -2963,15 +3209,29 @@ def _run_ck_train_runtime(
                     except Exception:
                         continue
 
-    # Auto-enable replay checks only for grad_accum=1. For grad_accum>1,
-    # replaying a single step from weights-only snapshot is insufficient
-    # because accumulated gradient buffers are not part of the snapshot yet.
+    # Auto-enable replay checks only when oracle checks run every micro-step.
+    # Sparse parity cadence (e.g. every=8) can skip intermediate runtime state
+    # that replay-on-check currently expects, so keep it opt-in there.
+    checks_cover_all_steps = bool(parity_on and total_steps > 0 and len(check_steps) == int(total_steps))
+
+    # Auto-enable replay checks:
+    # - grad_accum=1: weight snapshots are sufficient.
+    # - grad_accum>1: require accumulation-buffer snapshots + counter state.
     if (
         parity_on
+        and checks_cover_all_steps
         and snapshot_oracle_enabled
         and has_weight_snapshot_api
         and (not parity_replay_on_check)
-        and int(runtime_grad_accum_steps) <= 1
+        and (
+            int(runtime_grad_accum_steps) <= 1
+            or (
+                has_accum_snapshot_api
+                and has_accum_counter_api
+                and has_optimizer_state_snapshot_api
+                and has_opt_step_getter_api
+            )
+        )
     ):
         parity_replay_on_check = True
         replay_auto_enabled = True
@@ -2982,8 +3242,11 @@ def _run_ck_train_runtime(
     replay_has_set_batch_api = False
     replay_has_act_snapshot_api = False
     replay_has_set_accum_counter_api = False
+    replay_has_get_accum_counter_api = False
     replay_has_get_opt_step_api = False
     replay_has_set_opt_step_api = False
+    replay_has_opt_state_snapshot_api = False
+    replay_has_accum_snapshot_api = False
     if (parity_replay_on_check or snapshot_oracle_enabled) and has_weight_snapshot_api:
         try:
             replay_so = run_dir / "libtrain_replay.so"
@@ -3003,6 +3266,16 @@ def _run_ck_train_runtime(
             replay_lib.ck_train_import_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
             replay_lib.ck_train_import_weight_snapshot.restype = ctypes.c_int
 
+            replay_has_opt_state_snapshot_api = bool(
+                hasattr(replay_lib, "ck_train_get_optimizer_state_snapshot_numel")
+                and hasattr(replay_lib, "ck_train_export_optimizer_state_snapshot")
+                and hasattr(replay_lib, "ck_train_import_optimizer_state_snapshot")
+            )
+            replay_has_accum_snapshot_api = bool(
+                hasattr(replay_lib, "ck_train_get_accum_snapshot_numel")
+                and hasattr(replay_lib, "ck_train_export_accum_snapshot")
+                and hasattr(replay_lib, "ck_train_import_accum_snapshot")
+            )
             replay_has_forward_api = bool(hasattr(replay_lib, "ck_train_forward_step"))
             replay_has_set_batch_api = bool(hasattr(replay_lib, "ck_train_set_batch"))
             replay_has_act_snapshot_api = bool(
@@ -3010,6 +3283,7 @@ def _run_ck_train_runtime(
                 and hasattr(replay_lib, "ck_train_export_activation_snapshot")
             )
             replay_has_set_accum_counter_api = bool(hasattr(replay_lib, "ck_train_set_accum_counter"))
+            replay_has_get_accum_counter_api = bool(hasattr(replay_lib, "ck_train_get_accum_counter"))
             replay_has_get_opt_step_api = bool(hasattr(replay_lib, "ck_train_get_opt_step"))
             replay_has_set_opt_step_api = bool(hasattr(replay_lib, "ck_train_set_opt_step"))
             if replay_has_forward_api:
@@ -3026,12 +3300,29 @@ def _run_ck_train_runtime(
             if replay_has_set_accum_counter_api:
                 replay_lib.ck_train_set_accum_counter.argtypes = [ctypes.c_int]
                 replay_lib.ck_train_set_accum_counter.restype = ctypes.c_int
+            if replay_has_get_accum_counter_api:
+                replay_lib.ck_train_get_accum_counter.argtypes = []
+                replay_lib.ck_train_get_accum_counter.restype = ctypes.c_int
             if replay_has_get_opt_step_api:
                 replay_lib.ck_train_get_opt_step.argtypes = []
                 replay_lib.ck_train_get_opt_step.restype = ctypes.c_int
             if replay_has_set_opt_step_api:
                 replay_lib.ck_train_set_opt_step.argtypes = [ctypes.c_int]
                 replay_lib.ck_train_set_opt_step.restype = ctypes.c_int
+            if replay_has_opt_state_snapshot_api:
+                replay_lib.ck_train_get_optimizer_state_snapshot_numel.argtypes = []
+                replay_lib.ck_train_get_optimizer_state_snapshot_numel.restype = ctypes.c_int
+                replay_lib.ck_train_export_optimizer_state_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                replay_lib.ck_train_export_optimizer_state_snapshot.restype = ctypes.c_int
+                replay_lib.ck_train_import_optimizer_state_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                replay_lib.ck_train_import_optimizer_state_snapshot.restype = ctypes.c_int
+            if replay_has_accum_snapshot_api:
+                replay_lib.ck_train_get_accum_snapshot_numel.argtypes = []
+                replay_lib.ck_train_get_accum_snapshot_numel.restype = ctypes.c_int
+                replay_lib.ck_train_export_accum_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                replay_lib.ck_train_export_accum_snapshot.restype = ctypes.c_int
+                replay_lib.ck_train_import_accum_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                replay_lib.ck_train_import_accum_snapshot.restype = ctypes.c_int
 
             replay_init_rc = int(replay_lib.ck_train_init(float_ptr, size_ptr, ctypes.c_int(init_payload["num_params"])))
             if replay_init_rc < 0:
@@ -3043,8 +3334,11 @@ def _run_ck_train_runtime(
             replay_has_set_batch_api = False
             replay_has_act_snapshot_api = False
             replay_has_set_accum_counter_api = False
+            replay_has_get_accum_counter_api = False
             replay_has_get_opt_step_api = False
             replay_has_set_opt_step_api = False
+            replay_has_opt_state_snapshot_api = False
+            replay_has_accum_snapshot_api = False
 
     step = 0
     micro_steps = 0
@@ -3086,10 +3380,22 @@ def _run_ck_train_runtime(
             pre_replay_opt_step = int(lib.ck_train_get_opt_step()) if has_opt_step_getter_api else None
             pre_snapshot = None
             pre_snapshot_numel = 0
+            pre_optimizer_state_snapshot = None
+            pre_optimizer_state_snapshot_numel = 0
+            pre_accum_snapshot = None
+            pre_accum_snapshot_numel = 0
             if need_check_snapshot and has_weight_snapshot_api:
                 snap = _ck_export_runtime_weight_snapshot(lib)
                 if snap is not None:
                     pre_snapshot, pre_snapshot_numel = snap
+            if need_check_snapshot and parity_replay_on_check and has_optimizer_state_snapshot_api:
+                opt_snap = _ck_export_runtime_optimizer_state_snapshot(lib)
+                if opt_snap is not None:
+                    pre_optimizer_state_snapshot, pre_optimizer_state_snapshot_numel = opt_snap
+            if need_check_snapshot and parity_replay_on_check and has_accum_snapshot_api:
+                accum_snap = _ck_export_runtime_accum_snapshot(lib)
+                if accum_snap is not None:
+                    pre_accum_snapshot, pre_accum_snapshot_numel = accum_snap
 
             t0 = time.perf_counter()
             calls = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
@@ -3097,12 +3403,14 @@ def _run_ck_train_runtime(
             if calls < 0:
                 raise RuntimeError(f"ck_train_step failed at step {step} (calls={calls})")
 
+            accum_now = None
             if has_accum_counter_api:
                 accum_now = int(lib.ck_train_get_accum_counter())
                 if accum_now == 0:
                     optimizer_steps += 1
             elif (micro_steps % grad_accum) == 0:
                 optimizer_steps += 1
+            opt_step_now = int(lib.ck_train_get_opt_step()) if has_opt_step_getter_api else None
 
             step_ms = (t1 - t0) * 1000.0
             total_ck_ms += step_ms
@@ -3111,10 +3419,22 @@ def _run_ck_train_runtime(
 
             post_snapshot = None
             post_snapshot_numel = 0
+            post_optimizer_state_snapshot = None
+            post_optimizer_state_snapshot_numel = 0
+            post_accum_snapshot = None
+            post_accum_snapshot_numel = 0
             if parity_replay_on_check and (step in check_steps) and has_weight_snapshot_api:
                 post_snap = _ck_export_runtime_weight_snapshot(lib)
                 if post_snap is not None:
                     post_snapshot, post_snapshot_numel = post_snap
+            if parity_replay_on_check and (step in check_steps) and has_optimizer_state_snapshot_api:
+                post_opt_snap = _ck_export_runtime_optimizer_state_snapshot(lib)
+                if post_opt_snap is not None:
+                    post_optimizer_state_snapshot, post_optimizer_state_snapshot_numel = post_opt_snap
+            if parity_replay_on_check and (step in check_steps) and has_accum_snapshot_api:
+                post_accum_snap = _ck_export_runtime_accum_snapshot(lib)
+                if post_accum_snap is not None:
+                    post_accum_snapshot, post_accum_snapshot_numel = post_accum_snap
 
             if has_weight_snapshot_api and train_save_every > 0 and (step % train_save_every) == 0:
                 ckpt_snap = (post_snapshot, post_snapshot_numel) if (post_snapshot is not None and post_snapshot_numel > 0) else _ck_export_runtime_weight_snapshot(lib)
@@ -3138,6 +3458,20 @@ def _run_ck_train_runtime(
             replay_weight_max_abs_diff = None
             replay_weight_mean_abs_diff = None
             replay_weight_error = None
+            replay_optimizer_state_max_abs_diff = None
+            replay_optimizer_state_mean_abs_diff = None
+            replay_optimizer_state_error = None
+            replay_optimizer_state_tol = replay_weight_tol
+            replay_accum_snapshot_max_abs_diff = None
+            replay_accum_snapshot_mean_abs_diff = None
+            replay_accum_snapshot_error = None
+            replay_accum_snapshot_tol = replay_weight_tol
+            replay_pre_optimizer_state_import_max_abs_diff = None
+            replay_pre_optimizer_state_import_error = None
+            replay_pre_accum_import_max_abs_diff = None
+            replay_pre_accum_import_error = None
+            replay_post_accum_counter = None
+            replay_post_opt_step = None
             if parity_replay_on_check and (step in check_steps):
                 if replay_lib is None:
                     replay_failures.append({
@@ -3150,21 +3484,117 @@ def _run_ck_train_runtime(
                         "weight_mean_abs_diff": None,
                         "weight_threshold": replay_weight_tol,
                         "weight_error": "replay_runtime_unavailable",
+                        "optimizer_state_max_abs_diff": None,
+                        "optimizer_state_mean_abs_diff": None,
+                        "optimizer_state_threshold": replay_optimizer_state_tol,
+                        "optimizer_state_error": ("replay_runtime_unavailable" if has_optimizer_state_snapshot_api else None),
+                        "accum_snapshot_max_abs_diff": None,
+                        "accum_snapshot_mean_abs_diff": None,
+                        "accum_snapshot_threshold": replay_accum_snapshot_tol,
+                        "accum_snapshot_error": ("replay_runtime_unavailable" if has_accum_snapshot_api else None),
                         "reason": f"replay_runtime_unavailable:{replay_runtime_error}",
                     })
                 elif pre_snapshot is not None and pre_snapshot_numel > 0:
                     import_rc = _ck_import_runtime_weight_snapshot(replay_lib, pre_snapshot, pre_snapshot_numel)
                     if import_rc >= 0:
+                        if has_optimizer_state_snapshot_api:
+                            if not replay_has_opt_state_snapshot_api:
+                                replay_optimizer_state_error = "replay_optimizer_state_snapshot_api_unavailable"
+                            elif pre_optimizer_state_snapshot is None or pre_optimizer_state_snapshot_numel <= 0:
+                                replay_optimizer_state_error = "optimizer_state_snapshot_unavailable"
+                            else:
+                                opt_import_rc = _ck_import_runtime_optimizer_state_snapshot(
+                                    replay_lib,
+                                    pre_optimizer_state_snapshot,
+                                    pre_optimizer_state_snapshot_numel,
+                                )
+                                if opt_import_rc < 0:
+                                    replay_optimizer_state_error = f"optimizer_state_snapshot_import_failed:{opt_import_rc}"
+                        if has_accum_snapshot_api:
+                            if not replay_has_accum_snapshot_api:
+                                replay_accum_snapshot_error = "replay_accum_snapshot_api_unavailable"
+                            elif pre_accum_snapshot is None or pre_accum_snapshot_numel < 0:
+                                replay_accum_snapshot_error = "accum_snapshot_unavailable"
+                            else:
+                                accum_import_rc = _ck_import_runtime_accum_snapshot(
+                                    replay_lib,
+                                    pre_accum_snapshot,
+                                    pre_accum_snapshot_numel,
+                                )
+                                if accum_import_rc < 0:
+                                    replay_accum_snapshot_error = f"accum_snapshot_import_failed:{accum_import_rc}"
+                        if (pre_replay_accum_counter is not None) and (int(pre_replay_accum_counter) > 0) and (not replay_has_set_accum_counter_api):
+                            if replay_accum_snapshot_error is None:
+                                replay_accum_snapshot_error = "replay_set_accum_counter_api_unavailable"
+                        if (pre_replay_opt_step is not None) and (int(pre_replay_opt_step) > 0) and (not replay_has_set_opt_step_api):
+                            if replay_optimizer_state_error is None:
+                                replay_optimizer_state_error = "replay_set_opt_step_api_unavailable"
                         if replay_has_set_accum_counter_api and pre_replay_accum_counter is not None:
                             _ = int(replay_lib.ck_train_set_accum_counter(ctypes.c_int(int(pre_replay_accum_counter))))
                         if replay_has_set_opt_step_api and pre_replay_opt_step is not None:
                             _ = int(replay_lib.ck_train_set_opt_step(ctypes.c_int(int(pre_replay_opt_step))))
+                        if has_optimizer_state_snapshot_api and pre_optimizer_state_snapshot is not None and pre_optimizer_state_snapshot_numel > 0:
+                            if replay_has_opt_state_snapshot_api:
+                                replay_pre_opt = _ck_export_runtime_optimizer_state_snapshot(replay_lib)
+                                if replay_pre_opt is not None:
+                                    replay_pre_opt_buf, replay_pre_opt_numel = replay_pre_opt
+                                    if int(replay_pre_opt_numel) == int(pre_optimizer_state_snapshot_numel):
+                                        try:
+                                            import numpy as _np
+                                            src_pre_opt_np = _np.ctypeslib.as_array(
+                                                pre_optimizer_state_snapshot,
+                                                shape=(int(pre_optimizer_state_snapshot_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            replay_pre_opt_np = _np.ctypeslib.as_array(
+                                                replay_pre_opt_buf,
+                                                shape=(int(replay_pre_opt_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            pre_opt_delta_np = _np.abs(src_pre_opt_np - replay_pre_opt_np)
+                                            replay_pre_optimizer_state_import_max_abs_diff = float(_np.max(pre_opt_delta_np)) if pre_opt_delta_np.size else 0.0
+                                        except Exception as e:
+                                            replay_pre_optimizer_state_import_error = f"pre_optimizer_state_compare_failed:{e}"
+                                    else:
+                                        replay_pre_optimizer_state_import_error = (
+                                            f"pre_optimizer_state_size_mismatch:{replay_pre_opt_numel}!={pre_optimizer_state_snapshot_numel}"
+                                        )
+                                else:
+                                    replay_pre_optimizer_state_import_error = "pre_optimizer_state_export_unavailable"
+                        if has_accum_snapshot_api and pre_accum_snapshot is not None and pre_accum_snapshot_numel >= 0:
+                            if replay_has_accum_snapshot_api:
+                                replay_pre_accum = _ck_export_runtime_accum_snapshot(replay_lib)
+                                if replay_pre_accum is not None:
+                                    replay_pre_accum_buf, replay_pre_accum_numel = replay_pre_accum
+                                    if int(replay_pre_accum_numel) == int(pre_accum_snapshot_numel):
+                                        try:
+                                            import numpy as _np
+                                            src_pre_accum_np = _np.ctypeslib.as_array(
+                                                pre_accum_snapshot,
+                                                shape=(int(pre_accum_snapshot_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            replay_pre_accum_np = _np.ctypeslib.as_array(
+                                                replay_pre_accum_buf,
+                                                shape=(int(replay_pre_accum_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            pre_accum_delta_np = _np.abs(src_pre_accum_np - replay_pre_accum_np)
+                                            replay_pre_accum_import_max_abs_diff = float(_np.max(pre_accum_delta_np)) if pre_accum_delta_np.size else 0.0
+                                        except Exception as e:
+                                            replay_pre_accum_import_error = f"pre_accum_compare_failed:{e}"
+                                    else:
+                                        replay_pre_accum_import_error = (
+                                            f"pre_accum_size_mismatch:{replay_pre_accum_numel}!={pre_accum_snapshot_numel}"
+                                        )
+                                else:
+                                    replay_pre_accum_import_error = "pre_accum_export_unavailable"
                         replay_loss_out = ctypes.c_float(0.0)
                         replay_calls = int(replay_lib.ck_train_step(x_buf, y_buf, ctypes.byref(replay_loss_out), ctypes.c_float(lr)))
                         if replay_calls < 0:
                             raise RuntimeError(f"ck_train_step replay failed at step {step} (calls={replay_calls})")
                         replay_loss = float(replay_loss_out.value)
                         replay_diff = abs(replay_loss - loss_val)
+                        if replay_has_get_accum_counter_api:
+                            replay_post_accum_counter = int(replay_lib.ck_train_get_accum_counter())
+                        if replay_has_get_opt_step_api:
+                            replay_post_opt_step = int(replay_lib.ck_train_get_opt_step())
 
                         if post_snapshot is not None and post_snapshot_numel > 0:
                             replay_post = _ck_export_runtime_weight_snapshot(replay_lib)
@@ -3187,12 +3617,91 @@ def _run_ck_train_runtime(
                         else:
                             replay_weight_error = "post_snapshot_unavailable"
 
+                        if has_optimizer_state_snapshot_api and replay_optimizer_state_error is None:
+                            if post_optimizer_state_snapshot is not None and post_optimizer_state_snapshot_numel > 0:
+                                replay_post_opt = _ck_export_runtime_optimizer_state_snapshot(replay_lib)
+                                if replay_post_opt is not None:
+                                    replay_post_opt_buf, replay_post_opt_numel = replay_post_opt
+                                    if int(replay_post_opt_numel) == int(post_optimizer_state_snapshot_numel):
+                                        try:
+                                            import numpy as _np
+                                            ck_post_opt_np = _np.ctypeslib.as_array(
+                                                post_optimizer_state_snapshot,
+                                                shape=(int(post_optimizer_state_snapshot_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            replay_post_opt_np = _np.ctypeslib.as_array(
+                                                replay_post_opt_buf,
+                                                shape=(int(replay_post_opt_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            opt_delta_np = _np.abs(ck_post_opt_np - replay_post_opt_np)
+                                            replay_optimizer_state_max_abs_diff = float(_np.max(opt_delta_np)) if opt_delta_np.size else 0.0
+                                            replay_optimizer_state_mean_abs_diff = float(_np.mean(opt_delta_np)) if opt_delta_np.size else 0.0
+                                        except Exception as e:
+                                            replay_optimizer_state_error = f"replay_optimizer_state_compare_failed:{e}"
+                                    else:
+                                        replay_optimizer_state_error = (
+                                            f"replay_post_optimizer_state_snapshot_size_mismatch:"
+                                            f"{replay_post_opt_numel}!={post_optimizer_state_snapshot_numel}"
+                                        )
+                                else:
+                                    replay_optimizer_state_error = "replay_post_optimizer_state_snapshot_unavailable"
+                            else:
+                                replay_optimizer_state_error = "post_optimizer_state_snapshot_unavailable"
+
+                        if has_accum_snapshot_api and replay_accum_snapshot_error is None:
+                            if post_accum_snapshot is not None and post_accum_snapshot_numel >= 0:
+                                replay_post_accum = _ck_export_runtime_accum_snapshot(replay_lib)
+                                if replay_post_accum is not None:
+                                    replay_post_accum_buf, replay_post_accum_numel = replay_post_accum
+                                    if int(replay_post_accum_numel) == int(post_accum_snapshot_numel):
+                                        try:
+                                            import numpy as _np
+                                            ck_post_accum_np = _np.ctypeslib.as_array(
+                                                post_accum_snapshot,
+                                                shape=(int(post_accum_snapshot_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            replay_post_accum_np = _np.ctypeslib.as_array(
+                                                replay_post_accum_buf,
+                                                shape=(int(replay_post_accum_numel),),
+                                            ).astype(_np.float32, copy=False)
+                                            accum_delta_np = _np.abs(ck_post_accum_np - replay_post_accum_np)
+                                            replay_accum_snapshot_max_abs_diff = float(_np.max(accum_delta_np)) if accum_delta_np.size else 0.0
+                                            replay_accum_snapshot_mean_abs_diff = float(_np.mean(accum_delta_np)) if accum_delta_np.size else 0.0
+                                        except Exception as e:
+                                            replay_accum_snapshot_error = f"replay_accum_snapshot_compare_failed:{e}"
+                                    else:
+                                        replay_accum_snapshot_error = (
+                                            f"replay_post_accum_snapshot_size_mismatch:"
+                                            f"{replay_post_accum_numel}!={post_accum_snapshot_numel}"
+                                        )
+                                else:
+                                    replay_accum_snapshot_error = "replay_post_accum_snapshot_unavailable"
+                            else:
+                                replay_accum_snapshot_error = "post_accum_snapshot_unavailable"
+
+                        replay_optimizer_state_ok = True
+                        if has_optimizer_state_snapshot_api:
+                            replay_optimizer_state_ok = bool(
+                                (replay_optimizer_state_error is None)
+                                and (replay_optimizer_state_max_abs_diff is not None)
+                                and (float(replay_optimizer_state_max_abs_diff) <= float(replay_optimizer_state_tol))
+                            )
+                        replay_accum_snapshot_ok = True
+                        if has_accum_snapshot_api:
+                            replay_accum_snapshot_ok = bool(
+                                (replay_accum_snapshot_error is None)
+                                and (replay_accum_snapshot_max_abs_diff is not None)
+                                and (float(replay_accum_snapshot_max_abs_diff) <= float(replay_accum_snapshot_tol))
+                            )
+
                         replay_ok = bool(
                             (replay_diff is not None)
                             and (replay_diff <= parity_replay_tol)
                             and (replay_weight_error is None)
                             and (replay_weight_max_abs_diff is not None)
                             and (float(replay_weight_max_abs_diff) <= float(replay_weight_tol))
+                            and replay_optimizer_state_ok
+                            and replay_accum_snapshot_ok
                         )
                         if not replay_ok:
                             replay_failures.append({
@@ -3205,6 +3714,14 @@ def _run_ck_train_runtime(
                                 "weight_mean_abs_diff": replay_weight_mean_abs_diff,
                                 "weight_threshold": replay_weight_tol,
                                 "weight_error": replay_weight_error,
+                                "optimizer_state_max_abs_diff": replay_optimizer_state_max_abs_diff,
+                                "optimizer_state_mean_abs_diff": replay_optimizer_state_mean_abs_diff,
+                                "optimizer_state_threshold": replay_optimizer_state_tol,
+                                "optimizer_state_error": replay_optimizer_state_error,
+                                "accum_snapshot_max_abs_diff": replay_accum_snapshot_max_abs_diff,
+                                "accum_snapshot_mean_abs_diff": replay_accum_snapshot_mean_abs_diff,
+                                "accum_snapshot_threshold": replay_accum_snapshot_tol,
+                                "accum_snapshot_error": replay_accum_snapshot_error,
                             })
                     else:
                         replay_failures.append({
@@ -3217,6 +3734,14 @@ def _run_ck_train_runtime(
                             "weight_mean_abs_diff": None,
                             "weight_threshold": replay_weight_tol,
                             "weight_error": "snapshot_import_failed",
+                            "optimizer_state_max_abs_diff": None,
+                            "optimizer_state_mean_abs_diff": None,
+                            "optimizer_state_threshold": replay_optimizer_state_tol,
+                            "optimizer_state_error": ("skipped_due_to_weight_import_failure" if has_optimizer_state_snapshot_api else None),
+                            "accum_snapshot_max_abs_diff": None,
+                            "accum_snapshot_mean_abs_diff": None,
+                            "accum_snapshot_threshold": replay_accum_snapshot_tol,
+                            "accum_snapshot_error": ("skipped_due_to_weight_import_failure" if has_accum_snapshot_api else None),
                             "reason": f"snapshot_import_failed:{import_rc}",
                         })
                 else:
@@ -3230,6 +3755,14 @@ def _run_ck_train_runtime(
                         "weight_mean_abs_diff": None,
                         "weight_threshold": replay_weight_tol,
                         "weight_error": "snapshot_unavailable",
+                        "optimizer_state_max_abs_diff": None,
+                        "optimizer_state_mean_abs_diff": None,
+                        "optimizer_state_threshold": replay_optimizer_state_tol,
+                        "optimizer_state_error": ("skipped_due_to_weight_snapshot_unavailable" if has_optimizer_state_snapshot_api else None),
+                        "accum_snapshot_max_abs_diff": None,
+                        "accum_snapshot_mean_abs_diff": None,
+                        "accum_snapshot_threshold": replay_accum_snapshot_tol,
+                        "accum_snapshot_error": ("skipped_due_to_weight_snapshot_unavailable" if has_accum_snapshot_api else None),
                         "reason": "snapshot_unavailable",
                     })
 
@@ -3483,6 +4016,28 @@ def _run_ck_train_runtime(
                     "replay_weight_mean_abs_diff": replay_weight_mean_abs_diff,
                     "replay_weight_threshold": replay_weight_tol,
                     "replay_weight_error": replay_weight_error,
+                    "replay_optimizer_state_max_abs_diff": replay_optimizer_state_max_abs_diff,
+                    "replay_optimizer_state_mean_abs_diff": replay_optimizer_state_mean_abs_diff,
+                    "replay_optimizer_state_threshold": replay_optimizer_state_tol,
+                    "replay_optimizer_state_error": replay_optimizer_state_error,
+                    "replay_accum_snapshot_max_abs_diff": replay_accum_snapshot_max_abs_diff,
+                    "replay_accum_snapshot_mean_abs_diff": replay_accum_snapshot_mean_abs_diff,
+                    "replay_accum_snapshot_threshold": replay_accum_snapshot_tol,
+                    "replay_accum_snapshot_error": replay_accum_snapshot_error,
+                    "pre_accum_counter": pre_replay_accum_counter,
+                    "post_accum_counter": accum_now,
+                    "pre_opt_step": pre_replay_opt_step,
+                    "post_opt_step": opt_step_now,
+                    "replay_post_accum_counter": replay_post_accum_counter,
+                    "replay_post_opt_step": replay_post_opt_step,
+                    "replay_has_set_accum_counter_api": replay_has_set_accum_counter_api,
+                    "replay_has_get_accum_counter_api": replay_has_get_accum_counter_api,
+                    "replay_has_set_opt_step_api": replay_has_set_opt_step_api,
+                    "replay_has_get_opt_step_api": replay_has_get_opt_step_api,
+                    "replay_pre_optimizer_state_import_max_abs_diff": replay_pre_optimizer_state_import_max_abs_diff,
+                    "replay_pre_optimizer_state_import_error": replay_pre_optimizer_state_import_error,
+                    "replay_pre_accum_import_max_abs_diff": replay_pre_accum_import_max_abs_diff,
+                    "replay_pre_accum_import_error": replay_pre_accum_import_error,
                 }
             )
             grad_steps.append(step)
@@ -3527,6 +4082,26 @@ def _run_ck_train_runtime(
         float(row.get("replay_weight_mean_abs_diff"))
         for row in parity_steps
         if isinstance(row, dict) and row.get("replay_weight_mean_abs_diff") is not None
+    ]
+    replay_optimizer_state_max_values = [
+        float(row.get("replay_optimizer_state_max_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_optimizer_state_max_abs_diff") is not None
+    ]
+    replay_optimizer_state_mean_values = [
+        float(row.get("replay_optimizer_state_mean_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_optimizer_state_mean_abs_diff") is not None
+    ]
+    replay_accum_snapshot_max_values = [
+        float(row.get("replay_accum_snapshot_max_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_accum_snapshot_max_abs_diff") is not None
+    ]
+    replay_accum_snapshot_mean_values = [
+        float(row.get("replay_accum_snapshot_mean_abs_diff"))
+        for row in parity_steps
+        if isinstance(row, dict) and row.get("replay_accum_snapshot_mean_abs_diff") is not None
     ]
 
     final_ck_loss = float(loss_curve[-1]["loss_ck"]) if loss_curve else 0.0
@@ -3589,6 +4164,16 @@ def _run_ck_train_runtime(
         "final_torch_loss": final_oracle_loss,
         "final_param_max_abs_diff": float(max(replay_weight_max_values) if replay_weight_max_values else 0.0),
         "final_param_mean_abs_diff": float((sum(replay_weight_mean_values) / len(replay_weight_mean_values)) if replay_weight_mean_values else 0.0),
+        "final_optimizer_state_max_abs_diff": float(max(replay_optimizer_state_max_values) if replay_optimizer_state_max_values else 0.0),
+        "final_optimizer_state_mean_abs_diff": float(
+            (sum(replay_optimizer_state_mean_values) / len(replay_optimizer_state_mean_values))
+            if replay_optimizer_state_mean_values else 0.0
+        ),
+        "final_accum_snapshot_max_abs_diff": float(max(replay_accum_snapshot_max_values) if replay_accum_snapshot_max_values else 0.0),
+        "final_accum_snapshot_mean_abs_diff": float(
+            (sum(replay_accum_snapshot_mean_values) / len(replay_accum_snapshot_mean_values))
+            if replay_accum_snapshot_mean_values else 0.0
+        ),
         "pass_parity": pass_parity,
         "loss_curve": loss_curve,
         "parity_steps": parity_steps,
@@ -3609,6 +4194,13 @@ def _run_ck_train_runtime(
             "torch_avg_step_ms": 0.0,
             "train_tok_s": train_tok_s,
             "decode_tok_s": train_tok_s,
+        },
+        "train_dims": {
+            "source": str(resolved_train_dims.get("source") or "cli"),
+            "manifest": resolved_train_dims.get("manifest"),
+            "requested": requested_train_dims,
+            "effective": effective_train_dims,
+            "mismatches": resolved_train_dims.get("mismatches"),
         },
         "backend": train_backend,
         "train_mode": train_mode,
@@ -3647,10 +4239,16 @@ def _run_ck_train_runtime(
             "replay_auto_enabled": bool(replay_auto_enabled),
             "replay_tol": float(parity_replay_tol),
             "replay_weight_tol": float(replay_weight_tol),
+            "replay_optimizer_state_tol": float(replay_weight_tol),
+            "replay_accum_snapshot_tol": float(replay_weight_tol),
             "logits_tol": float(activation_tol),
             "replay_failures": replay_failures,
             "snapshot_api_available": bool(has_weight_snapshot_api),
+            "optimizer_state_snapshot_api_available": bool(has_optimizer_state_snapshot_api),
+            "accum_snapshot_api_available": bool(has_accum_snapshot_api),
             "activation_snapshot_api_available": bool(has_act_snapshot_numel and has_act_snapshot_export),
+            "replay_optimizer_state_snapshot_api_available": bool(replay_has_opt_state_snapshot_api),
+            "replay_accum_snapshot_api_available": bool(replay_has_accum_snapshot_api),
             "replay_runtime_error": replay_runtime_error,
             "snapshot_files": snapshot_artifacts,
             "activation_snapshot_files": activation_snapshot_artifacts,
@@ -3820,9 +4418,23 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     if bool(getattr(args, "train_strict", False)):
         _run_train_strict_preflight(python_exec)
 
-    train_vocab = int(getattr(args, "train_vocab", 256) or 256)
-    train_d_model = int(getattr(args, "train_d_model", 64) or 64)
-    train_hidden = int(getattr(args, "train_hidden", 128) or 128)
+    train_dims = _resolve_train_dims_for_run(args, run_dir)
+    train_vocab = int(train_dims["effective"]["vocab"])
+    train_d_model = int(train_dims["effective"]["d_model"])
+    train_hidden = int(train_dims["effective"]["hidden"])
+    train_num_layers = int(train_dims["effective"]["num_layers"])
+    if train_dims.get("mismatches"):
+        mismatch_txt = ", ".join(
+            f"{k}:{v.get('requested')}->{v.get('effective')}"
+            for k, v in (train_dims.get("mismatches") or {}).items()
+            if isinstance(v, dict)
+        )
+        manifest_src = str(train_dims.get("manifest") or "")
+        log(
+            f"  train dims: using run-dir manifest ({mismatch_txt})"
+            + (f" [{manifest_src}]" if manifest_src else ""),
+            C_ORANGE,
+        )
     train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
     train_param_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
     train_max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
@@ -3841,6 +4453,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "--vocab", str(train_vocab),
         "--d-model", str(train_d_model),
         "--hidden", str(train_hidden),
+        "--num-layers", str(train_num_layers),
         "--loss-tol", str(train_loss_tol),
         "--param-tol", str(train_param_tol),
         "--max-grad-norm", str(train_max_grad_norm),
@@ -3869,7 +4482,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         C_DIM,
     )
     log(
-        f"  d_model={train_d_model} hidden={train_hidden} vocab={train_vocab} "
+        f"  d_model={train_d_model} hidden={train_hidden} vocab={train_vocab} layers={train_num_layers} "
         f"grad_accum={getattr(args, 'train_grad_accum', 8)} optimizer={getattr(args, 'train_optimizer', 'adamw')}",
         C_DIM,
     )

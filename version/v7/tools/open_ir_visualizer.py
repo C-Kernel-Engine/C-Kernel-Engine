@@ -326,9 +326,12 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "profile_summary.json",
         "perf_stat_summary.json",
         "flamegraph_manifest.json",
+        "cachegrind_summary.json",
+        "asan_summary.json",
         "vtune_summary.json",
         "advisor_summary.json",
         "memory_signoff.json",
+        "memory_verification_latest.json",
         "perf_gate_report.json",
         "ir1_train_forward.json",
         "ir2_train_backward.json",
@@ -374,6 +377,8 @@ def validate_artifact_set(
     expect_perf: bool,
     expect_vtune: bool,
     expect_advisor: bool = False,
+    expect_cachegrind: bool = False,
+    expect_asan: bool = False,
 ) -> list[str]:
     missing: list[str] = []
     base_required = ["memory_signoff.json", "profile_summary.json"]
@@ -388,6 +393,10 @@ def validate_artifact_set(
         missing.append("vtune_summary.json")
     if expect_advisor and not has_model_artifact(model_root, ck_build, "advisor_summary.json"):
         missing.append("advisor_summary.json")
+    if expect_cachegrind and not has_model_artifact(model_root, ck_build, "cachegrind_summary.json"):
+        missing.append("cachegrind_summary.json")
+    if expect_asan and not has_model_artifact(model_root, ck_build, "asan_summary.json"):
+        missing.append("asan_summary.json")
     return missing
 
 
@@ -622,6 +631,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "layout_train_audit",
         "train_exec_plan",
         "memory_diagnostic",
+        "memory_verification",
         "generated_train_runtime_summary",
         "training_loss_curve",
         "training_grad_norms",
@@ -641,6 +651,8 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "fd_gradients",
         "train_parity_epochs_3",
         "train_parity_epochs_5",
+        "train_runtime_parity_realistic",
+        "train_runtime_parity_stress",
         "replay_determinism",
         "grad_rules",
         "manifest",
@@ -648,6 +660,8 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "profile_summary",
         "perf_stat_summary",
         "flamegraph_manifest",
+        "cachegrind_summary",
+        "asan_summary",
         "vtune_summary",
         "advisor_summary",
         "memory_signoff",
@@ -674,6 +688,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "layout_train_audit": model_candidates("layout_train_audit.json") + model_candidates("layout_train_audit_latest.json") + [V7_REPORT_PATH / "layout_train_audit_latest.json", V7_REPORT_PATH_LEGACY / "layout_train_audit_latest.json"],
         "train_exec_plan": model_candidates("train_exec_plan.json") + model_candidates("train_exec_plan_latest.json") + [V7_REPORT_PATH / "train_exec_plan_latest.json", V7_REPORT_PATH_LEGACY / "train_exec_plan_latest.json"],
         "memory_diagnostic": model_candidates("memory_diagnostic_latest.json") + model_candidates("memory_diagnostic.json") + [V7_REPORT_PATH / "memory_diagnostic_latest.json", V7_REPORT_PATH_LEGACY / "memory_diagnostic_latest.json"],
+        "memory_verification": model_candidates("memory_verification_latest.json") + model_candidates("memory_verification.json") + [V7_REPORT_PATH / "memory_verification_latest.json", V7_REPORT_PATH_LEGACY / "memory_verification_latest.json"],
         "generated_train_runtime_summary": model_candidates("generated_train_runtime_summary_v7.json") + model_candidates("generated_train_runtime_summary.json") + [V7_REPORT_PATH / "generated_train_runtime_summary_v7.json", V7_REPORT_PATH_LEGACY / "generated_train_runtime_summary_v7.json"],
         "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_REPORT_PATH / "training_loss_curve_latest.json", V7_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
         "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_REPORT_PATH / "training_grad_norms_latest.json", V7_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
@@ -692,12 +707,16 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "fd_gradients": model_candidates("fd_gradients_latest.json") + [V7_REPORT_PATH / "fd_gradients_latest.json", V7_REPORT_PATH_LEGACY / "fd_gradients_latest.json"],
         "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_3_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_3_latest.json"],
         "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_5_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_5_latest.json"],
+        "train_runtime_parity_realistic": model_candidates("train_runtime_parity_realistic_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_realistic_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_realistic_latest.json"],
+        "train_runtime_parity_stress": model_candidates("train_runtime_parity_stress_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_stress_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_stress_latest.json"],
         "replay_determinism": model_candidates("replay_determinism_latest.json") + [V7_REPORT_PATH / "replay_determinism_latest.json", V7_REPORT_PATH_LEGACY / "replay_determinism_latest.json"],
         "grad_rules": [V7_ROOT / "scripts" / "grad_rules_v7.json"],
         "manifest": model_candidates("weights_manifest.json"),
         "profile_summary": model_candidates("profile_summary.json"),
         "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_REPORT_PATH / "perf_stat_summary.json", V7_REPORT_PATH_LEGACY / "perf_stat_summary.json"],
         "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_REPORT_PATH / "flamegraph_manifest.json", V7_REPORT_PATH_LEGACY / "flamegraph_manifest.json"],
+        "cachegrind_summary": model_candidates("cachegrind_summary.json") + [V7_REPORT_PATH / "cachegrind_summary.json", V7_REPORT_PATH_LEGACY / "cachegrind_summary.json"],
+        "asan_summary": model_candidates("asan_summary.json") + [V7_REPORT_PATH / "asan_summary.json", V7_REPORT_PATH_LEGACY / "asan_summary.json"],
         "vtune_summary": model_candidates("vtune_summary.json") + [V7_REPORT_PATH / "vtune_summary.json", V7_REPORT_PATH_LEGACY / "vtune_summary.json"],
         "advisor_summary": model_candidates("advisor_summary.json") + [V7_REPORT_PATH / "advisor_summary.json", V7_REPORT_PATH_LEGACY / "advisor_summary.json"],
         "memory_signoff": model_candidates("memory_signoff.json") + [V7_REPORT_PATH / "memory_signoff.json", V7_REPORT_PATH_LEGACY / "memory_signoff.json"],
@@ -745,6 +764,32 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         loaded.append("analysis_checkpoints")
     else:
         missing_optional.append("analysis_checkpoints")
+
+    # If only runtime parity reports are present, derive dashboard-friendly
+    # training_* aliases so the viewer renders without manual file renaming.
+    runtime_payload = None
+    for key in ("train_runtime_parity_realistic", "train_runtime_parity_stress"):
+        candidate = data["files"].get(key)
+        if isinstance(candidate, dict):
+            runtime_payload = candidate
+            break
+    if isinstance(runtime_payload, dict):
+        files = data["files"]
+        if "train_e2e" not in files:
+            files["train_e2e"] = runtime_payload
+            loaded.append("train_e2e(runtime)")
+        if "training_loss_curve" not in files and isinstance(runtime_payload.get("loss_curve"), list):
+            files["training_loss_curve"] = {"steps": runtime_payload.get("loss_curve")}
+            loaded.append("training_loss_curve(runtime)")
+        if "training_parity" not in files and isinstance(runtime_payload.get("parity_steps"), list):
+            files["training_parity"] = {"steps": runtime_payload.get("parity_steps")}
+            loaded.append("training_parity(runtime)")
+        if "training_step_profile" not in files and isinstance(runtime_payload.get("step_profile"), dict):
+            files["training_step_profile"] = runtime_payload.get("step_profile")
+            loaded.append("training_step_profile(runtime)")
+        if "training_grad_norms" not in files and isinstance(runtime_payload.get("grad_norm_series"), dict):
+            files["training_grad_norms"] = runtime_payload.get("grad_norm_series")
+            loaded.append("training_grad_norms(runtime)")
 
     # Enrich artifacts for standalone report portability.
     flame = data["files"].get("flamegraph_manifest")
@@ -834,6 +879,26 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
                         item2["resolved_path"] = str(resolved)
                 enriched.append(item2)
             advisor["artifacts"] = enriched
+
+    cachegrind = data["files"].get("cachegrind_summary")
+    if isinstance(cachegrind, dict):
+        for key in ("cachegrind_out", "annotate_path"):
+            raw = cachegrind.get(key)
+            if not isinstance(raw, str):
+                continue
+            resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+            if resolved:
+                cachegrind[f"{key}_resolved"] = str(resolved)
+
+    asan = data["files"].get("asan_summary")
+    if isinstance(asan, dict):
+        for key in ("verify_report_path", "memory_diagnostic_path"):
+            raw = asan.get(key)
+            if not isinstance(raw, str):
+                continue
+            resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+            if resolved:
+                asan[f"{key}_resolved"] = str(resolved)
 
     mem = data["files"].get("memory_signoff")
     if isinstance(mem, dict):
@@ -1020,6 +1085,18 @@ Examples:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Capture VTune artifacts in probe flow (default: enabled, use --no-vtune to skip)"
+    )
+    parser.add_argument(
+        "--cachegrind",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Capture cachegrind artifacts for run-dir native train probes when available (default: enabled)"
+    )
+    parser.add_argument(
+        "--asan",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Capture ASan verification artifacts for run-dir native train probes when available (default: enabled)"
     )
     parser.add_argument(
         "--advisor",
@@ -1277,6 +1354,7 @@ Examples:
                 perf_available = shutil.which("perf") is not None
                 vtune_available = shutil.which("vtune") is not None
                 advisor_available = shutil.which("advisor") is not None
+                valgrind_available = shutil.which("valgrind") is not None
                 flamegraph_ok = (
                     (PROJECT_ROOT / "FlameGraph" / "stackcollapse-perf.pl").exists()
                     and (PROJECT_ROOT / "FlameGraph" / "flamegraph.pl").exists()
@@ -1293,6 +1371,8 @@ Examples:
                     )
 
                 expect_advisor = False
+                expect_cachegrind = False
+                expect_asan = False
                 if run_dir is not None and has_train_runtime_artifacts(run_dir):
                     ck_cli = PROJECT_ROOT / "build" / "ck-cli-v7"
                     thread_hint = os.environ.get("CK_NUM_THREADS", "8")
@@ -1330,6 +1410,29 @@ Examples:
                         else:
                             print("Skipping native train VTune probe (vtune not installed).")
 
+                    if args.cachegrind:
+                        if valgrind_available:
+                            expect_cachegrind = True
+                            print("Running native train cachegrind probe (ck-cli-v7 profile)...")
+                            try_run_cmd(
+                                "native train cachegrind probe",
+                                [*native_probe_prefix, "--tool", "cachegrind"],
+                                PROJECT_ROOT,
+                                extra_env={"CK_NUM_THREADS": thread_hint},
+                            )
+                        else:
+                            print("Skipping native train cachegrind probe (valgrind not installed).")
+
+                    if args.asan:
+                        expect_asan = True
+                        print("Running native train ASan verification probe (ck-cli-v7 profile)...")
+                        try_run_cmd(
+                            "native train ASan probe",
+                            [*native_probe_prefix, "--tool", "asan"],
+                            PROJECT_ROOT,
+                            extra_env={"CK_NUM_THREADS": thread_hint},
+                        )
+
                     if args.advisor:
                         if advisor_available:
                             expect_advisor = True
@@ -1344,6 +1447,8 @@ Examples:
                             print("Skipping native train Advisor probe (advisor not installed).")
                 elif args.advisor and run_dir is not None:
                     print("Skipping native train Advisor probe (run directory does not contain compiled train runtime artifacts).")
+                if run_dir is None and (args.advisor or args.cachegrind or args.asan):
+                    print("Skipping native train probes (no --run directory).")
 
                 runtime_model_dir = detect_model_dir_from_input(run_model_input)
                 if runtime_model_dir and runtime_model_dir.exists():
@@ -1357,6 +1462,8 @@ Examples:
                     expect_perf=perf_available and flamegraph_ok,
                     expect_vtune=bool(args.vtune and vtune_available),
                     expect_advisor=expect_advisor,
+                    expect_cachegrind=expect_cachegrind,
+                    expect_asan=expect_asan,
                 )
                 if missing:
                     print(f"Warning: missing expected artifacts after probe run: {missing}")

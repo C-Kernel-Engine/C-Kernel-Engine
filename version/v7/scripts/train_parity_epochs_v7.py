@@ -22,6 +22,7 @@ import json
 import math
 import os
 import random
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -292,6 +293,25 @@ def c_cross_entropy(
     return CCrossEntropyFn.apply(logits, targets, lib, kernel_variant)
 
 
+def _rmsnorm_apply_torch(x: torch.Tensor, gamma: torch.Tensor, eps: float) -> torch.Tensor:
+    var = x.pow(2).mean(dim=-1, keepdim=True)
+    rstd = (var + eps).rsqrt()
+    return x * rstd * gamma
+
+
+def _swiglu_apply_torch(x: torch.Tensor, hidden: int) -> torch.Tensor:
+    gate, up = x[:, :hidden], x[:, hidden:]
+    return F.silu(gate) * up
+
+
+class _MLPResidualBlock(nn.Module):
+    def __init__(self, d_model: int, hidden: int):
+        super().__init__()
+        self.rms_gamma = nn.Parameter(torch.ones(d_model, dtype=torch.float32))
+        self.fc1 = nn.Linear(d_model, 2 * hidden)
+        self.fc2 = nn.Linear(hidden, d_model)
+
+
 class TinyCKModel(nn.Module):
     def __init__(
         self,
@@ -323,15 +343,12 @@ class TinyCKModel(nn.Module):
         if self.use_c_rmsnorm:
             x = c_rmsnorm(x, self.rms_gamma, self.eps, self.lib)
         else:
-            var = x.pow(2).mean(dim=-1, keepdim=True)
-            rstd = (var + self.eps).rsqrt()
-            x = x * rstd * self.rms_gamma
+            x = _rmsnorm_apply_torch(x, self.rms_gamma, self.eps)
         x = self.fc1(x)
         if self.use_c_swiglu:
             x = c_swiglu(x, self.lib)
         else:
-            gate, up = x[:, : self.hidden], x[:, self.hidden :]
-            x = F.silu(gate) * up
+            x = _swiglu_apply_torch(x, self.hidden)
         logits = self.fc2(x)
         return logits
 
@@ -351,14 +368,87 @@ class TinyTorchModel(nn.Module):
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids).reshape(-1, self.d_model)
-        var = x.pow(2).mean(dim=-1, keepdim=True)
-        rstd = (var + self.eps).rsqrt()
-        x = x * rstd * self.rms_gamma
+        x = _rmsnorm_apply_torch(x, self.rms_gamma, self.eps)
         x = self.fc1(x)
-        gate, up = x[:, : self.hidden], x[:, self.hidden :]
-        x = F.silu(gate) * up
+        x = _swiglu_apply_torch(x, self.hidden)
         logits = self.fc2(x)
         return logits
+
+
+class StackedCKModel(nn.Module):
+    def __init__(
+        self,
+        vocab: int,
+        d_model: int,
+        hidden: int,
+        eps: float,
+        lib: ctypes.CDLL,
+        num_layers: int,
+        use_c_rmsnorm: bool = True,
+        use_c_swiglu: bool = True,
+    ):
+        super().__init__()
+        self.vocab = int(vocab)
+        self.d_model = int(d_model)
+        self.hidden = int(hidden)
+        self.eps = float(eps)
+        self.lib = lib
+        self.num_layers = int(num_layers)
+        self.use_c_rmsnorm = bool(use_c_rmsnorm)
+        self.use_c_swiglu = bool(use_c_swiglu)
+
+        self.embedding = nn.Embedding(self.vocab, self.d_model)
+        self.blocks = nn.ModuleList([_MLPResidualBlock(self.d_model, self.hidden) for _ in range(self.num_layers)])
+        self.final_ln_gamma = nn.Parameter(torch.ones(self.d_model, dtype=torch.float32))
+        self.lm_head = nn.Linear(self.d_model, self.vocab, bias=False)
+
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        x = self.embedding(input_ids).reshape(-1, self.d_model)
+        for blk in self.blocks:
+            residual = x
+            if self.use_c_rmsnorm:
+                h = c_rmsnorm(x, blk.rms_gamma, self.eps, self.lib)
+            else:
+                h = _rmsnorm_apply_torch(x, blk.rms_gamma, self.eps)
+            h = blk.fc1(h)
+            if self.use_c_swiglu:
+                h = c_swiglu(h, self.lib)
+            else:
+                h = _swiglu_apply_torch(h, self.hidden)
+            h = blk.fc2(h)
+            x = residual + h
+        if self.use_c_rmsnorm:
+            x = c_rmsnorm(x, self.final_ln_gamma, self.eps, self.lib)
+        else:
+            x = _rmsnorm_apply_torch(x, self.final_ln_gamma, self.eps)
+        return self.lm_head(x)
+
+
+class StackedTorchModel(nn.Module):
+    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float, num_layers: int):
+        super().__init__()
+        self.vocab = int(vocab)
+        self.d_model = int(d_model)
+        self.hidden = int(hidden)
+        self.eps = float(eps)
+        self.num_layers = int(num_layers)
+
+        self.embedding = nn.Embedding(self.vocab, self.d_model)
+        self.blocks = nn.ModuleList([_MLPResidualBlock(self.d_model, self.hidden) for _ in range(self.num_layers)])
+        self.final_ln_gamma = nn.Parameter(torch.ones(self.d_model, dtype=torch.float32))
+        self.lm_head = nn.Linear(self.d_model, self.vocab, bias=False)
+
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        x = self.embedding(input_ids).reshape(-1, self.d_model)
+        for blk in self.blocks:
+            residual = x
+            h = _rmsnorm_apply_torch(x, blk.rms_gamma, self.eps)
+            h = blk.fc1(h)
+            h = _swiglu_apply_torch(h, self.hidden)
+            h = blk.fc2(h)
+            x = residual + h
+        x = _rmsnorm_apply_torch(x, self.final_ln_gamma, self.eps)
+        return self.lm_head(x)
 
 
 def _seed_all(seed: int) -> None:
@@ -473,6 +563,145 @@ def _load_tiny_state_from_bump(weights_bump: Path, weights_manifest: Path) -> tu
         raise ValueError("tiny.rms_gamma shape mismatch")
 
     return state, dims
+
+
+def _infer_stacked_layer_ids(entries: Dict[str, dict]) -> list[int]:
+    layer_ids: set[int] = set()
+    pat = re.compile(r"^layer\.(\d+)\.w1$")
+    for name in entries.keys():
+        m = pat.match(name)
+        if m is not None:
+            layer_ids.add(int(m.group(1)))
+    out = sorted(layer_ids)
+    if not out:
+        return out
+    expected = list(range(out[-1] + 1))
+    if out != expected:
+        raise ValueError(
+            "stacked layer ids are non-contiguous. "
+            f"Found={out}, expected={expected}"
+        )
+    return out
+
+
+def _load_stacked_state_from_bump(weights_bump: Path, weights_manifest: Path) -> tuple[Dict[str, torch.Tensor], dict]:
+    manifest = json.loads(weights_manifest.read_text(encoding="utf-8"))
+    entries = _manifest_entries_map(manifest)
+    bump_blob = weights_bump.read_bytes()
+
+    required_globals = ["token_emb", "final_ln_weight", "output.weight"]
+    missing_globals = [name for name in required_globals if name not in entries]
+    if missing_globals:
+        raise ValueError(
+            "weights.bump/manifest missing stacked parity tensors. "
+            f"Missing globals: {', '.join(missing_globals)}"
+        )
+
+    layer_ids = _infer_stacked_layer_ids(entries)
+    if not layer_ids:
+        raise ValueError("No stacked layers found in manifest (expected layer.<i>.w1 entries)")
+
+    required_layer_suffixes = ["ln2_gamma", "w1", "b1", "w2", "b2"]
+    for lid in layer_ids:
+        for suffix in required_layer_suffixes:
+            name = f"layer.{lid}.{suffix}"
+            if name not in entries:
+                raise ValueError(f"Missing stacked layer tensor: {name}")
+
+    state: Dict[str, torch.Tensor] = {}
+    token_emb = _load_tensor_from_bump(entries["token_emb"], bump_blob)
+    final_ln = _load_tensor_from_bump(entries["final_ln_weight"], bump_blob)
+    output_w = _load_tensor_from_bump(entries["output.weight"], bump_blob)
+    state["embedding.weight"] = torch.from_numpy(token_emb.astype(np.float32, copy=False))
+    state["final_ln_gamma"] = torch.from_numpy(final_ln.astype(np.float32, copy=False))
+    state["lm_head.weight"] = torch.from_numpy(output_w.astype(np.float32, copy=False))
+
+    for lid in layer_ids:
+        ln2 = _load_tensor_from_bump(entries[f"layer.{lid}.ln2_gamma"], bump_blob)
+        w1 = _load_tensor_from_bump(entries[f"layer.{lid}.w1"], bump_blob)
+        b1 = _load_tensor_from_bump(entries[f"layer.{lid}.b1"], bump_blob)
+        w2 = _load_tensor_from_bump(entries[f"layer.{lid}.w2"], bump_blob)
+        b2 = _load_tensor_from_bump(entries[f"layer.{lid}.b2"], bump_blob)
+        prefix = f"blocks.{lid}"
+        state[f"{prefix}.rms_gamma"] = torch.from_numpy(ln2.astype(np.float32, copy=False))
+        state[f"{prefix}.fc1.weight"] = torch.from_numpy(w1.astype(np.float32, copy=False))
+        state[f"{prefix}.fc1.bias"] = torch.from_numpy(b1.astype(np.float32, copy=False))
+        state[f"{prefix}.fc2.weight"] = torch.from_numpy(w2.astype(np.float32, copy=False))
+        state[f"{prefix}.fc2.bias"] = torch.from_numpy(b2.astype(np.float32, copy=False))
+
+    embed_shape = tuple(state["embedding.weight"].shape)
+    final_ln_shape = tuple(state["final_ln_gamma"].shape)
+    lm_head_shape = tuple(state["lm_head.weight"].shape)
+    first_w1_shape = tuple(state["blocks.0.fc1.weight"].shape)
+    first_w2_shape = tuple(state["blocks.0.fc2.weight"].shape)
+    dims = {
+        "vocab": int(embed_shape[0]),
+        "d_model": int(embed_shape[1]),
+        "hidden": int(first_w1_shape[0] // 2),
+        "num_layers": int(len(layer_ids)),
+    }
+
+    if final_ln_shape != (dims["d_model"],):
+        raise ValueError(
+            "final_ln_weight shape mismatch: "
+            f"expected ({dims['d_model']},), got {final_ln_shape}"
+        )
+    if lm_head_shape != (dims["vocab"], dims["d_model"]):
+        raise ValueError(
+            "output.weight shape mismatch: "
+            f"expected ({dims['vocab']}, {dims['d_model']}), got {lm_head_shape}"
+        )
+    if first_w1_shape[1] != dims["d_model"]:
+        raise ValueError(f"layer.0.w1 shape mismatch: expected [2H, D], got {first_w1_shape}")
+    if first_w2_shape != (dims["d_model"], dims["hidden"]):
+        raise ValueError(
+            "layer.0.w2 shape mismatch: "
+            f"expected ({dims['d_model']}, {dims['hidden']}), got {first_w2_shape}"
+        )
+
+    for lid in layer_ids:
+        rg = tuple(state[f"blocks.{lid}.rms_gamma"].shape)
+        w1 = tuple(state[f"blocks.{lid}.fc1.weight"].shape)
+        b1 = tuple(state[f"blocks.{lid}.fc1.bias"].shape)
+        w2 = tuple(state[f"blocks.{lid}.fc2.weight"].shape)
+        b2 = tuple(state[f"blocks.{lid}.fc2.bias"].shape)
+        if rg != (dims["d_model"],):
+            raise ValueError(f"layer.{lid}.ln2_gamma shape mismatch")
+        if w1 != (2 * dims["hidden"], dims["d_model"]):
+            raise ValueError(f"layer.{lid}.w1 shape mismatch")
+        if b1 != (2 * dims["hidden"],):
+            raise ValueError(f"layer.{lid}.b1 shape mismatch")
+        if w2 != (dims["d_model"], dims["hidden"]):
+            raise ValueError(f"layer.{lid}.w2 shape mismatch")
+        if b2 != (dims["d_model"],):
+            raise ValueError(f"layer.{lid}.b2 shape mismatch")
+
+    return state, dims
+
+
+def _load_init_state_from_bump(
+    weights_bump: Path, weights_manifest: Path, model_kind: str
+) -> tuple[Dict[str, torch.Tensor], dict, str]:
+    kind = str(model_kind).lower().strip()
+    if kind not in {"auto", "tiny", "stacked"}:
+        raise ValueError(f"Unsupported model kind: {model_kind}")
+
+    if kind == "tiny":
+        state, dims = _load_tiny_state_from_bump(weights_bump, weights_manifest)
+        dims.setdefault("num_layers", 1)
+        return state, dims, "tiny"
+    if kind == "stacked":
+        state, dims = _load_stacked_state_from_bump(weights_bump, weights_manifest)
+        return state, dims, "stacked"
+
+    # auto: prefer stacked if available, else fallback tiny.
+    try:
+        state, dims = _load_stacked_state_from_bump(weights_bump, weights_manifest)
+        return state, dims, "stacked"
+    except Exception:
+        state, dims = _load_tiny_state_from_bump(weights_bump, weights_manifest)
+        dims.setdefault("num_layers", 1)
+        return state, dims, "tiny"
 
 def _global_grad_norm(params: Iterable[torch.nn.Parameter]) -> float:
     total = 0.0
@@ -885,6 +1114,8 @@ def _localize_step_divergence(
 
 @dataclass
 class RunStats:
+    model_kind: str
+    num_layers: int
     epochs: int
     seq_len: int
     total_tokens: int
@@ -912,6 +1143,8 @@ class RunStats:
 
 def run_training_parity(
     lib: ctypes.CDLL,
+    model_kind: str,
+    num_layers: int,
     epochs: int,
     seq_len: int,
     total_tokens: int,
@@ -938,20 +1171,49 @@ def run_training_parity(
     epoch_snapshot_every: int = 1,
     epoch_snapshot_topk: int = 8,
     max_grad_norm: float = 0.0,
+    dump_step_state_dir: Path | None = None,
+    dump_step_state: int = 0,
+    dump_step_grads_dir: Path | None = None,
+    dump_step_grads: int = 0,
     safety: dict | None = None,
 ) -> RunStats:
     _seed_all(seed)
 
-    model_ck = TinyCKModel(
-        vocab=vocab,
-        d_model=d_model,
-        hidden=hidden,
-        eps=eps,
-        lib=lib,
-        use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
-        use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
-    )
-    model_torch = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
+    resolved_model_kind = str(model_kind).lower().strip()
+    if resolved_model_kind not in {"tiny", "stacked"}:
+        raise ValueError(f"Unsupported model kind: {model_kind}")
+    if int(num_layers) < 1:
+        raise ValueError("--num-layers must be >= 1")
+
+    if resolved_model_kind == "stacked":
+        model_ck: nn.Module = StackedCKModel(
+            vocab=vocab,
+            d_model=d_model,
+            hidden=hidden,
+            eps=eps,
+            lib=lib,
+            num_layers=int(num_layers),
+            use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
+            use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+        )
+        model_torch: nn.Module = StackedTorchModel(
+            vocab=vocab,
+            d_model=d_model,
+            hidden=hidden,
+            eps=eps,
+            num_layers=int(num_layers),
+        )
+    else:
+        model_ck = TinyCKModel(
+            vocab=vocab,
+            d_model=d_model,
+            hidden=hidden,
+            eps=eps,
+            lib=lib,
+            use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
+            use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+        )
+        model_torch = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
     if init_state is not None:
         model_ck.load_state_dict(init_state, strict=True)
         model_torch.load_state_dict(init_state, strict=True)
@@ -1002,6 +1264,177 @@ def run_training_parity(
     epoch_snapshots: list[dict] = []
     window_samples: list[tuple[torch.Tensor, torch.Tensor]] = []
     localized_step_report: dict | None = None
+    step_state_dump = {
+        "enabled": bool(dump_step_state_dir),
+        "requested_step": int(dump_step_state),
+        "written": False,
+        "step": None,
+        "dir": str(dump_step_state_dir) if dump_step_state_dir is not None else None,
+        "error": None,
+    }
+    _dump_step_state_done = False
+    _resolved_dump_step = int(dump_step_state)
+    if _resolved_dump_step <= 0:
+        _resolved_dump_step = 1
+    if dump_step_state_dir is not None:
+        dump_step_state_dir.mkdir(parents=True, exist_ok=True)
+
+    step_grads_dump = {
+        "enabled": bool(dump_step_grads_dir),
+        "requested_step": int(dump_step_grads),
+        "written": False,
+        "step": None,
+        "dir": str(dump_step_grads_dir) if dump_step_grads_dir is not None else None,
+        "ck_grads_path": None,
+        "torch_grads_path": None,
+        "summary_path": None,
+        "error": None,
+    }
+    _dump_step_grads_done = False
+    _resolved_dump_step_grads = int(dump_step_grads)
+    if _resolved_dump_step_grads <= 0:
+        _resolved_dump_step_grads = 1
+    if dump_step_grads_dir is not None:
+        dump_step_grads_dir.mkdir(parents=True, exist_ok=True)
+
+    def _maybe_dump_step_state(step_now: int) -> None:
+        nonlocal _dump_step_state_done
+        if dump_step_state_dir is None:
+            return
+        if _dump_step_state_done:
+            return
+        if int(step_now) != int(_resolved_dump_step):
+            return
+        stem = f"step_{int(step_now):08d}"
+        try:
+            torch.save(model_ck.state_dict(), dump_step_state_dir / f"{stem}_ck_state.pt")
+            torch.save(model_torch.state_dict(), dump_step_state_dir / f"{stem}_torch_state.pt")
+            torch.save(opt_ck.state_dict(), dump_step_state_dir / f"{stem}_ck_opt_state.pt")
+            torch.save(opt_torch.state_dict(), dump_step_state_dir / f"{stem}_torch_opt_state.pt")
+            meta = {
+                "step": int(step_now),
+                "model_kind": str(resolved_model_kind),
+                "num_layers": int(num_layers),
+                "optimizer": str(optimizer),
+                "lr": float(lr),
+                "grad_accum": int(grad_accum),
+                "seq_len": int(seq_len),
+                "total_tokens": int(total_tokens),
+            }
+            (dump_step_state_dir / f"{stem}_meta.json").write_text(
+                json.dumps(meta, indent=2), encoding="utf-8"
+            )
+            step_state_dump["written"] = True
+            step_state_dump["step"] = int(step_now)
+        except Exception as e:
+            step_state_dump["error"] = str(e)
+        _dump_step_state_done = True
+
+    def _maybe_dump_step_grads(step_now: int) -> None:
+        nonlocal _dump_step_grads_done
+        if dump_step_grads_dir is None:
+            return
+        if _dump_step_grads_done:
+            return
+        if int(step_now) != int(_resolved_dump_step_grads):
+            return
+
+        stem = f"step_{int(step_now):08d}"
+        ck_grads_path = dump_step_grads_dir / f"{stem}_ck_grads.pt"
+        torch_grads_path = dump_step_grads_dir / f"{stem}_torch_grads.pt"
+        summary_path = dump_step_grads_dir / f"{stem}_grad_diff_summary.json"
+
+        try:
+            ck_grads: Dict[str, torch.Tensor] = {
+                name: p.grad.detach().cpu().float().clone()
+                for name, p in model_ck.named_parameters()
+                if p.grad is not None
+            }
+            torch_grads: Dict[str, torch.Tensor] = {
+                name: p.grad.detach().cpu().float().clone()
+                for name, p in model_torch.named_parameters()
+                if p.grad is not None
+            }
+
+            torch.save(ck_grads, ck_grads_path)
+            torch.save(torch_grads, torch_grads_path)
+
+            all_names = sorted(set(ck_grads.keys()) | set(torch_grads.keys()))
+            per_tensor: list[dict] = []
+            global_max_abs = 0.0
+            global_sum_abs = 0.0
+            global_numel = 0
+            worst_name = None
+
+            for name in all_names:
+                g_ck = ck_grads.get(name)
+                g_t = torch_grads.get(name)
+                if g_ck is None or g_t is None:
+                    per_tensor.append(
+                        {
+                            "name": name,
+                            "missing_ck": g_ck is None,
+                            "missing_torch": g_t is None,
+                        }
+                    )
+                    continue
+                if tuple(g_ck.shape) != tuple(g_t.shape):
+                    per_tensor.append(
+                        {
+                            "name": name,
+                            "shape_ck": list(g_ck.shape),
+                            "shape_torch": list(g_t.shape),
+                            "shape_mismatch": True,
+                        }
+                    )
+                    continue
+
+                d = (g_ck - g_t).abs()
+                max_abs = float(d.max().item()) if d.numel() > 0 else 0.0
+                mean_abs = float(d.mean().item()) if d.numel() > 0 else 0.0
+                l2 = float(torch.linalg.vector_norm((g_ck - g_t).reshape(-1)).item()) if d.numel() > 0 else 0.0
+                ck_l2 = float(torch.linalg.vector_norm(g_ck.reshape(-1)).item()) if d.numel() > 0 else 0.0
+                torch_l2 = float(torch.linalg.vector_norm(g_t.reshape(-1)).item()) if d.numel() > 0 else 0.0
+
+                if max_abs > global_max_abs:
+                    global_max_abs = max_abs
+                    worst_name = name
+                global_sum_abs += float(d.sum().item())
+                global_numel += int(d.numel())
+
+                per_tensor.append(
+                    {
+                        "name": name,
+                        "shape": list(g_ck.shape),
+                        "numel": int(d.numel()),
+                        "ck_max_abs": float(g_ck.abs().max().item()) if d.numel() > 0 else 0.0,
+                        "torch_max_abs": float(g_t.abs().max().item()) if d.numel() > 0 else 0.0,
+                        "max_abs_diff": max_abs,
+                        "mean_abs_diff": mean_abs,
+                        "l2_diff": l2,
+                        "ck_l2": ck_l2,
+                        "torch_l2": torch_l2,
+                    }
+                )
+
+            summary_payload = {
+                "step": int(step_now),
+                "global_max_abs_diff": float(global_max_abs),
+                "global_mean_abs_diff": float(global_sum_abs / max(1, global_numel)),
+                "global_numel": int(global_numel),
+                "worst_tensor": worst_name,
+                "per_tensor": per_tensor,
+            }
+            summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+
+            step_grads_dump["written"] = True
+            step_grads_dump["step"] = int(step_now)
+            step_grads_dump["ck_grads_path"] = str(ck_grads_path)
+            step_grads_dump["torch_grads_path"] = str(torch_grads_path)
+            step_grads_dump["summary_path"] = str(summary_path)
+        except Exception as e:
+            step_grads_dump["error"] = str(e)
+        _dump_step_grads_done = True
 
     def _flush_optimizer_step() -> None:
         nonlocal step_count
@@ -1032,38 +1465,47 @@ def run_training_parity(
             pre_torch_model_state = copy.deepcopy(model_torch.state_dict())
             pre_ck_opt_state = copy.deepcopy(opt_ck.state_dict())
             pre_torch_opt_state = copy.deepcopy(opt_torch.state_dict())
-            localized_step_report = _localize_step_divergence(
-                lib=lib,
-                window_samples=window_samples,
-                vocab=vocab,
-                d_model=d_model,
-                hidden=hidden,
-                eps=eps,
-                optimizer=optimizer,
-                lr=lr,
-                grad_accum=grad_accum,
-                ck_rmsnorm_backend=ck_rmsnorm_backend,
-                ck_swiglu_backend=ck_swiglu_backend,
-                ck_loss_backend=ck_loss_backend,
-                pre_ck_model_state=pre_ck_model_state,
-                pre_ck_opt_state=pre_ck_opt_state,
-                pre_torch_model_state=pre_torch_model_state,
-                pre_torch_opt_state=pre_torch_opt_state,
-                source=drift_localize_source,
-                tol=float(drift_localize_tol),
-            )
-            localized_step_report["target_step"] = target_step
-            localized_step_report["trajectory_pre_step"] = {
-                "max_param_diff": float(pre_param_max),
-                "mean_param_diff": float(pre_param_mean),
-                "worst_param": pre_worst_param,
-                **pre_opt_state_diag,
-            }
+            if resolved_model_kind == "tiny":
+                localized_step_report = _localize_step_divergence(
+                    lib=lib,
+                    window_samples=window_samples,
+                    vocab=vocab,
+                    d_model=d_model,
+                    hidden=hidden,
+                    eps=eps,
+                    optimizer=optimizer,
+                    lr=lr,
+                    grad_accum=grad_accum,
+                    ck_rmsnorm_backend=ck_rmsnorm_backend,
+                    ck_swiglu_backend=ck_swiglu_backend,
+                    ck_loss_backend=ck_loss_backend,
+                    pre_ck_model_state=pre_ck_model_state,
+                    pre_ck_opt_state=pre_ck_opt_state,
+                    pre_torch_model_state=pre_torch_model_state,
+                    pre_torch_opt_state=pre_torch_opt_state,
+                    source=drift_localize_source,
+                    tol=float(drift_localize_tol),
+                )
+                localized_step_report["target_step"] = target_step
+                localized_step_report["trajectory_pre_step"] = {
+                    "max_param_diff": float(pre_param_max),
+                    "mean_param_diff": float(pre_param_mean),
+                    "worst_param": pre_worst_param,
+                    **pre_opt_state_diag,
+                }
+            else:
+                localized_step_report = {
+                    "target_step": int(target_step),
+                    "error": "localize_not_supported_for_stacked_model",
+                    "model_kind": str(resolved_model_kind),
+                    "num_layers": int(num_layers),
+                }
 
         grad_max, grad_mean, worst_grad_param = _named_tensor_diff_stats(
             ((name, p.grad.detach()) for name, p in model_ck.named_parameters() if p.grad is not None),
             ((name, p.grad.detach()) for name, p in model_torch.named_parameters() if p.grad is not None),
         )
+        _maybe_dump_step_grads(target_step)
         grad_norm_pre_clip = _global_grad_norm(params_ck)
         torch_grad_norm_pre_clip = _global_grad_norm(params_torch)
         grad_norm = grad_norm_pre_clip
@@ -1159,6 +1601,7 @@ def run_training_parity(
                 "clip_scale_torch": float(clip_scale_torch),
             }
         )
+        _maybe_dump_step_state(step_count)
         if diag_every > 0 and (step_count % diag_every == 0):
             diag_steps.append(
                 {
@@ -1335,6 +1778,8 @@ def run_training_parity(
     max_grad_abs_diff = max((float(s.get("max_grad_diff", 0.0)) for s in parity_steps), default=0.0)
 
     return RunStats(
+        model_kind=str(resolved_model_kind),
+        num_layers=int(num_layers),
         epochs=epochs,
         seq_len=seq_len,
         total_tokens=total_tokens,
@@ -1378,6 +1823,8 @@ def run_training_parity(
             "max_grad_abs_diff": max_grad_abs_diff,
             "steps": diag_steps,
             "localize_step_report": localized_step_report,
+            "step_state_dump": step_state_dump,
+            "step_grads_dump": step_grads_dump,
         },
         epoch_snapshots=epoch_snapshots,
         safety=dict(safety or {}),
@@ -1386,6 +1833,19 @@ def run_training_parity(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="v7 multi-epoch tiny training parity (C vs PyTorch).")
+    parser.add_argument(
+        "--model-kind",
+        type=str,
+        default="auto",
+        choices=["auto", "tiny", "stacked"],
+        help="Parity model shape: auto-detect from manifest (default), force tiny, or force stacked.",
+    )
+    parser.add_argument(
+        "--num-layers",
+        type=int,
+        default=1,
+        help="Number of stacked layers when model-kind=stacked and no manifest init is provided.",
+    )
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--seq-len", type=int, default=16)
     parser.add_argument("--total-tokens", type=int, default=1024)
@@ -1449,6 +1909,30 @@ def main() -> int:
         help="Global grad-norm clip applied to both CK and Torch branches before optimizer step (0 disables).",
     )
     parser.add_argument(
+        "--dump-step-state-dir",
+        type=Path,
+        default=None,
+        help="Optional directory to dump CK/Torch model+optimizer states at one optimizer step.",
+    )
+    parser.add_argument(
+        "--dump-step-state",
+        type=int,
+        default=0,
+        help="Optimizer step index to dump (<=0 means step 1).",
+    )
+    parser.add_argument(
+        "--dump-step-grads-dir",
+        type=Path,
+        default=None,
+        help="Optional directory to dump CK/Torch gradient tensors at one optimizer step.",
+    )
+    parser.add_argument(
+        "--dump-step-grads",
+        type=int,
+        default=0,
+        help="Optimizer step index to dump gradients (<=0 means step 1).",
+    )
+    parser.add_argument(
         "--enforce-production-safety",
         action="store_true",
         help="Fail fast on known-unsafe long-horizon AdamW settings.",
@@ -1468,6 +1952,9 @@ def main() -> int:
 
     if args.epochs < 1:
         print("ERROR: --epochs must be >= 1", file=sys.stderr)
+        return 2
+    if args.num_layers < 1:
+        print("ERROR: --num-layers must be >= 1", file=sys.stderr)
         return 2
     if args.grad_accum < 1:
         print("ERROR: --grad-accum must be >= 1", file=sys.stderr)
@@ -1492,6 +1979,12 @@ def main() -> int:
         return 2
     if args.epoch_snapshot_topk < 1:
         print("ERROR: --epoch-snapshot-topk must be >= 1", file=sys.stderr)
+        return 2
+    if args.dump_step_state < 0:
+        print("ERROR: --dump-step-state must be >= 0", file=sys.stderr)
+        return 2
+    if args.dump_step_grads < 0:
+        print("ERROR: --dump-step-grads must be >= 0", file=sys.stderr)
         return 2
     if args.max_grad_norm < 0:
         print("ERROR: --max-grad-norm must be >= 0", file=sys.stderr)
@@ -1533,6 +2026,7 @@ def main() -> int:
             safety["status"] = "unsafe_allowed"
             safety["message"] = "Unsafe AdamW LR profile explicitly allowed by CLI flag."
         print(f"WARNING: {safety['message']}", file=sys.stderr)
+    resolved_model_kind = "tiny" if str(args.model_kind).lower().strip() == "auto" else str(args.model_kind).lower().strip()
     init_state = None
     if (args.weights_bump is None) != (args.weights_manifest is None):
         print("ERROR: --weights-bump and --weights-manifest must be provided together", file=sys.stderr)
@@ -1545,22 +2039,34 @@ def main() -> int:
             print(f"ERROR: weights_manifest.json not found: {args.weights_manifest}", file=sys.stderr)
             return 2
         try:
-            init_state, dims = _load_tiny_state_from_bump(args.weights_bump, args.weights_manifest)
+            init_state, dims, resolved_model_kind = _load_init_state_from_bump(
+                args.weights_bump,
+                args.weights_manifest,
+                model_kind=str(args.model_kind),
+            )
         except Exception as e:
-            print(f"ERROR: failed to load tiny init from bump: {e}", file=sys.stderr)
+            print(f"ERROR: failed to load init from bump: {e}", file=sys.stderr)
             print("Hint: regenerate run_dir with cks-v7-run init (updated v7 init format).", file=sys.stderr)
             return 2
         args.vocab = int(dims["vocab"])
         args.d_model = int(dims["d_model"])
         args.hidden = int(dims["hidden"])
+        args.num_layers = int(dims.get("num_layers", args.num_layers))
         print(
-            f"Loaded tiny parity init from bump: vocab={args.vocab} d_model={args.d_model} hidden={args.hidden}",
+            "Loaded parity init from bump: "
+            f"model_kind={resolved_model_kind} "
+            f"vocab={args.vocab} d_model={args.d_model} hidden={args.hidden} "
+            f"num_layers={args.num_layers}",
             file=sys.stderr,
         )
+    elif str(args.model_kind).lower().strip() != "auto":
+        resolved_model_kind = str(args.model_kind).lower().strip()
 
     lib = _load_lib()
     stats = run_training_parity(
         lib=lib,
+        model_kind=resolved_model_kind,
+        num_layers=args.num_layers,
         epochs=args.epochs,
         seq_len=args.seq_len,
         total_tokens=args.total_tokens,
@@ -1587,12 +2093,17 @@ def main() -> int:
         epoch_snapshot_every=args.epoch_snapshot_every,
         epoch_snapshot_topk=args.epoch_snapshot_topk,
         max_grad_norm=args.max_grad_norm,
+        dump_step_state_dir=args.dump_step_state_dir,
+        dump_step_state=args.dump_step_state,
+        dump_step_grads_dir=args.dump_step_grads_dir,
+        dump_step_grads=args.dump_step_grads,
         safety=safety,
     )
 
     print("=" * 100)
     print("v7 TRAIN PARITY (multi-epoch)")
     print("=" * 100)
+    print(f"model_kind={stats.model_kind} num_layers={stats.num_layers}")
     print(f"epochs={stats.epochs} seq_len={stats.seq_len} total_tokens={stats.total_tokens} "
           f"grad_accum={stats.grad_accum} optimizer={stats.optimizer} lr={stats.lr}")
     print(
@@ -1629,6 +2140,27 @@ def main() -> int:
                 f"source={localize.get('same_state_source')} "
                 f"first_stage_over_tol={localize.get('first_stage_over_tol')} "
                 f"top_stage={top_stage}({max(top_val, 0.0):.3e})"
+            )
+        step_dump = stats.drift_diagnostics.get("step_state_dump")
+        if isinstance(step_dump, dict) and step_dump.get("enabled"):
+            print(
+                "step_dump: "
+                f"dir={step_dump.get('dir')} "
+                f"requested={step_dump.get('requested_step')} "
+                f"written={step_dump.get('written')} "
+                f"step={step_dump.get('step')} "
+                f"error={step_dump.get('error')}"
+            )
+        grad_dump = stats.drift_diagnostics.get("step_grads_dump")
+        if isinstance(grad_dump, dict) and grad_dump.get("enabled"):
+            print(
+                "grad_dump: "
+                f"dir={grad_dump.get('dir')} "
+                f"requested={grad_dump.get('requested_step')} "
+                f"written={grad_dump.get('written')} "
+                f"step={grad_dump.get('step')} "
+                f"summary={grad_dump.get('summary_path')} "
+                f"error={grad_dump.get('error')}"
             )
     print("PARITY:", "PASS" if stats.pass_parity else "FAIL")
     print("=" * 100)

@@ -1486,6 +1486,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 0.7rem;
+            min-width: 0;
         }
 
         .profile-howto-block {
@@ -1493,6 +1494,7 @@
             border-radius: 8px;
             background: rgba(0,0,0,0.24);
             padding: 0.6rem;
+            min-width: 0;
         }
 
         .profile-howto-block h4 {
@@ -1554,7 +1556,10 @@
             padding: 0.55rem;
             overflow-x: auto;
             font-family: 'JetBrains Mono', monospace;
-            white-space: pre;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            max-width: 100%;
         }
 
         .profile-howto-block pre {
@@ -1568,7 +1573,80 @@
             padding: 0.55rem;
             overflow-x: auto;
             font-family: 'JetBrains Mono', monospace;
-            white-space: pre;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            max-width: 100%;
+        }
+
+        .profile-howto-card pre {
+            min-width: 0;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            max-width: 100%;
+        }
+
+        /* Keep profile tab cards/tables from overflowing on long metric text */
+        #profile .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            align-items: stretch;
+        }
+
+        #profile .stat-card {
+            min-width: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.3rem;
+        }
+
+        #profile .stat-value {
+            font-size: clamp(1rem, 1.45vw, 1.55rem);
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            hyphens: auto;
+        }
+
+        #profile .stat-value.stat-value-compact {
+            font-size: 0.86rem;
+            line-height: 1.35;
+            text-align: left;
+        }
+
+        #profile .stat-label {
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        #profile .profile-hero-grid {
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        }
+
+        #profile .profile-stage-row {
+            grid-template-columns: minmax(96px, 120px) minmax(0, 1fr) minmax(56px, 70px);
+        }
+
+        #profile .profile-artifact-panel,
+        #profile .parity-section,
+        #profile table,
+        #profile .profile-hotspot-table {
+            min-width: 0;
+        }
+
+        #profile .profile-hotspot-table td,
+        #profile .profile-hotspot-table th,
+        #profile .profile-hotspot-table code {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            white-space: normal;
+        }
+
+        #profile select {
+            max-width: 100%;
         }
 
         @media (max-width: 900px) {
@@ -1587,6 +1665,21 @@
             .profile-stage-row {
                 grid-template-columns: 98px 1fr 64px;
                 gap: 0.4rem;
+            }
+        }
+
+        @media (max-width: 700px) {
+            #profile .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #profile .profile-stage-row {
+                grid-template-columns: 1fr;
+                gap: 0.25rem;
+            }
+
+            #profile .profile-stage-val {
+                text-align: left;
             }
         }
     </style>
@@ -2622,8 +2715,12 @@ python test_gemv_q8_0_q8_0.py</pre>
         let callData = null;
         let manifestData = null;
         let profileData = null;
+        let profileDataSource = null;
+        let profileDataIssue = '';
         let perfStatData = null;
         let flamegraphManifestData = null;
+        let cachegrindSummaryData = null;
+        let asanSummaryData = null;
         let vtuneSummaryData = null;
         let advisorSummaryData = null;
         let memorySignoffData = null;
@@ -2639,6 +2736,8 @@ python test_gemv_q8_0_q8_0.py</pre>
         let trainFdGradData = null;
         let trainParityEpoch3Data = null;
         let trainParityEpoch5Data = null;
+        let trainRuntimeParityRealisticData = null;
+        let trainRuntimeParityStressData = null;
         let trainReplayData = null;
         let ir1Data = null;
         let currentDfLayer = -1;
@@ -3107,9 +3206,11 @@ python test_gemv_q8_0_q8_0.py</pre>
             ];
             const optional = [
                 { key: 'manifest', label: 'weights_manifest.json', ready: Boolean(manifestData) },
-                { key: 'profile', label: 'profile_summary.json', ready: Boolean(profileData) },
+                { key: 'profile', label: 'profile_summary.json', ready: hasRenderableProfileData(profileData) },
                 { key: 'perf_stat', label: 'perf_stat_summary.json', ready: Boolean(perfStatData) },
                 { key: 'flamegraph_manifest', label: 'flamegraph_manifest.json', ready: Boolean(flamegraphManifestData) },
+                { key: 'cachegrind_summary', label: 'cachegrind_summary.json', ready: Boolean(cachegrindSummaryData) },
+                { key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) },
                 { key: 'vtune_summary', label: 'vtune_summary.json', ready: Boolean(vtuneSummaryData) },
                 { key: 'advisor_summary', label: 'advisor_summary.json', ready: Boolean(advisorSummaryData) },
                 { key: 'memory_signoff', label: 'memory_signoff.json', ready: Boolean(memorySignoffData) },
@@ -3390,6 +3491,55 @@ python test_gemv_q8_0_q8_0.py</pre>
             renderAll();
         }
 
+        function hasRenderableProfileData(payload) {
+            if (!payload || typeof payload !== 'object') return false;
+            if (Array.isArray(payload.entries) && payload.entries.length > 0) return true;
+            if (payload.by_op && typeof payload.by_op === 'object' && Object.keys(payload.by_op).length > 0) return true;
+            if (payload.by_mode && typeof payload.by_mode === 'object' && Object.keys(payload.by_mode).length > 0) return true;
+            return false;
+        }
+
+        function describeInvalidProfilePayload(payload, source = 'profile_summary.json') {
+            if (!payload) return '';
+            if (typeof payload !== 'object') {
+                return `${source} is not a JSON object with per-kernel profile timings.`;
+            }
+            const schema = String(payload.schema || '');
+            const tool = String(payload.tool || '');
+            if (schema === 'ck.profile.summary.v1' && tool) {
+                return `${source} is a ${tool} marker stub, not decode timing data. Run "make profile-v7-decode ..." to generate real profile entries.`;
+            }
+            if (schema === 'ck.profile.summary.v1') {
+                return `${source} is a marker stub without per-kernel timing entries.`;
+            }
+            return `${source} is missing required profile timing fields (entries/by_op/by_mode).`;
+        }
+
+        function normalizeProfilePayload(payload, source = 'profile_summary.json') {
+            if (Array.isArray(payload)) {
+                return { data: summarizeProfileEntries(payload), issue: '' };
+            }
+            if (!payload || typeof payload !== 'object') {
+                return { data: null, issue: describeInvalidProfilePayload(payload, source) };
+            }
+            if (hasRenderableProfileData(payload)) {
+                return { data: payload, issue: '' };
+            }
+            return { data: null, issue: describeInvalidProfilePayload(payload, source) };
+        }
+
+        function setProfilePayload(payload, source = 'profile_summary.json') {
+            const normalized = normalizeProfilePayload(payload, source);
+            if (!normalized.data) {
+                if (normalized.issue) profileDataIssue = normalized.issue;
+                return false;
+            }
+            profileData = normalized.data;
+            profileDataSource = source;
+            profileDataIssue = '';
+            return true;
+        }
+
         async function tryFetchJson(path) {
             try {
                 const resp = await fetch(path);
@@ -3398,6 +3548,65 @@ python test_gemv_q8_0_q8_0.py</pre>
             } catch (_err) {
                 return null;
             }
+        }
+
+        async function tryFetchText(path) {
+            try {
+                const resp = await fetch(path);
+                if (!resp.ok) return null;
+                return await resp.text();
+            } catch (_err) {
+                return null;
+            }
+        }
+
+        async function loadProfileFromCacheCandidates() {
+            const jsonCandidates = [
+                'profile_summary.json',
+                '.ck_build/profile_summary.json',
+                'ck_build/profile_summary.json',
+                'profile_decode.json',
+                '.ck_build/profile_decode.json',
+                'ck_build/profile_decode.json',
+            ];
+            const csvCandidates = [
+                'profile_decode.csv',
+                '.ck_build/profile_decode.csv',
+                'ck_build/profile_decode.csv',
+            ];
+            profileData = null;
+            profileDataSource = null;
+            let firstIssue = '';
+
+            for (const path of jsonCandidates) {
+                const payload = await tryFetchJson(path);
+                if (!payload) continue;
+                const normalized = normalizeProfilePayload(payload, path);
+                if (normalized.data) {
+                    profileData = normalized.data;
+                    profileDataSource = path;
+                    profileDataIssue = '';
+                    return true;
+                }
+                if (!firstIssue && normalized.issue) firstIssue = normalized.issue;
+            }
+
+            for (const path of csvCandidates) {
+                const text = await tryFetchText(path);
+                if (!text) continue;
+                const parsed = parseProfileCSV(text);
+                const normalized = normalizeProfilePayload(parsed, path);
+                if (normalized.data) {
+                    profileData = normalized.data;
+                    profileDataSource = path;
+                    profileDataIssue = '';
+                    return true;
+                }
+                if (!firstIssue && normalized.issue) firstIssue = normalized.issue;
+            }
+
+            if (firstIssue) profileDataIssue = firstIssue;
+            return false;
         }
 
         async function loadFromCache() {
@@ -3433,11 +3642,8 @@ python test_gemv_q8_0_q8_0.py</pre>
                 }
             }
 
-            if (!profileData) {
-                const profile = await tryFetchJson('profile_summary.json') ||
-                    await tryFetchJson('.ck_build/profile_summary.json') ||
-                    await tryFetchJson('ck_build/profile_summary.json');
-                if (profile) profileData = profile;
+            if (!hasRenderableProfileData(profileData)) {
+                await loadProfileFromCacheCandidates();
             }
             if (!perfStatData) {
                 perfStatData = await tryFetchJson('perf_stat_summary.json') ||
@@ -3448,6 +3654,16 @@ python test_gemv_q8_0_q8_0.py</pre>
                 flamegraphManifestData = await tryFetchJson('flamegraph_manifest.json') ||
                     await tryFetchJson('.ck_build/flamegraph_manifest.json') ||
                     await tryFetchJson('ck_build/flamegraph_manifest.json');
+            }
+            if (!cachegrindSummaryData) {
+                cachegrindSummaryData = await tryFetchJson('cachegrind_summary.json') ||
+                    await tryFetchJson('.ck_build/cachegrind_summary.json') ||
+                    await tryFetchJson('ck_build/cachegrind_summary.json');
+            }
+            if (!asanSummaryData) {
+                asanSummaryData = await tryFetchJson('asan_summary.json') ||
+                    await tryFetchJson('.ck_build/asan_summary.json') ||
+                    await tryFetchJson('ck_build/asan_summary.json');
             }
             if (!vtuneSummaryData) {
                 vtuneSummaryData = await tryFetchJson('vtune_summary.json') ||
@@ -3582,9 +3798,13 @@ python test_gemv_q8_0_q8_0.py</pre>
             setModeData('prefill', 'lowered', files.lowered_prefill || files.lowered_prefill_call || null);
 
             manifestData = files.manifest || manifestData;
-            profileData = files.profile_summary || profileData;
+            if (files.profile_summary) {
+                setProfilePayload(files.profile_summary, 'embedded:profile_summary');
+            }
             perfStatData = files.perf_stat_summary || perfStatData;
             flamegraphManifestData = files.flamegraph_manifest || flamegraphManifestData;
+            cachegrindSummaryData = files.cachegrind_summary || cachegrindSummaryData;
+            asanSummaryData = files.asan_summary || asanSummaryData;
             vtuneSummaryData = files.vtune_summary || vtuneSummaryData;
             advisorSummaryData = files.advisor_summary || advisorSummaryData;
             memorySignoffData = files.memory_signoff || memorySignoffData;
@@ -3599,10 +3819,16 @@ python test_gemv_q8_0_q8_0.py</pre>
             trainFdGradData = files.fd_gradients || trainFdGradData;
             trainParityEpoch3Data = files.train_parity_epochs_3 || trainParityEpoch3Data;
             trainParityEpoch5Data = files.train_parity_epochs_5 || trainParityEpoch5Data;
+            trainRuntimeParityRealisticData = files.train_runtime_parity_realistic || trainRuntimeParityRealisticData;
+            trainRuntimeParityStressData = files.train_runtime_parity_stress || trainRuntimeParityStressData;
             trainReplayData = files.replay_determinism || trainReplayData;
 
             window.__ckAnalysisCheckpoints = files.analysis_checkpoints || null;
-            window.__ckTrainE2E = files.train_e2e || null;
+            window.__ckTrainE2E =
+                files.train_e2e ||
+                files.train_runtime_parity_realistic ||
+                files.train_runtime_parity_stress ||
+                null;
             window.__ckLayoutTrain = files.layout_train || null;
 
             loadedFiles = {};
@@ -5193,6 +5419,8 @@ function renderTraining() {
         trainFdGradData ||
         trainParityEpoch3Data ||
         trainParityEpoch5Data ||
+        trainRuntimeParityRealisticData ||
+        trainRuntimeParityStressData ||
         trainReplayData
     );
 
@@ -5236,6 +5464,8 @@ function renderTraining() {
         { label: '1-token Parity', pass: trainParity1TokenData?.overall_pass === true },
         { label: 'FD Gradients', pass: trainFdGradData?.passed === true },
         { label: 'Epoch-3 Parity', pass: trainParityEpoch3Data?.pass_parity === true },
+        { label: 'Runtime Parity (Realistic)', pass: trainRuntimeParityRealisticData?.pass_parity === true },
+        { label: 'Runtime Parity (Stress)', pass: trainRuntimeParityStressData?.pass_parity === true },
         { label: 'Replay Determinism', pass: trainReplayData?.passed === true },
     ];
     const gatePassCount = gateStatuses.filter(s => s.pass === true).length;
@@ -5250,6 +5480,8 @@ function renderTraining() {
         <div class="stat-card"><div class="stat-value" style="color:${invColor}">${invStatus}</div><div class="stat-label">Invariant Gate</div></div>
         <div class="stat-card"><div class="stat-value">${gatePassCount}/${gateSeenCount || gateStatuses.length}</div><div class="stat-label">Gate Checks Passing</div></div>
         <div class="stat-card"><div class="stat-value">${trainParityEpoch3Data?.steps ?? '-'}</div><div class="stat-label">Optimizer Steps (E3)</div></div>
+        <div class="stat-card"><div class="stat-value">${trainRuntimeParityRealisticData?.pass_parity === true ? 'PASS' : (trainRuntimeParityRealisticData ? 'FAIL' : '-')}</div><div class="stat-label">Runtime Parity (Realistic)</div></div>
+        <div class="stat-card"><div class="stat-value">${trainRuntimeParityStressData?.pass_parity === true ? 'PASS' : (trainRuntimeParityStressData ? 'FAIL' : '-')}</div><div class="stat-label">Runtime Parity (Stress)</div></div>
     `;
 
     const unresolvedRows = (ir2?.unresolved || summary?.unresolved || []).slice(0, 12).map(item => `
@@ -5342,6 +5574,18 @@ function renderTraining() {
             `<div><strong>Epoch-5 parity:</strong> max |loss_ck-loss_torch| = ${Number(trainParityEpoch5Data.max_loss_abs_diff || 0).toExponential(3)}, final |param| max diff = ${Number(trainParityEpoch5Data.final_param_max_abs_diff || 0).toExponential(3)}</div>`
         );
     }
+    if (trainRuntimeParityRealisticData) {
+        const fails = Array.isArray(trainRuntimeParityRealisticData?.oracle?.failures) ? trainRuntimeParityRealisticData.oracle.failures.length : 0;
+        gradientDetails.push(
+            `<div><strong>Runtime parity (realistic):</strong> pass=${trainRuntimeParityRealisticData.pass_parity === true ? 'yes' : 'no'}, failures=${fails}, max |loss_ck-loss_torch| = ${Number(trainRuntimeParityRealisticData.max_loss_abs_diff || 0).toExponential(3)}</div>`
+        );
+    }
+    if (trainRuntimeParityStressData) {
+        const fails = Array.isArray(trainRuntimeParityStressData?.oracle?.failures) ? trainRuntimeParityStressData.oracle.failures.length : 0;
+        gradientDetails.push(
+            `<div><strong>Runtime parity (stress):</strong> pass=${trainRuntimeParityStressData.pass_parity === true ? 'yes' : 'no'}, failures=${fails}, max |loss_ck-loss_torch| = ${Number(trainRuntimeParityStressData.max_loss_abs_diff || 0).toExponential(3)}</div>`
+        );
+    }
     const invWarnings = Array.isArray(inv?.warnings) ? inv.warnings : [];
     if (invWarnings.length > 0) {
         gradientDetails.push(`<div style="color:#ffc66d;"><strong>Warnings:</strong> ${escapeHtml(invWarnings.slice(0, 5).join(' | '))}</div>`);
@@ -5379,6 +5623,24 @@ function renderTraining() {
                     <td>Replay determinism</td>
                     <td>${statusBadge(trainReplayData ? (trainReplayData.passed === true) : undefined)}</td>
                     <td>${trainReplayData ? `max replay diff=${Math.max(...Object.values(trainReplayData.abs_diffs || {x: 0})).toExponential(3)}` : '-'}</td>
+                </tr>
+                <tr>
+                    <td>Runtime parity (realistic)</td>
+                    <td>${statusBadge(trainRuntimeParityRealisticData ? (trainRuntimeParityRealisticData.pass_parity === true) : undefined)}</td>
+                    <td>${
+                        trainRuntimeParityRealisticData
+                            ? `fails=${Array.isArray(trainRuntimeParityRealisticData?.oracle?.failures) ? trainRuntimeParityRealisticData.oracle.failures.length : 0}, max_loss_diff=${Number(trainRuntimeParityRealisticData.max_loss_abs_diff || 0).toExponential(3)}`
+                            : '-'
+                    }</td>
+                </tr>
+                <tr>
+                    <td>Runtime parity (stress)</td>
+                    <td>${statusBadge(trainRuntimeParityStressData ? (trainRuntimeParityStressData.pass_parity === true) : undefined)}</td>
+                    <td>${
+                        trainRuntimeParityStressData
+                            ? `fails=${Array.isArray(trainRuntimeParityStressData?.oracle?.failures) ? trainRuntimeParityStressData.oracle.failures.length : 0}, max_loss_diff=${Number(trainRuntimeParityStressData.max_loss_abs_diff || 0).toExponential(3)}`
+                            : '-'
+                    }</td>
                 </tr>
             </tbody>
         </table>
@@ -6696,8 +6958,8 @@ function renderTraining() {
         function getFileType(filename) {
             const name = filename.toLowerCase();
             if (name.includes('profile')) return 'profile';
-            if (name.includes('perf_stat') || name.includes('flamegraph_manifest') || name.includes('vtune_summary') || name.includes('advisor_summary')) return 'profile';
-            if (name.includes('memory_signoff') || name.includes('perf_gate_report')) return 'validation';
+            if (name.includes('perf_stat') || name.includes('flamegraph_manifest') || name.includes('cachegrind_summary') || name.includes('vtune_summary') || name.includes('advisor_summary')) return 'profile';
+            if (name.includes('memory_signoff') || name.includes('perf_gate_report') || name.includes('asan_summary') || name.includes('memory_verification')) return 'validation';
             if (name.includes('ir_train_invariants') || name.includes('ir2_train_summary')) return 'training';
             if (name.includes('ir1_train') || name.includes('ir2_train')) return 'training';
             if (name.includes('train_parity') || name.includes('gradient_summary')) return 'training';
@@ -6757,14 +7019,25 @@ function renderTraining() {
                         setModeData(mode, 'ir1', info.data);
                         console.log(`Auto-loaded: ir1 dataflow (${mode})`);
                     } else if (name.includes('profile_summary') || name.includes('profile_decode')) {
-                        profileData = info.data;
-                        console.log('Auto-loaded: profile data');
+                        if (setProfilePayload(info.data, info.name || 'profile artifact')) {
+                            console.log('Auto-loaded: profile data');
+                        } else {
+                            profileData = null;
+                            profileDataSource = info.name || null;
+                            console.warn(`Ignored non-renderable profile artifact: ${info.name}`);
+                        }
                     } else if (name.includes('perf_stat_summary')) {
                         perfStatData = info.data;
                         console.log('Auto-loaded: perf stat summary');
                     } else if (name.includes('flamegraph_manifest')) {
                         flamegraphManifestData = info.data;
                         console.log('Auto-loaded: flamegraph manifest');
+                    } else if (name.includes('cachegrind_summary')) {
+                        cachegrindSummaryData = info.data;
+                        console.log('Auto-loaded: cachegrind summary');
+                    } else if (name.includes('asan_summary')) {
+                        asanSummaryData = info.data;
+                        console.log('Auto-loaded: ASan summary');
                     } else if (name.includes('vtune_summary')) {
                         vtuneSummaryData = info.data;
                         console.log('Auto-loaded: vtune summary');
@@ -6807,6 +7080,12 @@ function renderTraining() {
                     } else if (name.includes('train_parity') && name.includes('epochs_3')) {
                         trainParityEpoch3Data = info.data;
                         console.log('Auto-loaded: train parity epochs=3');
+                    } else if (name.includes('train_runtime_parity') && name.includes('realistic')) {
+                        trainRuntimeParityRealisticData = info.data;
+                        console.log('Auto-loaded: runtime parity realistic');
+                    } else if (name.includes('train_runtime_parity') && name.includes('stress')) {
+                        trainRuntimeParityStressData = info.data;
+                        console.log('Auto-loaded: runtime parity stress');
                     } else if (name.includes('replay_determinism')) {
                         trainReplayData = info.data;
                         console.log('Auto-loaded: replay determinism');
@@ -7532,10 +7811,15 @@ function renderTraining() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
+                    let parsed = null;
                     if (file.name.endsWith('.json')) {
-                        profileData = JSON.parse(e.target.result);
+                        parsed = JSON.parse(e.target.result);
                     } else if (file.name.endsWith('.csv')) {
-                        profileData = parseProfileCSV(e.target.result);
+                        parsed = parseProfileCSV(e.target.result);
+                    }
+                    if (!setProfilePayload(parsed, file.name)) {
+                        profileData = null;
+                        profileDataSource = null;
                     }
                     renderProfile();
                     console.log('Loaded profile data:', file.name);
@@ -8009,13 +8293,19 @@ function renderProfileHowTo() {
     const advisorTokenPath = `${reportRunDir}/.ck_profile_tokens_viz.txt`;
 
     const depChips = [
-        { name: 'profile_summary.json', ok: Boolean(profileData) },
+        { name: 'profile_summary.json', ok: hasRenderableProfileData(profileData) },
         { name: 'perf_stat_summary.json', ok: Boolean(perfStatData) },
         { name: 'flamegraph_manifest.json', ok: Boolean(flamegraphManifestData) },
+        { name: 'cachegrind_summary.json', ok: Boolean(cachegrindSummaryData) },
+        { name: 'asan_summary.json', ok: Boolean(asanSummaryData) },
         { name: 'perf_gate_report.json', ok: Boolean(perfGateData) },
         { name: 'vtune_summary.json', ok: Boolean(vtuneSummaryData) },
         { name: 'advisor_summary.json', ok: Boolean(advisorSummaryData) },
     ];
+
+    const profileIssueHtml = profileDataIssue
+        ? `<div style="margin-top:0.65rem;padding:0.55rem 0.7rem;border:1px solid #7a5f1a;border-radius:8px;background:rgba(243,156,18,0.10);color:#f6d48f;font-size:0.84rem;">${escapeHtml(profileDataIssue)}</div>`
+        : '';
 
     const missingDeps = depChips.filter((d) => !d.ok).map((d) => d.name);
 
@@ -8033,8 +8323,9 @@ function renderProfileHowTo() {
     const profileDecodeCmd = `make profile-v7-decode V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
     const perfStatCmd = `make profile-v7-perf-stat V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
     const flamegraphCmd = `make profile-v7-flamegraph V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
+    const cachegrindCmd = `make profile-v7-cachegrind V7_MODEL=${quoteShell(runModel)} V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`;
     const perfGateEvalCmd = `make v7-perf-gate-evaluate V7_MODEL=${quoteShell(runModel)}`;
-    const fullPerfCmd = [profileDecodeCmd, perfStatCmd, flamegraphCmd, perfGateEvalCmd].join('\n');
+    const fullPerfCmd = [profileDecodeCmd, perfStatCmd, flamegraphCmd, cachegrindCmd, perfGateEvalCmd].join('\n');
 
     const oneShotCmd = `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --with-probes --force-compile --run-model ${quoteShell(reportModelDir)} --perf-runtime cli${chatRunArg} --output ${quoteShell(reportHtmlPath)}`;
 
@@ -8063,6 +8354,20 @@ function renderProfileHowTo() {
         `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
     ].join('\n');
 
+    const cachegrindNativeCmd = [
+        advisorTokenCmd,
+        "make --no-print-directory ck-cli-v7",
+        `CK_NUM_THREADS=8 ./build/ck-cli-v7 profile --run ${quoteShell(reportRunDir)} --tool cachegrind --train-token-file ${quoteShell(advisorTokenPath)} --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 --threads 8`,
+        `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
+    ].join('\n');
+
+    const asanCmd = [
+        advisorTokenCmd,
+        "make --no-print-directory ck-cli-v7",
+        `CK_NUM_THREADS=8 ./build/ck-cli-v7 profile --run ${quoteShell(reportRunDir)} --tool asan --train-token-file ${quoteShell(advisorTokenPath)} --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 --threads 8`,
+        `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
+    ].join('\n');
+
     const artifactHelp = {
         'profile_summary.json': {
             why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown).',
@@ -8075,6 +8380,14 @@ function renderProfileHowTo() {
         'flamegraph_manifest.json': {
             why: 'Flamegraph index linking folded stacks and SVG hotspot view.',
             cmd: flamegraphCmd,
+        },
+        'cachegrind_summary.json': {
+            why: 'Cachegrind summary for instruction/data/cache-miss attribution by function.',
+            cmd: cachegrindNativeCmd,
+        },
+        'asan_summary.json': {
+            why: 'ASan verification summary (bounds/canary agreement and fault-injection checks).',
+            cmd: asanCmd,
         },
         'perf_gate_report.json': {
             why: 'Budget gate evaluation (tok/s, IPC, cache/branch thresholds).',
@@ -8135,6 +8448,7 @@ function renderProfileHowTo() {
             <div class="profile-dep-grid">
                 ${depChips.map(d => `<div class="profile-dep-chip ${d.ok ? 'ok' : 'missing'}">${escapeHtml(d.name)}: ${d.ok ? 'loaded' : 'missing'}</div>`).join('')}
             </div>
+            ${profileIssueHtml}
             ${missingHelpHtml}
             <div class="profile-howto-grid">
                 ${renderHowToBlock('1) Install Dependencies (once)', depsCmd)}
@@ -8159,7 +8473,9 @@ function renderProfileHowTo() {
             const cards = [];
             const links = [];
             let gatePanelHtml = '';
+            let cliPanelHtml = '';
             let advisorPanelHtml = '';
+            let safetyPanelHtml = '';
 
             const cyc = getPerfCounterByMatcher(['cycles', 'cpu-cycles', /cycles/i, /cpu_core\/cycles/i]);
             const ins = getPerfCounterByMatcher(['instructions', /instructions/i]);
@@ -8251,6 +8567,88 @@ function renderProfileHowTo() {
                 `;
             }
 
+            const selectedMode = String(document.getElementById('profileMode')?.value || 'decode');
+            const summarySource = (profileSummaryForMode && typeof profileSummaryForMode === 'object')
+                ? profileSummaryForMode
+                : (hasRenderableProfileData(profileData) ? profileData : {});
+            const summaryEntries = Array.isArray(summarySource?.entries) ? summarySource.entries : [];
+            const summaryByOp = (summarySource?.by_op && typeof summarySource.by_op === 'object') ? summarySource.by_op : {};
+            const summaryTotalUs = safeNum(summarySource?.total_us, 0);
+            const topModeOps = Object.entries(summaryByOp)
+                .map(([op, us]) => [String(op), safeNum(us, 0)])
+                .filter(([, us]) => us > 0)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            let token0TotalUs = 0;
+            const token0Agg = new Map();
+            summaryEntries.forEach((entry) => {
+                if (normalizeTokenId(entry?.token_id) !== 0) return;
+                const op = String(entry?.op || entry?.kernel || 'unknown');
+                const us = safeNum(entry?.time_us, 0);
+                if (us <= 0) return;
+                token0Agg.set(op, (token0Agg.get(op) || 0) + us);
+                token0TotalUs += us;
+            });
+            const topToken0Ops = [...token0Agg.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            const formatHotspotLines = (rows, totalUs) => {
+                if (!rows || rows.length === 0 || totalUs <= 0) {
+                    return ['  (no hotspot rows)'];
+                }
+                return rows.map(([name, us]) => {
+                    const pct = (safeNum(us, 0) / totalUs) * 100;
+                    const msTxt = `${(safeNum(us, 0) / 1000).toFixed(2)} ms`;
+                    const pctTxt = `(${pct.toFixed(1)}%)`;
+                    return `  ${String(name).padEnd(22)} ${msTxt.padStart(10)} ${pctTxt}`;
+                });
+            };
+
+            const cliLines = [];
+            if (perfGate && Array.isArray(perfGate.checks)) {
+                const family = String(perfGate.family || 'default');
+                const modelHint = String(perfGate.model_name || perfGate.model || '').trim();
+                const modelDirHint = String(perfGate.model_dir || '').trim();
+                const modelFromDir = modelDirHint
+                    ? modelDirHint.split('/').filter(Boolean).slice(-1)[0]
+                    : '';
+                const modelName = modelHint || modelFromDir || String(summarySource?.model_name || '-');
+                cliLines.push(`[perf-gate] model=${modelName} family=${family}`);
+                const decodeTokS = perfGate?.metrics?.decode_tok_s;
+                if (decodeTokS !== undefined && decodeTokS !== null) {
+                    cliLines.push(`[perf-gate] decode_tok_s=${String(decodeTokS)}`);
+                }
+                perfGate.checks.forEach((c) => {
+                    const status = c?.passed ? 'PASS' : 'FAIL';
+                    const metric = String(c?.metric || '-');
+                    const cmp = String(c?.comparison || '?');
+                    const threshold = formatMetricValue(c?.threshold);
+                    const value = formatMetricValue(c?.value);
+                    const reason = String(c?.reason || '-');
+                    cliLines.push(`  [${status}] ${metric} ${cmp} ${threshold} (value=${value}, reason=${reason})`);
+                });
+                cliLines.push('');
+            }
+            if (topToken0Ops.length > 0) {
+                cliLines.push('Top hotspots (token_id=0):');
+                cliLines.push(...formatHotspotLines(topToken0Ops, token0TotalUs));
+                cliLines.push('');
+            }
+            if (topModeOps.length > 0) {
+                cliLines.push(`Top ${selectedMode} hotspots (all ${selectedMode} tokens):`);
+                cliLines.push(...formatHotspotLines(topModeOps, summaryTotalUs));
+            }
+            if (cliLines.length > 0) {
+                cliPanelHtml = `
+                    <div class="parity-section" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-blue">CLI View</span> Perf Gate + Hotspots</h3>
+                        <pre style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(cliLines.join('\n'))}</pre>
+                    </div>
+                `;
+            }
+
             if (memorySignoffData) {
                 const ok = Boolean(memorySignoffData.passed);
                 cards.push(`
@@ -8261,7 +8659,95 @@ function renderProfileHowTo() {
                 `);
             }
 
-            const physics = computeProfilePhysics(profileSummaryForMode || profileData);
+            if (cachegrindSummaryData) {
+                const d1 = cachegrindSummaryData?.derived?.d1_miss_rate;
+                const ll = cachegrindSummaryData?.derived?.ll_miss_rate;
+                const totals = cachegrindSummaryData?.totals || {};
+                const topFns = Array.isArray(cachegrindSummaryData?.top_functions)
+                    ? cachegrindSummaryData.top_functions.slice(0, 8)
+                    : [];
+                cards.push(`
+                    <div class="stat-card">
+                        <div class="stat-value">${d1 !== undefined ? `${(Number(d1) * 100).toFixed(2)}%` : '-'}</div>
+                        <div class="stat-label">Cachegrind D1 Miss Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${ll !== undefined ? `${(Number(ll) * 100).toFixed(2)}%` : '-'}</div>
+                        <div class="stat-label">Cachegrind LL Miss Rate</div>
+                    </div>
+                `);
+                if (cachegrindSummaryData?.annotate_path_resolved || cachegrindSummaryData?.annotate_path) {
+                    const p = cachegrindSummaryData?.annotate_path_resolved || cachegrindSummaryData?.annotate_path;
+                    links.push(`<a href="${escapeHtml(String(p))}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Open cachegrind annotate report</a>`);
+                }
+                const fnRows = topFns.map((row) => `
+                    <tr>
+                        <td><code>${escapeHtml(String(row?.function || '-'))}</code></td>
+                        <td>${escapeHtml(formatMetricValue(row?.Ir))}</td>
+                        <td>${escapeHtml(formatMetricValue((Number(row?.D1mr || 0) + Number(row?.D1mw || 0))))}</td>
+                    </tr>
+                `).join('');
+                safetyPanelHtml += `
+                    <div class="profile-artifact-panel" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-blue">Cachegrind</span> Cache-Miss Attribution</h3>
+                        <table class="profile-hotspot-table">
+                            <tbody>
+                                <tr><td>Ir</td><td>${escapeHtml(formatMetricValue(totals?.Ir))}</td></tr>
+                                <tr><td>Dr</td><td>${escapeHtml(formatMetricValue(totals?.Dr))}</td></tr>
+                                <tr><td>Dw</td><td>${escapeHtml(formatMetricValue(totals?.Dw))}</td></tr>
+                                <tr><td>D1mr + D1mw</td><td>${escapeHtml(formatMetricValue((Number(totals?.D1mr || 0) + Number(totals?.D1mw || 0))))}</td></tr>
+                                <tr><td>LLmr + LLmw</td><td>${escapeHtml(formatMetricValue((Number(totals?.LLmr || 0) + Number(totals?.LLmw || 0))))}</td></tr>
+                            </tbody>
+                        </table>
+                        <div style="margin-top:0.6rem;">
+                            <table class="profile-hotspot-table">
+                                <thead><tr><th>Function</th><th>Ir</th><th>D1 misses</th></tr></thead>
+                                <tbody>${fnRows || '<tr><td colspan="3" style="color:var(--text-muted);">No cachegrind function rows.</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (asanSummaryData) {
+                const ok = Boolean(asanSummaryData?.overall_ok);
+                const passedChecks = Number(asanSummaryData?.passed_checks || 0);
+                const totalChecks = Number(asanSummaryData?.total_checks || 0);
+                cards.push(`
+                    <div class="stat-card">
+                        <div class="stat-value" style="color:${ok ? 'var(--green)' : '#e74c3c'}">${ok ? 'PASS' : 'FAIL'}</div>
+                        <div class="stat-label">ASan Verification (${passedChecks}/${totalChecks})</div>
+                    </div>
+                `);
+                const checkRows = Object.entries(asanSummaryData?.checks || {}).map(([k, v]) => {
+                    const okCheck = Boolean(v?.ok);
+                    return `
+                        <tr>
+                            <td><code>${escapeHtml(String(k))}</code></td>
+                            <td style="color:${okCheck ? 'var(--green)' : '#e74c3c'};font-weight:700;">${okCheck ? 'PASS' : 'FAIL'}</td>
+                            <td>${escapeHtml(String(v?.summary || ''))}</td>
+                        </tr>
+                    `;
+                }).join('');
+                if (asanSummaryData?.verify_report_path_resolved || asanSummaryData?.verify_report_path) {
+                    const p = asanSummaryData?.verify_report_path_resolved || asanSummaryData?.verify_report_path;
+                    links.push(`<a href="${escapeHtml(String(p))}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Open ASan verification report</a>`);
+                }
+                safetyPanelHtml += `
+                    <div class="profile-artifact-panel" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-orange">ASan</span> Memory Safety Verification</h3>
+                        <table class="profile-hotspot-table">
+                            <thead><tr><th>Check</th><th>Status</th><th>Summary</th></tr></thead>
+                            <tbody>${checkRows || '<tr><td colspan="3" style="color:var(--text-muted);">No ASan check rows.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            const profileBasis = (profileSummaryForMode && typeof profileSummaryForMode === 'object')
+                ? profileSummaryForMode
+                : (hasRenderableProfileData(profileData) ? profileData : {});
+            const physics = computeProfilePhysics(profileBasis);
             cards.push(`
                 <div class="stat-card">
                     <div class="stat-value">${physics.gemmSharePct.toFixed(1)}%</div>
@@ -8297,7 +8783,7 @@ function renderProfileHowTo() {
                 </div>
             `);
 
-            const stageBreakdown = getProfileStageBreakdown(profileSummaryForMode || profileData);
+            const stageBreakdown = getProfileStageBreakdown(profileBasis);
             const stageRows = stageBreakdown.map((s) => `
                 <div class="profile-stage-row">
                     <div class="profile-stage-name">${escapeHtml(s.label)}</div>
@@ -8442,24 +8928,64 @@ function renderProfileHowTo() {
                 }).join('');
 
                 const candidates = [];
+                const vtunePathLinks = [];
+                const vtuneLinkSeen = new Set();
+                const isRenderableMediaPath = (p) => /\.(svg|png|jpe?g|gif|webp)$/i.test(String(p || ''));
+                const addVtunePathLink = (path, label) => {
+                    const p = String(path || '').trim();
+                    if (!p) return;
+                    const text = String(label || p);
+                    const key = `${text}::${p}`;
+                    if (vtuneLinkSeen.has(key)) return;
+                    vtuneLinkSeen.add(key);
+                    vtunePathLinks.push({ path: p, label: text });
+                };
+                const addVtuneMediaOrLink = (path, label) => {
+                    const p = String(path || '').trim();
+                    if (!p) return;
+                    if (isRenderableMediaPath(p)) {
+                        candidates.push({ type: 'path', payload: p, label: label || p });
+                    } else {
+                        addVtunePathLink(p, label);
+                    }
+                };
+
                 const vtunePathKeys = ['svg_path', 'hotspots_svg', 'png_path', 'hotspots_png', 'image_path'];
                 vtunePathKeys.forEach((k) => {
                     if (typeof vtuneSummaryData?.[`${k}_inline`] === 'string') {
                         candidates.push({ type: 'svg-inline', payload: vtuneSummaryData[`${k}_inline`], label: k });
                     } else if (typeof vtuneSummaryData?.[`${k}_data_uri`] === 'string') {
                         candidates.push({ type: 'img', payload: vtuneSummaryData[`${k}_data_uri`], label: k });
-                    } else if (typeof vtuneSummaryData?.[`${k}_resolved`] === 'string') {
-                        candidates.push({ type: 'path', payload: vtuneSummaryData[`${k}_resolved`], label: k });
+                    } else {
+                        addVtuneMediaOrLink(vtuneSummaryData?.[`${k}_resolved`] || vtuneSummaryData?.[k], k);
                     }
                 });
+                addVtunePathLink(vtuneSummaryData?.result_dir_resolved || vtuneSummaryData?.result_dir, 'result_dir');
+                addVtunePathLink(vtuneSummaryData?.report_path_resolved || vtuneSummaryData?.report_path, 'report_path');
+                addVtunePathLink(vtuneSummaryData?.csv_path_resolved || vtuneSummaryData?.csv_path, 'csv_path');
 
                 const art = Array.isArray(vtuneSummaryData?.artifacts) ? vtuneSummaryData.artifacts : [];
                 art.forEach((a) => {
                     if (!a || typeof a !== 'object') return;
-                    if (typeof a.inline === 'string') candidates.push({ type: 'svg-inline', payload: a.inline, label: a.label || a.path || 'artifact' });
-                    else if (typeof a.data_uri === 'string') candidates.push({ type: 'img', payload: a.data_uri, label: a.label || a.path || 'artifact' });
-                    else if (typeof a.resolved_path === 'string') candidates.push({ type: 'path', payload: a.resolved_path, label: a.label || a.path || 'artifact' });
+                    const label = a.label || a.path || 'artifact';
+                    if (typeof a.inline === 'string') {
+                        candidates.push({ type: 'svg-inline', payload: a.inline, label });
+                    } else if (typeof a.data_uri === 'string') {
+                        candidates.push({ type: 'img', payload: a.data_uri, label });
+                    } else {
+                        addVtuneMediaOrLink(a.resolved_path || a.path, label);
+                    }
                 });
+
+                const vtuneHasAbsolutePath = vtunePathLinks.some((x) => /^([A-Za-z]:[\\/]|\/)/.test(String(x.path || '')));
+                const vtunePathLinksHtml = vtunePathLinks.length > 0
+                    ? `<div style="margin-top:0.55rem;display:grid;gap:0.28rem;">
+                        ${vtunePathLinks.map((x) => `<a href="${escapeHtml(String(x.path))}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">${escapeHtml(String(x.label))}: ${escapeHtml(String(x.path))}</a>`).join('')}
+                       </div>`
+                    : '';
+                const vtunePathHintHtml = vtuneHasAbsolutePath
+                    ? `<div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.78rem;">If these links 404, serve a parent directory that contains the path, or open with <code>vtune-gui</code>.</div>`
+                    : '';
 
                 const hotspotRows = normalizeHotspots(vtuneSummaryData).map((h) => `
                     <tr>
@@ -8485,6 +9011,7 @@ function renderProfileHowTo() {
                         }
                     }
                 }
+                mediaHtml = `${mediaHtml}${vtunePathLinksHtml}${vtunePathHintHtml}`;
 
                 vtuneEl.innerHTML = `
                     <div class="profile-artifact-panel">
@@ -8502,14 +9029,15 @@ function renderProfileHowTo() {
                         </div>
                     </div>
                 ${advisorPanelHtml}
+                ${safetyPanelHtml}
                 `;
             } else {
-                vtuneEl.innerHTML = advisorPanelHtml || '';
+                vtuneEl.innerHTML = `${advisorPanelHtml}${safetyPanelHtml}` || '';
             }
 
             summaryEl.innerHTML = cards.length > 0
-                ? `<div class="stats-grid">${cards.join('')}</div>${gatePanelHtml}`
-                : '<p style="color:var(--text-muted);">No perf_stat_summary.json / memory_signoff.json / perf_gate_report.json loaded.</p>';
+                ? `<div class="stats-grid">${cards.join('')}</div>${cliPanelHtml}${gatePanelHtml}`
+                : '<p style="color:var(--text-muted);">No perf/cache/validation artifacts loaded (perf_stat_summary.json, cachegrind_summary.json, asan_summary.json, memory_signoff.json, perf_gate_report.json).</p>';
             artifactsEl.innerHTML = links.length > 0
                 ? `<div class="parity-section"><h3><span class="badge badge-blue">Artifacts</span> External Profiling Artifacts</h3><div style="display:grid;gap:0.45rem;color:var(--text-secondary);">${links.map(x => `<div>${x}</div>`).join('')}</div></div>`
                 : '';
@@ -8517,12 +9045,12 @@ function renderProfileHowTo() {
 
         function renderProfile() {
             const mode = document.getElementById('profileMode').value;
-            let filteredData = profileData;
+            let filteredData = hasRenderableProfileData(profileData) ? profileData : null;
 
             renderProfileHowTo();
 
-            if (profileData && profileData.entries && profileData.entries.length > 0 && profileData.entries[0].mode) {
-                const summaryForMode = summarizeProfileEntries(profileData.entries, mode);
+            if (filteredData && filteredData.entries && filteredData.entries.length > 0 && filteredData.entries[0].mode) {
+                const summaryForMode = summarizeProfileEntries(filteredData.entries, mode);
                 if ((summaryForMode.entries || []).length > 0) {
                     filteredData = summaryForMode;
                 }
@@ -8530,7 +9058,9 @@ function renderProfileHowTo() {
 
             renderProfileExternalArtifacts(filteredData);
             if (!filteredData) {
-                document.getElementById('profileStats').innerHTML = '<p style="color:var(--text-muted);">No profile data loaded. Use the Load Profile button or load a model folder.</p>';
+                const issue = profileDataIssue ? `<br/><span style="color:#f6d48f;">${escapeHtml(profileDataIssue)}</span>` : '';
+                const src = profileDataSource ? `<br/><span style="color:var(--text-muted);font-size:0.82rem;">source: ${escapeHtml(profileDataSource)}</span>` : '';
+                document.getElementById('profileStats').innerHTML = `<p style="color:var(--text-muted);">No renderable profile timing data loaded. Use the Load Profile button or run <code>make profile-v7-decode ...</code>.${issue}${src}</p>`;
                 document.getElementById('profileOpChart').innerHTML = '';
                 document.getElementById('profileHeatmap').innerHTML = '';
                 document.getElementById('profileRawTable').innerHTML = '';
@@ -8568,15 +9098,15 @@ function renderProfileHowTo() {
 
             const sorted = Object.entries(data.by_op || {}).sort((a, b) => b[1] - a[1]);
             const top3 = sorted.slice(0, 3).map(([op, us]) =>
-                `${op}: ${(us/1000).toFixed(2)}ms`
-            ).join(', ');
+                `${escapeHtml(String(op))}: ${(us / 1000).toFixed(2)}ms`
+            );
 
             container.innerHTML = `
                 <div class="stat-card"><div class="stat-value">${totalMs.toFixed(2)} ms</div><div class="stat-label">Total Time (selected mode window)</div></div>
                 <div class="stat-card"><div class="stat-value">${msPerToken.toFixed(2)}</div><div class="stat-label">ms/token (selected window)</div></div>
                 <div class="stat-card"><div class="stat-value">${toksPerSec}</div><div class="stat-label">Tokens/sec (estimated)</div></div>
                 <div class="stat-card"><div class="stat-value">${sorted.length}</div><div class="stat-label">Unique Operations</div></div>
-                <div class="stat-card"><div class="stat-value" style="font-size:0.9rem;">${top3 || '-'}</div><div class="stat-label">Top Hotspots</div></div>
+                <div class="stat-card"><div class="stat-value stat-value-compact">${top3.length > 0 ? top3.join('<br/>') : '-'}</div><div class="stat-label">Top Hotspots</div></div>
             `;
         }
 
@@ -9096,6 +9626,130 @@ function getRunContext() {
     return { runDir, modelPath };
 }
 
+function collectRuntimeParityRows(files) {
+    const specs = [
+        { key: 'train_runtime_parity_realistic', label: 'Realistic' },
+        { key: 'train_runtime_parity_stress', label: 'Stress' },
+    ];
+    return specs.map((spec) => {
+        const payload = files && files[spec.key] && typeof files[spec.key] === 'object'
+            ? files[spec.key]
+            : null;
+        if (!payload) return null;
+        const oracle = payload.oracle && typeof payload.oracle === 'object' ? payload.oracle : {};
+        const failures = Array.isArray(oracle.failures) ? oracle.failures : [];
+        const replayFailures = Array.isArray(oracle.replay_failures) ? oracle.replay_failures : [];
+        const checks = Array.isArray(oracle.checks) ? oracle.checks.length : 0;
+        const denominator = checks > 0 ? checks : Math.max(1, toNum(payload.steps, 0));
+        return {
+            key: spec.key,
+            label: spec.label,
+            passParity: payload.pass_parity === true,
+            steps: toNum(payload.steps, 0),
+            optimizerSteps: toNum(payload.optimizer_steps, 0),
+            gradAccum: toNum(payload.grad_accum, NaN),
+            tokensPerUpdate: toNum(payload.tokens_per_update, NaN),
+            maxLossAbsDiff: toNum(payload.max_loss_abs_diff, NaN),
+            finalParamMaxAbsDiff: toNum(payload.final_param_max_abs_diff, NaN),
+            finalOptimizerStateMaxAbsDiff: toNum(payload.final_optimizer_state_max_abs_diff, NaN),
+            failureCount: failures.length,
+            replayFailureCount: replayFailures.length,
+            failureRate: failures.length / denominator,
+            firstFailure: failures.length > 0 ? failures[0] : null,
+            safetyStatus: payload?.safety?.status || null,
+            oracleSource: oracle.source || null,
+        };
+    }).filter(Boolean);
+}
+
+function renderRuntimeParityInfographic(container, rows) {
+    if (!container) return;
+    if (!Array.isArray(rows) || rows.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">No runtime parity reports loaded yet (expected train_runtime_parity_realistic_latest.json and train_runtime_parity_stress_latest.json).</div>';
+        return;
+    }
+    const logScale = (v) => {
+        if (!Number.isFinite(v) || v <= 0) return 0;
+        const lo = -8;
+        const hi = -2;
+        const x = Math.log10(v);
+        return Math.max(0, Math.min(1, (x - lo) / (hi - lo)));
+    };
+    const cards = rows.map((row) => {
+        const failWidth = Math.round(Math.max(0, Math.min(1, row.failureRate)) * 170);
+        const lossWidth = Math.round(logScale(row.maxLossAbsDiff) * 170);
+        const paramWidth = Math.round(logScale(row.finalParamMaxAbsDiff) * 170);
+        const optWidth = Math.round(logScale(row.finalOptimizerStateMaxAbsDiff) * 170);
+        const badge = row.passParity
+            ? '<span class="badge badge-green">PASS</span>'
+            : '<span class="badge badge-red">FAIL</span>';
+        const firstFailStep = row.firstFailure && Number.isFinite(toNum(row.firstFailure.step, NaN))
+            ? toNum(row.firstFailure.step, 0)
+            : NaN;
+        const firstFail = Number.isFinite(firstFailStep)
+            ? `first_fail_step=${firstFailStep}`
+            : 'first_fail_step=-';
+        const firstFailOptStep = Number.isFinite(firstFailStep) && Number.isFinite(row.gradAccum) && row.gradAccum > 0
+            ? Math.ceil(firstFailStep / row.gradAccum)
+            : NaN;
+        const firstBadTensor = row.firstFailure && typeof row.firstFailure.first_bad_tensor === 'string'
+            ? row.firstFailure.first_bad_tensor
+            : '-';
+        const firstBadOp = row.firstFailure && typeof row.firstFailure.first_bad_op === 'string'
+            ? row.firstFailure.first_bad_op
+            : '-';
+        const firstBadDiff = row.firstFailure && Number.isFinite(toNum(row.firstFailure.first_bad_diff, NaN))
+            ? toNum(row.firstFailure.first_bad_diff, NaN)
+            : NaN;
+        return `
+            <div class="parity-section" style="margin-top:0.6rem;">
+                <h3><span class="badge badge-blue">Runtime ${escapeHtml(row.label)}</span> Generated-C Train Parity ${badge}</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
+                    <div><strong>steps:</strong> ${row.steps || '-'}</div>
+                    <div><strong>optimizer steps:</strong> ${row.optimizerSteps || '-'}</div>
+                    <div><strong>grad accum:</strong> ${Number.isFinite(row.gradAccum) ? row.gradAccum : '-'}</div>
+                    <div><strong>tokens/update:</strong> ${Number.isFinite(row.tokensPerUpdate) ? row.tokensPerUpdate : '-'}</div>
+                    <div><strong>failures:</strong> ${row.failureCount}</div>
+                    <div><strong>replay failures:</strong> ${row.replayFailureCount}</div>
+                    <div><strong>${firstFail}</strong></div>
+                    <div><strong>first_fail_opt_step:</strong> ${Number.isFinite(firstFailOptStep) ? firstFailOptStep : '-'}</div>
+                    <div><strong>safety:</strong> ${escapeHtml(String(row.safetyStatus || '-'))}</div>
+                </div>
+                <svg style="width:100%;height:96px;" viewBox="0 0 330 96" preserveAspectRatio="xMinYMin meet">
+                    <text x="4" y="16" font-size="11" fill="#cbd5e1">Failure Density</text>
+                    <rect x="150" y="8" width="170" height="10" rx="3" fill="#1f2937"></rect>
+                    <rect x="150" y="8" width="${failWidth}" height="10" rx="3" fill="#f97316"></rect>
+                    <text x="324" y="16" font-size="10" text-anchor="end" fill="#e5e7eb">${fmt(toNum(row.failureRate, 0) * 100.0, 1)}%</text>
+
+                    <text x="4" y="38" font-size="11" fill="#cbd5e1">Max Loss Diff (log)</text>
+                    <rect x="150" y="30" width="170" height="10" rx="3" fill="#1f2937"></rect>
+                    <rect x="150" y="30" width="${lossWidth}" height="10" rx="3" fill="#60a5fa"></rect>
+                    <text x="324" y="38" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.maxLossAbsDiff) ? fmtExp(row.maxLossAbsDiff, 2) : '-'}</text>
+
+                    <text x="4" y="60" font-size="11" fill="#cbd5e1">Max Param Diff (log)</text>
+                    <rect x="150" y="52" width="170" height="10" rx="3" fill="#1f2937"></rect>
+                    <rect x="150" y="52" width="${paramWidth}" height="10" rx="3" fill="#34d399"></rect>
+                    <text x="324" y="60" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.finalParamMaxAbsDiff) ? fmtExp(row.finalParamMaxAbsDiff, 2) : '-'}</text>
+
+                    <text x="4" y="82" font-size="11" fill="#cbd5e1">Max Adam State Diff (log)</text>
+                    <rect x="150" y="74" width="170" height="10" rx="3" fill="#1f2937"></rect>
+                    <rect x="150" y="74" width="${optWidth}" height="10" rx="3" fill="#a78bfa"></rect>
+                    <text x="324" y="82" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.finalOptimizerStateMaxAbsDiff) ? fmtExp(row.finalOptimizerStateMaxAbsDiff, 2) : '-'}</text>
+                </svg>
+                <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.82rem;">
+                    oracle=${escapeHtml(String(row.oracleSource || '-'))}
+                </div>
+                <div style="margin-top:0.3rem;color:var(--text-muted);font-size:0.82rem;">
+                    first_bad_tensor=${escapeHtml(String(firstBadTensor))} ·
+                    first_bad_op=${escapeHtml(String(firstBadOp))} ·
+                    first_bad_diff=${Number.isFinite(firstBadDiff) ? fmtExp(firstBadDiff, 2) : '-'}
+                </div>
+            </div>
+        `;
+    }).join('');
+    container.innerHTML = cards;
+}
+
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -9117,6 +9771,8 @@ function renderTrainingDashboard(files) {
     const layoutTrain = files.layout_train || {};
     const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
     const layoutRegionCount = Array.isArray(layoutTrain.regions) ? layoutTrain.regions.length : 0;
+    const runtimeParityRows = collectRuntimeParityRows(files);
+    const runtimeParityPassCount = runtimeParityRows.filter((r) => r.passParity).length;
     const runCtx = getRunContext();
     const memoryDiag = files.memory_diagnostic || {};
     const memoryDiagState = memoryDiag && memoryDiag.diagnostic && memoryDiag.diagnostic.ok === true
@@ -9159,6 +9815,7 @@ function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
             <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
             <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
+            <div class="stat-card"><div class="stat-value">${runtimeParityRows.length > 0 ? `${runtimeParityPassCount}/${runtimeParityRows.length}` : '-'}</div><div class="stat-label">Runtime Parity Runs Passing</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -9188,6 +9845,10 @@ function renderTrainingDashboard(files) {
             <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
             <pre style="font-size:0.8rem;white-space:pre-wrap;">${suiteCmd}</pre>
         </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Runtime Parity</span> Generated-C Train Infographics (Realistic/Stress)</h3>
+            <div id="trainRuntimeParityInfographic"></div>
+        </div>
     `;
 
     drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt');
@@ -9207,6 +9868,7 @@ function renderTrainingDashboard(files) {
 
     const sweepEl = document.getElementById('trainSweepTable');
     if (!sweepEl) return;
+    renderRuntimeParityInfographic(document.getElementById('trainRuntimeParityInfographic'), runtimeParityRows);
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
         sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         return;

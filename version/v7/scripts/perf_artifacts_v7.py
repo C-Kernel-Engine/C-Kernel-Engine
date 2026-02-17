@@ -11,6 +11,7 @@ Outputs (when source files are available):
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
 from datetime import datetime, timezone
@@ -35,11 +36,44 @@ def parse_perf_number(value: str) -> Optional[float]:
         return None
 
 
+def parse_perf_stat_csv_line(line: str) -> Optional[Tuple[str, float, str]]:
+    """
+    Parse one line from `perf stat -x,` output.
+
+    Expected format (kernel/version dependent):
+      value,unit,event,run_time,pcnt_running[,metric_value,metric_unit]
+    """
+    try:
+        fields = next(csv.reader([line], delimiter=","))
+    except Exception:
+        return None
+    if len(fields) < 3:
+        return None
+
+    raw_value = (fields[0] or "").strip()
+    metric = (fields[2] or "").strip()
+    if not raw_value or not metric:
+        return None
+
+    value = parse_perf_number(raw_value)
+    if value is None:
+        return None
+
+    note = ""
+    if len(fields) >= 6:
+        metric_value = (fields[5] or "").strip()
+        metric_unit = (fields[6] or "").strip() if len(fields) >= 7 else ""
+        if metric_value:
+            note = f"metric={metric_value}{(' ' + metric_unit) if metric_unit else ''}"
+
+    return metric, value, note
+
+
 def parse_perf_stat_text(text: str) -> Dict[str, object]:
     counters: Dict[str, float] = {}
     notes: Dict[str, str] = {}
     elapsed_sec: Optional[float] = None
-    csv = []
+    rows = []
 
     # Typical line:
     #  1,234,567      cycles                    # 1.23 GHz
@@ -57,17 +91,25 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
 
         m = line_re.match(line)
         if not m:
-            continue
+            parsed_csv = parse_perf_stat_csv_line(line)
+            if parsed_csv is None:
+                continue
+            metric, value, note = parsed_csv
+        else:
+            raw_value, metric, note = m.groups()
+            value = parse_perf_number(raw_value)
+            if value is None:
+                parsed_csv = parse_perf_stat_csv_line(line)
+                if parsed_csv is None:
+                    continue
+                metric, value, note = parsed_csv
+            else:
+                note = note.strip() if note else ""
 
-        raw_value, metric, note = m.groups()
-        value = parse_perf_number(raw_value)
-        if value is None:
-            continue
-
-        counters[metric] = value
+        counters[metric] = float(value)
         if note:
-            notes[metric] = note.strip()
-        csv.append({"metric": metric, "value": value, "note": note.strip() if note else ""})
+            notes[metric] = note
+        rows.append({"metric": metric, "value": float(value), "note": note})
 
     def _sum_matching(patterns: List[str]) -> Optional[float]:
         total = 0.0
@@ -129,7 +171,7 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
         "derived": derived,
         "elapsed_seconds": elapsed_sec,
         "notes": notes,
-        "rows": csv,
+        "rows": rows,
     }
 
 

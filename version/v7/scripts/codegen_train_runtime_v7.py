@@ -1121,6 +1121,16 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         if str(row.get("section", "")) in ("activations",)
     ]
     activation_snapshot_floats = sum(int(slot_rows[idx]["numel"]) for idx in activation_slot_indices)
+    optimizer_state_slot_indices = [
+        idx for idx, row in enumerate(slot_rows)
+        if str(row.get("section", "")) in ("optimizer_m", "optimizer_v")
+    ]
+    optimizer_state_snapshot_floats = sum(int(slot_rows[idx]["numel"]) for idx in optimizer_state_slot_indices)
+    accum_snapshot_floats = 0
+    if "grads" in region_offsets:
+        accum_snapshot_floats += int(region_offsets["grads"][1])
+    if "grad_activations" in region_offsets:
+        accum_snapshot_floats += int(region_offsets["grad_activations"][1])
 
     lines: List[str] = []
     ap = lines.append
@@ -1228,6 +1238,18 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#ifndef CK_FAULT_INJECT_OP_ID")
     ap("#define CK_FAULT_INJECT_OP_ID (-1)")
     ap("#endif")
+    ap("#ifndef CK_ABLATE_QK_NORM_BACKWARD")
+    ap("#define CK_ABLATE_QK_NORM_BACKWARD 0")
+    ap("#endif")
+    ap("#ifndef CK_ABLATE_ROPE_BACKWARD_QK")
+    ap("#define CK_ABLATE_ROPE_BACKWARD_QK 0")
+    ap("#endif")
+    ap("#ifndef CK_ABLATE_ATTENTION_BACKWARD")
+    ap("#define CK_ABLATE_ATTENTION_BACKWARD 0")
+    ap("#endif")
+    ap("#ifndef CK_ABLATE_GEMM_BACKWARD_BIAS")
+    ap("#define CK_ABLATE_GEMM_BACKWARD_BIAS 0")
+    ap("#endif")
     ap("#define CK_TENSOR_SLOT_COUNT %d" % len(slot_rows))
     ap("static const CKTensorSlot g_tensor_slots[CK_TENSOR_SLOT_COUNT] = {")
     for row in slot_rows:
@@ -1261,6 +1283,16 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    -1,")
     ap("};")
     ap("#define CK_ACTIVATION_SNAPSHOT_FLOATS ((size_t)%d)" % int(activation_snapshot_floats))
+    ap("#define CK_OPTIMIZER_STATE_SLOT_COUNT %d" % len(optimizer_state_slot_indices))
+    ap("static const int g_optimizer_state_slot_indices[CK_OPTIMIZER_STATE_SLOT_COUNT > 0 ? CK_OPTIMIZER_STATE_SLOT_COUNT : 1] = {")
+    if optimizer_state_slot_indices:
+        for idx in optimizer_state_slot_indices:
+            ap("    %d," % int(idx))
+    else:
+        ap("    -1,")
+    ap("};")
+    ap("#define CK_OPTIMIZER_STATE_SNAPSHOT_FLOATS ((size_t)%d)" % int(optimizer_state_snapshot_floats))
+    ap("#define CK_ACCUM_SNAPSHOT_FLOATS ((size_t)(CK_GRADS_SIZE + CK_GRAD_ACT_SIZE))")
     ap("")
 
     ap("static float *g_memory = NULL;")
@@ -1374,6 +1406,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("void ck_train_reset_profile(void);")
     ap("int ck_train_get_last_step_profile(double *step_ms, double *fwd_ms, double *bwd_ms, double *opt_ms, int *fwd_calls, int *bwd_calls, int *opt_calls, int *opt_applied);")
     ap("int ck_train_get_cumulative_profile(double *total_ms, double *fwd_ms, double *bwd_ms, double *opt_ms, int *steps, int *optimizer_steps);")
+    ap("int ck_train_get_optimizer_state_snapshot_numel(void);")
+    ap("int ck_train_export_optimizer_state_snapshot(float *dst, int dst_numel);")
+    ap("int ck_train_import_optimizer_state_snapshot(const float *src, int src_numel);")
+    ap("int ck_train_get_accum_snapshot_numel(void);")
+    ap("int ck_train_export_accum_snapshot(float *dst, int dst_numel);")
+    ap("int ck_train_import_accum_snapshot(const float *src, int src_numel);")
     ap("")
 
     ap("static inline float ck_canary_value_f32(void) {")
@@ -1442,6 +1480,77 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_export_activation_snapshot(float *dst, int dst_numel) {")
     ap("    if (dst_numel < 0) return -1;")
     ap("    return ck_train_snapshot_activations(dst, (size_t)dst_numel);")
+    ap("}")
+    ap("")
+    ap("static int ck_train_snapshot_optimizer_state(float *dst, size_t dst_numel) {")
+    ap("    if (g_memory == NULL || dst == NULL) return -1;")
+    ap("    if (dst_numel < CK_OPTIMIZER_STATE_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_OPTIMIZER_STATE_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_optimizer_state_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        memcpy(dst + cursor, g_memory + s->offset_floats, s->numel * sizeof(float));")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_optimizer_state_snapshot_numel(void) {")
+    ap("    return (int)CK_OPTIMIZER_STATE_SNAPSHOT_FLOATS;")
+    ap("}")
+    ap("")
+    ap("int ck_train_export_optimizer_state_snapshot(float *dst, int dst_numel) {")
+    ap("    if (dst_numel < 0) return -1;")
+    ap("    return ck_train_snapshot_optimizer_state(dst, (size_t)dst_numel);")
+    ap("}")
+    ap("")
+    ap("int ck_train_import_optimizer_state_snapshot(const float *src, int src_numel) {")
+    ap("    if (g_memory == NULL || src == NULL) return -1;")
+    ap("    if (src_numel < (int)CK_OPTIMIZER_STATE_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    for (int i = 0; i < CK_OPTIMIZER_STATE_SLOT_COUNT; ++i) {")
+    ap("        int slot_idx = g_optimizer_state_slot_indices[i];")
+    ap("        if (slot_idx < 0 || slot_idx >= CK_TENSOR_SLOT_COUNT) continue;")
+    ap("        const CKTensorSlot *s = &g_tensor_slots[slot_idx];")
+    ap("        memcpy(g_memory + s->offset_floats, src + cursor, s->numel * sizeof(float));")
+    ap("        cursor += s->numel;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_get_accum_snapshot_numel(void) {")
+    ap("    return (int)CK_ACCUM_SNAPSHOT_FLOATS;")
+    ap("}")
+    ap("")
+    ap("int ck_train_export_accum_snapshot(float *dst, int dst_numel) {")
+    ap("    if (g_memory == NULL || dst == NULL) return -1;")
+    ap("    if (dst_numel < (int)CK_ACCUM_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    if (CK_GRADS_SIZE > 0) {")
+    ap("        memcpy(dst + cursor, g_memory + CK_GRADS_OFFSET, CK_GRADS_SIZE * sizeof(float));")
+    ap("        cursor += CK_GRADS_SIZE;")
+    ap("    }")
+    ap("    if (CK_GRAD_ACT_SIZE > 0) {")
+    ap("        memcpy(dst + cursor, g_memory + CK_GRAD_ACT_OFFSET, CK_GRAD_ACT_SIZE * sizeof(float));")
+    ap("        cursor += CK_GRAD_ACT_SIZE;")
+    ap("    }")
+    ap("    return (int)cursor;")
+    ap("}")
+    ap("")
+    ap("int ck_train_import_accum_snapshot(const float *src, int src_numel) {")
+    ap("    if (g_memory == NULL || src == NULL) return -1;")
+    ap("    if (src_numel < (int)CK_ACCUM_SNAPSHOT_FLOATS) return -2;")
+    ap("    size_t cursor = 0;")
+    ap("    if (CK_GRADS_SIZE > 0) {")
+    ap("        memcpy(g_memory + CK_GRADS_OFFSET, src + cursor, CK_GRADS_SIZE * sizeof(float));")
+    ap("        cursor += CK_GRADS_SIZE;")
+    ap("    }")
+    ap("    if (CK_GRAD_ACT_SIZE > 0) {")
+    ap("        memcpy(g_memory + CK_GRAD_ACT_OFFSET, src + cursor, CK_GRAD_ACT_SIZE * sizeof(float));")
+    ap("        cursor += CK_GRAD_ACT_SIZE;")
+    ap("    }")
+    ap("    return (int)cursor;")
     ap("}")
     ap("")
     ap("int ck_train_import_weight_snapshot(const float *src, int src_numel) {")
@@ -1724,8 +1833,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             fn, args, _decl = resolved
             io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
 
-            # qk_norm_forward is in-place in kernel API, but IR models distinct outputs.
-            # Preserve IR semantics by copying input buffers into output buffers, then running in-place.
+            # qk_norm_forward is in-place and head-major in kernel API, while IR
+            # models token-major out-of-place tensors.
             if kid == "qk_norm_forward":
                 q_in_tid = io_inputs.get("q")
                 k_in_tid = io_inputs.get("k")
@@ -1739,19 +1848,40 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 k_gamma_var = tvars_f32.get(io_weights.get("k_gamma", ""), "g_dummy_f32")
                 q_numel = int(tensor_numel.get(q_out_tid or q_in_tid or "", 0) or 0)
                 k_numel = int(tensor_numel.get(k_out_tid or k_in_tid or "", 0) or 0)
+                banned: set[str] = {q_in_var, k_in_var, q_out_var, k_out_var}
+                q_scratch = _pick_tmp_scratch_var(q_numel, banned)
+                if q_scratch is not None:
+                    banned.add(q_scratch)
+                k_scratch = _pick_tmp_scratch_var(k_numel, banned)
 
-                ap("    /* op_id=%s op=%s kernel_id=%s (IR out-of-place -> kernel in-place) */" % (op_id, op_name, kid))
+                ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
                 if q_numel > 0 and q_out_var != q_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
                 if k_numel > 0 and k_out_var != k_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
-                if q_numel > 0:
-                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
-                if k_numel > 0:
-                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
-                    q_out_var, k_out_var, q_gamma_var, k_gamma_var
-                ))
+                if q_scratch and k_scratch:
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
+                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                        q_scratch, k_scratch, q_gamma_var, k_gamma_var
+                    ))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                else:
+                    ap("    /* missing tmp.* scratch for qk_norm bridge; fallback direct call */")
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                        q_out_var, k_out_var, q_gamma_var, k_gamma_var
+                    ))
                 ap("    call_count++;")
                 continue
 
@@ -1861,6 +1991,294 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
 
+            # attention_backward_* kernels consume/produce head-major tensors.
+            # IR tensors are token-major, so bridge layouts explicitly.
+            if kid in ("attention_backward_causal_head_major_gqa", "attention_backward_causal_head_major"):
+                dy_tid = io_inputs.get("in_0")
+                q_tid = io_inputs.get("in_1")
+                k_tid = io_inputs.get("in_2")
+                v_tid = io_inputs.get("in_3")
+                attn_tid = io_inputs.get("in_4")
+                dq_tid = io_outputs.get("d_q")
+                dk_tid = io_outputs.get("d_k")
+                dv_tid = io_outputs.get("d_v")
+                ds_tid = io_outputs.get("d_scores")
+
+                dy_var = tvars_f32.get(dy_tid or "", "g_dummy_f32")
+                q_var = tvars_f32.get(q_tid or "", "g_dummy_f32")
+                k_var = tvars_f32.get(k_tid or "", "g_dummy_f32")
+                v_var = tvars_f32.get(v_tid or "", "g_dummy_f32")
+                attn_var = tvars_f32.get(attn_tid or "", "g_dummy_f32")
+                dq_var = tvars_f32.get(dq_tid or "", "g_dummy_f32")
+                dk_var = tvars_f32.get(dk_tid or "", "g_dummy_f32")
+                dv_var = tvars_f32.get(dv_tid or "", "g_dummy_f32")
+                ds_var = tvars_f32.get(ds_tid or "", "g_dummy_f32")
+
+                dy_numel = int(tensor_numel.get(dy_tid or "", 0) or 0)
+                q_numel = int(tensor_numel.get(q_tid or "", 0) or 0)
+                k_numel = int(tensor_numel.get(k_tid or "", 0) or 0)
+                v_numel = int(tensor_numel.get(v_tid or "", 0) or 0)
+                dq_numel = int(tensor_numel.get(dq_tid or "", 0) or 0)
+                dk_numel = int(tensor_numel.get(dk_tid or "", 0) or 0)
+                dv_numel = int(tensor_numel.get(dv_tid or "", 0) or 0)
+                ds_numel = int(tensor_numel.get(ds_tid or "", 0) or 0)
+
+                banned: set[str] = {dy_var, q_var, k_var, v_var, attn_var, dq_var, dk_var, dv_var, ds_var}
+                dy_scratch = _pick_tmp_scratch_var(dy_numel, banned)
+                if dy_scratch is not None:
+                    banned.add(dy_scratch)
+                q_scratch = _pick_tmp_scratch_var(q_numel, banned)
+                if q_scratch is not None:
+                    banned.add(q_scratch)
+                k_scratch = _pick_tmp_scratch_var(k_numel, banned)
+                if k_scratch is not None:
+                    banned.add(k_scratch)
+                v_scratch = _pick_tmp_scratch_var(v_numel, banned)
+                if v_scratch is not None:
+                    banned.add(v_scratch)
+                dq_scratch = _pick_tmp_scratch_var(dq_numel, banned)
+                if dq_scratch is not None:
+                    banned.add(dq_scratch)
+                dk_scratch = _pick_tmp_scratch_var(dk_numel, banned)
+                if dk_scratch is not None:
+                    banned.add(dk_scratch)
+                dv_scratch = _pick_tmp_scratch_var(dv_numel, banned)
+
+                if dy_scratch and q_scratch and k_scratch and v_scratch and dq_scratch and dk_scratch and dv_scratch:
+                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
+                    if dy_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dy_var, int(dy_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dy_scratch, int(dy_numel), op_id))
+                    if q_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_var, int(q_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
+                    if k_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_var, int(k_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
+                    if v_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_var, int(v_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_scratch, int(v_numel), op_id))
+                    if dq_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
+                    if dk_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
+                    if dv_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_var, int(dv_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_scratch, int(dv_numel), op_id))
+
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dy_var, dy_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
+
+                    ap("    %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                        fn, dy_scratch, q_scratch, k_scratch, v_scratch, attn_var, dq_scratch, dk_scratch, dv_scratch, ds_var
+                    ))
+
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dv_scratch, dv_var))
+                    ap("#if CK_ABLATE_ATTENTION_BACKWARD")
+                    ap("    /* Ablation fallback: bypass attention backward outputs with passthrough/zeros. */")
+                    if dq_numel > 0:
+                        cp = min(int(dq_numel), int(dy_numel))
+                        if cp > 0:
+                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dy_var, int(cp)))
+                        if int(dq_numel) > cp:
+                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+                    if dk_numel > 0:
+                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_var, int(dk_numel)))
+                    if dv_numel > 0:
+                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dv_var, int(dv_numel)))
+                    if ds_numel > 0:
+                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (ds_var, int(ds_numel)))
+                    ap("#endif")
+                    ap("    call_count++;")
+                    continue
+                else:
+                    ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
+
+            # rope_backward_qk expects head-major q/k gradient tensors.
+            if kid == "rope_backward_qk_f32":
+                dq_out_tid = io_inputs.get("in_0")
+                dk_out_tid = io_inputs.get("in_1")
+                dq_tid = io_outputs.get("d_q")
+                dk_tid = io_outputs.get("d_k")
+
+                dq_out_var = tvars_f32.get(dq_out_tid or "", "g_dummy_f32")
+                dk_out_var = tvars_f32.get(dk_out_tid or "", "g_dummy_f32")
+                dq_var = tvars_f32.get(dq_tid or "", "g_dummy_f32")
+                dk_var = tvars_f32.get(dk_tid or "", "g_dummy_f32")
+
+                dq_out_numel = int(tensor_numel.get(dq_out_tid or "", 0) or 0)
+                dk_out_numel = int(tensor_numel.get(dk_out_tid or "", 0) or 0)
+                dq_numel = int(tensor_numel.get(dq_tid or "", 0) or 0)
+                dk_numel = int(tensor_numel.get(dk_tid or "", 0) or 0)
+
+                banned: set[str] = {dq_out_var, dk_out_var, dq_var, dk_var}
+                dq_out_scratch = _pick_tmp_scratch_var(dq_out_numel, banned)
+                if dq_out_scratch is not None:
+                    banned.add(dq_out_scratch)
+                dk_out_scratch = _pick_tmp_scratch_var(dk_out_numel, banned)
+                if dk_out_scratch is not None:
+                    banned.add(dk_out_scratch)
+                dq_scratch = _pick_tmp_scratch_var(dq_numel, banned)
+                if dq_scratch is not None:
+                    banned.add(dq_scratch)
+                dk_scratch = _pick_tmp_scratch_var(dk_numel, banned)
+
+                if dq_out_scratch and dk_out_scratch and dq_scratch and dk_scratch:
+                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
+                    if dq_out_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_var, int(dq_out_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_scratch, int(dq_out_numel), op_id))
+                    if dk_out_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_var, int(dk_out_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_scratch, int(dk_out_numel), op_id))
+                    if dq_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
+                    if dk_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
+
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
+                    ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
+                        dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
+                    ))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("#if CK_ABLATE_ROPE_BACKWARD_QK")
+                    ap("    /* Ablation fallback: treat RoPE backward as identity for dq/dk. */")
+                    if dq_numel > 0:
+                        cp = min(int(dq_numel), int(dq_out_numel))
+                        if cp > 0:
+                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
+                        if int(dq_numel) > cp:
+                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+                    if dk_numel > 0:
+                        cp = min(int(dk_numel), int(dk_out_numel))
+                        if cp > 0:
+                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
+                        if int(dk_numel) > cp:
+                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
+                    ap("#endif")
+                    ap("    call_count++;")
+                    continue
+                else:
+                    ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for rope backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
+
+            # qk_norm_backward expects head-major q/k tensors for grads + activations.
+            if kid == "qk_norm_backward_f32":
+                dq_out_tid = io_inputs.get("in_0")
+                dk_out_tid = io_inputs.get("in_1")
+                q_in_tid = io_inputs.get("in_2")
+                k_in_tid = io_inputs.get("in_3")
+                q_gamma_tid = io_inputs.get("in_4")
+                k_gamma_tid = io_inputs.get("in_5")
+                dq_tid = io_outputs.get("d_q")
+                dk_tid = io_outputs.get("d_k")
+                dq_gamma_tid = io_outputs.get("d_q_gamma")
+                dk_gamma_tid = io_outputs.get("d_k_gamma")
+
+                dq_out_var = tvars_f32.get(dq_out_tid or "", "g_dummy_f32")
+                dk_out_var = tvars_f32.get(dk_out_tid or "", "g_dummy_f32")
+                q_in_var = tvars_f32.get(q_in_tid or "", "g_dummy_f32")
+                k_in_var = tvars_f32.get(k_in_tid or "", "g_dummy_f32")
+                q_gamma_var = tvars_f32.get(q_gamma_tid or "", "g_dummy_f32")
+                k_gamma_var = tvars_f32.get(k_gamma_tid or "", "g_dummy_f32")
+                dq_var = tvars_f32.get(dq_tid or "", "g_dummy_f32")
+                dk_var = tvars_f32.get(dk_tid or "", "g_dummy_f32")
+                dq_gamma_var = tvars_f32.get(dq_gamma_tid or "", "g_dummy_f32")
+                dk_gamma_var = tvars_f32.get(dk_gamma_tid or "", "g_dummy_f32")
+
+                dq_out_numel = int(tensor_numel.get(dq_out_tid or "", 0) or 0)
+                dk_out_numel = int(tensor_numel.get(dk_out_tid or "", 0) or 0)
+                q_in_numel = int(tensor_numel.get(q_in_tid or "", 0) or 0)
+                k_in_numel = int(tensor_numel.get(k_in_tid or "", 0) or 0)
+                dq_numel = int(tensor_numel.get(dq_tid or "", 0) or 0)
+                dk_numel = int(tensor_numel.get(dk_tid or "", 0) or 0)
+                dq_gamma_numel = int(tensor_numel.get(dq_gamma_tid or "", 0) or 0)
+                dk_gamma_numel = int(tensor_numel.get(dk_gamma_tid or "", 0) or 0)
+
+                banned: set[str] = {dq_out_var, dk_out_var, q_in_var, k_in_var, q_gamma_var, k_gamma_var, dq_var, dk_var, dq_gamma_var, dk_gamma_var}
+                dq_out_scratch = _pick_tmp_scratch_var(dq_out_numel, banned)
+                if dq_out_scratch is not None:
+                    banned.add(dq_out_scratch)
+                dk_out_scratch = _pick_tmp_scratch_var(dk_out_numel, banned)
+                if dk_out_scratch is not None:
+                    banned.add(dk_out_scratch)
+                q_in_scratch = _pick_tmp_scratch_var(q_in_numel, banned)
+                if q_in_scratch is not None:
+                    banned.add(q_in_scratch)
+                k_in_scratch = _pick_tmp_scratch_var(k_in_numel, banned)
+                if k_in_scratch is not None:
+                    banned.add(k_in_scratch)
+                dq_scratch = _pick_tmp_scratch_var(dq_numel, banned)
+                if dq_scratch is not None:
+                    banned.add(dq_scratch)
+                dk_scratch = _pick_tmp_scratch_var(dk_numel, banned)
+
+                if dq_out_scratch and dk_out_scratch and q_in_scratch and k_in_scratch and dq_scratch and dk_scratch:
+                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
+                    if dq_out_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_var, int(dq_out_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_scratch, int(dq_out_numel), op_id))
+                    if dk_out_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_var, int(dk_out_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_scratch, int(dk_out_numel), op_id))
+                    if q_in_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_in_var, int(q_in_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_in_scratch, int(q_in_numel), op_id))
+                    if k_in_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_in_var, int(k_in_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_in_scratch, int(k_in_numel), op_id))
+                    if dq_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
+                    if dk_numel > 0:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
+
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_in_var, q_in_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_in_var, k_in_scratch))
+
+                    ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                        dq_out_scratch, dk_out_scratch, q_in_scratch, k_in_scratch, q_gamma_var, k_gamma_var,
+                        dq_scratch, dk_scratch, dq_gamma_var, dk_gamma_var
+                    ))
+
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("#if CK_ABLATE_QK_NORM_BACKWARD")
+                    ap("    /* Ablation fallback: treat qk_norm backward as identity for dq/dk and zero gamma grads. */")
+                    if dq_numel > 0:
+                        cp = min(int(dq_numel), int(dq_out_numel))
+                        if cp > 0:
+                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
+                        if int(dq_numel) > cp:
+                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+                    if dk_numel > 0:
+                        cp = min(int(dk_numel), int(dk_out_numel))
+                        if cp > 0:
+                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
+                        if int(dk_numel) > cp:
+                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
+                    if dq_gamma_numel > 0:
+                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dq_gamma_var, int(dq_gamma_numel)))
+                    if dk_gamma_numel > 0:
+                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_gamma_var, int(dk_gamma_numel)))
+                    ap("#endif")
+                    ap("    call_count++;")
+                    continue
+                else:
+                    ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for qk_norm backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
+
             op_plan = exec_plan_by_op.get(int(op_id)) if isinstance(op_id, int) else None
             # gemm_backward_f32 uses op-local inferred dims from IR tensor sizes.
             # Avoid generic defaults here: wrong aligned_out can corrupt
@@ -1955,6 +2373,52 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                                 atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
                                 fallback_state=ptr_fallback_state,
                             )
+                    elif kid == "gemm_backward_f32":
+                        lname = str(aname).lower()
+                        mapped = None
+                        # Prefer positional pointer mapping first because registry declarations
+                        # may use opaque arg names after normalization.
+                        ptr_idx = int(ptr_fallback_state.get("__gemm_bwd_ptr_idx", 0) or 0)
+                        ptr_fallback_state["__gemm_bwd_ptr_idx"] = int(ptr_idx + 1)
+                        if ptr_idx == 0:
+                            mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                        elif ptr_idx == 1:
+                            mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                        elif ptr_idx == 2:
+                            mapped = tvars_f32.get(io_inputs.get("in_2", ""))
+                        elif ptr_idx == 3:
+                            mapped = tvars_f32.get(io_outputs.get("d_input", ""))
+                        elif ptr_idx == 4:
+                            mapped = tvars_f32.get(io_outputs.get("d_W", ""))
+                        elif ptr_idx == 5:
+                            mapped = tvars_f32.get(io_outputs.get("d_bias", "")) or "NULL"
+                            if mapped != "NULL":
+                                mapped = "(CK_ABLATE_GEMM_BACKWARD_BIAS ? NULL : %s)" % mapped
+                        # Fallback name-based mapping for unexpected signatures.
+                        if mapped is None:
+                            if lname in ("d_output", "grad_output", "dy"):
+                                mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                            elif lname in ("input", "x", "in"):
+                                mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                            elif lname in ("w", "weight"):
+                                mapped = tvars_f32.get(io_inputs.get("in_2", ""))
+                            elif lname in ("d_input", "dx"):
+                                mapped = tvars_f32.get(io_outputs.get("d_input", ""))
+                            elif lname in ("d_w", "dw", "d_weight", "dweight"):
+                                mapped = tvars_f32.get(io_outputs.get("d_W", ""))
+                            elif lname in ("d_b", "db", "d_bias", "dbias", "bias"):
+                                mapped = tvars_f32.get(io_outputs.get("d_bias", ""))
+                                if mapped is None:
+                                    mapped = "NULL"
+                                if mapped != "NULL":
+                                    mapped = "(CK_ABLATE_GEMM_BACKWARD_BIAS ? NULL : %s)" % mapped
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
                     elif kid in ("attention_backward_causal_head_major_gqa", "attention_backward_causal_head_major"):
                         lname = str(aname).lower()
                         mapped: Optional[str] = None
@@ -1976,6 +2440,84 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                             mapped = tvars_f32.get(io_outputs.get("d_v", ""))
                         elif lname in ("d_scores", "dscores"):
                             mapped = tvars_f32.get(io_outputs.get("d_scores", ""))
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
+                    elif kid == "rmsnorm_backward":
+                        # Keep backward argument binding stable for:
+                        # rmsnorm_backward(d_output, input, gamma, rstd_cache, d_input, d_gamma, ...)
+                        lname = str(aname).lower()
+                        mapped = None
+                        if lname in ("d_output", "grad_output", "dy"):
+                            mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                        elif lname in ("input", "x"):
+                            mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                        elif lname in ("gamma", "weight", "w"):
+                            mapped = tvars_f32.get(io_inputs.get("in_2", ""))
+                        elif lname in ("rstd_cache", "rstd", "inv_rms", "inv_rms_cache"):
+                            mapped = tvars_f32.get(io_inputs.get("in_3", ""))
+                        elif lname in ("d_input", "dx"):
+                            mapped = tvars_f32.get(io_outputs.get("d_input", ""))
+                        elif lname in ("d_gamma", "dgamma"):
+                            mapped = tvars_f32.get(io_outputs.get("d_gamma", ""))
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
+                    elif kid == "qk_norm_backward_f32":
+                        # qk_norm_backward(d_q_out, d_k_out, q_in, k_in, q_gamma, k_gamma, d_q_in, d_k_in, d_q_gamma, d_k_gamma, ...)
+                        lname = str(aname).lower()
+                        mapped = None
+                        if lname in ("d_q_out", "dq_out", "d_q", "dq"):
+                            mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                        elif lname in ("d_k_out", "dk_out"):
+                            mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                        elif lname in ("q_in", "q"):
+                            mapped = tvars_f32.get(io_inputs.get("in_2", ""))
+                        elif lname in ("k_in", "k"):
+                            mapped = tvars_f32.get(io_inputs.get("in_3", ""))
+                        elif lname in ("q_gamma", "gamma_q"):
+                            mapped = tvars_f32.get(io_inputs.get("in_4", ""))
+                        elif lname in ("k_gamma", "gamma_k"):
+                            mapped = tvars_f32.get(io_inputs.get("in_5", ""))
+                        elif lname in ("d_q_in", "dq_in"):
+                            mapped = tvars_f32.get(io_outputs.get("d_q", ""))
+                        elif lname in ("d_k_in", "dk_in"):
+                            mapped = tvars_f32.get(io_outputs.get("d_k", ""))
+                        elif lname in ("d_q_gamma", "dq_gamma", "d_gamma_q"):
+                            mapped = tvars_f32.get(io_outputs.get("d_q_gamma", ""))
+                        elif lname in ("d_k_gamma", "dk_gamma", "d_gamma_k"):
+                            mapped = tvars_f32.get(io_outputs.get("d_k_gamma", ""))
+                        if mapped is not None:
+                            expr = mapped
+                        else:
+                            expr = _choose_tensor_for_ptr(
+                                atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                                fallback_state=ptr_fallback_state,
+                            )
+                    elif kid == "rope_backward_qk_f32":
+                        # rope_backward_qk(d_q_out, d_k_out, d_q, d_k, cos_cache, sin_cache, ...)
+                        lname = str(aname).lower()
+                        mapped = None
+                        if lname in ("d_q_out", "dq_out"):
+                            mapped = tvars_f32.get(io_inputs.get("in_0", ""))
+                        elif lname in ("d_k_out", "dk_out"):
+                            mapped = tvars_f32.get(io_inputs.get("in_1", ""))
+                        elif lname in ("d_q", "dq"):
+                            mapped = tvars_f32.get(io_outputs.get("d_q", ""))
+                        elif lname in ("d_k", "dk"):
+                            mapped = tvars_f32.get(io_outputs.get("d_k", ""))
+                        elif lname in ("cos_cache", "cos"):
+                            mapped = "g_rope_cos_cache"
+                        elif lname in ("sin_cache", "sin"):
+                            mapped = "g_rope_sin_cache"
                         if mapped is not None:
                             expr = mapped
                         else:
@@ -2291,6 +2833,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "exec_plan_ops": len(exec_plan_by_op),
         "weight_snapshot_floats": int(weight_snapshot_floats),
         "activation_snapshot_floats": int(activation_snapshot_floats),
+        "optimizer_state_snapshot_floats": int(optimizer_state_snapshot_floats),
+        "accum_snapshot_floats": int(accum_snapshot_floats),
         "tensor_slots": [
             {
                 "index": int(i),
