@@ -84,5 +84,7 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   `--max-grad-norm`, `--enforce-production-safety`, and AdamW LR threshold checks.
 - `make v7-backprop-production-ready` runs `v7-gate-train` + nightly long-horizon bundle with production safety enforcement.
 - `profile-v7-vtune` now supports deep capture (`V7_VTUNE_DEEP=1`): hotspots + memory-access + uarch-exploration, exported to `vtune_summary.json` for the IR viewer.
+- `profile-v7-advisor` captures roofline artifacts and emits `advisor_summary.json` for the IR viewer.
+- `ck-cli-v7 profile --tool perf` now emits parsed `perf_stat_summary.json`/`flamegraph_manifest.json` via v7 artifact scripts (including `perf stat -x,` CSV mode).
 - Inference baseline is synced from `version/v6.6` into `version/v7` so inference and
   backprop can evolve together in one track.

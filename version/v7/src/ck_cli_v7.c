@@ -692,6 +692,7 @@ static int write_run_index(const char *run_dir, const char *output_path) {
         "training_step_profile_latest.json",
         "training_checkpoint_policy_latest.json",
         "memory_diagnostic_latest.json",
+        "memory_verification_latest.json",
         "layout_train.json",
         "layout_train_audit.json",
         "generated_train_runtime_summary_v7.json",
@@ -700,6 +701,8 @@ static int write_run_index(const char *run_dir, const char *output_path) {
         "profile_summary.json",
         "perf_stat_summary.json",
         "flamegraph_manifest.json",
+        "cachegrind_summary.json",
+        "asan_summary.json",
         "vtune_summary.json",
         "advisor_summary.json",
         "run_index.json",
@@ -1777,6 +1780,27 @@ typedef struct {
     int (*ck_train_step)(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr);
     int (*ck_train_flush_optimizer)(float lr);
     int (*ck_train_memory_diagnostic)(const float *oracle_acts, const float *oracle_grads, float tolerance);
+    int (*ck_train_get_accum_steps)(void);
+    int (*ck_train_get_opt_step)(void);
+    void (*ck_train_reset_profile)(void);
+    int (*ck_train_get_last_step_profile)(
+        double *step_ms,
+        double *fwd_ms,
+        double *bwd_ms,
+        double *opt_ms,
+        int *fwd_calls,
+        int *bwd_calls,
+        int *opt_calls,
+        int *opt_applied
+    );
+    int (*ck_train_get_cumulative_profile)(
+        double *total_ms,
+        double *fwd_ms,
+        double *bwd_ms,
+        double *opt_ms,
+        int *steps,
+        int *optimizer_steps
+    );
 } TrainRuntimeAPI;
 
 static void print_train_help(const char *prog) {
@@ -1803,7 +1827,7 @@ static void print_report_index_help(const char *prog) {
 
 static void print_profile_help(const char *prog) {
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "  %s profile --run <run_dir> --tool perf|vtune|advisor --train-token-file <tokens.txt> [options]\n\n", prog);
+    fprintf(stderr, "  %s profile --run <run_dir> --tool perf|vtune|advisor|cachegrind|asan --train-token-file <tokens.txt> [options]\n\n", prog);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  --output-dir DIR          Profiling artifact directory (default: <run>)\n");
     fprintf(stderr, "  --train-epochs N\n");
@@ -1942,7 +1966,7 @@ static bool parse_profile_subcommand_args(int argc, char **argv, ProfileOptions 
         return false;
     }
     if (!opt->tool || !*opt->tool) {
-        fprintf(stderr, "profile: missing --tool perf|vtune|advisor\n");
+        fprintf(stderr, "profile: missing --tool perf|vtune|advisor|cachegrind|asan\n");
         return false;
     }
     if (!opt->token_file || !*opt->token_file) {
@@ -1965,6 +1989,13 @@ static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
     api->ck_train_step = (int(*)(const int32_t*, const int32_t*, float*, float))dlsym(api->handle, "ck_train_step");
     api->ck_train_flush_optimizer = (int(*)(float))dlsym(api->handle, "ck_train_flush_optimizer");
     api->ck_train_memory_diagnostic = (int(*)(const float*, const float*, float))dlsym(api->handle, "ck_train_memory_diagnostic");
+    api->ck_train_get_accum_steps = (int(*)(void))dlsym(api->handle, "ck_train_get_accum_steps");
+    api->ck_train_get_opt_step = (int(*)(void))dlsym(api->handle, "ck_train_get_opt_step");
+    api->ck_train_reset_profile = (void(*)(void))dlsym(api->handle, "ck_train_reset_profile");
+    api->ck_train_get_last_step_profile =
+        (int(*)(double*, double*, double*, double*, int*, int*, int*, int*))dlsym(api->handle, "ck_train_get_last_step_profile");
+    api->ck_train_get_cumulative_profile =
+        (int(*)(double*, double*, double*, double*, int*, int*))dlsym(api->handle, "ck_train_get_cumulative_profile");
 
     if (!api->ck_train_init || !api->ck_train_step) {
         fprintf(stderr, "Missing required training symbols in %s (need ck_train_init + ck_train_step)\n", lib_path);
@@ -2092,6 +2123,25 @@ static int build_train_init_payload(
     return 0;
 }
 
+typedef struct {
+    const double *step_ms;
+    const double *fwd_ms;
+    const double *bwd_ms;
+    const double *opt_ms;
+    const int *opt_applied;
+    const int *fwd_calls;
+    const int *bwd_calls;
+    const int *opt_calls;
+    int steps;
+    int optimizer_steps;
+    double profile_total_ms;
+    double fwd_total_ms;
+    double bwd_total_ms;
+    double opt_total_ms;
+    int runtime_grad_accum;
+    int breakdown_available;
+} TrainStepProfileTelemetry;
+
 static int write_train_summary_and_telemetry(
     const char *run_dir,
     const char *summary_path,
@@ -2101,7 +2151,8 @@ static int write_train_summary_and_telemetry(
     double ck_total_ms,
     int processed_tokens,
     int total_floats,
-    int num_params
+    int num_params,
+    const TrainStepProfileTelemetry *telemetry
 ) {
     const char *out_path = summary_path;
     char fallback_path[4096];
@@ -2114,7 +2165,31 @@ static int write_train_summary_and_telemetry(
     float final_loss = (total_steps > 0) ? losses[total_steps - 1] : 0.0f;
     double avg_step_ms = (total_steps > 0) ? (ck_total_ms / (double)total_steps) : 0.0;
     double train_tok_s = (ck_total_ms > 0.0) ? ((double)processed_tokens / (ck_total_ms / 1000.0)) : 0.0;
-    int optimizer_steps = (opt->grad_accum > 0) ? ((total_steps + opt->grad_accum - 1) / opt->grad_accum) : total_steps;
+    int effective_grad_accum = opt->grad_accum;
+    if (telemetry != NULL && telemetry->runtime_grad_accum > 0) {
+        effective_grad_accum = telemetry->runtime_grad_accum;
+    }
+    if (effective_grad_accum <= 0) effective_grad_accum = 1;
+    int optimizer_steps = (total_steps + effective_grad_accum - 1) / effective_grad_accum;
+    double profile_total_ms = ck_total_ms;
+    double fwd_total_ms = 0.0;
+    double bwd_total_ms = 0.0;
+    double opt_total_ms = 0.0;
+    int breakdown_available = 0;
+    if (telemetry != NULL) {
+        if (telemetry->optimizer_steps >= 0) optimizer_steps = telemetry->optimizer_steps;
+        if (telemetry->profile_total_ms > 0.0) profile_total_ms = telemetry->profile_total_ms;
+        fwd_total_ms = telemetry->fwd_total_ms;
+        bwd_total_ms = telemetry->bwd_total_ms;
+        opt_total_ms = telemetry->opt_total_ms;
+        breakdown_available = telemetry->breakdown_available;
+    }
+    double other_total_ms = profile_total_ms - (fwd_total_ms + bwd_total_ms + opt_total_ms);
+    if (other_total_ms < 0.0) other_total_ms = 0.0;
+    double fwd_pct = (profile_total_ms > 0.0) ? (100.0 * fwd_total_ms / profile_total_ms) : 0.0;
+    double bwd_pct = (profile_total_ms > 0.0) ? (100.0 * bwd_total_ms / profile_total_ms) : 0.0;
+    double opt_pct = (profile_total_ms > 0.0) ? (100.0 * opt_total_ms / profile_total_ms) : 0.0;
+    double other_pct = (profile_total_ms > 0.0) ? (100.0 * other_total_ms / profile_total_ms) : 0.0;
 
     FILE *f = fopen(out_path, "w");
     if (!f) return -2;
@@ -2124,12 +2199,13 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"seq_len\": %d,\n", opt->seq_len);
     fprintf(f, "  \"total_tokens\": %d,\n", opt->total_tokens);
     fprintf(f, "  \"grad_accum\": %d,\n", opt->grad_accum);
+    fprintf(f, "  \"runtime_grad_accum\": %d,\n", effective_grad_accum);
     fprintf(f, "  \"optimizer\": \"adamw\",\n");
     fprintf(f, "  \"lr\": %.9g,\n", opt->lr);
     fprintf(f, "  \"steps\": %d,\n", total_steps);
     fprintf(f, "  \"micro_steps\": %d,\n", total_steps);
     fprintf(f, "  \"optimizer_steps\": %d,\n", optimizer_steps);
-    fprintf(f, "  \"tokens_per_update\": %d,\n", opt->seq_len * opt->grad_accum);
+    fprintf(f, "  \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
     fprintf(f, "  \"max_loss_abs_diff\": 0.0,\n");
     fprintf(f, "  \"mean_loss_abs_diff\": 0.0,\n");
     fprintf(f, "  \"final_ck_loss\": %.9g,\n", final_loss);
@@ -2139,8 +2215,12 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"pass_parity\": true,\n");
     fprintf(f, "  \"loss_curve\": [\n");
     for (int i = 0; i < total_steps; i++) {
-        fprintf(f, "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0}%s\n",
-                i + 1, losses[i], losses[i], opt->lr, (i + 1 < total_steps) ? "," : "");
+        double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+        fprintf(
+            f,
+            "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0, \"step_ms\": %.6f}%s\n",
+            i + 1, losses[i], losses[i], opt->lr, step_ms, (i + 1 < total_steps) ? "," : ""
+        );
     }
     fprintf(f, "  ],\n");
     fprintf(f, "  \"parity_steps\": [\n");
@@ -2158,7 +2238,8 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"step_profile\": {\n");
     fprintf(f, "    \"steps\": %d,\n", total_steps);
     fprintf(f, "    \"micro_steps\": %d,\n", total_steps);
-    fprintf(f, "    \"tokens_per_update\": %d,\n", opt->seq_len * opt->grad_accum);
+    fprintf(f, "    \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
+    fprintf(f, "    \"optimizer_steps\": %d,\n", optimizer_steps);
     fprintf(f, "    \"processed_tokens\": %d,\n", processed_tokens);
     fprintf(f, "    \"ck_total_ms\": %.6f,\n", ck_total_ms);
     fprintf(f, "    \"torch_total_ms\": 0.0,\n");
@@ -2166,6 +2247,44 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "    \"torch_avg_step_ms\": 0.0,\n");
     fprintf(f, "    \"train_tok_s\": %.6f,\n", train_tok_s);
     fprintf(f, "    \"decode_tok_s\": %.6f,\n", train_tok_s);
+    fprintf(f, "    \"phase_breakdown\": {\n");
+    fprintf(f, "      \"available\": %s,\n", breakdown_available ? "true" : "false");
+    fprintf(f, "      \"profile_total_ms\": %.6f,\n", profile_total_ms);
+    fprintf(f, "      \"forward_ms\": %.6f,\n", fwd_total_ms);
+    fprintf(f, "      \"backward_ms\": %.6f,\n", bwd_total_ms);
+    fprintf(f, "      \"optimizer_ms\": %.6f,\n", opt_total_ms);
+    fprintf(f, "      \"other_ms\": %.6f,\n", other_total_ms);
+    fprintf(f, "      \"forward_pct\": %.3f,\n", fwd_pct);
+    fprintf(f, "      \"backward_pct\": %.3f,\n", bwd_pct);
+    fprintf(f, "      \"optimizer_pct\": %.3f,\n", opt_pct);
+    fprintf(f, "      \"other_pct\": %.3f\n", other_pct);
+    fprintf(f, "    },\n");
+    fprintf(f, "    \"phase_series\": [\n");
+    for (int i = 0; i < total_steps; i++) {
+        double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+        double fwd_ms = (telemetry && telemetry->fwd_ms && i < telemetry->steps) ? telemetry->fwd_ms[i] : 0.0;
+        double bwd_ms = (telemetry && telemetry->bwd_ms && i < telemetry->steps) ? telemetry->bwd_ms[i] : 0.0;
+        double opt_ms = (telemetry && telemetry->opt_ms && i < telemetry->steps) ? telemetry->opt_ms[i] : 0.0;
+        int opt_applied = (telemetry && telemetry->opt_applied && i < telemetry->steps) ? telemetry->opt_applied[i] : 0;
+        int fwd_calls = (telemetry && telemetry->fwd_calls && i < telemetry->steps) ? telemetry->fwd_calls[i] : 0;
+        int bwd_calls = (telemetry && telemetry->bwd_calls && i < telemetry->steps) ? telemetry->bwd_calls[i] : 0;
+        int opt_calls = (telemetry && telemetry->opt_calls && i < telemetry->steps) ? telemetry->opt_calls[i] : 0;
+        fprintf(
+            f,
+            "      {\"step\": %d, \"step_ms\": %.6f, \"forward_ms\": %.6f, \"backward_ms\": %.6f, \"optimizer_ms\": %.6f, \"optimizer_applied\": %s, \"forward_calls\": %d, \"backward_calls\": %d, \"optimizer_calls\": %d}%s\n",
+            i + 1,
+            step_ms,
+            fwd_ms,
+            bwd_ms,
+            opt_ms,
+            opt_applied ? "true" : "false",
+            fwd_calls,
+            bwd_calls,
+            opt_calls,
+            (i + 1 < total_steps) ? "," : ""
+        );
+    }
+    fprintf(f, "    ],\n");
     fprintf(f, "    \"external_profiles\": {}\n");
     fprintf(f, "  },\n");
     fprintf(f, "  \"backend\": \"ck\",\n");
@@ -2188,8 +2307,17 @@ static int write_train_summary_and_telemetry(
     if (g) {
         fprintf(g, "{\"steps\": [");
         for (int i = 0; i < total_steps; i++) {
-            fprintf(g, "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0}",
-                    (i == 0 ? "" : ","), i + 1, losses[i], losses[i], opt->lr);
+            double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+            fprintf(
+                g,
+                "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0, \"step_ms\": %.6f}",
+                (i == 0 ? "" : ","),
+                i + 1,
+                losses[i],
+                losses[i],
+                opt->lr,
+                step_ms
+            );
         }
         fprintf(g, "], \"source\": \"ck_cli_v7_native\"}\n");
         fclose(g);
@@ -2213,8 +2341,58 @@ static int write_train_summary_and_telemetry(
 
     g = fopen(path_profile, "w");
     if (g) {
-        fprintf(g, "{\"steps\": %d, \"micro_steps\": %d, \"tokens_per_update\": %d, \"processed_tokens\": %d, \"ck_total_ms\": %.6f, \"torch_total_ms\": 0.0, \"ck_avg_step_ms\": %.6f, \"torch_avg_step_ms\": 0.0, \"train_tok_s\": %.6f, \"decode_tok_s\": %.6f, \"external_profiles\": {}}\n",
-                total_steps, total_steps, opt->seq_len * opt->grad_accum, processed_tokens, ck_total_ms, avg_step_ms, train_tok_s, train_tok_s);
+        fprintf(g, "{\n");
+        fprintf(g, "  \"steps\": %d,\n", total_steps);
+        fprintf(g, "  \"micro_steps\": %d,\n", total_steps);
+        fprintf(g, "  \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
+        fprintf(g, "  \"optimizer_steps\": %d,\n", optimizer_steps);
+        fprintf(g, "  \"processed_tokens\": %d,\n", processed_tokens);
+        fprintf(g, "  \"ck_total_ms\": %.6f,\n", ck_total_ms);
+        fprintf(g, "  \"torch_total_ms\": 0.0,\n");
+        fprintf(g, "  \"ck_avg_step_ms\": %.6f,\n", avg_step_ms);
+        fprintf(g, "  \"torch_avg_step_ms\": 0.0,\n");
+        fprintf(g, "  \"train_tok_s\": %.6f,\n", train_tok_s);
+        fprintf(g, "  \"decode_tok_s\": %.6f,\n", train_tok_s);
+        fprintf(g, "  \"phase_breakdown\": {\n");
+        fprintf(g, "    \"available\": %s,\n", breakdown_available ? "true" : "false");
+        fprintf(g, "    \"profile_total_ms\": %.6f,\n", profile_total_ms);
+        fprintf(g, "    \"forward_ms\": %.6f,\n", fwd_total_ms);
+        fprintf(g, "    \"backward_ms\": %.6f,\n", bwd_total_ms);
+        fprintf(g, "    \"optimizer_ms\": %.6f,\n", opt_total_ms);
+        fprintf(g, "    \"other_ms\": %.6f,\n", other_total_ms);
+        fprintf(g, "    \"forward_pct\": %.3f,\n", fwd_pct);
+        fprintf(g, "    \"backward_pct\": %.3f,\n", bwd_pct);
+        fprintf(g, "    \"optimizer_pct\": %.3f,\n", opt_pct);
+        fprintf(g, "    \"other_pct\": %.3f\n", other_pct);
+        fprintf(g, "  },\n");
+        fprintf(g, "  \"phase_series\": [\n");
+        for (int i = 0; i < total_steps; i++) {
+            double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+            double fwd_ms = (telemetry && telemetry->fwd_ms && i < telemetry->steps) ? telemetry->fwd_ms[i] : 0.0;
+            double bwd_ms = (telemetry && telemetry->bwd_ms && i < telemetry->steps) ? telemetry->bwd_ms[i] : 0.0;
+            double opt_ms = (telemetry && telemetry->opt_ms && i < telemetry->steps) ? telemetry->opt_ms[i] : 0.0;
+            int opt_applied = (telemetry && telemetry->opt_applied && i < telemetry->steps) ? telemetry->opt_applied[i] : 0;
+            int fwd_calls = (telemetry && telemetry->fwd_calls && i < telemetry->steps) ? telemetry->fwd_calls[i] : 0;
+            int bwd_calls = (telemetry && telemetry->bwd_calls && i < telemetry->steps) ? telemetry->bwd_calls[i] : 0;
+            int opt_calls = (telemetry && telemetry->opt_calls && i < telemetry->steps) ? telemetry->opt_calls[i] : 0;
+            fprintf(
+                g,
+                "    {\"step\": %d, \"step_ms\": %.6f, \"forward_ms\": %.6f, \"backward_ms\": %.6f, \"optimizer_ms\": %.6f, \"optimizer_applied\": %s, \"forward_calls\": %d, \"backward_calls\": %d, \"optimizer_calls\": %d}%s\n",
+                i + 1,
+                step_ms,
+                fwd_ms,
+                bwd_ms,
+                opt_ms,
+                opt_applied ? "true" : "false",
+                fwd_calls,
+                bwd_calls,
+                opt_calls,
+                (i + 1 < total_steps) ? "," : ""
+            );
+        }
+        fprintf(g, "  ],\n");
+        fprintf(g, "  \"external_profiles\": {}\n");
+        fprintf(g, "}\n");
         fclose(g);
     }
 
@@ -2332,9 +2510,63 @@ static int cmd_train_subcommand(int argc, char **argv) {
         return 11;
     }
 
+    double *step_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *fwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *bwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *opt_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    int *opt_applied_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *fwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *bwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *opt_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    if (!step_ms_series || !fwd_ms_series || !bwd_ms_series || !opt_ms_series ||
+        !opt_applied_series || !fwd_calls_series || !bwd_calls_series || !opt_calls_series) {
+        free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+        free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
+        free(losses); free(stream); free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 11;
+    }
+
+    TrainStepProfileTelemetry telemetry;
+    memset(&telemetry, 0, sizeof(telemetry));
+    telemetry.step_ms = step_ms_series;
+    telemetry.fwd_ms = fwd_ms_series;
+    telemetry.bwd_ms = bwd_ms_series;
+    telemetry.opt_ms = opt_ms_series;
+    telemetry.opt_applied = opt_applied_series;
+    telemetry.fwd_calls = fwd_calls_series;
+    telemetry.bwd_calls = bwd_calls_series;
+    telemetry.opt_calls = opt_calls_series;
+    telemetry.steps = total_steps;
+    telemetry.optimizer_steps = -1;
+    telemetry.runtime_grad_accum = -1;
+
+    int effective_grad_accum = opt.grad_accum > 0 ? opt.grad_accum : 1;
+    if (api.ck_train_get_accum_steps) {
+        int runtime_grad_accum = api.ck_train_get_accum_steps();
+        if (runtime_grad_accum > 0) {
+            telemetry.runtime_grad_accum = runtime_grad_accum;
+            effective_grad_accum = runtime_grad_accum;
+            if (runtime_grad_accum != opt.grad_accum) {
+                fprintf(
+                    stderr,
+                    "train: runtime grad-accum=%d differs from requested --train-grad-accum=%d; using runtime cadence.\n",
+                    runtime_grad_accum,
+                    opt.grad_accum
+                );
+            }
+        }
+    }
+
+    if (api.ck_train_reset_profile) {
+        api.ck_train_reset_profile();
+    }
+
     if (opt.verbose) {
-        fprintf(stderr, "[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d lr=%.6g\n",
-                opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens, opt.grad_accum, opt.lr);
+        fprintf(stderr, "[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d runtime_grad_accum=%d lr=%.6g\n",
+                opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens, opt.grad_accum, effective_grad_accum, opt.lr);
     }
 
     double t0 = monotonic_ms();
@@ -2345,26 +2577,132 @@ static int cmd_train_subcommand(int argc, char **argv) {
             const int32_t *x = &stream[pos];
             const int32_t *y = &stream[pos + 1];
             float loss = 0.0f;
+            int this_step = step_idx;
+            double step_t0 = monotonic_ms();
             int src = api.ck_train_step(x, y, &loss, opt.lr);
+            double step_t1 = monotonic_ms();
             if (src < 0) {
                 fprintf(stderr, "ck_train_step failed at step %d: %d\n", step_idx + 1, src);
+                free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+                free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
                 free(losses); free(stream); free(tokens);
                 if (api.ck_train_free) api.ck_train_free();
                 free(init_floats); free(init_sizes);
                 unload_train_runtime_api(&api);
                 return 12;
             }
-            losses[step_idx++] = loss;
+            double step_ms = step_t1 - step_t0;
+            double fwd_ms = 0.0;
+            double bwd_ms = 0.0;
+            double opt_ms = 0.0;
+            int fwd_calls = 0;
+            int bwd_calls = 0;
+            int opt_calls = 0;
+            int opt_applied = 0;
+            if (api.ck_train_get_last_step_profile &&
+                api.ck_train_get_last_step_profile(&step_ms, &fwd_ms, &bwd_ms, &opt_ms,
+                                                   &fwd_calls, &bwd_calls, &opt_calls, &opt_applied) == 0) {
+                if (fwd_ms > 0.0 || bwd_ms > 0.0 || opt_ms > 0.0) {
+                    telemetry.breakdown_available = 1;
+                }
+            } else if (effective_grad_accum > 0 && ((this_step + 1) % effective_grad_accum == 0)) {
+                opt_applied = 1;
+            }
+            if (step_ms < 0.0) step_ms = 0.0;
+            if (fwd_ms < 0.0) fwd_ms = 0.0;
+            if (bwd_ms < 0.0) bwd_ms = 0.0;
+            if (opt_ms < 0.0) opt_ms = 0.0;
+            step_ms_series[this_step] = step_ms;
+            fwd_ms_series[this_step] = fwd_ms;
+            bwd_ms_series[this_step] = bwd_ms;
+            opt_ms_series[this_step] = opt_ms;
+            opt_applied_series[this_step] = opt_applied;
+            fwd_calls_series[this_step] = fwd_calls;
+            bwd_calls_series[this_step] = bwd_calls;
+            opt_calls_series[this_step] = opt_calls;
+            losses[this_step] = loss;
+            step_idx++;
         }
     }
     if (api.ck_train_flush_optimizer) {
-        api.ck_train_flush_optimizer(opt.lr);
+        int flush_rc = api.ck_train_flush_optimizer(opt.lr);
+        if (flush_rc < 0) {
+            fprintf(stderr, "ck_train_flush_optimizer failed: %d\n", flush_rc);
+            free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+            free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
+            free(losses); free(stream); free(tokens);
+            if (api.ck_train_free) api.ck_train_free();
+            free(init_floats); free(init_sizes);
+            unload_train_runtime_api(&api);
+            return 13;
+        }
     }
     double t1 = monotonic_ms();
     double elapsed_ms = t1 - t0;
 
     int processed_tokens = total_steps * opt.seq_len;
-    int wr = write_train_summary_and_telemetry(opt.run_dir, opt.json_out, &opt, losses, total_steps, elapsed_ms, processed_tokens, total_floats, num_params);
+    double sum_step_ms = 0.0;
+    double sum_fwd_ms = 0.0;
+    double sum_bwd_ms = 0.0;
+    double sum_opt_ms = 0.0;
+    int sum_opt_applied = 0;
+    for (int i = 0; i < total_steps; i++) {
+        sum_step_ms += step_ms_series[i];
+        sum_fwd_ms += fwd_ms_series[i];
+        sum_bwd_ms += bwd_ms_series[i];
+        sum_opt_ms += opt_ms_series[i];
+        if (opt_applied_series[i]) sum_opt_applied += 1;
+    }
+    telemetry.profile_total_ms = sum_step_ms;
+    telemetry.fwd_total_ms = sum_fwd_ms;
+    telemetry.bwd_total_ms = sum_bwd_ms;
+    telemetry.opt_total_ms = sum_opt_ms;
+    if (api.ck_train_get_cumulative_profile) {
+        double profile_total_ms = 0.0;
+        double fwd_total_ms = 0.0;
+        double bwd_total_ms = 0.0;
+        double opt_total_ms = 0.0;
+        int profile_steps = 0;
+        int optimizer_steps = -1;
+        if (api.ck_train_get_cumulative_profile(
+                &profile_total_ms,
+                &fwd_total_ms,
+                &bwd_total_ms,
+                &opt_total_ms,
+                &profile_steps,
+                &optimizer_steps) == 0) {
+            telemetry.profile_total_ms = profile_total_ms;
+            telemetry.fwd_total_ms = fwd_total_ms;
+            telemetry.bwd_total_ms = bwd_total_ms;
+            telemetry.opt_total_ms = opt_total_ms;
+            if (optimizer_steps >= 0) telemetry.optimizer_steps = optimizer_steps;
+            if (fwd_total_ms > 0.0 || bwd_total_ms > 0.0 || opt_total_ms > 0.0) {
+                telemetry.breakdown_available = 1;
+            }
+        }
+    }
+    if (api.ck_train_get_opt_step) {
+        int opt_step = api.ck_train_get_opt_step();
+        if (opt_step >= 0) telemetry.optimizer_steps = opt_step;
+    }
+    if (telemetry.optimizer_steps < 0 && sum_opt_applied > 0) {
+        telemetry.optimizer_steps = sum_opt_applied;
+    }
+    if (telemetry.profile_total_ms <= 0.0) {
+        telemetry.profile_total_ms = elapsed_ms;
+    }
+    int wr = write_train_summary_and_telemetry(
+        opt.run_dir,
+        opt.json_out,
+        &opt,
+        losses,
+        total_steps,
+        elapsed_ms,
+        processed_tokens,
+        total_floats,
+        num_params,
+        &telemetry
+    );
     if (wr != 0) {
         fprintf(stderr, "Failed to write training summary/telemetry (rc=%d)\n", wr);
     }
@@ -2381,6 +2719,14 @@ static int cmd_train_subcommand(int argc, char **argv) {
                 total_steps, processed_tokens, elapsed_ms, tok_s, total_steps > 0 ? losses[total_steps - 1] : 0.0f);
     }
 
+    free(step_ms_series);
+    free(fwd_ms_series);
+    free(bwd_ms_series);
+    free(opt_ms_series);
+    free(opt_applied_series);
+    free(fwd_calls_series);
+    free(bwd_calls_series);
+    free(opt_calls_series);
     free(losses);
     free(stream);
     free(tokens);
@@ -2422,9 +2768,15 @@ static int run_shell_cmd(const char *cmd) {
     return rc;
 }
 
+static const char *detect_python_exe(void) {
+    if (path_exists(".venv/bin/python")) return ".venv/bin/python";
+    return "python3";
+}
+
 static int write_profile_summary_stub(const char *run_dir, const char *tool, const char *output_dir) {
     char path[4096];
     snprintf(path, sizeof(path), "%s/profile_summary.json", run_dir);
+    if (path_exists(path)) return 0;
     FILE *f = fopen(path, "w");
     if (!f) return -1;
     time_t now = time(NULL);
@@ -2480,15 +2832,18 @@ static int cmd_profile_subcommand(int argc, char **argv) {
              thread_opt);
 
     char cmd[32768];
+    const char *python_exe = detect_python_exe();
     int rc = 0;
     if (strcmp(opt.tool, "perf") == 0) {
         char perf_data[4096], perf_stat_raw[4096], perf_stat_json[4096], folded[4096], svg[4096], manifest[4096];
+        char perf_script[4096];
         snprintf(perf_data, sizeof(perf_data), "%s/v7_train_perf.data", out_dir);
         snprintf(perf_stat_raw, sizeof(perf_stat_raw), "%s/perf_stat_summary.txt", out_dir);
         snprintf(perf_stat_json, sizeof(perf_stat_json), "%s/perf_stat_summary.json", opt.run_dir);
         snprintf(folded, sizeof(folded), "%s/v7_train_flame.folded", out_dir);
         snprintf(svg, sizeof(svg), "%s/v7_train_flame.svg", out_dir);
         snprintf(manifest, sizeof(manifest), "%s/flamegraph_manifest.json", opt.run_dir);
+        snprintf(perf_script, sizeof(perf_script), "version/v7/scripts/perf_artifacts_v7.py");
 
         snprintf(cmd, sizeof(cmd), "perf stat -x, -o '%s' -- %s", perf_stat_raw, base_train);
         rc = run_shell_cmd(cmd);
@@ -2506,17 +2861,169 @@ static int cmd_profile_subcommand(int argc, char **argv) {
                  folded, folded, svg);
         run_shell_cmd(cmd);
 
-        FILE *mf = fopen(manifest, "w");
-        if (mf) {
-            fprintf(mf, "{\"folded\": \"%s\", \"svg\": \"%s\", \"perf_data\": \"%s\"}\n", folded, svg, perf_data);
-            fclose(mf);
+        int artifacts_rc = -1;
+        if (path_exists(perf_script)) {
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --perf-stat '%s' --perf-data '%s' --folded '%s' --flamegraph-svg '%s'",
+                python_exe,
+                perf_script,
+                opt.run_dir,
+                perf_stat_raw,
+                perf_data,
+                folded,
+                svg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
         }
-        FILE *pf = fopen(perf_stat_json, "w");
-        if (pf) {
-            time_t now = time(NULL);
-            fprintf(pf, "{\"schema\":\"ck.perf.stat.v1\",\"tool\":\"perf\",\"generated_at_epoch\":%lld,\"raw_path\":\"%s\",\"perf_data\":\"%s\"}\n",
-                    (long long)now, perf_stat_raw, perf_data);
-            fclose(pf);
+
+        if (artifacts_rc != 0) {
+            FILE *mf = fopen(manifest, "w");
+            if (mf) {
+                fprintf(mf, "{\"folded\": \"%s\", \"svg\": \"%s\", \"perf_data\": \"%s\"}\n", folded, svg, perf_data);
+                fclose(mf);
+            }
+            FILE *pf = fopen(perf_stat_json, "w");
+            if (pf) {
+                time_t now = time(NULL);
+                fprintf(pf, "{\"schema\":\"ck.perf.stat.v1\",\"tool\":\"perf\",\"generated_at_epoch\":%lld,\"raw_path\":\"%s\",\"perf_data\":\"%s\"}\n",
+                        (long long)now, perf_stat_raw, perf_data);
+                fclose(pf);
+            }
+        }
+    } else if (strcmp(opt.tool, "cachegrind") == 0) {
+        char cg_out[4096], cg_txt[4096], cg_json[4096], cg_script[4096];
+        snprintf(cg_out, sizeof(cg_out), "%s/cachegrind_train.out", out_dir);
+        snprintf(cg_txt, sizeof(cg_txt), "%s/cachegrind_train_annotated.txt", out_dir);
+        snprintf(cg_json, sizeof(cg_json), "%s/cachegrind_summary.json", opt.run_dir);
+        snprintf(cg_script, sizeof(cg_script), "version/v7/scripts/cachegrind_artifacts_v7.py");
+
+        snprintf(cmd, sizeof(cmd),
+                 "valgrind --tool=cachegrind --cache-sim=yes --branch-sim=no --cachegrind-out-file='%s' -- %s",
+                 cg_out, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        snprintf(
+            cmd,
+            sizeof(cmd),
+            "if command -v cg_annotate >/dev/null 2>&1; then "
+            "cg_annotate --show=Ir,Dr,Dw,D1mr,D1mw,DLmr,DLmw '%s' > '%s'; fi",
+            cg_out,
+            cg_txt
+        );
+        run_shell_cmd(cmd);
+
+        int artifacts_rc = -1;
+        if (path_exists(cg_script)) {
+            char ann_arg[4200] = {0};
+            if (path_exists(cg_txt)) {
+                snprintf(ann_arg, sizeof(ann_arg), " --annotate '%s'", cg_txt);
+            }
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --cachegrind-out '%s'%s",
+                python_exe,
+                cg_script,
+                opt.run_dir,
+                cg_out,
+                ann_arg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
+        }
+
+        if (artifacts_rc != 0) {
+            FILE *cf = fopen(cg_json, "w");
+            if (cf) {
+                time_t now = time(NULL);
+                fprintf(
+                    cf,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"cachegrind_out\": \"%s\", "
+                    "\"annotate_path\": \"%s\""
+                    "}\n",
+                    (long long)now,
+                    cg_out,
+                    path_exists(cg_txt) ? cg_txt : ""
+                );
+                fclose(cf);
+            }
+        }
+    } else if (strcmp(opt.tool, "asan") == 0) {
+        char verify_json[4096], diag_json[4096], asan_sum[4096], asan_script[4096], ck_run_script[4096];
+        snprintf(verify_json, sizeof(verify_json), "%s/memory_verification_latest.json", opt.run_dir);
+        snprintf(diag_json, sizeof(diag_json), "%s/memory_diagnostic_latest.json", opt.run_dir);
+        snprintf(asan_sum, sizeof(asan_sum), "%s/asan_summary.json", opt.run_dir);
+        snprintf(asan_script, sizeof(asan_script), "version/v7/scripts/asan_artifacts_v7.py");
+        snprintf(ck_run_script, sizeof(ck_run_script), "version/v7/scripts/ck_run_v7.py");
+        double asan_lr = (double)opt.lr;
+        if (asan_lr >= 1e-3) {
+            asan_lr = 3e-4;
+            fprintf(stderr,
+                    "profile[asan]: lowering --train-lr %.9g -> %.9g to satisfy train safety gate\n",
+                    (double)opt.lr,
+                    asan_lr);
+        }
+
+        char th_prefix[64] = {0};
+        if (opt.threads > 0) {
+            snprintf(th_prefix, sizeof(th_prefix), "CK_NUM_THREADS=%d ", opt.threads);
+        }
+        snprintf(
+            cmd,
+            sizeof(cmd),
+            "%s'%s' '%s' train-e2e --run '%s' --backend ck --train-verify-memory --train-strict "
+            "--train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g --prompt 'Hello!'",
+            th_prefix,
+            python_exe,
+            ck_run_script,
+            opt.run_dir,
+            opt.epochs,
+            opt.seq_len,
+            opt.total_tokens,
+            opt.grad_accum,
+            asan_lr
+        );
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        int artifacts_rc = -1;
+        if (path_exists(asan_script)) {
+            char diag_arg[4200] = {0};
+            if (path_exists(diag_json)) {
+                snprintf(diag_arg, sizeof(diag_arg), " --memory-diagnostic '%s'", diag_json);
+            }
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --verify-report '%s'%s",
+                python_exe,
+                asan_script,
+                opt.run_dir,
+                verify_json,
+                diag_arg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
+        }
+        if (artifacts_rc != 0) {
+            FILE *af = fopen(asan_sum, "w");
+            if (af) {
+                time_t now = time(NULL);
+                fprintf(
+                    af,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"overall_ok\": false, "
+                    "\"verify_report_path\": \"%s\""
+                    "}\n",
+                    (long long)now,
+                    verify_json
+                );
+                fclose(af);
+            }
         }
     } else if (strcmp(opt.tool, "vtune") == 0) {
         char vt_hot[4096], vt_mem[4096], vt_sum[4096];
@@ -2553,8 +3060,9 @@ static int cmd_profile_subcommand(int argc, char **argv) {
                 snprintf(
                     cmd,
                     sizeof(cmd),
-                    "python3 '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s' "
+                    "'%s' '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s' "
                     "--analysis-name memory-access --analysis-result-dir '%s' --analysis-report-text '%s' --analysis-report-csv '%s'",
+                    python_exe,
                     vt_script,
                     opt.run_dir,
                     vt_hot,
@@ -2568,7 +3076,8 @@ static int cmd_profile_subcommand(int argc, char **argv) {
                 snprintf(
                     cmd,
                     sizeof(cmd),
-                    "python3 '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s'",
+                    "'%s' '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s'",
+                    python_exe,
                     vt_script,
                     opt.run_dir,
                     vt_hot,
@@ -2592,19 +3101,99 @@ static int cmd_profile_subcommand(int argc, char **argv) {
             }
         }
     } else if (strcmp(opt.tool, "advisor") == 0) {
-        char adv_dir[4096], adv_sum[4096];
+        char adv_dir[4096], adv_sum[4096], adv_txt[4096], adv_csv[4096], adv_html[4096], adv_script[4096];
         snprintf(adv_dir, sizeof(adv_dir), "%s/advisor_run", out_dir);
         snprintf(adv_sum, sizeof(adv_sum), "%s/advisor_summary.json", opt.run_dir);
+        snprintf(adv_txt, sizeof(adv_txt), "%s/advisor_roofline.txt", out_dir);
+        snprintf(adv_csv, sizeof(adv_csv), "%s/advisor_roofline.csv", out_dir);
+        snprintf(adv_html, sizeof(adv_html), "%s/advisor_roofline.html", out_dir);
+        snprintf(adv_script, sizeof(adv_script), "version/v7/scripts/advisor_artifacts_v7.py");
         snprintf(cmd, sizeof(cmd), "advisor --collect=roofline --project-dir '%s' -- %s", adv_dir, base_train);
-        rc = run_shell_cmd(cmd);
-        if (rc != 0) return rc;
-        FILE *af = fopen(adv_sum, "w");
-        if (af) {
-            fprintf(af, "{\"project_dir\": \"%s\"}\n", adv_dir);
-            fclose(af);
+        int collect_rc = run_shell_cmd(cmd);
+
+        if (collect_rc == 0) {
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=text --report-output '%s' >/dev/null 2>&1", adv_dir, adv_txt);
+            run_shell_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=csv --report-output '%s' >/dev/null 2>&1", adv_dir, adv_csv);
+            run_shell_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=html --report-output '%s' >/dev/null 2>&1", adv_dir, adv_html);
+            run_shell_cmd(cmd);
+
+            int advisor_sum_rc = -1;
+            if (path_exists(adv_script)) {
+                char adv_txt_arg[4200] = {0};
+                char adv_csv_arg[4200] = {0};
+                char adv_html_arg[4200] = {0};
+                if (path_exists(adv_txt)) {
+                    snprintf(adv_txt_arg, sizeof(adv_txt_arg), " --report-text '%s'", adv_txt);
+                }
+                if (path_exists(adv_csv)) {
+                    snprintf(adv_csv_arg, sizeof(adv_csv_arg), " --report-csv '%s'", adv_csv);
+                }
+                if (path_exists(adv_html)) {
+                    snprintf(adv_html_arg, sizeof(adv_html_arg), " --report-html '%s'", adv_html);
+                }
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "'%s' '%s' --out-dir '%s' --project-dir '%s'%s%s%s",
+                    python_exe,
+                    adv_script,
+                    opt.run_dir,
+                    adv_dir,
+                    adv_txt_arg,
+                    adv_csv_arg,
+                    adv_html_arg
+                );
+                advisor_sum_rc = run_shell_cmd(cmd);
+            }
+
+            if (advisor_sum_rc != 0) {
+                FILE *af = fopen(adv_sum, "w");
+                if (af) {
+                    time_t now = time(NULL);
+                    fprintf(
+                        af,
+                        "{"
+                        "\"generated_at_epoch\": %lld, "
+                        "\"analysis\": \"roofline\", "
+                        "\"project_dir\": \"%s\", "
+                        "\"report_path\": \"%s\", "
+                        "\"csv_path\": \"%s\", "
+                        "\"html_path\": \"%s\""
+                        "}\n",
+                        (long long)now,
+                        adv_dir,
+                        path_exists(adv_txt) ? adv_txt : "",
+                        path_exists(adv_csv) ? adv_csv : "",
+                        path_exists(adv_html) ? adv_html : ""
+                    );
+                    fclose(af);
+                }
+            }
+        } else {
+            FILE *af = fopen(adv_sum, "w");
+            if (af) {
+                time_t now = time(NULL);
+                fprintf(
+                    af,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"analysis\": \"roofline\", "
+                    "\"collect_failed\": true, "
+                    "\"collect_rc\": %d, "
+                    "\"project_dir\": \"%s\", "
+                    "\"hint\": \"advisor collect failed (host constraints like loopback/ptrace can block collection)\""
+                    "}\n",
+                    (long long)now,
+                    collect_rc,
+                    adv_dir
+                );
+                fclose(af);
+            }
         }
     } else {
-        fprintf(stderr, "profile: unsupported --tool %s (use perf|vtune|advisor)\n", opt.tool);
+        fprintf(stderr, "profile: unsupported --tool %s (use perf|vtune|advisor|cachegrind|asan)\n", opt.tool);
         return 5;
     }
 
@@ -2630,7 +3219,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "Subcommands:\n");
     fprintf(stderr, "  %s train --run <dir> --train-token-file <tokens.txt> [options]\n", prog);
     fprintf(stderr, "  %s report-index --run <dir> [--output <path>]\n", prog);
-    fprintf(stderr, "  %s profile --run <dir> --tool perf|vtune|advisor --train-token-file <tokens.txt> [options]\n", prog);
+    fprintf(stderr, "  %s profile --run <dir> --tool perf|vtune|advisor|cachegrind|asan --train-token-file <tokens.txt> [options]\n", prog);
     fprintf(stderr, "  %s train --help | %s profile --help | %s report-index --help\n", prog, prog, prog);
     fprintf(stderr, "\n");
     fprintf(stderr, "Quick start:\n");

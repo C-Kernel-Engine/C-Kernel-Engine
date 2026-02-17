@@ -17,12 +17,39 @@
 #include "ckernel_engine.h"
 
 #include <math.h>
+#include <stdlib.h>
 
 static void zero_row_f32(float *row, int cols)
 {
     for (int i = 0; i < cols; ++i) {
         row[i] = 0.0f;
     }
+}
+
+static int parse_env_bool_on(const char *name)
+{
+    const char *v = getenv(name);
+    if (!v || !v[0]) {
+        return 0;
+    }
+    if (v[0] == '1' || v[0] == 'y' || v[0] == 'Y' || v[0] == 't' || v[0] == 'T') {
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * Diagnostics escape hatch:
+ * CK_CE_LEGACY_MODE=1 restores historical all-valid CE code path.
+ * Production defaults to PyTorch-aligned index-target reduction semantics.
+ */
+static int ce_legacy_mode_enabled(void)
+{
+    static int cached = -1;
+    if (cached < 0) {
+        cached = parse_env_bool_on("CK_CE_LEGACY_MODE") ? 1 : 0;
+    }
+    return cached;
 }
 
 /*
@@ -243,7 +270,7 @@ void softmax_cross_entropy_loss(const float *logits,
         return;
     }
 
-    if (ce_targets_all_valid_no_ignore(targets, tokens, vocab_size)) {
+    if (ce_legacy_mode_enabled() && ce_targets_all_valid_no_ignore(targets, tokens, vocab_size)) {
         softmax_cross_entropy_loss_legacy_mean_impl(
             logits, targets, tokens, vocab_size, d_logits, loss_out);
         return;

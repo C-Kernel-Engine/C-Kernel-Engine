@@ -44,24 +44,25 @@ static void rmsnorm_forward_strict_scalar(const float *input,
                                           int aligned_embed_dim,
                                           float eps)
 {
+    const float inv_d = 1.0f / (float)d_model;
     for (int t = 0; t < tokens; ++t) {
         const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
         float *y = output + (size_t)t * (size_t)aligned_embed_dim;
 
-        double sum_sq = 0.0;
+        float sum_sq = 0.0f;
         for (int d = 0; d < d_model; ++d) {
-            const double v = (double)x[d];
+            const float v = x[d];
             sum_sq += v * v;
         }
-        const double mean_sq = sum_sq / (double)d_model;
-        const double rstd64 = 1.0 / sqrt(mean_sq + (double)eps);
-        const float rstd = (float)rstd64;
+        const float mean_sq = sum_sq * inv_d;
+        const float rstd = 1.0f / sqrtf(mean_sq + eps);
         if (rstd_cache) {
             rstd_cache[t] = rstd;
         }
 
         for (int d = 0; d < d_model; ++d) {
-            y[d] = (float)(((double)x[d]) * ((double)gamma[d]) * rstd64);
+            const float x_hat = x[d] * rstd;
+            y[d] = x_hat * gamma[d];
         }
         for (int d = d_model; d < aligned_embed_dim; ++d) {
             y[d] = 0.0f;
@@ -79,6 +80,7 @@ static void rmsnorm_backward_strict_scalar(const float *d_output,
                                            int d_model,
                                            int aligned_embed_dim)
 {
+    const float inv_d = 1.0f / (float)d_model;
     for (int d = 0; d < d_model; ++d) {
         d_gamma[d] = 0.0f;
     }
@@ -87,35 +89,24 @@ static void rmsnorm_backward_strict_scalar(const float *d_output,
         const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
         const float *dY = d_output + (size_t)t * (size_t)aligned_embed_dim;
         float *dX = d_input + (size_t)t * (size_t)aligned_embed_dim;
-        const double rstd = (double)rstd_cache[t];
+        const float rstd = rstd_cache[t];
 
-        double sum_dY_g_xhat = 0.0;
+        float sum_dY_g_xhat = 0.0f;
         for (int d = 0; d < d_model; ++d) {
-            const double x_hat = (double)x[d] * rstd;
-            sum_dY_g_xhat += (double)dY[d] * (double)gamma[d] * x_hat;
+            const float x_hat = x[d] * rstd;
+            const float grad_x_hat = dY[d] * gamma[d];
+            sum_dY_g_xhat += x_hat * grad_x_hat;
         }
-        const double m = sum_dY_g_xhat / (double)d_model;
 
         for (int d = 0; d < d_model; ++d) {
-            const double x_hat = (double)x[d] * rstd;
-            const double dy = (double)dY[d];
-            dX[d] = (float)(rstd * (dy * (double)gamma[d] - x_hat * m));
+            const float x_hat = x[d] * rstd;
+            const float grad_x_hat = dY[d] * gamma[d];
+            dX[d] = (grad_x_hat - (x_hat * inv_d) * sum_dY_g_xhat) * rstd;
+            d_gamma[d] += dY[d] * x_hat;
         }
         for (int d = d_model; d < aligned_embed_dim; ++d) {
             dX[d] = 0.0f;
         }
-    }
-
-    for (int d = 0; d < d_model; ++d) {
-        double acc = 0.0;
-        for (int t = 0; t < tokens; ++t) {
-            const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
-            const float *dY = d_output + (size_t)t * (size_t)aligned_embed_dim;
-            const double rstd = (double)rstd_cache[t];
-            const double x_hat = (double)x[d] * rstd;
-            acc += (double)dY[d] * x_hat;
-        }
-        d_gamma[d] = (float)acc;
     }
 }
 

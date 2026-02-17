@@ -1485,6 +1485,7 @@ test: $(LIB) test-libs
 			V7_PERF_RUNTIME=cli \
 			V7_PREP_WITH_PYTHON=0 \
 			V7_WITH_VTUNE=$(CK_TEST_V7_WITH_VTUNE) \
+			V7_WITH_ADVISOR=$(CK_TEST_V7_WITH_ADVISOR) \
 			V7_VTUNE_DEEP=$(CK_TEST_V7_VTUNE_DEEP); \
 	else \
 		echo "Skipping v7 perf gate (set CK_TEST_WITH_V7_PERF=1 to enable)"; \
@@ -3092,7 +3093,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-cachegrind profile-v7-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-advisor profile-v7-cachegrind profile-v7-full
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
@@ -3251,6 +3252,7 @@ V7_RUN_ARGS ?= $(V7_WEIGHT_DTYPE_ARG) $(if $(filter auto,$(V7_CHAT_TEMPLATE)),,-
 V7_PERF_RUNTIME ?= cli
 V7_CLI_ARGS ?=
 V7_WITH_VTUNE ?= 1
+V7_WITH_ADVISOR ?= 1
 V7_VTUNE_DEEP ?= 1
 V7_PREP_WITH_PYTHON ?= 1
 V7_FORCE_COMPILE ?= 1
@@ -3311,20 +3313,42 @@ V7_TRAIN_DRIFT_LOCALIZE_JSON ?= $(V7_REPORT_DIR)/train_parity_drift_localize_lat
 V7_TRAIN_REALISTIC_STEPS ?= 320
 V7_TRAIN_REALISTIC_TEXT ?= The quick brown fox jumps over the lazy dog. In optimization practice, stable gradients and careful clipping matter. Diverse token windows reduce periodic aliasing and expose long-horizon drift sooner.
 V7_TRAIN_REALISTIC_JSON ?= $(V7_REPORT_DIR)/train_parity_realistic_long_horizon_latest.json
+V7_TRAIN_RUNTIME_PARITY_RUN_DIR ?= /tmp/v7_runtime_parity
+V7_TRAIN_RUNTIME_PARITY_EPOCHS ?= 5
+V7_TRAIN_RUNTIME_PARITY_SEQ_LEN ?= $(V7_TRAIN_LONG_HORIZON_SEQ_LEN)
+V7_TRAIN_RUNTIME_PARITY_TOTAL_TOKENS ?= $(V7_TRAIN_LONG_HORIZON_TOTAL_TOKENS)
+V7_TRAIN_RUNTIME_PARITY_GRAD_ACCUM ?= $(V7_TRAIN_LONG_HORIZON_GRAD_ACCUM)
+V7_TRAIN_RUNTIME_PARITY_VOCAB ?= $(V7_TRAIN_LONG_HORIZON_VOCAB)
+V7_TRAIN_RUNTIME_PARITY_D_MODEL ?= $(V7_TRAIN_LONG_HORIZON_D_MODEL)
+V7_TRAIN_RUNTIME_PARITY_HIDDEN ?= $(V7_TRAIN_LONG_HORIZON_HIDDEN)
+V7_TRAIN_RUNTIME_PARITY_SEED ?= $(V7_TRAIN_LONG_HORIZON_SEED)
+V7_TRAIN_RUNTIME_PARITY_EVERY ?= $(V7_TRAIN_RUNTIME_PARITY_GRAD_ACCUM)
+V7_TRAIN_RUNTIME_PARITY_STRESS_LR ?= 1e-3
+V7_TRAIN_RUNTIME_PARITY_STRESS_TEXT ?= $(V7_TRAIN_LONG_HORIZON_TEXT)
+V7_TRAIN_RUNTIME_PARITY_STRESS_JSON ?= $(V7_REPORT_DIR)/train_runtime_parity_stress_latest.json
+V7_TRAIN_RUNTIME_PARITY_REALISTIC_LR ?= 5e-4
+V7_TRAIN_RUNTIME_PARITY_REALISTIC_TEXT ?= $(V7_TRAIN_REALISTIC_TEXT)
+V7_TRAIN_RUNTIME_PARITY_REALISTIC_JSON ?= $(V7_REPORT_DIR)/train_runtime_parity_realistic_latest.json
+V7_TRAIN_RUNTIME_PARITY_DUMP_ON_DRIFT ?= 0
+V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG := $(if $(filter 1,$(V7_TRAIN_RUNTIME_PARITY_DUMP_ON_DRIFT)),--dump-on-drift,)
 V7_BACKPROP_LONG_EPOCH_MODE ?= smoke
 V7_BACKPROP_LONG_EPOCH_NIGHTLY_MODE ?= smoke
 V7_GATE_WITH_LONG_HORIZON_PARITY ?= 1
 V7_GATE_WITH_BPE_TRAIN_PARITY ?= 1
+V7_GATE_WITH_REPLAY_ACCUM ?= 1
 V7_BPE_TRAIN_PARITY_JSON ?= $(V7_REPORT_DIR)/v7_bpe_train_parity_latest.json
 CK_TEST_WITH_V7_LONG_HORIZON ?= 1
 CK_TEST_WITH_V7_PERF ?= 0
 CK_TEST_V7_WITH_VTUNE ?= 0
+CK_TEST_V7_WITH_ADVISOR ?= 0
 CK_TEST_V7_VTUNE_DEEP ?= 0
 CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
 
 .PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
-	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity
+	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic \
+	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
+	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -3336,6 +3360,7 @@ v7-help:
 	@echo "  make v7-inference-smoke"
 	@echo "  make v7-perf-gate"
 	@echo "  make profile-v7-full"
+	@echo "  make profile-v7-advisor"
 	@echo "  make v7-validate-contracts"
 	@echo "  make v7-parity-1tok"
 	@echo "  make v7-qk-norm-backward-parity"
@@ -3351,6 +3376,7 @@ v7-help:
 	@echo "  make v7-init-tiny"
 	@echo "  make v7-grad-fd"
 	@echo "  make v7-replay"
+	@echo "  make v7-replay-accum"
 	@echo "  make v7-train-parity-3"
 	@echo "  make v7-train-parity-5"
 	@echo "  make test-v7-bpe-train-parity"
@@ -3358,6 +3384,9 @@ v7-help:
 	@echo "  make v7-train-parity-drift-localize"
 	@echo "  make v7-train-parity-long-horizon"
 	@echo "  make v7-train-parity-long-horizon-realistic"
+	@echo "  make v7-train-runtime-parity-stress"
+	@echo "  make v7-train-runtime-parity-realistic"
+	@echo "  make v7-train-runtime-parity-long-horizon"
 	@echo "  make v7-backprop-long-epoch"
 	@echo "  make v7-backprop-long-epoch-nightly"
 	@echo "  make v7-backprop-production-ready"
@@ -3381,6 +3410,7 @@ v7-help:
 	@echo "  - long-horizon drift smoke is enforced in v7-gate-train by default (V7_GATE_WITH_LONG_HORIZON_PARITY=1)"
 	@echo "  - production train safety defaults: max-grad-norm=$(V7_TRAIN_PROD_MAX_GRAD_NORM), enforce=$(V7_TRAIN_ENFORCE_PROD_SAFETY)"
 	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
+	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
 
 v7-sync-inference:
 	@$(PYTHON) version/v7/scripts/sync_v7_inference_baseline.py
@@ -3523,6 +3553,79 @@ v7-train-parity-long-horizon-realistic:
 		--train-text "$(V7_TRAIN_REALISTIC_TEXT)" \
 		--json-out "$(V7_TRAIN_REALISTIC_JSON)"
 
+v7-train-runtime-parity-prepare:
+	@set -e; \
+	mkdir -p "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)"; \
+	if [ -f "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)/weights.bump" ] && [ -f "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)/weights_manifest.json" ]; then \
+		echo "v7-train-runtime-parity-prepare: using existing run dir $(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)"; \
+	else \
+		echo "v7-train-runtime-parity-prepare: initializing run dir $(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)"; \
+		$(PYTHON) version/v7/scripts/ck_run_v7.py init \
+			--run "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)" \
+			--train-seed $(V7_TRAIN_RUNTIME_PARITY_SEED) \
+			--layers $(V7_TRAIN_MAX_LAYERS) \
+			--vocab-size $(V7_TRAIN_RUNTIME_PARITY_VOCAB) \
+			--embed-dim $(V7_TRAIN_RUNTIME_PARITY_D_MODEL) \
+			--hidden-dim $(V7_TRAIN_RUNTIME_PARITY_HIDDEN) \
+			--context-len $(V7_TINY_CTX); \
+	fi
+
+v7-train-runtime-parity-stress: v7-train-runtime-parity-prepare
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)" \
+		--backend ck \
+		--train-epochs $(V7_TRAIN_RUNTIME_PARITY_EPOCHS) \
+		--train-seq-len $(V7_TRAIN_RUNTIME_PARITY_SEQ_LEN) \
+		--train-total-tokens $(V7_TRAIN_RUNTIME_PARITY_TOTAL_TOKENS) \
+		--train-grad-accum $(V7_TRAIN_RUNTIME_PARITY_GRAD_ACCUM) \
+		--train-optimizer adamw \
+		--train-lr $(V7_TRAIN_RUNTIME_PARITY_STRESS_LR) \
+		--train-max-grad-norm 0 \
+		--enforce-production-safety \
+		--allow-unsafe-adamw-lr \
+		--train-unsafe-adamw-lr-threshold 1e-3 \
+		--train-seed $(V7_TRAIN_RUNTIME_PARITY_SEED) \
+		--train-vocab $(V7_TRAIN_RUNTIME_PARITY_VOCAB) \
+		--train-d-model $(V7_TRAIN_RUNTIME_PARITY_D_MODEL) \
+		--train-hidden $(V7_TRAIN_RUNTIME_PARITY_HIDDEN) \
+		--train-loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--train-param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--prompt "$(V7_TRAIN_RUNTIME_PARITY_STRESS_TEXT)" \
+		--parity-on \
+		--parity-every $(V7_TRAIN_RUNTIME_PARITY_EVERY) \
+		$(V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG) --train-json-out "$(V7_TRAIN_RUNTIME_PARITY_STRESS_JSON)"
+
+v7-train-runtime-parity-realistic: v7-train-runtime-parity-prepare
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_RUNTIME_PARITY_RUN_DIR)" \
+		--backend ck \
+		--train-epochs $(V7_TRAIN_RUNTIME_PARITY_EPOCHS) \
+		--train-seq-len $(V7_TRAIN_RUNTIME_PARITY_SEQ_LEN) \
+		--train-total-tokens $(V7_TRAIN_RUNTIME_PARITY_TOTAL_TOKENS) \
+		--train-grad-accum $(V7_TRAIN_RUNTIME_PARITY_GRAD_ACCUM) \
+		--train-optimizer adamw \
+		--train-lr $(V7_TRAIN_RUNTIME_PARITY_REALISTIC_LR) \
+		--train-max-grad-norm $(V7_TRAIN_PROD_MAX_GRAD_NORM) \
+		--enforce-production-safety \
+		--train-unsafe-adamw-lr-threshold 1e-3 \
+		--train-seed $(V7_TRAIN_RUNTIME_PARITY_SEED) \
+		--train-vocab $(V7_TRAIN_RUNTIME_PARITY_VOCAB) \
+		--train-d-model $(V7_TRAIN_RUNTIME_PARITY_D_MODEL) \
+		--train-hidden $(V7_TRAIN_RUNTIME_PARITY_HIDDEN) \
+		--train-loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
+		--train-param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
+		--prompt "$(V7_TRAIN_RUNTIME_PARITY_REALISTIC_TEXT)" \
+		--parity-on \
+		--parity-every $(V7_TRAIN_RUNTIME_PARITY_EVERY) \
+		$(V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG) --train-json-out "$(V7_TRAIN_RUNTIME_PARITY_REALISTIC_JSON)"
+
+v7-train-runtime-parity-long-horizon:
+	@set -e; \
+	echo "v7-train-runtime-parity-long-horizon: realistic"; \
+	$(MAKE) --no-print-directory v7-train-runtime-parity-realistic; \
+	echo "v7-train-runtime-parity-long-horizon: stress"; \
+	$(MAKE) --no-print-directory v7-train-runtime-parity-stress
+
 v7-backprop-long-epoch:
 	@if [ "$(V7_BACKPROP_LONG_EPOCH_MODE)" = "full" ]; then \
 		echo "v7-backprop-long-epoch: full horizon"; \
@@ -3642,6 +3745,9 @@ v7-grad-fd:
 v7-replay:
 	@$(PYTHON) version/v7/scripts/check_replay_determinism_v7.py --json-out $(V7_REPORT_DIR)/replay_determinism_latest.json
 
+v7-replay-accum:
+	@$(PYTHON) version/v7/scripts/check_runtime_replay_accum_v7.py --json-out $(V7_REPORT_DIR)/replay_accum_latest.json
+
 test-v7-bpe-train-parity: tokenizer ck-bpe-train
 	@$(PYTHON) version/v7/scripts/test_bpe_train_parity_v7.py --json-out "$(V7_BPE_TRAIN_PARITY_JSON)"
 
@@ -3671,6 +3777,12 @@ v7-gate-train:
 		$(MAKE) --no-print-directory test-v7-bpe-train-parity; \
 	else \
 		echo "v7-gate-train: skip bpe-train parity gate (set V7_GATE_WITH_BPE_TRAIN_PARITY=1 to enable)"; \
+	fi
+	@if [ "$(V7_GATE_WITH_REPLAY_ACCUM)" = "1" ]; then \
+		echo "v7-gate-train: running runtime replay accum gate"; \
+		$(MAKE) --no-print-directory v7-replay-accum; \
+	else \
+		echo "v7-gate-train: skip runtime replay accum gate (set V7_GATE_WITH_REPLAY_ACCUM=1 to enable)"; \
 	fi
 	@$(MAKE) --no-print-directory v7-replay
 
@@ -3728,6 +3840,7 @@ PROFILE_V6_VTUNE_CSV ?= build/ck_v6_vtune_hotspots.csv
 PROFILE_V7_SCRIPT := version/v7/scripts/ck_run_v7.py
 PERF_ARTIFACTS_V7_SCRIPT := version/v7/scripts/perf_artifacts_v7.py
 VTUNE_ARTIFACTS_V7_SCRIPT := version/v7/scripts/vtune_artifacts_v7.py
+ADVISOR_ARTIFACTS_V7_SCRIPT := version/v7/scripts/advisor_artifacts_v7.py
 PERF_GATE_V7_SCRIPT := version/v7/scripts/perf_gate_v7.py
 RESOLVE_MODEL_DIR_V7_SCRIPT := version/v7/scripts/resolve_model_dir_v7.py
 PROFILE_V7_SUMMARY_SCRIPT := version/v7/scripts/generate_profile_summary_v7.py
@@ -3744,6 +3857,9 @@ PROFILE_V7_VTUNE_MEMORY_TEXT ?= build/ck_v7_vtune_memory_summary.txt
 PROFILE_V7_VTUNE_MEMORY_CSV ?= build/ck_v7_vtune_memory_summary.csv
 PROFILE_V7_VTUNE_UARCH_TEXT ?= build/ck_v7_vtune_uarch_summary.txt
 PROFILE_V7_VTUNE_UARCH_CSV ?= build/ck_v7_vtune_uarch_summary.csv
+PROFILE_V7_ADVISOR_TEXT ?= build/ck_v7_advisor_roofline.txt
+PROFILE_V7_ADVISOR_CSV ?= build/ck_v7_advisor_roofline.csv
+PROFILE_V7_ADVISOR_HTML ?= build/ck_v7_advisor_roofline.html
 
 profile-v6-prepare-runtime:
 	@if [ "$(V66_PREP_WITH_PYTHON)" != "1" ]; then \
@@ -4122,13 +4238,26 @@ profile-v7-decode:
 			fi; \
 		fi; \
 		$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
-		CK_PROFILE=1 \
-		CK_PROFILE_CSV="$$runtime_dir/profile_decode.csv" \
-		CK_PROFILE_JSON="$$runtime_dir/profile_decode.json" \
-		./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
-			--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
-				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null 2>&1; \
-		$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
+			decode_log="$$model_dir/profile_decode_run.log"; \
+			CK_PROFILE=1 \
+			CK_PROFILE_CSV="$$runtime_dir/profile_decode.csv" \
+			CK_PROFILE_JSON="$$runtime_dir/profile_decode.json" \
+			./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+					$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > "$$decode_log" 2>&1; \
+			cli_rc=$$?; \
+			if [ "$$cli_rc" -ne 0 ]; then \
+				echo "ERROR: decode profiling run failed (rc=$$cli_rc). Log: $$decode_log"; \
+				tail -n 80 "$$decode_log" || true; \
+				echo "Hint: if you see libimf.so errors, run: source /opt/intel/oneapi/setvars.sh"; \
+				exit "$$cli_rc"; \
+			fi; \
+			if [ ! -s "$$runtime_dir/profile_decode.csv" ]; then \
+				echo "ERROR: missing $$runtime_dir/profile_decode.csv after decode profiling run. Log: $$decode_log"; \
+				tail -n 80 "$$decode_log" || true; \
+				exit 1; \
+			fi; \
+			$(PYTHON) $(PROFILE_V7_SUMMARY_SCRIPT) --work-dir "$$model_dir"; \
 	else \
 		CK_PROFILE=1 \
 		CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
@@ -4466,6 +4595,84 @@ profile-v7-vtune:
 			--report-csv $(PROFILE_V7_VTUNE_CSV) \
 			$$extra_args; \
 	fi
+
+profile-v7-advisor:
+	@if [ "$(V7_WITH_ADVISOR)" != "1" ]; then \
+		echo "SKIP: Advisor probe disabled (V7_WITH_ADVISOR=$(V7_WITH_ADVISOR))"; \
+	elif ! command -v advisor >/dev/null 2>&1; then \
+		echo "SKIP: advisor not installed"; \
+	else \
+		mkdir -p build; \
+		advisor_result="build/ck_v7_advisor_$$(date +%Y%m%d_%H%M%S)"; \
+		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
+			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+			runtime_dir="$$model_dir"; \
+			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+				runtime_dir="$$model_dir/.ck_build"; \
+			fi; \
+			needs_regen=0; regen_reason=""; \
+			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
+				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+			fi; \
+			if [ "$$needs_regen" -eq 0 ]; then \
+				echo "Using existing compiled runtime in $$runtime_dir"; \
+			else \
+				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
+				regen_model="$(V7_MODEL)"; \
+				if [ -d "$$regen_model" ]; then \
+					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
+					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
+				fi; \
+				CK_PROFILE=1 \
+				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+				$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+					"$$regen_model" \
+					--generate-only --profile $(V7_FORCE_COMPILE_ARG) \
+					--context-len 1024 --prompt "Hello" --max-tokens 1 \
+					$(V7_RUN_ARGS); \
+				model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$$regen_model" )"; \
+				runtime_dir="$$model_dir"; \
+				if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
+					runtime_dir="$$model_dir/.ck_build"; \
+				fi; \
+			fi; \
+			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
+			advisor --collect=roofline --project-dir "$$advisor_result" -- \
+				./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
+				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
+				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) || { \
+					echo "SKIP: advisor collect failed for CLI runtime"; \
+					exit 0; \
+				}; \
+		else \
+			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
+			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
+			advisor --collect=roofline --project-dir "$$advisor_result" -- \
+			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
+				"$(V7_MODEL)" \
+				$(V7_FORCE_COMPILE_ARG) \
+				--prompt "The quick brown fox" --max-tokens 32 \
+				$(V7_RUN_ARGS) || { \
+					echo "SKIP: advisor collect failed for python runtime"; \
+					exit 0; \
+				}; \
+		fi; \
+		advisor --report=roofline --project-dir "$$advisor_result" --format=text --report-output $(PROFILE_V7_ADVISOR_TEXT) >/dev/null 2>&1 || true; \
+		advisor --report=roofline --project-dir "$$advisor_result" --format=csv --report-output $(PROFILE_V7_ADVISOR_CSV) >/dev/null 2>&1 || true; \
+		advisor --report=roofline --project-dir "$$advisor_result" --format=html --report-output $(PROFILE_V7_ADVISOR_HTML) >/dev/null 2>&1 || true; \
+		advisor_args=""; \
+		if [ -f "$(PROFILE_V7_ADVISOR_TEXT)" ]; then advisor_args="$$advisor_args --report-text $(PROFILE_V7_ADVISOR_TEXT)"; fi; \
+		if [ -f "$(PROFILE_V7_ADVISOR_CSV)" ]; then advisor_args="$$advisor_args --report-csv $(PROFILE_V7_ADVISOR_CSV)"; fi; \
+		if [ -f "$(PROFILE_V7_ADVISOR_HTML)" ]; then advisor_args="$$advisor_args --report-html $(PROFILE_V7_ADVISOR_HTML)"; fi; \
+		$(PYTHON) $(ADVISOR_ARTIFACTS_V7_SCRIPT) \
+			--model-input "$(V7_MODEL)" \
+			--project-dir "$$advisor_result" \
+			$$advisor_args; \
+	fi
+
 profile-v7-full:
 	@$(MAKE) --no-print-directory profile-v7-prepare-runtime
 	@$(MAKE) --no-print-directory profile-v7-decode
@@ -4473,6 +4680,7 @@ profile-v7-full:
 	@$(MAKE) --no-print-directory profile-v7-perf-stat
 	@$(MAKE) --no-print-directory profile-v7-flamegraph
 	@$(MAKE) --no-print-directory profile-v7-vtune
+	@$(MAKE) --no-print-directory profile-v7-advisor
 	@echo "=== Open visualizer: version/v7/tools/ir_visualizer.html ==="
 	@echo "=== Load folder from model cache to see Profile tab ==="
 
@@ -4509,6 +4717,7 @@ v7-perf-gate:
 		$(MAKE) --no-print-directory profile-v7-perf-stat; \
 		$(MAKE) --no-print-directory profile-v7-flamegraph; \
 		$(MAKE) --no-print-directory profile-v7-vtune || true; \
+		$(MAKE) --no-print-directory profile-v7-advisor || true; \
 		$(MAKE) --no-print-directory v7-perf-gate-evaluate; \
 	fi
 

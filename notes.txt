@@ -9,6 +9,44 @@ python3 version/v7/scripts/ck_run_v7.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/q
 
 python3 version/v7/scripts/ck_run_v7.py run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf --context-len 1024 --force-compile --force-convert
 
+CK_NUM_THREADS=8 vtune -collect memory-access -result-dir /tmp/v7_vtune_mem -quiet --   python3 version/v7/scripts/ck_run_v7.py train --run /tmp/v7_ht_threads --backend ck     --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8     --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none     --train-json-out /tmp/v7_vtune_mem_train.json
+
+CK_NUM_THREADS=8 perf record --all-user -F 999 --call-graph dwarf -o /tmp/v7_train_perf.data --   python3 version/v7/scripts/ck_run_v7.py train     --run /tmp/v7_ht_threads --backend ck     --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8     --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none     --train-json-out /tmp/v7_perf_train.json
+
+perf script -i /tmp/v7_train_perf.data | ./FlameGraph/stackcollapse-perf.pl > /tmp/v7_train_flame.folded
+
+  930  vtune-gui /tmp/v7_gui/vtune_hotspots
+  931  vtune-gui /tmp/v7_gui/vtune_memory
+
+
+Vtune:
+  1. vtune-gui /tmp/v7_gui/vtune_hotspots
+  2. vtune-gui /tmp/v7_gui/vtune_memory
+  3. advisor-gui /tmp/v7_gui/advisor_run/advisor_run.advixeproj
+  4. Optional roofline HTML: /tmp/v7_gui/advisor_run/e000/hs001/advisor-roofline.html
+
+  - make --no-print-directory ck-cli-v7 ✅
+  - ./build/ck-cli-v7 train --run /tmp/v7_pr3_contig --train-token-file /tmp/v7_tokens.txt ... ✅
+  - ./build/ck-cli-v7 report-index --run /tmp/v7_pr3_contig ✅
+  - ./build/ck-cli-v7 profile --run /tmp/v7_pr3_contig --tool perf --train-token-file /tmp/v7_tokens.txt ... ✅
+
+  # 1) native train
+  ./build/ck-cli-v7 train \
+    --run /tmp/v7_pr3_contig \
+    --train-token-file /tmp/v7_tokens.txt \
+    --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 \
+    --train-grad-accum 4 --threads 4
+
+  # 2) emit canonical run index
+  ./build/ck-cli-v7 report-index --run /tmp/v7_pr3_contig
+
+  # 3) native perf profiling
+  ./build/ck-cli-v7 profile \
+    --run /tmp/v7_pr3_contig \
+    --tool perf \
+    --train-token-file /tmp/v7_tokens.txt \
+    --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 \
+    --train-grad-accum 4 --threads 4
 
 
 
@@ -59,3 +97,296 @@ python3 version/v7/scripts/ck_run_v7.py train \
 
 # Inference non-regression smoke (Gemma/Qwen2/Qwen3)
 make --no-print-directory v7-inference-smoke
+
+## v7 training runtime verification (contiguous layout + diagnostics)
+# 1) init run-dir with train IR, layout, exec plan, generated runtime
+python3 version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/v7_smoke \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# 2) CK runtime strict train (runs generated C runtime, not PyTorch loop)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_smoke \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-strict --profile-train none
+
+# 3) memory verification suite (toggle diff + intentional +1 + ASan + bounds)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_smoke \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-strict --train-verify-memory --train-verify-steps 4 --profile-train none
+
+# 4) existing parity harness still valid
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_smoke \
+  --backend both \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 --profile-train none
+
+# Key artifacts in run_dir:
+# - ir1_train_forward.json
+# - ir2_train_backward.json
+# - layout_train.json
+# - layout_train_audit.json
+# - train_exec_plan.json
+# - generated_train_runtime_v7.c
+# - generated_train_runtime_summary_v7.json
+# - memory_diagnostic_latest.json
+# - memory_verification_latest.json
+# - train_e2e_latest.json
+
+## v7 start-training-now checklist (current state)
+# A) build run-dir + strict artifacts (IR1/IR2/layout/exec plan/runtime)
+python3 version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/v7_train_now \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# B) CK-only train (generated C runtime)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_train_now \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-strict --profile-train none
+
+# C) strict memory verifier (must stay green)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_train_now \
+  --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --train-strict --train-verify-memory --train-verify-steps 4 --profile-train none
+
+# D) baseline parity harness reference (CK vs torch harness)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_train_now \
+  --backend both \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 --profile-train none
+
+# E) generate IR report from same run-dir
+python3 version/v7/tools/open_ir_visualizer.py \
+  --generate --run /tmp/v7_train_now --html-only --output /tmp/v7_train_now/ir_report.html
+
+# F) quick perf snapshot from produced train_e2e JSON
+python3 - <<'PY'
+import json
+from pathlib import Path
+p=Path('/tmp/v7_train_now/train_e2e_latest.json')
+d=json.loads(p.read_text()) if p.exists() else {}
+sp=d.get('step_profile') or {}
+print('backend=', d.get('backend'))
+print('pass_parity=', d.get('pass_parity'))
+print('final_ck_loss=', d.get('final_ck_loss'), 'final_torch_loss=', d.get('final_torch_loss'))
+print('ck_total_ms=', sp.get('ck_total_ms'), 'torch_total_ms=', sp.get('torch_total_ms'))
+print('train_tok_s=', sp.get('train_tok_s'))
+PY
+
+## Threadpool GEMM benchmark (v7 training runtime)
+# Compare CK runtime throughput with different CK thread counts.
+# NOTE: CK_NUM_THREADS controls CK threadpool; OMP_NUM_THREADS is pinned to 1 by ck_run_v7.
+
+CK_NUM_THREADS=1 python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_tp_bench --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 256 --train-grad-accum 2 \
+  --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+
+CK_NUM_THREADS=12 python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_tp_bench --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 256 --train-grad-accum 2 \
+  --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+
+# CK vs torch reference timing (same harness config)
+python3 version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/v7_tp_bench --backend both \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 256 --train-grad-accum 2 \
+  --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+
+## v7 training performance profiling (physical-core default)
+
+# Hyperthreading-aware defaults (auto picks physical cores when detectable)
+python3 - << 'PY'
+import importlib.util
+spec=importlib.util.spec_from_file_location('ck_run_v7','version/v7/scripts/ck_run_v7.py')
+m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print('default_ck_threads=', m._detect_default_ck_threads())
+PY
+
+# CK-only benchmark (physical vs logical threads)
+CK_NUM_THREADS=12 python3 version/v7/scripts/ck_run_v7.py train --run /tmp/v7_ht_threads --backend ck --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none --train-json-out /tmp/v7_ht_threads_t12.json
+CK_NUM_THREADS=16 python3 version/v7/scripts/ck_run_v7.py train --run /tmp/v7_ht_threads --backend ck --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none --train-json-out /tmp/v7_ht_threads_t16.json
+
+# VTune hotspots (training runtime)
+CK_NUM_THREADS=12 vtune -collect hotspots -result-dir /tmp/v7_vtune_ck_hotspots -quiet -- \
+  python3 version/v7/scripts/ck_run_v7.py train --run /tmp/v7_ht_threads --backend ck \
+    --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 \
+    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+vtune -report hotspots -result-dir /tmp/v7_vtune_ck_hotspots -format text -report-output /tmp/v7_vtune_ck_hotspots.txt
+
+# Flamegraph (perf)
+CK_NUM_THREADS=12 perf record --all-user -F 999 --call-graph dwarf -o /tmp/v7_train_perf.data -- \
+  python3 version/v7/scripts/ck_run_v7.py train --run /tmp/v7_ht_threads --backend ck \
+    --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 \
+    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
+perf script -i /tmp/v7_train_perf.data | ./FlameGraph/stackcollapse-perf.pl > /tmp/v7_train_flame.folded
+./FlameGraph/flamegraph.pl --title="v7 Train CK" /tmp/v7_train_flame.folded > /tmp/v7_train_flame.svg
+
+## v7 training runtime quick checks (CK contiguous layout + oracle)
+
+# Use venv python for torch snapshot oracle path.
+PY=.venv/bin/python
+RUN=/tmp/v7_fused_opt
+
+# 1) Init tiny train run (IR1 + IR2 + layout_train + codegen runtime)
+$PY version/v7/scripts/ck_run_v7.py init \
+  --run "$RUN" \
+  --init xavier_uniform \
+  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --generate-ir --generate-runtime --strict
+
+# 2) CK-only runtime training smoke
+$PY version/v7/scripts/ck_run_v7.py train \
+  --run "$RUN" --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none
+
+# 3) PR3.7 memory verification suite (toggle diff + fault inject + ASan + bounds)
+$PY version/v7/scripts/ck_run_v7.py train \
+  --run "$RUN" --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none \
+  --train-verify-memory --train-verify-steps 2
+
+# 4) CK runtime + true PyTorch snapshot oracle cadence checks
+$PY version/v7/scripts/ck_run_v7.py train \
+  --run "$RUN" --backend ck \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none \
+  --parity-on --oracle pytorch --parity-profile debug --parity-every 1 \
+  --parity-replay-on-check
+
+# 5) Reference harness parity path remains available
+$PY version/v7/scripts/ck_run_v7.py train \
+  --run "$RUN" --backend both \
+  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
+  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
+  --profile-train none
+
+# Key artifacts:
+# - $RUN/layout_train.json
+# - $RUN/memory_diagnostic_latest.json
+# - $RUN/memory_verification_latest.json
+# - $RUN/train_exec_plan.json
+# - $RUN/train_e2e_latest.json
+
+# v7 AdamW Drift Drill-Down (2026-02-16)
+# Full C micro-stack parity run (shows first-fail diagnostics)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 3 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 \
+  --vocab 1024 --d-model 256 --hidden 1024 \
+  --train-text 'Hello!' --loss-tol 2e-5 --param-tol 3e-5 \
+  --diag-every 10 --json-out /tmp/v7_diag_all_c_192.json
+
+# Isolate contribution by kernel family (all else torch)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 3 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 \
+  --vocab 1024 --d-model 256 --hidden 1024 --train-text 'Hello!' \
+  --max-steps 70 --diag-every 10 \
+  --ck-rmsnorm-backend torch --ck-swiglu-backend c --ck-loss-backend torch \
+  --json-out /tmp/v7_diag_only_swiglu_c_70.json
+
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 3 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 \
+  --vocab 1024 --d-model 256 --hidden 1024 --train-text 'Hello!' \
+  --max-steps 70 --diag-every 10 \
+  --ck-rmsnorm-backend c --ck-swiglu-backend torch --ck-loss-backend torch \
+  --json-out /tmp/v7_diag_only_rmsnorm_c_70.json
+
+# Torch reference sanity (should be exact zero drift)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 3 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --seed 42 \
+  --vocab 1024 --d-model 256 --hidden 1024 --train-text 'Hello!' \
+  --ck-rmsnorm-backend torch --ck-swiglu-backend torch --ck-loss-backend torch \
+  --json-out /tmp/v7_diag_all_torch_ref.json
+
+# v7 long-horizon drift gates (now wired into Makefile)
+make --no-print-directory v7-train-parity-drift-smoke
+make --no-print-directory v7-train-parity-long-horizon
+
+# Toggle from default gates:
+# - v7-gate-train includes drift smoke by default:
+#     V7_GATE_WITH_LONG_HORIZON_PARITY=1
+# - make test includes drift smoke by default:
+#     CK_TEST_WITH_V7_LONG_HORIZON=1
+# Example skips:
+#   make --no-print-directory v7-gate-train V7_GATE_WITH_LONG_HORIZON_PARITY=0
+#   make --no-print-directory test CK_TEST_WITH_V7_LONG_HORIZON=0
+
+# v7 long-horizon gate policy (updated)
+# Realistic blocker + Hello stress monitor (non-blocking in nightly target)
+make --no-print-directory v7-train-parity-long-horizon-realistic
+make --no-print-directory v7-backprop-long-epoch-nightly
+
+# Stress repro at lr=1e-3 (expected harsh)
+V7_BACKPROP_LONG_EPOCH_MODE=full V7_TRAIN_LONG_HORIZON_LR=1e-3 make --no-print-directory v7-backprop-long-epoch
+
+# Current status snapshot:
+# - nightly blocker (realistic, max-steps=320, lr=5e-4): PASS
+# - nightly Hello monitor (max-steps=70, lr=5e-4): PASS
+# - stress full horizon Hello at lr=1e-3: still FAIL (drift tracked)
+
+# Drift localizer (same-state stage-level first divergence)
+# Defaults: step=65, source=ck, tol=1e-6, all-C backends
+make --no-print-directory v7-train-parity-drift-localize
+# Override example:
+# V7_TRAIN_LONG_HORIZON_LR=1e-3 V7_TRAIN_DRIFT_LOCALIZE_STEP=65 make --no-print-directory v7-train-parity-drift-localize
+
+# v7 drift sweep update (2026-02-16, strict C micro-stack)
+# 1) Per-epoch snapshot JSON (new fields: epoch_snapshots[*].top_param_diffs)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 20 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --train-text 'Hello!' --max-steps 1000 \
+  --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c \
+  --epoch-snapshot-every 1 --epoch-snapshot-topk 12 \
+  --json-out /tmp/v7_drift_sweeps/g_allc_1000_multi_epoch.json
+
+# 2) Compare against torch-loss variant (isolates CE path effect)
+.venv/bin/python version/v7/scripts/train_parity_epochs_v7.py \
+  --epochs 20 --seq-len 8 --total-tokens 4096 --grad-accum 8 \
+  --optimizer adamw --lr 1e-3 --train-text 'Hello!' --max-steps 1000 \
+  --ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend torch \
+  --epoch-snapshot-every 1 --epoch-snapshot-topk 12 \
+  --json-out /tmp/v7_drift_sweeps/h_losstorch_1000_multi_epoch.json
+
+# 3) Depth sweep helper (init + backend=both train for 1/2 layers)
+.venv/bin/python version/v7/scripts/sweep_train_depth_drift_v7.py \
+  --run-root /tmp/v7_depth_sweep --layers 1,2 \
+  --vocab-size 1024 --embed-dim 256 --hidden-dim 1024 \
+  --num-heads 8 --num-kv-heads 4 --context-len 128 \
+  --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 \
+  --train-grad-accum 8 --train-lr 5e-4 --prompt 'Hello!' \
+  --python .venv/bin/python
+
+# Latest measured drift summary:
+# - step-65 drift no longer reproduces on current strict path.
+# - all-C, AdamW, lr=1e-3, Hello stress: first_param_fail_step ~= 800-804 (loss still passes).
+# - switching only loss backend to torch makes same run pass to 1000 steps.
+# - SGD (all-C) passes to 1000 at same shape/lr, pointing to long-horizon AdamW sensitivity.
