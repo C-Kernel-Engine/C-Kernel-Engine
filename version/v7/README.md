@@ -31,6 +31,7 @@ make v7-grad-fd
 make v7-replay
 make v7-train-parity-3
 make v7-train-parity-5
+make v7-backprop-production-ready
 make v7-gate-train
 make v7-gate
 ```
@@ -79,6 +80,9 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `v7-train-compile-smoke` compiles that generated C to an object as an operator gate.
 - `v7-init-tiny` provides from-scratch tiny-model initialization (`weights.bump` + `weights_manifest.json`).
 - `v7-parity-1tok` now includes `qk_norm_backward` parity in addition to RMSNorm, SwiGLU, and CE.
+- Long-horizon backprop targets now pass explicit train safety controls to parity harness:
+  `--max-grad-norm`, `--enforce-production-safety`, and AdamW LR threshold checks.
+- `make v7-backprop-production-ready` runs `v7-gate-train` + nightly long-horizon bundle with production safety enforcement.
 - `profile-v7-vtune` now supports deep capture (`V7_VTUNE_DEEP=1`): hotspots + memory-access + uarch-exploration, exported to `vtune_summary.json` for the IR viewer.
 - Inference baseline is synced from `version/v6.6` into `version/v7` so inference and
   backprop can evolve together in one track.

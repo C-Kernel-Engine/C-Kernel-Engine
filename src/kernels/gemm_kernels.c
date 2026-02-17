@@ -22,6 +22,8 @@
 #include <immintrin.h>
 #endif
 #include <omp.h>
+#include <stdlib.h>
+#include <string.h>
 
 static inline int ck_min(int a, int b) { return a < b ? a : b; }
 
@@ -399,6 +401,96 @@ void gemm_nn_avx512(const float *A,
 #endif
 }
 
+/*
+ * Profiling duplicate of gemm_nn_avx512.
+ * Keep numerics and shape contract identical; this exists only so VTune/Advisor
+ * can attribute runtime to a distinct symbol during A/B experiments.
+ */
+#if defined(__GNUC__) && !defined(__INTEL_LLVM_COMPILER)
+__attribute__((noinline, noipa))
+#elif defined(__GNUC__)
+__attribute__((noinline))
+#endif
+void gemm_nn_avx512_probe(const float *A,
+                          const float *B,
+                          const float *bias,
+                          float *C,
+                          int M, int N, int K)
+{
+    if (ck_strict_parity_enabled()) {
+        gemm_nn_serial_double(A, B, bias, C, M, N, K);
+        return;
+    }
+#if defined(__AVX512F__)
+    // For gemm_nn, we can't vectorize over K easily since B[k,j] has stride N.
+    // Instead, vectorize over N (output columns) when N >= 16.
+#pragma omp parallel for
+    for (int i = 0; i < M; i++) {
+        int j = 0;
+        // Process 16 output columns at a time
+        for (; j <= N - 16; j += 16) {
+            __m512 sum_vec = bias ? _mm512_loadu_ps(&bias[j]) : _mm512_setzero_ps();
+            for (int k = 0; k < K; k++) {
+                __m512 a_broadcast = _mm512_set1_ps(A[i * K + k]);
+                __m512 b_vec = _mm512_loadu_ps(&B[k * N + j]);
+                sum_vec = _mm512_fmadd_ps(a_broadcast, b_vec, sum_vec);
+            }
+            _mm512_storeu_ps(&C[i * N + j], sum_vec);
+        }
+        // Handle remaining columns
+        for (; j < N; j++) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; k++) {
+                sum += A[i * K + k] * B[k * N + j];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+#elif defined(__AVX__)
+    // AVX1: vectorize over N (8 columns at a time)
+#pragma omp parallel for
+    for (int i = 0; i < M; i++) {
+        int j = 0;
+        for (; j <= N - 8; j += 8) {
+            __m256 sum_vec = bias ? _mm256_loadu_ps(&bias[j]) : _mm256_setzero_ps();
+            for (int k = 0; k < K; k++) {
+                __m256 a_broadcast = _mm256_set1_ps(A[i * K + k]);
+                __m256 b_vec = _mm256_loadu_ps(&B[k * N + j]);
+                __m256 prod = _mm256_mul_ps(a_broadcast, b_vec);
+                sum_vec = _mm256_add_ps(sum_vec, prod);
+            }
+            _mm256_storeu_ps(&C[i * N + j], sum_vec);
+        }
+        for (; j < N; j++) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; k++) {
+                sum += A[i * K + k] * B[k * N + j];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+#else
+    gemm_nn_parallel(A, B, bias, C, M, N, K);
+#endif
+}
+
+static int ck_gemm_nn_impl_probe_enabled(void)
+{
+    static int cached = -1;
+    if (cached != -1) {
+        return cached;
+    }
+    cached = 0;
+    const char *v = getenv("CK_GEMM_NN_IMPL");
+    if (!v || !v[0]) {
+        return cached;
+    }
+    if (strcmp(v, "probe") == 0 || strcmp(v, "dup") == 0 || strcmp(v, "1") == 0) {
+        cached = 1;
+    }
+    return cached;
+}
+
 /* Keep legacy symbol name for ABI stability.
  * Actual ISA path is selected at compile time in gemm_nn_avx512().
  * This wrapper avoids ISA-specific naming at call sites and in new code.
@@ -409,6 +501,10 @@ void gemm_nn_simd(const float *A,
                   float *C,
                   int M, int N, int K)
 {
+    if (ck_gemm_nn_impl_probe_enabled()) {
+        gemm_nn_avx512_probe(A, B, bias, C, M, N, K);
+        return;
+    }
     gemm_nn_avx512(A, B, bias, C, M, N, K);
 }
 

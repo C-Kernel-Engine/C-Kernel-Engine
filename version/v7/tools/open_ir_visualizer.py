@@ -14,6 +14,7 @@ Usage:
     python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --weight-dtype float32
     python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --perf-runtime cli
     python version/v7/tools/open_ir_visualizer.py --generate <model> --no-vtune
+    python version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline --with-probes --advisor
     python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --run-model hf://... --chat-template none
     python version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline
 """
@@ -326,6 +327,7 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "perf_stat_summary.json",
         "flamegraph_manifest.json",
         "vtune_summary.json",
+        "advisor_summary.json",
         "memory_signoff.json",
         "perf_gate_report.json",
         "ir1_train_forward.json",
@@ -371,6 +373,7 @@ def validate_artifact_set(
     ck_build: Path,
     expect_perf: bool,
     expect_vtune: bool,
+    expect_advisor: bool = False,
 ) -> list[str]:
     missing: list[str] = []
     base_required = ["memory_signoff.json", "profile_summary.json"]
@@ -383,7 +386,59 @@ def validate_artifact_set(
                 missing.append(name)
     if expect_vtune and not has_model_artifact(model_root, ck_build, "vtune_summary.json"):
         missing.append("vtune_summary.json")
+    if expect_advisor and not has_model_artifact(model_root, ck_build, "advisor_summary.json"):
+        missing.append("advisor_summary.json")
     return missing
+
+
+def has_train_runtime_artifacts(run_dir: Path) -> bool:
+    if not run_dir.exists() or not run_dir.is_dir():
+        return False
+    has_lib = (run_dir / "libtrain.so").exists() or (run_dir / ".ck_build" / "libtrain.so").exists()
+    has_weights = (run_dir / "weights.bump").exists()
+    has_manifest = (run_dir / "weights_manifest.json").exists()
+    has_summary = (run_dir / "generated_train_runtime_summary_v7.json").exists()
+    return bool(has_lib and has_weights and has_manifest and has_summary)
+
+
+def infer_train_vocab_size(run_dir: Path, default_vocab: int = 1024) -> int:
+    candidates = [
+        run_dir / "train_init_config.json",
+        run_dir / "config.json",
+    ]
+    keys = ("train_vocab", "vocab_size", "vocab", "n_vocab")
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        # Direct keys.
+        for key in keys:
+            value = payload.get(key)
+            if isinstance(value, int) and value > 0:
+                return value
+        # Nested config dictionary.
+        cfg = payload.get("config")
+        if isinstance(cfg, dict):
+            for key in keys:
+                value = cfg.get(key)
+                if isinstance(value, int) and value > 0:
+                    return value
+    return default_vocab
+
+
+def ensure_train_token_file(run_dir: Path, token_count: int = 8192) -> Path:
+    vocab = max(2, infer_train_vocab_size(run_dir))
+    token_path = run_dir / ".ck_profile_tokens_viz.txt"
+    if token_path.exists():
+        return token_path
+    seq = " ".join(str(i % vocab) for i in range(token_count))
+    token_path.write_text(seq)
+    return token_path
 
 
 def _resolve_asset_path(raw_path: str, ck_build_path: Path, model_root: Path) -> Path | None:
@@ -594,6 +649,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "perf_stat_summary",
         "flamegraph_manifest",
         "vtune_summary",
+        "advisor_summary",
         "memory_signoff",
         "perf_gate_report",
     ]
@@ -643,6 +699,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_REPORT_PATH / "perf_stat_summary.json", V7_REPORT_PATH_LEGACY / "perf_stat_summary.json"],
         "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_REPORT_PATH / "flamegraph_manifest.json", V7_REPORT_PATH_LEGACY / "flamegraph_manifest.json"],
         "vtune_summary": model_candidates("vtune_summary.json") + [V7_REPORT_PATH / "vtune_summary.json", V7_REPORT_PATH_LEGACY / "vtune_summary.json"],
+        "advisor_summary": model_candidates("advisor_summary.json") + [V7_REPORT_PATH / "advisor_summary.json", V7_REPORT_PATH_LEGACY / "advisor_summary.json"],
         "memory_signoff": model_candidates("memory_signoff.json") + [V7_REPORT_PATH / "memory_signoff.json", V7_REPORT_PATH_LEGACY / "memory_signoff.json"],
         "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_REPORT_PATH / "perf_gate_report.json", V7_REPORT_PATH_LEGACY / "perf_gate_report.json"],
         "kernel_registry": [V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
@@ -753,6 +810,30 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
                                 item2["data_uri"] = data_uri
                 enriched.append(item2)
             vtune["artifacts"] = enriched
+
+    advisor = data["files"].get("advisor_summary")
+    if isinstance(advisor, dict):
+        for key in ("project_dir", "project_path", "report_path"):
+            raw = advisor.get(key)
+            if not isinstance(raw, str):
+                continue
+            resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+            if resolved:
+                advisor[f"{key}_resolved"] = str(resolved)
+        artifacts = advisor.get("artifacts")
+        if isinstance(artifacts, list):
+            enriched = []
+            for item in artifacts:
+                if not isinstance(item, dict):
+                    continue
+                item2 = dict(item)
+                raw = item2.get("path")
+                if isinstance(raw, str):
+                    resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+                    if resolved:
+                        item2["resolved_path"] = str(resolved)
+                enriched.append(item2)
+            advisor["artifacts"] = enriched
 
     mem = data["files"].get("memory_signoff")
     if isinstance(mem, dict):
@@ -939,6 +1020,12 @@ Examples:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Capture VTune artifacts in probe flow (default: enabled, use --no-vtune to skip)"
+    )
+    parser.add_argument(
+        "--advisor",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Capture Advisor roofline artifacts for run-dir native train probes when available (default: enabled, use --no-advisor to skip)"
     )
 
     args = parser.parse_args()
@@ -1188,6 +1275,8 @@ Examples:
 
                 print("Running perf probes + budget gate...")
                 perf_available = shutil.which("perf") is not None
+                vtune_available = shutil.which("vtune") is not None
+                advisor_available = shutil.which("advisor") is not None
                 flamegraph_ok = (
                     (PROJECT_ROOT / "FlameGraph" / "stackcollapse-perf.pl").exists()
                     and (PROJECT_ROOT / "FlameGraph" / "flamegraph.pl").exists()
@@ -1203,22 +1292,75 @@ Examples:
                         PROJECT_ROOT,
                     )
 
+                expect_advisor = False
+                if run_dir is not None and has_train_runtime_artifacts(run_dir):
+                    ck_cli = PROJECT_ROOT / "build" / "ck-cli-v7"
+                    thread_hint = os.environ.get("CK_NUM_THREADS", "8")
+                    token_file = ensure_train_token_file(run_dir)
+                    try_run_cmd("build ck-cli-v7 (native profile probes)", ["make", "--no-print-directory", "ck-cli-v7"], PROJECT_ROOT)
+
+                    native_probe_prefix = [
+                        str(ck_cli),
+                        "profile",
+                        "--run",
+                        str(run_dir),
+                        "--train-token-file",
+                        str(token_file),
+                        "--train-epochs",
+                        "1",
+                        "--train-seq-len",
+                        "8",
+                        "--train-total-tokens",
+                        "2048",
+                        "--train-grad-accum",
+                        "8",
+                        "--threads",
+                        thread_hint,
+                    ]
+
+                    if args.vtune:
+                        if vtune_available:
+                            print("Running native train VTune probe (ck-cli-v7 profile)...")
+                            try_run_cmd(
+                                "native train VTune probe",
+                                [*native_probe_prefix, "--tool", "vtune"],
+                                PROJECT_ROOT,
+                                extra_env={"CK_NUM_THREADS": thread_hint},
+                            )
+                        else:
+                            print("Skipping native train VTune probe (vtune not installed).")
+
+                    if args.advisor:
+                        if advisor_available:
+                            expect_advisor = True
+                            print("Running native train Advisor probe (ck-cli-v7 profile)...")
+                            try_run_cmd(
+                                "native train Advisor probe",
+                                [*native_probe_prefix, "--tool", "advisor"],
+                                PROJECT_ROOT,
+                                extra_env={"CK_NUM_THREADS": thread_hint},
+                            )
+                        else:
+                            print("Skipping native train Advisor probe (advisor not installed).")
+                elif args.advisor and run_dir is not None:
+                    print("Skipping native train Advisor probe (run directory does not contain compiled train runtime artifacts).")
+
                 runtime_model_dir = detect_model_dir_from_input(run_model_input)
                 if runtime_model_dir and runtime_model_dir.exists():
                     copy_artifacts_if_needed(runtime_model_dir, report_model_dir)
                 elif runtime_model_dir and not runtime_model_dir.exists():
                     print(f"Warning: runtime artifact directory not found, skip copy: {runtime_model_dir}")
 
-                vtune_available = shutil.which("vtune") is not None
                 missing = validate_artifact_set(
                     model_root=report_model_dir,
                     ck_build=ck_build,
                     expect_perf=perf_available and flamegraph_ok,
                     expect_vtune=bool(args.vtune and vtune_available),
+                    expect_advisor=expect_advisor,
                 )
                 if missing:
                     print(f"Warning: missing expected artifacts after probe run: {missing}")
-                    print("Tip: rerun with explicit model source or disable optional stages (e.g., --no-vtune).")
+                    print("Tip: rerun with explicit model source or disable optional stages (e.g., --no-vtune/--no-advisor).")
 
         # Generate report
         output = args.output or ((run_dir or model_root) / "ir_report.html")

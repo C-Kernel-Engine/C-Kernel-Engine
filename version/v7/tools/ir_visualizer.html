@@ -2625,6 +2625,7 @@ python test_gemv_q8_0_q8_0.py</pre>
         let perfStatData = null;
         let flamegraphManifestData = null;
         let vtuneSummaryData = null;
+        let advisorSummaryData = null;
         let memorySignoffData = null;
         let perfGateData = null;
         let kernelRegistryData = null;
@@ -3110,6 +3111,7 @@ python test_gemv_q8_0_q8_0.py</pre>
                 { key: 'perf_stat', label: 'perf_stat_summary.json', ready: Boolean(perfStatData) },
                 { key: 'flamegraph_manifest', label: 'flamegraph_manifest.json', ready: Boolean(flamegraphManifestData) },
                 { key: 'vtune_summary', label: 'vtune_summary.json', ready: Boolean(vtuneSummaryData) },
+                { key: 'advisor_summary', label: 'advisor_summary.json', ready: Boolean(advisorSummaryData) },
                 { key: 'memory_signoff', label: 'memory_signoff.json', ready: Boolean(memorySignoffData) },
                 { key: 'perf_gate_report', label: 'perf_gate_report.json', ready: Boolean(perfGateData) },
                 { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
@@ -3452,6 +3454,11 @@ python test_gemv_q8_0_q8_0.py</pre>
                     await tryFetchJson('.ck_build/vtune_summary.json') ||
                     await tryFetchJson('ck_build/vtune_summary.json');
             }
+            if (!advisorSummaryData) {
+                advisorSummaryData = await tryFetchJson('advisor_summary.json') ||
+                    await tryFetchJson('.ck_build/advisor_summary.json') ||
+                    await tryFetchJson('ck_build/advisor_summary.json');
+            }
             if (!memorySignoffData) {
                 memorySignoffData = await tryFetchJson('memory_signoff.json') ||
                     await tryFetchJson('.ck_build/memory_signoff.json') ||
@@ -3579,6 +3586,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             perfStatData = files.perf_stat_summary || perfStatData;
             flamegraphManifestData = files.flamegraph_manifest || flamegraphManifestData;
             vtuneSummaryData = files.vtune_summary || vtuneSummaryData;
+            advisorSummaryData = files.advisor_summary || advisorSummaryData;
             memorySignoffData = files.memory_signoff || memorySignoffData;
             perfGateData = files.perf_gate_report || perfGateData;
             ir1TrainData = files.ir1_train || ir1TrainData;
@@ -6688,7 +6696,7 @@ function renderTraining() {
         function getFileType(filename) {
             const name = filename.toLowerCase();
             if (name.includes('profile')) return 'profile';
-            if (name.includes('perf_stat') || name.includes('flamegraph_manifest') || name.includes('vtune_summary')) return 'profile';
+            if (name.includes('perf_stat') || name.includes('flamegraph_manifest') || name.includes('vtune_summary') || name.includes('advisor_summary')) return 'profile';
             if (name.includes('memory_signoff') || name.includes('perf_gate_report')) return 'validation';
             if (name.includes('ir_train_invariants') || name.includes('ir2_train_summary')) return 'training';
             if (name.includes('ir1_train') || name.includes('ir2_train')) return 'training';
@@ -6760,6 +6768,9 @@ function renderTraining() {
                     } else if (name.includes('vtune_summary')) {
                         vtuneSummaryData = info.data;
                         console.log('Auto-loaded: vtune summary');
+                    } else if (name.includes('advisor_summary')) {
+                        advisorSummaryData = info.data;
+                        console.log('Auto-loaded: advisor summary');
                     } else if (name.includes('memory_signoff')) {
                         memorySignoffData = info.data;
                         console.log('Auto-loaded: memory signoff');
@@ -7995,6 +8006,7 @@ function renderProfileHowTo() {
     const chatRunArg = chatTemplate !== 'auto' ? ` --chat-template ${chatTemplate}` : '';
     const makeChatArg = chatTemplate !== 'auto' ? ` V7_CHAT_TEMPLATE=${chatTemplate}` : '';
     const makeCliArg = chatTemplate === 'none' ? ' V7_CLI_ARGS=--no-chat-template' : '';
+    const advisorTokenPath = `${reportRunDir}/.ck_profile_tokens_viz.txt`;
 
     const depChips = [
         { name: 'profile_summary.json', ok: Boolean(profileData) },
@@ -8002,6 +8014,7 @@ function renderProfileHowTo() {
         { name: 'flamegraph_manifest.json', ok: Boolean(flamegraphManifestData) },
         { name: 'perf_gate_report.json', ok: Boolean(perfGateData) },
         { name: 'vtune_summary.json', ok: Boolean(vtuneSummaryData) },
+        { name: 'advisor_summary.json', ok: Boolean(advisorSummaryData) },
     ];
 
     const missingDeps = depChips.filter((d) => !d.ok).map((d) => d.name);
@@ -8034,6 +8047,22 @@ function renderProfileHowTo() {
         `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
     ].join('\n');
 
+    const advisorTokenCmd = [
+        "python3 - <<'PY'",
+        "from pathlib import Path",
+        `p = Path(${JSON.stringify(advisorTokenPath)})`,
+        "p.write_text(' '.join(str(i % 1024) for i in range(8192)))",
+        "print(p)",
+        "PY",
+    ].join('\n');
+
+    const advisorCmd = [
+        advisorTokenCmd,
+        "make --no-print-directory ck-cli-v7",
+        `CK_NUM_THREADS=8 ./build/ck-cli-v7 profile --run ${quoteShell(reportRunDir)} --tool advisor --train-token-file ${quoteShell(advisorTokenPath)} --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 --threads 8`,
+        `python version/v7/tools/open_ir_visualizer.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
+    ].join('\n');
+
     const artifactHelp = {
         'profile_summary.json': {
             why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown).',
@@ -8054,6 +8083,10 @@ function renderProfileHowTo() {
         'vtune_summary.json': {
             why: 'VTune hotspot summary and optional media artifacts for advanced profiling.',
             cmd: vtuneCmd,
+        },
+        'advisor_summary.json': {
+            why: 'Advisor roofline project pointer and metadata for memory-vs-compute analysis.',
+            cmd: advisorCmd,
         },
     };
 
@@ -8109,6 +8142,7 @@ function renderProfileHowTo() {
                 ${renderHowToBlock('3) One-Command Rich Report (exact local model path)', oneShotCmd)}
                 ${renderHowToBlock('4) One-Command with Explicit Source Model (optional)', sourceCmd)}
                 ${renderHowToBlock('5) VTune Capture + Refresh Report', vtuneCmd)}
+                ${renderHowToBlock('6) Advisor Capture + Refresh Report (run-dir)', advisorCmd)}
             </div>
         </div>
     `;
@@ -8125,6 +8159,7 @@ function renderProfileHowTo() {
             const cards = [];
             const links = [];
             let gatePanelHtml = '';
+            let advisorPanelHtml = '';
 
             const cyc = getPerfCounterByMatcher(['cycles', 'cpu-cycles', /cycles/i, /cpu_core\/cycles/i]);
             const ins = getPerfCounterByMatcher(['instructions', /instructions/i]);
@@ -8347,6 +8382,31 @@ function renderProfileHowTo() {
                 flameEl.innerHTML = '';
             }
 
+            if (advisorSummaryData) {
+                links.push('Advisor summary loaded');
+                const advisorProjectPath =
+                    advisorSummaryData?.project_dir_resolved ||
+                    advisorSummaryData?.project_dir ||
+                    advisorSummaryData?.project_path_resolved ||
+                    advisorSummaryData?.project_path ||
+                    '';
+                const advisorGenerated = advisorSummaryData?.generated_at || advisorSummaryData?.generated_at_epoch || '-';
+                if (advisorProjectPath) {
+                    links.push(`<a href="${escapeHtml(String(advisorProjectPath))}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Open Advisor project</a>`);
+                }
+                advisorPanelHtml = `
+                    <div class="profile-artifact-panel" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-blue">Advisor</span> Roofline Summary</h3>
+                        <table class="profile-hotspot-table">
+                            <tbody>
+                                <tr><td>Generated</td><td>${escapeHtml(String(advisorGenerated))}</td></tr>
+                                <tr><td>Project</td><td><code>${escapeHtml(String(advisorProjectPath || '-'))}</code></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
             if (vtuneSummaryData) {
                 links.push('VTune summary loaded');
 
@@ -8441,9 +8501,10 @@ function renderProfileHowTo() {
                             </div>
                         </div>
                     </div>
+                ${advisorPanelHtml}
                 `;
             } else {
-                vtuneEl.innerHTML = '';
+                vtuneEl.innerHTML = advisorPanelHtml || '';
             }
 
             summaryEl.innerHTML = cards.length > 0

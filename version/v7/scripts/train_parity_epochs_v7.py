@@ -94,6 +94,18 @@ def _load_lib() -> ctypes.CDLL:
         ctypes.POINTER(ctypes.c_float),
     ]
     lib.softmax_cross_entropy_loss.restype = None
+    try:
+        lib.softmax_cross_entropy_loss_ptref.argtypes = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.softmax_cross_entropy_loss_ptref.restype = None
+    except Exception:
+        pass
 
     try:
         lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
@@ -210,7 +222,7 @@ class CSwiGLUFn(torch.autograd.Function):
 
 class CCrossEntropyFn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, logits: torch.Tensor, targets: torch.Tensor, lib: ctypes.CDLL):
+    def forward(ctx, logits: torch.Tensor, targets: torch.Tensor, lib: ctypes.CDLL, kernel_variant: str):
         if logits.device.type != "cpu" or targets.device.type != "cpu":
             raise RuntimeError("CCrossEntropyFn supports CPU tensors only")
         logits_np = logits.detach().contiguous().numpy().astype(np.float32, copy=False)
@@ -220,7 +232,19 @@ class CCrossEntropyFn(torch.autograd.Function):
         dlogits_np = np.empty_like(logits_np, dtype=np.float32)
         loss_c = ctypes.c_float(0.0)
 
-        lib.softmax_cross_entropy_loss(
+        variant = str(kernel_variant).lower().strip()
+        if variant == "ptref":
+            kernel_fn = getattr(lib, "softmax_cross_entropy_loss_ptref", None)
+            if kernel_fn is None:
+                raise RuntimeError(
+                    "Requested --ck-loss-backend c_ptref but symbol "
+                    "`softmax_cross_entropy_loss_ptref` is missing. "
+                    "Rebuild shared library via `make build/libckernel_engine.so`."
+                )
+        else:
+            kernel_fn = lib.softmax_cross_entropy_loss
+
+        kernel_fn(
             _float_ptr(logits_np),
             _int32_ptr(targets_np),
             ctypes.c_int(n),
@@ -236,7 +260,7 @@ class CCrossEntropyFn(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_out: torch.Tensor):
         # dL/dlogits was already produced for mean CE; scale by upstream scalar.
-        return ctx.dlogits * grad_out.to(dtype=ctx.dlogits.dtype), None, None
+        return ctx.dlogits * grad_out.to(dtype=ctx.dlogits.dtype), None, None, None
 
 
 def c_rmsnorm(x: torch.Tensor, gamma: torch.Tensor, eps: float, lib: ctypes.CDLL) -> torch.Tensor:
@@ -247,8 +271,25 @@ def c_swiglu(x: torch.Tensor, lib: ctypes.CDLL) -> torch.Tensor:
     return CSwiGLUFn.apply(x, lib)
 
 
-def c_cross_entropy(logits: torch.Tensor, targets: torch.Tensor, lib: ctypes.CDLL) -> torch.Tensor:
-    return CCrossEntropyFn.apply(logits, targets, lib)
+def _is_c_loss_backend(name: str) -> bool:
+    return str(name).lower().strip() in {"c", "c_ptref"}
+
+
+def _c_loss_kernel_variant(name: str) -> str:
+    loss_backend = str(name).lower().strip()
+    if loss_backend == "c_ptref":
+        return "ptref"
+    return "default"
+
+
+def c_cross_entropy(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    lib: ctypes.CDLL,
+    *,
+    kernel_variant: str = "default",
+) -> torch.Tensor:
+    return CCrossEntropyFn.apply(logits, targets, lib, kernel_variant)
 
 
 class TinyCKModel(nn.Module):
@@ -606,8 +647,13 @@ def _forward_stages_ck(
     logits = model_ck.fc2(sw)
     stages["logits"] = logits
 
-    if str(ck_loss_backend).lower() == "c":
-        loss = c_cross_entropy(logits, targets, lib)
+    if _is_c_loss_backend(ck_loss_backend):
+        loss = c_cross_entropy(
+            logits,
+            targets,
+            lib,
+            kernel_variant=_c_loss_kernel_variant(ck_loss_backend),
+        )
     else:
         loss = F.cross_entropy(logits, targets, reduction="mean")
     stages["loss"] = loss
@@ -861,6 +907,7 @@ class RunStats:
     step_profile: dict
     drift_diagnostics: dict
     epoch_snapshots: list[dict]
+    safety: dict
 
 
 def run_training_parity(
@@ -890,6 +937,8 @@ def run_training_parity(
     drift_localize_source: str = "ck",
     epoch_snapshot_every: int = 1,
     epoch_snapshot_topk: int = 8,
+    max_grad_norm: float = 0.0,
+    safety: dict | None = None,
 ) -> RunStats:
     _seed_all(seed)
 
@@ -909,8 +958,10 @@ def run_training_parity(
     else:
         model_torch.load_state_dict(model_ck.state_dict(), strict=True)
 
-    opt_ck = _make_optimizer(optimizer, model_ck.parameters(), lr=lr)
-    opt_torch = _make_optimizer(optimizer, model_torch.parameters(), lr=lr)
+    params_ck = list(model_ck.parameters())
+    params_torch = list(model_torch.parameters())
+    opt_ck = _make_optimizer(optimizer, params_ck, lr=lr)
+    opt_torch = _make_optimizer(optimizer, params_torch, lr=lr)
 
     if train_text:
         batches = _build_batches_from_text(train_text, total_tokens=total_tokens, seq_len=seq_len, vocab=vocab)
@@ -1013,8 +1064,24 @@ def run_training_parity(
             ((name, p.grad.detach()) for name, p in model_ck.named_parameters() if p.grad is not None),
             ((name, p.grad.detach()) for name, p in model_torch.named_parameters() if p.grad is not None),
         )
-        grad_norm = _global_grad_norm(model_ck.parameters())
+        grad_norm_pre_clip = _global_grad_norm(params_ck)
+        torch_grad_norm_pre_clip = _global_grad_norm(params_torch)
+        grad_norm = grad_norm_pre_clip
         per_param = _param_grad_norms(model_ck.named_parameters())
+        clip_applied = False
+        clip_total_ck = grad_norm_pre_clip
+        clip_total_torch = torch_grad_norm_pre_clip
+        clip_scale_ck = 1.0
+        clip_scale_torch = 1.0
+        if max_grad_norm > 0.0:
+            clip_applied = True
+            clip_total_ck = float(torch.nn.utils.clip_grad_norm_(params_ck, max_grad_norm).item())
+            clip_total_torch = float(torch.nn.utils.clip_grad_norm_(params_torch, max_grad_norm).item())
+            if clip_total_ck > float(max_grad_norm) and clip_total_ck > 0.0:
+                clip_scale_ck = float(max_grad_norm / clip_total_ck)
+            if clip_total_torch > float(max_grad_norm) and clip_total_torch > 0.0:
+                clip_scale_torch = float(max_grad_norm / clip_total_torch)
+            grad_norm = _global_grad_norm(params_ck)
 
         t_opt_ck_0 = time.perf_counter()
         opt_ck.step()
@@ -1060,6 +1127,10 @@ def run_training_parity(
                 "torch_backward_ms": win_torch_backward_ms,
                 "torch_optimizer_ms": win_torch_opt_ms,
                 "torch_step_ms": step_torch_ms,
+                "grad_norm_pre_clip": grad_norm_pre_clip,
+                "torch_grad_norm_pre_clip": torch_grad_norm_pre_clip,
+                "grad_clip_applied": bool(clip_applied),
+                "max_grad_norm": float(max_grad_norm),
             }
         )
         parity_steps.append(
@@ -1078,6 +1149,14 @@ def run_training_parity(
                 "pre_worst_param": pre_worst_param,
                 **pre_opt_state_diag_prefixed,
                 **opt_state_diag,
+                "grad_norm_pre_clip": float(grad_norm_pre_clip),
+                "torch_grad_norm_pre_clip": float(torch_grad_norm_pre_clip),
+                "grad_clip_applied": bool(clip_applied),
+                "max_grad_norm": float(max_grad_norm),
+                "clip_total_norm_ck": float(clip_total_ck),
+                "clip_total_norm_torch": float(clip_total_torch),
+                "clip_scale_ck": float(clip_scale_ck),
+                "clip_scale_torch": float(clip_scale_torch),
             }
         )
         if diag_every > 0 and (step_count % diag_every == 0):
@@ -1094,6 +1173,14 @@ def run_training_parity(
                     "pre_worst_param": pre_worst_param,
                     **pre_opt_state_diag_prefixed,
                     **opt_state_diag,
+                    "grad_norm_pre_clip": float(grad_norm_pre_clip),
+                    "torch_grad_norm_pre_clip": float(torch_grad_norm_pre_clip),
+                    "grad_clip_applied": bool(clip_applied),
+                    "max_grad_norm": float(max_grad_norm),
+                    "clip_total_norm_ck": float(clip_total_ck),
+                    "clip_total_norm_torch": float(clip_total_torch),
+                    "clip_scale_ck": float(clip_scale_ck),
+                    "clip_scale_torch": float(clip_scale_torch),
                 }
             )
         grad_steps.append(step_count)
@@ -1169,8 +1256,13 @@ def run_training_parity(
 
             t_ck_fwd_0 = time.perf_counter()
             logits_ck = model_ck(x)
-            if str(ck_loss_backend).lower() == "c":
-                loss_ck = c_cross_entropy(logits_ck, targets, lib)
+            if _is_c_loss_backend(ck_loss_backend):
+                loss_ck = c_cross_entropy(
+                    logits_ck,
+                    targets,
+                    lib,
+                    kernel_variant=_c_loss_kernel_variant(ck_loss_backend),
+                )
             else:
                 loss_ck = F.cross_entropy(logits_ck, targets, reduction="mean")
             t_ck_fwd_1 = time.perf_counter()
@@ -1288,6 +1380,7 @@ def run_training_parity(
             "localize_step_report": localized_step_report,
         },
         epoch_snapshots=epoch_snapshots,
+        safety=dict(safety or {}),
     )
 
 
@@ -1329,7 +1422,7 @@ def main() -> int:
                         help="CK model RMSNorm path for parity harness (default: c)")
     parser.add_argument("--ck-swiglu-backend", choices=["c", "torch"], default="c",
                         help="CK model SwiGLU path for parity harness (default: c)")
-    parser.add_argument("--ck-loss-backend", choices=["c", "torch"], default="c",
+    parser.add_argument("--ck-loss-backend", choices=["c", "c_ptref", "torch"], default="c",
                         help="CK model loss path for parity harness (default: c)")
     parser.add_argument("--drift-localize-step", type=int, default=0,
                         help="If >0, capture paired/same-state localization report at this optimizer step")
@@ -1348,6 +1441,28 @@ def main() -> int:
         type=int,
         default=8,
         help="Top-K parameter diff rows to keep in each epoch snapshot.",
+    )
+    parser.add_argument(
+        "--max-grad-norm",
+        type=float,
+        default=0.0,
+        help="Global grad-norm clip applied to both CK and Torch branches before optimizer step (0 disables).",
+    )
+    parser.add_argument(
+        "--enforce-production-safety",
+        action="store_true",
+        help="Fail fast on known-unsafe long-horizon AdamW settings.",
+    )
+    parser.add_argument(
+        "--allow-unsafe-adamw-lr",
+        action="store_true",
+        help="Allow high AdamW LR without clipping even when production safety is enforced.",
+    )
+    parser.add_argument(
+        "--unsafe-adamw-lr-threshold",
+        type=float,
+        default=1e-3,
+        help="LR threshold used by production safety checks for all-C AdamW path.",
     )
     args = parser.parse_args()
 
@@ -1378,6 +1493,46 @@ def main() -> int:
     if args.epoch_snapshot_topk < 1:
         print("ERROR: --epoch-snapshot-topk must be >= 1", file=sys.stderr)
         return 2
+    if args.max_grad_norm < 0:
+        print("ERROR: --max-grad-norm must be >= 0", file=sys.stderr)
+        return 2
+    if args.unsafe_adamw_lr_threshold <= 0:
+        print("ERROR: --unsafe-adamw-lr-threshold must be > 0", file=sys.stderr)
+        return 2
+
+    risky_all_c_adamw = (
+        str(args.optimizer).lower() == "adamw"
+        and float(args.lr) >= float(args.unsafe_adamw_lr_threshold)
+        and str(args.ck_rmsnorm_backend).lower() == "c"
+        and str(args.ck_swiglu_backend).lower() == "c"
+        and _is_c_loss_backend(args.ck_loss_backend)
+    )
+    clip_enabled = float(args.max_grad_norm) > 0.0
+    safety = {
+        "enforce_production_safety": bool(args.enforce_production_safety),
+        "allow_unsafe_adamw_lr": bool(args.allow_unsafe_adamw_lr),
+        "unsafe_adamw_lr_threshold": float(args.unsafe_adamw_lr_threshold),
+        "risky_all_c_adamw": bool(risky_all_c_adamw),
+        "max_grad_norm": float(args.max_grad_norm),
+        "grad_clip_configured": bool(clip_enabled),
+        "status": "ok",
+        "message": "",
+    }
+    if risky_all_c_adamw:
+        safety["status"] = "unsafe"
+        safety["message"] = (
+            "all-C AdamW long-horizon with lr >= threshold is high-risk "
+            "(known drift around step ~800 at lr=1e-3). "
+            "Production path should lower --lr below threshold. "
+            "Use --allow-unsafe-adamw-lr only for diagnostics."
+        )
+        if args.enforce_production_safety and not args.allow_unsafe_adamw_lr:
+            print(f"ERROR: {safety['message']}", file=sys.stderr)
+            return 2
+        if args.allow_unsafe_adamw_lr:
+            safety["status"] = "unsafe_allowed"
+            safety["message"] = "Unsafe AdamW LR profile explicitly allowed by CLI flag."
+        print(f"WARNING: {safety['message']}", file=sys.stderr)
     init_state = None
     if (args.weights_bump is None) != (args.weights_manifest is None):
         print("ERROR: --weights-bump and --weights-manifest must be provided together", file=sys.stderr)
@@ -1431,6 +1586,8 @@ def main() -> int:
         drift_localize_source=args.drift_localize_source,
         epoch_snapshot_every=args.epoch_snapshot_every,
         epoch_snapshot_topk=args.epoch_snapshot_topk,
+        max_grad_norm=args.max_grad_norm,
+        safety=safety,
     )
 
     print("=" * 100)
@@ -1443,6 +1600,7 @@ def main() -> int:
         f"swiglu={args.ck_swiglu_backend} loss={args.ck_loss_backend}"
     )
     print(f"micro_steps={stats.micro_steps} optimizer_steps={stats.steps} tokens_per_update={stats.tokens_per_update}")
+    print(f"max_grad_norm={float(args.max_grad_norm):.6g} safety_status={stats.safety.get('status', 'ok')}")
     print(f"max_loss_abs_diff={stats.max_loss_abs_diff:.3e} mean_loss_abs_diff={stats.mean_loss_abs_diff:.3e}")
     print(f"final_ck_loss={stats.final_ck_loss:.6f} final_torch_loss={stats.final_torch_loss:.6f}")
     print(f"final_param_max_abs_diff={stats.final_param_max_abs_diff:.3e} "

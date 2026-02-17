@@ -2520,19 +2520,76 @@ static int cmd_profile_subcommand(int argc, char **argv) {
         }
     } else if (strcmp(opt.tool, "vtune") == 0) {
         char vt_hot[4096], vt_mem[4096], vt_sum[4096];
+        char vt_hot_txt[4096], vt_hot_csv[4096], vt_mem_txt[4096], vt_mem_csv[4096];
+        char vt_script[4096];
         snprintf(vt_hot, sizeof(vt_hot), "%s/vtune_hotspots", out_dir);
         snprintf(vt_mem, sizeof(vt_mem), "%s/vtune_memory", out_dir);
         snprintf(vt_sum, sizeof(vt_sum), "%s/vtune_summary.json", opt.run_dir);
+        snprintf(vt_hot_txt, sizeof(vt_hot_txt), "%s/vtune_hotspots.txt", out_dir);
+        snprintf(vt_hot_csv, sizeof(vt_hot_csv), "%s/vtune_hotspots.csv", out_dir);
+        snprintf(vt_mem_txt, sizeof(vt_mem_txt), "%s/vtune_memory_summary.txt", out_dir);
+        snprintf(vt_mem_csv, sizeof(vt_mem_csv), "%s/vtune_memory_summary.csv", out_dir);
+        snprintf(vt_script, sizeof(vt_script), "version/v7/scripts/vtune_artifacts_v7.py");
 
         snprintf(cmd, sizeof(cmd), "vtune -collect hotspots -result-dir '%s' -quiet -- %s", vt_hot, base_train);
         rc = run_shell_cmd(cmd);
         if (rc != 0) return rc;
-        snprintf(cmd, sizeof(cmd), "vtune -collect memory-access -result-dir '%s' -quiet -- %s", vt_mem, base_train);
+        snprintf(cmd, sizeof(cmd), "vtune -report hotspots -result-dir '%s' -format text -report-output '%s' >/dev/null 2>&1", vt_hot, vt_hot_txt);
         run_shell_cmd(cmd);
-        FILE *vf = fopen(vt_sum, "w");
-        if (vf) {
-            fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, vt_mem);
-            fclose(vf);
+        snprintf(cmd, sizeof(cmd), "vtune -report hotspots -result-dir '%s' -format csv -report-output '%s' >/dev/null 2>&1", vt_hot, vt_hot_csv);
+        run_shell_cmd(cmd);
+
+        snprintf(cmd, sizeof(cmd), "vtune -collect memory-access -result-dir '%s' -quiet -- %s", vt_mem, base_train);
+        int mem_rc = run_shell_cmd(cmd);
+        if (mem_rc == 0) {
+            snprintf(cmd, sizeof(cmd), "vtune -report summary -result-dir '%s' -format text -report-output '%s' >/dev/null 2>&1", vt_mem, vt_mem_txt);
+            run_shell_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "vtune -report summary -result-dir '%s' -format csv -report-output '%s' >/dev/null 2>&1", vt_mem, vt_mem_csv);
+            run_shell_cmd(cmd);
+        }
+
+        if (path_exists(vt_script)) {
+            if (mem_rc == 0) {
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "python3 '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s' "
+                    "--analysis-name memory-access --analysis-result-dir '%s' --analysis-report-text '%s' --analysis-report-csv '%s'",
+                    vt_script,
+                    opt.run_dir,
+                    vt_hot,
+                    vt_hot_txt,
+                    vt_hot_csv,
+                    vt_mem,
+                    vt_mem_txt,
+                    vt_mem_csv
+                );
+            } else {
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "python3 '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s'",
+                    vt_script,
+                    opt.run_dir,
+                    vt_hot,
+                    vt_hot_txt,
+                    vt_hot_csv
+                );
+            }
+            int sum_rc = run_shell_cmd(cmd);
+            if (sum_rc != 0) {
+                FILE *vf = fopen(vt_sum, "w");
+                if (vf) {
+                    fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, mem_rc == 0 ? vt_mem : "");
+                    fclose(vf);
+                }
+            }
+        } else {
+            FILE *vf = fopen(vt_sum, "w");
+            if (vf) {
+                fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, mem_rc == 0 ? vt_mem : "");
+                fclose(vf);
+            }
         }
     } else if (strcmp(opt.tool, "advisor") == 0) {
         char adv_dir[4096], adv_sum[4096];

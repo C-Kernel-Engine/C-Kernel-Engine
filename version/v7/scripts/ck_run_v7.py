@@ -1455,6 +1455,58 @@ def _resolve_train_backend(args: argparse.Namespace) -> str:
     return backend
 
 
+def _assess_train_safety(args: argparse.Namespace, train_backend: str) -> dict:
+    """Evaluate known-risk train configs and enforce policy when requested."""
+    optimizer = str(getattr(args, "train_optimizer", "adamw") or "adamw").lower()
+    lr = float(getattr(args, "train_lr", 1e-3) or 1e-3)
+    max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
+    unsafe_lr_threshold = float(getattr(args, "train_unsafe_adamw_lr_threshold", 1e-3) or 1e-3)
+    if unsafe_lr_threshold <= 0.0:
+        log_error("--train-unsafe-adamw-lr-threshold must be > 0")
+        sys.exit(2)
+
+    allow_unsafe = bool(getattr(args, "allow_unsafe_adamw_lr", False))
+    enforce = bool(getattr(args, "enforce_production_safety", False) or getattr(args, "train_strict", False))
+
+    risky = bool(
+        optimizer == "adamw"
+        and lr >= unsafe_lr_threshold
+        and train_backend in ("ck", "pytorch", "both")
+    )
+
+    status = "ok"
+    message = ""
+    if risky:
+        status = "unsafe"
+        message = (
+            "AdamW long-horizon profile is high-risk: lr >= threshold "
+            "(known all-C drift around step ~800 at lr=1e-3). "
+            "Production path should lower --train-lr below threshold. "
+            "Use --allow-unsafe-adamw-lr only for diagnostics."
+        )
+        if enforce and not allow_unsafe:
+            log_error(message)
+            sys.exit(2)
+        if allow_unsafe:
+            status = "unsafe_allowed"
+            message = "Unsafe AdamW LR profile explicitly allowed by CLI flag."
+        log(f"  Warning: {message}", C_ORANGE)
+
+    return {
+        "status": status,
+        "message": message,
+        "optimizer": optimizer,
+        "lr": lr,
+        "train_backend": train_backend,
+        "max_grad_norm": max_grad_norm,
+        "grad_clip_configured": bool(max_grad_norm > 0.0),
+        "unsafe_adamw_lr_threshold": unsafe_lr_threshold,
+        "enforce_production_safety": enforce,
+        "allow_unsafe_adamw_lr": allow_unsafe,
+        "risky": risky,
+    }
+
+
 
 def _build_train_token_batches(train_text: Optional[str], total_tokens: int, seq_len: int, vocab: int, seed: int) -> list[tuple[list[int], list[int]]]:
     """Build deterministic token/target batches for CK runtime train stepping."""
@@ -3561,6 +3613,7 @@ def _run_ck_train_runtime(
         "backend": train_backend,
         "train_mode": train_mode,
         "source": "ck_runtime_generated",
+        "safety": dict(profile_meta.get("train_safety", {})) if isinstance(profile_meta, dict) else {},
         "runtime_init": {
             "num_params": int(init_payload.get("num_params", 0)),
             "total_floats": int(init_payload.get("total_floats", 0)),
@@ -3772,6 +3825,8 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     train_hidden = int(getattr(args, "train_hidden", 128) or 128)
     train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
     train_param_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
+    train_max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
+    train_safety = _assess_train_safety(args, train_backend)
 
     cmd = [
         python_exec,
@@ -3788,8 +3843,15 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "--hidden", str(train_hidden),
         "--loss-tol", str(train_loss_tol),
         "--param-tol", str(train_param_tol),
+        "--max-grad-norm", str(train_max_grad_norm),
+        "--unsafe-adamw-lr-threshold", str(float(getattr(args, "train_unsafe_adamw_lr_threshold", 1e-3) or 1e-3)),
+        "--ck-loss-backend", str(getattr(args, "ck_loss_backend", "c") or "c"),
         "--json-out", str(json_out),
     ]
+    if bool(train_safety.get("enforce_production_safety")):
+        cmd.append("--enforce-production-safety")
+    if bool(train_safety.get("allow_unsafe_adamw_lr")):
+        cmd.append("--allow-unsafe-adamw-lr")
 
     if run_dir is not None and bool(getattr(args, "train_use_init_bump", True)):
         bump_path = run_dir / "weights.bump"
@@ -3809,6 +3871,12 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     log(
         f"  d_model={train_d_model} hidden={train_hidden} vocab={train_vocab} "
         f"grad_accum={getattr(args, 'train_grad_accum', 8)} optimizer={getattr(args, 'train_optimizer', 'adamw')}",
+        C_DIM,
+    )
+    log(
+        f"  train safety: status={train_safety.get('status')} "
+        f"lr={train_safety.get('lr')} max_grad_norm={train_safety.get('max_grad_norm')} "
+        f"threshold={train_safety.get('unsafe_adamw_lr_threshold')}",
         C_DIM,
     )
     if train_text:
@@ -3859,6 +3927,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "analysis_checkpoints": analysis_mode,
         "train_save_every": train_save_every,
         "train_save_final": train_save_final,
+        "train_safety": train_safety,
         "artifacts": [],
     }
 
@@ -5480,9 +5549,17 @@ Examples:
         sp.add_argument('--train-total-tokens', type=int, default=1024)
         sp.add_argument('--train-grad-accum', type=int, default=8)
         sp.add_argument('--train-optimizer', choices=['adamw', 'sgd'], default='adamw')
+        sp.add_argument('--ck-loss-backend', choices=['c', 'c_ptref', 'torch'], default='c',
+                        help='CK CE backend for parity harness (c/c_ptref/torch)')
         sp.add_argument('--train-lr', type=float, default=1e-3)
         sp.add_argument('--train-max-grad-norm', type=float, default=0.0,
                         help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
+        sp.add_argument('--enforce-production-safety', action='store_true',
+                        help='Fail fast on known-unsafe long-horizon AdamW settings')
+        sp.add_argument('--allow-unsafe-adamw-lr', action='store_true',
+                        help='Bypass AdamW LR safety guard (use only for diagnostics)')
+        sp.add_argument('--train-unsafe-adamw-lr-threshold', type=float, default=1e-3,
+                        help='LR threshold used by production safety guard (default: 1e-3)')
         sp.add_argument('--train-seed', type=int, default=42)
 
         sp.add_argument('--train-vocab', type=int, default=256,
@@ -5569,10 +5646,18 @@ Examples:
                            help='Gradient accumulation steps for --train-e2e (default: 8)')
     run_parser.add_argument('--train-optimizer', choices=['adamw', 'sgd'], default='adamw',
                            help='Optimizer for --train-e2e (default: adamw)')
+    run_parser.add_argument('--ck-loss-backend', choices=['c', 'c_ptref', 'torch'], default='c',
+                           help='CK CE backend for parity harness (c/c_ptref/torch)')
     run_parser.add_argument('--train-lr', type=float, default=1e-3,
                            help='Learning rate for --train-e2e (default: 1e-3)')
     run_parser.add_argument('--train-max-grad-norm', type=float, default=0.0,
                            help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
+    run_parser.add_argument('--enforce-production-safety', action='store_true',
+                           help='Fail fast on known-unsafe long-horizon AdamW settings')
+    run_parser.add_argument('--allow-unsafe-adamw-lr', action='store_true',
+                           help='Bypass AdamW LR safety guard (use only for diagnostics)')
+    run_parser.add_argument('--train-unsafe-adamw-lr-threshold', type=float, default=1e-3,
+                           help='LR threshold used by production safety guard (default: 1e-3)')
     run_parser.add_argument('--train-seed', type=int, default=42,
                            help='Random seed for --train-e2e (default: 42)')
     run_parser.add_argument('--train-vocab', type=int, default=256)

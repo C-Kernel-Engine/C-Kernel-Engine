@@ -3299,6 +3299,10 @@ V7_TRAIN_LONG_HORIZON_DIAG_EVERY ?= 10
 V7_TRAIN_LONG_HORIZON_JSON ?= $(V7_REPORT_DIR)/train_parity_long_horizon_latest.json
 V7_TRAIN_DRIFT_SMOKE_STEPS ?= 70
 V7_TRAIN_DRIFT_SMOKE_JSON ?= $(V7_REPORT_DIR)/train_parity_drift_smoke_latest.json
+V7_TRAIN_PROD_MAX_GRAD_NORM ?= 1.0
+V7_TRAIN_ENFORCE_PROD_SAFETY ?= 1
+V7_TRAIN_ALLOW_UNSAFE_ADAMW_LR ?= 0
+V7_TRAIN_PROD_SAFETY_FLAGS := $(if $(filter 1,$(V7_TRAIN_ENFORCE_PROD_SAFETY)),--enforce-production-safety,) $(if $(filter 1,$(V7_TRAIN_ALLOW_UNSAFE_ADAMW_LR)),--allow-unsafe-adamw-lr,)
 V7_TRAIN_DRIFT_LOCALIZE_STEP ?= 65
 V7_TRAIN_DRIFT_LOCALIZE_TOL ?= 1e-6
 V7_TRAIN_DRIFT_LOCALIZE_SOURCE ?= ck
@@ -3320,7 +3324,7 @@ CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
 
 .PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
-	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic v7-backprop-long-epoch v7-backprop-long-epoch-nightly test-v7-bpe-train-parity
+	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -3356,6 +3360,7 @@ v7-help:
 	@echo "  make v7-train-parity-long-horizon-realistic"
 	@echo "  make v7-backprop-long-epoch"
 	@echo "  make v7-backprop-long-epoch-nightly"
+	@echo "  make v7-backprop-production-ready"
 	@echo "  make v7-gate-train"
 	@echo "  make v7-gate"
 	@echo "  make v7"
@@ -3374,6 +3379,7 @@ v7-help:
 	@echo "  - v7-kernel-parity-train uses ISA matrix by default; set V7_KERNEL_PARITY_QK_STRICT_ISA=1 for strict ISA fallback failures"
 	@echo "  - set V7_TRAIN_ALLOW_PARTIAL=1 only while iterating unfinished grad-rules"
 	@echo "  - long-horizon drift smoke is enforced in v7-gate-train by default (V7_GATE_WITH_LONG_HORIZON_PARITY=1)"
+	@echo "  - production train safety defaults: max-grad-norm=$(V7_TRAIN_PROD_MAX_GRAD_NORM), enforce=$(V7_TRAIN_ENFORCE_PROD_SAFETY)"
 	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
 
 v7-sync-inference:
@@ -3439,6 +3445,9 @@ v7-train-parity-drift-smoke:
 		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
 		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
 		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-grad-norm $(V7_TRAIN_PROD_MAX_GRAD_NORM) \
+		--unsafe-adamw-lr-threshold 1e-3 \
+		$(V7_TRAIN_PROD_SAFETY_FLAGS) \
 		--max-steps $(V7_TRAIN_DRIFT_SMOKE_STEPS) \
 		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
 		--json-out "$(V7_TRAIN_DRIFT_SMOKE_JSON)"
@@ -3459,6 +3468,9 @@ v7-train-parity-drift-localize:
 		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
 		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
 		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-grad-norm $(V7_TRAIN_PROD_MAX_GRAD_NORM) \
+		--unsafe-adamw-lr-threshold 1e-3 \
+		$(V7_TRAIN_PROD_SAFETY_FLAGS) \
 		--max-steps $(V7_TRAIN_DRIFT_LOCALIZE_MAX_STEPS) \
 		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
 		--ck-rmsnorm-backend c --ck-swiglu-backend c --ck-loss-backend c \
@@ -3482,6 +3494,9 @@ v7-train-parity-long-horizon:
 		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
 		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
 		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-grad-norm $(V7_TRAIN_PROD_MAX_GRAD_NORM) \
+		--unsafe-adamw-lr-threshold 1e-3 \
+		$(V7_TRAIN_PROD_SAFETY_FLAGS) \
 		--train-text "$(V7_TRAIN_LONG_HORIZON_TEXT)" \
 		--json-out "$(V7_TRAIN_LONG_HORIZON_JSON)"
 
@@ -3501,6 +3516,9 @@ v7-train-parity-long-horizon-realistic:
 		--loss-tol $(V7_TRAIN_LONG_HORIZON_LOSS_TOL) \
 		--param-tol $(V7_TRAIN_LONG_HORIZON_PARAM_TOL) \
 		--diag-every $(V7_TRAIN_LONG_HORIZON_DIAG_EVERY) \
+		--max-grad-norm $(V7_TRAIN_PROD_MAX_GRAD_NORM) \
+		--unsafe-adamw-lr-threshold 1e-3 \
+		$(V7_TRAIN_PROD_SAFETY_FLAGS) \
 		--max-steps $(V7_TRAIN_REALISTIC_STEPS) \
 		--train-text "$(V7_TRAIN_REALISTIC_TEXT)" \
 		--json-out "$(V7_TRAIN_REALISTIC_JSON)"
@@ -3522,6 +3540,12 @@ v7-backprop-long-epoch-nightly:
 	if ! $(MAKE) --no-print-directory v7-train-parity-drift-smoke; then \
 		echo "WARNING: hello stress monitor failed (non-blocking nightly signal)"; \
 	fi
+
+v7-backprop-production-ready:
+	@set -e; \
+	echo "v7-backprop-production-ready: v7-gate-train + nightly long-horizon with production safety"; \
+	$(MAKE) --no-print-directory v7-gate-train V7_TRAIN_ENFORCE_PROD_SAFETY=1; \
+	$(MAKE) --no-print-directory v7-backprop-long-epoch-nightly V7_TRAIN_ENFORCE_PROD_SAFETY=1
 
 
 v7-train-ir-smoke:
