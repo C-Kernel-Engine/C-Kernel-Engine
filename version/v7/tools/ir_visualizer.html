@@ -9767,6 +9767,21 @@ function renderTrainingDashboard(files) {
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
     const decodeTokS = toNum(profile.decode_tok_s, NaN);
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
+    const checkpointPolicy = files && typeof files.training_checkpoint_policy === 'object'
+        ? files.training_checkpoint_policy
+        : {};
+    const checkpointFiles = Array.isArray(checkpointPolicy.files)
+        ? checkpointPolicy.files.filter((row) => row && typeof row === 'object')
+        : [];
+    const checkpointFilesSorted = [...checkpointFiles].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0));
+    const checkpointCount = Math.max(0, toNum(checkpointPolicy.count, checkpointFiles.length));
+    const checkpointLatestStep = toNum(checkpointPolicy.latest_step, NaN);
+    const checkpointingEnabled = checkpointPolicy.checkpointing === true
+        || checkpointPolicy.enabled === true
+        || checkpointFilesSorted.length > 0;
+    const checkpointLatest = checkpointFilesSorted.length > 0
+        ? checkpointFilesSorted[checkpointFilesSorted.length - 1]
+        : null;
     const trainE2E = files.train_e2e || {};
     const layoutTrain = files.layout_train || {};
     const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
@@ -9810,6 +9825,8 @@ function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${checkpointCount}</div><div class="stat-label">Runtime Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(checkpointLatestStep) ? checkpointLatestStep : '-'}</div><div class="stat-label">Latest Runtime Ckpt Step</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
@@ -9846,6 +9863,10 @@ function renderTrainingDashboard(files) {
             <pre style="font-size:0.8rem;white-space:pre-wrap;">${suiteCmd}</pre>
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Checkpoint</span> Runtime Weight Checkpoints</h3>
+            <div id="trainCheckpointArtifacts"></div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-blue">Runtime Parity</span> Generated-C Train Infographics (Realistic/Stress)</h3>
             <div id="trainRuntimeParityInfographic"></div>
         </div>
@@ -9864,6 +9885,41 @@ function renderTrainingDashboard(files) {
         alertsEl.innerHTML = alerts.map((a) =>
             `<div class="alert-item ${a.level}">${a.text}</div>`
         ).join('');
+    }
+
+    const ckptEl = document.getElementById('trainCheckpointArtifacts');
+    if (ckptEl) {
+        if (!checkpointingEnabled || checkpointCount <= 0 || checkpointFilesSorted.length === 0) {
+            ckptEl.innerHTML = '<div style="color:var(--text-muted);">No runtime weight checkpoints recorded. Enable final/cadence checkpointing in train config.</div>';
+        } else {
+            const latestStep = Number.isFinite(checkpointLatestStep) ? checkpointLatestStep : toNum(checkpointLatest && checkpointLatest.step, NaN);
+            const latestReason = checkpointLatest && checkpointLatest.reason ? String(checkpointLatest.reason) : '-';
+            const rows = checkpointFilesSorted.slice(-8).map((row) => {
+                const step = toNum(row.step, NaN);
+                const reason = escapeHtml(String(row.reason || '-'));
+                const bump = escapeHtml(String(row.bump || '-'));
+                const manifest = escapeHtml(String(row.manifest || '-'));
+                const bytes = toNum(row.bytes, NaN);
+                return `
+                    <tr>
+                        <td>${Number.isFinite(step) ? step : '-'}</td>
+                        <td>${reason}</td>
+                        <td>${Number.isFinite(bytes) ? formatBytesHuman(bytes) : '-'}</td>
+                        <td><code>${bump}</code></td>
+                        <td><code>${manifest}</code></td>
+                    </tr>
+                `;
+            }).join('');
+            ckptEl.innerHTML = `
+                <div style="color:var(--text-muted);margin-bottom:0.5rem;">
+                    checkpointing=${checkpointingEnabled ? 'on' : 'off'} · count=${checkpointCount} · latest_step=${Number.isFinite(latestStep) ? latestStep : '-'} · latest_reason=${escapeHtml(String(latestReason))}
+                </div>
+                <table>
+                    <thead><tr><th>Step</th><th>Reason</th><th>Bytes</th><th>Bump</th><th>Manifest</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
     }
 
     const sweepEl = document.getElementById('trainSweepTable');

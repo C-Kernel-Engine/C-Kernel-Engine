@@ -102,5 +102,8 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `profile-v7-vtune` now supports deep capture (`V7_VTUNE_DEEP=1`): hotspots + memory-access + uarch-exploration, exported to `vtune_summary.json` for the IR viewer.
 - `profile-v7-advisor` captures roofline artifacts and emits `advisor_summary.json` for the IR viewer.
 - `ck-cli-v7 profile --tool perf` now emits parsed `perf_stat_summary.json`/`flamegraph_manifest.json` via v7 artifact scripts (including `perf stat -x,` CSV mode).
+- `ck-cli-v7 train` now exports a final runtime checkpoint for token-file/BPE flows:
+  `run_dir/checkpoints/weights_step_XXXXXXXX.bump` + `weights_step_XXXXXXXX_manifest.json`,
+  and records them in `training_checkpoint_policy_latest.json` + `train_e2e_latest.json`.
 - Inference baseline is synced from `version/v6.6` into `version/v7` so inference and
   backprop can evolve together in one track.
