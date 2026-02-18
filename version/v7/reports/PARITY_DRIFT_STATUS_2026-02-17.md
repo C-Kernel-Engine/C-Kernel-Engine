@@ -24,6 +24,49 @@
   - `version/v7/scripts/ck_run_v7.py:4198`
   - `version/v7/scripts/ck_run_v7.py:4456`
 
+## Attention save-for-backward contract fix (added 2026-02-18)
+- Root cause:
+  - Generated train runtime used `attention_forward_causal_head_major_gqa_flash_strided` in forward for attn ops.
+  - The same graph's backward path consumed `saved.op*.attn_weights`.
+  - Flash forward path does not materialize attention weights, so backward consumed invalid/empty saved weights.
+- Fix:
+  - `version/v7/scripts/codegen_train_runtime_v7.py` now checks `save_for_backward.attn_weights` on attn forward ops.
+  - If present, codegen emits `attention_forward_causal_head_major_gqa_exact(..., scores=saved_attn_weights, ...)`.
+  - If absent, codegen keeps flash forward.
+- One-token generated-runtime effect (step-1 gradient slots):
+  - `grad.act.act.L1.v_proj.0.y` max diff: `2.2376e-01` -> `6.5193e-08`
+  - `grad.act.act.L0.v_proj.0.y` max diff: `2.4468e-01` -> `1.0431e-07`
+  - canonical artifacts:
+    - `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json`
+    - `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json`
+    - `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/train_1tok_after_fix.json`
+- Practical SVG overfit check (10 epochs, same harness):
+  - artifact: `version/v7/.cache/reports/svg_overfit_regression_after_attn_fix.json`
+  - CK: first `5.3451185`, final `0.0434142`, min `0.0156908` (step 289)
+  - Torch: first `5.3451180`, final `0.0986388`, min `0.0063651` (step 289)
+  - Interpretation: this fix materially improved CK train trajectory versus prior run, but long-horizon CK-vs-Torch training parity is still not fully closed.
+
+## Grad-activation accumulation fix (added 2026-02-18, generated runtime)
+- Root cause:
+  - In generated C runtime, `ck_train_step` only called `ck_zero_grad()` at accumulation-window start.
+  - This accidentally preserved `grad_activations` across micro-steps when `grad_accum > 1`.
+  - `grad_activations` are per-micro-step intermediates and must be reset every micro-step; only parameter grads should accumulate across the window.
+- Fix:
+  - Updated codegen in `version/v7/scripts/codegen_train_runtime_v7.py`:
+    - emit `ck_zero_grad_weights()` and `ck_zero_grad_activations()`
+    - keep `ck_zero_grad()` as both
+    - in `ck_train_step`: at window start clear both; mid-window clear activations only.
+- Regression wiring:
+  - `version/v7/scripts/check_backprop_stitch_runtime_v7.py` now validates all checked parity steps (`all_checked_steps_clean`), not only step 1.
+  - New target: `make v7-backprop-stitch-runtime-accum` (defaults: `grad_accum=4`, `total_tokens=32`).
+- Before/after parity signal on generated runtime stress (`lr=1e-3`, 1 epoch, `Hello!`, seq=8, total_tokens=4096):
+  - before: `grad_accum=2/4/8` all failed (first fail steps `72/184/408`, mostly `layer_1:mlp_down`/`residual_add`)
+  - after: `grad_accum=2/4/8` all pass (`fail_count=0`)
+  - canonical artifacts:
+    - `version/v7/.cache/reports/train_runtime_parity_stress_e1_ga2_after_gradactfix.json`
+    - `version/v7/.cache/reports/train_runtime_parity_stress_e1_ga4_after_gradactfix.json`
+    - `version/v7/.cache/reports/train_runtime_parity_stress_e1_ga8_after_gradactfix.json`
+
 ## Reproducibility stamp
 - `git_sha_short`: `4accf5e2`
 - `git_sha_full`: `4accf5e28590dd4f4baf917236b8b8c07a6be0c6`
@@ -49,8 +92,8 @@
 | Low-LR sensitivity (hello) | all_c | 5e-4 | 1.0 | repeated `Hello!` | 110 | FAIL | 89 / 97 | `version/v7/.cache/reports/parity_drift_2026-02-17/v7_lowlr_hello_localize89.json` |
 | Low-LR sensitivity (hello alt run) | all_c | 5e-4 | 0.0 | repeated `Hello!` | 1000 | PASS | none | `version/v7/.cache/reports/parity_drift_2026-02-17/v7_backprop_repro_hello_5e4_1000.json` |
 | Production-safe profile | all_c | 5e-4 | 1.0 | realistic mixed text | 192 | PASS | none | `version/v7/.cache/reports/train_parity_realistic_long_horizon_latest.json` |
-| Generated runtime parity (realistic) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle) | 5e-4 | 1.0 | realistic mixed text | 320 opt steps (`2560` micro) | FAIL (slot-only) | n/a (`loss/param` stayed tiny) | `version/v7/.cache/reports/train_runtime_parity_realistic_latest.json` |
-| Generated runtime parity (stress) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle) | 1e-3 | 0.0 | repeated `Hello!` | 320 opt steps (`2560` micro) | FAIL (slot-only) | n/a (`loss/param` stayed tiny) | `version/v7/.cache/reports/train_runtime_parity_stress_latest.json` |
+| Generated runtime parity (realistic) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle) | 5e-4 | 1.0 | realistic mixed text | 320 opt steps (`2560` micro) | PASS | none | `version/v7/.cache/reports/train_runtime_parity_realistic_latest.json` |
+| Generated runtime parity (stress) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle) | 1e-3 | 0.0 | repeated `Hello!` | 320 opt steps (`2560` micro) | PASS | none | `version/v7/.cache/reports/train_runtime_parity_stress_latest.json` |
 | Generated runtime parity (stress, post dim-fix short) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle, manifest-resolved dims) | 1e-3 | 0.0 | repeated `Hello!` | 16 opt steps (`128` micro) | PASS | none | `version/v7/.cache/reports/parity_drift_2026-02-17/v7_l24_every8_1024_after_dimfix_venv.json` |
 | Generated runtime parity (stress, post dim-fix long) | `ck_run_v7.py train --backend ck --parity-on` (snapshot oracle, manifest-resolved dims) | 1e-3 | 0.0 | repeated `Hello!` | 320 opt steps (`2560` micro) | FAIL (slot-only) | first slot fail at micro `160` (opt `20`) | `version/v7/.cache/reports/parity_drift_2026-02-17/v7_l24_every8_4096_after_dimfix_venv.json` |
 | SVG practical trainability check | `ck_run_v7.py train --backend ck --parity-on` | 5e-4 | 1.0 | repeated SVG `<rect>` snippet | 640 opt steps (`640` micro) | PASS | none | `version/v7/.cache/reports/parity_drift_2026-02-17/v7_svg_box_train_ck.json` |

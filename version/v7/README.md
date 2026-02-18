@@ -29,6 +29,8 @@ make v7-train-compile-smoke
 make v7-init-tiny
 make v7-grad-fd
 make v7-replay
+make v7-backprop-plumbing
+make v7-backprop-stitch-runtime
 make v7-train-parity-3
 make v7-train-parity-5
 make v7-backprop-production-ready
@@ -59,6 +61,8 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `scripts/check_qk_norm_backward_parity_v7.py`
 - `scripts/check_fd_gradients_v7.py`
 - `scripts/check_replay_determinism_v7.py`
+- `scripts/check_backprop_plumbing_v7.py`
+- `scripts/check_backprop_stitch_runtime_v7.py`
 - `scripts/build_ir_train_v7.py`
 - `scripts/lower_ir2_backward_v7.py`
 - `scripts/validate_ir_train_invariants_v7.py`
@@ -79,7 +83,19 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - Generated `ck_train_optimizer_step()` now calls `adamw_update_f32` per `grad.weight.*` tensor.
 - `v7-train-compile-smoke` compiles that generated C to an object as an operator gate.
 - `v7-init-tiny` provides from-scratch tiny-model initialization (`weights.bump` + `weights_manifest.json`).
+- `v7-backprop-plumbing` is a static hard check for backprop wiring:
+  weight->grad coverage, layer flow, tensor shape/dataflow consistency, layout map, and tying status.
+- `v7-backprop-stitch-runtime` is a runtime hard check for one-step CK-vs-oracle stitch parity and manifest-dim wiring.
+- Attention save-for-backward contract fix (2026-02-18):
+  generated runtime previously used flash attention forward while backward consumed `saved.*.attn_weights`.
+  Codegen now materializes attention weights when `save_for_backward.attn_weights` is present, and only uses flash
+  forward when weights are not required by backward. See:
+  `version/v7/scripts/codegen_train_runtime_v7.py`,
+  `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json`,
+  `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json`.
 - `v7-parity-1tok` now includes `qk_norm_backward` parity in addition to RMSNorm, SwiGLU, and CE.
+- CK generated-runtime train path supports `--bitwise-parity` for stricter diagnostics:
+  single-thread runtime (`CK_NUM_THREADS=1`, `OMP_NUM_THREADS=1`) + strict FP compile flags for near-bitwise parity checks.
 - Long-horizon backprop targets now pass explicit train safety controls to parity harness:
   `--max-grad-norm`, `--enforce-production-safety`, and AdamW LR threshold checks.
 - `make v7-backprop-production-ready` runs `v7-gate-train` + nightly long-horizon bundle with production safety enforcement.

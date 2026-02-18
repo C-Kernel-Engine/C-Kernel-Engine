@@ -3281,6 +3281,7 @@ V7_TINY_KV_HEADS ?= 4
 V7_TINY_CTX ?= 128
 V7_KERNEL_PARITY_OPT_JSON ?= $(V7_REPORT_DIR)/optimizer_parity_latest.json
 V7_KERNEL_PARITY_GEMM_JSON ?= $(V7_REPORT_DIR)/gemm_backward_shape_sweep_latest.json
+V7_KERNEL_PARITY_RMS_SWIGLU_JSON ?= $(V7_REPORT_DIR)/rms_swiglu_backward_parity_latest.json
 V7_GATE_WITH_KERNEL_PARITY ?= 1
 V7_KERNEL_PARITY_QK_STRICT_ISA ?= 0
 V7_KERNEL_PARITY_QK_JSON ?= $(V7_REPORT_DIR)/qk_norm_backward_parity_isa_latest.json
@@ -3331,24 +3332,42 @@ V7_TRAIN_RUNTIME_PARITY_REALISTIC_TEXT ?= $(V7_TRAIN_REALISTIC_TEXT)
 V7_TRAIN_RUNTIME_PARITY_REALISTIC_JSON ?= $(V7_REPORT_DIR)/train_runtime_parity_realistic_latest.json
 V7_TRAIN_RUNTIME_PARITY_DUMP_ON_DRIFT ?= 0
 V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG := $(if $(filter 1,$(V7_TRAIN_RUNTIME_PARITY_DUMP_ON_DRIFT)),--dump-on-drift,)
+V7_TRAIN_RUNTIME_PARITY_BITWISE ?= 0
+V7_TRAIN_RUNTIME_PARITY_BITWISE_FLAG := $(if $(filter 1,$(V7_TRAIN_RUNTIME_PARITY_BITWISE)),--bitwise-parity,)
 V7_BACKPROP_LONG_EPOCH_MODE ?= smoke
 V7_BACKPROP_LONG_EPOCH_NIGHTLY_MODE ?= smoke
 V7_GATE_WITH_LONG_HORIZON_PARITY ?= 1
 V7_GATE_WITH_BPE_TRAIN_PARITY ?= 1
 V7_GATE_WITH_REPLAY_ACCUM ?= 1
+V7_GATE_WITH_BACKPROP_PLUMBING ?= 1
+V7_GATE_WITH_BACKPROP_STITCH_RUNTIME ?= 1
+V7_GATE_WITH_SVG_OVERFIT ?= 0
 V7_BPE_TRAIN_PARITY_JSON ?= $(V7_REPORT_DIR)/v7_bpe_train_parity_latest.json
+V7_SVG_OVERFIT_JSON ?= $(V7_REPORT_DIR)/svg_overfit_regression_latest.json
+V7_BACKPROP_PLUMBING_JSON ?= $(V7_REPORT_DIR)/backprop_plumbing_latest.json
+V7_BACKPROP_STITCH_JSON ?= $(V7_REPORT_DIR)/backprop_stitch_runtime_latest.json
+V7_BACKPROP_STITCH_ACCUM_JSON ?= $(V7_REPORT_DIR)/backprop_stitch_runtime_accum_latest.json
+V7_BACKPROP_STITCH_DUMP_CHECK_TOPK ?= 32
+V7_BACKPROP_STITCH_RUN_DIR ?= /tmp/v7_backprop_stitch_runtime
+V7_BACKPROP_STITCH_ACCUM ?= 4
+V7_BACKPROP_STITCH_TOTAL_TOKENS ?= 32
+V7_BACKPROP_PLUMBING_RUNTIME_REPORT ?=
+V7_BACKPROP_PLUMBING_RUNTIME_SUMMARY ?=
 CK_TEST_WITH_V7_LONG_HORIZON ?= 1
 CK_TEST_WITH_V7_PERF ?= 0
 CK_TEST_V7_WITH_VTUNE ?= 0
 CK_TEST_V7_WITH_ADVISOR ?= 0
 CK_TEST_V7_VTUNE_DEEP ?= 0
 CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
+V7_CKTOP_RUN ?= /tmp/v7_runtime_parity
 
-.PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict \
+.PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict v7-rms-swiglu-backward-parity \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
 	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic \
 	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
-	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum
+	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum \
+	v7-backprop-plumbing v7-backprop-stitch-runtime v7-backprop-stitch-runtime-accum test-v7-svg-overfit-regression \
+	v7-ctop v7-ctop-demo
 
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
@@ -3366,6 +3385,7 @@ v7-help:
 	@echo "  make v7-qk-norm-backward-parity"
 	@echo "  make v7-qk-norm-backward-parity-isa"
 	@echo "  make v7-qk-norm-backward-parity-isa-strict"
+	@echo "  make v7-rms-swiglu-backward-parity"
 	@echo "  make v7-kernel-parity-train"
 	@echo "  make v7-train-ir-smoke"
 	@echo "  make v7-train-ir-backward"
@@ -3377,9 +3397,13 @@ v7-help:
 	@echo "  make v7-grad-fd"
 	@echo "  make v7-replay"
 	@echo "  make v7-replay-accum"
+	@echo "  make v7-backprop-plumbing"
+	@echo "  make v7-backprop-stitch-runtime"
+	@echo "  make v7-backprop-stitch-runtime-accum"
 	@echo "  make v7-train-parity-3"
 	@echo "  make v7-train-parity-5"
 	@echo "  make test-v7-bpe-train-parity"
+	@echo "  make test-v7-svg-overfit-regression"
 	@echo "  make v7-train-parity-drift-smoke"
 	@echo "  make v7-train-parity-drift-localize"
 	@echo "  make v7-train-parity-long-horizon"
@@ -3387,6 +3411,8 @@ v7-help:
 	@echo "  make v7-train-runtime-parity-stress"
 	@echo "  make v7-train-runtime-parity-realistic"
 	@echo "  make v7-train-runtime-parity-long-horizon"
+	@echo "  make v7-ctop"
+	@echo "  make v7-ctop-demo"
 	@echo "  make v7-backprop-long-epoch"
 	@echo "  make v7-backprop-long-epoch-nightly"
 	@echo "  make v7-backprop-production-ready"
@@ -3408,9 +3434,21 @@ v7-help:
 	@echo "  - v7-kernel-parity-train uses ISA matrix by default; set V7_KERNEL_PARITY_QK_STRICT_ISA=1 for strict ISA fallback failures"
 	@echo "  - set V7_TRAIN_ALLOW_PARTIAL=1 only while iterating unfinished grad-rules"
 	@echo "  - long-horizon drift smoke is enforced in v7-gate-train by default (V7_GATE_WITH_LONG_HORIZON_PARITY=1)"
+	@echo "  - backprop plumbing audit is enabled in v7-gate-train by default (V7_GATE_WITH_BACKPROP_PLUMBING=1)"
+	@echo "  - one-step runtime stitch smoke is enabled in v7-gate-train by default (V7_GATE_WITH_BACKPROP_STITCH_RUNTIME=1)"
 	@echo "  - production train safety defaults: max-grad-norm=$(V7_TRAIN_PROD_MAX_GRAD_NORM), enforce=$(V7_TRAIN_ENFORCE_PROD_SAFETY)"
 	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
+	@echo "  - runtime parity bitwise diagnostics: set V7_TRAIN_RUNTIME_PARITY_BITWISE=1 (forces --bitwise-parity)"
+	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
 	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
+
+v7-ctop:
+	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \
+	$(PYTHON) version/v7/tools/cktop_v7.py --run "$$RUN_DIR"
+
+v7-ctop-demo:
+	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \
+	$(PYTHON) version/v7/tools/cktop_v7.py --run "$$RUN_DIR" --demo
 
 v7-sync-inference:
 	@$(PYTHON) version/v7/scripts/sync_v7_inference_baseline.py
@@ -3444,6 +3482,9 @@ v7-qk-norm-backward-parity-isa:
 v7-qk-norm-backward-parity-isa-strict:
 	@$(PYTHON) version/v7/scripts/check_qk_norm_backward_parity_v7.py --isa-matrix --strict-isa --json-out $(V7_REPORT_DIR)/qk_norm_backward_parity_isa_strict_latest.json
 
+v7-rms-swiglu-backward-parity:
+	@$(PYTHON) version/v7/scripts/check_rms_swiglu_backward_parity_v7.py --require-fast --json-out $(V7_KERNEL_PARITY_RMS_SWIGLU_JSON)
+
 v7-kernel-parity-train:
 	@$(PYTHON) version/v7/scripts/check_optimizer_parity_v7.py --json-out $(V7_KERNEL_PARITY_OPT_JSON)
 	@if [ "$(V7_KERNEL_PARITY_QK_STRICT_ISA)" = "1" ]; then \
@@ -3451,6 +3492,7 @@ v7-kernel-parity-train:
 	else \
 		$(PYTHON) version/v7/scripts/check_qk_norm_backward_parity_v7.py --isa-matrix --json-out $(V7_KERNEL_PARITY_QK_JSON); \
 	fi
+	@$(PYTHON) version/v7/scripts/check_rms_swiglu_backward_parity_v7.py --require-fast --json-out $(V7_KERNEL_PARITY_RMS_SWIGLU_JSON)
 	@$(PYTHON) version/v7/scripts/check_gemm_backward_parity_v7.py --json-out $(V7_KERNEL_PARITY_GEMM_JSON)
 
 v7-train-parity-3:
@@ -3593,6 +3635,7 @@ v7-train-runtime-parity-stress: v7-train-runtime-parity-prepare
 		--prompt "$(V7_TRAIN_RUNTIME_PARITY_STRESS_TEXT)" \
 		--parity-on \
 		--parity-every $(V7_TRAIN_RUNTIME_PARITY_EVERY) \
+		$(V7_TRAIN_RUNTIME_PARITY_BITWISE_FLAG) \
 		$(V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG) --train-json-out "$(V7_TRAIN_RUNTIME_PARITY_STRESS_JSON)"
 
 v7-train-runtime-parity-realistic: v7-train-runtime-parity-prepare
@@ -3617,6 +3660,7 @@ v7-train-runtime-parity-realistic: v7-train-runtime-parity-prepare
 		--prompt "$(V7_TRAIN_RUNTIME_PARITY_REALISTIC_TEXT)" \
 		--parity-on \
 		--parity-every $(V7_TRAIN_RUNTIME_PARITY_EVERY) \
+		$(V7_TRAIN_RUNTIME_PARITY_BITWISE_FLAG) \
 		$(V7_TRAIN_RUNTIME_PARITY_DUMP_FLAG) --train-json-out "$(V7_TRAIN_RUNTIME_PARITY_REALISTIC_JSON)"
 
 v7-train-runtime-parity-long-horizon:
@@ -3748,8 +3792,52 @@ v7-replay:
 v7-replay-accum:
 	@$(PYTHON) version/v7/scripts/check_runtime_replay_accum_v7.py --json-out $(V7_REPORT_DIR)/replay_accum_latest.json
 
+v7-backprop-plumbing:
+	@set -e; \
+	manifest="$$V7_TRAIN_MANIFEST"; \
+	if [ -z "$$manifest" ]; then \
+		manifest="$$( $(PYTHON) version/v7/scripts/resolve_train_manifest_v7.py )" || { \
+			echo "ERROR: could not resolve train manifest. Set V7_TRAIN_MANIFEST=/path/to/weights_manifest.json"; exit 1; }; \
+	fi; \
+	if [ ! -f "$$manifest" ]; then \
+		echo "ERROR: manifest not found: $$manifest"; exit 1; \
+	fi; \
+	if [ ! -f "$(V7_TRAIN_CODEGEN_IR2)" ] || [ ! -f "$(V7_TRAIN_LAYOUT_OUT)" ]; then \
+		echo "v7-backprop-plumbing: IR2/layout not found; running v7-train-layout-smoke first"; \
+		$(MAKE) --no-print-directory v7-train-layout-smoke; \
+	fi; \
+	runtime_report_args=""; \
+	if [ -n "$(V7_BACKPROP_PLUMBING_RUNTIME_REPORT)" ] && [ -f "$(V7_BACKPROP_PLUMBING_RUNTIME_REPORT)" ]; then \
+		runtime_report_args="--runtime-report $(V7_BACKPROP_PLUMBING_RUNTIME_REPORT)"; \
+	fi; \
+	runtime_summary="$(V7_BACKPROP_PLUMBING_RUNTIME_SUMMARY)"; \
+	if [ -z "$$runtime_summary" ] && [ -f "$(V7_TRAIN_CODEGEN_SUMMARY)" ]; then \
+		runtime_summary="$(V7_TRAIN_CODEGEN_SUMMARY)"; \
+	fi; \
+	runtime_summary_args=""; \
+	if [ -n "$$runtime_summary" ] && [ -f "$$runtime_summary" ]; then \
+		runtime_summary_args="--runtime-summary $$runtime_summary"; \
+	fi; \
+	$(PYTHON) version/v7/scripts/check_backprop_plumbing_v7.py \
+		--ir2 "$(V7_TRAIN_CODEGEN_IR2)" \
+		--layout "$(V7_TRAIN_LAYOUT_OUT)" \
+		--manifest "$$manifest" \
+		$$runtime_report_args \
+		$$runtime_summary_args \
+		$(if $(filter 1,$(V7_TRAIN_STRICT_UNRESOLVED)),--strict,) \
+		--json-out "$(V7_BACKPROP_PLUMBING_JSON)"
+
+v7-backprop-stitch-runtime:
+	@$(PYTHON) version/v7/scripts/check_backprop_stitch_runtime_v7.py --keep-run-dir "$(V7_BACKPROP_STITCH_RUN_DIR)" --dump-check-topk "$(V7_BACKPROP_STITCH_DUMP_CHECK_TOPK)" --json-out "$(V7_BACKPROP_STITCH_JSON)"
+
+v7-backprop-stitch-runtime-accum:
+	@$(PYTHON) version/v7/scripts/check_backprop_stitch_runtime_v7.py --keep-run-dir "$(V7_BACKPROP_STITCH_RUN_DIR)" --grad-accum "$(V7_BACKPROP_STITCH_ACCUM)" --total-tokens "$(V7_BACKPROP_STITCH_TOTAL_TOKENS)" --dump-check-topk "$(V7_BACKPROP_STITCH_DUMP_CHECK_TOPK)" --json-out "$(V7_BACKPROP_STITCH_ACCUM_JSON)"
+
 test-v7-bpe-train-parity: tokenizer ck-bpe-train
 	@$(PYTHON) version/v7/scripts/test_bpe_train_parity_v7.py --json-out "$(V7_BPE_TRAIN_PARITY_JSON)"
+
+test-v7-svg-overfit-regression:
+	@$(PYTHON) version/v7/scripts/test_svg_overfit_regression_v7.py --json-out "$(V7_SVG_OVERFIT_JSON)"
 
 v7-gate-train:
 	@$(MAKE) --no-print-directory v7-inference-smoke
@@ -3760,6 +3848,18 @@ v7-gate-train:
 	@$(MAKE) --no-print-directory v7-parity-1tok
 	@$(MAKE) --no-print-directory v7-grad-fd
 	@$(MAKE) --no-print-directory v7-train-parity-3
+	@if [ "$(V7_GATE_WITH_BACKPROP_PLUMBING)" = "1" ]; then \
+		echo "v7-gate-train: running backprop plumbing audit"; \
+		$(MAKE) --no-print-directory v7-backprop-plumbing; \
+	else \
+		echo "v7-gate-train: skip backprop plumbing audit (set V7_GATE_WITH_BACKPROP_PLUMBING=1 to enable)"; \
+	fi
+	@if [ "$(V7_GATE_WITH_BACKPROP_STITCH_RUNTIME)" = "1" ]; then \
+		echo "v7-gate-train: running one-step runtime stitch smoke"; \
+		$(MAKE) --no-print-directory v7-backprop-stitch-runtime; \
+	else \
+		echo "v7-gate-train: skip one-step runtime stitch smoke (set V7_GATE_WITH_BACKPROP_STITCH_RUNTIME=1 to enable)"; \
+	fi
 	@if [ "$(V7_GATE_WITH_LONG_HORIZON_PARITY)" = "1" ]; then \
 		echo "v7-gate-train: running long-horizon drift smoke"; \
 		$(MAKE) --no-print-directory v7-train-parity-drift-smoke; \
@@ -3777,6 +3877,12 @@ v7-gate-train:
 		$(MAKE) --no-print-directory test-v7-bpe-train-parity; \
 	else \
 		echo "v7-gate-train: skip bpe-train parity gate (set V7_GATE_WITH_BPE_TRAIN_PARITY=1 to enable)"; \
+	fi
+	@if [ "$(V7_GATE_WITH_SVG_OVERFIT)" = "1" ]; then \
+		echo "v7-gate-train: running svg-overfit regression gate"; \
+		$(MAKE) --no-print-directory test-v7-svg-overfit-regression; \
+	else \
+		echo "v7-gate-train: skip svg-overfit regression gate (set V7_GATE_WITH_SVG_OVERFIT=1 to enable)"; \
 	fi
 	@if [ "$(V7_GATE_WITH_REPLAY_ACCUM)" = "1" ]; then \
 		echo "v7-gate-train: running runtime replay accum gate"; \

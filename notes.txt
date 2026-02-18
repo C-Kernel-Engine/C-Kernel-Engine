@@ -13,6 +13,12 @@ CK_NUM_THREADS=8 vtune -collect memory-access -result-dir /tmp/v7_vtune_mem -qui
 
 CK_NUM_THREADS=8 perf record --all-user -F 999 --call-graph dwarf -o /tmp/v7_train_perf.data --   python3 version/v7/scripts/ck_run_v7.py train     --run /tmp/v7_ht_threads --backend ck     --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8     --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none     --train-json-out /tmp/v7_perf_train.json
 
+TRAIN:
+make v7-backprop-plumbing V7_TRAIN_MANIFEST=/tmp/v7_pr3_contig/weights_manifest.json V7_TRAIN_CODEGEN_IR2=/tmp/v7_pr3_contig/ir2_train_backward.json V7_TRAIN_LAYOUT_OUT=/tmp/v7_pr3_contig/layout_train.json
+make v7-backprop-stitch-runtime
+Run your train command with --train-strict
+
+
 perf script -i /tmp/v7_train_perf.data | ./FlameGraph/stackcollapse-perf.pl > /tmp/v7_train_flame.folded
 
   930  vtune-gui /tmp/v7_gui/vtune_hotspots
