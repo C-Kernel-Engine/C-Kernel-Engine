@@ -104,6 +104,10 @@ def build_tiny_model(
     context_len: int,
     rope_theta: float,
     kernel_policy: str,
+    adamw_beta1: float,
+    adamw_beta2: float,
+    adamw_eps: float,
+    adamw_weight_decay: float,
 ) -> None:
     if embed_dim % num_heads != 0:
         raise ValueError("embed_dim must be divisible by num_heads")
@@ -171,6 +175,15 @@ def build_tiny_model(
             "enabled": True,
             "kernel_policy": kernel_policy,
             "precision_policy": "fp32_only",
+            "optimizer": {
+                "name": "adamw",
+                "adamw": {
+                    "beta1": float(adamw_beta1),
+                    "beta2": float(adamw_beta2),
+                    "eps": float(adamw_eps),
+                    "weight_decay": float(adamw_weight_decay),
+                },
+            },
             "tiny_parity": {
                 "enabled": True,
                 "state_tensors": {
@@ -232,6 +245,15 @@ def build_tiny_model(
                 "fc2.bias": "tiny.fc2.bias",
             },
         },
+        "optimizer": {
+            "name": "adamw",
+            "adamw": {
+                "beta1": float(adamw_beta1),
+                "beta2": float(adamw_beta2),
+                "eps": float(adamw_eps),
+                "weight_decay": float(adamw_weight_decay),
+            },
+        },
     }
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -267,6 +289,10 @@ def main() -> int:
     ap.add_argument("--context-len", type=int, default=128)
     ap.add_argument("--rope-theta", type=float, default=1_000_000.0)
     ap.add_argument("--kernel-policy", type=str, default="fp32_reference_first")
+    ap.add_argument("--adamw-beta1", type=float, default=0.9)
+    ap.add_argument("--adamw-beta2", type=float, default=0.999)
+    ap.add_argument("--adamw-eps", type=float, default=1e-8)
+    ap.add_argument("--adamw-weight-decay", type=float, default=0.01)
     ap.add_argument(
         "--template",
         type=str,
@@ -280,6 +306,15 @@ def main() -> int:
         help="Optional custom template JSON path. When set, template is embedded into weights_manifest.json.",
     )
     args = ap.parse_args()
+
+    if not (0.0 <= float(args.adamw_beta1) < 1.0):
+        raise ValueError("--adamw-beta1 must be in [0, 1)")
+    if not (0.0 <= float(args.adamw_beta2) < 1.0):
+        raise ValueError("--adamw-beta2 must be in [0, 1)")
+    if not (float(args.adamw_eps) > 0.0):
+        raise ValueError("--adamw-eps must be > 0")
+    if not (float(args.adamw_weight_decay) >= 0.0):
+        raise ValueError("--adamw-weight-decay must be >= 0")
 
     template_name = str(args.template or "qwen3").strip().lower()
     template_doc: Optional[Dict[str, Any]] = None
@@ -310,6 +345,10 @@ def main() -> int:
         context_len=int(args.context_len),
         rope_theta=float(args.rope_theta),
         kernel_policy=str(args.kernel_policy),
+        adamw_beta1=float(args.adamw_beta1),
+        adamw_beta2=float(args.adamw_beta2),
+        adamw_eps=float(args.adamw_eps),
+        adamw_weight_decay=float(args.adamw_weight_decay),
     )
     return 0
 

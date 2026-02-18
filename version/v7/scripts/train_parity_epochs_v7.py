@@ -484,10 +484,25 @@ def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: 
     return batches
 
 
-def _make_optimizer(name: str, params: Iterable[torch.nn.Parameter], lr: float):
+def _make_optimizer(
+    name: str,
+    params: Iterable[torch.nn.Parameter],
+    lr: float,
+    *,
+    adamw_beta1: float = 0.9,
+    adamw_beta2: float = 0.999,
+    adamw_eps: float = 1e-8,
+    adamw_weight_decay: float = 0.01,
+):
     name = name.lower()
     if name == "adamw":
-        return torch.optim.AdamW(params, lr=lr)
+        return torch.optim.AdamW(
+            params,
+            lr=lr,
+            betas=(float(adamw_beta1), float(adamw_beta2)),
+            eps=float(adamw_eps),
+            weight_decay=float(adamw_weight_decay),
+        )
     if name == "sgd":
         return torch.optim.SGD(params, lr=lr)
     raise ValueError(f"Unsupported optimizer: {name}")
@@ -933,6 +948,10 @@ def _localize_step_divergence(
     eps: float,
     optimizer: str,
     lr: float,
+    adamw_beta1: float,
+    adamw_beta2: float,
+    adamw_eps: float,
+    adamw_weight_decay: float,
     grad_accum: int,
     ck_rmsnorm_backend: str,
     ck_swiglu_backend: str,
@@ -966,8 +985,24 @@ def _localize_step_divergence(
     )
     torch_probe = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
 
-    opt_ck_probe = _make_optimizer(optimizer, ck_probe.parameters(), lr=lr)
-    opt_torch_probe = _make_optimizer(optimizer, torch_probe.parameters(), lr=lr)
+    opt_ck_probe = _make_optimizer(
+        optimizer,
+        ck_probe.parameters(),
+        lr=lr,
+        adamw_beta1=adamw_beta1,
+        adamw_beta2=adamw_beta2,
+        adamw_eps=adamw_eps,
+        adamw_weight_decay=adamw_weight_decay,
+    )
+    opt_torch_probe = _make_optimizer(
+        optimizer,
+        torch_probe.parameters(),
+        lr=lr,
+        adamw_beta1=adamw_beta1,
+        adamw_beta2=adamw_beta2,
+        adamw_eps=adamw_eps,
+        adamw_weight_decay=adamw_weight_decay,
+    )
 
     try:
         if str(source).lower() == "torch":
@@ -1158,6 +1193,10 @@ def run_training_parity(
     seed: int,
     loss_tol: float,
     param_tol: float,
+    adamw_beta1: float = 0.9,
+    adamw_beta2: float = 0.999,
+    adamw_eps: float = 1e-8,
+    adamw_weight_decay: float = 0.01,
     train_text: str | None = None,
     init_state: Dict[str, torch.Tensor] | None = None,
     max_steps: int | None = None,
@@ -1222,8 +1261,24 @@ def run_training_parity(
 
     params_ck = list(model_ck.parameters())
     params_torch = list(model_torch.parameters())
-    opt_ck = _make_optimizer(optimizer, params_ck, lr=lr)
-    opt_torch = _make_optimizer(optimizer, params_torch, lr=lr)
+    opt_ck = _make_optimizer(
+        optimizer,
+        params_ck,
+        lr=lr,
+        adamw_beta1=adamw_beta1,
+        adamw_beta2=adamw_beta2,
+        adamw_eps=adamw_eps,
+        adamw_weight_decay=adamw_weight_decay,
+    )
+    opt_torch = _make_optimizer(
+        optimizer,
+        params_torch,
+        lr=lr,
+        adamw_beta1=adamw_beta1,
+        adamw_beta2=adamw_beta2,
+        adamw_eps=adamw_eps,
+        adamw_weight_decay=adamw_weight_decay,
+    )
 
     if train_text:
         batches = _build_batches_from_text(train_text, total_tokens=total_tokens, seq_len=seq_len, vocab=vocab)
@@ -1475,6 +1530,10 @@ def run_training_parity(
                     eps=eps,
                     optimizer=optimizer,
                     lr=lr,
+                    adamw_beta1=adamw_beta1,
+                    adamw_beta2=adamw_beta2,
+                    adamw_eps=adamw_eps,
+                    adamw_weight_decay=adamw_weight_decay,
                     grad_accum=grad_accum,
                     ck_rmsnorm_backend=ck_rmsnorm_backend,
                     ck_swiglu_backend=ck_swiglu_backend,
@@ -1856,6 +1915,10 @@ def main() -> int:
     parser.add_argument("--grad-accum", type=int, default=8)
     parser.add_argument("--optimizer", type=str, default="adamw", choices=["adamw", "sgd"])
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--adamw-beta1", type=float, default=0.9)
+    parser.add_argument("--adamw-beta2", type=float, default=0.999)
+    parser.add_argument("--adamw-eps", type=float, default=1e-8)
+    parser.add_argument("--adamw-weight-decay", type=float, default=0.01)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--loss-tol", type=float, default=2e-5)
     parser.add_argument("--param-tol", type=float, default=3e-5)
@@ -1992,6 +2055,18 @@ def main() -> int:
     if args.unsafe_adamw_lr_threshold <= 0:
         print("ERROR: --unsafe-adamw-lr-threshold must be > 0", file=sys.stderr)
         return 2
+    if not (0.0 <= float(args.adamw_beta1) < 1.0):
+        print("ERROR: --adamw-beta1 must be in [0, 1)", file=sys.stderr)
+        return 2
+    if not (0.0 <= float(args.adamw_beta2) < 1.0):
+        print("ERROR: --adamw-beta2 must be in [0, 1)", file=sys.stderr)
+        return 2
+    if not (float(args.adamw_eps) > 0.0):
+        print("ERROR: --adamw-eps must be > 0", file=sys.stderr)
+        return 2
+    if not (float(args.adamw_weight_decay) >= 0.0):
+        print("ERROR: --adamw-weight-decay must be >= 0", file=sys.stderr)
+        return 2
 
     risky_all_c_adamw = (
         str(args.optimizer).lower() == "adamw"
@@ -2077,6 +2152,10 @@ def main() -> int:
         grad_accum=args.grad_accum,
         optimizer=args.optimizer,
         lr=args.lr,
+        adamw_beta1=args.adamw_beta1,
+        adamw_beta2=args.adamw_beta2,
+        adamw_eps=args.adamw_eps,
+        adamw_weight_decay=args.adamw_weight_decay,
         seed=args.seed,
         loss_tol=args.loss_tol,
         param_tol=args.param_tol,
@@ -2106,6 +2185,13 @@ def main() -> int:
     print(f"model_kind={stats.model_kind} num_layers={stats.num_layers}")
     print(f"epochs={stats.epochs} seq_len={stats.seq_len} total_tokens={stats.total_tokens} "
           f"grad_accum={stats.grad_accum} optimizer={stats.optimizer} lr={stats.lr}")
+    if str(stats.optimizer).lower() == "adamw":
+        print(
+            f"adamw: beta1={float(args.adamw_beta1):.6g} "
+            f"beta2={float(args.adamw_beta2):.6g} "
+            f"eps={float(args.adamw_eps):.6g} "
+            f"weight_decay={float(args.adamw_weight_decay):.6g}"
+        )
     print(
         f"ck-kernel-backends: rmsnorm={args.ck_rmsnorm_backend} "
         f"swiglu={args.ck_swiglu_backend} loss={args.ck_loss_backend}"

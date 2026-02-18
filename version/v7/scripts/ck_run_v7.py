@@ -381,6 +381,132 @@ def _as_positive_int(value: object) -> Optional[int]:
     return iv if iv > 0 else None
 
 
+def _as_finite_float(value: object) -> Optional[float]:
+    """Best-effort float parse that returns None for invalid/non-finite values."""
+    try:
+        fv = float(value)
+    except Exception:
+        return None
+    return fv if math.isfinite(fv) else None
+
+
+def _load_train_adamw_from_run_manifest(run_dir: Optional[Path]) -> Optional[dict]:
+    """Extract AdamW defaults from run_dir/weights_manifest.json when available."""
+    if run_dir is None:
+        return None
+    manifest_path = run_dir / "weights_manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    cfg = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    training_cfg = cfg.get("training") if isinstance(cfg.get("training"), dict) else {}
+    optimizer_cfg = (
+        training_cfg.get("optimizer")
+        if isinstance(training_cfg.get("optimizer"), dict)
+        else {}
+    )
+    adamw_cfg = {}
+    if isinstance(optimizer_cfg.get("adamw"), dict):
+        adamw_cfg = optimizer_cfg.get("adamw") or {}
+    elif isinstance(training_cfg.get("adamw"), dict):
+        adamw_cfg = training_cfg.get("adamw") or {}
+    else:
+        adamw_cfg = optimizer_cfg
+
+    out: dict[str, object] = {"manifest": str(manifest_path)}
+    beta1 = _as_finite_float(adamw_cfg.get("beta1"))
+    beta2 = _as_finite_float(adamw_cfg.get("beta2"))
+    eps = _as_finite_float(adamw_cfg.get("eps"))
+    weight_decay = _as_finite_float(adamw_cfg.get("weight_decay"))
+
+    if beta1 is not None:
+        out["beta1"] = float(beta1)
+    if beta2 is not None:
+        out["beta2"] = float(beta2)
+    if eps is not None:
+        out["eps"] = float(eps)
+    if weight_decay is not None:
+        out["weight_decay"] = float(weight_decay)
+
+    if len(out) <= 1:
+        return None
+    return out
+
+
+def _validate_adamw_hparams(beta1: float, beta2: float, eps: float, weight_decay: float) -> None:
+    """Validate AdamW hyperparameters used by generated runtime and parity harness."""
+    if not (0.0 <= float(beta1) < 1.0):
+        raise ValueError(f"--train-adamw-beta1 must be in [0, 1): got {beta1}")
+    if not (0.0 <= float(beta2) < 1.0):
+        raise ValueError(f"--train-adamw-beta2 must be in [0, 1): got {beta2}")
+    if not (float(eps) > 0.0):
+        raise ValueError(f"--train-adamw-eps must be > 0: got {eps}")
+    if not (float(weight_decay) >= 0.0):
+        raise ValueError(f"--train-adamw-weight-decay must be >= 0: got {weight_decay}")
+
+
+def _resolve_train_adamw_hparams(args: argparse.Namespace, run_dir: Optional[Path]) -> dict:
+    """Resolve AdamW hparams with precedence: CLI override -> run manifest -> defaults."""
+    defaults = {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "eps": 1e-8,
+        "weight_decay": 0.01,
+    }
+    requested_raw: dict[str, Optional[float]] = {}
+    cli_arg_map = {
+        "beta1": "train_adamw_beta1",
+        "beta2": "train_adamw_beta2",
+        "eps": "train_adamw_eps",
+        "weight_decay": "train_adamw_weight_decay",
+    }
+    for key, attr in cli_arg_map.items():
+        raw = getattr(args, attr, None)
+        if raw is None:
+            requested_raw[key] = None
+            continue
+        fv = _as_finite_float(raw)
+        if fv is None:
+            raise ValueError(f"--{attr.replace('_', '-')} must be finite")
+        requested_raw[key] = float(fv)
+    effective = dict(defaults)
+    source = "defaults"
+    manifest_path = None
+
+    manifest_cfg = _load_train_adamw_from_run_manifest(run_dir)
+    if isinstance(manifest_cfg, dict):
+        for key in ("beta1", "beta2", "eps", "weight_decay"):
+            fv = _as_finite_float(manifest_cfg.get(key))
+            if fv is not None:
+                effective[key] = float(fv)
+        manifest_path = manifest_cfg.get("manifest")
+        source = "run_manifest"
+
+    for key in ("beta1", "beta2", "eps", "weight_decay"):
+        rv = requested_raw.get(key)
+        if rv is not None:
+            effective[key] = float(rv)
+            source = "cli"
+
+    _validate_adamw_hparams(
+        beta1=float(effective["beta1"]),
+        beta2=float(effective["beta2"]),
+        eps=float(effective["eps"]),
+        weight_decay=float(effective["weight_decay"]),
+    )
+
+    return {
+        "requested": requested_raw,
+        "effective": effective,
+        "source": source,
+        "manifest": manifest_path,
+    }
+
+
 def _load_train_dims_from_run_manifest(run_dir: Optional[Path]) -> Optional[dict]:
     """Extract training dims from run_dir/weights_manifest.json when available."""
     if run_dir is None:
@@ -1895,6 +2021,12 @@ def _run_ck_oracle_reference(
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
     oracle_json = run_dir / "oracle_reference_latest.json"
+    try:
+        adamw_cfg = _resolve_train_adamw_hparams(args, run_dir)
+    except ValueError as e:
+        log_error(str(e))
+        return None
+    adamw_effective = dict(adamw_cfg.get("effective") or {})
 
     resolved_vocab = int(train_vocab) if _as_positive_int(train_vocab) is not None else int(getattr(args, "train_vocab", 256))
     resolved_d_model = int(train_d_model) if _as_positive_int(train_d_model) is not None else int(getattr(args, "train_d_model", 64))
@@ -1914,6 +2046,10 @@ def _run_ck_oracle_reference(
         "--grad-accum", str(getattr(args, "train_grad_accum", 8)),
         "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
         "--lr", str(getattr(args, "train_lr", 1e-3)),
+        "--adamw-beta1", str(float(adamw_effective.get("beta1", 0.9))),
+        "--adamw-beta2", str(float(adamw_effective.get("beta2", 0.999))),
+        "--adamw-eps", str(float(adamw_effective.get("eps", 1e-8))),
+        "--adamw-weight-decay", str(float(adamw_effective.get("weight_decay", 0.01))),
         "--seed", str(getattr(args, "train_seed", 42)),
         "--vocab", str(resolved_vocab),
         "--d-model", str(resolved_d_model),
@@ -3033,6 +3169,26 @@ def _run_ck_train_runtime(
         log("  backend=ck CE note: --ck-loss-backend=torch maps to ptref C CE in generated runtime", C_ORANGE)
     max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
     runtime_defines["CK_MAX_GRAD_NORM"] = f"{max_grad_norm:.9g}"
+    try:
+        adamw_cfg = _resolve_train_adamw_hparams(args, run_dir)
+    except ValueError as e:
+        raise RuntimeError(str(e)) from e
+    adamw_effective = dict(adamw_cfg.get("effective") or {})
+    runtime_defines["CK_ADAMW_BETA1"] = f"{float(adamw_effective.get('beta1', 0.9)):.9g}"
+    runtime_defines["CK_ADAMW_BETA2"] = f"{float(adamw_effective.get('beta2', 0.999)):.9g}"
+    runtime_defines["CK_ADAMW_EPS"] = f"{float(adamw_effective.get('eps', 1e-8)):.9g}"
+    runtime_defines["CK_ADAMW_WEIGHT_DECAY"] = f"{float(adamw_effective.get('weight_decay', 0.01)):.9g}"
+    if isinstance(profile_meta, dict):
+        profile_meta["optimizer_hparams"] = {
+            "source": str(adamw_cfg.get("source") or "defaults"),
+            "manifest": adamw_cfg.get("manifest"),
+            "adamw": {
+                "beta1": float(adamw_effective.get("beta1", 0.9)),
+                "beta2": float(adamw_effective.get("beta2", 0.999)),
+                "eps": float(adamw_effective.get("eps", 1e-8)),
+                "weight_decay": float(adamw_effective.get("weight_decay", 0.01)),
+            },
+        }
     if bool(getattr(args, "ablate_attention_backward", False)):
         runtime_defines["CK_ABLATE_ATTENTION_BACKWARD"] = 1
     if bool(getattr(args, "ablate_rope_backward_qk", False)):
@@ -4502,6 +4658,16 @@ def _run_ck_train_runtime(
         "total_tokens": total_tokens,
         "grad_accum": grad_accum,
         "optimizer": optimizer,
+        "optimizer_hparams": {
+            "source": str(adamw_cfg.get("source") or "defaults"),
+            "manifest": adamw_cfg.get("manifest"),
+            "adamw": {
+                "beta1": float(adamw_effective.get("beta1", 0.9)),
+                "beta2": float(adamw_effective.get("beta2", 0.999)),
+                "eps": float(adamw_effective.get("eps", 1e-8)),
+                "weight_decay": float(adamw_effective.get("weight_decay", 0.01)),
+            },
+        },
         "lr": lr,
         "ck_loss_backend": ck_loss_backend,
         "runtime_ce_backend": runtime_ce_backend,
@@ -4813,6 +4979,12 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     train_loss_tol = float(getattr(args, "train_loss_tol", 2e-5) or 2e-5)
     train_param_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
     train_max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
+    try:
+        train_adamw_cfg = _resolve_train_adamw_hparams(args, run_dir)
+    except ValueError as e:
+        log_error(str(e))
+        sys.exit(1)
+    train_adamw_effective = dict(train_adamw_cfg.get("effective") or {})
     train_safety = _assess_train_safety(args, train_backend)
 
     cmd = [
@@ -4824,6 +4996,10 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "--grad-accum", str(getattr(args, "train_grad_accum", 8)),
         "--optimizer", str(getattr(args, "train_optimizer", "adamw")),
         "--lr", str(getattr(args, "train_lr", 1e-3)),
+        "--adamw-beta1", str(float(train_adamw_effective.get("beta1", 0.9))),
+        "--adamw-beta2", str(float(train_adamw_effective.get("beta2", 0.999))),
+        "--adamw-eps", str(float(train_adamw_effective.get("eps", 1e-8))),
+        "--adamw-weight-decay", str(float(train_adamw_effective.get("weight_decay", 0.01))),
         "--seed", str(getattr(args, "train_seed", 42)),
         "--vocab", str(train_vocab),
         "--d-model", str(train_d_model),
@@ -4861,6 +5037,16 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         f"grad_accum={getattr(args, 'train_grad_accum', 8)} optimizer={getattr(args, 'train_optimizer', 'adamw')}",
         C_DIM,
     )
+    if str(getattr(args, "train_optimizer", "adamw") or "adamw").lower() == "adamw":
+        log(
+            "  adamw: "
+            f"beta1={float(train_adamw_effective.get('beta1', 0.9))} "
+            f"beta2={float(train_adamw_effective.get('beta2', 0.999))} "
+            f"eps={float(train_adamw_effective.get('eps', 1e-8))} "
+            f"weight_decay={float(train_adamw_effective.get('weight_decay', 0.01))} "
+            f"source={train_adamw_cfg.get('source', 'defaults')}",
+            C_DIM,
+        )
     log(
         f"  train safety: status={train_safety.get('status')} "
         f"lr={train_safety.get('lr')} max_grad_norm={train_safety.get('max_grad_norm')} "
@@ -5055,6 +5241,10 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         "--context-len", str(getattr(args, "context_len", 128)),
         "--rope-theta", str(getattr(args, "rope_theta", 1_000_000.0)),
         "--kernel-policy", str(getattr(args, "kernel_policy", "fp32_reference_first")),
+        "--adamw-beta1", str(getattr(args, "adamw_beta1", 0.9)),
+        "--adamw-beta2", str(getattr(args, "adamw_beta2", 0.999)),
+        "--adamw-eps", str(getattr(args, "adamw_eps", 1e-8)),
+        "--adamw-weight-decay", str(getattr(args, "adamw_weight_decay", 0.01)),
         "--template", str(getattr(args, "template", "qwen3")),
     ]
     template_file = getattr(args, "template_file", None)
@@ -6570,6 +6760,14 @@ Examples:
         sp.add_argument('--ck-loss-backend', choices=['c', 'c_ptref', 'torch'], default='c',
                         help='CK CE backend for parity harness (c/c_ptref/torch)')
         sp.add_argument('--train-lr', type=float, default=1e-3)
+        sp.add_argument('--train-adamw-beta1', type=float, default=None,
+                        help='AdamW beta1 for CK runtime/parity harness (default: 0.9)')
+        sp.add_argument('--train-adamw-beta2', type=float, default=None,
+                        help='AdamW beta2 for CK runtime/parity harness (default: 0.999)')
+        sp.add_argument('--train-adamw-eps', type=float, default=None,
+                        help='AdamW epsilon for CK runtime/parity harness (default: 1e-8)')
+        sp.add_argument('--train-adamw-weight-decay', type=float, default=None,
+                        help='AdamW weight decay for CK runtime/parity harness (default: 0.01)')
         sp.add_argument('--train-max-grad-norm', type=float, default=0.0,
                         help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
         sp.add_argument('--enforce-production-safety', action='store_true',
@@ -6677,6 +6875,14 @@ Examples:
                            help='CK CE backend for parity harness (c/c_ptref/torch)')
     run_parser.add_argument('--train-lr', type=float, default=1e-3,
                            help='Learning rate for --train-e2e (default: 1e-3)')
+    run_parser.add_argument('--train-adamw-beta1', type=float, default=None,
+                           help='AdamW beta1 for CK runtime/parity harness (default: 0.9)')
+    run_parser.add_argument('--train-adamw-beta2', type=float, default=None,
+                           help='AdamW beta2 for CK runtime/parity harness (default: 0.999)')
+    run_parser.add_argument('--train-adamw-eps', type=float, default=None,
+                           help='AdamW epsilon for CK runtime/parity harness (default: 1e-8)')
+    run_parser.add_argument('--train-adamw-weight-decay', type=float, default=None,
+                           help='AdamW weight decay for CK runtime/parity harness (default: 0.01)')
     run_parser.add_argument('--train-max-grad-norm', type=float, default=0.0,
                            help='Global grad norm clip for CK runtime (0 disables clipping; default: 0.0)')
     run_parser.add_argument('--enforce-production-safety', action='store_true',
@@ -6795,6 +7001,14 @@ Examples:
     init_parser.add_argument('--context-len', type=int, default=128)
     init_parser.add_argument('--rope-theta', type=float, default=1_000_000.0)
     init_parser.add_argument('--kernel-policy', default='fp32_reference_first')
+    init_parser.add_argument('--adamw-beta1', type=float, default=0.9,
+                             help='AdamW beta1 embedded into run manifest training defaults')
+    init_parser.add_argument('--adamw-beta2', type=float, default=0.999,
+                             help='AdamW beta2 embedded into run manifest training defaults')
+    init_parser.add_argument('--adamw-eps', type=float, default=1e-8,
+                             help='AdamW epsilon embedded into run manifest training defaults')
+    init_parser.add_argument('--adamw-weight-decay', type=float, default=0.01,
+                             help='AdamW weight_decay embedded into run manifest training defaults')
     init_parser.add_argument('--template', default='qwen3',
                              help='Training graph template name (built-ins: qwen3, qwen2, gemma3)')
     init_parser.add_argument('--template-file', default=None,
