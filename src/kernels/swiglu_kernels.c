@@ -22,15 +22,13 @@
 #include <immintrin.h>
 #endif
 
-/* Numerically stable sigmoid variant for strict parity paths. */
-static inline float sigmoid_scalar_stable(float x)
+/*
+ * PyTorch-parity sigmoid for strict/exact SwiGLU paths.
+ * Keep this in fp32 to match ATen CPU opmath more closely.
+ */
+static inline float sigmoid_scalar_parity(float x)
 {
-    if (x >= 0.0f) {
-        float z = expf(-x);
-        return 1.0f / (1.0f + z);
-    }
-    float z = expf(x);
-    return z / (1.0f + z);
+    return 1.0f / (1.0f + expf(-x));
 }
 
 /* ========================================================================== */
@@ -258,8 +256,9 @@ void swiglu_backward(const float *input,
 
             __m512 s = sigmoid512_fast(a);              // sigmoid(a)
             __m512 silu = _mm512_mul_ps(a, s);          // silu(a) = a * s
-            __m512 s_prime = _mm512_mul_ps(s, _mm512_sub_ps(one, s)); // s * (1 - s)
-            __m512 silu_prime = _mm512_fmadd_ps(a, s_prime, s);       // s + a * s_prime
+            __m512 one_minus_s = _mm512_sub_ps(one, s);
+            __m512 inner = _mm512_fmadd_ps(a, one_minus_s, one);      // 1 + a * (1 - s)
+            __m512 silu_prime = _mm512_mul_ps(s, inner);              // s * (1 + a * (1 - s))
 
             // dA = dy * b * silu_prime
             __m512 dA = _mm512_mul_ps(dy, _mm512_mul_ps(b, silu_prime));
@@ -279,8 +278,9 @@ void swiglu_backward(const float *input,
 
             __m256 s = sigmoid256_fast(a);              // sigmoid(a)
             __m256 silu = _mm256_mul_ps(a, s);          // silu(a) = a * s
-            __m256 s_prime = _mm256_mul_ps(s, _mm256_sub_ps(one, s)); // s * (1 - s)
-            __m256 silu_prime = _mm256_fmadd_ps(a, s_prime, s);       // s + a * s_prime
+            __m256 one_minus_s = _mm256_sub_ps(one, s);
+            __m256 inner = _mm256_fmadd_ps(a, one_minus_s, one);      // 1 + a * (1 - s)
+            __m256 silu_prime = _mm256_mul_ps(s, inner);              // s * (1 + a * (1 - s))
 
             // dA = dy * b * silu_prime
             __m256 dA = _mm256_mul_ps(dy, _mm256_mul_ps(b, silu_prime));
@@ -309,10 +309,10 @@ void swiglu_backward(const float *input,
             __m256 s = _mm256_load_ps(s_arr);
 
             __m256 silu = _mm256_mul_ps(a, s);                        // silu(a) = a * s
-            __m256 s_prime = _mm256_mul_ps(s, _mm256_sub_ps(one, s)); // s * (1 - s)
-            // silu_prime = s + a * s_prime (no FMA in AVX1)
-            __m256 a_s_prime = _mm256_mul_ps(a, s_prime);
-            __m256 silu_prime = _mm256_add_ps(s, a_s_prime);
+            __m256 one_minus_s = _mm256_sub_ps(one, s);
+            __m256 a_one_minus_s = _mm256_mul_ps(a, one_minus_s);
+            __m256 inner = _mm256_add_ps(one, a_one_minus_s);         // 1 + a * (1 - s)
+            __m256 silu_prime = _mm256_mul_ps(s, inner);              // s * (1 + a * (1 - s))
 
             // dA = dy * b * silu_prime
             __m256 dA = _mm256_mul_ps(dy, _mm256_mul_ps(b, silu_prime));
@@ -332,8 +332,7 @@ void swiglu_backward(const float *input,
 
             float s = sigmoid_scalar(a);               // sigmoid(a)
             float silu = a * s;                        // silu(a)
-            float s_prime = s * (1.0f - s);            // sigmoid'(a)
-            float silu_prime = s + a * s_prime;        // silu'(a)
+            float silu_prime = s * (1.0f + a * (1.0f - s)); // silu'(a), PyTorch form
 
             float dA = dy * b * silu_prime;
             float dB = dy * silu;
@@ -372,12 +371,9 @@ void swiglu_forward_exact(const float *input,
             float a = row[d];       // gate
             float b = row[D + d];   // value
 
-            double ad = (double)a;
-            double bd = (double)b;
-            double s = (double)sigmoid_scalar_stable(a); // sigmoid(a)
-            double silu = ad * s;                        // silu(a)
-
-            out_row[d] = (float)(silu * bd);
+            float s = sigmoid_scalar_parity(a); // sigmoid(a)
+            float silu = a * s;                 // silu(a)
+            out_row[d] = silu * b;
         }
     }
 }
@@ -410,19 +406,15 @@ void swiglu_backward_exact(const float *input,
             float b = row[D + d];   // value
             float dy = dy_row[d];
 
-            double ad = (double)a;
-            double bd = (double)b;
-            double dyd = (double)dy;
-            double s = (double)sigmoid_scalar_stable(a); // sigmoid(a)
-            double silu = ad * s;                        // silu(a)
-            double s_prime = s * (1.0 - s);              // sigmoid'(a)
-            double silu_prime = s + ad * s_prime;        // silu'(a)
+            float s = sigmoid_scalar_parity(a); // sigmoid(a)
+            float silu = a * s;                 // silu(a)
+            float silu_prime = s * (1.0f + a * (1.0f - s)); // silu'(a), PyTorch form
 
-            double dA = dyd * bd * silu_prime;
-            double dB = dyd * silu;
+            float dA = dy * b * silu_prime;
+            float dB = dy * silu;
 
-            dx_row[d] = (float)dA;
-            dx_row[D + d] = (float)dB;
+            dx_row[d] = dA;
+            dx_row[D + d] = dB;
         }
     }
 }

@@ -224,14 +224,13 @@ void rmsnorm_forward(const float *input,
 
 #else
         // Scalar fallback
-        double sum_sq = 0.0;
+        float sum_sq = 0.0f;
         for (int d = 0; d < D; ++d) {
-            double v = (double)x[d];
+            float v = x[d];
             sum_sq += v * v;
         }
-        double mean_sq = sum_sq / (double)D;
-        double r = sqrt(mean_sq + (double)eps);
-        float rstd = (float)(1.0 / r);
+        float mean_sq = sum_sq / (float)D;
+        float rstd = 1.0f / sqrtf(mean_sq + eps);
         if (rstd_cache) {
             rstd_cache[t] = rstd;
         }
@@ -428,12 +427,12 @@ void rmsnorm_backward(const float *d_output,
 #else
         // Scalar fallback
         // Compute m = (1/D) * sum_j (dY_j * gamma_j * x_hat_j)
-        double sum_dY_g_xhat = 0.0;
+        float sum_dY_g_xhat = 0.0f;
         for (int d = 0; d < D; ++d) {
             float x_hat = x[d] * rstd;
-            sum_dY_g_xhat += (double)dY[d] * (double)gamma[d] * (double)x_hat;
+            sum_dY_g_xhat += dY[d] * gamma[d] * x_hat;
         }
-        float m = (float)(sum_dY_g_xhat / (double)D);
+        float m = sum_dY_g_xhat / (float)D;
 
         // Compute dX and accumulate dGamma
         for (int d = 0; d < D; ++d) {

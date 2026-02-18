@@ -785,6 +785,74 @@ static void attention_flash_query_causal(const float *q_vec,
     }
 }
 
+// Strict parity reference for flash-style query path.
+// Uses a two-pass exact softmax formulation per query:
+// 1) max(score), 2) exp(score-max) accumulation for sum and weighted V.
+// This avoids online-softmax re-normalization drift in long reductions.
+static void attention_flash_query_causal_exact(const float *q_vec,
+                                               const float *k_head,
+                                               const float *v_head,
+                                               int kv_tokens,
+                                               int head_dim,
+                                               int aligned_head_dim,
+                                               float scale,
+                                               float *out_vec)
+{
+    if (kv_tokens <= 0) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int d = 0; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+
+    float max_score = -INFINITY;
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t)j * (size_t)aligned_head_dim;
+        float dot = 0.0f;
+        for (int d = 0; d < head_dim; ++d) {
+            dot += q_vec[d] * k_vec[d];
+        }
+        float score = dot * scale;
+        if (score > max_score) {
+            max_score = score;
+        }
+    }
+
+    float sum = 0.0f;
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t)j * (size_t)aligned_head_dim;
+        const float *v_vec = v_head + (size_t)j * (size_t)aligned_head_dim;
+        float dot = 0.0f;
+        for (int d = 0; d < head_dim; ++d) {
+            dot += q_vec[d] * k_vec[d];
+        }
+        float score = dot * scale;
+        float w = expf(score - max_score);
+        sum += w;
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] += w * v_vec[d];
+        }
+    }
+
+    if (sum > 0.0f) {
+        float inv_sum = 1.0f / sum;
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] *= inv_sum;
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+}
+
 /**
  * Flash attention forward for GQA (prefill, no score materialization)
  * @test test_flash_attention.py::TestFlashAttention::test_flash_forward
@@ -816,6 +884,24 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
 
     const float scale = 1.0f / sqrtf((float)head_dim);
     const int T = num_tokens;
+
+    if (ck_strict_parity_enabled()) {
+        for (int h = 0; h < num_heads; ++h) {
+            int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+            const float *k_head = k + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
+            const float *v_head = v + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
+
+            for (int i = 0; i < T; ++i) {
+                const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+                float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+                attention_flash_query_causal_exact(q_vec, k_head, v_head,
+                                                   /*kv_tokens=*/i + 1,
+                                                   head_dim, aligned_head_dim,
+                                                   scale, out_vec);
+            }
+        }
+        return;
+    }
 
     // Select SIMD implementation based on compile-time CPU features
 #if defined(__AVX512F__)
@@ -880,6 +966,24 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
     const float scale = 1.0f / sqrtf((float)head_dim);
     const int T = num_tokens;
     const size_t kv_head_stride = (size_t)kv_stride_tokens * (size_t)aligned_head_dim;
+
+    if (ck_strict_parity_enabled()) {
+        for (int h = 0; h < num_heads; ++h) {
+            int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+            const float *k_head = k + (size_t)kv_head * kv_head_stride;
+            const float *v_head = v + (size_t)kv_head * kv_head_stride;
+
+            for (int i = 0; i < T; ++i) {
+                const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+                float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+                attention_flash_query_causal_exact(q_vec, k_head, v_head,
+                                                   /*kv_tokens=*/i + 1,
+                                                   head_dim, aligned_head_dim,
+                                                   scale, out_vec);
+            }
+        }
+        return;
+    }
 
     // Select SIMD implementation based on compile-time CPU features
 #if defined(__AVX512F__)

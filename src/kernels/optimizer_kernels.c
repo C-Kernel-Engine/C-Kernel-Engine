@@ -81,7 +81,7 @@ typedef struct {
     float beta2;
     float eps;
     float weight_decay;
-    float max_grad_norm;
+    float grad_scale;
     int step;
 } ck_adamw_multi_parallel_args_t;
 
@@ -214,13 +214,8 @@ static void ck_adamw_multi_parallel_work(int ith, int nth, void *argp)
             continue;
         }
 
-        if (a->max_grad_norm > 0.0f) {
-            double sum_sq = gradient_sum_sq_f32_impl(g, n);
-            float norm = sqrtf((float)sum_sq);
-            if (norm > a->max_grad_norm) {
-                float scale = a->max_grad_norm / norm;
-                gradient_scale_f32_impl(g, n, scale);
-            }
+        if (a->grad_scale != 1.0f) {
+            gradient_scale_f32_impl(g, n, a->grad_scale);
         }
 
         adamw_update_f32_impl(
@@ -566,6 +561,25 @@ void adamw_clip_update_multi_f32(
         return;
     }
 
+    float grad_scale = 1.0f;
+    if (max_grad_norm > 0.0f) {
+        double total_sum_sq = 0.0;
+        for (int i = 0; i < tensor_count; ++i) {
+            const float *g = grads[i];
+            size_t n = numels[i];
+            if (!g || n == 0) {
+                continue;
+            }
+            total_sum_sq += gradient_sum_sq_f32_impl(g, n);
+        }
+        if (total_sum_sq > 0.0) {
+            double global_norm = sqrt(total_sum_sq);
+            if (global_norm > (double)max_grad_norm) {
+                grad_scale = max_grad_norm / (float)global_norm;
+            }
+        }
+    }
+
     ck_threadpool_t *pool = ck_threadpool_global();
     int nth = pool ? ck_threadpool_n_threads(pool) : 1;
 
@@ -580,13 +594,8 @@ void adamw_clip_update_multi_f32(
             if (!g || !w || !m || !v || n == 0) {
                 continue;
             }
-            if (max_grad_norm > 0.0f) {
-                double sum_sq = gradient_sum_sq_f32_impl(g, n);
-                float norm = sqrtf((float)sum_sq);
-                if (norm > max_grad_norm) {
-                    float scale = max_grad_norm / norm;
-                    gradient_scale_f32_impl(g, n, scale);
-                }
+            if (grad_scale != 1.0f) {
+                gradient_scale_f32_impl(g, n, grad_scale);
             }
             adamw_update_f32_impl(g, w, m, v, n, lr, beta1, beta2, eps, weight_decay, step);
         }
@@ -605,7 +614,7 @@ void adamw_clip_update_multi_f32(
         .beta2 = beta2,
         .eps = eps,
         .weight_decay = weight_decay,
-        .max_grad_norm = max_grad_norm,
+        .grad_scale = grad_scale,
         .step = step,
     };
     ck_threadpool_dispatch(pool, ck_adamw_multi_parallel_work, &args);
