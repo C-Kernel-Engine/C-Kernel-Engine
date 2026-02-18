@@ -253,6 +253,7 @@ typedef struct {
     long offset;
     long size;
     char *dtype;
+    char *shape_json;
 } ManifestEntry;
 
 typedef struct {
@@ -585,6 +586,7 @@ static int parse_manifest_entries(const char *manifest_path, ManifestEntry **out
         int off_idx = json_find_key_value(json, toks, obj, "offset");
         int size_idx = json_find_key_value(json, toks, obj, "size");
         int dtype_idx = json_find_key_value(json, toks, obj, "dtype");
+        int shape_idx = json_find_key_value(json, toks, obj, "shape");
         if (name_idx >= 0 && off_idx >= 0 && size_idx >= 0) {
             entries[w].name = json_tok_strdup(json, &toks[name_idx]);
             char *off_s = json_tok_strdup(json, &toks[off_idx]);
@@ -592,11 +594,12 @@ static int parse_manifest_entries(const char *manifest_path, ManifestEntry **out
             entries[w].offset = off_s ? atol(off_s) : -1;
             entries[w].size = size_s ? atol(size_s) : -1;
             entries[w].dtype = (dtype_idx >= 0) ? json_tok_strdup(json, &toks[dtype_idx]) : NULL;
+            entries[w].shape_json = (shape_idx >= 0) ? json_tok_strdup(json, &toks[shape_idx]) : NULL;
             free(off_s);
             free(size_s);
             if (entries[w].name && entries[w].offset >= 0 && entries[w].size > 0) w++;
             else {
-                free(entries[w].name); free(entries[w].dtype);
+                free(entries[w].name); free(entries[w].dtype); free(entries[w].shape_json);
             }
         }
         idx = json_skip_token(toks, idx);
@@ -613,8 +616,35 @@ static void free_manifest_entries(ManifestEntry *entries, int count) {
     for (int i = 0; i < count; i++) {
         free(entries[i].name);
         free(entries[i].dtype);
+        free(entries[i].shape_json);
     }
     free(entries);
+}
+
+static int parse_manifest_embedded_meta(const char *manifest_path, char **out_config_json, char **out_template_json) {
+    if (!out_config_json || !out_template_json) return -1;
+    *out_config_json = NULL;
+    *out_template_json = NULL;
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(manifest_path, &json, &len)) return -2;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) {
+        free(json);
+        return -3;
+    }
+    int config_idx = json_find_key_value(json, toks, 0, "config");
+    int template_idx = json_find_key_value(json, toks, 0, "template");
+    if (config_idx >= 0) {
+        *out_config_json = json_tok_strdup(json, &toks[config_idx]);
+    }
+    if (template_idx >= 0) {
+        *out_template_json = json_tok_strdup(json, &toks[template_idx]);
+    }
+    free(toks);
+    free(json);
+    return 0;
 }
 
 static const ManifestEntry *find_manifest_entry(const ManifestEntry *entries, int count, const char *name) {
@@ -1801,6 +1831,8 @@ typedef struct {
         int *steps,
         int *optimizer_steps
     );
+    int (*ck_train_get_weight_snapshot_numel)(void);
+    int (*ck_train_export_weight_snapshot)(float *dst, int dst_numel);
 } TrainRuntimeAPI;
 
 static void print_train_help(const char *prog) {
@@ -1996,6 +2028,10 @@ static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
         (int(*)(double*, double*, double*, double*, int*, int*, int*, int*))dlsym(api->handle, "ck_train_get_last_step_profile");
     api->ck_train_get_cumulative_profile =
         (int(*)(double*, double*, double*, double*, int*, int*))dlsym(api->handle, "ck_train_get_cumulative_profile");
+    api->ck_train_get_weight_snapshot_numel =
+        (int(*)(void))dlsym(api->handle, "ck_train_get_weight_snapshot_numel");
+    api->ck_train_export_weight_snapshot =
+        (int(*)(float*, int))dlsym(api->handle, "ck_train_export_weight_snapshot");
 
     if (!api->ck_train_init || !api->ck_train_step) {
         fprintf(stderr, "Missing required training symbols in %s (need ck_train_init + ck_train_step)\n", lib_path);
@@ -2123,6 +2159,13 @@ static int build_train_init_payload(
     return 0;
 }
 
+static size_t ck_align_up_size(size_t value, size_t alignment) {
+    if (alignment == 0) return value;
+    size_t rem = value % alignment;
+    if (rem == 0) return value;
+    return value + (alignment - rem);
+}
+
 typedef struct {
     const double *step_ms;
     const double *fwd_ms;
@@ -2142,6 +2185,259 @@ typedef struct {
     int breakdown_available;
 } TrainStepProfileTelemetry;
 
+typedef struct {
+    int enabled;
+    int save_every;
+    int save_final;
+    int count;
+    int latest_step;
+    int weights;
+    int floats;
+    long bytes;
+    char bump_path[4096];
+    char manifest_path[4096];
+} TrainCheckpointInfo;
+
+static int export_train_final_checkpoint(
+    const char *run_dir,
+    const TrainRuntimeAPI *api,
+    int step,
+    TrainCheckpointInfo *out_ckpt
+) {
+    if (!run_dir || !api || !out_ckpt) return -1;
+    memset(out_ckpt, 0, sizeof(*out_ckpt));
+    out_ckpt->save_final = 1;
+    out_ckpt->save_every = 0;
+    if (!api->ck_train_get_weight_snapshot_numel || !api->ck_train_export_weight_snapshot) {
+        return 0;
+    }
+
+    int snapshot_numel = api->ck_train_get_weight_snapshot_numel();
+    if (snapshot_numel <= 0) return -2;
+    if (snapshot_numel > (1 << 30)) return -3;
+    float *snapshot = (float*)malloc((size_t)snapshot_numel * sizeof(float));
+    if (!snapshot) return -4;
+    int wrote = api->ck_train_export_weight_snapshot(snapshot, snapshot_numel);
+    if (wrote <= 0) {
+        free(snapshot);
+        return -5;
+    }
+    int available_numel = wrote < snapshot_numel ? wrote : snapshot_numel;
+
+    char summary_path[4096], src_manifest_path[4096];
+    snprintf(summary_path, sizeof(summary_path), "%s/generated_train_runtime_summary_v7.json", run_dir);
+    snprintf(src_manifest_path, sizeof(src_manifest_path), "%s/weights_manifest.json", run_dir);
+
+    RuntimeInitOrder order;
+    if (parse_runtime_init_order(summary_path, &order) != 0) {
+        free(snapshot);
+        return -6;
+    }
+    ManifestEntry *entries = NULL;
+    int entry_count = 0;
+    if (parse_manifest_entries(src_manifest_path, &entries, &entry_count) != 0) {
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -7;
+    }
+    char *src_config_json = NULL;
+    char *src_template_json = NULL;
+    (void)parse_manifest_embedded_meta(src_manifest_path, &src_config_json, &src_template_json);
+
+    int expected_total = 0;
+    size_t blob_size = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e || e->size <= 0) {
+            free(src_config_json);
+            free(src_template_json);
+            free_manifest_entries(entries, entry_count);
+            free_runtime_init_order(&order);
+            free(snapshot);
+            return -8;
+        }
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+        expected_total += copy_numel;
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_size, 64);
+        blob_size = off + nbytes;
+    }
+    if (expected_total <= 0 || available_numel < expected_total) {
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -9;
+    }
+
+    uint8_t *blob = (uint8_t*)calloc(blob_size ? blob_size : 1, 1);
+    if (!blob) {
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -10;
+    }
+
+    size_t blob_cursor = 0;
+    int snap_cursor = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) continue;
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_cursor, 64);
+        memcpy(blob + off, snapshot + snap_cursor, nbytes);
+        snap_cursor += copy_numel;
+        blob_cursor = off + nbytes;
+    }
+
+    char bump_path[4096], manifest_path[4096];
+    snprintf(bump_path, sizeof(bump_path), "%s/checkpoints/weights_step_%08d.bump", run_dir, step > 0 ? step : 1);
+    snprintf(manifest_path, sizeof(manifest_path), "%s/checkpoints/weights_step_%08d_manifest.json", run_dir, step > 0 ? step : 1);
+    if (ensure_parent_dir(bump_path) != 0 || ensure_parent_dir(manifest_path) != 0) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -11;
+    }
+
+    FILE *bf = fopen(bump_path, "wb");
+    if (!bf) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -12;
+    }
+    size_t bw = fwrite(blob, 1, blob_size, bf);
+    fclose(bf);
+    if (bw != blob_size) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -13;
+    }
+
+    FILE *mf = fopen(manifest_path, "w");
+    if (!mf) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -14;
+    }
+    fprintf(mf, "{\n");
+    fprintf(mf, "  \"version\": 1,\n");
+    fprintf(mf, "  \"format\": \"weights_manifest_v7_runtime_checkpoint\",\n");
+    fprintf(mf, "  \"source\": \"ck_cli_v7_native\",\n");
+    fprintf(mf, "  \"step\": %d,\n", step > 0 ? step : 1);
+    fprintf(mf, "  \"reason\": \"final\",\n");
+    if (src_config_json && *src_config_json) {
+        fprintf(mf, "  \"config\": %s,\n", src_config_json);
+    }
+    if (src_template_json && *src_template_json) {
+        fprintf(mf, "  \"template\": %s,\n", src_template_json);
+    }
+    fprintf(mf, "  \"entries\": [\n");
+    blob_cursor = 0;
+    int written = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) continue;
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_cursor, 64);
+        if (written > 0) fprintf(mf, ",\n");
+        if (e->shape_json && *e->shape_json) {
+            fprintf(
+                mf,
+                "    {\"name\": \"%s\", \"offset\": %zu, \"size\": %zu, \"dtype\": \"%s\", \"shape\": %s}",
+                wname,
+                off,
+                nbytes,
+                e->dtype ? e->dtype : "fp32",
+                e->shape_json
+            );
+        } else {
+            fprintf(
+                mf,
+                "    {\"name\": \"%s\", \"offset\": %zu, \"size\": %zu, \"dtype\": \"%s\", \"shape\": [%d]}",
+                wname,
+                off,
+                nbytes,
+                e->dtype ? e->dtype : "fp32",
+                copy_numel
+            );
+        }
+        blob_cursor = off + nbytes;
+        written++;
+    }
+    fprintf(mf, "\n  ]\n");
+    fprintf(mf, "}\n");
+    fclose(mf);
+
+    out_ckpt->enabled = 1;
+    out_ckpt->count = 1;
+    out_ckpt->latest_step = step > 0 ? step : 1;
+    out_ckpt->weights = written;
+    out_ckpt->floats = expected_total;
+    out_ckpt->bytes = (long)blob_size;
+    snprintf(out_ckpt->bump_path, sizeof(out_ckpt->bump_path), "%s", bump_path);
+    snprintf(out_ckpt->manifest_path, sizeof(out_ckpt->manifest_path), "%s", manifest_path);
+
+    free(blob);
+    free(src_config_json);
+    free(src_template_json);
+    free_manifest_entries(entries, entry_count);
+    free_runtime_init_order(&order);
+    free(snapshot);
+    return 1;
+}
+
 static int write_train_summary_and_telemetry(
     const char *run_dir,
     const char *summary_path,
@@ -2152,7 +2448,8 @@ static int write_train_summary_and_telemetry(
     int processed_tokens,
     int total_floats,
     int num_params,
-    const TrainStepProfileTelemetry *telemetry
+    const TrainStepProfileTelemetry *telemetry,
+    const TrainCheckpointInfo *ckpt
 ) {
     const char *out_path = summary_path;
     char fallback_path[4096];
@@ -2190,6 +2487,18 @@ static int write_train_summary_and_telemetry(
     double bwd_pct = (profile_total_ms > 0.0) ? (100.0 * bwd_total_ms / profile_total_ms) : 0.0;
     double opt_pct = (profile_total_ms > 0.0) ? (100.0 * opt_total_ms / profile_total_ms) : 0.0;
     double other_pct = (profile_total_ms > 0.0) ? (100.0 * other_total_ms / profile_total_ms) : 0.0;
+    int ckpt_enabled = 0;
+    int ckpt_save_every = 0;
+    int ckpt_save_final = 1;
+    int ckpt_count = 0;
+    int ckpt_latest_step = 0;
+    if (ckpt) {
+        ckpt_enabled = ckpt->enabled ? 1 : 0;
+        ckpt_save_every = ckpt->save_every;
+        ckpt_save_final = ckpt->save_final ? 1 : 0;
+        ckpt_count = ckpt->count;
+        ckpt_latest_step = ckpt->latest_step;
+    }
 
     FILE *f = fopen(out_path, "w");
     if (!f) return -2;
@@ -2291,7 +2600,27 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"train_mode\": \"pretrain\",\n");
     fprintf(f, "  \"source\": \"ck_cli_v7_native\",\n");
     fprintf(f, "  \"runtime_init\": {\"num_params\": %d, \"total_floats\": %d},\n", num_params, total_floats);
-    fprintf(f, "  \"checkpoints\": {\"enabled\": false, \"save_every\": 0, \"save_final\": true, \"count\": 0, \"latest_step\": 0, \"files\": []},\n");
+    fprintf(f, "  \"checkpoints\": {\n");
+    fprintf(f, "    \"enabled\": %s,\n", ckpt_enabled ? "true" : "false");
+    fprintf(f, "    \"save_every\": %d,\n", ckpt_save_every);
+    fprintf(f, "    \"save_final\": %s,\n", ckpt_save_final ? "true" : "false");
+    fprintf(f, "    \"count\": %d,\n", ckpt_count);
+    fprintf(f, "    \"latest_step\": %d,\n", ckpt_latest_step);
+    fprintf(f, "    \"files\": [");
+    if (ckpt && ckpt_count > 0) {
+        fprintf(
+            f,
+            "{\"step\": %d, \"reason\": \"final\", \"bump\": \"%s\", \"manifest\": \"%s\", \"weights\": %d, \"floats\": %d, \"bytes\": %ld}",
+            ckpt_latest_step,
+            ckpt->bump_path,
+            ckpt->manifest_path,
+            ckpt->weights,
+            ckpt->floats,
+            ckpt->bytes
+        );
+    }
+    fprintf(f, "]\n");
+    fprintf(f, "  },\n");
     fprintf(f, "  \"oracle\": {\"enabled\": false}\n");
     fprintf(f, "}\n");
     fclose(f);
@@ -2398,7 +2727,29 @@ static int write_train_summary_and_telemetry(
 
     g = fopen(path_ckpt, "w");
     if (g) {
-        fprintf(g, "{\"policy\": \"none\", \"source\": \"ck_cli_v7_native\", \"checkpointing\": false, \"save_every\": 0, \"save_final\": true, \"count\": 0, \"latest_step\": 0, \"files\": []}\n");
+        fprintf(g, "{");
+        fprintf(g, "\"policy\": \"%s\", ", ckpt_enabled ? "step_interval" : "none");
+        fprintf(g, "\"source\": \"ck_cli_v7_native\", ");
+        fprintf(g, "\"checkpointing\": %s, ", ckpt_enabled ? "true" : "false");
+        fprintf(g, "\"save_every\": %d, ", ckpt_save_every);
+        fprintf(g, "\"save_final\": %s, ", ckpt_save_final ? "true" : "false");
+        fprintf(g, "\"count\": %d, ", ckpt_count);
+        fprintf(g, "\"latest_step\": %d, ", ckpt_latest_step);
+        fprintf(g, "\"files\": [");
+        if (ckpt && ckpt_count > 0) {
+            fprintf(
+                g,
+                "{\"step\": %d, \"reason\": \"final\", \"bump\": \"%s\", \"manifest\": \"%s\", \"weights\": %d, \"floats\": %d, \"bytes\": %ld}",
+                ckpt_latest_step,
+                ckpt->bump_path,
+                ckpt->manifest_path,
+                ckpt->weights,
+                ckpt->floats,
+                ckpt->bytes
+            );
+        }
+        fprintf(g, "]}");
+        fprintf(g, "\n");
         fclose(g);
     }
 
@@ -2691,6 +3042,13 @@ static int cmd_train_subcommand(int argc, char **argv) {
     if (telemetry.profile_total_ms <= 0.0) {
         telemetry.profile_total_ms = elapsed_ms;
     }
+    TrainCheckpointInfo ckpt;
+    memset(&ckpt, 0, sizeof(ckpt));
+    ckpt.save_final = 1;
+    int ckpt_rc = export_train_final_checkpoint(opt.run_dir, &api, total_steps, &ckpt);
+    if (ckpt_rc < 0) {
+        fprintf(stderr, "Warning: failed to export final checkpoint (rc=%d)\n", ckpt_rc);
+    }
     int wr = write_train_summary_and_telemetry(
         opt.run_dir,
         opt.json_out,
@@ -2701,7 +3059,8 @@ static int cmd_train_subcommand(int argc, char **argv) {
         processed_tokens,
         total_floats,
         num_params,
-        &telemetry
+        &telemetry,
+        &ckpt
     );
     if (wr != 0) {
         fprintf(stderr, "Failed to write training summary/telemetry (rc=%d)\n", wr);
