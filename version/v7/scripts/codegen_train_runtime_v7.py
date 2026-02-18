@@ -1162,17 +1162,32 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#ifndef CK_MAX_GRAD_NORM")
     ap("#define CK_MAX_GRAD_NORM 0.0f")
     ap("#endif")
+    ap("#ifndef CK_TRAIN_USE_CE_PTREF")
+    ap("#define CK_TRAIN_USE_CE_PTREF 0")
+    ap("#endif")
     ap("")
 
     ap("/* Training GEMM wrapper (threadpool dispatch + serial fallback). */")
     ap("void gemm_blocked_serial_train_parallel_dispatch(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);")
     ap("void gemm_backward_f32_train_parallel_dispatch(const float *d_output, const float *input, const float *W, float *d_input, float *d_W, float *d_b, int T, int aligned_in, int aligned_out, int num_threads);")
     ap("void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output, const float *input, const float *W, float *d_input, float *d_W, float *d_b, int T, int aligned_in, int aligned_out, int num_threads);")
+    ap("/* Attention materialized-score forward used when backward needs saved attn weights. */")
+    ap("void attention_forward_causal_head_major_gqa(const float *q, const float *k, const float *v, float *scores, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window);")
+    ap("void attention_forward_causal_head_major_gqa_exact(const float *q, const float *k, const float *v, float *scores, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int aligned_context_window);")
     ap("/* Fallback declarations for kernels with incomplete registry declarations. */")
     for kid in sorted(used_decl.keys()):
         fn, args, decl = used_decl[kid]
         ap("/* %s -> %s */" % (kid, fn))
         ap(decl if decl.endswith(";") else (decl + ";"))
+    ap("")
+    ap("/* CE dispatch selectable at compile time for generated runtime. */")
+    ap("static inline void ck_train_ce_dispatch(const float *logits, const int32_t *targets, int tokens, int vocab_size, float *d_logits, float *loss_out) {")
+    ap("#if CK_TRAIN_USE_CE_PTREF")
+    ap("    softmax_cross_entropy_loss_ptref(logits, targets, tokens, vocab_size, d_logits, loss_out);")
+    ap("#else")
+    ap("    softmax_cross_entropy_loss(logits, targets, tokens, vocab_size, d_logits, loss_out);")
+    ap("#endif")
+    ap("}")
     ap("")
 
     ap("#define CK_TRAIN_TOTAL_FLOATS ((size_t)%d)" % int(layout_info["total_floats"]))
@@ -1761,14 +1776,38 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    return CK_INIT_WEIGHT_COUNT;")
     ap("}")
     ap("")
-    ap("void ck_zero_grad(void) {")
+    tmp_grad_ptrs: List[Tuple[str, int, str]] = []
+    for _tid, _var in sorted(tvars_f32.items(), key=lambda x: x[1]):
+        _tid_s = str(_tid)
+        if not (_tid_s.startswith("tmp.grad.") or _tid_s.startswith("tmp_grad.")):
+            continue
+        _n = int(tensor_numel.get(_tid, 0) or 0)
+        if _n > 0:
+            tmp_grad_ptrs.append((_var, _n, _tid_s))
+    ap("void ck_zero_grad_weights(void) {")
     ap("    if (g_memory == NULL) return;")
     ap("    if (CK_GRADS_SIZE > 0) {")
     ap("        memset(g_memory + CK_GRADS_OFFSET, 0, CK_GRADS_SIZE * sizeof(float));")
     ap("    }")
+    ap("}")
+    ap("")
+    ap("void ck_zero_grad_activations(void) {")
+    ap("    if (g_memory == NULL) return;")
     ap("    if (CK_GRAD_ACT_SIZE > 0) {")
     ap("        memset(g_memory + CK_GRAD_ACT_OFFSET, 0, CK_GRAD_ACT_SIZE * sizeof(float));")
     ap("    }")
+    ap("}")
+    ap("")
+    ap("void ck_zero_tmp_grads(void) {")
+    ap("    if (g_memory == NULL) return;")
+    for _var, _n, _tid in tmp_grad_ptrs:
+        ap("    if (%s != NULL) { memset(%s, 0, (size_t)%d * sizeof(float)); } /* %s */" % (_var, _var, int(_n), _tid))
+    ap("}")
+    ap("")
+    ap("void ck_zero_grad(void) {")
+    ap("    ck_zero_grad_weights();")
+    ap("    ck_zero_grad_activations();")
+    ap("    ck_zero_tmp_grads();")
     ap("}")
     ap("")
 
@@ -1944,14 +1983,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 k_tid = io_inputs.get("k")
                 v_tid = io_inputs.get("v")
                 y_tid = io_outputs.get("out") or io_outputs.get("output") or io_outputs.get("y")
+                sfb = op.get("save_for_backward")
+                attn_sfb = sfb.get("attn_weights") if isinstance(sfb, dict) else None
+                attn_saved_tid = attn_sfb.get("tensor") if isinstance(attn_sfb, dict) else None
                 q_var = tvars_f32.get(q_tid or "", "g_dummy_f32")
                 k_var = tvars_f32.get(k_tid or "", "g_dummy_f32")
                 v_var = tvars_f32.get(v_tid or "", "g_dummy_f32")
                 y_var = tvars_f32.get(y_tid or "", "g_dummy_f32")
+                attn_saved_var = tvars_f32.get(attn_saved_tid or "", "")
                 q_numel = int(tensor_numel.get(q_tid or "", 0) or 0)
                 k_numel = int(tensor_numel.get(k_tid or "", 0) or 0)
                 v_numel = int(tensor_numel.get(v_tid or "", 0) or 0)
                 y_numel = int(tensor_numel.get(y_tid or "", 0) or 0)
+                attn_saved_numel = int(tensor_numel.get(attn_saved_tid or "", 0) or 0)
+                needs_attn_saved = bool(attn_saved_var and attn_saved_numel > 0)
 
                 banned: set[str] = {q_var, k_var, v_var, y_var}
                 q_scratch = _pick_tmp_scratch_var(q_numel, banned)
@@ -1979,12 +2024,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     if y_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_var, int(y_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_scratch, int(y_numel), op_id))
+                    if needs_attn_saved:
+                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (attn_saved_var, int(attn_saved_numel), op_id))
                     ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
                     ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
                     ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
-                    ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
-                        q_scratch, k_scratch, v_scratch, y_scratch
-                    ))
+                    if needs_attn_saved:
+                        # Flash forward does not materialize softmax weights; backward expects saved attn weights.
+                        ap("    attention_forward_causal_head_major_gqa_exact(%s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                            q_scratch, k_scratch, v_scratch, attn_saved_var, y_scratch
+                        ))
+                    else:
+                        ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                            q_scratch, k_scratch, v_scratch, y_scratch
+                        ))
                     ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (y_scratch, y_var))
                     ap("    call_count++;")
                     continue
@@ -2575,6 +2628,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 call_fn = "gemm_blocked_serial_train_parallel_dispatch"
             elif kid == "gemm_backward_f32":
                 call_fn = "gemm_backward_f32_train_parallel_dispatch_v2"
+            elif kid == "softmax_cross_entropy_loss":
+                # Keep IR/kernel id stable while allowing runtime CE backend selection
+                # via CK_TRAIN_USE_CE_PTREF for parity diagnostics.
+                call_fn = "ck_train_ce_dispatch"
             ap("    %s(%s);" % (call_fn, ", ".join(call_args)))
             if phase.startswith("backward"):
                 inj_tid: Optional[str] = None
@@ -2764,8 +2821,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("     * - run optimizer exactly at accumulation boundary")
     ap("     */")
     ap("    if (g_accum_step <= 0) {")
-    ap("        /* Window start: clear gradients before first micro-step. */")
+    ap("        /* Window start: clear param + activation grad buffers. */")
     ap("        ck_zero_grad();")
+    ap("    } else {")
+    ap("        /* Mid-window micro-step: keep param-grad accumulation, reset activation/tmp-grad buffers. */")
+    ap("        ck_zero_grad_activations();")
+    ap("        ck_zero_tmp_grads();")
     ap("    }")
     ap("    int first = -1;")
     ap("    if (CK_RUNTIME_CANARY_CHECKS) ck_train_plant_canaries();")

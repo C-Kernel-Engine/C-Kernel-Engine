@@ -30,7 +30,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Configuration
@@ -131,6 +131,48 @@ def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.Co
 def run_cmd_allow_fail(cmd: list, cwd: Path = None) -> subprocess.CompletedProcess:
     """Run command without exiting on non-zero status."""
     return subprocess.run(cmd, cwd=cwd)
+
+
+def _cc_supports_flags(cc: str, flags: Sequence[str]) -> bool:
+    """Return True when compiler accepts all flags."""
+    if not flags:
+        return True
+    try:
+        probe = subprocess.run(
+            [cc, "-Werror", "-x", "c", "-fsyntax-only", *list(flags), "-"],
+            input="int main(void) { return 0; }\n",
+            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return int(probe.returncode) == 0
+    except Exception:
+        return False
+
+
+def _bitwise_parity_compile_flags(cc: str) -> list[str]:
+    """
+    Compiler flags for tighter FP reproducibility in generated train runtime.
+    We probe support per-flag to stay portable across gcc/clang variants.
+    """
+    candidates = [
+        "-O1",
+        "-fno-fast-math",
+        "-ffp-contract=off",
+        "-fno-unsafe-math-optimizations",
+        "-fno-associative-math",
+        "-fno-reciprocal-math",
+        "-fno-finite-math-only",
+        "-frounding-math",
+        "-fexcess-precision=standard",
+        "-fno-tree-vectorize",
+    ]
+    selected: list[str] = []
+    for f in candidates:
+        if _cc_supports_flags(cc, [f]):
+            selected.append(f)
+    return selected
 
 
 def _path_to_make_target(path: Path) -> str:
@@ -2050,13 +2092,17 @@ def _write_ck_weight_snapshot_artifact(
     snapshot_numel: int,
     *,
     reason: str,
+    tag: Optional[str] = None,
 ) -> Optional[Path]:
     """Persist CK weight snapshot for drift/replay triage."""
     try:
         snap_dir = run_dir / "oracle_ck_snapshots"
         snap_dir.mkdir(parents=True, exist_ok=True)
-        bin_path = snap_dir / f"step_{int(step):08d}.f32bin"
-        meta_path = snap_dir / f"step_{int(step):08d}.json"
+        stem = f"step_{int(step):08d}"
+        if tag:
+            stem = f"{stem}_{str(tag)}"
+        bin_path = snap_dir / f"{stem}.f32bin"
+        meta_path = snap_dir / f"{stem}.json"
         raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
         bin_path.write_bytes(raw)
         meta = {
@@ -2080,13 +2126,85 @@ def _write_ck_activation_snapshot_artifact(
     snapshot_numel: int,
     *,
     reason: str,
+    tag: Optional[str] = None,
 ) -> Optional[Path]:
     """Persist CK activation snapshot for drift/replay triage."""
     try:
         snap_dir = run_dir / "oracle_ck_activations"
         snap_dir.mkdir(parents=True, exist_ok=True)
-        bin_path = snap_dir / f"step_{int(step):08d}.f32bin"
-        meta_path = snap_dir / f"step_{int(step):08d}.json"
+        stem = f"step_{int(step):08d}"
+        if tag:
+            stem = f"{stem}_{str(tag)}"
+        bin_path = snap_dir / f"{stem}.f32bin"
+        meta_path = snap_dir / f"{stem}.json"
+        raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
+        bin_path.write_bytes(raw)
+        meta = {
+            "generated_at": _utc_now_iso(),
+            "step": int(step),
+            "numel": int(snapshot_numel),
+            "bytes": int(len(raw)),
+            "reason": str(reason),
+            "file": str(bin_path),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        return bin_path
+    except Exception:
+        return None
+
+
+def _write_ck_optimizer_state_snapshot_artifact(
+    run_dir: Path,
+    step: int,
+    snapshot_buf: object,
+    snapshot_numel: int,
+    *,
+    reason: str,
+    tag: Optional[str] = None,
+) -> Optional[Path]:
+    """Persist CK optimizer-state snapshot for runtime parity triage."""
+    try:
+        snap_dir = run_dir / "oracle_ck_optimizer_state"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"step_{int(step):08d}"
+        if tag:
+            stem = f"{stem}_{str(tag)}"
+        bin_path = snap_dir / f"{stem}.f32bin"
+        meta_path = snap_dir / f"{stem}.json"
+        raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
+        bin_path.write_bytes(raw)
+        meta = {
+            "generated_at": _utc_now_iso(),
+            "step": int(step),
+            "numel": int(snapshot_numel),
+            "bytes": int(len(raw)),
+            "reason": str(reason),
+            "file": str(bin_path),
+        }
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        return bin_path
+    except Exception:
+        return None
+
+
+def _write_ck_accum_snapshot_artifact(
+    run_dir: Path,
+    step: int,
+    snapshot_buf: object,
+    snapshot_numel: int,
+    *,
+    reason: str,
+    tag: Optional[str] = None,
+) -> Optional[Path]:
+    """Persist CK grad-accum snapshot for runtime parity triage."""
+    try:
+        snap_dir = run_dir / "oracle_ck_accum"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"step_{int(step):08d}"
+        if tag:
+            stem = f"{stem}_{str(tag)}"
+        bin_path = snap_dir / f"{stem}.f32bin"
+        meta_path = snap_dir / f"{stem}.json"
         raw = ctypes.string_at(ctypes.addressof(snapshot_buf), int(snapshot_numel) * ctypes.sizeof(ctypes.c_float))
         bin_path.write_bytes(raw)
         meta = {
@@ -2627,7 +2745,14 @@ def _run_pr37_memory_verification(
 
 
 
-def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: bool, runtime_defines: Optional[dict] = None, train_tokens: int = 1) -> tuple[Path, Path]:
+def _ensure_train_runtime_artifacts(
+    run_dir: Path,
+    python_exec: str,
+    strict: bool,
+    runtime_defines: Optional[dict] = None,
+    train_tokens: int = 1,
+    extra_cflags: Optional[Sequence[str]] = None,
+) -> tuple[Path, Path]:
     """Ensure run_dir has IR1/IR2/layout/audits and compiled libtrain.so."""
     # This is the train-runtime artifact chain in one place:
     # manifest -> IR1 -> IR2 -> invariants -> layout -> layout audit -> codegen -> libtrain.so
@@ -2825,8 +2950,11 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
 
     libtrain_so = run_dir / "libtrain.so"
     defines = dict(runtime_defines or {})
+    cflags = [str(f) for f in (extra_cflags or []) if str(f).strip()]
     needs_compile = (not libtrain_so.exists()) or (c_src.stat().st_mtime > libtrain_so.stat().st_mtime)
     if defines:
+        needs_compile = True
+    if cflags:
         needs_compile = True
     if needs_compile:
         cc = os.environ.get("CC") or "gcc"
@@ -2835,6 +2963,7 @@ def _ensure_train_runtime_artifacts(run_dir: Path, python_exec: str, strict: boo
             "-shared",
             "-fPIC",
             "-O3",
+            *cflags,
             str(c_src),
             "-o",
             str(libtrain_so),
@@ -2887,8 +3016,29 @@ def _run_ck_train_runtime(
         "CK_NUM_TOKENS": max(1, int(seq_len)),
         "CK_GRAD_ACCUM_STEPS": int(grad_accum),
     }
+    bitwise_parity_enabled = bool(getattr(args, "bitwise_parity", False))
+    bitwise_compile_flags: list[str] = []
+    bitwise_runtime_env: dict[str, str] = {}
+    bitwise_runtime_env_prev: dict[str, Optional[str]] = {}
+    ck_loss_backend = str(getattr(args, "ck_loss_backend", "c") or "c").strip().lower()
+    runtime_ce_backend = "default"
+    # Generated runtime cannot call into Python/PyTorch kernels directly.
+    # For backend=ck, route torch parity CE request to the strict C ptref CE path.
+    if ck_loss_backend in ("c_ptref", "torch"):
+        runtime_defines["CK_TRAIN_USE_CE_PTREF"] = 1
+        runtime_ce_backend = "ptref"
+    else:
+        runtime_defines["CK_TRAIN_USE_CE_PTREF"] = 0
+    if ck_loss_backend == "torch":
+        log("  backend=ck CE note: --ck-loss-backend=torch maps to ptref C CE in generated runtime", C_ORANGE)
     max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
     runtime_defines["CK_MAX_GRAD_NORM"] = f"{max_grad_norm:.9g}"
+    if bool(getattr(args, "ablate_attention_backward", False)):
+        runtime_defines["CK_ABLATE_ATTENTION_BACKWARD"] = 1
+    if bool(getattr(args, "ablate_rope_backward_qk", False)):
+        runtime_defines["CK_ABLATE_ROPE_BACKWARD_QK"] = 1
+    if bool(getattr(args, "ablate_qk_norm_backward", False)):
+        runtime_defines["CK_ABLATE_QK_NORM_BACKWARD"] = 1
     if bool(getattr(args, "train_runtime_canary_checks", False)):
         runtime_defines["CK_RUNTIME_CANARY_CHECKS"] = 1
     if bool(getattr(args, "train_runtime_bounds_assert", False)):
@@ -2897,6 +3047,50 @@ def _run_ck_train_runtime(
     if fault_op_id >= 0:
         runtime_defines["CK_RUNTIME_FAULT_INJECT"] = 1
         runtime_defines["CK_FAULT_INJECT_OP_ID"] = int(fault_op_id)
+    if bitwise_parity_enabled:
+        # Bitwise-parity mode is explicitly slower: force deterministic runtime
+        # scheduling + conservative FP compilation for the generated train runtime.
+        runtime_defines["CK_TRAIN_BITWISE_PARITY"] = 1
+        cc = os.environ.get("CC") or "gcc"
+        bitwise_compile_flags = _bitwise_parity_compile_flags(cc)
+        bitwise_runtime_env = {
+            "CK_NUM_THREADS": "1",
+            "OMP_NUM_THREADS": "1",
+            "OMP_DYNAMIC": "FALSE",
+            "MKL_NUM_THREADS": "1",
+            "CK_QK_NORM_BACKWARD_ISA": "scalar",
+        }
+        for env_k, env_v in bitwise_runtime_env.items():
+            bitwise_runtime_env_prev[env_k] = os.environ.get(env_k)
+            os.environ[env_k] = str(env_v)
+        if bitwise_compile_flags:
+            log(
+                "  bitwise parity mode: on "
+                f"(env=deterministic, cflags={' '.join(bitwise_compile_flags)})",
+                C_DIM,
+            )
+        else:
+            log(
+                "  bitwise parity mode: on (env=deterministic, no extra compiler flags accepted)",
+                C_ORANGE,
+            )
+        if isinstance(profile_meta, dict):
+            profile_meta["bitwise_parity"] = {
+                "enabled": True,
+                "compile_flags": list(bitwise_compile_flags),
+                "runtime_env": dict(bitwise_runtime_env),
+            }
+    if any(
+        bool(getattr(args, name, False))
+        for name in ("ablate_attention_backward", "ablate_rope_backward_qk", "ablate_qk_norm_backward")
+    ):
+        log(
+            "  runtime ablations: "
+            f"attention_backward={int(bool(getattr(args, 'ablate_attention_backward', False)))} "
+            f"rope_backward_qk={int(bool(getattr(args, 'ablate_rope_backward_qk', False)))} "
+            f"qk_norm_backward={int(bool(getattr(args, 'ablate_qk_norm_backward', False)))}",
+            C_ORANGE,
+        )
 
     c_src, libtrain_so = _ensure_train_runtime_artifacts(
         run_dir=run_dir,
@@ -2904,6 +3098,7 @@ def _run_ck_train_runtime(
         strict=bool(getattr(args, "train_strict", False)),
         runtime_defines=runtime_defines,
         train_tokens=seq_len,
+        extra_cflags=bitwise_compile_flags,
     )
 
     runtime_summary_path = run_dir / "generated_train_runtime_summary_v7.json"
@@ -3106,9 +3301,28 @@ def _run_ck_train_runtime(
     activation_tol = max(train_loss_tol * 10.0, 1e-5)
     parity_replay_on_check = bool(getattr(args, "parity_replay_on_check", False))
     parity_replay_tol = float(getattr(args, "parity_replay_tol", 1e-7) or 1e-7)
+    bruteforce_debug = bool(getattr(args, "bruteforce_debug", False))
+    dump_on_drift = bool(getattr(args, "dump_on_drift", False))
+    dump_on_check = bool(getattr(args, "dump_on_check", False))
+    dump_check_topk = max(1, int(getattr(args, "dump_check_topk", 200) or 200))
     replay_weight_tol = float(getattr(args, "train_param_tol", 3e-5) or 3e-5)
     train_save_every = int(getattr(args, "train_save_every", 0) or 0)
     train_save_final = bool(getattr(args, "train_save_final", True))
+
+    if bruteforce_debug:
+        if not parity_on:
+            parity_on = True
+        parity_profile = "debug"
+        parity_every = 1
+        if not parity_replay_on_check:
+            parity_replay_on_check = True
+        if not dump_on_check:
+            dump_on_check = True
+        log(
+            "  generated-runtime brute-force debug: parity_on + parity_every=1 + parity_replay_on_check + dump_on_check",
+            C_DIM,
+        )
+
     replay_auto_enabled = False
     has_weight_snapshot_api = bool(has_snapshot_numel and has_snapshot_export and has_snapshot_import)
     has_optimizer_state_snapshot_api = bool(
@@ -3148,7 +3362,9 @@ def _run_ck_train_runtime(
 
     # For oracle parity runs, force strict kernel math by default.
     # Can also be enabled explicitly for non-oracle CK runs via --kernel-strict-math.
-    strict_runtime_enabled = bool(parity_on or bool(getattr(args, "kernel_strict_math", False)))
+    strict_runtime_enabled = bool(
+        bitwise_parity_enabled or parity_on or bool(getattr(args, "kernel_strict_math", False))
+    )
     strict_runtime_bound = _set_runtime_strict_parity(lib, strict_runtime_enabled)
 
     oracle_payload = None
@@ -3354,6 +3570,9 @@ def _run_ck_train_runtime(
     checked_diffs: list[float] = []
     snapshot_artifacts: list[str] = []
     activation_snapshot_artifacts: list[str] = []
+    optimizer_snapshot_artifacts: list[str] = []
+    accum_snapshot_artifacts: list[str] = []
+    check_dump_artifacts: list[dict] = []
     checkpoint_artifacts: list[dict] = []
     last_checkpoint_step = 0
     oracle_points = 0
@@ -3373,7 +3592,8 @@ def _run_ck_train_runtime(
                 and (
                     snapshot_oracle_enabled
                     or parity_replay_on_check
-                    or bool(getattr(args, "dump_on_drift", False))
+                    or dump_on_drift
+                    or dump_on_check
                 )
             )
             pre_replay_accum_counter = int(lib.ck_train_get_accum_counter()) if has_accum_counter_api else None
@@ -3388,11 +3608,11 @@ def _run_ck_train_runtime(
                 snap = _ck_export_runtime_weight_snapshot(lib)
                 if snap is not None:
                     pre_snapshot, pre_snapshot_numel = snap
-            if need_check_snapshot and parity_replay_on_check and has_optimizer_state_snapshot_api:
+            if need_check_snapshot and (parity_replay_on_check or dump_on_check) and has_optimizer_state_snapshot_api:
                 opt_snap = _ck_export_runtime_optimizer_state_snapshot(lib)
                 if opt_snap is not None:
                     pre_optimizer_state_snapshot, pre_optimizer_state_snapshot_numel = opt_snap
-            if need_check_snapshot and parity_replay_on_check and has_accum_snapshot_api:
+            if need_check_snapshot and (parity_replay_on_check or dump_on_check) and has_accum_snapshot_api:
                 accum_snap = _ck_export_runtime_accum_snapshot(lib)
                 if accum_snap is not None:
                     pre_accum_snapshot, pre_accum_snapshot_numel = accum_snap
@@ -3423,18 +3643,110 @@ def _run_ck_train_runtime(
             post_optimizer_state_snapshot_numel = 0
             post_accum_snapshot = None
             post_accum_snapshot_numel = 0
-            if parity_replay_on_check and (step in check_steps) and has_weight_snapshot_api:
+            if (parity_replay_on_check or dump_on_check) and (step in check_steps) and has_weight_snapshot_api:
                 post_snap = _ck_export_runtime_weight_snapshot(lib)
                 if post_snap is not None:
                     post_snapshot, post_snapshot_numel = post_snap
-            if parity_replay_on_check and (step in check_steps) and has_optimizer_state_snapshot_api:
+            if (parity_replay_on_check or dump_on_check) and (step in check_steps) and has_optimizer_state_snapshot_api:
                 post_opt_snap = _ck_export_runtime_optimizer_state_snapshot(lib)
                 if post_opt_snap is not None:
                     post_optimizer_state_snapshot, post_optimizer_state_snapshot_numel = post_opt_snap
-            if parity_replay_on_check and (step in check_steps) and has_accum_snapshot_api:
+            if (parity_replay_on_check or dump_on_check) and (step in check_steps) and has_accum_snapshot_api:
                 post_accum_snap = _ck_export_runtime_accum_snapshot(lib)
                 if post_accum_snap is not None:
                     post_accum_snapshot, post_accum_snapshot_numel = post_accum_snap
+
+            if dump_on_check and (step in check_steps):
+                dump_row: dict = {"step": int(step)}
+                if pre_snapshot is not None and pre_snapshot_numel > 0:
+                    wpre = _write_ck_weight_snapshot_artifact(
+                        run_dir,
+                        step,
+                        pre_snapshot,
+                        pre_snapshot_numel,
+                        reason="parity_check",
+                        tag="pre",
+                    )
+                    if wpre is not None:
+                        snapshot_artifacts.append(str(wpre))
+                        dump_row["weight_pre"] = str(wpre)
+                if post_snapshot is not None and post_snapshot_numel > 0:
+                    wpost = _write_ck_weight_snapshot_artifact(
+                        run_dir,
+                        step,
+                        post_snapshot,
+                        post_snapshot_numel,
+                        reason="parity_check",
+                        tag="post",
+                    )
+                    if wpost is not None:
+                        snapshot_artifacts.append(str(wpost))
+                        dump_row["weight_post"] = str(wpost)
+                if pre_optimizer_state_snapshot is not None and pre_optimizer_state_snapshot_numel > 0:
+                    opre = _write_ck_optimizer_state_snapshot_artifact(
+                        run_dir,
+                        step,
+                        pre_optimizer_state_snapshot,
+                        pre_optimizer_state_snapshot_numel,
+                        reason="parity_check",
+                        tag="pre",
+                    )
+                    if opre is not None:
+                        optimizer_snapshot_artifacts.append(str(opre))
+                        dump_row["optimizer_pre"] = str(opre)
+                if post_optimizer_state_snapshot is not None and post_optimizer_state_snapshot_numel > 0:
+                    opost = _write_ck_optimizer_state_snapshot_artifact(
+                        run_dir,
+                        step,
+                        post_optimizer_state_snapshot,
+                        post_optimizer_state_snapshot_numel,
+                        reason="parity_check",
+                        tag="post",
+                    )
+                    if opost is not None:
+                        optimizer_snapshot_artifacts.append(str(opost))
+                        dump_row["optimizer_post"] = str(opost)
+                if pre_accum_snapshot is not None and pre_accum_snapshot_numel >= 0:
+                    apre = _write_ck_accum_snapshot_artifact(
+                        run_dir,
+                        step,
+                        pre_accum_snapshot,
+                        pre_accum_snapshot_numel,
+                        reason="parity_check",
+                        tag="pre",
+                    )
+                    if apre is not None:
+                        accum_snapshot_artifacts.append(str(apre))
+                        dump_row["accum_pre"] = str(apre)
+                if post_accum_snapshot is not None and post_accum_snapshot_numel >= 0:
+                    apost = _write_ck_accum_snapshot_artifact(
+                        run_dir,
+                        step,
+                        post_accum_snapshot,
+                        post_accum_snapshot_numel,
+                        reason="parity_check",
+                        tag="post",
+                    )
+                    if apost is not None:
+                        accum_snapshot_artifacts.append(str(apost))
+                        dump_row["accum_post"] = str(apost)
+                if has_act_snapshot_export:
+                    act_snap = _ck_export_runtime_activation_snapshot(lib)
+                    if act_snap is not None:
+                        act_buf, act_numel = act_snap
+                        adump = _write_ck_activation_snapshot_artifact(
+                            run_dir,
+                            step,
+                            act_buf,
+                            act_numel,
+                            reason="parity_check",
+                            tag="post",
+                        )
+                        if adump is not None:
+                            activation_snapshot_artifacts.append(str(adump))
+                            dump_row["activation_post"] = str(adump)
+                if len(dump_row) > 1:
+                    check_dump_artifacts.append(dump_row)
 
             if has_weight_snapshot_api and train_save_every > 0 and (step % train_save_every) == 0:
                 ckpt_snap = (post_snapshot, post_snapshot_numel) if (post_snapshot is not None and post_snapshot_numel > 0) else _ck_export_runtime_weight_snapshot(lib)
@@ -3773,6 +4085,9 @@ def _run_ck_train_runtime(
             oracle_first_bad_tensor = None
             oracle_first_bad_diff = None
             oracle_first_bad_op = None
+            oracle_top_tensor = None
+            oracle_top_diff = None
+            oracle_top_op = None
             oracle_slots_compared = 0
             oracle_slots_matched = 0
             if parity_on and (step in check_steps) and snapshot_oracle_enabled and snapshot_oracle_fn is not None:
@@ -3844,6 +4159,11 @@ def _run_ck_train_runtime(
                                     oracle_logits_max_abs_diff = diff
                                     oracle_logits_slot = name
 
+                                if (oracle_top_diff is None) or (float(diff) > float(oracle_top_diff)):
+                                    oracle_top_tensor = name
+                                    oracle_top_diff = float(diff)
+                                    oracle_top_op = _slot_op_hint_from_name(name)
+
                                 if (oracle_first_bad_tensor is None) and (diff > float(activation_tol)):
                                     oracle_first_bad_tensor = name
                                     oracle_first_bad_diff = diff
@@ -3902,7 +4222,7 @@ def _run_ck_train_runtime(
                             drift_signature = "tensor_slot"
                         else:
                             drift_signature = "mixed"
-                        if bool(getattr(args, "dump_on_drift", False)) and pre_snapshot is not None and pre_snapshot_numel > 0:
+                        if dump_on_drift and pre_snapshot is not None and pre_snapshot_numel > 0:
                             snap_path = _write_ck_weight_snapshot_artifact(
                                 run_dir,
                                 step,
@@ -3913,7 +4233,7 @@ def _run_ck_train_runtime(
                             if snap_path is not None:
                                 snapshot_path = str(snap_path)
                                 snapshot_artifacts.append(snapshot_path)
-                        if bool(getattr(args, "dump_on_drift", False)) and has_act_snapshot_export:
+                        if dump_on_drift and has_act_snapshot_export:
                             act_snap = _ck_export_runtime_activation_snapshot(lib)
                             if act_snap is not None:
                                 act_buf, act_numel = act_snap
@@ -3927,6 +4247,26 @@ def _run_ck_train_runtime(
                                 if act_path is not None:
                                     activation_snapshot_path = str(act_path)
                                     activation_snapshot_artifacts.append(activation_snapshot_path)
+                        if dump_on_drift and pre_optimizer_state_snapshot is not None and pre_optimizer_state_snapshot_numel > 0:
+                            drift_opt_path = _write_ck_optimizer_state_snapshot_artifact(
+                                run_dir,
+                                step,
+                                pre_optimizer_state_snapshot,
+                                pre_optimizer_state_snapshot_numel,
+                                reason="parity_drift",
+                            )
+                            if drift_opt_path is not None:
+                                optimizer_snapshot_artifacts.append(str(drift_opt_path))
+                        if dump_on_drift and pre_accum_snapshot is not None and pre_accum_snapshot_numel >= 0:
+                            drift_accum_path = _write_ck_accum_snapshot_artifact(
+                                run_dir,
+                                step,
+                                pre_accum_snapshot,
+                                pre_accum_snapshot_numel,
+                                reason="parity_drift",
+                            )
+                            if drift_accum_path is not None:
+                                accum_snapshot_artifacts.append(str(drift_accum_path))
                         parity_failures.append({
                             "step": step,
                             "loss_ck": loss_val,
@@ -3974,6 +4314,9 @@ def _run_ck_train_runtime(
                     "first_bad_tensor": oracle_first_bad_tensor,
                     "first_bad_diff": oracle_first_bad_diff,
                     "first_bad_op": oracle_first_bad_op,
+                    "top_tensor": oracle_top_tensor,
+                    "top_diff": oracle_top_diff,
+                    "top_op": oracle_top_op,
                     "slots_compared": oracle_slots_compared,
                     "slots_matched": oracle_slots_matched,
                     "lr": lr,
@@ -4005,6 +4348,9 @@ def _run_ck_train_runtime(
                     "first_bad_tensor": oracle_first_bad_tensor,
                     "first_bad_diff": oracle_first_bad_diff,
                     "first_bad_op": oracle_first_bad_op,
+                    "top_tensor": oracle_top_tensor,
+                    "top_diff": oracle_top_diff,
+                    "top_op": oracle_top_op,
                     "slots_compared": oracle_slots_compared,
                     "slots_matched": oracle_slots_matched,
                     "replay_enabled": bool(parity_replay_on_check),
@@ -4123,7 +4469,7 @@ def _run_ck_train_runtime(
     mean_loss_abs_diff = (sum(checked_diffs) / len(checked_diffs)) if checked_diffs else 0.0
     pass_parity = (len(parity_failures) == 0) and (not parity_replay_on_check or len(replay_failures) == 0)
 
-    if parity_on and parity_failures and bool(getattr(args, "dump_on_drift", False)):
+    if parity_on and parity_failures and dump_on_drift:
         topk = int(getattr(args, "drift_topk", 20) or 20)
         ranked = sorted(
             parity_failures,
@@ -4142,6 +4488,9 @@ def _run_ck_train_runtime(
             "replay_failures": replay_failures[:topk],
             "snapshot_files": snapshot_artifacts[:topk],
             "activation_snapshot_files": activation_snapshot_artifacts[:topk],
+            "optimizer_snapshot_files": optimizer_snapshot_artifacts[:topk],
+            "accum_snapshot_files": accum_snapshot_artifacts[:topk],
+            "check_dump_files": check_dump_artifacts[:topk],
         }
         drift_path = run_dir / "drift_report.json"
         drift_path.write_text(json.dumps(drift_report, indent=2), encoding="utf-8")
@@ -4154,6 +4503,14 @@ def _run_ck_train_runtime(
         "grad_accum": grad_accum,
         "optimizer": optimizer,
         "lr": lr,
+        "ck_loss_backend": ck_loss_backend,
+        "runtime_ce_backend": runtime_ce_backend,
+        "bitwise_parity": {
+            "enabled": bool(bitwise_parity_enabled),
+            "compile_flags": list(bitwise_compile_flags),
+            "runtime_env": dict(bitwise_runtime_env),
+            "strict_runtime_forced": bool(strict_runtime_enabled),
+        },
         "steps": step,
         "micro_steps": micro_steps,
         "optimizer_steps": optimizer_steps,
@@ -4242,6 +4599,10 @@ def _run_ck_train_runtime(
             "replay_optimizer_state_tol": float(replay_weight_tol),
             "replay_accum_snapshot_tol": float(replay_weight_tol),
             "logits_tol": float(activation_tol),
+            "bruteforce_debug": bool(bruteforce_debug),
+            "dump_on_drift": bool(dump_on_drift),
+            "dump_on_check": bool(dump_on_check),
+            "dump_check_topk": int(dump_check_topk),
             "replay_failures": replay_failures,
             "snapshot_api_available": bool(has_weight_snapshot_api),
             "optimizer_state_snapshot_api_available": bool(has_optimizer_state_snapshot_api),
@@ -4252,6 +4613,9 @@ def _run_ck_train_runtime(
             "replay_runtime_error": replay_runtime_error,
             "snapshot_files": snapshot_artifacts,
             "activation_snapshot_files": activation_snapshot_artifacts,
+            "optimizer_snapshot_files": optimizer_snapshot_artifacts,
+            "accum_snapshot_files": accum_snapshot_artifacts,
+            "check_dump_files": check_dump_artifacts[:dump_check_topk],
         },
     }
 
@@ -4273,8 +4637,19 @@ def _run_ck_train_runtime(
         profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_snapshots", "path": str(run_dir / "oracle_ck_snapshots")})
     if activation_snapshot_artifacts:
         profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_activations", "path": str(run_dir / "oracle_ck_activations")})
+    if optimizer_snapshot_artifacts:
+        profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_optimizer_state", "path": str(run_dir / "oracle_ck_optimizer_state")})
+    if accum_snapshot_artifacts:
+        profile_meta.setdefault("artifacts", []).append({"label": "oracle_ck_accum", "path": str(run_dir / "oracle_ck_accum")})
     if checkpoint_artifacts:
         profile_meta.setdefault("artifacts", []).append({"label": "train_checkpoints", "path": str(run_dir / "checkpoints")})
+
+    if bitwise_runtime_env_prev:
+        for env_k, prev_v in bitwise_runtime_env_prev.items():
+            if prev_v is None:
+                os.environ.pop(env_k, None)
+            else:
+                os.environ[env_k] = str(prev_v)
 
     return json_out
 
@@ -4501,8 +4876,13 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     parity_every = int(getattr(args, "parity_every", 50) or 0)
     oracle = str(getattr(args, "oracle", "pytorch") or "pytorch")
     analysis_mode = str(getattr(args, "analysis_checkpoints", "log") or "log")
+    bruteforce_debug = bool(getattr(args, "bruteforce_debug", False))
+    dump_on_check = bool(getattr(args, "dump_on_check", False))
+    dump_check_topk = max(1, int(getattr(args, "dump_check_topk", 200) or 200))
     train_save_every = int(getattr(args, "train_save_every", 0) or 0)
     train_save_final = bool(getattr(args, "train_save_final", True))
+    if bruteforce_debug:
+        log("  generated-runtime brute-force debug: on", C_DIM)
     if parity_on:
         cadence = f"every={parity_every}" if parity_every > 0 else f"profile={parity_profile}"
         log(f"  parity oracle: on ({oracle}, {cadence})", C_DIM)
@@ -4510,8 +4890,15 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         log("  parity oracle: off", C_DIM)
     if bool(getattr(args, "kernel_strict_math", False)):
         log("  kernel strict math: on", C_DIM)
+    if bool(getattr(args, "bitwise_parity", False)):
+        if train_backend == "ck":
+            log("  bitwise parity mode: on", C_DIM)
+        else:
+            log("  bitwise parity mode: ignored (backend must be ck)", C_ORANGE)
     if bool(getattr(args, "dump_on_drift", False)):
         log(f"  drift dumps: on (topk={int(getattr(args, 'drift_topk', 20) or 20)})", C_DIM)
+    if dump_on_check:
+        log(f"  check dumps: on (metadata topk={dump_check_topk})", C_DIM)
     if train_save_every > 0 or train_save_final:
         cadence = f"every={train_save_every}" if train_save_every > 0 else "off"
         final_txt = "on" if train_save_final else "off"
@@ -4535,7 +4922,11 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         "parity_profile": parity_profile,
         "parity_every": parity_every,
         "oracle": oracle,
+        "bruteforce_debug": bruteforce_debug,
+        "bitwise_parity": bool(getattr(args, "bitwise_parity", False)),
         "dump_on_drift": bool(getattr(args, "dump_on_drift", False)),
+        "dump_on_check": dump_on_check,
+        "dump_check_topk": dump_check_topk,
         "drift_topk": int(getattr(args, "drift_topk", 20) or 20),
         "analysis_checkpoints": analysis_mode,
         "train_save_every": train_save_every,
@@ -6120,6 +6511,8 @@ Examples:
                         help='Enable scheduled oracle parity checks (metadata/config for training pipeline)')
         sp.add_argument('--kernel-strict-math', action='store_true',
                         help='Force strict kernel math in CK runtime (exact sigmoid/SwiGLU + strict parity math paths)')
+        sp.add_argument('--bitwise-parity', action='store_true',
+                        help='CK runtime only: force deterministic single-thread + strict FP compile flags for near-bitwise parity diagnostics')
         sp.add_argument('--oracle', choices=['pytorch'], default='pytorch',
                         help='Oracle backend used for parity checks (default: pytorch)')
         sp.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced',
@@ -6130,8 +6523,14 @@ Examples:
                         help='Replay checked CK steps from exported weight snapshots to verify one-step determinism')
         sp.add_argument('--parity-replay-tol', type=float, default=1e-7,
                         help='Allowed absolute loss delta for CK replay-on-check')
+        sp.add_argument('--bruteforce-debug', action='store_true',
+                        help='Generated-runtime only: force parity_every=1 + replay checks + check-step dumps')
         sp.add_argument('--dump-on-drift', action='store_true',
                         help='On parity mismatch, dump drift artifacts for triage')
+        sp.add_argument('--dump-on-check', action='store_true',
+                        help='Dump runtime snapshots on every checked parity step (generated-runtime backend)')
+        sp.add_argument('--dump-check-topk', type=int, default=200,
+                        help='Cap check-dump entries retained in JSON metadata (default: 200)')
         sp.add_argument('--drift-topk', type=int, default=20,
                         help='Top-K tensor diffs to include in drift report')
         sp.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log',
@@ -6147,6 +6546,12 @@ Examples:
                         help='Compile CK train runtime with CK_RUNTIME_BOUNDS_ASSERT=1 (pointer-span assertions)')
         sp.add_argument('--train-runtime-fault-op-id', type=int, default=-1,
                         help='Compile CK train runtime with fault injection at op_id (>=0 writes +1 past output)')
+        sp.add_argument('--ablate-attention-backward', action='store_true',
+                        help='Compile CK runtime with CK_ABLATE_ATTENTION_BACKWARD=1 (diagnostic only)')
+        sp.add_argument('--ablate-rope-backward-qk', action='store_true',
+                        help='Compile CK runtime with CK_ABLATE_ROPE_BACKWARD_QK=1 (diagnostic only)')
+        sp.add_argument('--ablate-qk-norm-backward', action='store_true',
+                        help='Compile CK runtime with CK_ABLATE_QK_NORM_BACKWARD=1 (diagnostic only)')
         sp.add_argument('--train-verify-memory', action='store_true',
                         help='Run PR3.7 memory verification suite (toggle diff, intentional +1, ASan agreement, bounds)')
         sp.add_argument('--train-verify-steps', type=int, default=4,
@@ -6232,17 +6637,26 @@ Examples:
                            help='Enable scheduled oracle parity checks metadata for --train-e2e')
     run_parser.add_argument('--kernel-strict-math', action='store_true',
                            help='Force strict kernel math in CK runtime (exact sigmoid/SwiGLU + strict parity math paths)')
+    run_parser.add_argument('--bitwise-parity', action='store_true',
+                           help='CK runtime only: force deterministic single-thread + strict FP compile flags for near-bitwise parity diagnostics')
     run_parser.add_argument('--oracle', choices=['pytorch'], default='pytorch')
     run_parser.add_argument('--parity-profile', choices=['debug', 'balanced', 'light'], default='balanced')
     run_parser.add_argument('--parity-every', type=int, default=50)
     run_parser.add_argument('--parity-replay-on-check', action='store_true')
     run_parser.add_argument('--parity-replay-tol', type=float, default=1e-7)
+    run_parser.add_argument('--bruteforce-debug', action='store_true',
+                           help='Generated-runtime only: force parity_every=1 + replay checks + check-step dumps')
     run_parser.add_argument('--dump-on-drift', action='store_true')
+    run_parser.add_argument('--dump-on-check', action='store_true')
+    run_parser.add_argument('--dump-check-topk', type=int, default=200)
     run_parser.add_argument('--drift-topk', type=int, default=20)
     run_parser.add_argument('--analysis-checkpoints', choices=['log', 'off'], default='log')
     run_parser.add_argument('--train-runtime-canary-checks', action='store_true')
     run_parser.add_argument('--train-runtime-bounds-assert', action='store_true')
     run_parser.add_argument('--train-runtime-fault-op-id', type=int, default=-1)
+    run_parser.add_argument('--ablate-attention-backward', action='store_true')
+    run_parser.add_argument('--ablate-rope-backward-qk', action='store_true')
+    run_parser.add_argument('--ablate-qk-norm-backward', action='store_true')
     run_parser.add_argument('--train-verify-memory', action='store_true')
     run_parser.add_argument('--train-verify-steps', type=int, default=4)
     run_parser.add_argument('--train-verify-fault-op-id', type=int, default=-1)
