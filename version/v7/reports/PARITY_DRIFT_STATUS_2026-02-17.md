@@ -24,6 +24,16 @@
   - `version/v7/scripts/ck_run_v7.py:4198`
   - `version/v7/scripts/ck_run_v7.py:4456`
 
+## Current gate status (2026-02-19)
+- Primary release gate is generated-runtime parity (`ck_run_v7.py train --backend ck --parity-on`) and native `ck-cli-v7 train` (same generated `libtrain.so` math path).
+- Latest canonical artifacts in this workspace:
+  - `version/v7/.cache/reports/train_runtime_parity_realistic_latest.json` -> `pass_parity=true`, `max_loss_abs_diff=1.0729e-06`
+  - `version/v7/.cache/reports/train_runtime_parity_stress_latest.json` -> `pass_parity=true`, `max_loss_abs_diff=7.1526e-07`
+  - `version/v7/.cache/reports/train_runtime_parity_stress_l24_e1_after_gradactfix.json` -> `pass_parity=true` (24-layer run-dir)
+- Interpretation:
+  - Earlier step-65/step-800 drift findings from legacy harness runs are kept for traceability but are not the current generated-runtime release signal.
+  - The major remaining validation gap is production-scale training dimensions (for example `d_model >= 1024`) rather than tiny/medium parity correctness.
+
 ## Attention save-for-backward contract fix (added 2026-02-18)
 - Root cause:
   - Generated train runtime used `attention_forward_causal_head_major_gqa_flash_strided` in forward for attn ops.

@@ -1730,7 +1730,7 @@
         <div class="tab" data-tab="dataflow" data-mode="inference" onclick="showTab('dataflow')">Dataflow Graph</div>
         <div class="tab" data-tab="tests" data-mode="inference" onclick="showTab('tests')">Tests</div>
         <div class="tab" data-tab="stats" data-mode="inference" onclick="showTab('stats')">Statistics</div>
-        <div class="tab" data-tab="training" data-mode="training" onclick="showTab('training')">Backward IR</div>
+        <div class="tab" data-tab="training" data-mode="training" onclick="showTab('training')">Backprop IR</div>
         <div class="tab" data-tab="profile" data-mode="inference,training" onclick="showTab('profile')">Profile</div>
     </div>
 
@@ -2140,7 +2140,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
         </div>
 
         <div id="dataflow" class="panel">
-            <h2 style="margin-bottom: 1rem;">IR1 Dataflow Graph</h2>
+            <h2 style="margin-bottom: 1rem;">IR Dataflow Graph (Forward + Backward)</h2>
             <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
                 Visualize the logical dataflow between operations. Each op shows its inputs (where data comes from)
                 and outputs (where data goes). Slots represent logical buffers (main_stream, residual, etc.).
@@ -2164,6 +2164,13 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
 
             <!-- Layer Selector -->
             <div style="margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <label style="color: var(--text-secondary);">Phase:</label>
+                <select id="dfPhaseSelect" onchange="renderDataflow()" style="padding: 0.5rem; background: var(--dark-card); color: var(--text-primary); border: 1px solid var(--grey); border-radius: 4px;">
+                    <option value="forward">Forward</option>
+                    <option value="backward">Backward</option>
+                    <option value="all">Forward + Backward</option>
+                    <option value="runtime">Runtime Stitch</option>
+                </select>
                 <label style="color: var(--text-secondary);">Show Layer:</label>
                 <select id="dfLayerSelect" onchange="renderDataflowLayer(this.value)" style="padding: 0.5rem; background: var(--dark-card); color: var(--text-primary); border: 1px solid var(--grey); border-radius: 4px;">
                     <option value="-1">Header</option>
@@ -2180,6 +2187,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                         <thead>
                             <tr>
                                 <th style="width: 50px;">ID</th>
+                                <th style="width: 90px;">Phase</th>
                                 <th style="width: 150px;">Operation</th>
                                 <th style="width: 200px;">Kernel</th>
                                 <th>Inputs (from)</th>
@@ -3858,6 +3866,36 @@ python test_gemv_q8_0_q8_0.py</pre>
             trainPipelineData = files.training_pipeline || trainPipelineData;
             trainExecPlanData = files.train_exec_plan || trainExecPlanData;
 
+            const hasDecodeArtifacts = Boolean(
+                files.ir1_decode ||
+                files.layout_decode ||
+                files.lowered_decode ||
+                files.lowered_decode_call
+            );
+            const hasPrefillArtifacts = Boolean(
+                files.ir1_prefill ||
+                files.layout_prefill ||
+                files.lowered_prefill ||
+                files.lowered_prefill_call
+            );
+            const hasTrainForwardArtifacts = Boolean(
+                files.ir1_train ||
+                files.layout_train ||
+                files.train_exec_plan
+            );
+            if (!hasDecodeArtifacts && hasTrainForwardArtifacts) {
+                setModeData('decode', 'ir1', files.ir1_train || null);
+                setModeData('decode', 'layout', files.layout_train || null);
+                setModeData('decode', 'call', files.train_exec_plan || null);
+                setModeData('decode', 'lowered', files.train_exec_plan || files.ir1_train || null);
+            }
+            if (!hasPrefillArtifacts && hasTrainForwardArtifacts) {
+                setModeData('prefill', 'ir1', files.ir1_train || null);
+                setModeData('prefill', 'layout', files.layout_train || null);
+                setModeData('prefill', 'call', files.train_exec_plan || null);
+                setModeData('prefill', 'lowered', files.train_exec_plan || files.ir1_train || null);
+            }
+
             window.__ckAnalysisCheckpoints = files.analysis_checkpoints || null;
             window.__ckTrainE2E =
                 files.train_e2e ||
@@ -4521,13 +4559,61 @@ python test_gemv_q8_0_q8_0.py</pre>
             if (!layoutData) return;
 
             const memory = layoutData.memory || layoutData;
-            const weights = memory.weights || {};
-            const activations = memory.activations || {};
+            let weightsEntries = ((memory.weights || {}).entries || []).slice();
+            let activationBuffers = ((memory.activations || {}).buffers || []).slice();
+            if ((weightsEntries.length === 0 && activationBuffers.length === 0) && Array.isArray(layoutData.tensors)) {
+                const tensorRows = layoutData.tensors
+                    .map((t, idx) => {
+                        if (!t || typeof t !== 'object') return null;
+                        const kind = String(t.kind || '').toLowerCase();
+                        const dtype = t.dtype || 'fp32';
+                        const bytes = Number.isFinite(Number(t.bytes)) ? Number(t.bytes) : ((Number(t.numel) || 0) * 4);
+                        const offset = Number.isFinite(Number(t.offset)) ? Number(t.offset) : Number(t.bump_offset || 0);
+                        return {
+                            _idx: idx,
+                            name: t.name || t.id || `tensor_${idx}`,
+                            kind,
+                            size: Math.max(0, bytes),
+                            offset: Math.max(0, offset),
+                            dtype,
+                            shape: t.shape || null,
+                            usage: kind || '-',
+                        };
+                    })
+                    .filter(Boolean);
+
+                const isWeightLike = (kind) => (
+                    kind === 'weight' ||
+                    kind.includes('weight_') ||
+                    kind.includes('_weight') ||
+                    kind.includes('adam_') ||
+                    kind.includes('accum') ||
+                    kind.includes('grad_weight')
+                );
+                weightsEntries = tensorRows
+                    .filter((t) => isWeightLike(t.kind))
+                    .map((t) => ({
+                        name: t.name,
+                        offset: t.offset,
+                        size: t.size,
+                        dtype: t.dtype,
+                        shape: t.shape,
+                    }));
+                activationBuffers = tensorRows
+                    .filter((t) => !isWeightLike(t.kind))
+                    .map((t) => ({
+                        name: t.name,
+                        offset: t.offset,
+                        size: t.size,
+                        dtype: t.dtype,
+                        shape: t.shape,
+                        usage: t.usage,
+                    }));
+            }
 
             let totalWeightSize = 0;
             let totalActivationSize = 0;
 
-            const weightsEntries = weights.entries || [];
             const weightsBody = document.querySelector('#weightsTable tbody');
             weightsBody.innerHTML = '';
 
@@ -4662,7 +4748,6 @@ python test_gemv_q8_0_q8_0.py</pre>
                 weightsBody.appendChild(row);
             });
 
-            const activationBuffers = activations.buffers || [];
             const activationsBody = document.querySelector('#activationsTable tbody');
             activationsBody.innerHTML = '';
 
@@ -4911,6 +4996,69 @@ python test_gemv_q8_0_q8_0.py</pre>
             return paths.slice(0, 6);
         }
 
+        function resolveTrainingOpMeta(op) {
+            if (!op || typeof op !== 'object') return null;
+            const opId = Number(op.op_id);
+            if (!Number.isFinite(opId)) return null;
+            const phase = String(op.phase || '').toLowerCase();
+            if (phase === 'forward' && Array.isArray(ir1TrainData?.ops)) {
+                return ir1TrainData.ops.find(x => Number(x?.op_id) === opId) || null;
+            }
+            if (phase === 'backward' && Array.isArray(ir2TrainData?.backward)) {
+                return ir2TrainData.backward.find(x => Number(x?.op_id) === opId) || null;
+            }
+            return null;
+        }
+
+        function buildKernelFlowItems(op, opMeta) {
+            const items = [];
+            const dataflow = (opMeta && opMeta.dataflow) || op.dataflow || null;
+            if (dataflow && typeof dataflow === 'object') {
+                Object.entries(dataflow.inputs || {}).forEach(([name, info]) => {
+                    const v = info && typeof info === 'object' ? info : {};
+                    let src = '';
+                    if (v.from_op !== undefined) {
+                        src = `op${v.from_op}.${v.from_output || '?'}`;
+                    } else if (v.from) {
+                        src = String(v.from);
+                    } else if (v.tensor) {
+                        src = String(v.tensor);
+                    } else {
+                        src = 'external';
+                    }
+                    const dtype = v.dtype ? ` [${v.dtype}]` : '';
+                    items.push({ cls: 'flow-input', text: `${name}: ${src}${dtype}` });
+                });
+
+                Object.entries((opMeta && opMeta.weights) || {}).forEach(([name, info]) => {
+                    const v = info && typeof info === 'object' ? info : {};
+                    const wref = String(v.name || v.tensor || '-');
+                    const shape = Array.isArray(v.shape) ? ` [${v.shape.join('x')}]` : '';
+                    items.push({ cls: 'flow-weight', text: `${name}: ${wref}${shape}` });
+                });
+
+                Object.entries(dataflow.outputs || {}).forEach(([name, info]) => {
+                    const v = info && typeof info === 'object' ? info : {};
+                    const target = String(v.tensor || name);
+                    const dtype = v.dtype ? ` [${v.dtype}]` : '';
+                    items.push({ cls: 'flow-output', text: `${name}: ${target}${dtype}` });
+                });
+            }
+
+            if (items.length === 0 && Array.isArray(op.args)) {
+                op.args.forEach(arg => {
+                    const src = String(arg?.source || '');
+                    const cls = src.includes('output')
+                        ? 'flow-output'
+                        : (src.includes('weight') ? 'flow-weight' : 'flow-input');
+                    const txt = `${arg?.name || '?'}: ${arg?.expr ? String(arg.expr).substring(0, 48) : src}`;
+                    items.push({ cls, text: txt });
+                });
+            }
+
+            return items;
+        }
+
         function renderKernelFlow() {
             const data = callData || loweredData;
             if (!data) return;
@@ -5008,7 +5156,9 @@ python test_gemv_q8_0_q8_0.py</pre>
 
                 layerOps.forEach((op, i) => {
                     const node = document.createElement('div');
-                    const kernelType = getKernelType(`${op.function || op.kernel_id || ''} ${op.op || ''}`);
+                    const opMeta = resolveTrainingOpMeta(op);
+                    const kernelFn = op.function || op.kernel_id || opMeta?.kernel_id || '-';
+                    const kernelType = getKernelType(`${kernelFn} ${op.op || ''}`);
                     node.className = `kernel-node ${kernelType}`;
 
                     const dims = [];
@@ -5017,28 +5167,35 @@ python test_gemv_q8_0_q8_0.py</pre>
                         if (op.params._output_dim) dims.push(`out: ${op.params._output_dim}`);
                         if (op.params.embed_dim) dims.push(`embed: ${op.params.embed_dim}`);
                     }
+                    if (opMeta && opMeta.dataflow && opMeta.dataflow.inputs && !op.params) {
+                        const maybeInput = Object.values(opMeta.dataflow.inputs)[0];
+                        const maybeOutput = Object.values(opMeta.dataflow.outputs || {})[0];
+                        const inShape = Array.isArray(maybeInput?.shape) ? maybeInput.shape.join('x') : '';
+                        const outShape = Array.isArray(maybeOutput?.shape) ? maybeOutput.shape.join('x') : '';
+                        if (inShape) dims.push(`in: ${inShape}`);
+                        if (outShape) dims.push(`out: ${outShape}`);
+                    }
+                    const opPhase = String(op.phase || opMeta?.phase || '').toLowerCase();
+                    if (opPhase) dims.push(`phase: ${opPhase}`);
+                    if (op.role) dims.push(`role: ${op.role}`);
 
                     node.innerHTML = `
                         <span class="kernel-idx">#${op.idx !== undefined ? op.idx : i}</span>
                         <span class="kernel-name">${op.op || op.kernel_id || '-'}</span>
-                        <span class="kernel-function">${op.function || op.kernel_id || '-'}</span>
-                        <span class="kernel-dims">${dims.join(' | ')}</span>
+                        <span class="kernel-function">${kernelFn}</span>
+                        <span class="kernel-dims">${dims.join(' | ') || '-'}</span>
                     `;
 
-                    if (op.args || op.activations || op.outputs) {
+                    const flowItems = buildKernelFlowItems(op, opMeta);
+                    if (flowItems.length > 0) {
                         const flow = document.createElement('div');
                         flow.className = 'data-flow';
-
-                        if (op.args) {
-                            op.args.forEach(arg => {
-                                const item = document.createElement('span');
-                                item.className = 'flow-item ' + (arg.source.includes('output') ? 'flow-output' :
-                                    arg.source.includes('weight') ? 'flow-weight' : 'flow-input');
-                                item.textContent = `${arg.name}: ${arg.expr ? arg.expr.substring(0, 30) : arg.source}`;
-                                flow.appendChild(item);
-                            });
-                        }
-
+                        flowItems.forEach((entry) => {
+                            const item = document.createElement('span');
+                            item.className = `flow-item ${entry.cls}`;
+                            item.textContent = entry.text;
+                            flow.appendChild(item);
+                        });
                         node.appendChild(flow);
                     }
 
@@ -7702,15 +7859,205 @@ function renderTraining() {
             reader.readAsText(file);
         }
 
-        function renderDataflow() {
-            if (!ir1Data) return;
+        function currentDataflowPhase() {
+            const phaseSel = document.getElementById('dfPhaseSelect');
+            const phase = String(phaseSel?.value || 'forward').toLowerCase();
+            if (phase === 'backward' || phase === 'all' || phase === 'runtime') return phase;
+            return 'forward';
+        }
 
-            const ops = ir1Data.ops || [];
-            const format = ir1Data.format || 'unknown';
-            const version = ir1Data.version || '-';
+        function getForwardDataflowOps() {
+            return Array.isArray(ir1Data?.ops) ? ir1Data.ops : [];
+        }
+
+        function getBackwardDataflowOps() {
+            return Array.isArray(ir2TrainData?.backward) ? ir2TrainData.backward : [];
+        }
+
+        function getRuntimeDataflowOps() {
+            const raw = Array.isArray(trainExecPlanData?.ops) ? trainExecPlanData.ops : [];
+            if (raw.length === 0) return [];
+            return raw.map((op, idx) => {
+                const syntheticId = 1000000 + idx;
+                const prevId = idx > 0 ? (1000000 + idx - 1) : null;
+                const rawPhase = String(op?.phase || '').toLowerCase();
+                const phase = rawPhase || 'runtime';
+                const inputs = {};
+                if (prevId !== null) {
+                    inputs.prev = {
+                        from_op: prevId,
+                        from_output: 'out',
+                        tensor: `runtime.exec.${idx - 1}.out`,
+                        dtype: 'fp32',
+                    };
+                }
+                return {
+                    ...op,
+                    op_id: syntheticId,
+                    runtime_ref: op?.op_id,
+                    phase,
+                    section: 'runtime',
+                    layer: Number.isFinite(Number(op?.layer)) ? Number(op.layer) : -1,
+                    dataflow: {
+                        inputs,
+                        outputs: {
+                            out: {
+                                tensor: `runtime.exec.${idx}.out`,
+                                dtype: 'fp32',
+                            }
+                        },
+                    },
+                };
+            });
+        }
+
+        function getDataflowOpsByPhase(phaseOverride = null) {
+            const phase = String(phaseOverride || currentDataflowPhase()).toLowerCase();
+            const forwardOps = getForwardDataflowOps();
+            const backwardOps = getBackwardDataflowOps();
+            const runtimeOps = getRuntimeDataflowOps();
+            if (phase === 'backward') return backwardOps.slice();
+            if (phase === 'runtime') return runtimeOps.slice();
+            if (phase === 'all') return [...forwardOps, ...backwardOps, ...runtimeOps];
+            return forwardOps.slice();
+        }
+
+        function getDataflowProducerScopeOps(phase) {
+            if (phase === 'backward') {
+                return [...getForwardDataflowOps(), ...getBackwardDataflowOps()];
+            }
+            if (phase === 'all') {
+                return [...getForwardDataflowOps(), ...getBackwardDataflowOps(), ...getRuntimeDataflowOps()];
+            }
+            if (phase === 'runtime') {
+                return getRuntimeDataflowOps();
+            }
+            return getForwardDataflowOps();
+        }
+
+        function buildTensorProducerIndex(phase) {
+            const map = new Map();
+            const scopeOps = getDataflowProducerScopeOps(phase);
+            scopeOps.forEach((op) => {
+                const outputs = op?.dataflow?.outputs || {};
+                Object.entries(outputs).forEach(([outName, outInfo]) => {
+                    const tensor = String(outInfo?.tensor || '').trim();
+                    if (!tensor) return;
+                    if (!map.has(tensor)) map.set(tensor, []);
+                    map.get(tensor).push({
+                        op_id: Number(op?.op_id),
+                        op_name: String(op?.op || '-'),
+                        output_name: outName,
+                        phase: String(op?.phase || ''),
+                        tensor,
+                    });
+                });
+            });
+            map.forEach((arr) => arr.sort((a, b) => Number(a.op_id) - Number(b.op_id)));
+            return map;
+        }
+
+        function buildTensorConsumerIndex(phase) {
+            const map = new Map();
+            const scopeOps = getDataflowOpsByPhase(phase);
+            scopeOps.forEach((op) => {
+                const inputs = op?.dataflow?.inputs || {};
+                Object.entries(inputs).forEach(([inName, inInfo]) => {
+                    const tensor = String(inInfo?.tensor || '').trim();
+                    if (!tensor) return;
+                    if (!map.has(tensor)) map.set(tensor, []);
+                    map.get(tensor).push({
+                        op_id: Number(op?.op_id),
+                        op_name: String(op?.op || '-'),
+                        input_name: inName,
+                        phase: String(op?.phase || ''),
+                        tensor,
+                    });
+                });
+            });
+            map.forEach((arr) => arr.sort((a, b) => Number(a.op_id) - Number(b.op_id)));
+            return map;
+        }
+
+        function resolveTensorProducerForInput(info, targetOpId, phase, producerIndex) {
+            if (!info || typeof info !== 'object') return null;
+            if (info.from_op !== undefined && info.from_op !== null) {
+                return {
+                    op_id: Number(info.from_op),
+                    output_name: String(info.from_output || '?'),
+                    phase: '',
+                    tensor: String(info.tensor || ''),
+                    via: 'from_op',
+                };
+            }
+            const tensor = String(info.tensor || '').trim();
+            if (!tensor) return null;
+            const candidates = producerIndex.get(tensor) || [];
+            if (candidates.length === 0) return null;
+            const t = Number(targetOpId);
+            if (!Number.isFinite(t)) return null;
+            let best = null;
+            for (const c of candidates) {
+                if (Number.isFinite(Number(c.op_id)) && Number(c.op_id) < t) {
+                    best = c;
+                }
+            }
+            return best;
+        }
+
+        function filterDataflowOpsForLayer(ops, layer, phase) {
+            if (!Array.isArray(ops) || ops.length === 0) return [];
+            const layerStr = String(layer);
+            if (layerStr === 'all') return ops.slice();
+            if (layerStr === 'footer') {
+                return ops.filter(op => String(op?.section || '').toLowerCase() === 'footer');
+            }
+            const layerNum = parseInt(layerStr, 10);
+            if (!Number.isFinite(layerNum)) return ops.slice();
+            if (layerNum === -1) {
+                if (phase === 'runtime') {
+                    return ops.filter(op => Number(op?.layer) === -1);
+                }
+                if (phase === 'backward') {
+                    return ops.filter(op => Number(op?.layer) === -1);
+                }
+                return ops.filter(op => {
+                    const section = String(op?.section || '').toLowerCase();
+                    return section === 'header' || (Number(op?.layer) === -1 && section !== 'footer');
+                });
+            }
+            return ops.filter(op => Number(op?.layer) === layerNum);
+        }
+
+        function renderDataflow() {
+            const phase = currentDataflowPhase();
+            const ops = getDataflowOpsByPhase(phase);
+            if (!Array.isArray(ops) || ops.length === 0) {
+                document.getElementById('dfTotalOps').textContent = '0';
+                document.getElementById('dfActiveSlots').textContent = '-';
+                document.getElementById('dfFormat').textContent = 'none';
+                document.getElementById('dfVersion').textContent = '-';
+                const tbody = document.querySelector('#dataflowTable tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted); text-align:center;">No ops for selected phase.</td></tr>';
+                }
+                const slotDiv = document.getElementById('slotStatus');
+                if (slotDiv) slotDiv.innerHTML = '<span style="color: var(--text-muted);">No slot activity for selected phase.</span>';
+                const residualBody = document.querySelector('#residualTable tbody');
+                if (residualBody) residualBody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted); text-align: center;">No residual links for selected phase</td></tr>';
+                return;
+            }
+
+            const formatParts = [];
+            if (getForwardDataflowOps().length > 0) formatParts.push('ir1');
+            if (getBackwardDataflowOps().length > 0) formatParts.push('ir2');
+            if (getRuntimeDataflowOps().length > 0) formatParts.push('exec');
+            const format = formatParts.length > 0 ? formatParts.join('+') : 'unknown';
+            const version = ir1Data?.version || ir2TrainData?.version || '-';
 
             // Update stats
             document.getElementById('dfTotalOps').textContent = ops.length;
+            document.getElementById('dfTotalOps').title = `phase=${phase}`;
             document.getElementById('dfFormat').textContent = format.replace('ir1-', '');
             document.getElementById('dfVersion').textContent = 'v' + version;
 
@@ -7732,18 +8079,35 @@ function renderTraining() {
 
             // Populate layer selector
             const layerSelect = document.getElementById('dfLayerSelect');
-            const layers = new Set(ops.map(op => op.layer).filter(l => l >= 0));
-            layerSelect.innerHTML = '<option value="-1">Header</option>';
+            const prevLayer = String(layerSelect?.value || 'all');
+            const layers = new Set(ops.map(op => Number(op?.layer)).filter(l => Number.isFinite(l) && l >= 0));
+            let options = '<option value="all">All</option>';
+            if (phase === 'runtime') {
+                if (ops.some(op => Number(op?.layer) === -1)) {
+                    options += '<option value="-1">Global (-1)</option>';
+                }
+            } else if (phase !== 'backward') {
+                options += '<option value="-1">Header</option>';
+            } else if (ops.some(op => Number(op?.layer) === -1)) {
+                options += '<option value="-1">Global (-1)</option>';
+            }
             [...layers].sort((a, b) => a - b).forEach(layer => {
-                layerSelect.innerHTML += `<option value="${layer}">Layer ${layer}</option>`;
+                options += `<option value="${layer}">Layer ${layer}</option>`;
             });
-            layerSelect.innerHTML += '<option value="footer">Footer</option>';
+            if (phase !== 'backward' && phase !== 'runtime') {
+                options += '<option value="footer">Footer</option>';
+            }
+            layerSelect.innerHTML = options;
+            const validValues = new Set(Array.from(layerSelect.options).map(o => String(o.value)));
+            if (validValues.has(prevLayer)) {
+                layerSelect.value = prevLayer;
+            }
 
             // Render slot status
             renderSlotStatus(ops);
 
-            // Render dataflow table for header
-            renderDataflowLayer(-1);
+            // Render dataflow table for selected layer
+            renderDataflowLayer(layerSelect.value || 'all');
 
             // Render residual tracking
             renderResidualTracking(ops);
@@ -7804,25 +8168,20 @@ function renderTraining() {
         }
 
         function renderDataflowLayer(layer) {
-            if (!ir1Data) return;
-
+            const phase = currentDataflowPhase();
+            const ops = getDataflowOpsByPhase(phase);
+            if (!Array.isArray(ops) || ops.length === 0) return;
             currentDfLayer = layer;
-            const ops = ir1Data.ops || [];
-
-            // Filter ops by layer
-            let filteredOps;
-            if (layer === 'footer') {
-                filteredOps = ops.filter(op => op.section === 'footer');
-            } else {
-                const layerNum = parseInt(layer);
-                filteredOps = ops.filter(op => {
-                    if (layerNum === -1) return op.section === 'header' || (op.layer === -1 && op.section !== 'footer');
-                    return op.layer === layerNum;
-                });
-            }
+            const filteredOps = filterDataflowOpsForLayer(ops, layer, phase);
+            const producerIndex = buildTensorProducerIndex(phase);
+            const consumerIndex = buildTensorConsumerIndex(phase);
 
             const tbody = document.querySelector('#dataflowTable tbody');
             tbody.innerHTML = '';
+            if (!filteredOps || filteredOps.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted); text-align:center;">No ops in selected layer.</td></tr>';
+                return;
+            }
 
             filteredOps.forEach(op => {
                 const row = document.createElement('tr');
@@ -7833,18 +8192,37 @@ function renderTraining() {
                 let inputsHtml = '';
                 if (op.dataflow && op.dataflow.inputs) {
                     Object.entries(op.dataflow.inputs).forEach(([name, info]) => {
-                        if (info.from_op !== undefined) {
+                        const producer = resolveTensorProducerForInput(info, Number(op?.op_id), phase, producerIndex);
+                        if (producer && Number.isFinite(Number(producer.op_id))) {
+                            const producerPhase = String(producer.phase || '').toLowerCase();
+                            const phaseBadge = producerPhase ? ` <span style="color:var(--text-muted);font-size:0.72rem;">(${producerPhase})</span>` : '';
+                            const tensorTail = info?.tensor ? ` <span style="color:var(--text-muted);font-size:0.72rem;">[${escapeHtml(String(info.tensor))}]</span>` : '';
                             inputsHtml += `
                                 <div class="flow-item flow-input" style="margin: 2px 0; cursor: pointer;"
-                                     onclick="event.stopPropagation(); scrollToOp(${info.from_op})">
-                                    <strong>${name}</strong>: Op ${info.from_op}.${info.from_output || '?'}
+                                     onclick="event.stopPropagation(); scrollToOp(${Number(producer.op_id)})">
+                                    <strong>${name}</strong>: Op ${Number(producer.op_id)}.${escapeHtml(String(producer.output_name || '?'))}${phaseBadge}${tensorTail}
                                     <span class="dtype dtype-${info.dtype || 'unknown'}">${info.dtype || '?'}</span>
+                                </div>
+                            `;
+                        } else if (info.tensor && String(op?.op || '').toLowerCase().includes('grad_accumulate') && String(name).toLowerCase() === 'dst') {
+                            inputsHtml += `
+                                <div class="flow-item" style="margin: 2px 0; background: rgba(100,100,100,0.3);">
+                                    <strong>${name}</strong>: init_zero
+                                    <span style="color:var(--text-muted);font-size:0.72rem;">[${escapeHtml(String(info.tensor))}]</span>
+                                    ${info.dtype ? `<span class="dtype dtype-${info.dtype}">${info.dtype}</span>` : ''}
                                 </div>
                             `;
                         } else if (info.from) {
                             inputsHtml += `
                                 <div class="flow-item" style="margin: 2px 0; background: rgba(100,100,100,0.3);">
                                     <strong>${name}</strong>: ${info.from}
+                                </div>
+                            `;
+                        } else if (info.tensor) {
+                            inputsHtml += `
+                                <div class="flow-item" style="margin: 2px 0; background: rgba(100,100,100,0.3);">
+                                    <strong>${name}</strong>: ${escapeHtml(String(info.tensor))}
+                                    ${info.dtype ? `<span class="dtype dtype-${info.dtype}">${info.dtype}</span>` : ''}
                                 </div>
                             `;
                         }
@@ -7856,9 +8234,18 @@ function renderTraining() {
                 let outputsHtml = '';
                 if (op.dataflow && op.dataflow.outputs) {
                     Object.entries(op.dataflow.outputs).forEach(([name, info]) => {
+                        const tensor = String(info?.tensor || '').trim();
+                        const consumers = tensor ? (consumerIndex.get(tensor) || []) : [];
+                        const downstream = consumers.find(c => Number(c?.op_id) !== Number(op?.op_id)) || null;
+                        const consumerHint = downstream
+                            ? ` <span style="color:var(--text-muted);font-size:0.72rem;cursor:pointer;" onclick="event.stopPropagation(); scrollToOp(${Number(downstream.op_id)})">→ op${Number(downstream.op_id)}.${escapeHtml(String(downstream.input_name || '?'))}</span>`
+                            : '';
+                        const tensorHint = tensor
+                            ? ` <span style="color:var(--text-muted);font-size:0.72rem;">[${escapeHtml(tensor)}]</span>`
+                            : '';
                         outputsHtml += `
                             <div class="flow-item flow-output" style="margin: 2px 0;">
-                                <strong>${name}</strong>
+                                <strong>${name}</strong>${tensorHint}${consumerHint}
                                 <span class="dtype dtype-${info.dtype || 'unknown'}">${info.dtype || '?'}</span>
                             </div>
                         `;
@@ -7867,16 +8254,19 @@ function renderTraining() {
                 if (!outputsHtml) outputsHtml = '<span style="color: var(--text-muted);">-</span>';
 
                 // Get kernel type for border color
-                const kernelType = getKernelType(`${op.kernel || ''} ${op.op || ''}`);
+                const kernelFn = op.kernel || op.kernel_id || op.function || '-';
+                const kernelType = getKernelType(`${kernelFn} ${op.op || ''}`);
                 const borderColor = getKernelColor(kernelType);
+                const phaseText = String(op.phase || (phase === 'backward' ? 'backward' : 'forward'));
 
                 row.innerHTML = `
                     <td style="font-family: monospace; color: var(--blue);">${op.op_id}</td>
+                    <td><span class="status-chip ${phaseText === 'backward' ? 'status-chip-warn' : 'status-chip-good'}">${phaseText}</span></td>
                     <td style="border-left: 3px solid ${borderColor}; padding-left: 0.75rem;">
                         <div style="font-weight: 600; color: var(--white);">${op.op || '-'}</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">L${op.layer} inst:${op.instance || 0}</div>
                     </td>
-                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--blue);">${op.kernel || '-'}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--blue);">${kernelFn}</td>
                     <td>${inputsHtml}</td>
                     <td>${outputsHtml}</td>
                 `;
@@ -7898,12 +8288,32 @@ function renderTraining() {
                 }, 2000);
             } else {
                 // Op is in a different layer, find it
-                if (!ir1Data) return;
-                const op = ir1Data.ops.find(o => o.op_id === opId);
+                const phase = currentDataflowPhase();
+                const navOps = getDataflowProducerScopeOps(phase);
+                const op = navOps.find(o => Number(o?.op_id) === Number(opId));
                 if (op) {
+                    const opPhase = String(op?.phase || '').toLowerCase();
+                    const phaseSel = document.getElementById('dfPhaseSelect');
+                    if (phaseSel) {
+                        if (phase === 'backward' && opPhase === 'forward') {
+                            phaseSel.value = 'all';
+                            renderDataflow();
+                        } else if (phase === 'runtime' && opPhase !== 'runtime' && opPhase) {
+                            phaseSel.value = 'all';
+                            renderDataflow();
+                        }
+                    }
                     const layerSelect = document.getElementById('dfLayerSelect');
-                    layerSelect.value = op.layer;
-                    renderDataflowLayer(op.layer);
+                    const section = String(op?.section || '').toLowerCase();
+                    let targetLayer = 'all';
+                    const newPhase = currentDataflowPhase();
+                    if (section === 'footer' && newPhase !== 'backward' && newPhase !== 'runtime') {
+                        targetLayer = 'footer';
+                    } else if (Number.isFinite(Number(op?.layer))) {
+                        targetLayer = String(Number(op.layer));
+                    }
+                    layerSelect.value = targetLayer;
+                    renderDataflowLayer(targetLayer);
                     setTimeout(() => scrollToOp(opId), 100);
                 }
             }
@@ -7997,8 +8407,10 @@ function renderTraining() {
         }
 
         function renderDataflowGraph() {
-            if (!ir1Data) {
-                alert('Load an IR1 file first.');
+            const phase = currentDataflowPhase();
+            const allOps = getDataflowOpsByPhase(phase);
+            if (!Array.isArray(allOps) || allOps.length === 0) {
+                alert('No dataflow ops loaded for selected phase.');
                 return;
             }
 
@@ -8006,15 +8418,15 @@ function renderTraining() {
             const container = document.getElementById('dataflowGraphContainer');
             container.innerHTML = '';
 
-            const ops = ir1Data.ops || [];
             const width = container.clientWidth || 1000;
             const height = 500;
 
             // Filter to current layer or all
-            let filteredOps = ops;
-            if (currentDfLayer !== -1 && currentDfLayer !== 'footer') {
-                const layerNum = parseInt(currentDfLayer);
-                filteredOps = ops.filter(op => op.layer === layerNum);
+            const selectedLayer = (currentDfLayer === null || currentDfLayer === undefined) ? 'all' : currentDfLayer;
+            const filteredOps = filterDataflowOpsForLayer(allOps, selectedLayer, phase);
+            if (!Array.isArray(filteredOps) || filteredOps.length === 0) {
+                alert('No graph nodes for selected layer/phase.');
+                return;
             }
 
             // Build nodes and links
@@ -8023,21 +8435,24 @@ function renderTraining() {
             const nodeMap = new Map();
 
             filteredOps.forEach((op, idx) => {
-                const kernelType = getKernelType(`${op.kernel || ''} ${op.op || ''}`);
+                const kernelFn = op.kernel || op.kernel_id || op.function || '';
+                const kernelType = getKernelType(`${kernelFn} ${op.op || ''}`);
                 const node = {
                     id: op.op_id,
                     op: op.op,
-                    kernel: op.kernel,
+                    kernel: kernelFn,
                     layer: op.layer,
                     color: getKernelColor(kernelType),
                     dataflow: op.dataflow,
-                    repoPaths: guessRepoSourcePaths(op.kernel || '', op.op || '')
+                    repoPaths: guessRepoSourcePaths(kernelFn, op.op || '')
                 };
                 nodes.push(node);
                 nodeMap.set(op.op_id, node);
             });
 
-            // Create dataflow links based on from_op
+            const producerIndex = buildTensorProducerIndex(phase);
+
+            // Create dataflow links based on from_op, then tensor producer fallback.
             filteredOps.forEach(op => {
                 if (op.dataflow && op.dataflow.inputs) {
                     Object.entries(op.dataflow.inputs).forEach(([inputName, input]) => {
@@ -8048,6 +8463,17 @@ function renderTraining() {
                                 inputName: inputName,
                                 dtype: input.dtype || 'fp32'
                             });
+                        } else {
+                            const producer = resolveTensorProducerForInput(input, Number(op?.op_id), phase, producerIndex);
+                            const src = Number(producer?.op_id);
+                            if (Number.isFinite(src) && nodeMap.has(src)) {
+                                links.push({
+                                    source: src,
+                                    target: op.op_id,
+                                    inputName: inputName,
+                                    dtype: input.dtype || 'fp32'
+                                });
+                            }
                         }
                     });
                 }
@@ -11750,11 +12176,11 @@ function renderTrainingMemoryDiag(files) {
 /* ===== question_headers.js ===== */
 const QUESTION_TABS = {
     'train-dashboard': {
-        label: 'Is It Training?',
+        label: 'Backprop Health',
         title: 'Loss, gradients, learning rate and run health overview.',
     },
     'training': {
-        label: 'How Does the Graph Flow?',
+        label: 'How Does Backprop Flow?',
         title: 'Forward/backward IR topology, invariants and gate status.',
     },
     'train-gradient': {
@@ -11959,7 +12385,7 @@ function ensurePanelRoot(panelId, rootId) {
 function ensureTrainingPanels() {
     ensurePanel(
         'train-dashboard',
-        'Training Dashboard',
+        'Backprop Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
     );
     ensurePanel(
@@ -12017,7 +12443,7 @@ function installModeToggle() {
     host.id = 'ckReportModeToggle';
     host.innerHTML = `
         <button type="button" data-mode="inference" class="active">Inference</button>
-        <button type="button" data-mode="training">Training</button>
+        <button type="button" data-mode="training">Backprop</button>
     `;
     controls.appendChild(host);
 }
@@ -12029,6 +12455,48 @@ function visibleTabElements() {
 function firstVisibleTabId() {
     const first = visibleTabElements()[0];
     return first ? tabIdForElement(first) : '';
+}
+
+function hasInferenceArtifacts(files) {
+    if (!files || typeof files !== 'object') return false;
+    return Boolean(
+        files.ir1_decode ||
+        files.layout_decode ||
+        files.lowered_decode ||
+        files.lowered_decode_call ||
+        files.ir1_prefill ||
+        files.layout_prefill ||
+        files.lowered_prefill ||
+        files.lowered_prefill_call
+    );
+}
+
+function hasTrainingArtifacts(files) {
+    if (!files || typeof files !== 'object') return false;
+    return Boolean(
+        files.ir1_train ||
+        files.ir2_train ||
+        files.layout_train ||
+        files.train_exec_plan ||
+        files.train_e2e ||
+        files.training_loss_curve ||
+        files.training_parity ||
+        files.generated_train_runtime_summary
+    );
+}
+
+function chooseInitialReportMode() {
+    let files = null;
+    if (typeof currentFiles === 'function') {
+        files = currentFiles();
+    }
+    if (!files && window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files) {
+        files = window.EMBEDDED_IR_DATA.files;
+    }
+    const infer = hasInferenceArtifacts(files);
+    const train = hasTrainingArtifacts(files);
+    if (train && !infer) return 'training';
+    return 'inference';
 }
 
 function applyReportMode(mode) {
@@ -12062,7 +12530,7 @@ function initModeUI() {
     setTabMode('memory', 'inference,training');
     setTabMode('kernels', 'inference,training');
     setTabMode('profile', 'inference,training');
-    setTabMode('training', 'training', 'Backward IR');
+    setTabMode('training', 'training', 'Backprop IR');
     INFERENCE_ONLY.forEach((id) => setTabMode(id, 'inference'));
 
     appendTrainingTabs();
@@ -12073,7 +12541,7 @@ function initModeUI() {
         btn.addEventListener('click', () => applyReportMode(btn.dataset.mode || 'inference'));
     });
 
-    applyReportMode('inference');
+    applyReportMode(chooseInitialReportMode());
 }
 
 function trainingTabIds() {

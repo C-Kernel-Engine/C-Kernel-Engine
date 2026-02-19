@@ -1,62 +1,87 @@
 <svg width="1400" height="760" viewBox="0 0 1400 760" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <style>
-      .bg { fill: #121417; }
-      .panel { fill: #1a1f26; stroke: #3a4552; stroke-width: 2; rx: 12; }
-      .title { fill: #f5f7fa; font-family: Inter, Arial, sans-serif; font-size: 32px; font-weight: 700; }
-      .subtitle { fill: #c7d1dc; font-family: Inter, Arial, sans-serif; font-size: 20px; font-weight: 600; }
-      .body { fill: #aeb7c2; font-family: Inter, Arial, sans-serif; font-size: 18px; }
-      .good { fill: #6dd29a; }
-      .warn { fill: #f2b550; }
-      .bad { fill: #ef6a6a; }
-      .chip { fill: #26303b; stroke: #4b5a6b; stroke-width: 1.5; rx: 8; }
-      .chipText { fill: #e8eef6; font-family: JetBrains Mono, monospace; font-size: 16px; }
-      .arrow { stroke: #8ea1b5; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
-    </style>
-    <marker id="arrowHead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#8ea1b5" />
+    <linearGradient id="bgGA" x1="0" y1="0" x2="1400" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#061526"/>
+      <stop offset="1" stop-color="#0b1f34"/>
+    </linearGradient>
+    <linearGradient id="accentGA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb400"/>
+      <stop offset="1" stop-color="#07adf8"/>
+    </linearGradient>
+    <filter id="shadowGA" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrowGA" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#79c8f7"/>
     </marker>
+    <style>
+      .gaTitle   { fill:#ffb400; font:700 32px 'Segoe UI', Arial, sans-serif; }
+      .gaBody    { fill:#a8c3d8; font:400 18px 'Segoe UI', Arial, sans-serif; }
+      .gaSub     { fill:#ef6a6a; font:600 20px 'Segoe UI', Arial, sans-serif; }
+      .gaSubGood { fill:#6dd29a; font:600 20px 'Segoe UI', Arial, sans-serif; }
+      .gaChipT   { fill:#e8eef6; font:400 16px 'JetBrains Mono', monospace; }
+      .gaNote    { fill:#9fb8cd; font:400 16px 'Segoe UI', Arial, sans-serif; }
+      .gaBad     { fill:#ef6a6a; }
+      .gaGood    { fill:#6dd29a; }
+      .gaArrow   { stroke:#79c8f7; stroke-width:3; fill:none; marker-end:url(#arrowGA); }
+    </style>
   </defs>
 
-  <rect x="0" y="0" width="1400" height="760" class="bg"/>
-  <text x="60" y="64" class="title">v7 Grad-Accum Schedule: Before vs After</text>
-  <text x="60" y="100" class="body">Why early drift moved from ~step 65 to much later in stress runs.</text>
+  <!-- Background -->
+  <rect x="0" y="0" width="1400" height="760" fill="url(#bgGA)"/>
+  <rect x="30" y="24" width="1340" height="712" rx="16" fill="#081a2b" stroke="#2b5373"/>
 
-  <rect x="60" y="140" width="620" height="560" class="panel"/>
-  <text x="90" y="188" class="subtitle bad">Before (drift-prone order)</text>
-  <text x="90" y="218" class="body">Optimizer timing could desynchronize from the intended accumulation window.</text>
+  <!-- Title -->
+  <text class="gaTitle" x="60" y="72">v7 Grad-Accum Schedule: Before vs After</text>
+  <text class="gaBody" x="60" y="102">Why early drift moved from ~step 65 to much later in stress runs.</text>
+  <rect x="60" y="118" width="1300" height="6" rx="3" fill="url(#accentGA)"/>
 
-  <rect x="90" y="248" width="560" height="88" class="chip"/>
-  <text x="112" y="302" class="chipText">microstep 1: zero_grad - fwd - bwd - maybe_opt</text>
+  <!-- LEFT PANEL: Before -->
+  <g filter="url(#shadowGA)">
+    <rect x="60" y="148" width="620" height="530" rx="14" fill="#0e1e30" stroke="#4a3035"/>
+    <text class="gaSub" x="90" y="190">Before (drift-prone order)</text>
+    <text class="gaBody" x="90" y="218">Optimizer timing could desynchronize</text>
+    <text class="gaBody" x="90" y="240">from the intended accumulation window.</text>
 
-  <path d="M370 338 L370 366" class="arrow"/>
+    <rect x="90" y="268" width="560" height="72" rx="10" fill="#12253a" stroke="#2d5373"/>
+    <text class="gaChipT" x="112" y="312">microstep 1: zero_grad → fwd → bwd → maybe_opt</text>
 
-  <rect x="90" y="374" width="560" height="88" class="chip"/>
-  <text x="112" y="428" class="chipText">microstep 2..N: fwd - bwd - maybe_opt</text>
+    <path class="gaArrow" d="M370 342 L370 366"/>
 
-  <path d="M370 464 L370 492" class="arrow"/>
+    <rect x="90" y="374" width="560" height="72" rx="10" fill="#12253a" stroke="#2d5373"/>
+    <text class="gaChipT" x="112" y="418">microstep 2..N: fwd → bwd → maybe_opt</text>
 
-  <rect x="90" y="500" width="560" height="88" class="chip"/>
-  <text x="112" y="554" class="chipText bad">update may occur before true window boundary</text>
+    <path class="gaArrow" d="M370 448 L370 472"/>
 
-  <text x="90" y="632" class="body">Effect: early optimizer-state skew, error amplifies quickly.</text>
+    <rect x="90" y="480" width="560" height="72" rx="10" fill="#1a1218" stroke="#6a3040"/>
+    <text class="gaChipT gaBad" x="112" y="524">update may occur before true window boundary</text>
 
-  <rect x="720" y="140" width="620" height="560" class="panel"/>
-  <text x="750" y="188" class="subtitle good">After (PyTorch-window aligned)</text>
-  <text x="750" y="218" class="body">Exactly one optimizer step per accumulation window.</text>
+    <text class="gaNote" x="90" y="600">Effect: early optimizer-state skew,</text>
+    <text class="gaNote" x="90" y="622">error amplifies quickly.</text>
+  </g>
 
-  <rect x="750" y="248" width="560" height="88" class="chip"/>
-  <text x="772" y="302" class="chipText">if g_accum_step == 0: zero_grad()</text>
+  <!-- RIGHT PANEL: After -->
+  <g filter="url(#shadowGA)">
+    <rect x="720" y="148" width="620" height="530" rx="14" fill="#0e1e30" stroke="#2a5040"/>
+    <text class="gaSubGood" x="750" y="190">After (PyTorch-window aligned)</text>
+    <text class="gaBody" x="750" y="218">Exactly one optimizer step per</text>
+    <text class="gaBody" x="750" y="240">accumulation window.</text>
 
-  <path d="M1030 338 L1030 366" class="arrow"/>
+    <rect x="750" y="268" width="560" height="72" rx="10" fill="#12253a" stroke="#2d5373"/>
+    <text class="gaChipT" x="772" y="312">if g_accum_step == 0: zero_grad()</text>
 
-  <rect x="750" y="374" width="560" height="88" class="chip"/>
-  <text x="772" y="428" class="chipText">fwd - bwd ; g_accum_step += 1</text>
+    <path class="gaArrow" d="M1030 342 L1030 366"/>
 
-  <path d="M1030 464 L1030 492" class="arrow"/>
+    <rect x="750" y="374" width="560" height="72" rx="10" fill="#12253a" stroke="#2d5373"/>
+    <text class="gaChipT" x="772" y="418">fwd → bwd ; g_accum_step += 1</text>
 
-  <rect x="750" y="500" width="560" height="88" class="chip"/>
-  <text x="772" y="554" class="chipText good">if g_accum_step &gt;= CK_GRAD_ACCUM_STEPS: optimizer_step(); g_accum_step=0</text>
+    <path class="gaArrow" d="M1030 448 L1030 472"/>
 
-  <text x="750" y="632" class="body">Effect: early drift removed; remaining drift is slower and easier to localize.</text>
+    <rect x="750" y="480" width="560" height="72" rx="10" fill="#0e2218" stroke="#3a7050"/>
+    <text class="gaChipT gaGood" x="772" y="510">if g_accum_step &gt;= CK_GRAD_ACCUM_STEPS:</text>
+    <text class="gaChipT gaGood" x="790" y="534">optimizer_step(); g_accum_step = 0</text>
+
+    <text class="gaNote" x="750" y="600">Effect: early drift removed; remaining drift</text>
+    <text class="gaNote" x="750" y="622">is slower and easier to localize.</text>
+  </g>
 </svg>

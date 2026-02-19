@@ -638,6 +638,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "training_parity",
         "training_step_profile",
         "training_checkpoint_policy",
+        "training_pipeline",
         "training_epoch_sweep",
         "analysis_checkpoints",
         "train_e2e",
@@ -695,6 +696,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_REPORT_PATH / "training_parity_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_latest.json"],
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
+        "training_pipeline": model_candidates("training_pipeline.json") + model_candidates("training_pipeline_latest.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
         "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
         "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
         "run_config": model_candidates("config.json"),
@@ -790,6 +792,94 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         if "training_grad_norms" not in files and isinstance(runtime_payload.get("grad_norm_series"), dict):
             files["training_grad_norms"] = runtime_payload.get("grad_norm_series")
             loaded.append("training_grad_norms(runtime)")
+        if "training_pipeline" not in files:
+            active_stage = str(runtime_payload.get("train_mode") or runtime_payload.get("mode") or "pretrain").strip().lower()
+            if not active_stage:
+                active_stage = "pretrain"
+            stages = ["pretrain", "sft", "dpo", "grpo", "ppo"]
+            if active_stage not in stages:
+                stages = [active_stage] + stages
+            active_idx = stages.index(active_stage)
+            stage_timeline = []
+            for idx, stage in enumerate(stages):
+                if idx < active_idx:
+                    status = "completed"
+                elif idx == active_idx:
+                    status = "active"
+                else:
+                    status = "planned"
+                stage_timeline.append({"stage": stage, "order": idx, "status": status, "active": stage == active_stage})
+            files["training_pipeline"] = {
+                "schema": "ck.training_pipeline.v1",
+                "generated_at": runtime_payload.get("generated_at"),
+                "active_stage": active_stage,
+                "stage_timeline": stage_timeline,
+                "backend": runtime_payload.get("backend"),
+                "optimizer": {
+                    "name": runtime_payload.get("optimizer"),
+                    "lr": runtime_payload.get("lr"),
+                    "hparams": runtime_payload.get("optimizer_hparams"),
+                },
+                "execution": {
+                    "epochs": runtime_payload.get("epochs"),
+                    "steps": runtime_payload.get("steps"),
+                    "micro_steps": runtime_payload.get("micro_steps"),
+                    "optimizer_steps": runtime_payload.get("optimizer_steps"),
+                    "seq_len": runtime_payload.get("seq_len"),
+                    "grad_accum": runtime_payload.get("grad_accum"),
+                    "tokens_total": runtime_payload.get("total_tokens"),
+                    "tokens_per_update": runtime_payload.get("tokens_per_update"),
+                },
+                "train_dims": runtime_payload.get("train_dims"),
+                "data_provenance": runtime_payload.get("data_provenance")
+                if isinstance(runtime_payload.get("data_provenance"), list)
+                else [],
+                "tokenizer_lineage": runtime_payload.get("tokenizer_lineage")
+                if isinstance(runtime_payload.get("tokenizer_lineage"), dict)
+                else {},
+                "sources": {"summary": "runtime_parity", "run_dir": str(run_dir) if run_dir is not None else None},
+            }
+            loaded.append("training_pipeline(runtime)")
+
+    # Training-only run directories often lack decode/prefill filenames.
+    # Add decode/prefill aliases so shared viewer tabs (Memory/Kernel/Stats)
+    # still render from training IR/layout/exec-plan artifacts.
+    files = data["files"]
+    aliased_optional: list[str] = []
+    if "ir1_decode" not in files and isinstance(files.get("ir1_train"), dict):
+        files["ir1_decode"] = files["ir1_train"]
+        loaded.append("ir1_decode(train_alias)")
+        aliased_optional.append("ir1_decode")
+    if "layout_decode" not in files and isinstance(files.get("layout_train"), dict):
+        files["layout_decode"] = files["layout_train"]
+        loaded.append("layout_decode(train_alias)")
+        aliased_optional.append("layout_decode")
+    if "lowered_decode_call" not in files and isinstance(files.get("train_exec_plan"), dict):
+        files["lowered_decode_call"] = files["train_exec_plan"]
+        loaded.append("lowered_decode_call(train_alias)")
+        aliased_optional.append("lowered_decode_call")
+    if "lowered_decode" not in files and isinstance(files.get("train_exec_plan"), dict):
+        files["lowered_decode"] = files["train_exec_plan"]
+        loaded.append("lowered_decode(train_alias)")
+        aliased_optional.append("lowered_decode")
+    if "ir1_prefill" not in files and isinstance(files.get("ir1_train"), dict):
+        files["ir1_prefill"] = files["ir1_train"]
+        loaded.append("ir1_prefill(train_alias)")
+        aliased_optional.append("ir1_prefill")
+    if "layout_prefill" not in files and isinstance(files.get("layout_train"), dict):
+        files["layout_prefill"] = files["layout_train"]
+        loaded.append("layout_prefill(train_alias)")
+        aliased_optional.append("layout_prefill")
+    if "lowered_prefill_call" not in files and isinstance(files.get("train_exec_plan"), dict):
+        files["lowered_prefill_call"] = files["train_exec_plan"]
+        loaded.append("lowered_prefill_call(train_alias)")
+        aliased_optional.append("lowered_prefill_call")
+    if "lowered_prefill" not in files and isinstance(files.get("train_exec_plan"), dict):
+        files["lowered_prefill"] = files["train_exec_plan"]
+        loaded.append("lowered_prefill(train_alias)")
+        aliased_optional.append("lowered_prefill")
+    if aliased_optional:
+        missing_optional = [k for k in missing_optional if k not in aliased_optional]
 
     # Enrich artifacts for standalone report portability.
     flame = data["files"].get("flamegraph_manifest")

@@ -161,15 +161,18 @@ def _run_ck_train(
     _run(cmd, cwd=ROOT)
 
 
-def _run_torch_ref(args: argparse.Namespace, dataset_path: Path, torch_json: Path) -> None:
+def _run_torch_ref(
+    args: argparse.Namespace,
+    dataset_path: Path,
+    torch_json: Path,
+    token_file: Path | None = None,
+) -> None:
     py = _python_exec()
     cmd = [
         py,
         str(TORCH_REF),
         "--run-dir",
         str(Path(args.run).expanduser().resolve()),
-        "--data",
-        str(dataset_path),
         "--epochs",
         str(args.epochs),
         "--seq-len",
@@ -185,6 +188,10 @@ def _run_torch_ref(args: argparse.Namespace, dataset_path: Path, torch_json: Pat
         "--json-out",
         str(torch_json),
     ]
+    if token_file is not None:
+        cmd.extend(["--token-file", str(token_file)])
+    else:
+        cmd.extend(["--data", str(dataset_path)])
     _run(cmd, cwd=ROOT)
 
 
@@ -213,7 +220,7 @@ def main() -> int:
     ap.add_argument("--max-grad-norm", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--enforce-production-safety", action="store_true")
-    ap.add_argument("--with-torch-ref", action="store_true", help="Run torch ref too (byte mode only)")
+    ap.add_argument("--with-torch-ref", action="store_true", help="Run torch ref too (byte or bpe via token-file)")
     ap.add_argument("--open-visualizer", action="store_true", help="Open v7 IR visualizer after training")
     ap.add_argument("--json-out", default=None, help="Optional pipeline report JSON")
     ap.add_argument("--bpe-vocab-size", type=int, default=1024)
@@ -329,10 +336,8 @@ def main() -> int:
 
     _run_ck_train(args, dataset_path, token_file, ck_json)
 
-    if args.with_torch_ref and args.tokenizer == "byte":
-        _run_torch_ref(args, dataset_path, torch_json)
-    elif args.with_torch_ref and args.tokenizer == "bpe":
-        print("Warning: --with-torch-ref skipped for tokenizer=bpe (torch ref path is byte-text based).")
+    if args.with_torch_ref:
+        _run_torch_ref(args, dataset_path, torch_json, token_file=token_file)
 
     report = {
         "format": "v7-train-data-pipeline",

@@ -1,182 +1,216 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 495">
   <defs>
     <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#ffb400"/>
       <stop offset="100%" style="stop-color:#ffc933"/>
     </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#47b475"/>
       <stop offset="100%" style="stop-color:#5cc98a"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#07adf8"/>
+      <stop offset="100%" style="stop-color:#38bdf8"/>
     </linearGradient>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
       <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
     </filter>
-  </defs>
-
-  <!-- Background -->
-  <rect width="900" height="500" fill="#232323"/>
-
-  <!-- Title -->
-  <text x="450" y="35" font-family="Inter, sans-serif" font-size="22" font-weight="700" fill="#ffb400" text-anchor="middle">C-Kernel-Engine Architecture</text>
-  <text x="450" y="55" font-family="Inter, sans-serif" font-size="12" fill="#707070" text-anchor="middle">From Model Config to Optimized C Runtime</text>
-
-  <!-- Stage 1: Model Config -->
-  <g transform="translate(50, 90)">
-    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
-    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
-    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">Model Config</text>
-    <text x="70" y="55" font-family="monospace" font-size="10" fill="#707070" text-anchor="middle">config.json</text>
-    <text x="70" y="75" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">hidden_size: 768</text>
-    <text x="70" y="90" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">num_heads: 12</text>
-    <text x="70" y="105" font-family="Inter, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">num_layers: 6</text>
-  </g>
-
-  <!-- Arrow 1 -->
-  <g transform="translate(195, 145)">
-    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
-  </g>
-  <defs>
-    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#ffb400"/>
     </marker>
   </defs>
 
-  <!-- Stage 2: IR Builder -->
-  <g transform="translate(250, 90)">
-    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
-    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
-    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">IR Builder</text>
-    <text x="70" y="55" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Intermediate</text>
-    <text x="70" y="70" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Representation</text>
-    <rect x="20" y="80" width="100" height="25" rx="4" fill="#2a2a2a"/>
-    <text x="70" y="97" font-family="monospace" font-size="9" fill="#ffb400" text-anchor="middle">CKLayerIR[]</text>
+  <!-- Background -->
+  <rect width="960" height="495" fill="#232323"/>
+
+  <!-- Title -->
+  <text x="480" y="30" font-family="Inter, sans-serif" font-size="19" font-weight="700" fill="#ffb400" text-anchor="middle">C-Kernel-Engine Architecture</text>
+  <text x="480" y="50" font-family="Inter, sans-serif" font-size="10.5" fill="#606060" text-anchor="middle">Kernel Library → IR Pipeline → Memory Layout → Dumb Codegen → Runtime</text>
+
+  <!-- ══════════════════════════════════════════════════
+       PIPELINE — 4 stages + forked output
+  ══════════════════════════════════════════════════ -->
+
+  <!-- Stage 1: Model Config -->
+  <g transform="translate(20,62)">
+    <rect width="135" height="115" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="135" height="27" rx="8" fill="url(#headerGrad)"/>
+    <text x="67" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#1d1d1d" text-anchor="middle">Model Config</text>
+    <text x="67" y="48" font-family="monospace" font-size="9.5" fill="#9ed6ff" text-anchor="middle">config.json</text>
+    <text x="67" y="65" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">hidden_size, num_heads</text>
+    <text x="67" y="79" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">num_layers, rope_theta</text>
+    <text x="67" y="93" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">intermediate_size</text>
+    <text x="67" y="109" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">HuggingFace format</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="155" y1="119" x2="163" y2="119" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Stage 2: IR Pipeline -->
+  <g transform="translate(165,62)">
+    <rect width="172" height="115" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="172" height="27" rx="8" fill="url(#headerGrad)"/>
+    <text x="86" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#1d1d1d" text-anchor="middle">IR Pipeline</text>
+    <text x="86" y="47" font-family="monospace" font-size="8.5" fill="#ffb400" text-anchor="middle">IR1 — fwd op graph · kernel IDs</text>
+    <text x="86" y="61" font-family="monospace" font-size="8.5" fill="#ffb400" text-anchor="middle">IR2 — fusion + bwd synthesis</text>
+    <text x="86" y="75" font-family="monospace" font-size="8.5" fill="#ffb400" text-anchor="middle">IR3 — lowering · quant dispatch</text>
+    <text x="86" y="92" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">template selection · fusion detection</text>
+    <text x="86" y="105" font-family="Inter, sans-serif" font-size="8" fill="#606060" text-anchor="middle">grad edge synthesis (v7 training)</text>
   </g>
 
   <!-- Arrow 2 -->
-  <g transform="translate(395, 145)">
-    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
-  </g>
+  <line x1="337" y1="119" x2="345" y2="119" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- Stage 3: Code Generator -->
-  <g transform="translate(450, 90)">
-    <rect width="140" height="120" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
-    <rect width="140" height="30" rx="8" fill="url(#headerGrad)"/>
-    <text x="70" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">Code Generator</text>
-    <text x="70" y="55" font-family="Inter, sans-serif" font-size="10" fill="#707070" text-anchor="middle">Emits optimized C</text>
-    <text x="70" y="75" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">forward_layer_0()</text>
-    <text x="70" y="90" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">backward_layer_0()</text>
-    <text x="70" y="105" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">alloc_buffers()</text>
+  <!-- Stage 3: Memory Layout -->
+  <g transform="translate(347,62)">
+    <rect width="148" height="115" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="148" height="27" rx="8" fill="url(#headerGrad)"/>
+    <text x="74" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#1d1d1d" text-anchor="middle">Memory Layout</text>
+    <text x="74" y="48" font-family="monospace" font-size="9" fill="#a0a0a0" text-anchor="middle">layout.json</text>
+    <text x="74" y="64" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">contiguous bump allocator</text>
+    <text x="74" y="78" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">cache-aligned sections</text>
+    <text x="74" y="92" font-family="Inter, sans-serif" font-size="8.5" fill="#707070" text-anchor="middle">canary sentinels (v7)</text>
+    <text x="74" y="107" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">weights · acts · grads · opt state</text>
   </g>
 
   <!-- Arrow 3 -->
-  <g transform="translate(595, 145)">
-    <line x1="0" y1="0" x2="50" y2="0" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="495" y1="119" x2="503" y2="119" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Stage 4: Dumb Codegen -->
+  <g transform="translate(505,62)">
+    <rect width="145" height="115" rx="8" fill="#2a2a2a" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect width="145" height="27" rx="8" fill="url(#headerGrad)"/>
+    <text x="72" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#1d1d1d" text-anchor="middle">Dumb Codegen</text>
+    <text x="72" y="48" font-family="Inter, sans-serif" font-size="8.5" fill="#808080" text-anchor="middle">emits only what lowered</text>
+    <text x="72" y="61" font-family="Inter, sans-serif" font-size="8.5" fill="#808080" text-anchor="middle">IR already decided</text>
+    <text x="72" y="78" font-family="monospace" font-size="8.5" fill="#a0a0a0" text-anchor="middle">forward_layer_N()</text>
+    <text x="72" y="91" font-family="monospace" font-size="8.5" fill="#a0a0a0" text-anchor="middle">backward_layer_N()</text>
+    <text x="72" y="107" font-family="Inter, sans-serif" font-size="7.5" fill="#505050" text-anchor="middle">no architecture guessing</text>
   </g>
 
-  <!-- Stage 4: C Runtime -->
-  <g transform="translate(650, 90)">
-    <rect width="180" height="120" rx="8" fill="#2a2a2a" stroke="#47b475" stroke-width="3" filter="url(#shadow)"/>
-    <rect width="180" height="30" rx="8" fill="url(#accentGrad)"/>
-    <text x="90" y="20" font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#1d1d1d" text-anchor="middle">C Runtime</text>
-    <text x="90" y="55" font-family="monospace" font-size="10" fill="#a0a0a0" text-anchor="middle">model_forward()</text>
-    <text x="90" y="75" font-family="monospace" font-size="10" fill="#a0a0a0" text-anchor="middle">model_backward()</text>
-    <rect x="20" y="90" width="140" height="20" rx="4" fill="#1a3d2a"/>
-    <text x="90" y="104" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Full PyTorch Parity</text>
+  <!-- Fork from codegen right edge (x=650, mid-y=119) -->
+  <line x1="650" y1="119" x2="658" y2="119" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="658" y1="87"  x2="658" y2="151" stroke="#ffb400" stroke-width="1.5"/>
+  <line x1="658" y1="87"  x2="663" y2="87"  stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="658" y1="151" x2="663" y2="151" stroke="#ffb400" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Output: Inference Runtime (blue) — top fork branch -->
+  <g transform="translate(665,62)">
+    <rect width="272" height="50" rx="8" fill="#0c1d2a" stroke="#07adf8" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="272" height="22" rx="8" fill="url(#blueGrad)"/>
+    <text x="136" y="15" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#0a1628" text-anchor="middle">Inference Runtime</text>
+    <text x="136" y="34" font-family="Inter, sans-serif" font-size="8" fill="#7dd3fc" text-anchor="middle">GEMM/GEMV · Q4_K→Q8_0 · MEGA fused · OpenMP</text>
+    <text x="136" y="45" font-family="monospace" font-size="7.5" fill="#0ea5e9" text-anchor="middle">generated_model.c → libckernel.so</text>
   </g>
 
-  <!-- Kernel Library Section -->
-  <g transform="translate(50, 250)">
-    <rect width="780" height="200" rx="12" fill="#2a2a2a" stroke="#454545" stroke-width="2" filter="url(#shadow)"/>
-    <rect width="780" height="35" rx="12" fill="#2a2a2a"/>
-    <text x="390" y="23" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffb400" text-anchor="middle">Kernel Library (libckernel_engine.so)</text>
-
-    <!-- Kernel boxes -->
-    <!-- Row 1 -->
-    <g transform="translate(20, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Attention</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">GQA + RoPE</text>
-    </g>
-
-    <g transform="translate(135, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RMSNorm</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fused</text>
-    </g>
-
-    <g transform="translate(250, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">SwiGLU</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fused gate</text>
-    </g>
-
-    <g transform="translate(365, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GEMM</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">blocked serial</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">AVX-512</text>
-    </g>
-
-    <g transform="translate(480, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Softmax</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Causal</text>
-    </g>
-
-    <g transform="translate(595, 50)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RoPE</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Precomputed</text>
-    </g>
-
-    <!-- Row 2 -->
-    <g transform="translate(20, 120)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">LayerNorm</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Unrolled</text>
-    </g>
-
-    <g transform="translate(135, 120)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GELU</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Fast approx</text>
-    </g>
-
-    <g transform="translate(250, 120)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Sigmoid</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">forward + backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Scalar + vector</text>
-    </g>
-
-    <g transform="translate(365, 120)">
-      <rect width="105" height="60" rx="6" fill="#323232" stroke="#ffb400" stroke-width="1.5"/>
-      <text x="52" y="25" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">MLP</text>
-      <text x="52" y="42" font-family="Inter, sans-serif" font-size="9" fill="#707070" text-anchor="middle">fc1 + fc2 backward</text>
-      <text x="52" y="54" font-family="Inter, sans-serif" font-size="9" fill="#47b475" text-anchor="middle">Token parallel</text>
-    </g>
-
-    <!-- PyTorch Parity Test Box -->
-    <g transform="translate(540, 120)">
-      <rect width="220" height="60" rx="6" fill="#1a3d2a" stroke="#47b475" stroke-width="2"/>
-      <text x="110" y="20" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#47b475" text-anchor="middle">PyTorch Parity Tests</text>
-      <text x="110" y="37" font-family="Inter, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">ctypes bindings + autograd comparison</text>
-      <text x="110" y="52" font-family="Inter, sans-serif" font-size="9" fill="#5cc98a" text-anchor="middle">max diff &lt; 1e-5 for all kernels</text>
-    </g>
+  <!-- Output: Training Runtime v7 (green) — bottom fork branch -->
+  <g transform="translate(665,126)">
+    <rect width="272" height="50" rx="8" fill="#0c1f14" stroke="#47b475" stroke-width="2" filter="url(#shadow)"/>
+    <rect width="272" height="22" rx="8" fill="url(#greenGrad)"/>
+    <text x="136" y="15" font-family="Inter, sans-serif" font-size="10" font-weight="700" fill="#0a1f10" text-anchor="middle">Training Runtime — v7</text>
+    <text x="136" y="34" font-family="Inter, sans-serif" font-size="8" fill="#86efac" text-anchor="middle">AdamW · grad accum · CE · oracle parity gates</text>
+    <text x="136" y="45" font-family="monospace" font-size="7.5" fill="#22c55e" text-anchor="middle">generated_train_runtime_v7.c → libtrain.so</text>
   </g>
 
-  <!-- Legend -->
-  <g transform="translate(700, 470)">
-    <rect x="0" y="0" width="12" height="12" rx="2" fill="#ffb400"/>
-    <text x="18" y="10" font-family="Inter, sans-serif" font-size="10" fill="#707070">Core Pipeline</text>
-    <rect x="90" y="0" width="12" height="12" rx="2" fill="#47b475"/>
-    <text x="108" y="10" font-family="Inter, sans-serif" font-size="10" fill="#707070">Output</text>
+  <!-- ══════════════════════════════════════════════════
+       KERNEL LIBRARY PANEL
+  ══════════════════════════════════════════════════ -->
+  <rect x="20" y="197" width="920" height="270" rx="12" fill="#252525" stroke="#454545" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <!-- Library header -->
+  <text x="480" y="219" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#ffb400" text-anchor="middle">Kernel Library — libckernel_engine.so</text>
+  <text x="480" y="235" font-family="Inter, sans-serif" font-size="9.5" fill="#555555" text-anchor="middle">Shared foundation for both inference and training · every kernel ships forward + backward</text>
+
+  <!-- ── Row 1 (y=247): attention, rope, rmsnorm, swiglu, softmax ── -->
+
+  <g transform="translate(35,247)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Attention</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Causal · GQA · Sliding Window</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(216,247)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RoPE</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Rotary Position Embeddings</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(397,247)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">RMSNorm</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Fused · rstd cache · learned scale</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(578,247)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">SwiGLU</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Fused gate · Llama / Qwen MLP</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(759,247)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Softmax</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Causal row-wise · numerically stable</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <!-- ── Row 2 (y=321): layernorm, gelu, cross_entropy, gemm, mlp ── -->
+
+  <g transform="translate(35,321)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">LayerNorm</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Rolled + unrolled variants</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(216,321)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GELU</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Exact + fast approximation</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(397,321)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">Cross-Entropy</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">Stable log-sum-exp · ignore-idx</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">forward + backward</text>
+  </g>
+
+  <g transform="translate(578,321)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="19" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">GEMM / GEMV</text>
+    <text x="83" y="34" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">AVX-512 · Q4_K Q5_K Q6_K Q8_0</text>
+    <text x="83" y="47" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">blocked serial + parallel</text>
+    <text x="83" y="60" font-family="Inter, sans-serif" font-size="7.5" fill="#9ed6ff" text-anchor="middle">llama.cpp parity verified</text>
+  </g>
+
+  <g transform="translate(759,321)">
+    <rect width="166" height="63" rx="6" fill="#2e2e2e" stroke="#ffb400" stroke-width="1.2"/>
+    <text x="83" y="21" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#ffb400" text-anchor="middle">MLP</text>
+    <text x="83" y="37" font-family="Inter, sans-serif" font-size="8" fill="#707070" text-anchor="middle">FC1 + activation + FC2</text>
+    <text x="83" y="52" font-family="Inter, sans-serif" font-size="8" fill="#47b475" text-anchor="middle">fwd + bwd · token-parallel</text>
+  </g>
+
+  <!-- ── Dual parity verification bar ── -->
+
+  <!-- PyTorch parity (green) -->
+  <g transform="translate(35,396)">
+    <rect width="430" height="50" rx="6" fill="#142010" stroke="#47b475" stroke-width="1.5"/>
+    <text x="215" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#47b475" text-anchor="middle">✓  PyTorch Autograd Parity</text>
+    <text x="215" y="33" font-family="Inter, sans-serif" font-size="8.5" fill="#5cc98a" text-anchor="middle">ctypes bindings · all fwd + bwd kernels · max diff &lt; 1e-5</text>
+    <text x="215" y="45" font-family="monospace" font-size="7.5" fill="#3a7a50" text-anchor="middle">make test · make v6.6-validate-matrix</text>
+  </g>
+
+  <!-- llama.cpp parity (blue) -->
+  <g transform="translate(475,396)">
+    <rect width="450" height="50" rx="6" fill="#0c1824" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="225" y="18" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#07adf8" text-anchor="middle">✓  llama.cpp Parity</text>
+    <text x="225" y="33" font-family="Inter, sans-serif" font-size="8.5" fill="#7dd3fc" text-anchor="middle">quantized GEMM/GEMV · Q4_K · Q5_K · Q6_K · Q8_0</text>
+    <text x="225" y="45" font-family="monospace" font-size="7.5" fill="#1e6a8a" text-anchor="middle">both references must agree before kernel ships</text>
   </g>
 </svg>

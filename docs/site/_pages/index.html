@@ -1,162 +1,432 @@
 <!-- TITLE: Home -->
 <!-- NAV: index -->
 
+<style>
+/* ── Hero stats ─────────────────────────────────────────────────────────── */
+.hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+.hero-stat {
+    background: rgba(255,180,0,0.1);
+    border: 1px solid rgba(255,180,0,0.25);
+    border-radius: 6px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.hero-stat strong { color: var(--orange); }
+
+/* ── IR Pipeline ────────────────────────────────────────────────────────── */
+.ir-foundation {
+    background: rgba(255,180,0,0.07);
+    border: 1px solid rgba(255,180,0,0.28);
+    border-radius: 10px 10px 0 0;
+    padding: 1rem 1.5rem;
+    text-align: center;
+}
+.ir-foundation-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--orange);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+.ir-foundation-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+}
+.ir-fs {
+    background: rgba(255,180,0,0.12);
+    border: 1px solid rgba(255,180,0,0.2);
+    border-radius: 5px;
+    padding: 0.3rem 0.7rem;
+    color: var(--text-primary);
+}
+.ir-fs-arrow { color: var(--orange); padding: 0 0.1rem; }
+
+.ir-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--grey);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+.ir-path {
+    padding: 1.25rem 1.4rem;
+}
+.ir-path.inference {
+    border-right: 1px solid var(--grey);
+    background: rgba(7,173,248,0.04);
+}
+.ir-path.training {
+    background: rgba(71,180,117,0.04);
+}
+.ir-path-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.ir-path.inference .ir-path-label { color: var(--blue); }
+.ir-path.training  .ir-path-label { color: var(--green); }
+.ir-path-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.ir-path.inference .ir-path-dot { background: var(--blue); }
+.ir-path.training  .ir-path-dot { background: var(--green); }
+
+.ir-step {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.42rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    align-items: flex-start;
+}
+.ir-step:last-child { border-bottom: none; }
+.ir-step-arr {
+    color: var(--orange);
+    font-size: 0.65rem;
+    flex-shrink: 0;
+    padding-top: 0.22rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+.ir-step-body { flex: 1; }
+.ir-step-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+.ir-step-detail {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.5;
+    margin-top: 0.1rem;
+}
+.ir-output {
+    margin-top: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+}
+.ir-path.inference .ir-output {
+    background: rgba(7,173,248,0.1);
+    border: 1px solid rgba(7,173,248,0.25);
+    color: var(--blue);
+}
+.ir-path.training .ir-output {
+    background: rgba(71,180,117,0.1);
+    border: 1px solid rgba(71,180,117,0.25);
+    color: var(--green);
+}
+.ir-emitter-note {
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-top: 3px solid var(--orange);
+    border-radius: 0 0 8px 8px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    margin-top: -1.5rem;
+}
+.ir-emitter-note strong { color: var(--text-secondary); }
+
+/* ── Pillar tables ──────────────────────────────────────────────────────── */
+.pillar-evidence {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+.pillar-evidence td {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--grey);
+    vertical-align: top;
+}
+.pillar-evidence tr:last-child td { border-bottom: none; }
+.pillar-evidence td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--orange);
+    white-space: nowrap;
+    width: 35%;
+}
+.pillar-evidence td:last-child {
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════════════════════════════ -->
 <div class="hero">
-    <span class="badge badge-amber">CPU-Native LLM Training</span>
+    <span class="badge badge-amber">CPU · Linux · x86-64 / ARM</span>
     <h1>C-Kernel-Engine</h1>
-    <p>A code generator and kernel library for training and running LLMs on CPU hardware. Designed for low-compute devices and server-grade CPUs with full PyTorch parity.</p>
-</div>
-
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    </div>
-    <div>
-        <strong>CPU-Only by Design</strong><br>
-        This engine targets x86 and embedded ARM architectures. No GPU required. Supports AVX, AVX-512, and AMX (coming soon).
-    </div>
-</div>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    </div>
-    <div>
-        <strong>System Requirements</strong><br>
-        C-Kernel-Engine is designed for <strong>Linux systems</strong> only. Target platforms include:
-        <ul style="margin: 0.5rem 0 0 1.5rem; padding: 0;">
-            <li>Server-grade CPUs (Intel Xeon, AMD EPYC) with AVX-512</li>
-            <li>Embedded systems (ARM Cortex-A, RISC-V)</li>
-            <li>Workstation CPUs with AVX2/FMA support</li>
-        </ul>
-        <small style="color: var(--text-muted);">Windows and macOS are not officially supported.</small>
+    <p>A code generator and kernel library for LLM training and inference in pure C. Every kernel has a forward and backward pass, validated to &lt;&nbsp;1e-5 against PyTorch autograd. The IR pipeline makes every architectural decision explicit and auditable — from graph lowering to memory layout to the final byte of generated C.</p>
+    <div class="hero-stats">
+        <span class="hero-stat"><strong>&lt; 1e-5</strong> parity threshold</span>
+        <span class="hero-stat"><strong>PyTorch + llama.cpp</strong> verified</span>
+        <span class="hero-stat"><strong>16.5x</strong> faster tokenizer</span>
+        <span class="hero-stat"><strong>9+</strong> fwd + bwd kernels</span>
+        <span class="hero-stat"><strong>IR1 → IR2 → IR3</strong> codegen</span>
+        <span class="hero-stat"><strong>VTune</strong> profiling</span>
+        <span class="hero-stat"><strong>Zero</strong> dependencies</span>
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════════
+     WHAT IS IT
+═══════════════════════════════════════════════════════════════════════ -->
 <h2>What is C-Kernel-Engine?</h2>
 
-<p>C-Kernel-Engine is a <strong>code generator</strong> that transforms HuggingFace-style config files into optimized, standalone C code for both inference and training.</p>
+<p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding.</p>
 
-<div class="img-container svg-viewer" data-title="C-Kernel-Engine Pipeline">
-    <img src="assets/pipeline-overview.svg" alt="Pipeline: Config → Parse → Generate → Weights → Compile → Run">
+<p>The current pipeline pulls GGUF as the weight/quantization source of truth, parses it, and combines that with C-Kernel-Engine templates and config hints. That merge produces deterministic <code>weights.bump</code> + sidecar metadata. From that point forward, the same IR chain can target either inference (v6.6) or training/backprop (v7).</p>
+
+<p>The architecture is deliberately split into a <em>smart</em> front-end (template selection, manifest resolution, IR construction, backward synthesis, layout planning, fusion detection) and a <em>dumb</em> back-end (a codegen emitter that only writes what the lowered IR already decided). This makes correctness auditable at every stage.</p>
+
+<h3>Why the Bump Format Exists</h3>
+
+<ul>
+    <li><code>weights.bump</code> is a contiguous binary blob optimized for deterministic C runtime access by offset.</li>
+    <li>The sidecar (for example <code>weights_manifest.json</code>) records tensor names, offsets, shapes, dtypes, quantization metadata, and template bindings.</li>
+    <li><code>bump + sidecar</code> is the handoff contract that gives IR1 enough concrete information to lower, codegen, and run inference or backprop paths without hidden runtime guesses.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     IR PIPELINE — THE CENTERPIECE
+═══════════════════════════════════════════════════════════════════════ -->
+<h2>The IR Pipeline</h2>
+
+<p>Both inference and training share the same IR foundation. The inference path (v6.6) adds quantized dispatch and MEGA kernel fusion. The training extension (v7) adds backward synthesis, explicit gradient accumulation, and a separate training memory layout — built on top of the same IR1/IR2 lowering chain.</p>
+
+<div class="ir-foundation">
+    <div class="ir-foundation-label">Shared IR Foundation</div>
+    <div class="ir-foundation-steps">
+        <span class="ir-fs">HF config + GGUF parse</span>
+        <span class="ir-fs-arrow">→</span>
+        <span class="ir-fs">CK template merge + tensor mapping</span>
+        <span class="ir-fs-arrow">→</span>
+        <span class="ir-fs">weights.bump + sidecar manifest</span>
+        <span class="ir-fs-arrow">→</span>
+        <span class="ir-fs">IR1 (fwd op graph, typed tensors, kernel IDs)</span>
+        <span class="ir-fs-arrow">→</span>
+        <span class="ir-fs">IR2 (fusion patterns, MEGA kernel detection)</span>
+    </div>
 </div>
 
-<h2>Target Hardware</h2>
+<div class="ir-paths">
+    <!-- Inference path -->
+    <div class="ir-path inference">
+        <div class="ir-path-label">
+            <span class="ir-path-dot"></span>
+            Inference Path — v6.6 + Quantization
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">IR3 Lowering</div>
+                <div class="ir-step-detail">quantized kernel dispatch, memory offsets<br>Q4_0 · Q4_K · Q5_K · Q6_K · Q8_0 · BF16 · FP32</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Memory Layout</div>
+                <div class="ir-step-detail">contiguous bump allocator, cache-aligned sections<br>→ layout.json</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Lowered IR3</div>
+                <div class="ir-step-detail">resolved offsets + kernel bindings</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Dumb Codegen</div>
+                <div class="ir-step-detail">emits only what lowered IR decided<br>no architecture guessing in the emitter</div>
+            </div>
+        </div>
+        <div class="ir-output">
+            → generated_model.c<br>
+            GEMM / GEMV quantized dispatch<br>
+            MEGA fused kernels (prefill + decode)<br>
+            OpenMP thread pool
+        </div>
+    </div>
 
-<div class="grid grid-2">
+    <!-- Training path -->
+    <div class="ir-path training">
+        <div class="ir-path-label">
+            <span class="ir-path-dot"></span>
+            Training Extension — v7 Backprop IR
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">IR2 Backward Synthesis</div>
+                <div class="ir-step-detail">grad edges, fanout accumulation, explicit<br>accumulation windows → ir2_train_backward.json</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Training Memory Layout</div>
+                <div class="ir-step-detail">weights · activations · grads · optimizer state<br>canary sentinels between sections → layout_train.json</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Layout Audit + Validation</div>
+                <div class="ir-step-detail">invariant checks, memory audit report<br>canary write + verify by phase</div>
+            </div>
+        </div>
+        <div class="ir-step">
+            <span class="ir-step-arr">↓</span>
+            <div class="ir-step-body">
+                <div class="ir-step-name">Dumb Codegen</div>
+                <div class="ir-step-detail">→ generated_train_runtime_v7.c → libtrain.so</div>
+            </div>
+        </div>
+        <div class="ir-output">
+            → libtrain.so<br>
+            AdamW · grad accumulation windows<br>
+            cross-entropy (stable log-sum-exp)<br>
+            PyTorch oracle parity gates
+        </div>
+    </div>
+</div>
+
+<div class="ir-emitter-note">
+    <strong>The emitter is intentionally dumb.</strong> All architecture decisions — fusion, quantized dispatch, memory placement, backward op ordering — live in the IR stages, not in the code generator. This is the core design principle: if generated behaviour is wrong, the root cause is upstream in IR or layout, never hidden in the emitter.
+    <span style="margin-left: 1rem;"><a href="ir-pipeline.html" style="color: var(--orange);">IR Pipeline v6.6 →</a> &nbsp; <a href="v7-backprop-ir.html" style="color: var(--green);">v7 Backprop IR →</a></span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ARCHITECTURE OVERVIEW SVG
+═══════════════════════════════════════════════════════════════════════ -->
+<p>The kernel library is the shared foundation for both pipelines — every kernel used in inference is also the backward-pass primitive used in training:</p>
+
+<div class="img-container svg-viewer" data-title="C-Kernel-Engine Architecture">
+    <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine: Kernel Library → IR Pipeline → Memory Layout → Dumb Codegen → Inference Runtime + Training Runtime v7">
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     CORRECTNESS
+═══════════════════════════════════════════════════════════════════════ -->
+<h2>Correctness</h2>
+
+<p>Every claim of correctness is backed by a specific, reproducible test. Parity is not a property we assert — it is something we measure at every kernel boundary, training step, and memory section.</p>
+
+<div class="grid grid-2" style="gap: 1rem;">
     <div class="card">
-        <h3 style="margin-top: 0;">Supported Architectures</h3>
-        <ul>
-            <li><strong>x86-64</strong> with AVX, AVX-512 support</li>
-            <li><strong>ARM</strong> for embedded systems</li>
-            <li><strong>AMX</strong> support coming soon</li>
-        </ul>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0;">Designed for low-compute hardware and server-grade CPUs. No GPU required.</p>
-    </div>
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Design Goals</h3>
-        <ul>
-            <li><strong>Both inference AND training</strong></li>
-            <li>Every kernel has forward + backward pass</li>
-            <li>Full parity with PyTorch autograd</li>
-            <li>Zero external dependencies</li>
-        </ul>
-    </div>
-</div>
-
-<h2>Development Roadmap</h2>
-
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;"><span class="badge badge-amber">Current</span> Phase 1: Kernel Composition</h3>
-        <ul>
-            <li>Individual kernel implementation and testing</li>
-            <li>Forward and backward pass parity with PyTorch</li>
-            <li>IR-based code generation from configs</li>
-            <li>Weight loading via bump allocator</li>
-            <li>Single-node training and inference</li>
-        </ul>
+        <h3 style="margin-top: 0;">Kernel Parity Gates</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td>max diff &lt; 1e-5</td>
+                <td>All forward and backward kernels tested via Python ctypes against PyTorch autograd. Fails hard on violation.</td>
+            </tr>
+            <tr>
+                <td>llama.cpp parity</td>
+                <td>Quantized GEMM/GEMV kernels (Q4_K, Q5_K, Q6_K, Q8_0) verified against llama.cpp reference output — not just PyTorch. Both references must agree.</td>
+            </tr>
+            <tr>
+                <td>per-kernel test</td>
+                <td>Each kernel ships its own Python parity test. <code>make test</code> runs the full suite.</td>
+            </tr>
+            <tr>
+                <td>model matrix</td>
+                <td><code>make v6.6-validate-matrix</code> runs the full kernel contract suite across GPT-2, Qwen2, Qwen3, Gemma3.</td>
+            </tr>
+        </table>
     </div>
     <div class="card">
-        <h3 style="margin-top: 0;"><span class="badge badge-indigo">Planned</span> Phase 2: Distributed CPU Training</h3>
-        <ul>
-            <li>RDMA-based distributed training</li>
-            <li>HPC-grade communication primitives</li>
-            <li>Multi-node gradient synchronization</li>
-            <li>Pipeline and tensor parallelism</li>
-            <li>Large-scale CPU cluster support</li>
-        </ul>
+        <h3 style="margin-top: 0;">Training Parity (v7)</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td>oracle cadence</td>
+                <td>Step-level and slot-level checks against a live PyTorch oracle. Run with <code>--parity-on</code>.</td>
+            </tr>
+            <tr>
+                <td>first-divergence</td>
+                <td>Operator + tensor level tracing. Reports the exact step, op, and tensor where CK diverges from PyTorch.</td>
+            </tr>
+            <tr>
+                <td>canary sentinels</td>
+                <td>Memory integrity markers between training phases (weights / activations / grads / optimizer state). Written and verified each phase.</td>
+            </tr>
+            <tr>
+                <td>850-step repro</td>
+                <td>Deterministic parity run across all three backends (<code>c</code> / <code>c_ptref</code> / <code>torch</code>). Artifacts in <code>train_runtime_parity_*_latest.json</code>.</td>
+            </tr>
+        </table>
     </div>
 </div>
 
-<h2>Key Features</h2>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PERFORMANCE
+═══════════════════════════════════════════════════════════════════════ -->
+<h2>Performance</h2>
 
-<div class="grid grid-3">
-    <div class="card card-accent">
-        <div class="feature-icon amber">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        </div>
-        <h3 style="margin-top: 0;">Full PyTorch Parity</h3>
-        <p>Every kernel has both forward and backward passes, validated against PyTorch autograd with max diff &lt; 1e-5.</p>
+<div class="grid grid-2" style="gap: 1rem;">
+    <div class="card">
+        <h3 style="margin-top: 0;">Profiling + SIMD</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td>VTune + flamegraph</td>
+                <td>Hardware counter integration via the IR Visualizer. Load run artifacts and inspect per-op hotspots with full flamegraph data.</td>
+            </tr>
+            <tr>
+                <td>AVX-512 MEGA kernels</td>
+                <td>RMSNorm + QKV + RoPE fused. MLP + Residual fused. Fusion patterns detected automatically at IR2. (v6.6)</td>
+            </tr>
+            <tr>
+                <td>AMX</td>
+                <td>Intel Advanced Matrix Extensions support coming in a future version.</td>
+            </tr>
+            <tr>
+                <td>OpenMP thread pool</td>
+                <td>Parallel prefill and decode passes. Token-parallel MLP. (v6.6)</td>
+            </tr>
+            <tr>
+                <td>Bump allocator</td>
+                <td>Cache-aligned, contiguous weight layout. Zero-copy load from GGUF. No heap fragmentation in hot paths.</td>
+            </tr>
+        </table>
+        <p style="margin-top: 0.75rem;"><a href="profiling.html" class="btn btn-sm">Profiling Guide →</a> <a href="v7-profiling.html" class="btn btn-sm" style="margin-left:0.4rem;">v7 Profiling →</a></p>
     </div>
     <div class="card">
-        <div class="feature-icon indigo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
-        </div>
-        <h3 style="margin-top: 0;">IR-Based Codegen</h3>
-        <p>Build an intermediate representation from config, then emit optimized C code with automatic buffer allocation.</p>
-    </div>
-    <div class="card card-blue">
-        <div class="feature-icon blue">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
-        </div>
-        <h3 style="margin-top: 0;">IR Pipeline v6.6</h3>
-        <p>Visual guide to templates → IR1/IR2 → lowering → memory layout → dumb codegen.</p>
-        <p style="margin-top: 0.75rem;"><a href="ir-pipeline.html" class="btn btn-sm">View Pipeline →</a></p>
-    </div>
-    <div class="card card-accent">
-        <div class="feature-icon amber">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
-        </div>
-        <h3 style="margin-top: 0;">v7 Backprop IR</h3>
-        <p>Operator-grade walkthrough of init → IR1 → IR2 → memory layout → generated training runtime with canary diagnostics, one-command train data pipeline, and Runtime Stitch graph.</p>
-        <p style="margin-top: 0.75rem;">
-            <a href="v7-backprop-ir.html" class="btn btn-sm">View v7 Guide →</a>
-            <a href="v7-backprop-ir.html#v7-runtime-stitch-graph" class="btn btn-sm" style="margin-left: 0.4rem;">Runtime Stitch →</a>
-        </p>
-    </div>
-    <div class="card card-green">
-        <div class="feature-icon green">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        </div>
-        <h3 style="margin-top: 0;">Zero Dependencies</h3>
-        <p>Pure C with optional SIMD. No external libraries required. Compiles with just GCC.</p>
-    </div>
-</div>
-
-<h2>Architecture Overview</h2>
-
-<div class="img-container">
-    <img src="assets/architecture-overview.svg" alt="C-Kernel-Engine Architecture">
-</div>
-
-<h2>Tokenizer (16x Faster than PyTorch)</h2>
-
-<div class="grid grid-2">
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Trie-Based Tokenization</h3>
-        <p>High-performance BPE/WordPiece tokenizer using trie-based longest-match. Achieves <strong>16.5x faster</strong> performance than PyTorch/tiktoken.</p>
-        <ul style="margin-top: 0.5rem;">
-            <li>O(k) lookup complexity vs O(n×k)</li>
-            <li>No memcpy in hot path</li>
-            <li>Full UTF-8 multilingual support</li>
-            <li>BPE, WordPiece, SentencePiece</li>
-        </ul>
-        <p style="margin-top: 1rem;"><a href="tokenizer.html" class="btn btn-sm">Learn More →</a></p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Performance Benchmarks</h3>
-        <table style="font-size: 0.85rem;">
+        <h3 style="margin-top: 0;">Tokenizer — 16.5x Faster</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Trie-based BPE/WordPiece tokenization. O(k) lookup vs O(n×k). No memcpy in hot path. Full UTF-8 multilingual support.</p>
+        <table style="font-size: 0.82rem;">
             <tr>
                 <th>Text Length</th>
                 <th>C-Kernel</th>
@@ -182,26 +452,30 @@
                 <td><span class="badge badge-green">18.4x</span></td>
             </tr>
         </table>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Average: 16.56x faster than PyTorch</p>
+        <p style="color: var(--text-muted); font-size: 0.78rem; margin-top: 0.5rem;">Average: 16.56x faster than PyTorch/tiktoken</p>
+        <p style="margin-top: 0.75rem;"><a href="tokenizer.html" class="btn btn-sm">Tokenizer Details →</a></p>
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════════
+     KERNEL LIBRARY
+═══════════════════════════════════════════════════════════════════════ -->
 <h2>Kernel Library</h2>
 
-<p>All kernels implement both forward and backward passes with full PyTorch parity:</p>
+<p>All kernels implement forward and backward passes. Each ships with a Python ctypes parity test that loads <code>libckernel_engine.so</code> and compares output against PyTorch autograd with max diff &lt; 1e-5:</p>
 
 <table>
     <tr>
         <th>Kernel</th>
         <th>Forward</th>
         <th>Backward</th>
-        <th>Features</th>
+        <th>Notes</th>
     </tr>
     <tr>
         <td><code>attention</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-green">Yes</span></td>
-        <td>Causal mask, GQA support, head-major layout</td>
+        <td>Causal mask, GQA, sliding-window, head-major layout</td>
     </tr>
     <tr>
         <td><code>rope</code></td>
@@ -213,13 +487,13 @@
         <td><code>rmsnorm</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-green">Yes</span></td>
-        <td>Fused normalization, rstd caching</td>
+        <td>Fused normalization, rstd caching, learned scale</td>
     </tr>
     <tr>
         <td><code>swiglu</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-green">Yes</span></td>
-        <td>Fused gate activation for Llama-style MLP</td>
+        <td>Fused gate activation for Llama/Qwen-style MLP</td>
     </tr>
     <tr>
         <td><code>softmax</code></td>
@@ -237,97 +511,71 @@
         <td><code>gelu</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-green">Yes</span></td>
-        <td>Exact and fast approximation</td>
+        <td>Exact and fast approximation variants</td>
+    </tr>
+    <tr>
+        <td><code>cross_entropy</code></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td><span class="badge badge-green">Yes</span></td>
+        <td>Stable log-sum-exp, mean reduction, ignore-index</td>
     </tr>
     <tr>
         <td><code>gemm</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-indigo">N/A</span></td>
-        <td>Blocked serial, AVX-512, parallel variants</td>
+        <td>Blocked serial, AVX-512, parallel — Q4_K · Q5_K · Q6_K · Q8_0 · FP32</td>
     </tr>
     <tr>
         <td><code>mlp</code></td>
         <td><span class="badge badge-green">Yes</span></td>
         <td><span class="badge badge-green">Yes</span></td>
-        <td>FC1 + activation + FC2, token parallel</td>
+        <td>FC1 + activation + FC2, token-parallel</td>
     </tr>
 </table>
 
+<p style="margin-top: 0.75rem;"><a href="kernels.html" class="btn btn-sm">Kernel Reference →</a> <a href="model-kernel-matrix.html" class="btn btn-sm" style="margin-left:0.4rem;">Model × Kernel Matrix →</a></p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     QUICK START
+═══════════════════════════════════════════════════════════════════════ -->
 <h2>Quick Start</h2>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">Build the Library</h3>
+    <h3 style="margin-top: 0;">Build + Parity Test</h3>
     <pre>git clone https://github.com/antshiv/C-Kernel-Engine.git
 cd C-Kernel-Engine
-make</pre>
-    <p>This builds <code>build/libckernel_engine.so</code> with all kernels.</p>
+make                  # builds build/libckernel_engine.so
+make test             # runs all kernel parity tests vs PyTorch</pre>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 0;">Requires Linux, GCC, Python 3 + PyTorch for parity tests. AVX2 minimum; AVX-512 recommended.</p>
 </div>
 
-<div class="card">
-    <h3 style="margin-top: 0;">Run Tests</h3>
-    <pre>make test</pre>
-    <p>Runs all Python ctypes tests against PyTorch reference implementations.</p>
-</div>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Generate Model Runtime</h3>
-    <pre># From a HuggingFace config.json:
-make ck-emit CONFIG=path/to/config.json OUT=build/generated_model.c</pre>
-    <p>Emits a complete C file with forward/backward passes stitched together.</p>
-</div>
-
-<h2>Data Flow</h2>
-
-<div class="img-container">
-    <img src="assets/forward-backward-flow.svg" alt="Forward and Backward Pass Data Flow">
-</div>
-
-<h2>Why CPU Training?</h2>
-
-<div class="grid grid-2">
+<div class="grid grid-2" style="gap: 1rem; margin-top: 1rem;">
     <div class="card">
-        <h3 style="margin-top: 0;">Inference + Training</h3>
-        <p>Unlike inference-only engines, C-Kernel-Engine provides complete backward passes for every operation, enabling full training loops in pure C.</p>
+        <h3 style="margin-top: 0;">Inference — Generate C Runtime</h3>
+        <pre style="font-size: 0.78rem;">make ck-emit \
+  CONFIG=path/to/config.json \
+  OUT=build/generated_model.c</pre>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Emits a complete C file from IR. Load GGUF quantized weights via <code>make gguf-convert</code>.</p>
+        <p style="margin-top: 0.75rem;"><a href="quickstart.html" class="btn btn-sm">Full Quickstart →</a></p>
     </div>
     <div class="card">
-        <h3 style="margin-top: 0;">Modular Composition</h3>
-        <p>Each kernel is a standalone unit. The codegen layer stitches them together based on your model architecture.</p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Llama/SmolLM Compatible</h3>
-        <p>Full support for modern architectures: RoPE, GQA, SwiGLU, RMSNorm. Load SmolLM configs and run with full parity.</p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Verifiable Correctness</h3>
-        <p>Every kernel ships with Python test that loads via ctypes and compares against PyTorch autograd.</p>
+        <h3 style="margin-top: 0;">Training — v7 IR Runtime</h3>
+        <pre style="font-size: 0.78rem;">. .venv/bin/activate
+python version/v7/scripts/ck_run_v7.py init \
+  --run /tmp/myrun \
+  --template qwen3 \
+  --generate-ir --generate-runtime --strict
+python version/v7/scripts/ck_run_v7.py train \
+  --run /tmp/myrun \
+  --backend ck --parity-on</pre>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0;">Produces IR1, IR2, layout, generated C runtime, and parity artifacts.</p>
+        <p style="margin-top: 0.75rem;"><a href="v7-backprop-ir.html" class="btn btn-sm">v7 Guide →</a></p>
     </div>
 </div>
 
-<h2>Weight Loading</h2>
-
-<div class="card">
-    <p>After generating C code, load pretrained weights using the built-in converters:</p>
-    <table>
-        <tr>
-            <th>Source Format</th>
-            <th>Method</th>
-        </tr>
-        <tr>
-            <td>SafeTensors</td>
-            <td>Direct load to bump allocator</td>
-        </tr>
-        <tr>
-            <td>GGML</td>
-            <td>GGML → bump allocator converter</td>
-        </tr>
-        <tr>
-            <td>PyTorch (.pt/.bin)</td>
-            <td>Built-in PyTorch weight converter</td>
-        </tr>
-    </table>
-    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 1rem;">The bump allocator provides cache-aligned, contiguous memory layout for optimal CPU performance.</p>
-</div>
-
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PROJECT STRUCTURE
+═══════════════════════════════════════════════════════════════════════ -->
 <h2>Project Structure</h2>
 
 {{FOLDER_STRUCTURE}}

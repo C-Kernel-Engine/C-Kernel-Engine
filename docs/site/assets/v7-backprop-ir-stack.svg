@@ -1,105 +1,218 @@
-<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v7 Backprop IR Pipeline — from init through smart IR stages, dumb codegen, to runtime execution">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="980" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#061221"/>
       <stop offset="1" stop-color="#081a2b"/>
     </linearGradient>
-    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f2940"/>
-      <stop offset="1" stop-color="#0b1f33"/>
-    </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#ffb400"/>
       <stop offset="1" stop-color="#07adf8"/>
     </linearGradient>
-    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#001" flood-opacity="0.35"/>
+    <linearGradient id="smartGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14365a"/>
+      <stop offset="1" stop-color="#1a2e50"/>
+    </linearGradient>
+    <linearGradient id="smartGrad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a3a5e"/>
+      <stop offset="1" stop-color="#1e3258"/>
+    </linearGradient>
+    <linearGradient id="dumbGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2a30"/>
+      <stop offset="1" stop-color="#1e1e24"/>
+    </linearGradient>
+    <linearGradient id="execGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a3e2a"/>
+      <stop offset="1" stop-color="#142e22"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.3"/>
     </filter>
-    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M0,0 L12,6 L0,12 Z" fill="#79c8f7"/>
+    <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#07adf8" flood-opacity="0.25"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#79c8f7"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#5dd39e"/>
+    </marker>
+    <marker id="arrowGrey" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#8a8a96"/>
     </marker>
   </defs>
 
+  <!-- Background -->
   <rect x="0" y="0" width="1600" height="980" fill="url(#bg)"/>
   <rect x="44" y="40" width="1512" height="900" rx="16" fill="#0a1a2a" stroke="#23415e"/>
 
-  <text x="86" y="98" fill="#ffb400" font-size="44" font-family="Segoe UI, Arial" font-weight="700">v7 Backprop IR Pipeline</text>
-  <text x="86" y="132" fill="#9fb8cd" font-size="22" font-family="Segoe UI, Arial">init -> template/manifest -> IR1 -> IR2 -> layout -> codegen -> libtrain -> train loop + oracle</text>
+  <!-- Title -->
+  <text x="86" y="96" fill="#ffb400" font-size="40" font-family="Segoe UI, Arial" font-weight="700">v7 Backprop IR Pipeline</text>
+  <text x="86" y="128" fill="#9fb8cd" font-size="20" font-family="Segoe UI, Arial">Smart decisions narrow early → dumb codegen emits fixed plan → runtime executes deterministically</text>
+  <rect x="82" y="148" width="1436" height="8" rx="4" fill="url(#accent)"/>
 
-  <rect x="82" y="168" width="1436" height="10" rx="5" fill="url(#accent)"/>
+  <!-- ═══════════ PHASE LABELS (funnel visual) ═══════════ -->
+  <!-- Smart zone bracket -->
+  <rect x="72" y="176" width="830" height="28" rx="6" fill="#0e2540" stroke="#2a6090"/>
+  <text x="340" y="196" fill="#79c8f7" font-size="15" font-weight="700" font-family="Segoe UI, Arial">SMART  —  decisions happen here</text>
 
+  <!-- Dumb zone bracket -->
+  <rect x="920" y="176" width="260" height="28" rx="6" fill="#1a1a22" stroke="#4a4a56"/>
+  <text x="980" y="196" fill="#8a8a96" font-size="15" font-weight="700" font-family="Segoe UI, Arial">DUMB  —  emit only</text>
+
+  <!-- Exec zone bracket -->
+  <rect x="1198" y="176" width="340" height="28" rx="6" fill="#142e1e" stroke="#3a7856"/>
+  <text x="1280" y="196" fill="#5dd39e" font-size="15" font-weight="700" font-family="Segoe UI, Arial">EXECUTE  —  run the plan</text>
+
+  <!-- ═══════════ STAGE 1: Init ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="90" y="214" width="232" height="170" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="112" y="252" fill="#ffb400" font-size="28" font-family="Segoe UI, Arial" font-weight="700">1) Init</text>
-    <text x="112" y="286" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">xavier or normal init</text>
-    <text x="112" y="314" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">dims and heads</text>
-    <text x="112" y="342" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">template choice</text>
+    <rect x="80" y="224" width="200" height="190" rx="14" fill="url(#smartGrad)" stroke="#3a7aaa"/>
+    <!-- Icon: gear/cog glyph -->
+    <circle cx="130" cy="260" r="16" fill="none" stroke="#ffb400" stroke-width="2"/>
+    <circle cx="130" cy="260" r="6" fill="#ffb400"/>
+    <text x="156" y="266" fill="#ffb400" font-size="24" font-family="Segoe UI, Arial" font-weight="700">Init</text>
+    <text x="100" y="298" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">xavier / normal init</text>
+    <text x="100" y="322" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">dims, heads, vocab</text>
+    <text x="100" y="346" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">template selection</text>
+    <text x="100" y="378" fill="#a0b8cc" font-size="14" font-family="Segoe UI, Arial">picks architecture shape</text>
   </g>
 
-  <g filter="url(#shadow)">
-    <rect x="366" y="214" width="258" height="170" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="388" y="252" fill="#ffb400" font-size="28" font-family="Segoe UI, Arial" font-weight="700">2) Inputs</text>
-    <text x="388" y="286" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">weights.bump</text>
-    <text x="388" y="314" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">weights_manifest.json</text>
-    <text x="388" y="342" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">template (built-in or custom)</text>
+  <!-- Arrow 1→2 with artifact label -->
+  <line x1="280" y1="319" x2="316" y2="319" stroke="#79c8f7" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="282" y="310" fill="#5aa8d8" font-size="11" font-family="Segoe UI, Arial" font-style="italic">manifest</text>
+
+  <!-- ═══════════ STAGE 2: IR1 (Forward Graph) ═══════════ -->
+  <g filter="url(#glowBlue)">
+    <rect x="326" y="224" width="240" height="190" rx="14" fill="url(#smartGrad2)" stroke="#4a8ac0"/>
+    <!-- Icon: directed graph -->
+    <circle cx="372" cy="258" r="8" fill="#07adf8"/>
+    <line x1="380" y1="258" x2="400" y2="248" stroke="#07adf8" stroke-width="2"/>
+    <circle cx="404" cy="246" r="6" fill="#07adf8"/>
+    <line x1="380" y1="258" x2="400" y2="268" stroke="#07adf8" stroke-width="2"/>
+    <circle cx="404" cy="270" r="6" fill="#07adf8"/>
+    <text x="418" y="264" fill="#07adf8" font-size="24" font-family="Segoe UI, Arial" font-weight="700">IR1</text>
+    <text x="346" y="298" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">forward graph only</text>
+    <text x="346" y="322" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">weight vs activation tags</text>
+    <text x="346" y="346" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">save_for_backward contract</text>
+    <text x="346" y="378" fill="#a0b8cc" font-size="14" font-family="Segoe UI, Arial">declares topology + data roles</text>
   </g>
 
-  <g filter="url(#shadow)">
-    <rect x="668" y="214" width="268" height="170" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="690" y="252" fill="#ffb400" font-size="28" font-family="Segoe UI, Arial" font-weight="700">3) IR1</text>
-    <text x="690" y="286" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">forward graph only</text>
-    <text x="690" y="314" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">weight vs activation tags</text>
-    <text x="690" y="342" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">save_for_backward contract</text>
+  <!-- Arrow 2→3 with artifact label -->
+  <line x1="566" y1="319" x2="602" y2="319" stroke="#79c8f7" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="568" y="310" fill="#5aa8d8" font-size="11" font-family="Segoe UI, Arial" font-style="italic">ir1.json</text>
+
+  <!-- ═══════════ STAGE 3: IR2 (Backward + Accum) ═══════════ -->
+  <g filter="url(#glowBlue)">
+    <rect x="612" y="224" width="280" height="190" rx="14" fill="url(#smartGrad2)" stroke="#4a8ac0"/>
+    <!-- Icon: bidirectional arrows (forward + backward) -->
+    <path d="M658 250 L678 240 L678 248 L700 248 L700 252 L678 252 L678 260 Z" fill="#ffb400"/>
+    <path d="M730 260 L710 270 L710 262 L688 262 L688 258 L710 258 L710 250 Z" fill="#7ce6b4"/>
+    <text x="744" y="264" fill="#ffb400" font-size="24" font-family="Segoe UI, Arial" font-weight="700">IR2</text>
+    <text x="632" y="298" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">reverse traversal</text>
+    <text x="632" y="322" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">grad fanout → accumulate nodes</text>
+    <text x="632" y="346" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">backward kernel binding</text>
+    <text x="632" y="370" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">layout + memory offsets</text>
+    <text x="632" y="396" fill="#a0b8cc" font-size="14" font-family="Segoe UI, Arial">the brain — all routing decisions</text>
   </g>
 
+  <!-- Arrow 3→4 with artifact label -->
+  <line x1="892" y1="319" x2="936" y2="319" stroke="#8a8a96" stroke-width="3" marker-end="url(#arrowGrey)"/>
+  <text x="894" y="310" fill="#8a8a96" font-size="11" font-family="Segoe UI, Arial" font-style="italic">ir2.json + layout.json</text>
+
+  <!-- ═══════════ STAGE 4: Codegen (DUMB) ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="980" y="214" width="268" height="170" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="1002" y="252" fill="#ffb400" font-size="28" font-family="Segoe UI, Arial" font-weight="700">4) IR2</text>
-    <text x="1002" y="286" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">reverse traversal</text>
-    <text x="1002" y="314" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">grad fanout accumulation</text>
-    <text x="1002" y="342" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">backward kernel binding</text>
+    <rect x="946" y="234" width="220" height="170" rx="14" fill="url(#dumbGrad)" stroke="#5a5a66"/>
+    <!-- Icon: code brackets -->
+    <text x="976" y="270" fill="#8a8a96" font-size="28" font-family="JetBrains Mono, monospace" font-weight="700">{...}</text>
+    <text x="1058" y="268" fill="#9a9aa6" font-size="22" font-family="Segoe UI, Arial" font-weight="700">Codegen</text>
+    <text x="966" y="300" fill="#b0b0bc" font-size="17" font-family="Segoe UI, Arial">emit C from lowered IR</text>
+    <text x="966" y="324" fill="#b0b0bc" font-size="17" font-family="Segoe UI, Arial">no decisions, no branching</text>
+    <text x="966" y="348" fill="#b0b0bc" font-size="17" font-family="Segoe UI, Arial">flat loop over op list</text>
+    <text x="966" y="378" fill="#707080" font-size="14" font-family="Segoe UI, Arial">intentionally dumb emitter</text>
   </g>
 
+  <!-- Arrow 4→5 with artifact label -->
+  <line x1="1166" y1="319" x2="1210" y2="319" stroke="#5dd39e" stroke-width="3" marker-end="url(#arrowG)"/>
+  <text x="1168" y="310" fill="#5dd39e" font-size="11" font-family="Segoe UI, Arial" font-style="italic">runtime_v7.c</text>
+
+  <!-- ═══════════ STAGE 5: Runtime (EXECUTE) ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="1292" y="214" width="226" height="170" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="1314" y="252" fill="#ffb400" font-size="28" font-family="Segoe UI, Arial" font-weight="700">5) Layout + Audit</text>
-    <text x="1314" y="286" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">layout_train.json</text>
-    <text x="1314" y="314" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">sections and offsets</text>
-    <text x="1314" y="342" fill="#dbeaf5" font-size="19" font-family="Segoe UI, Arial">audit and canaries</text>
+    <rect x="1220" y="224" width="310" height="190" rx="14" fill="url(#execGrad)" stroke="#4a9068"/>
+    <!-- Icon: play triangle -->
+    <polygon points="1260,246 1260,274 1284,260" fill="#5dd39e"/>
+    <text x="1296" y="266" fill="#5dd39e" font-size="24" font-family="Segoe UI, Arial" font-weight="700">Runtime</text>
+    <text x="1240" y="300" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">forward → backward → optimizer</text>
+    <text x="1240" y="324" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">deterministic memory access</text>
+    <text x="1240" y="348" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">canary checks (strict mode)</text>
+    <text x="1240" y="378" fill="#a0ccb0" font-size="14" font-family="Segoe UI, Arial">CK primary + PyTorch oracle</text>
   </g>
 
-  <line x1="322" y1="299" x2="354" y2="299" stroke="#79c8f7" stroke-width="4" marker-end="url(#arrow)"/>
-  <line x1="624" y1="299" x2="656" y2="299" stroke="#79c8f7" stroke-width="4" marker-end="url(#arrow)"/>
-  <line x1="936" y1="299" x2="968" y2="299" stroke="#79c8f7" stroke-width="4" marker-end="url(#arrow)"/>
-  <line x1="1248" y1="299" x2="1280" y2="299" stroke="#79c8f7" stroke-width="4" marker-end="url(#arrow)"/>
+  <!-- ═══════════ FUNNEL VISUAL ═══════════ -->
+  <!-- Trapezoid shape showing narrowing from wide inputs to thin codegen -->
+  <path d="M80 440 L280 440 L260 470 L100 470 Z" fill="#14365a" fill-opacity="0.4" stroke="#3a7aaa" stroke-width="1"/>
+  <path d="M326 440 L566 440 L540 470 L352 470 Z" fill="#1a3a5e" fill-opacity="0.4" stroke="#4a8ac0" stroke-width="1"/>
+  <path d="M612 440 L892 440 L860 470 L644 470 Z" fill="#1a3a5e" fill-opacity="0.4" stroke="#4a8ac0" stroke-width="1"/>
+  <path d="M946 440 L1166 440 L1140 470 L972 470 Z" fill="#2a2a30" fill-opacity="0.4" stroke="#5a5a66" stroke-width="1"/>
+  <path d="M1220 440 L1530 440 L1530 470 L1220 470 Z" fill="#1a3e2a" fill-opacity="0.4" stroke="#4a9068" stroke-width="1"/>
+  <text x="340" y="462" fill="#5aa8d8" font-size="13" font-weight="600" font-family="Segoe UI, Arial">decisions narrow ─────────────────────────────────▶</text>
+  <text x="960" y="462" fill="#707080" font-size="13" font-weight="600" font-family="Segoe UI, Arial">thin pipe</text>
+  <text x="1280" y="462" fill="#5dd39e" font-size="13" font-weight="600" font-family="Segoe UI, Arial">expands to execution</text>
 
+  <!-- ═══════════ GENERATED RUNTIME DETAIL ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="90" y="438" width="684" height="214" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="116" y="478" fill="#07adf8" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Generated Runtime (C)</text>
-    <text x="116" y="514" fill="#dbeaf5" font-size="21" font-family="Segoe UI, Arial">generated_train_runtime_v7.c</text>
-    <text x="116" y="544" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- forward_step / backward_step / optimizer_step</text>
-    <text x="116" y="572" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- contiguous memory references from layout offsets</text>
-    <text x="116" y="600" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- memory diagnostics and canary checks in strict mode</text>
-    <text x="116" y="630" fill="#9fb8cd" font-size="18" font-family="Segoe UI, Arial">Codegen remains intentionally dumb: emit only what lowered IR already decided.</text>
+    <rect x="80" y="500" width="640" height="180" rx="14" fill="#0f2940" stroke="#2d5d84"/>
+    <text x="106" y="536" fill="#07adf8" font-size="26" font-family="Segoe UI, Arial" font-weight="700">Generated C Runtime</text>
+    <text x="106" y="566" fill="#dbeaf5" font-size="18" font-family="Segoe UI, Arial">generated_train_runtime_v7.c</text>
+    <text x="106" y="594" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">- forward_step / backward_step / optimizer_step</text>
+    <text x="106" y="618" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">- contiguous memory refs from layout offsets</text>
+    <text x="106" y="646" fill="#9fb8cd" font-size="15" font-family="Segoe UI, Arial">Codegen emits only what lowered IR already decided.</text>
   </g>
 
+  <!-- Arrow to operator loop -->
+  <line x1="720" y1="590" x2="758" y2="590" stroke="#5dd39e" stroke-width="3" marker-end="url(#arrowG)"/>
+
+  <!-- ═══════════ OPERATOR LOOP ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="810" y="438" width="708" height="214" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="836" y="478" fill="#5dd39e" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Operator Loop</text>
-    <text x="836" y="514" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">cks-v7-run train --backend ck</text>
-    <text x="836" y="542" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- executes generated C runtime path</text>
-    <text x="836" y="570" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- writes loss, grad, parity, memory diagnostic artifacts</text>
-    <text x="836" y="598" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">cks-v7-run train --backend both</text>
-    <text x="836" y="626" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">- CK remains primary, PyTorch runs as oracle reference</text>
+    <rect x="768" y="500" width="762" height="180" rx="14" fill="#142e22" stroke="#3a7856"/>
+    <text x="794" y="536" fill="#5dd39e" font-size="26" font-family="Segoe UI, Arial" font-weight="700">Train Loop + Oracle</text>
+    <text x="794" y="566" fill="#dbeaf5" font-size="18" font-family="Segoe UI, Arial">cks-v7-run train --backend ck</text>
+    <text x="794" y="594" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">- executes generated C runtime path</text>
+    <text x="794" y="618" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">- writes loss, grad, parity, memory diagnostic artifacts</text>
+    <text x="794" y="646" fill="#dbeaf5" font-size="17" font-family="Segoe UI, Arial">- --backend both: CK primary, PyTorch as oracle reference</text>
   </g>
 
-  <line x1="774" y1="544" x2="798" y2="544" stroke="#79c8f7" stroke-width="4" marker-end="url(#arrow)"/>
-
+  <!-- ═══════════ OUTPUT ARTIFACTS ═══════════ -->
   <g filter="url(#shadow)">
-    <rect x="90" y="708" width="1428" height="184" rx="14" fill="url(#card)" stroke="#2d5d84"/>
-    <text x="116" y="748" fill="#ffb400" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Output Artifacts for Visualizer</text>
-    <text x="116" y="784" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">ir1_train_forward.json, ir2_train_backward.json, layout_train.json, layout_train_audit.json</text>
-    <text x="116" y="812" fill="#dbeaf5" font-size="20" font-family="Segoe UI, Arial">generated_train_runtime_summary_v7.json, train_e2e_latest.json, training_loss_curve.json, training_parity.json, memory_diagnostic_latest.json</text>
-    <text x="116" y="848" fill="#9fb8cd" font-size="19" font-family="Segoe UI, Arial">open_ir_visualizer.py --generate --run /path/to/run --html-only</text>
+    <rect x="80" y="720" width="1450" height="170" rx="14" fill="#0f2940" stroke="#2d5d84"/>
+    <text x="106" y="758" fill="#ffb400" font-size="26" font-family="Segoe UI, Arial" font-weight="700">Output Artifacts</text>
+
+    <!-- Artifact chips -->
+    <rect x="106" y="776" width="150" height="30" rx="8" fill="#1a3a5e" stroke="#3a7aaa"/>
+    <text x="120" y="796" fill="#79c8f7" font-size="13" font-family="JetBrains Mono, monospace">ir1_forward.json</text>
+
+    <rect x="270" y="776" width="160" height="30" rx="8" fill="#1a3a5e" stroke="#3a7aaa"/>
+    <text x="284" y="796" fill="#79c8f7" font-size="13" font-family="JetBrains Mono, monospace">ir2_backward.json</text>
+
+    <rect x="444" y="776" width="154" height="30" rx="8" fill="#1a3a5e" stroke="#3a7aaa"/>
+    <text x="458" y="796" fill="#79c8f7" font-size="13" font-family="JetBrains Mono, monospace">layout_train.json</text>
+
+    <rect x="612" y="776" width="190" height="30" rx="8" fill="#1a3a5e" stroke="#3a7aaa"/>
+    <text x="626" y="796" fill="#79c8f7" font-size="13" font-family="JetBrains Mono, monospace">layout_train_audit.json</text>
+
+    <rect x="816" y="776" width="230" height="30" rx="8" fill="#142e22" stroke="#3a7856"/>
+    <text x="830" y="796" fill="#5dd39e" font-size="13" font-family="JetBrains Mono, monospace">train_e2e_latest.json</text>
+
+    <rect x="1060" y="776" width="220" height="30" rx="8" fill="#142e22" stroke="#3a7856"/>
+    <text x="1074" y="796" fill="#5dd39e" font-size="13" font-family="JetBrains Mono, monospace">training_loss_curve.json</text>
+
+    <rect x="1294" y="776" width="220" height="30" rx="8" fill="#142e22" stroke="#3a7856"/>
+    <text x="1308" y="796" fill="#5dd39e" font-size="13" font-family="JetBrains Mono, monospace">memory_diagnostic.json</text>
+
+    <rect x="106" y="820" width="280" height="30" rx="8" fill="#142e22" stroke="#3a7856"/>
+    <text x="120" y="840" fill="#5dd39e" font-size="13" font-family="JetBrains Mono, monospace">runtime_summary_v7.json</text>
+
+    <rect x="400" y="820" width="200" height="30" rx="8" fill="#142e22" stroke="#3a7856"/>
+    <text x="414" y="840" fill="#5dd39e" font-size="13" font-family="JetBrains Mono, monospace">training_parity.json</text>
+
+    <text x="106" y="876" fill="#9fb8cd" font-size="16" font-family="Segoe UI, Arial">open_ir_visualizer.py --generate --run /path/to/run --html-only</text>
   </g>
 </svg>

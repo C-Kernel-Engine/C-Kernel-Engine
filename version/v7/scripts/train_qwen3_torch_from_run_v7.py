@@ -39,11 +39,38 @@ def _load_text(prompt: Optional[str], data_path: Optional[Path]) -> str:
     return str(prompt)
 
 
+def _load_token_file(path: Path) -> List[int]:
+    ids: List[int] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        ids.append(int(s))
+    if len(ids) < 2:
+        raise ValueError("Token file must contain at least 2 token ids")
+    return ids
+
+
 def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     data = (text or "").encode("utf-8", errors="ignore")
     if len(data) < 2:
         raise ValueError("Training text must encode to at least 2 bytes")
     ids = [int(b) % int(vocab) for b in data]
+    needed = int(total_tokens) + 1
+    repeats = (needed + len(ids) - 1) // len(ids)
+    stream = np.array((ids * repeats)[:needed], dtype=np.int64)
+    batches: List[Tuple[torch.Tensor, torch.Tensor]] = []
+    for i in range(0, total_tokens - seq_len + 1, seq_len):
+        x = torch.from_numpy(stream[i : i + seq_len]).long().view(1, seq_len)
+        y = torch.from_numpy(stream[i + 1 : i + seq_len + 1]).long().view(1, seq_len)
+        batches.append((x, y))
+    return batches
+
+
+def _build_batches_from_ids(token_ids: Sequence[int], total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+    ids = [int(x) % int(vocab) for x in token_ids]
+    if len(ids) < 2:
+        raise ValueError("Need at least 2 token ids")
     needed = int(total_tokens) + 1
     repeats = (needed + len(ids) - 1) // len(ids)
     stream = np.array((ids * repeats)[:needed], dtype=np.int64)
@@ -294,7 +321,8 @@ class TorchQwenFromRun(nn.Module):
 def train_qwen_from_run(
     *,
     run_dir: Path,
-    text: str,
+    text: Optional[str],
+    token_ids: Optional[Sequence[int]],
     epochs: int,
     seq_len: int,
     total_tokens: int,
@@ -312,7 +340,12 @@ def train_qwen_from_run(
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(lr), weight_decay=float(weight_decay))
 
-    batches = _build_batches_from_text(text, total_tokens=total_tokens, seq_len=seq_len, vocab=vocab)
+    if token_ids is not None:
+        batches = _build_batches_from_ids(token_ids, total_tokens=total_tokens, seq_len=seq_len, vocab=vocab)
+    else:
+        if text is None:
+            raise ValueError("Need either text or token_ids")
+        batches = _build_batches_from_text(text, total_tokens=total_tokens, seq_len=seq_len, vocab=vocab)
     if not batches:
         raise ValueError("No batches generated")
 
@@ -367,6 +400,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Train Qwen-like PyTorch model from v7 run-dir weights.")
     ap.add_argument("--run-dir", type=Path, required=True)
     ap.add_argument("--data", type=Path, default=None, help="UTF-8 text file for training stream.")
+    ap.add_argument("--token-file", type=Path, default=None, help="Pre-tokenized integer stream file (one id per line).")
     ap.add_argument("--prompt", type=str, default=None, help="Inline training text (if --data is not set).")
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--seq-len", type=int, default=8)
@@ -386,10 +420,16 @@ def main() -> int:
     if args.total_tokens < args.seq_len + 1:
         raise ValueError("need total_tokens >= seq_len + 1")
 
-    text = _load_text(args.prompt, args.data)
+    text: Optional[str] = None
+    token_ids: Optional[List[int]] = None
+    if args.token_file is not None:
+        token_ids = _load_token_file(args.token_file)
+    else:
+        text = _load_text(args.prompt, args.data)
     summary = train_qwen_from_run(
         run_dir=args.run_dir,
         text=text,
+        token_ids=token_ids,
         epochs=int(args.epochs),
         seq_len=int(args.seq_len),
         total_tokens=int(args.total_tokens),
@@ -427,4 +467,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

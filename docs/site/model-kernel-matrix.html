@@ -933,15 +933,13 @@
 <div class="container">
   <h1>Model + Kernel Matrix</h1>
   <p class="lead">
-    A visual map of what the C Kernel Engine supports today (GPT‑2, Qwen2, Qwen3, Gemma3)
-    and the kernel families that power them. This is grounded in our own templates,
-    IR lowering, and the GGUF test models we run locally.
+    A visual map of what the C Kernel Engine supports: IR templates, kernel families, quant contracts, and pipeline coverage (inference-only vs. inference + v7 training). Grounded in the actual templates, IR lowering passes, and GGUF test corpus run locally.
   </p>
 
   <style>
     .matrix-hero {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
       gap: 1rem;
       margin-top: 1.5rem;
     }
@@ -949,24 +947,91 @@
       background: var(--dark-card);
       border: 1px solid var(--grey);
       border-radius: 12px;
-      padding: 1rem 1.2rem;
+      padding: 1.1rem 1.2rem 1rem;
       position: relative;
       overflow: hidden;
     }
+    /* top accent bar per model */
+    .model-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .model-card.mc-qwen2::before  { background: var(--orange); }
+    .model-card.mc-qwen3::before  { background: var(--green); }
+    .model-card.mc-gemma3::before { background: var(--blue); }
+    .model-card.mc-gpt2::before   { background: #9b59b6; }
+
     .model-badge {
-      font-size: 0.8rem;
-      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      padding: 0.18rem 0.55rem;
       border-radius: 999px;
       background: #15202b;
       color: #9ed6ff;
       border: 1px solid #22313f;
+      font-family: 'JetBrains Mono', monospace;
     }
     .model-title {
-      margin: 0.25rem 0 0.5rem;
-      font-size: 1.3rem;
-      color: var(--orange);
+      margin: 0.3rem 0 0.25rem;
+      font-size: 1.25rem;
+      color: var(--text-primary);
       font-weight: 700;
     }
+    .model-arch {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 0.75rem;
+      line-height: 1.5;
+    }
+    /* pipeline coverage indicators */
+    .model-pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.28rem;
+      margin-bottom: 0.85rem;
+    }
+    .mp-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.76rem;
+    }
+    .mp-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mp-dot.inference { background: var(--blue); }
+    .mp-dot.training  { background: var(--green); }
+    .mp-dot.no        { background: var(--grey); }
+    .mp-text { color: var(--text-secondary); }
+    .mp-text.dim { color: var(--text-muted); }
+
+    /* quant badges */
+    .model-quant {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.28rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--grey);
+    }
+    .mq-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.67rem;
+      padding: 0.12rem 0.42rem;
+      border-radius: 4px;
+      background: rgba(7,173,248,0.1);
+      border: 1px solid rgba(7,173,248,0.22);
+      color: #7dd3fc;
+    }
+    .mq-chip.preferred {
+      background: rgba(255,180,0,0.12);
+      border-color: rgba(255,180,0,0.28);
+      color: var(--orange);
+    }
+
     .model-tags {
       display: flex;
       flex-wrap: wrap;
@@ -1120,56 +1185,78 @@
   </style>
 
   <div class="matrix-hero">
-    <div class="model-card">
-      <span class="model-badge">Template: gpt2.json</span>
-      <div class="model-title">GPT‑2</div>
-      <div class="dim">LayerNorm + Learned PosEmb + GELU</div>
-      <div class="model-tags">
-        <span class="tag">Positional: learned</span>
-        <span class="tag">Tokenizer: BPE</span>
-        <span class="tag">Activation: GELU</span>
-        <span class="tag">Attention: full</span>
-      </div>
-    </div>
-    <div class="model-card">
-      <span class="model-badge">Template: qwen2.json</span>
+
+    <!-- Qwen2 -->
+    <div class="model-card mc-qwen2">
+      <span class="model-badge">template: qwen2.json</span>
       <div class="model-title">Qwen2</div>
-      <div class="dim">RMSNorm + RoPE + SwiGLU</div>
-      <div class="model-tags">
-        <span class="tag">QKV bias: from weights</span>
-        <span class="tag">Tokenizer: BPE</span>
-        <span class="tag">Activation: SwiGLU</span>
-        <span class="tag">Attention: full</span>
-        <span class="tag learned">QK‑Norm: learned</span>
-        <span class="tag learned">RMSNorm: learned</span>
+      <div class="model-arch">RMSNorm · RoPE · SwiGLU · GQA<br>QKV bias from weights · BPE tokenizer</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
+        <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q5_K</span>
+        <span class="mq-chip">Q6_K</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">FP32</span>
       </div>
     </div>
-    <div class="model-card">
-      <span class="model-badge">Template: qwen3.json</span>
+
+    <!-- Qwen3 -->
+    <div class="model-card mc-qwen3">
+      <span class="model-badge">template: qwen3.json</span>
       <div class="model-title">Qwen3</div>
-      <div class="dim">RMSNorm + RoPE + QK‑Norm + SwiGLU</div>
-      <div class="model-tags">
-        <span class="tag">QKV bias: no</span>
-        <span class="tag">Tokenizer: BPE</span>
-        <span class="tag">Activation: SwiGLU</span>
-        <span class="tag">QK‑Norm: yes</span>
-        <span class="tag learned">QK‑Norm: learned</span>
-        <span class="tag learned">RMSNorm: learned</span>
+      <div class="model-arch">RMSNorm · RoPE · QK‑Norm · SwiGLU<br>No QKV bias · BPE tokenizer · learned QK‑Norm</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
+        <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q5_K</span>
+        <span class="mq-chip">Q6_K</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">FP32</span>
       </div>
     </div>
-    <div class="model-card">
-      <span class="model-badge">Template: gemma3.json</span>
+
+    <!-- Gemma3 -->
+    <div class="model-card mc-gemma3">
+      <span class="model-badge">template: gemma3.json</span>
       <div class="model-title">Gemma3</div>
-      <div class="dim">RMSNorm + RoPE + QK‑Norm + GeGLU + Sliding Window</div>
-      <div class="model-tags">
-        <span class="tag">Tokenizer: SentencePiece</span>
-        <span class="tag">Attention: sliding</span>
-        <span class="tag">Post‑Norms: yes</span>
-        <span class="tag">Prefer Q8_0 contract</span>
-        <span class="tag learned">QK‑Norm: learned</span>
-        <span class="tag learned">RMSNorm: learned</span>
+      <div class="model-arch">RMSNorm · RoPE · QK‑Norm · GeGLU · Sliding Window<br>Post-norms · embed scale √dim · SentencePiece</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, sliding-window attn kernel</span></div>
+        <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q8_0 ★</span>
+        <span class="mq-chip">Q4_K</span>
+        <span class="mq-chip">BF16</span>
+        <span class="mq-chip">FP32</span>
       </div>
     </div>
+
+    <!-- GPT-2 -->
+    <div class="model-card mc-gpt2">
+      <span class="model-badge">template: gpt2.json</span>
+      <div class="model-title">GPT‑2</div>
+      <div class="model-arch">LayerNorm · Learned PosEmb · GELU<br>QKV bias · tied embeddings · BPE tokenizer</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF baseline</span></div>
+        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">v7 training — not yet in scope</span></div>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip">Q4_0</span>
+        <span class="mq-chip">Q4_1</span>
+        <span class="mq-chip">Q5_0</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">FP32</span>
+      </div>
+    </div>
+
   </div>
 
   <div class="matrix-section">
@@ -1285,8 +1372,8 @@
   <div class="matrix-section">
     <h2 style="margin: 0; color: var(--orange);">Supported Quant + DType Coverage</h2>
     <p style="margin-top: 0.6rem; color: var(--text-secondary);">
-      We target weight‑only quantized GEMM/GEMV kernels with BF16/FP32 activations and Q8_* activation contracts.
-      This is the quant palette used by our GGUF conversions and kernel registry.
+      Weight-only quantized GEMM/GEMV kernels with BF16/FP32 activations and Q8_* activation contracts.
+      Quantized kernels (Q4_K, Q5_K, Q6_K, Q8_0) are verified against <strong style="color: var(--text-primary);">both PyTorch and llama.cpp</strong> reference output — both references must agree before a kernel is considered validated.
     </p>
     <div class="quant-badges">
       <span class="qchip">Q4_0</span>
@@ -1604,7 +1691,7 @@ make test-attention-sliding
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-16</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-18</p>
             </div>
         </div>
     </footer>
