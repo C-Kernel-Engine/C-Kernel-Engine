@@ -1,28 +1,19 @@
-<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v7 forward branching and backward stitching for residual and GQA attention">
+<svg width="1600" height="1100" viewBox="0 0 1600 1100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v7 forward branching and backward stitching for residual and GQA attention — mirrored top-to-bottom layout">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="980" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="1100" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#061526"/>
       <stop offset="1" stop-color="#0b1f34"/>
-    </linearGradient>
-    <linearGradient id="fwdCard" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#123652"/>
-      <stop offset="1" stop-color="#102b44"/>
-    </linearGradient>
-    <linearGradient id="bwdCard" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#20432e"/>
-      <stop offset="1" stop-color="#1a3524"/>
-    </linearGradient>
-    <linearGradient id="kernelCard" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#302857"/>
-      <stop offset="1" stop-color="#241f45"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#ffb400"/>
       <stop offset="1" stop-color="#ffd88a"/>
     </linearGradient>
 
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.28"/>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glowOrange" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ffb400" flood-opacity="0.35"/>
     </filter>
 
     <marker id="arrF" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
@@ -36,172 +27,326 @@
     </marker>
 
     <style>
-      .title { fill:#ffb400; font:700 42px 'Segoe UI', Arial, sans-serif; }
-      .subtitle { fill:#a8c3d8; font:400 22px 'Segoe UI', Arial, sans-serif; }
-      .lane { fill:#8fd6ff; font:700 18px 'Segoe UI', Arial, sans-serif; }
-      .laneB { fill:#acefca; font:700 18px 'Segoe UI', Arial, sans-serif; }
-      .nodeT { fill:#eaf6ff; font:700 18px 'Segoe UI', Arial, sans-serif; }
-      .nodeS { fill:#a8c8dd; font:400 13px 'Segoe UI', Arial, sans-serif; }
-      .nodeTB { fill:#effff5; font:700 18px 'Segoe UI', Arial, sans-serif; }
-      .nodeSB { fill:#bfe7d0; font:400 13px 'Segoe UI', Arial, sans-serif; }
-      .kernelT { fill:#f1eaff; font:700 18px 'Segoe UI', Arial, sans-serif; }
-      .kernelS { fill:#d7ceff; font:400 13px 'Segoe UI', Arial, sans-serif; }
-      .legend { fill:#dbe8f3; font:400 15px 'Segoe UI', Arial, sans-serif; }
-      .footerK { fill:#ffd884; font:700 20px 'Segoe UI', Arial, sans-serif; }
-      .footerS { fill:#d8e6f2; font:400 18px 'Segoe UI', Arial, sans-serif; }
-      .lineF { stroke:#74cfff; stroke-width:3; fill:none; marker-end:url(#arrF); }
-      .lineB { stroke:#7ce6b4; stroke-width:3; fill:none; marker-end:url(#arrB); }
-      .lineW { stroke:#f5a9dc; stroke-width:3; fill:none; marker-end:url(#arrW); }
+      .title  { fill:#ffb400; font:700 38px 'Segoe UI', Arial, sans-serif; }
+      .sub    { fill:#a8c3d8; font:400 20px 'Segoe UI', Arial, sans-serif; }
+      .lane   { fill:#8fd6ff; font:700 17px 'Segoe UI', Arial, sans-serif; }
+      .laneB  { fill:#acefca; font:700 17px 'Segoe UI', Arial, sans-serif; }
+      .fwdT   { fill:#eaf6ff; font:700 16px 'Segoe UI', Arial, sans-serif; }
+      .fwdS   { fill:#a8c8dd; font:400 12px 'Segoe UI', Arial, sans-serif; }
+      .bwdT   { fill:#effff5; font:700 16px 'Segoe UI', Arial, sans-serif; }
+      .bwdS   { fill:#bfe7d0; font:400 12px 'Segoe UI', Arial, sans-serif; }
+      .accT   { fill:#fff5e0; font:700 17px 'Segoe UI', Arial, sans-serif; }
+      .accS   { fill:#ffe0a0; font:400 13px 'Segoe UI', Arial, sans-serif; }
+      .dwT    { fill:#f8e0f0; font:700 15px 'Segoe UI', Arial, sans-serif; }
+      .dwS    { fill:#e0b8d6; font:400 12px 'Segoe UI', Arial, sans-serif; }
+      .legend { fill:#dbe8f3; font:400 14px 'Segoe UI', Arial, sans-serif; }
+      .mirrorLabel { fill:#7a9bb5; font:italic 400 13px 'Segoe UI', Arial, sans-serif; }
+      .lineF  { stroke:#74cfff; stroke-width:2.5; fill:none; marker-end:url(#arrF); }
+      .lineB  { stroke:#7ce6b4; stroke-width:2.5; fill:none; marker-end:url(#arrB); }
+      .lineW  { stroke:#f5a9dc; stroke-width:2.5; fill:none; marker-end:url(#arrW); }
+      .mirror { stroke:#5a7a94; stroke-width:1.5; stroke-dasharray:6,4; fill:none; }
     </style>
   </defs>
 
-  <rect width="1600" height="980" fill="url(#bg)"/>
-  <rect x="28" y="24" width="1544" height="932" rx="18" fill="#081a2b" stroke="#2b5373"/>
+  <!-- Background -->
+  <rect width="1600" height="1100" fill="url(#bg)"/>
+  <rect x="28" y="24" width="1544" height="1052" rx="18" fill="#081a2b" stroke="#2b5373"/>
 
-  <text class="title" x="64" y="86">Forward Branching and Backward Stitching (v7)</text>
-  <text class="subtitle" x="64" y="120">IR2 handles routing + accumulation. local kernels compute internal derivatives.</text>
-  <rect x="64" y="140" width="1472" height="8" rx="4" fill="url(#accent)"/>
+  <!-- Title -->
+  <text class="title" x="64" y="76">Forward Branching → Backward Stitching</text>
+  <text class="sub" x="64" y="106">Each forward fork creates a backward merge. IR2 inserts explicit grad_accumulate at every fan-in.</text>
+  <rect x="64" y="122" width="1472" height="6" rx="3" fill="url(#accent)"/>
 
-  <rect x="64" y="170" width="748" height="42" rx="10" fill="#123149" stroke="#3f789d"/>
-  <text class="lane" x="84" y="197">Forward producer flow</text>
+  <!-- ═══════════ FORWARD HALF (top) ═══════════ -->
+  <rect x="56" y="148" width="1488" height="34" rx="8" fill="#0e2540" stroke="#2a5a7d"/>
+  <text class="lane" x="76" y="171">FORWARD  (left → right)</text>
 
-  <rect x="836" y="170" width="700" height="42" rx="10" fill="#1f3c29" stroke="#4e9069"/>
-  <text class="laneB" x="856" y="197">Backward consumer-gradient flow</text>
-
-  <!-- Forward area -->
+  <!-- x_in -->
   <g filter="url(#shadow)">
-    <rect x="84" y="232" width="148" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="102" y="258">x_in</text>
-    <text class="nodeS" x="102" y="280">block input tensor</text>
-
-    <rect x="264" y="232" width="170" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="282" y="258">rmsnorm</text>
-    <text class="nodeS" x="282" y="280">norm path</text>
-
-    <rect x="264" y="336" width="170" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="282" y="362">residual_save</text>
-    <text class="nodeS" x="282" y="384">skip copy</text>
-
-    <rect x="464" y="232" width="150" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="482" y="258">q/k/v proj</text>
-    <text class="nodeS" x="482" y="280">3 GEMM ops</text>
-
-    <rect x="644" y="232" width="148" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="662" y="258">qk_norm+rope</text>
-    <text class="nodeS" x="662" y="280">GQA reshape</text>
-
-    <rect x="644" y="336" width="148" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="662" y="362">attention</text>
-    <text class="nodeS" x="662" y="384">head-major GQA</text>
-
-    <rect x="644" y="440" width="148" height="68" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="662" y="466">out_proj</text>
-    <text class="nodeS" x="662" y="488">GEMM + bias</text>
-
-    <rect x="430" y="548" width="194" height="76" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="448" y="576">residual_add</text>
-    <text class="nodeS" x="448" y="598">skip + out_proj</text>
-
-    <rect x="654" y="548" width="138" height="76" rx="10" fill="url(#fwdCard)" stroke="#4280a8"/>
-    <text class="nodeT" x="672" y="576">x_out</text>
-    <text class="nodeS" x="672" y="598">to MLP</text>
+    <rect x="80" y="206" width="130" height="58" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="108" y="232">x_in</text>
+    <text class="fwdS" x="98" y="250">block input</text>
   </g>
 
-  <!-- Backward area -->
+  <!-- FORK DIAMOND: residual fork -->
   <g filter="url(#shadow)">
-    <rect x="856" y="232" width="170" height="68" rx="10" fill="url(#bwdCard)" stroke="#5ea77b"/>
-    <text class="nodeTB" x="874" y="258">dL/dx_out</text>
-    <text class="nodeSB" x="874" y="280">incoming grad</text>
+    <polygon points="280,235 310,210 340,235 310,260" fill="#1a4060" stroke="#ffb400" stroke-width="2"/>
+    <text x="297" y="240" fill="#ffb400" font-size="14" font-weight="700" font-family="Segoe UI, Arial">F1</text>
+  </g>
+  <text x="266" y="278" fill="#ffb400" font-size="11" font-family="Segoe UI, Arial" font-weight="600">residual fork</text>
 
-    <rect x="1054" y="232" width="230" height="76" rx="10" fill="url(#bwdCard)" stroke="#5ea77b"/>
-    <text class="nodeTB" x="1072" y="258">residual_add_bwd</text>
-    <text class="nodeSB" x="1072" y="280">split to path1 + path2</text>
-
-    <rect x="1312" y="232" width="130" height="76" rx="10" fill="url(#bwdCard)" stroke="#5ea77b"/>
-    <text class="nodeTB" x="1330" y="258">d_skip</text>
-    <text class="nodeSB" x="1330" y="280">path 1</text>
-
-    <rect x="1054" y="340" width="388" height="104" rx="10" fill="url(#kernelCard)" stroke="#7a6dd5"/>
-    <text class="kernelT" x="1072" y="366">attention backward kernel group</text>
-    <text class="kernelS" x="1072" y="388">out_proj_bwd -> attn_bwd_gqa -> q/k/v_bwd</text>
-    <text class="kernelS" x="1072" y="410">local kernels return dAct path + dW path</text>
-
-    <rect x="1054" y="476" width="230" height="68" rx="10" fill="url(#bwdCard)" stroke="#5ea77b"/>
-    <text class="nodeTB" x="1072" y="502">rmsnorm_bwd</text>
-    <text class="nodeSB" x="1072" y="524">path 2 (d_norm_in)</text>
-
-    <rect x="1054" y="576" width="388" height="96" rx="10" fill="url(#bwdCard)" stroke="#5ea77b"/>
-    <text class="nodeTB" x="1072" y="604">grad_accumulate (IR2 explicit)</text>
-    <text class="nodeSB" x="1072" y="626">dL/dx_in = d_skip + d_norm_in</text>
-    <text class="nodeSB" x="1072" y="648">deterministic fanout/fanin merge</text>
-
-    <rect x="856" y="714" width="586" height="78" rx="10" fill="url(#kernelCard)" stroke="#ba84dd"/>
-    <text class="kernelT" x="874" y="742">dW stream stays separate</text>
-    <text class="kernelS" x="874" y="764">grad.weight.* buffers are never merged into dAct buffers</text>
+  <!-- rmsnorm (upper path) -->
+  <g filter="url(#shadow)">
+    <rect x="380" y="198" width="140" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="404" y="222">rmsnorm</text>
+    <text class="fwdS" x="398" y="240">norm path</text>
   </g>
 
-  <!-- Forward connectors (non-overlapping lanes) -->
-  <path class="lineF" d="M232 266 H256"/>
-  <path class="lineF" d="M158 300 V370 H256"/>
-  <path class="lineF" d="M434 266 H456"/>
-  <path class="lineF" d="M614 266 H636"/>
-  <path class="lineF" d="M718 300 V328"/>
-  <path class="lineF" d="M718 404 V432"/>
-  <path class="lineF" d="M718 508 V522 H630 V586"/>
-  <path class="lineF" d="M348 404 V522 H430 V586"/>
-  <path class="lineF" d="M624 586 H646"/>
-
-  <!-- Backward connectors (split lanes for clarity) -->
-  <path class="lineB" d="M1026 266 H1046"/>
-  <path class="lineB" d="M1284 270 H1304"/>
-  <path class="lineB" d="M1168 308 V336"/>
-  <path class="lineB" d="M1168 444 V472"/>
-  <path class="lineB" d="M1168 544 V572"/>
-  <path class="lineB" d="M1377 308 V560"/>
-  <path class="lineB" d="M1377 560 H1438"/>
-
-  <!-- dW connectors on isolated lane -->
-  <path class="lineW" d="M1298 444 V710"/>
-  <path class="lineW" d="M1378 444 V710"/>
-
-  <!-- Numbered badges -->
-  <g>
-    <circle cx="846" cy="246" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="842" y="251" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">1</text>
-
-    <circle cx="1044" cy="246" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1040" y="251" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">2</text>
-
-    <circle cx="1044" cy="354" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1040" y="359" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">3</text>
-
-    <circle cx="1044" cy="490" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1040" y="495" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">4</text>
-
-    <circle cx="1302" cy="246" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1298" y="251" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">5</text>
-
-    <circle cx="1044" cy="590" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1040" y="595" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">6</text>
-
-    <circle cx="1286" cy="706" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1282" y="711" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">7</text>
-
-    <circle cx="1432" cy="590" r="12" fill="#ffb400" stroke="#ffe6b1" stroke-width="2"/>
-    <text x="1428" y="595" fill="#181818" font-size="14" font-family="Segoe UI, Arial" font-weight="700">8</text>
+  <!-- residual_save (lower path) -->
+  <g filter="url(#shadow)">
+    <rect x="380" y="274" width="140" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="392" y="298">residual_save</text>
+    <text class="fwdS" x="398" y="316">skip copy</text>
   </g>
 
-  <!-- Legend -->
-  <rect x="64" y="714" width="748" height="78" rx="10" fill="#0f253a" stroke="#366380"/>
-  <circle cx="92" cy="753" r="6" fill="#74cfff"/>
-  <text class="legend" x="106" y="758">forward activation flow</text>
-  <circle cx="300" cy="753" r="6" fill="#7ce6b4"/>
-  <text class="legend" x="314" y="758">backward dAct flow</text>
-  <circle cx="502" cy="753" r="6" fill="#f5a9dc"/>
-  <text class="legend" x="516" y="758">dW flow</text>
+  <!-- q/k/v proj -->
+  <g filter="url(#shadow)">
+    <rect x="560" y="198" width="130" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="580" y="222">q/k/v proj</text>
+    <text class="fwdS" x="578" y="240">3 GEMM ops</text>
+  </g>
 
-  <!-- Footer -->
-  <rect x="64" y="834" width="1472" height="62" rx="10" fill="#10263a" stroke="#3c6582"/>
-  <text class="footerK" x="84" y="872">v7 contract:</text>
-  <text class="footerS" x="232" y="872">IR stitches topology + ownership. kernels do local derivatives. codegen emits a fixed plan.</text>
+  <!-- FORK DIAMOND: GQA split -->
+  <g filter="url(#shadow)">
+    <polygon points="760,224 790,199 820,224 790,249" fill="#1a4060" stroke="#ffb400" stroke-width="2"/>
+    <text x="777" y="229" fill="#ffb400" font-size="14" font-weight="700" font-family="Segoe UI, Arial">F2</text>
+  </g>
+  <text x="752" y="268" fill="#ffb400" font-size="11" font-family="Segoe UI, Arial" font-weight="600">GQA split</text>
+
+  <!-- qk_norm + rope (Q heads) -->
+  <g filter="url(#shadow)">
+    <rect x="860" y="190" width="150" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="876" y="214">qk_norm+rope</text>
+    <text class="fwdS" x="878" y="232">Q head reshape</text>
+  </g>
+
+  <!-- KV broadcast -->
+  <g filter="url(#shadow)">
+    <rect x="860" y="258" width="150" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="876" y="282">KV broadcast</text>
+    <text class="fwdS" x="878" y="300">GQA groups</text>
+  </g>
+
+  <!-- attention -->
+  <g filter="url(#shadow)">
+    <rect x="1050" y="206" width="140" height="58" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="1082" y="232">attention</text>
+    <text class="fwdS" x="1068" y="250">head-major GQA</text>
+  </g>
+
+  <!-- out_proj -->
+  <g filter="url(#shadow)">
+    <rect x="1230" y="206" width="130" height="58" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="1258" y="232">out_proj</text>
+    <text class="fwdS" x="1248" y="250">GEMM + bias</text>
+  </g>
+
+  <!-- residual_add -->
+  <g filter="url(#shadow)">
+    <rect x="1230" y="286" width="130" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="1240" y="310">residual_add</text>
+    <text class="fwdS" x="1248" y="328">skip + out</text>
+  </g>
+
+  <!-- x_out -->
+  <g filter="url(#shadow)">
+    <rect x="1400" y="286" width="110" height="52" rx="10" fill="#123652" stroke="#4280a8"/>
+    <text class="fwdT" x="1428" y="310">x_out</text>
+    <text class="fwdS" x="1418" y="328">to MLP</text>
+  </g>
+
+  <!-- Forward connectors -->
+  <path class="lineF" d="M210 235 H272"/>
+  <!-- fork top: to rmsnorm -->
+  <path class="lineF" d="M340 225 H372"/>
+  <!-- fork bottom: to residual_save -->
+  <path class="lineF" d="M340 245 L358 300 H372"/>
+  <!-- rmsnorm to q/k/v -->
+  <path class="lineF" d="M520 224 H552"/>
+  <!-- q/k/v to GQA fork -->
+  <path class="lineF" d="M690 224 H752"/>
+  <!-- GQA fork top: Q heads -->
+  <path class="lineF" d="M820 214 H852"/>
+  <!-- GQA fork bottom: KV -->
+  <path class="lineF" d="M820 234 L840 284 H852"/>
+  <!-- Q heads to attention -->
+  <path class="lineF" d="M1010 216 H1042"/>
+  <!-- KV to attention -->
+  <path class="lineF" d="M1010 284 L1032 240 H1042"/>
+  <!-- attention to out_proj -->
+  <path class="lineF" d="M1190 235 H1222"/>
+  <!-- out_proj down to residual_add -->
+  <path class="lineF" d="M1295 264 V280"/>
+  <!-- residual_save long skip to residual_add -->
+  <path class="lineF" d="M520 300 H540 V360 H1238 V344"/>
+  <!-- residual_add to x_out -->
+  <path class="lineF" d="M1360 312 H1392"/>
+
+  <!-- ═══════════ CENTER MIRROR ZONE ═══════════ -->
+  <rect x="56" y="374" width="1488" height="30" rx="6" fill="#0c1e30" stroke="#1e4260"/>
+  <text x="660" y="394" fill="#6a96b8" font-size="15" font-weight="600" font-family="Segoe UI, Arial">▼  forward forks create backward merges  ▼</text>
+
+  <!-- Dashed mirror lines connecting forward to backward -->
+  <!-- x_in ↔ dL/dx_in (accumulate) -->
+  <path class="mirror" d="M145 264 V690"/>
+  <text class="mirrorLabel" x="150" y="490">x_in ↔ grad_accum</text>
+
+  <!-- rmsnorm ↔ rmsnorm_bwd -->
+  <path class="mirror" d="M450 250 V580"/>
+  <text class="mirrorLabel" x="455" y="420">rmsnorm ↔ bwd</text>
+
+  <!-- q/k/v ↔ q/k/v_bwd -->
+  <path class="mirror" d="M625 250 V580"/>
+
+  <!-- attention ↔ attn_bwd -->
+  <path class="mirror" d="M1120 264 V580"/>
+
+  <!-- out_proj ↔ out_proj_bwd -->
+  <path class="mirror" d="M1295 264 V500"/>
+
+  <!-- residual fork F1 ↔ merge M1 -->
+  <path class="mirror" d="M310 260 V690"/>
+  <text class="mirrorLabel" x="315" y="490">F1 fork ↔ M1 merge</text>
+
+  <!-- ═══════════ BACKWARD HALF (bottom) ═══════════ -->
+  <rect x="56" y="420" width="1488" height="34" rx="8" fill="#142e1e" stroke="#3a7856"/>
+  <text class="laneB" x="76" y="443">BACKWARD  (right → left)  —  reversed flow</text>
+
+  <!-- dL/dx_out (entry point, right side) -->
+  <g filter="url(#shadow)">
+    <rect x="1400" y="478" width="120" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="1416" y="504">dL/dx_out</text>
+    <text class="bwdS" x="1412" y="522">incoming grad</text>
+  </g>
+
+  <!-- out_proj_bwd -->
+  <g filter="url(#shadow)">
+    <rect x="1210" y="478" width="150" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="1226" y="504">out_proj_bwd</text>
+    <text class="bwdS" x="1224" y="522">dAct + dW_out</text>
+  </g>
+
+  <!-- attn_bwd_gqa -->
+  <g filter="url(#shadow)">
+    <rect x="1020" y="478" width="150" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="1036" y="504">attn_bwd_gqa</text>
+    <text class="bwdS" x="1034" y="522">dQ, dK, dV</text>
+  </g>
+
+  <!-- MERGE DIAMOND: GQA merge (M2) -->
+  <g filter="url(#shadow)">
+    <polygon points="940,507 970,482 1000,507 970,532" fill="#1e3e28" stroke="#ffb400" stroke-width="2"/>
+    <text x="956" y="512" fill="#ffb400" font-size="14" font-weight="700" font-family="Segoe UI, Arial">M2</text>
+  </g>
+  <text x="928" y="550" fill="#ffb400" font-size="11" font-family="Segoe UI, Arial" font-weight="600">GQA merge</text>
+
+  <!-- q/k/v_bwd -->
+  <g filter="url(#shadow)">
+    <rect x="540" y="478" width="150" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="564" y="504">q/k/v_bwd</text>
+    <text class="bwdS" x="558" y="522">3 GEMM bwd + dW</text>
+  </g>
+
+  <!-- rmsnorm_bwd -->
+  <g filter="url(#shadow)">
+    <rect x="360" y="478" width="140" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="376" y="504">rmsnorm_bwd</text>
+    <text class="bwdS" x="374" y="522">d_norm_in</text>
+  </g>
+
+  <!-- d_skip (residual backward pass-through) -->
+  <g filter="url(#shadow)">
+    <rect x="1210" y="570" width="150" height="52" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="1248" y="594">d_skip</text>
+    <text class="bwdS" x="1224" y="612">residual path grad</text>
+  </g>
+
+  <!-- MERGE DIAMOND: Residual merge (M1) -->
+  <g filter="url(#glowOrange)">
+    <polygon points="240,700 280,670 320,700 280,730" fill="#2a2210" stroke="#ffb400" stroke-width="3"/>
+    <text x="266" y="705" fill="#ffb400" font-size="14" font-weight="700" font-family="Segoe UI, Arial">M1</text>
+  </g>
+  <text x="228" y="748" fill="#ffb400" font-size="11" font-family="Segoe UI, Arial" font-weight="600">residual merge</text>
+
+  <!-- ★ ACCUMULATE NODE (the star of the show) ★ -->
+  <g filter="url(#glowOrange)">
+    <rect x="370" y="660" width="380" height="82" rx="14" fill="#2a1e08" stroke="#ffb400" stroke-width="3"/>
+    <text class="accT" x="392" y="690">grad_accumulate  (IR2 inserted)</text>
+    <text class="accS" x="392" y="712">dL/dx_in = d_skip + d_norm_in</text>
+    <text class="accS" x="392" y="730">deterministic fan-in merge — no implicit sum</text>
+  </g>
+
+  <!-- dL/dx_in (output) -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="680" width="130" height="58" rx="10" fill="#20432e" stroke="#5ea77b"/>
+    <text class="bwdT" x="96" y="706">dL/dx_in</text>
+    <text class="bwdS" x="94" y="724">merged grad out</text>
+  </g>
+
+  <!-- Backward connectors (right to left) -->
+  <path class="lineB" d="M1400 507 H1368"/>
+  <path class="lineB" d="M1210 507 H1178"/>
+  <path class="lineB" d="M1020 507 H1008"/>
+  <!-- M2 merge to q/k/v_bwd -->
+  <path class="lineB" d="M940 507 H698"/>
+  <!-- q/k/v_bwd to rmsnorm_bwd -->
+  <path class="lineB" d="M540 507 H508"/>
+  <!-- rmsnorm_bwd to M1 merge (d_norm_in path) -->
+  <path class="lineB" d="M360 507 H340 V700 H328"/>
+
+  <!-- d_skip path: residual_add_bwd splits, skip goes down and left to M1 -->
+  <path class="lineB" d="M1285 536 V564"/>
+  <path class="lineB" d="M1210 596 H340 V700 H328"/>
+
+  <!-- M1 merge to accumulate node -->
+  <path class="lineB" d="M280 700 H362"/>
+  <!-- accumulate to dL/dx_in -->
+  <path class="lineB" d="M370 701 H218"/>
+
+  <!-- ═══════════ dW SIDE LANE ═══════════ -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="810" width="700" height="70" rx="12" fill="#2a1840" stroke="#8a60b8"/>
+    <text class="dwT" x="846" y="840">dW stream (weight gradients stay separate)</text>
+    <text class="dwS" x="846" y="860">grad.weight.* buffers are never merged into dAct. Updated only in optimizer_step().</text>
+  </g>
+
+  <!-- dW arrows from backward kernels down to dW lane -->
+  <path class="lineW" d="M1285 536 V802"/>
+  <path class="lineW" d="M1095 536 V802"/>
+  <path class="lineW" d="M615 536 V802"/>
+
+  <!-- dW labels -->
+  <text x="1290" y="680" fill="#f5a9dc" font-size="11" font-family="Segoe UI, Arial">dW_out</text>
+  <text x="1100" y="680" fill="#f5a9dc" font-size="11" font-family="Segoe UI, Arial">dW_attn</text>
+  <text x="620" y="680" fill="#f5a9dc" font-size="11" font-family="Segoe UI, Arial">dW_qkv</text>
+
+  <!-- ═══════════ KEY INSIGHT CALLOUT ═══════════ -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="660" width="380" height="70" rx="10" fill="#1a1408" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="842" y="686" fill="#ffb400" font-size="15" font-weight="700" font-family="Segoe UI, Arial">Key rule (IR2 contract):</text>
+    <text x="842" y="710" fill="#ffe0a0" font-size="13" font-family="Segoe UI, Arial">1 producer → N consumers in fwd = explicit</text>
+    <text x="842" y="724" fill="#ffe0a0" font-size="13" font-family="Segoe UI, Arial">grad_accumulate in bwd. No silent fan-in.</text>
+  </g>
+
+  <!-- ═══════════ LEGEND ═══════════ -->
+  <rect x="56" y="920" width="1488" height="56" rx="10" fill="#0f253a" stroke="#366380"/>
+
+  <!-- Forward flow -->
+  <line x1="80" y1="948" x2="110" y2="948" stroke="#74cfff" stroke-width="3" marker-end="url(#arrF)"/>
+  <text class="legend" x="118" y="953">forward activation</text>
+
+  <!-- Backward dAct flow -->
+  <line x1="286" y1="948" x2="316" y2="948" stroke="#7ce6b4" stroke-width="3" marker-end="url(#arrB)"/>
+  <text class="legend" x="324" y="953">backward dAct</text>
+
+  <!-- dW flow -->
+  <line x1="468" y1="948" x2="498" y2="948" stroke="#f5a9dc" stroke-width="3" marker-end="url(#arrW)"/>
+  <text class="legend" x="506" y="953">dW (weight grad)</text>
+
+  <!-- Mirror line -->
+  <line x1="648" y1="948" x2="694" y2="948" stroke="#5a7a94" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="legend" x="702" y="953">fwd↔bwd mirror</text>
+
+  <!-- Fork diamond -->
+  <polygon points="856,940 870,930 884,940 870,950" fill="#1a4060" stroke="#ffb400" stroke-width="1.5"/>
+  <text class="legend" x="892" y="953">fork / merge point</text>
+
+  <!-- Accumulate -->
+  <rect x="1048" y="936" width="18" height="18" rx="4" fill="#2a1e08" stroke="#ffb400" stroke-width="2"/>
+  <text class="legend" x="1074" y="953">IR2-inserted accumulate</text>
+
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <rect x="56" y="1000" width="1488" height="50" rx="10" fill="#10263a" stroke="#3c6582"/>
+  <text x="76" y="1032" fill="#ffd884" font-size="18" font-weight="700" font-family="Segoe UI, Arial">v7 contract:</text>
+  <text x="210" y="1032" fill="#d8e6f2" font-size="16" font-family="Segoe UI, Arial">IR stitches topology + ownership. Kernels compute local derivatives. Codegen emits a fixed plan. Every fan-in is explicit.</text>
 </svg>

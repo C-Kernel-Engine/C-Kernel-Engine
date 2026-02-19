@@ -930,6 +930,59 @@
     </header>
     <main>
 
+<style>
+.v7-test-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1rem 0 1.5rem;
+  border: 1px solid var(--grey);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.83rem;
+}
+.v7-test-table th {
+  background: linear-gradient(90deg, rgba(255,180,0,0.18), rgba(7,173,248,0.12));
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-size: 0.7rem;
+  padding: 0.72rem 0.82rem;
+  text-align: left;
+  border-bottom: 1px solid var(--grey);
+}
+.v7-test-table td {
+  padding: 0.7rem 0.82rem;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.v7-test-table tr:last-child td {
+  border-bottom: none;
+}
+.v7-test-table code {
+  font-size: 0.74rem;
+}
+.v7-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+  border: 1px solid transparent;
+  margin-right: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+.v7-badge.kernel { color: #8ce6b5; border-color: rgba(140,230,181,0.35); background: rgba(140,230,181,0.1); }
+.v7-badge.runtime { color: #8ecfff; border-color: rgba(142,207,255,0.35); background: rgba(142,207,255,0.1); }
+.v7-badge.audit { color: #ffcd7f; border-color: rgba(255,205,127,0.35); background: rgba(255,205,127,0.1); }
+.v7-badge.drift { color: #ff9fa4; border-color: rgba(255,159,164,0.35); background: rgba(255,159,164,0.1); }
+.v7-badge.bundle { color: #d8b8ff; border-color: rgba(216,184,255,0.35); background: rgba(216,184,255,0.12); }
+</style>
+
 <h1>v7 Backprop IR Pipeline (Operator Guide)</h1>
 
 <p>This page explains how v7 training works end to end, with a focus on what is generated from IR, what is layout/codegen output, where logic lives, and how to debug correctness quickly.</p>
@@ -1045,6 +1098,7 @@
     <li>Historical baseline showed late drift in full-C stress; CE parity fixes now remove that trigger in the 850-step repro.</li>
     <li>All three loss backends (<code>c</code>, <code>c_ptref</code>, <code>torch</code>) pass the same deterministic 850-step parity run.</li>
     <li>Training-side production gates (drift smoke, realistic long-horizon, optimizer parity, FD-grad, replay) are now passing in this validation pass.</li>
+    <li>Interpretation rule: treat generated-runtime parity artifacts (<code>train_runtime_parity_*_latest.json</code>) as release truth; older step-65/step-800 harness failures are historical diagnostics.</li>
   </ul>
 </div>
 
@@ -1239,6 +1293,88 @@ version/v7/scripts/cks-v7-run init \
   <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
 </div>
 
+<h2 id="v7-train-data-pipeline">New: One-Command Data -> Tokenizer -> Train Pipeline</h2>
+
+<p>For operator workflows, use the pipeline wrapper to avoid manual wiring errors such as missing data files or token/vocab mismatches.</p>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Byte tokenizer pipeline (with torch reference)</h3>
+  <pre>make v7-train-data-pipeline \
+  RUN=/tmp/v7_pipeline_byte \
+  V7_PIPELINE_TOKENIZER=byte \
+  V7_PIPELINE_WITH_TORCH=1</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">BPE pipeline</h3>
+  <pre>make v7-train-data-pipeline \
+  RUN=/tmp/v7_pipeline_bpe \
+  V7_PIPELINE_TOKENIZER=bpe \
+  V7_PIPELINE_WITH_TORCH=0</pre>
+</div>
+
+<table>
+  <tr>
+    <th>Knob</th>
+    <th>Purpose</th>
+    <th>Typical values</th>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_TOKENIZER</code></td>
+    <td>Select tokenization path</td>
+    <td><code>byte</code>, <code>bpe</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_EPOCHS</code>, <code>V7_PIPELINE_SEQ_LEN</code>, <code>V7_PIPELINE_TOTAL_TOKENS</code></td>
+    <td>Train budget</td>
+    <td><code>10</code>, <code>32</code>, <code>1024</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_GRAD_ACCUM</code>, <code>V7_PIPELINE_LR</code></td>
+    <td>Update scale</td>
+    <td><code>1..8</code>, <code>5e-4</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_OPEN_VIS</code></td>
+    <td>Generate visualizer report automatically</td>
+    <td><code>0</code>, <code>1</code></td>
+  </tr>
+</table>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Safety guard now built in</strong><br>
+    Token-file training now fails fast if token IDs exceed run-dir vocab size. This prevents NaN runs from silent token/vocab mismatch.
+  </div>
+</div>
+
+<h2 id="v7-runtime-stitch-graph">New: Runtime Stitch Graph in IR Visualizer</h2>
+
+<p>The Training tab now includes a function-level runtime graph fed by <code>train_exec_plan.json</code> with explicit stages:</p>
+<ul>
+  <li>forward ops</li>
+  <li>backward ops</li>
+  <li>gradient accumulation ops</li>
+  <li>optimizer/update transition</li>
+</ul>
+
+<div class="card">
+  <h3 style="margin-top: 0;">How to inspect stitching</h3>
+  <ol style="margin-bottom: 0;">
+    <li>Generate report from run-dir: <code>python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_pipeline_byte --html-only</code></li>
+    <li>Open <code>/tmp/v7_pipeline_byte/ir_report.html</code></li>
+    <li>Go to <strong>Training</strong> tab</li>
+    <li>Use <strong>Runtime Stitch</strong> section filters:
+      <code>Stage=forward|backward|accum|optimizer</code> and <code>Layer=all|Lx</code></li>
+    <li>Click a node to inspect dispatch/reduction metadata and phase stitching details</li>
+  </ol>
+</div>
+
+<p>Use this graph when first loss is correct but later updates diverge. It makes boundary mistakes visible at function level without opening generated C manually.</p>
+
 
 <h2>Verification Matrix: Epoch 1 to 10 + Checkpoints + Oracle</h2>
 
@@ -1314,6 +1450,216 @@ version/v7/scripts/cks-v7-run init \
   </tr>
 </table>
 
+<h2 id="v7-backprop-parity-suite">Backprop + PyTorch Parity Test Suite</h2>
+
+<p>This is the concrete v7 inventory used to keep backprop parity green. By default, artifacts write to <code>version/v7/.cache/reports/</code> (override with <code>V7_REPORT_DIR</code>).</p>
+
+<table class="v7-test-table">
+  <tr>
+    <th>Script</th>
+    <th>Primary Entry</th>
+    <th>What It Verifies</th>
+    <th>Main Artifact</th>
+  </tr>
+  <tr>
+    <td><code>run_parity_1token_v7.py</code></td>
+    <td><span class="v7-badge kernel">kernel</span><code>make v7-parity-1tok</code></td>
+    <td>T=1 parity for RMSNorm (fwd/bwd), SwiGLU (fwd/bwd), CE (loss + dlogits), and QK-norm backward hook.</td>
+    <td><code>parity_1token_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_qk_norm_backward_parity_v7.py</code></td>
+    <td><span class="v7-badge kernel">kernel</span><code>make v7-qk-norm-backward-parity*</code></td>
+    <td>QK-norm backward parity, ISA matrix sweep (scalar/avx/avx2/avx_vnni), and strict no-fallback mode.</td>
+    <td><code>qk_norm_backward_parity*_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_rms_swiglu_backward_parity_v7.py</code></td>
+    <td><span class="v7-badge kernel">kernel</span><code>make v7-rms-swiglu-backward-parity</code></td>
+    <td>RMSNorm backward default+strict paths, SwiGLU exact path, and optional fast-path gate.</td>
+    <td><code>rms_swiglu_backward_parity_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_gemm_backward_parity_v7.py</code></td>
+    <td><span class="v7-badge kernel">kernel</span><code>make v7-kernel-parity-train</code></td>
+    <td>GEMM backward shape-sweep parity for v7 training kernel bindings.</td>
+    <td><code>gemm_backward_shape_sweep_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_optimizer_parity_v7.py</code></td>
+    <td><span class="v7-badge kernel">kernel</span><code>make v7-kernel-parity-train</code></td>
+    <td>Optimizer kernels: <code>adamw_update_f32</code>, <code>gradient_clip_norm_f32</code>, <code>adamw_clip_update_multi_f32</code>, <code>gradient_accumulate_f32</code>.</td>
+    <td><code>optimizer_parity_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_fd_gradients_v7.py</code></td>
+    <td><span class="v7-badge audit">audit</span><code>make v7-grad-fd</code></td>
+    <td>Finite-difference sanity against analytical gradients in the tiny training stack.</td>
+    <td><code>fd_gradients_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_replay_determinism_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make v7-replay</code></td>
+    <td>Deterministic replay across identical training runs (same losses + parameter deltas).</td>
+    <td><code>replay_determinism_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_runtime_replay_accum_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make v7-replay-accum</code></td>
+    <td>Replay-on-check correctness with <code>grad_accum &gt; 1</code>, including accumulation snapshot restoration.</td>
+    <td><code>replay_accum_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>train_parity_epochs_v7.py</code></td>
+    <td><span class="v7-badge drift">drift</span><code>make v7-train-parity-3/5</code> and long-horizon targets</td>
+    <td>Epoch parity, drift smoke, drift localization, and long-horizon CK-vs-PyTorch trajectory checks.</td>
+    <td><code>train_parity_*_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_backprop_plumbing_v7.py</code></td>
+    <td><span class="v7-badge audit">audit</span><code>make v7-backprop-plumbing</code></td>
+    <td>Static IR2/layout/manifest audit: grad coverage, writer coverage, per-layer flow, saved-tensor + layout integrity.</td>
+    <td><code>backprop_plumbing_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>check_backprop_stitch_runtime_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make v7-backprop-stitch-runtime*</code></td>
+    <td>Runtime stitch smoke: manifest-dim wiring, first checked parity step cleanliness, and all checked-step consistency.</td>
+    <td><code>backprop_stitch_runtime*_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>test_bpe_train_parity_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make test-v7-bpe-train-parity</code></td>
+    <td>BPE trainer parity: HF tokenizer JSON vs CK binary tokenizer artifacts on deterministic text probes.</td>
+    <td><code>v7_bpe_train_parity_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>test_svg_overfit_regression_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make test-v7-svg-overfit-regression</code></td>
+    <td>CK runtime vs PyTorch reference overfit regression on deterministic SVG-derived dataset.</td>
+    <td><code>svg_overfit_regression_latest.json</code></td>
+  </tr>
+  <tr>
+    <td><code>ck_run_v7.py</code></td>
+    <td><span class="v7-badge runtime">runtime</span><code>make v7-train-runtime-parity-*</code></td>
+    <td>Generated runtime long-horizon parity checks (stress + realistic) with <code>--parity-on</code>.</td>
+    <td><code>train_runtime_parity_*_latest.json</code></td>
+  </tr>
+</table>
+
+<h3>Exhaustive Test-Case Matrix (Backprop + Parity)</h3>
+
+<table class="v7-test-table">
+  <tr>
+    <th>Case Family</th>
+    <th>Exact Command(s)</th>
+    <th>Pass Condition</th>
+    <th>Artifact(s)</th>
+  </tr>
+  <tr>
+    <td>Single-token parity baseline</td>
+    <td><code>make v7-parity-1tok</code></td>
+    <td>All T=1 kernel checks pass under strict tolerances.</td>
+    <td><code>parity_1token_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>QK-norm backward (default + ISA + strict ISA)</td>
+    <td><code>make v7-qk-norm-backward-parity</code><br><code>make v7-qk-norm-backward-parity-isa</code><br><code>make v7-qk-norm-backward-parity-isa-strict</code></td>
+    <td>Parity holds across ISA modes; strict mode fails any fallback mismatch.</td>
+    <td><code>qk_norm_backward_parity_latest.json</code><br><code>qk_norm_backward_parity_isa_latest.json</code><br><code>qk_norm_backward_parity_isa_strict_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>RMSNorm/SwiGLU backward parity</td>
+    <td><code>make v7-rms-swiglu-backward-parity</code></td>
+    <td>RMSNorm default+strict and SwiGLU exact/fast checks all stay within tolerance.</td>
+    <td><code>rms_swiglu_backward_parity_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Kernel parity bundle</td>
+    <td><code>make v7-kernel-parity-train</code></td>
+    <td>Optimizer + QK-norm ISA + RMS/SwiGLU + GEMM-backward sweeps all pass.</td>
+    <td><code>optimizer_parity_latest.json</code><br><code>qk_norm_backward_parity_isa*_latest.json</code><br><code>rms_swiglu_backward_parity_latest.json</code><br><code>gemm_backward_shape_sweep_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Finite-difference gradients</td>
+    <td><code>make v7-grad-fd</code></td>
+    <td>Central-difference numerical grads agree with analytical grads.</td>
+    <td><code>fd_gradients_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Deterministic replay</td>
+    <td><code>make v7-replay</code></td>
+    <td>Two identical runs produce identical replay outputs.</td>
+    <td><code>replay_determinism_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Replay with grad-accum snapshots</td>
+    <td><code>make v7-replay-accum</code></td>
+    <td>Replay-on-check is enabled and accumulation state restores within tolerance.</td>
+    <td><code>replay_accum_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Backprop plumbing static audit</td>
+    <td><code>make v7-backprop-plumbing</code></td>
+    <td>IR2 graph/dataflow, grad writers, saved tensors, layout, and manifest wiring all pass audit checks.</td>
+    <td><code>backprop_plumbing_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Runtime stitch smoke (step-1)</td>
+    <td><code>make v7-backprop-stitch-runtime</code><br><code>make v7-backprop-stitch-runtime-accum</code></td>
+    <td>Manifest dims override conflicting requests; first checked parity step is clean; checked steps stay clean.</td>
+    <td><code>backprop_stitch_runtime_latest.json</code><br><code>backprop_stitch_runtime_accum_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Epoch parity sweeps</td>
+    <td><code>make v7-train-parity-3</code><br><code>make v7-train-parity-5</code></td>
+    <td>Multi-epoch CK-vs-PyTorch parity stays within configured tolerances.</td>
+    <td><code>train_parity_epochs_3_latest.json</code><br><code>train_parity_epochs_5_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Drift smoke and localization</td>
+    <td><code>make v7-train-parity-drift-smoke</code><br><code>make v7-train-parity-drift-localize</code></td>
+    <td>Smoke run reports bounded drift; localization emits same-state stage diagnostics near target step.</td>
+    <td><code>train_parity_drift_smoke_latest.json</code><br><code>train_parity_drift_localize_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Long-horizon parity (stress + realistic)</td>
+    <td><code>make v7-train-parity-long-horizon</code><br><code>make v7-train-parity-long-horizon-realistic</code></td>
+    <td>Long-run loss and parameter parity stay within blocker thresholds.</td>
+    <td><code>train_parity_long_horizon_latest.json</code><br><code>train_parity_realistic_long_horizon_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Generated-runtime long-horizon parity</td>
+    <td><code>make v7-train-runtime-parity-stress</code><br><code>make v7-train-runtime-parity-realistic</code><br><code>make v7-train-runtime-parity-long-horizon</code></td>
+    <td>Generated C runtime with <code>--parity-on</code> stays aligned with oracle over stress and realistic prompts.</td>
+    <td><code>train_runtime_parity_stress_latest.json</code><br><code>train_runtime_parity_realistic_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>BPE train parity gate</td>
+    <td><code>make test-v7-bpe-train-parity</code></td>
+    <td>Tokenizer IDs match between HF tokenizer JSON and CK true-BPE binary path.</td>
+    <td><code>v7_bpe_train_parity_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>SVG overfit regression gate</td>
+    <td><code>make test-v7-svg-overfit-regression</code></td>
+    <td>CK and PyTorch overfit curves satisfy configured first/min/final loss thresholds.</td>
+    <td><code>svg_overfit_regression_latest.json</code></td>
+  </tr>
+  <tr>
+    <td>Full train gate bundle</td>
+    <td><code>make v7-gate-train</code></td>
+    <td>Contract checks, IR/layout/codegen smoke, parity kernels, FD, replay, and enabled optional gates all pass.</td>
+    <td><code>contract_report_latest.json</code> + parity/runtime gate artifacts above</td>
+  </tr>
+  <tr>
+    <td>Production-ready nightly bundle</td>
+    <td><code>make v7-backprop-production-ready</code></td>
+    <td><code>v7-gate-train</code> passes with production safety, then realistic long-horizon blocker + stress monitor run.</td>
+    <td><code>train_parity_realistic_long_horizon_latest.json</code> + gate artifacts</td>
+  </tr>
+</table>
+
 <h2>PR4.5 Throughput Track</h2>
 
 <ul>
@@ -1345,7 +1691,6 @@ version/v7/scripts/cks-v7-run init \
   <li><code>train_e2e_latest.json</code> shows loss curve with decreasing trend</li>
   <li><code>training_loss_curve.json</code> and <code>training_grad_norms.json</code> are populated</li>
   <li><code>training_parity.json</code> reports PASS for oracle checkpoints (when enabled)</li>
-  <li><code>training_checkpoint_policy_latest.json</code> records checkpoint files/steps (native <code>ck-cli-v7 train --train-token-file</code> writes final checkpoint by default)</li>
   <li><code>layout_train_audit.json</code> and memory diagnostics show no bounds/overlap/canary failures</li>
   <li>Generated runtime summary includes expected forward/backward/optimizer kernel calls</li>
 </ul>
@@ -1640,7 +1985,7 @@ version/v7/scripts/cks-v7-run init \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-17</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
             </div>
         </div>
     </footer>

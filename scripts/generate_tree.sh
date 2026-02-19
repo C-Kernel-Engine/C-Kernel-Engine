@@ -5,8 +5,9 @@
 PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 OUTPUT_FILE="$(dirname "$0")/../_partials/folder_structure.html"
 
-# Run tree with nice formatting, excluding build artifacts
-TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -L 3 --dirsfirst \
+# Run a focused tree for core source areas only.
+TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -d -L 3 --dirsfirst \
+    src/kernels version/v6.6 version/v7 \
     -I '__pycache__|*.o|*.pyc|doxygen_output|build|.git|node_modules|*.bin|*.so' \
     --charset=ascii 2>/dev/null)
 
@@ -14,7 +15,8 @@ TREE_OUTPUT=$(cd "$PROJECT_ROOT" && tree -L 3 --dirsfirst \
 cat > "$OUTPUT_FILE" << 'HEADER'
 <div class="folder-structure">
     <div class="folder-header">
-        <span class="folder-title">Project Structure</span>
+        <span class="folder-title">Focused Source Tree</span>
+        <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
         <span class="folder-updated">Updated: TIMESTAMP</span>
     </div>
     <pre class="tree-output">
@@ -39,8 +41,10 @@ cat >> "$OUTPUT_FILE" << 'FOOTER'
     background: #252525;
     padding: 12px 16px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
     border-bottom: 1px solid #333;
 }
 .folder-title {
@@ -48,9 +52,15 @@ cat >> "$OUTPUT_FILE" << 'FOOTER'
     font-weight: 600;
     font-size: 14px;
 }
+.folder-scope {
+    color: #89d3ff;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
 .folder-updated {
     color: #666;
     font-size: 11px;
+    margin-left: auto;
 }
 .tree-output {
     margin: 0;
