@@ -310,6 +310,88 @@ version/v7/scripts/cks-v7-run init \
   <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
 </div>
 
+<h2 id="v7-train-data-pipeline">New: One-Command Data -> Tokenizer -> Train Pipeline</h2>
+
+<p>For operator workflows, use the pipeline wrapper to avoid manual wiring errors such as missing data files or token/vocab mismatches.</p>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">Byte tokenizer pipeline (with torch reference)</h3>
+  <pre>make v7-train-data-pipeline \
+  RUN=/tmp/v7_pipeline_byte \
+  V7_PIPELINE_TOKENIZER=byte \
+  V7_PIPELINE_WITH_TORCH=1</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">BPE pipeline</h3>
+  <pre>make v7-train-data-pipeline \
+  RUN=/tmp/v7_pipeline_bpe \
+  V7_PIPELINE_TOKENIZER=bpe \
+  V7_PIPELINE_WITH_TORCH=0</pre>
+</div>
+
+<table>
+  <tr>
+    <th>Knob</th>
+    <th>Purpose</th>
+    <th>Typical values</th>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_TOKENIZER</code></td>
+    <td>Select tokenization path</td>
+    <td><code>byte</code>, <code>bpe</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_EPOCHS</code>, <code>V7_PIPELINE_SEQ_LEN</code>, <code>V7_PIPELINE_TOTAL_TOKENS</code></td>
+    <td>Train budget</td>
+    <td><code>10</code>, <code>32</code>, <code>1024</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_GRAD_ACCUM</code>, <code>V7_PIPELINE_LR</code></td>
+    <td>Update scale</td>
+    <td><code>1..8</code>, <code>5e-4</code></td>
+  </tr>
+  <tr>
+    <td><code>V7_PIPELINE_OPEN_VIS</code></td>
+    <td>Generate visualizer report automatically</td>
+    <td><code>0</code>, <code>1</code></td>
+  </tr>
+</table>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Safety guard now built in</strong><br>
+    Token-file training now fails fast if token IDs exceed run-dir vocab size. This prevents NaN runs from silent token/vocab mismatch.
+  </div>
+</div>
+
+<h2 id="v7-runtime-stitch-graph">New: Runtime Stitch Graph in IR Visualizer</h2>
+
+<p>The Training tab now includes a function-level runtime graph fed by <code>train_exec_plan.json</code> with explicit stages:</p>
+<ul>
+  <li>forward ops</li>
+  <li>backward ops</li>
+  <li>gradient accumulation ops</li>
+  <li>optimizer/update transition</li>
+</ul>
+
+<div class="card">
+  <h3 style="margin-top: 0;">How to inspect stitching</h3>
+  <ol style="margin-bottom: 0;">
+    <li>Generate report from run-dir: <code>python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_pipeline_byte --html-only</code></li>
+    <li>Open <code>/tmp/v7_pipeline_byte/ir_report.html</code></li>
+    <li>Go to <strong>Training</strong> tab</li>
+    <li>Use <strong>Runtime Stitch</strong> section filters:
+      <code>Stage=forward|backward|accum|optimizer</code> and <code>Layer=all|Lx</code></li>
+    <li>Click a node to inspect dispatch/reduction metadata and phase stitching details</li>
+  </ol>
+</div>
+
+<p>Use this graph when first loss is correct but later updates diverge. It makes boundary mistakes visible at function level without opening generated C manually.</p>
+
 
 <h2>Verification Matrix: Epoch 1 to 10 + Checkpoints + Oracle</h2>
 
