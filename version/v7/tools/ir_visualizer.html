@@ -1682,6 +1682,126 @@
                 text-align: left;
             }
         }
+
+        /* ── Memory Explorer ─────────────────────────────────── */
+        .me-controls {
+            display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
+            padding: 0.75rem; background: var(--dark-card, #1a1a2e); border-radius: 6px;
+            margin-bottom: 0.75rem;
+        }
+        .me-ctrl-group { display: flex; align-items: center; gap: 0.35rem; }
+        .me-ctrl-group label { font-size: 0.8rem; color: var(--text-muted, #888); }
+        .me-ctrl-group select, .me-btn {
+            padding: 0.3rem 0.5rem; font-size: 0.8rem; border-radius: 4px;
+            background: var(--grey, #333); color: var(--text-primary, #eee);
+            border: 1px solid var(--grey, #444); cursor: pointer;
+        }
+        .me-btn:hover { background: var(--orange, #e6a23c); color: var(--dark, #111); }
+
+        .me-summary {
+            display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;
+        }
+        .me-card {
+            background: var(--dark-card, #1a1a2e); padding: 0.6rem 0.9rem;
+            border-radius: 6px; min-width: 90px; text-align: center;
+        }
+        .me-card-val { font-size: 1.1em; font-weight: 700; color: var(--text-primary, #eee); }
+        .me-card-lbl { font-size: 0.75em; color: var(--text-muted, #888); margin-top: 0.15rem; }
+        .me-card-warn { border: 1px solid #e74c3c; }
+        .me-card-ok   { border: 1px solid #47b475; }
+
+        .me-align-issues { margin-bottom: 0.75rem; }
+        .me-issue-tbl {
+            width: 100%; border-collapse: collapse; margin-top: 0.4rem; font-size: 0.8rem;
+        }
+        .me-issue-tbl th, .me-issue-tbl td {
+            padding: 0.25rem 0.5rem; text-align: left;
+            border-bottom: 1px solid var(--grey, #333);
+        }
+        .me-issue-tbl th { color: var(--text-muted, #888); font-weight: 600; }
+
+        .me-region-bar { margin-bottom: 0.75rem; }
+        .me-region-bar-label { font-size: 0.75rem; color: var(--text-muted, #888); margin-bottom: 0.25rem; }
+        .me-region-bar-inner {
+            display: flex; height: 28px; border-radius: 4px; overflow: hidden;
+            background: var(--dark-card, #1a1a2e);
+        }
+        .me-region-seg {
+            position: relative; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: filter 0.15s;
+        }
+        .me-region-seg:hover { filter: brightness(1.3); }
+        .me-region-seg-lbl { font-size: 0.65rem; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+
+        .me-grid-wrapper {
+            display: flex; gap: 0; margin-bottom: 0.75rem;
+        }
+        .me-ruler {
+            width: 80px; flex-shrink: 0; position: relative; overflow: hidden;
+        }
+        .me-ruler-lbl {
+            position: absolute; left: 0; width: 80px;
+            font-family: var(--font-mono, monospace); font-size: 0.6rem;
+            color: var(--text-muted, #666); display: flex; align-items: center;
+        }
+        .me-grid { flex: 1; min-width: 0; }
+        .me-scroller { overflow-x: hidden; }
+        .me-inner { position: relative; }
+        .me-row { white-space: nowrap; }
+
+        .me-cell {
+            display: inline-block; border-radius: 1px; cursor: pointer;
+            transition: outline 0.1s; box-sizing: border-box;
+        }
+        .me-cell:hover { outline: 1px solid #fff; z-index: 1; position: relative; }
+        .me-sel { outline: 2px solid #f1c40f !important; z-index: 2; position: relative; }
+        .me-start.me-ok  { box-shadow: inset 0 0 0 1px #47b475; }
+        .me-start.me-bad  { box-shadow: inset 0 0 0 1px #e74c3c; }
+        .me-region-bound { border-left: 2px solid rgba(255,255,255,0.5); }
+
+        .me-detail {
+            background: var(--dark-card, #1a1a2e); padding: 1rem; border-radius: 6px;
+            margin-bottom: 0.75rem; min-height: 60px;
+        }
+        .me-detail-empty { color: var(--text-muted, #888); text-align: center; padding: 1rem; }
+        .me-detail-hdr { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+        .me-detail-name { font-size: 1.1em; font-weight: 700; color: var(--text-primary, #eee); font-family: var(--font-mono, monospace); }
+        .me-detail-badge { font-size: 0.8em; font-weight: 600; }
+        .me-detail-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 0.3rem 1rem;
+        }
+        .me-kv { display: flex; gap: 0.5rem; font-size: 0.85rem; }
+        .me-k { color: var(--text-muted, #888); min-width: 90px; flex-shrink: 0; }
+        .me-v { color: var(--text-primary, #eee); word-break: break-all; }
+        .me-detail-section { margin-top: 0.75rem; }
+        .me-detail-tbl {
+            width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.3rem;
+        }
+        .me-detail-tbl th, .me-detail-tbl td {
+            padding: 0.2rem 0.5rem; text-align: left;
+            border-bottom: 1px solid var(--grey, #333);
+        }
+        .me-detail-tbl th { color: var(--text-muted, #888); font-weight: 600; }
+
+        .me-legend {
+            background: var(--dark-card, #1a1a2e); padding: 0.75rem; border-radius: 6px;
+        }
+        .me-legend-title { font-size: 0.8em; color: var(--text-muted, #888); margin-bottom: 0.35rem; }
+        .me-legend-items { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .me-legend-item { display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--text-primary, #eee); }
+        .me-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+
+        .me-subtabs {
+            display: flex; gap: 0; margin-bottom: 0.75rem; border-bottom: 2px solid var(--grey, #333);
+        }
+        .me-subtab {
+            padding: 0.4rem 1rem; cursor: pointer; font-size: 0.85rem;
+            color: var(--text-muted, #888); border-bottom: 2px solid transparent;
+            margin-bottom: -2px; transition: color 0.15s, border-color 0.15s;
+        }
+        .me-subtab:hover { color: var(--text-primary, #eee); }
+        .me-subtab.active { color: var(--orange, #e6a23c); border-bottom-color: var(--orange, #e6a23c); }
     </style>
 </head>
 <body>
@@ -1838,6 +1958,13 @@ make v7-test-quick</pre>
                 <div class="stat-card"><div class="stat-value" id="totalMemory">-</div><div class="stat-label">Total Memory</div></div>
             </div>
 
+            <!-- Memory sub-tabs: Overview | Explorer -->
+            <div class="me-subtabs">
+                <div class="me-subtab active" onclick="meShowSubtab('overview')" id="meSubOverview">Overview</div>
+                <div class="me-subtab" onclick="meShowSubtab('explorer')" id="meSubExplorer">Explorer</div>
+            </div>
+
+            <div id="memoryOverviewPane">
             <div class="memory-region">
                 <h3>Weights Region <span class="size" id="weightsRegionSize"></span></h3>
                 <div class="memory-bar" id="weightsBar"></div>
@@ -1854,6 +1981,11 @@ make v7-test-quick</pre>
                     <thead><tr><th>Buffer</th><th>Offset</th><th>Size</th><th>Shape</th><th>Usage</th></tr></thead>
                     <tbody></tbody>
                 </table>
+            </div>
+            </div><!-- /memoryOverviewPane -->
+
+            <div id="memoryExplorerPane" style="display:none;">
+                <div id="memoryExplorerContainer"></div>
             </div>
         </div>
 
@@ -2158,7 +2290,9 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                 <h3><span class="badge badge-orange">Slots</span> Logical Buffer State</h3>
                 <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
                     Track which op last wrote to each logical slot. Memory planner uses this to assign physical buffers.
+                    Click a slot card to filter the ops table to that slot; click again to clear.
                 </p>
+                <div id="dfSlotFocus" style="color:var(--text-muted);font-size:0.78rem;margin-bottom:0.55rem;">Slot filter: none</div>
                 <div id="slotStatus" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
             </div>
 
@@ -2773,10 +2907,12 @@ python test_gemv_q8_0_q8_0.py</pre>
         let trainRuntimeParityRealisticData = null;
         let trainRuntimeParityStressData = null;
         let trainReplayData = null;
+        let trainBackpropStitchData = null;
         let trainPipelineData = null;
         let trainExecPlanData = null;
         let ir1Data = null;
         let currentDfLayer = -1;
+        let selectedDfSlot = null;
         let loadedFiles = {};
 
         let currentMode = 'decode';
@@ -3491,6 +3627,14 @@ python test_gemv_q8_0_q8_0.py</pre>
                 renderTraining();
             }
 
+            if (tabId === 'memory') {
+                // Lazy-render explorer if explorer subtab is active
+                const explorerTab = document.getElementById('meSubExplorer');
+                if (explorerTab && explorerTab.classList.contains('active')) {
+                    if (typeof renderMemoryExplorer === 'function') renderMemoryExplorer();
+                }
+            }
+
             window.dispatchEvent(new CustomEvent('ck:tab-shown', { detail: { tabId } }));
         }
 
@@ -3808,6 +3952,26 @@ python test_gemv_q8_0_q8_0.py</pre>
             reader.readAsText(file);
         }
 
+        /* Memory Explorer sub-tab switcher */
+        function meShowSubtab(which) {
+            var overview = document.getElementById('memoryOverviewPane');
+            var explorer = document.getElementById('memoryExplorerPane');
+            var tabO = document.getElementById('meSubOverview');
+            var tabE = document.getElementById('meSubExplorer');
+            if (which === 'explorer') {
+                if (overview) overview.style.display = 'none';
+                if (explorer) explorer.style.display = '';
+                if (tabO) tabO.classList.remove('active');
+                if (tabE) tabE.classList.add('active');
+                if (typeof renderMemoryExplorer === 'function') renderMemoryExplorer();
+            } else {
+                if (overview) overview.style.display = '';
+                if (explorer) explorer.style.display = 'none';
+                if (tabO) tabO.classList.add('active');
+                if (tabE) tabE.classList.remove('active');
+            }
+        }
+
         function renderAll() {
             renderMemory();
             renderMemorySignoffPanel();
@@ -3863,6 +4027,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             trainRuntimeParityRealisticData = files.train_runtime_parity_realistic || trainRuntimeParityRealisticData;
             trainRuntimeParityStressData = files.train_runtime_parity_stress || trainRuntimeParityStressData;
             trainReplayData = files.replay_determinism || trainReplayData;
+            trainBackpropStitchData = files.backprop_stitch_runtime || trainBackpropStitchData;
             trainPipelineData = files.training_pipeline || trainPipelineData;
             trainExecPlanData = files.train_exec_plan || trainExecPlanData;
 
@@ -5589,6 +5754,29 @@ function trainingBackwardNodeColor(op) {
     return '#f39c12';
 }
 
+function isGradAccumulateOp(op) {
+    const opName = String(op?.op || '').toLowerCase();
+    return opName === 'grad_accumulate' || opName.includes('grad_accumulate');
+}
+
+function gradAccumulateExplanation(op, compact = false) {
+    if (!isGradAccumulateOp(op)) return '';
+    const role = String(op?.role || '').toLowerCase();
+    if (role === 'activation') {
+        return compact
+            ? 'backprop dL/dx flow; explicit in v7 IR (optimizable later).'
+            : 'Activation grad_accumulate is backprop gradient flow (dL/dx), including residual/skip fan-in. Single-writer cases may be optimizable; v7 keeps this explicit today.';
+    }
+    if (role === 'weight') {
+        return compact
+            ? 'micro-batch dL/dW accumulation before optimizer step.'
+            : 'Weight grad_accumulate collects dL/dW for micro-batch gradient accumulation before optimizer step.';
+    }
+    return compact
+        ? 'explicit gradient accumulator (dst += src).'
+        : 'Explicit gradient accumulator op (dst += src).';
+}
+
 function refreshTrainingSelectionUI(backwardList) {
     const linked = document.getElementById('trainingLinkedDetails');
     const selectedId = trainingGraphState.selectedBackwardOpId;
@@ -5620,6 +5808,7 @@ function refreshTrainingSelectionUI(backwardList) {
     if (selectedOp) {
         const fwdRef = Number(selectedOp?.forward_ref);
         const fwdOp = getTrainingForwardOpById(fwdRef);
+        const accumNote = gradAccumulateExplanation(selectedOp, false);
         const outKeys = Object.keys(selectedOp?.dataflow?.outputs || {});
         const outputSummary = outKeys.slice(0, 4).map(k => {
             const t = selectedOp?.dataflow?.outputs?.[k]?.tensor || '-';
@@ -5634,6 +5823,7 @@ function refreshTrainingSelectionUI(backwardList) {
                 ${Number.isFinite(fwdRef) ? `<button type="button" class="graph-chip" onclick="jumpToForwardTrainingRef(${fwdRef})">Open Forward Op</button>` : ''}
                 ${fwdOp ? `<span style="color:var(--text-secondary);">(${escapeHtml(String(fwdOp?.op || fwdOp?.kernel || '-'))})</span>` : ''}
             </div>
+            ${accumNote ? `<div style="margin-top:0.45rem;padding:0.4rem 0.55rem;border:1px solid rgba(255,180,0,0.42);background:rgba(255,180,0,0.10);border-radius:6px;color:#ffd58a;font-size:0.78rem;"><strong>Note:</strong> ${escapeHtml(accumNote)}</div>` : ''}
         `;
         return;
     }
@@ -6024,6 +6214,7 @@ function renderTraining() {
         trainRuntimeParityRealisticData ||
         trainRuntimeParityStressData ||
         trainReplayData ||
+        trainBackpropStitchData ||
         trainPipelineData
     );
 
@@ -6071,6 +6262,7 @@ function renderTraining() {
 
     const gateStatuses = [
         { label: 'Contracts', pass: trainContractData?.summary?.fail === 0 && trainContractData?.summary?.pass > 0 },
+        { label: 'Runtime Stitch Smoke', pass: trainBackpropStitchData?.passed === true },
         { label: '1-token Parity', pass: trainParity1TokenData?.overall_pass === true },
         { label: 'FD Gradients', pass: trainFdGradData?.passed === true },
         { label: 'Epoch-3 Parity', pass: trainParityEpoch3Data?.pass_parity === true },
@@ -6150,6 +6342,7 @@ function renderTraining() {
                 }).join(', ');
                 const opId = Number(op.op_id);
                 const forwardRef = Number(op.forward_ref);
+                const roleNoteCompact = gradAccumulateExplanation(op, true);
                 const row = document.createElement('tr');
                 row.dataset.backwardOpId = Number.isFinite(opId) ? String(opId) : '';
                 row.dataset.forwardRef = Number.isFinite(forwardRef) ? String(forwardRef) : '';
@@ -6159,7 +6352,10 @@ function renderTraining() {
                     <td><code>${escapeHtml(String(op.kernel_id || '-'))}</code></td>
                     <td>${Number.isFinite(forwardRef) ? `<button type="button" class="graph-chip" style="padding:0.12rem 0.48rem;font-size:0.72rem;" onclick="event.stopPropagation();jumpToForwardTrainingRef(${forwardRef})">${forwardRef}</button>` : '-'}</td>
                     <td>${escapeHtml(String(op.layer ?? '-'))}</td>
-                    <td>${escapeHtml(String(op.role || '-'))}</td>
+                    <td>
+                        <div>${escapeHtml(String(op.role || '-'))}</div>
+                        ${roleNoteCompact ? `<div style="font-size:0.72rem;color:#ffc66d;margin-top:0.18rem;">${escapeHtml(roleNoteCompact)}</div>` : ''}
+                    </td>
                     <td style="font-size:0.78rem;">${escapeHtml(outDisplay)}</td>
                 `;
                 row.addEventListener('click', () => {
@@ -6198,6 +6394,12 @@ function renderTraining() {
             `<div><strong>Runtime parity (stress):</strong> pass=${trainRuntimeParityStressData.pass_parity === true ? 'yes' : 'no'}, failures=${fails}, max |loss_ck-loss_torch| = ${Number(trainRuntimeParityStressData.max_loss_abs_diff || 0).toExponential(3)}</div>`
         );
     }
+    if (trainBackpropStitchData) {
+        const first = trainBackpropStitchData?.checks?.first_checked_parity_step || {};
+        gradientDetails.push(
+            `<div><strong>Runtime stitch smoke:</strong> pass=${trainBackpropStitchData.passed === true ? 'yes' : 'no'}, first_step=${Number.isFinite(Number(first.step)) ? Number(first.step) : '-'}, logits_diff=${Number.isFinite(Number(first.logits_max_abs_diff)) ? Number(first.logits_max_abs_diff).toExponential(3) : '-'}</div>`
+        );
+    }
     const invWarnings = Array.isArray(inv?.warnings) ? inv.warnings : [];
     if (invWarnings.length > 0) {
         gradientDetails.push(`<div style="color:#ffc66d;"><strong>Warnings:</strong> ${escapeHtml(invWarnings.slice(0, 5).join(' | '))}</div>`);
@@ -6220,6 +6422,15 @@ function renderTraining() {
                     <td>Contracts</td>
                     <td>${statusBadge(trainContractData ? (trainContractData.summary?.fail === 0) : undefined)}</td>
                     <td>${trainContractData ? `PASS=${trainContractData.summary?.pass || 0} WARN=${trainContractData.summary?.warn || 0} FAIL=${trainContractData.summary?.fail || 0}` : '-'}</td>
+                </tr>
+                <tr>
+                    <td>Runtime stitch smoke</td>
+                    <td>${statusBadge(trainBackpropStitchData ? (trainBackpropStitchData.passed === true) : undefined)}</td>
+                    <td>${
+                        trainBackpropStitchData
+                            ? `first_step=${Number.isFinite(Number(trainBackpropStitchData?.checks?.first_checked_parity_step?.step)) ? Number(trainBackpropStitchData.checks.first_checked_parity_step.step) : '-'}, logits_diff=${Number.isFinite(Number(trainBackpropStitchData?.checks?.first_checked_parity_step?.logits_max_abs_diff)) ? Number(trainBackpropStitchData.checks.first_checked_parity_step.logits_max_abs_diff).toExponential(3) : '-'}`
+                            : '-'
+                    }</td>
                 </tr>
                 <tr>
                     <td>1-token parity</td>
@@ -7578,7 +7789,7 @@ function renderTraining() {
             if (name.includes('training_pipeline')) return 'training';
             if (name.includes('train_exec_plan')) return 'training';
             if (name.includes('train_parity') || name.includes('gradient_summary')) return 'training';
-            if (name.includes('fd_gradients') || name.includes('replay_determinism')) return 'training';
+            if (name.includes('fd_gradients') || name.includes('replay_determinism') || name.includes('backprop_stitch_runtime')) return 'training';
             if (name.includes('parity_1token') || name.includes('qk_norm_backward_parity')) return 'training';
             if (name.includes('contract_report')) return 'training';
             if (name.includes('layout')) return 'layout';
@@ -7701,6 +7912,9 @@ function renderTraining() {
                     } else if (name.includes('train_runtime_parity') && name.includes('stress')) {
                         trainRuntimeParityStressData = info.data;
                         console.log('Auto-loaded: runtime parity stress');
+                    } else if (name.includes('backprop_stitch_runtime')) {
+                        trainBackpropStitchData = info.data;
+                        console.log('Auto-loaded: backprop stitch runtime');
                     } else if (name.includes('replay_determinism')) {
                         trainReplayData = info.data;
                         console.log('Auto-loaded: replay determinism');
@@ -8029,8 +8243,28 @@ function renderTraining() {
             return ops.filter(op => Number(op?.layer) === layerNum);
         }
 
+        function opTouchesDataflowSlot(op, slotName) {
+            const target = String(slotName || '').trim();
+            if (!target) return true;
+            const dataflow = op && typeof op === 'object' ? (op.dataflow || {}) : {};
+            const inputs = dataflow && typeof dataflow.inputs === 'object' ? dataflow.inputs : {};
+            const outputs = dataflow && typeof dataflow.outputs === 'object' ? dataflow.outputs : {};
+            if (Object.prototype.hasOwnProperty.call(outputs, target)) return true;
+            for (const [name, info] of Object.entries(outputs)) {
+                if (String(name) === target) return true;
+                if (String(info?.tensor || '').trim() === target) return true;
+            }
+            for (const [name, info] of Object.entries(inputs)) {
+                if (String(name) === target) return true;
+                if (String(info?.tensor || '').trim() === target) return true;
+                if (String(info?.from || '').trim() === target) return true;
+            }
+            return false;
+        }
+
         function renderDataflow() {
             const phase = currentDataflowPhase();
+            selectedDfSlot = null;
             const ops = getDataflowOpsByPhase(phase);
             if (!Array.isArray(ops) || ops.length === 0) {
                 document.getElementById('dfTotalOps').textContent = '0';
@@ -8115,6 +8349,7 @@ function renderTraining() {
 
         function renderSlotStatus(ops) {
             const slotDiv = document.getElementById('slotStatus');
+            const slotFocus = document.getElementById('dfSlotFocus');
             slotDiv.innerHTML = '';
 
             // Track last writer for each slot
@@ -8133,6 +8368,15 @@ function renderTraining() {
                 }
             });
 
+            if (selectedDfSlot && !Object.prototype.hasOwnProperty.call(slotWriters, selectedDfSlot)) {
+                selectedDfSlot = null;
+            }
+            if (slotFocus) {
+                slotFocus.innerHTML = selectedDfSlot
+                    ? `Slot filter: <code>${escapeHtml(String(selectedDfSlot))}</code> <button type="button" class="graph-chip" style="margin-left:0.45rem;padding:0.14rem 0.46rem;font-size:0.72rem;" onclick="selectedDfSlot=null;renderSlotStatus(getDataflowOpsByPhase(currentDataflowPhase()));renderDataflowLayer(currentDfLayer===null||currentDfLayer===undefined?'all':currentDfLayer);">Clear</button>`
+                    : 'Slot filter: none';
+            }
+
             // Slot colors
             const slotColors = {
                 'out': '#47b475',
@@ -8146,6 +8390,7 @@ function renderTraining() {
 
             Object.entries(slotWriters).forEach(([slot, info]) => {
                 const color = slotColors[slot] || '#666';
+                const isSelected = String(selectedDfSlot || '') === String(slot);
                 const card = document.createElement('div');
                 card.style.cssText = `
                     padding: 0.5rem 1rem;
@@ -8153,6 +8398,8 @@ function renderTraining() {
                     border: 1px solid ${color};
                     border-radius: 6px;
                     font-size: 0.85rem;
+                    cursor: pointer;
+                    box-shadow: ${isSelected ? '0 0 0 1px rgba(255,255,255,0.85) inset' : 'none'};
                 `;
                 card.innerHTML = `
                     <div style="color: ${color}; font-weight: 600;">${slot}</div>
@@ -8163,6 +8410,11 @@ function renderTraining() {
                         dtype: ${info.dtype}
                     </div>
                 `;
+                card.addEventListener('click', () => {
+                    selectedDfSlot = (String(selectedDfSlot || '') === String(slot)) ? null : slot;
+                    renderSlotStatus(ops);
+                    renderDataflowLayer(currentDfLayer === null || currentDfLayer === undefined ? 'all' : currentDfLayer);
+                });
                 slotDiv.appendChild(card);
             });
         }
@@ -8173,17 +8425,24 @@ function renderTraining() {
             if (!Array.isArray(ops) || ops.length === 0) return;
             currentDfLayer = layer;
             const filteredOps = filterDataflowOpsForLayer(ops, layer, phase);
+            const slotFilter = String(selectedDfSlot || '').trim();
+            const scopedOps = slotFilter
+                ? filteredOps.filter(op => opTouchesDataflowSlot(op, slotFilter))
+                : filteredOps;
             const producerIndex = buildTensorProducerIndex(phase);
             const consumerIndex = buildTensorConsumerIndex(phase);
 
             const tbody = document.querySelector('#dataflowTable tbody');
             tbody.innerHTML = '';
-            if (!filteredOps || filteredOps.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted); text-align:center;">No ops in selected layer.</td></tr>';
+            if (!scopedOps || scopedOps.length === 0) {
+                const filterMsg = slotFilter
+                    ? `No ops in selected layer for slot "${escapeHtml(slotFilter)}".`
+                    : 'No ops in selected layer.';
+                tbody.innerHTML = `<tr><td colspan="6" style="color: var(--text-muted); text-align:center;">${filterMsg}</td></tr>`;
                 return;
             }
 
-            filteredOps.forEach(op => {
+            scopedOps.forEach(op => {
                 const row = document.createElement('tr');
                 row.style.cursor = 'pointer';
                 row.onclick = () => highlightDataflowOp(op.op_id);
@@ -8258,6 +8517,7 @@ function renderTraining() {
                 const kernelType = getKernelType(`${kernelFn} ${op.op || ''}`);
                 const borderColor = getKernelColor(kernelType);
                 const phaseText = String(op.phase || (phase === 'backward' ? 'backward' : 'forward'));
+                const accumNoteCompact = gradAccumulateExplanation(op, true);
 
                 row.innerHTML = `
                     <td style="font-family: monospace; color: var(--blue);">${op.op_id}</td>
@@ -8265,6 +8525,7 @@ function renderTraining() {
                     <td style="border-left: 3px solid ${borderColor}; padding-left: 0.75rem;">
                         <div style="font-weight: 600; color: var(--white);">${op.op || '-'}</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">L${op.layer} inst:${op.instance || 0}</div>
+                        ${accumNoteCompact ? `<div style="font-size: 0.72rem; color: #ffc66d; margin-top: 0.22rem;">${escapeHtml(accumNoteCompact)}</div>` : ''}
                     </td>
                     <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--blue);">${kernelFn}</td>
                     <td>${inputsHtml}</td>
@@ -9767,9 +10028,48 @@ function renderProfileHowTo() {
                     advisorSummaryData?.project_path ||
                     '';
                 const advisorGenerated = advisorSummaryData?.generated_at || advisorSummaryData?.generated_at_epoch || '-';
+                const advisorSummaryMetrics = (advisorSummaryData && typeof advisorSummaryData.summary_metrics === 'object')
+                    ? advisorSummaryData.summary_metrics
+                    : {};
+                const advisorMetricRows = Object.entries(advisorSummaryMetrics).slice(0, 10).map(([k, v]) => {
+                    const n = Number(v);
+                    const value = Number.isFinite(n) ? (Math.abs(n) >= 100 ? n.toFixed(1) : n.toFixed(3)) : String(v);
+                    return `<tr><td>${escapeHtml(String(k))}</td><td>${escapeHtml(value)}</td></tr>`;
+                }).join('');
+
+                const advisorReportLinks = [];
+                const advisorSeenPaths = new Set();
+                const addAdvisorLink = (label, rawPath) => {
+                    if (!rawPath) return;
+                    const p = String(rawPath);
+                    if (advisorSeenPaths.has(p)) return;
+                    advisorSeenPaths.add(p);
+                    advisorReportLinks.push({ label: String(label), path: p });
+                };
+                addAdvisorLink('Report', advisorSummaryData?.report_path_resolved || advisorSummaryData?.report_path);
+                addAdvisorLink('CSV', advisorSummaryData?.csv_path_resolved || advisorSummaryData?.csv_path);
+                addAdvisorLink('HTML', advisorSummaryData?.html_path_resolved || advisorSummaryData?.html_path);
+                if (Array.isArray(advisorSummaryData?.artifacts)) {
+                    advisorSummaryData.artifacts.forEach((a) => {
+                        if (!a || typeof a !== 'object') return;
+                        const p = a?.resolved_path || a?.path;
+                        if (!p) return;
+                        addAdvisorLink(a?.label || 'Artifact', p);
+                    });
+                }
+
                 if (advisorProjectPath) {
                     links.push(`<a href="${escapeHtml(String(advisorProjectPath))}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Open Advisor project</a>`);
                 }
+                advisorReportLinks.forEach((item) => {
+                    links.push(`<a href="${escapeHtml(item.path)}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Advisor ${escapeHtml(item.label)}</a>`);
+                });
+
+                const advisorReportLinksHtml = advisorReportLinks.length
+                    ? advisorReportLinks.map((item) => (
+                        `<a href="${escapeHtml(item.path)}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">${escapeHtml(item.label)}</a>`
+                    )).join(' <span style="color:var(--text-muted);">|</span> ')
+                    : '<span style="color:var(--text-muted);">No Advisor report links found.</span>';
                 advisorPanelHtml = `
                     <div class="profile-artifact-panel" style="margin-top:0.8rem;">
                         <h3><span class="badge badge-blue">Advisor</span> Roofline Summary</h3>
@@ -9779,6 +10079,16 @@ function renderProfileHowTo() {
                                 <tr><td>Project</td><td><code>${escapeHtml(String(advisorProjectPath || '-'))}</code></td></tr>
                             </tbody>
                         </table>
+                        <div style="margin-top:0.6rem;display:flex;gap:0.45rem;flex-wrap:wrap;">
+                            ${advisorReportLinksHtml}
+                        </div>
+                        ${advisorMetricRows ? `
+                        <div style="margin-top:0.7rem;">
+                            <table class="profile-hotspot-table">
+                                <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+                                <tbody>${advisorMetricRows}</tbody>
+                            </table>
+                        </div>` : ''}
                     </div>
                 `;
             }
@@ -10516,130 +10826,6 @@ function getRunContext() {
     return { runDir, modelPath };
 }
 
-function collectRuntimeParityRows(files) {
-    const specs = [
-        { key: 'train_runtime_parity_realistic', label: 'Realistic' },
-        { key: 'train_runtime_parity_stress', label: 'Stress' },
-    ];
-    return specs.map((spec) => {
-        const payload = files && files[spec.key] && typeof files[spec.key] === 'object'
-            ? files[spec.key]
-            : null;
-        if (!payload) return null;
-        const oracle = payload.oracle && typeof payload.oracle === 'object' ? payload.oracle : {};
-        const failures = Array.isArray(oracle.failures) ? oracle.failures : [];
-        const replayFailures = Array.isArray(oracle.replay_failures) ? oracle.replay_failures : [];
-        const checks = Array.isArray(oracle.checks) ? oracle.checks.length : 0;
-        const denominator = checks > 0 ? checks : Math.max(1, toNum(payload.steps, 0));
-        return {
-            key: spec.key,
-            label: spec.label,
-            passParity: payload.pass_parity === true,
-            steps: toNum(payload.steps, 0),
-            optimizerSteps: toNum(payload.optimizer_steps, 0),
-            gradAccum: toNum(payload.grad_accum, NaN),
-            tokensPerUpdate: toNum(payload.tokens_per_update, NaN),
-            maxLossAbsDiff: toNum(payload.max_loss_abs_diff, NaN),
-            finalParamMaxAbsDiff: toNum(payload.final_param_max_abs_diff, NaN),
-            finalOptimizerStateMaxAbsDiff: toNum(payload.final_optimizer_state_max_abs_diff, NaN),
-            failureCount: failures.length,
-            replayFailureCount: replayFailures.length,
-            failureRate: failures.length / denominator,
-            firstFailure: failures.length > 0 ? failures[0] : null,
-            safetyStatus: payload?.safety?.status || null,
-            oracleSource: oracle.source || null,
-        };
-    }).filter(Boolean);
-}
-
-function renderRuntimeParityInfographic(container, rows) {
-    if (!container) return;
-    if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = '<div style="color:var(--text-muted);">No runtime parity reports loaded yet (expected train_runtime_parity_realistic_latest.json and train_runtime_parity_stress_latest.json).</div>';
-        return;
-    }
-    const logScale = (v) => {
-        if (!Number.isFinite(v) || v <= 0) return 0;
-        const lo = -8;
-        const hi = -2;
-        const x = Math.log10(v);
-        return Math.max(0, Math.min(1, (x - lo) / (hi - lo)));
-    };
-    const cards = rows.map((row) => {
-        const failWidth = Math.round(Math.max(0, Math.min(1, row.failureRate)) * 170);
-        const lossWidth = Math.round(logScale(row.maxLossAbsDiff) * 170);
-        const paramWidth = Math.round(logScale(row.finalParamMaxAbsDiff) * 170);
-        const optWidth = Math.round(logScale(row.finalOptimizerStateMaxAbsDiff) * 170);
-        const badge = row.passParity
-            ? '<span class="badge badge-green">PASS</span>'
-            : '<span class="badge badge-red">FAIL</span>';
-        const firstFailStep = row.firstFailure && Number.isFinite(toNum(row.firstFailure.step, NaN))
-            ? toNum(row.firstFailure.step, 0)
-            : NaN;
-        const firstFail = Number.isFinite(firstFailStep)
-            ? `first_fail_step=${firstFailStep}`
-            : 'first_fail_step=-';
-        const firstFailOptStep = Number.isFinite(firstFailStep) && Number.isFinite(row.gradAccum) && row.gradAccum > 0
-            ? Math.ceil(firstFailStep / row.gradAccum)
-            : NaN;
-        const firstBadTensor = row.firstFailure && typeof row.firstFailure.first_bad_tensor === 'string'
-            ? row.firstFailure.first_bad_tensor
-            : '-';
-        const firstBadOp = row.firstFailure && typeof row.firstFailure.first_bad_op === 'string'
-            ? row.firstFailure.first_bad_op
-            : '-';
-        const firstBadDiff = row.firstFailure && Number.isFinite(toNum(row.firstFailure.first_bad_diff, NaN))
-            ? toNum(row.firstFailure.first_bad_diff, NaN)
-            : NaN;
-        return `
-            <div class="parity-section" style="margin-top:0.6rem;">
-                <h3><span class="badge badge-blue">Runtime ${escapeHtml(row.label)}</span> Generated-C Train Parity ${badge}</h3>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
-                    <div><strong>steps:</strong> ${row.steps || '-'}</div>
-                    <div><strong>optimizer steps:</strong> ${row.optimizerSteps || '-'}</div>
-                    <div><strong>grad accum:</strong> ${Number.isFinite(row.gradAccum) ? row.gradAccum : '-'}</div>
-                    <div><strong>tokens/update:</strong> ${Number.isFinite(row.tokensPerUpdate) ? row.tokensPerUpdate : '-'}</div>
-                    <div><strong>failures:</strong> ${row.failureCount}</div>
-                    <div><strong>replay failures:</strong> ${row.replayFailureCount}</div>
-                    <div><strong>${firstFail}</strong></div>
-                    <div><strong>first_fail_opt_step:</strong> ${Number.isFinite(firstFailOptStep) ? firstFailOptStep : '-'}</div>
-                    <div><strong>safety:</strong> ${escapeHtml(String(row.safetyStatus || '-'))}</div>
-                </div>
-                <svg style="width:100%;height:96px;" viewBox="0 0 330 96" preserveAspectRatio="xMinYMin meet">
-                    <text x="4" y="16" font-size="11" fill="#cbd5e1">Failure Density</text>
-                    <rect x="150" y="8" width="170" height="10" rx="3" fill="#1f2937"></rect>
-                    <rect x="150" y="8" width="${failWidth}" height="10" rx="3" fill="#f97316"></rect>
-                    <text x="324" y="16" font-size="10" text-anchor="end" fill="#e5e7eb">${fmt(toNum(row.failureRate, 0) * 100.0, 1)}%</text>
-
-                    <text x="4" y="38" font-size="11" fill="#cbd5e1">Max Loss Diff (log)</text>
-                    <rect x="150" y="30" width="170" height="10" rx="3" fill="#1f2937"></rect>
-                    <rect x="150" y="30" width="${lossWidth}" height="10" rx="3" fill="#60a5fa"></rect>
-                    <text x="324" y="38" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.maxLossAbsDiff) ? fmtExp(row.maxLossAbsDiff, 2) : '-'}</text>
-
-                    <text x="4" y="60" font-size="11" fill="#cbd5e1">Max Param Diff (log)</text>
-                    <rect x="150" y="52" width="170" height="10" rx="3" fill="#1f2937"></rect>
-                    <rect x="150" y="52" width="${paramWidth}" height="10" rx="3" fill="#34d399"></rect>
-                    <text x="324" y="60" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.finalParamMaxAbsDiff) ? fmtExp(row.finalParamMaxAbsDiff, 2) : '-'}</text>
-
-                    <text x="4" y="82" font-size="11" fill="#cbd5e1">Max Adam State Diff (log)</text>
-                    <rect x="150" y="74" width="170" height="10" rx="3" fill="#1f2937"></rect>
-                    <rect x="150" y="74" width="${optWidth}" height="10" rx="3" fill="#a78bfa"></rect>
-                    <text x="324" y="82" font-size="10" text-anchor="end" fill="#e5e7eb">${Number.isFinite(row.finalOptimizerStateMaxAbsDiff) ? fmtExp(row.finalOptimizerStateMaxAbsDiff, 2) : '-'}</text>
-                </svg>
-                <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.82rem;">
-                    oracle=${escapeHtml(String(row.oracleSource || '-'))}
-                </div>
-                <div style="margin-top:0.3rem;color:var(--text-muted);font-size:0.82rem;">
-                    first_bad_tensor=${escapeHtml(String(firstBadTensor))} ·
-                    first_bad_op=${escapeHtml(String(firstBadOp))} ·
-                    first_bad_diff=${Number.isFinite(firstBadDiff) ? fmtExp(firstBadDiff, 2) : '-'}
-                </div>
-            </div>
-        `;
-    }).join('');
-    container.innerHTML = cards;
-}
-
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -10657,27 +10843,10 @@ function renderTrainingDashboard(files) {
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
     const decodeTokS = toNum(profile.decode_tok_s, NaN);
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
-    const checkpointPolicy = files && typeof files.training_checkpoint_policy === 'object'
-        ? files.training_checkpoint_policy
-        : {};
-    const checkpointFiles = Array.isArray(checkpointPolicy.files)
-        ? checkpointPolicy.files.filter((row) => row && typeof row === 'object')
-        : [];
-    const checkpointFilesSorted = [...checkpointFiles].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0));
-    const checkpointCount = Math.max(0, toNum(checkpointPolicy.count, checkpointFiles.length));
-    const checkpointLatestStep = toNum(checkpointPolicy.latest_step, NaN);
-    const checkpointingEnabled = checkpointPolicy.checkpointing === true
-        || checkpointPolicy.enabled === true
-        || checkpointFilesSorted.length > 0;
-    const checkpointLatest = checkpointFilesSorted.length > 0
-        ? checkpointFilesSorted[checkpointFilesSorted.length - 1]
-        : null;
     const trainE2E = files.train_e2e || {};
     const layoutTrain = files.layout_train || {};
     const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
     const layoutRegionCount = Array.isArray(layoutTrain.regions) ? layoutTrain.regions.length : 0;
-    const runtimeParityRows = collectRuntimeParityRows(files);
-    const runtimeParityPassCount = runtimeParityRows.filter((r) => r.passParity).length;
     const runCtx = getRunContext();
     const memoryDiag = files.memory_diagnostic || {};
     const memoryDiagState = memoryDiag && memoryDiag.diagnostic && memoryDiag.diagnostic.ok === true
@@ -10715,14 +10884,11 @@ function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
-            <div class="stat-card"><div class="stat-value">${checkpointCount}</div><div class="stat-label">Runtime Checkpoints</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(checkpointLatestStep) ? checkpointLatestStep : '-'}</div><div class="stat-label">Latest Runtime Ckpt Step</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
             <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
             <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
-            <div class="stat-card"><div class="stat-value">${runtimeParityRows.length > 0 ? `${runtimeParityPassCount}/${runtimeParityRows.length}` : '-'}</div><div class="stat-label">Runtime Parity Runs Passing</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -10752,14 +10918,6 @@ function renderTrainingDashboard(files) {
             <pre style="font-size:0.8rem;white-space:pre-wrap;">${reportCmd}</pre>
             <pre style="font-size:0.8rem;white-space:pre-wrap;">${suiteCmd}</pre>
         </div>
-        <div class="parity-section" style="margin-top:0.8rem;">
-            <h3><span class="badge badge-green">Checkpoint</span> Runtime Weight Checkpoints</h3>
-            <div id="trainCheckpointArtifacts"></div>
-        </div>
-        <div class="parity-section" style="margin-top:0.8rem;">
-            <h3><span class="badge badge-blue">Runtime Parity</span> Generated-C Train Infographics (Realistic/Stress)</h3>
-            <div id="trainRuntimeParityInfographic"></div>
-        </div>
     `;
 
     drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt');
@@ -10777,44 +10935,8 @@ function renderTrainingDashboard(files) {
         ).join('');
     }
 
-    const ckptEl = document.getElementById('trainCheckpointArtifacts');
-    if (ckptEl) {
-        if (!checkpointingEnabled || checkpointCount <= 0 || checkpointFilesSorted.length === 0) {
-            ckptEl.innerHTML = '<div style="color:var(--text-muted);">No runtime weight checkpoints recorded. Enable final/cadence checkpointing in train config.</div>';
-        } else {
-            const latestStep = Number.isFinite(checkpointLatestStep) ? checkpointLatestStep : toNum(checkpointLatest && checkpointLatest.step, NaN);
-            const latestReason = checkpointLatest && checkpointLatest.reason ? String(checkpointLatest.reason) : '-';
-            const rows = checkpointFilesSorted.slice(-8).map((row) => {
-                const step = toNum(row.step, NaN);
-                const reason = escapeHtml(String(row.reason || '-'));
-                const bump = escapeHtml(String(row.bump || '-'));
-                const manifest = escapeHtml(String(row.manifest || '-'));
-                const bytes = toNum(row.bytes, NaN);
-                return `
-                    <tr>
-                        <td>${Number.isFinite(step) ? step : '-'}</td>
-                        <td>${reason}</td>
-                        <td>${Number.isFinite(bytes) ? formatBytesHuman(bytes) : '-'}</td>
-                        <td><code>${bump}</code></td>
-                        <td><code>${manifest}</code></td>
-                    </tr>
-                `;
-            }).join('');
-            ckptEl.innerHTML = `
-                <div style="color:var(--text-muted);margin-bottom:0.5rem;">
-                    checkpointing=${checkpointingEnabled ? 'on' : 'off'} · count=${checkpointCount} · latest_step=${Number.isFinite(latestStep) ? latestStep : '-'} · latest_reason=${escapeHtml(String(latestReason))}
-                </div>
-                <table>
-                    <thead><tr><th>Step</th><th>Reason</th><th>Bytes</th><th>Bump</th><th>Manifest</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            `;
-        }
-    }
-
     const sweepEl = document.getElementById('trainSweepTable');
     if (!sweepEl) return;
-    renderRuntimeParityInfographic(document.getElementById('trainRuntimeParityInfographic'), runtimeParityRows);
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
         sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         return;
@@ -12176,11 +12298,11 @@ function renderTrainingMemoryDiag(files) {
 /* ===== question_headers.js ===== */
 const QUESTION_TABS = {
     'train-dashboard': {
-        label: 'Backprop Health',
+        label: 'Is It Training?',
         title: 'Loss, gradients, learning rate and run health overview.',
     },
     'training': {
-        label: 'How Does Backprop Flow?',
+        label: 'How Does the Graph Flow?',
         title: 'Forward/backward IR topology, invariants and gate status.',
     },
     'train-gradient': {
@@ -12385,7 +12507,7 @@ function ensurePanelRoot(panelId, rootId) {
 function ensureTrainingPanels() {
     ensurePanel(
         'train-dashboard',
-        'Backprop Dashboard',
+        'Training Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
     );
     ensurePanel(
@@ -12443,7 +12565,7 @@ function installModeToggle() {
     host.id = 'ckReportModeToggle';
     host.innerHTML = `
         <button type="button" data-mode="inference" class="active">Inference</button>
-        <button type="button" data-mode="training">Backprop</button>
+        <button type="button" data-mode="training">Training</button>
     `;
     controls.appendChild(host);
 }
@@ -12455,48 +12577,6 @@ function visibleTabElements() {
 function firstVisibleTabId() {
     const first = visibleTabElements()[0];
     return first ? tabIdForElement(first) : '';
-}
-
-function hasInferenceArtifacts(files) {
-    if (!files || typeof files !== 'object') return false;
-    return Boolean(
-        files.ir1_decode ||
-        files.layout_decode ||
-        files.lowered_decode ||
-        files.lowered_decode_call ||
-        files.ir1_prefill ||
-        files.layout_prefill ||
-        files.lowered_prefill ||
-        files.lowered_prefill_call
-    );
-}
-
-function hasTrainingArtifacts(files) {
-    if (!files || typeof files !== 'object') return false;
-    return Boolean(
-        files.ir1_train ||
-        files.ir2_train ||
-        files.layout_train ||
-        files.train_exec_plan ||
-        files.train_e2e ||
-        files.training_loss_curve ||
-        files.training_parity ||
-        files.generated_train_runtime_summary
-    );
-}
-
-function chooseInitialReportMode() {
-    let files = null;
-    if (typeof currentFiles === 'function') {
-        files = currentFiles();
-    }
-    if (!files && window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files) {
-        files = window.EMBEDDED_IR_DATA.files;
-    }
-    const infer = hasInferenceArtifacts(files);
-    const train = hasTrainingArtifacts(files);
-    if (train && !infer) return 'training';
-    return 'inference';
 }
 
 function applyReportMode(mode) {
@@ -12530,7 +12610,7 @@ function initModeUI() {
     setTabMode('memory', 'inference,training');
     setTabMode('kernels', 'inference,training');
     setTabMode('profile', 'inference,training');
-    setTabMode('training', 'training', 'Backprop IR');
+    setTabMode('training', 'training', 'Backward IR');
     INFERENCE_ONLY.forEach((id) => setTabMode(id, 'inference'));
 
     appendTrainingTabs();
@@ -12541,11 +12621,911 @@ function initModeUI() {
         btn.addEventListener('click', () => applyReportMode(btn.dataset.mode || 'inference'));
     });
 
-    applyReportMode(chooseInitialReportMode());
+    applyReportMode('inference');
 }
 
 function trainingTabIds() {
     return [...TRAINING_TABS, ...SHARED_TABS];
+}
+
+/* ===== memory_explorer.js ===== */
+/**
+ * Memory Explorer — v7 BUMP allocator grid visualization
+ *
+ * Renders the BUMP allocator's arena as a grid of colored squares
+ * (1 square = 1 cache line = 64 bytes by default).
+ *
+ * Handles both v7 data formats:
+ *
+ * 1) Training (layout-train-v7):
+ *    regions[]:  { name, offset, bytes, count }
+ *    tensors[]:  { id, dtype, numel, bytes, kind, persistent, requires_grad,
+ *                  region, shape, producer, bump_offset, bump_size, offset, end }
+ *
+ * 2) Inference (memory-layout, from ck-cli):
+ *    memory.weights.entries[]:      { name, dtype, size, offset, abs_offset }
+ *    memory.activations.buffers[]:  { name, size, offset, usage }
+ *
+ * Features:
+ *  - CSS Grid (no D3), one div = one cache line (or page/block at zoom)
+ *  - Color by: tensor, region, kind/role, dtype, alignment audit
+ *  - Hover → tooltip: offset, cache line #, tensor id, dtype, shape, region
+ *  - Click → highlight tensor, detail panel with head-parallelism split
+ *  - Alignment audit: green ✓ / red ✗ per tensor and per region
+ *  - Zoom: cache line (64B) | page (4KB) | overview (64KB)
+ *  - Hex offset ruler, virtual scrolling for large arenas
+ *  - Region boundary markers
+ *
+ * Expects globals: layoutData, formatBytes (from ir_visualizer.html)
+ */
+
+/* ─── Constants ─────────────────────────────────────────── */
+const ME_CACHE_LINE = 64;
+const ME_PAGE_SIZE  = 4096;
+const ME_ZOOM_LEVELS = [
+    { label: 'Cache Line (64B)', bytesPerCell: 64,    cellPx: 10 },
+    { label: 'Page (4KB)',        bytesPerCell: 4096,  cellPx: 8  },
+    { label: 'Overview (64KB)',   bytesPerCell: 65536, cellPx: 6  },
+];
+
+/* Region colour palette — matches v7 region names */
+const ME_REGION_COLORS = {
+    params:            { bg: '#2a5599', border: '#4a90d9' },
+    grads:             { bg: '#993333', border: '#e74c3c' },
+    optimizer_m:       { bg: '#336666', border: '#1abc9c' },
+    optimizer_v:       { bg: '#5a2a7a', border: '#9b59b6' },
+    activations:       { bg: '#1a7a3a', border: '#2ecc71' },
+    grad_activations:  { bg: '#885522', border: '#e67e22' },
+    saved:             { bg: '#7a5a1a', border: '#f39c12' },
+    scratch:           { bg: '#555555', border: '#888888' },
+    /* v7 inference layout uses role names rather than region names */
+    weight:            { bg: '#2a5599', border: '#4a90d9' },
+    activation:        { bg: '#1a7a3a', border: '#2ecc71' },
+    kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
+    gap:               { bg: '#111',    border: '#222'    },
+};
+
+/* Per-tensor hue rotation */
+const ME_TENSOR_HUES = [
+    '#4a90d9', '#47b475', '#e6a23c', '#e74c3c', '#9b59b6',
+    '#1abc9c', '#e67e22', '#2ecc71', '#3498db', '#f39c12',
+    '#8e44ad', '#16a085', '#c0392b', '#2980b9', '#27ae60',
+    '#d35400', '#7f8c8d', '#f1c40f', '#e91e63', '#00bcd4',
+];
+
+/* ─── State ─────────────────────────────────────────────── */
+const meState = {
+    zoomLevel:      0,
+    colorMode:      'region',    // 'tensor' | 'region' | 'dtype' | 'alignment'
+    viewRegion:     'all',       // 'all' | region name
+    selectedTensor: null,
+    gridCols:       128,
+    tensors:        [],          // processed [{id, offset, end, bytes, kind, region, dtype, shape, persistent, requires_grad, colorIdx}]
+    regions:        [],          // [{name, offset, bytes, count}]
+    totalBytes:     0,
+    config:         {},
+    lookup:         null,        // (byteOffset) => tensor or null
+};
+
+/* ─── Data Extraction ───────────────────────────────────── */
+
+function meExtractData(ld) {
+    if (!ld) return;
+
+    const tensors = [];
+    const regions = [];
+    let totalBytes = 0;
+
+    /* v7 layout-train format (primary) */
+    if (ld.format && ld.format.startsWith('layout-train')) {
+        if (Array.isArray(ld.regions)) {
+            for (const r of ld.regions) {
+                regions.push({
+                    name:   r.name,
+                    offset: Number(r.offset) || 0,
+                    bytes:  Number(r.bytes)  || 0,
+                    count:  Number(r.count)  || 0,
+                });
+            }
+        }
+        if (Array.isArray(ld.tensors)) {
+            ld.tensors.forEach(function(t, idx) {
+                if (!t) return;
+                tensors.push({
+                    id:            t.id || t.name || 'tensor_' + idx,
+                    offset:        Number(t.offset) || 0,
+                    end:           Number(t.end)    || (Number(t.offset || 0) + Number(t.bytes || 0)),
+                    bytes:         Number(t.bytes)  || 0,
+                    bump_offset:   Number(t.bump_offset) || 0,
+                    bump_size:     Number(t.bump_size)   || 0,
+                    kind:          t.kind || '',
+                    region:        t.region || '',
+                    dtype:         t.dtype || 'fp32',
+                    shape:         t.shape || [],
+                    persistent:    !!t.persistent,
+                    requires_grad: !!t.requires_grad,
+                    producer:      t.producer || null,
+                    numel:         Number(t.numel) || 0,
+                    colorIdx:      idx,
+                });
+            });
+        }
+        /* total bytes from regions */
+        if (regions.length) {
+            totalBytes = regions.reduce(function(mx, r) { return Math.max(mx, r.offset + r.bytes); }, 0);
+        }
+    }
+
+    /* v7 inference format: memory.weights.entries + memory.activations.buffers */
+    if (tensors.length === 0) {
+        var memory = ld.memory || ld;
+        var wEntries = ((memory.weights || {}).entries || []);
+        var aBuffers = ((memory.activations || {}).buffers || []);
+
+        wEntries.forEach(function(e, idx) {
+            tensors.push(meParseFlatEntry(e, 'params', idx));
+        });
+        aBuffers.forEach(function(e, idx) {
+            tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx));
+        });
+
+        /* v7 tensors[] flat array (e.g. from ir1 or lowered IR) */
+        if (tensors.length === 0 && Array.isArray(ld.tensors)) {
+            ld.tensors.forEach(function(t, idx) {
+                if (!t) return;
+                var b = Number(t.bytes) || (Number(t.numel || 0) * 4);
+                var off = Number(t.offset || t.bump_offset || 0);
+                tensors.push({
+                    id:       t.name || t.id || 'tensor_' + idx,
+                    offset:   off,
+                    end:      off + b,
+                    bytes:    b,
+                    bump_offset: Number(t.bump_offset) || 0,
+                    bump_size:   Number(t.bump_size) || 0,
+                    kind:     t.kind || '',
+                    region:   t.region || meInferRegion(t.kind || ''),
+                    dtype:    t.dtype || 'fp32',
+                    shape:    t.shape || [],
+                    persistent: !!t.persistent,
+                    requires_grad: !!t.requires_grad,
+                    producer: null,
+                    numel:    Number(t.numel) || 0,
+                    colorIdx: idx,
+                });
+            });
+        }
+
+        if (tensors.length) {
+            var last = tensors.reduce(function(a, b) { return a.end > b.end ? a : b; });
+            totalBytes = last.end;
+        }
+        if (memory.total_bytes) totalBytes = memory.total_bytes;
+    }
+
+    /* Sort by offset */
+    tensors.sort(function(a, b) { return a.offset - b.offset; });
+    tensors.forEach(function(t, i) { t.colorIdx = i; });
+
+    meState.tensors   = tensors;
+    meState.regions   = regions;
+    meState.totalBytes = totalBytes;
+    meState.config    = ld.config || {};
+    meState.lookup    = meBuildLookup(tensors);
+}
+
+function meParseFlatEntry(e, region, idx) {
+    var off = meParseHex(e.offset || e.bump_offset || 0);
+    var sz  = Number(e.size || e.bytes || 0);
+    return {
+        id:       e.name || e.key || 'tensor_' + idx,
+        offset:   off,
+        end:      off + sz,
+        bytes:    sz,
+        bump_offset: Number(e.bump_offset) || off,
+        bump_size:   sz,
+        kind:     e.kind || e.role || '',
+        region:   region,
+        dtype:    e.dtype || 'fp32',
+        shape:    e.shape || [],
+        persistent: true,
+        requires_grad: false,
+        producer: null,
+        numel:    0,
+        colorIdx: idx,
+    };
+}
+
+function meInferRegion(kind) {
+    var k = String(kind).toLowerCase();
+    if (k.includes('weight') || k === 'weight') return 'params';
+    if (k.includes('grad_weight') || k.includes('grad_bias')) return 'grads';
+    if (k.includes('adam_m')) return 'optimizer_m';
+    if (k.includes('adam_v')) return 'optimizer_v';
+    if (k.includes('grad_act')) return 'grad_activations';
+    if (k.includes('activation') || k.includes('act_')) return 'activations';
+    if (k.includes('scratch') || k.includes('temp')) return 'scratch';
+    return 'params';
+}
+
+function meParseHex(val) {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+        if (val.startsWith('0x') || val.startsWith('0X')) return parseInt(val, 16);
+        return parseInt(val, 10) || 0;
+    }
+    return 0;
+}
+
+/* Binary-search lookup: byte offset → tensor */
+function meBuildLookup(tensors) {
+    var sorted = tensors.filter(function(t) { return t.bytes > 0; }).sort(function(a, b) { return a.offset - b.offset; });
+    return function(byteOffset) {
+        var lo = 0, hi = sorted.length - 1;
+        while (lo <= hi) {
+            var mid = (lo + hi) >>> 1;
+            var t = sorted[mid];
+            if (byteOffset < t.offset)     hi = mid - 1;
+            else if (byteOffset >= t.end)  lo = mid + 1;
+            else                            return t;
+        }
+        return null;
+    };
+}
+
+/* ─── Alignment Analysis ────────────────────────────────── */
+
+function meAnalyzeAlignment(tensors) {
+    var aligned = 0, misaligned = 0;
+    var issues = [];
+
+    for (var i = 0; i < tensors.length; i++) {
+        var t = tensors[i];
+        if (!t.bytes || t.bytes === 0) continue;
+        var mod = t.offset % ME_CACHE_LINE;
+        if (mod === 0) { aligned++; }
+        else {
+            misaligned++;
+            issues.push({ id: t.id, offset: t.offset, mod: mod, wasted: ME_CACHE_LINE - mod, region: t.region });
+        }
+    }
+    return { aligned: aligned, misaligned: misaligned, issues: issues, total: aligned + misaligned };
+}
+
+/* ─── Head Parallelism Analysis ─────────────────────────── */
+
+function meHeadParallelism(tensor, config) {
+    if (!config || !tensor) return null;
+    var n = tensor.id.toLowerCase();
+    var numHeads   = config.num_heads || 8;
+    var numKVHeads = config.num_kv_heads || numHeads;
+    var headDim    = config.head_dim || (Math.floor((config.embed_dim || 128) / numHeads));
+
+    var heads = 0;
+    if (n.includes('wq') || n.includes('w_q') || n.includes('.q.') || n.includes('q_proj')) {
+        heads = numHeads;
+    } else if (n.includes('wk') || n.includes('w_k') || n.includes('.k.') || n.includes('k_proj') ||
+               n.includes('wv') || n.includes('w_v') || n.includes('.v.') || n.includes('v_proj')) {
+        heads = numKVHeads;
+    } else if (n.includes('wo') || n.includes('w_o') || n.includes('o_proj')) {
+        heads = numHeads;
+    }
+
+    if (heads === 0) return null;
+    var headBytes = Math.floor(tensor.bytes / heads);
+    var splits = [];
+    for (var h = 0; h < Math.min(heads, 128); h++) {
+        var off = tensor.offset + h * headBytes;
+        splits.push({
+            head: h,
+            offset: off,
+            bytes: headBytes,
+            cacheAligned: off % ME_CACHE_LINE === 0,
+        });
+    }
+    return { heads: heads, headDim: headDim, headBytes: headBytes, splits: splits };
+}
+
+/* ─── Cell Color ────────────────────────────────────────── */
+
+function meCellColor(tensor) {
+    if (!tensor) return ME_REGION_COLORS.gap.bg;
+
+    switch (meState.colorMode) {
+    case 'tensor':
+        return ME_TENSOR_HUES[tensor.colorIdx % ME_TENSOR_HUES.length];
+
+    case 'region':
+        var rc = ME_REGION_COLORS[tensor.region] || ME_REGION_COLORS.params;
+        return rc.bg;
+
+    case 'dtype':
+        var dt = (tensor.dtype || '').toLowerCase();
+        if (dt.includes('q4'))   return '#c0392b';
+        if (dt.includes('q5'))   return '#e74c3c';
+        if (dt.includes('q6'))   return '#e67e22';
+        if (dt.includes('q8'))   return '#f39c12';
+        if (dt.includes('bf16')) return '#9b59b6';
+        if (dt.includes('fp16')) return '#8e44ad';
+        if (dt.includes('fp32')) return '#3498db';
+        if (dt.includes('i32'))  return '#1abc9c';
+        if (dt.includes('u8'))   return '#7f8c8d';
+        return '#555';
+
+    case 'alignment':
+        return (tensor.offset % ME_CACHE_LINE === 0) ? '#47b475' : '#e74c3c';
+
+    default:
+        return ME_TENSOR_HUES[tensor.colorIdx % ME_TENSOR_HUES.length];
+    }
+}
+
+/* ─── Formatting Helpers ────────────────────────────────── */
+
+function meFmtBytes(n) {
+    if (typeof formatBytes === 'function') return formatBytes(n);
+    if (n >= 1024 * 1024 * 1024) return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    if (n >= 1024 * 1024)        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    if (n >= 1024)               return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
+}
+
+function meHex(n) {
+    return '0x' + n.toString(16).toUpperCase().padStart(8, '0');
+}
+
+function meEsc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+/* ─── Main Render ───────────────────────────────────────── */
+
+function renderMemoryExplorer(containerId) {
+    var container = document.getElementById(containerId || 'memoryExplorerContainer');
+    if (!container) return;
+
+    /* Extract data from global layoutData */
+    meExtractData(typeof layoutData !== 'undefined' ? layoutData : null);
+
+    if (meState.tensors.length === 0) {
+        container.innerHTML =
+            '<div style="text-align:center; padding:3rem; color:var(--text-muted,#888);">' +
+                '<p style="font-size:1.3em; margin-bottom:0.5rem;">No memory layout data loaded</p>' +
+                '<p>Load a <code>layout_train.json</code> (v7 format) to explore the BUMP allocator arena.</p>' +
+            '</div>';
+        return;
+    }
+
+    var alignment = meAnalyzeAlignment(meState.tensors);
+    container.innerHTML = '';
+
+    /* ── Controls Bar ── */
+    var ctrl = document.createElement('div');
+    ctrl.className = 'me-controls';
+    var regionOpts = meState.regions.length
+        ? meState.regions.map(function(r) { return '<option value="' + r.name + '"' + (meState.viewRegion === r.name ? ' selected' : '') + '>' + r.name + ' (' + meFmtBytes(r.bytes) + ')</option>'; }).join('')
+        : '';
+    ctrl.innerHTML =
+        '<div class="me-ctrl-group">' +
+            '<label>Zoom</label>' +
+            '<select onchange="meSetZoom(+this.value)">' +
+                ME_ZOOM_LEVELS.map(function(z, i) { return '<option value="' + i + '"' + (i === meState.zoomLevel ? ' selected' : '') + '>' + z.label + '</option>'; }).join('') +
+            '</select>' +
+        '</div>' +
+        '<div class="me-ctrl-group">' +
+            '<label>Color</label>' +
+            '<select onchange="meSetColor(this.value)">' +
+                '<option value="region"' + (meState.colorMode === 'region' ? ' selected' : '') + '>By Region</option>' +
+                '<option value="tensor"' + (meState.colorMode === 'tensor' ? ' selected' : '') + '>Per Tensor</option>' +
+                '<option value="dtype"'  + (meState.colorMode === 'dtype'  ? ' selected' : '') + '>By Dtype</option>' +
+                '<option value="alignment"' + (meState.colorMode === 'alignment' ? ' selected' : '') + '>Alignment Audit</option>' +
+            '</select>' +
+        '</div>' +
+        '<div class="me-ctrl-group">' +
+            '<label>Region</label>' +
+            '<select onchange="meSetRegion(this.value)">' +
+                '<option value="all"' + (meState.viewRegion === 'all' ? ' selected' : '') + '>Full Arena (' + meFmtBytes(meState.totalBytes) + ')</option>' +
+                regionOpts +
+            '</select>' +
+        '</div>' +
+        '<div class="me-ctrl-group">' +
+            '<button class="me-btn" onclick="meClearSelection()">Clear</button>' +
+        '</div>';
+    container.appendChild(ctrl);
+
+    /* ── Summary Cards ── */
+    var sumDiv = document.createElement('div');
+    sumDiv.className = 'me-summary';
+
+    var sumHTML =
+        '<div class="me-card"><div class="me-card-val">' + meFmtBytes(meState.totalBytes) + '</div><div class="me-card-lbl">Arena</div></div>' +
+        '<div class="me-card"><div class="me-card-val">' + meState.tensors.length + '</div><div class="me-card-lbl">Tensors</div></div>' +
+        '<div class="me-card"><div class="me-card-val">' + (meState.regions.length || Object.keys(ME_REGION_COLORS).length) + '</div><div class="me-card-lbl">Regions</div></div>';
+
+    for (var ri = 0; ri < meState.regions.length; ri++) {
+        var r = meState.regions[ri];
+        var rci = ME_REGION_COLORS[r.name] || ME_REGION_COLORS.params;
+        sumHTML += '<div class="me-card" style="border-left:3px solid ' + rci.border + '"><div class="me-card-val">' + meFmtBytes(r.bytes) + '</div><div class="me-card-lbl">' + meEsc(r.name) + '</div></div>';
+    }
+    var alignCls = alignment.misaligned > 0 ? 'me-card-warn' : 'me-card-ok';
+    sumHTML += '<div class="me-card ' + alignCls + '"><div class="me-card-val">' + alignment.aligned + '/' + alignment.total + '</div><div class="me-card-lbl">Cache-Aligned' + (alignment.misaligned > 0 ? ' ⚠' : ' ✓') + '</div></div>';
+    sumHTML += '<div class="me-card"><div class="me-card-val">' + Math.ceil(meState.totalBytes / ME_CACHE_LINE).toLocaleString() + '</div><div class="me-card-lbl">Cache Lines</div></div>';
+
+    sumDiv.innerHTML = sumHTML;
+    container.appendChild(sumDiv);
+
+    /* ── Alignment Issues ── */
+    if (alignment.misaligned > 0) {
+        var issDiv = document.createElement('div');
+        issDiv.className = 'me-align-issues';
+        var issRows = alignment.issues.slice(0, 50).map(function(iss) {
+            return '<tr>' +
+                '<td>' + meEsc(iss.id) + '</td>' +
+                '<td>' + iss.region + '</td>' +
+                '<td style="font-family:var(--font-mono,monospace);">' + meHex(iss.offset) + '</td>' +
+                '<td>' + iss.mod + 'B</td>' +
+                '<td>' + iss.wasted + 'B</td>' +
+            '</tr>';
+        }).join('');
+        if (alignment.issues.length > 50) {
+            issRows += '<tr><td colspan="5" style="color:var(--text-muted,#888);">...and ' + (alignment.issues.length - 50) + ' more</td></tr>';
+        }
+        issDiv.innerHTML =
+            '<details>' +
+                '<summary style="cursor:pointer; color:#e74c3c; font-weight:600;">' +
+                    '⚠ ' + alignment.misaligned + ' misaligned tensor' + (alignment.misaligned > 1 ? 's' : '') + ' — click to expand' +
+                '</summary>' +
+                '<table class="me-issue-tbl">' +
+                    '<thead><tr><th>Tensor</th><th>Region</th><th>Offset</th><th>mod 64</th><th>Wasted/line</th></tr></thead>' +
+                    '<tbody>' + issRows + '</tbody>' +
+                '</table>' +
+            '</details>';
+        container.appendChild(issDiv);
+    }
+
+    /* ── Region Bar (objdump-like section overview) ── */
+    if (meState.regions.length > 0) {
+        var regionBar = document.createElement('div');
+        regionBar.className = 'me-region-bar';
+        regionBar.innerHTML = '<div class="me-region-bar-label">Arena Regions</div>';
+        var barInner = document.createElement('div');
+        barInner.className = 'me-region-bar-inner';
+        for (var rbi = 0; rbi < meState.regions.length; rbi++) {
+            var reg = meState.regions[rbi];
+            var pct = (reg.bytes / meState.totalBytes * 100);
+            var regC = ME_REGION_COLORS[reg.name] || ME_REGION_COLORS.params;
+            var seg = document.createElement('div');
+            seg.className = 'me-region-seg';
+            seg.style.width = Math.max(pct, 0.5) + '%';
+            seg.style.backgroundColor = regC.bg;
+            seg.style.borderLeft = '1px solid ' + regC.border;
+            seg.title = reg.name + ': ' + meHex(reg.offset) + ' — ' + meHex(reg.offset + reg.bytes) + ' (' + meFmtBytes(reg.bytes) + ', ' + reg.count + ' tensors)';
+            (function(regName) {
+                seg.onclick = function() { meSetRegion(regName); };
+            })(reg.name);
+            var lbl = document.createElement('span');
+            lbl.className = 'me-region-seg-lbl';
+            lbl.textContent = pct > 5 ? reg.name : '';
+            seg.appendChild(lbl);
+            barInner.appendChild(seg);
+        }
+        regionBar.appendChild(barInner);
+        container.appendChild(regionBar);
+    }
+
+    /* ── Grid Wrapper ── */
+    var wrapper = document.createElement('div');
+    wrapper.className = 'me-grid-wrapper';
+    wrapper.id = 'meGridWrapper';
+
+    var ruler = document.createElement('div');
+    ruler.className = 'me-ruler';
+    ruler.id = 'meRuler';
+
+    var grid = document.createElement('div');
+    grid.className = 'me-grid';
+    grid.id = 'meGrid';
+
+    wrapper.appendChild(ruler);
+    wrapper.appendChild(grid);
+    container.appendChild(wrapper);
+
+    /* ── Detail Panel ── */
+    var detail = document.createElement('div');
+    detail.className = 'me-detail';
+    detail.id = 'meDetail';
+    detail.innerHTML = '<div class="me-detail-empty">Click a cell to inspect a tensor</div>';
+    container.appendChild(detail);
+
+    /* ── Legend ── */
+    var legend = document.createElement('div');
+    legend.className = 'me-legend';
+    legend.id = 'meLegend';
+    container.appendChild(legend);
+    meUpdateLegend();
+
+    /* Render grid */
+    meRenderGrid();
+}
+
+/* ─── Grid Rendering ────────────────────────────────────── */
+
+function meRenderGrid() {
+    var grid  = document.getElementById('meGrid');
+    var ruler = document.getElementById('meRuler');
+    if (!grid) return;
+
+    var zoom = ME_ZOOM_LEVELS[meState.zoomLevel];
+    var cellPx = zoom.cellPx;
+    var bpc    = zoom.bytesPerCell;
+    var cols   = meState.gridCols;
+
+    /* Filter tensors by region view */
+    var tensors = meState.tensors;
+    var regionFilter = null;
+    if (meState.viewRegion !== 'all') {
+        regionFilter = meState.regions.find(function(r) { return r.name === meState.viewRegion; });
+        tensors = tensors.filter(function(t) { return t.region === meState.viewRegion; });
+    }
+
+    if (tensors.length === 0) {
+        grid.innerHTML = '<div style="padding:2rem; color:var(--text-muted,#888);">No tensors in this region</div>';
+        if (ruler) ruler.innerHTML = '';
+        return;
+    }
+
+    /* Byte range */
+    var minOff = regionFilter ? regionFilter.offset : 0;
+    var maxOff = regionFilter ? (regionFilter.offset + regionFilter.bytes) : meState.totalBytes;
+    var totalCells = Math.ceil((maxOff - minOff) / bpc);
+    var rows = Math.ceil(totalCells / cols);
+
+    /* Lookup */
+    var lookup = meBuildLookup(tensors);
+
+    /* Region boundary set (for markers) */
+    var regionBoundsArr = [];
+    for (var rbi2 = 0; rbi2 < meState.regions.length; rbi2++) {
+        var rb = meState.regions[rbi2];
+        regionBoundsArr.push(rb.offset);
+        regionBoundsArr.push(rb.offset + rb.bytes);
+    }
+
+    /* Virtual scroll sizing */
+    var rowH = cellPx + 1;
+    var viewH = 560;
+    var maxVisRows = Math.ceil(viewH / rowH) + 4;
+
+    grid.innerHTML = '';
+    grid.style.setProperty('--me-cell', cellPx + 'px');
+    grid.style.setProperty('--me-cols', cols);
+
+    var scroller = document.createElement('div');
+    scroller.className = 'me-scroller';
+    scroller.style.height = Math.min(rows * rowH, viewH) + 'px';
+    scroller.style.overflowY = rows * rowH > viewH ? 'auto' : 'hidden';
+
+    var inner = document.createElement('div');
+    inner.className = 'me-inner';
+    inner.style.height = rows * rowH + 'px';
+    inner.style.position = 'relative';
+
+    scroller.appendChild(inner);
+    grid.appendChild(scroller);
+
+    if (ruler) {
+        ruler.innerHTML = '';
+        ruler.style.height = Math.min(rows * rowH, viewH) + 'px';
+        ruler.style.overflowY = 'hidden';
+    }
+
+    var renderedRows = {};
+
+    function paint() {
+        var scrollTop = scroller.scrollTop;
+        var startRow = Math.max(0, Math.floor(scrollTop / rowH) - 1);
+        var endRow = Math.min(startRow + maxVisRows, rows);
+
+        /* Garbage-collect off-screen rows */
+        for (var rk in renderedRows) {
+            var rn = parseInt(rk, 10);
+            if (rn < startRow || rn >= endRow) {
+                var el = inner.querySelector('[data-r="' + rn + '"]');
+                if (el) el.remove();
+                delete renderedRows[rk];
+            }
+        }
+
+        /* Ruler labels */
+        if (ruler) {
+            ruler.innerHTML = '';
+            for (var rl = startRow; rl < endRow; rl++) {
+                var off = minOff + rl * cols * bpc;
+                var lblEl = document.createElement('div');
+                lblEl.className = 'me-ruler-lbl';
+                lblEl.style.top  = (rl * rowH - scrollTop) + 'px';
+                lblEl.style.height = rowH + 'px';
+                lblEl.textContent = meHex(off);
+                ruler.appendChild(lblEl);
+            }
+        }
+
+        /* Cell rows */
+        for (var rowIdx = startRow; rowIdx < endRow; rowIdx++) {
+            if (renderedRows[rowIdx]) continue;
+            renderedRows[rowIdx] = true;
+
+            var rowEl = document.createElement('div');
+            rowEl.className = 'me-row';
+            rowEl.setAttribute('data-r', rowIdx);
+            rowEl.style.position = 'absolute';
+            rowEl.style.top = rowIdx * rowH + 'px';
+            rowEl.style.display = 'grid';
+            rowEl.style.gridTemplateColumns = 'repeat(' + cols + ', var(--me-cell))';
+            rowEl.style.gap = '1px';
+
+            for (var c = 0; c < cols; c++) {
+                var cellIdx = rowIdx * cols + c;
+                if (cellIdx >= totalCells) break;
+
+                var byteOff = minOff + cellIdx * bpc;
+                var tensor  = lookup(byteOff);
+
+                var cell = document.createElement('div');
+                cell.className = 'me-cell';
+                cell.style.backgroundColor = meCellColor(tensor);
+                cell.style.width  = cellPx + 'px';
+                cell.style.height = cellPx + 'px';
+
+                if (meState.selectedTensor && tensor && tensor.id === meState.selectedTensor) {
+                    cell.classList.add('me-sel');
+                }
+
+                /* tensor start marker */
+                if (tensor && byteOff <= tensor.offset && byteOff + bpc > tensor.offset) {
+                    cell.classList.add('me-start');
+                    cell.classList.add(tensor.offset % ME_CACHE_LINE === 0 ? 'me-ok' : 'me-bad');
+                }
+
+                /* region boundary */
+                for (var rbi3 = 0; rbi3 < regionBoundsArr.length; rbi3++) {
+                    if (byteOff <= regionBoundsArr[rbi3] && byteOff + bpc > regionBoundsArr[rbi3] && byteOff !== minOff) {
+                        cell.classList.add('me-region-bound');
+                        break;
+                    }
+                }
+
+                cell.setAttribute('data-off', byteOff);
+                cell.setAttribute('data-tid', tensor ? tensor.id : '');
+                cell.setAttribute('data-cl', Math.floor(byteOff / ME_CACHE_LINE));
+
+                cell.addEventListener('mouseenter', meCellHover);
+                cell.addEventListener('click', meCellClick);
+
+                rowEl.appendChild(cell);
+            }
+            inner.appendChild(rowEl);
+        }
+    }
+
+    scroller.addEventListener('scroll', paint);
+    paint();
+}
+
+/* ─── Interaction ───────────────────────────────────────── */
+
+function meCellHover(e) {
+    var c = e.target;
+    var off = parseInt(c.getAttribute('data-off'), 10);
+    var tid = c.getAttribute('data-tid');
+    var cl  = parseInt(c.getAttribute('data-cl'), 10);
+
+    if (!tid) {
+        c.title = 'Gap — ' + meHex(off) + ' — cache line #' + cl.toLocaleString();
+        return;
+    }
+
+    var t = null;
+    for (var i = 0; i < meState.tensors.length; i++) {
+        if (meState.tensors[i].id === tid) { t = meState.tensors[i]; break; }
+    }
+    if (!t) return;
+
+    var bpc = ME_ZOOM_LEVELS[meState.zoomLevel].bytesPerCell;
+    var blk = Math.floor((off - t.offset) / bpc);
+    var blkTotal = Math.ceil(t.bytes / bpc);
+
+    c.title = [
+        t.id,
+        'Region: ' + t.region,
+        'Offset: ' + meHex(off) + '   Tensor start: ' + meHex(t.offset),
+        'Cache line: #' + cl.toLocaleString(),
+        'Size: ' + meFmtBytes(t.bytes) + ' (' + t.bytes.toLocaleString() + ' B)',
+        'Dtype: ' + t.dtype + '   Shape: [' + t.shape.join(', ') + ']',
+        'Block: ' + (blk + 1) + '/' + blkTotal,
+        'Kind: ' + t.kind + '   ' + (t.persistent ? 'persistent' : 'ephemeral') + '   ' + (t.requires_grad ? 'grad ✓' : 'no grad'),
+        t.offset % ME_CACHE_LINE === 0 ? '✓ Cache-aligned' : '✗ Misaligned (mod 64 = ' + (t.offset % ME_CACHE_LINE) + ')',
+    ].join('\n');
+}
+
+function meCellClick(e) {
+    var tid = e.target.getAttribute('data-tid');
+    if (!tid) return;
+
+    meState.selectedTensor = tid;
+
+    /* Highlight */
+    var allSel = document.querySelectorAll('.me-sel');
+    for (var i = 0; i < allSel.length; i++) allSel[i].classList.remove('me-sel');
+
+    var matching = document.querySelectorAll('.me-cell[data-tid="' + tid.replace(/"/g, '\\"') + '"]');
+    for (var j = 0; j < matching.length; j++) matching[j].classList.add('me-sel');
+
+    /* Detail panel */
+    var t = null;
+    for (var k = 0; k < meState.tensors.length; k++) {
+        if (meState.tensors[k].id === tid) { t = meState.tensors[k]; break; }
+    }
+    if (t) meShowDetail(t);
+}
+
+function meShowDetail(t) {
+    var panel = document.getElementById('meDetail');
+    if (!panel) return;
+
+    var rc = ME_REGION_COLORS[t.region] || ME_REGION_COLORS.params;
+    var mod = t.offset % ME_CACHE_LINE;
+    var pageMod = t.offset % ME_PAGE_SIZE;
+    var cacheLines = Math.ceil(t.bytes / ME_CACHE_LINE);
+    var pages = Math.ceil(t.bytes / ME_PAGE_SIZE);
+
+    /* Head parallelism */
+    var headHTML = '';
+    var hp = meHeadParallelism(t, meState.config);
+    if (hp) {
+        var hrows = '';
+        for (var h = 0; h < hp.splits.length; h++) {
+            var s = hp.splits[h];
+            hrows += '<tr>' +
+                '<td>Head ' + s.head + '</td>' +
+                '<td style="font-family:var(--font-mono,monospace);">' + meHex(s.offset) + '</td>' +
+                '<td>' + meFmtBytes(s.bytes) + '</td>' +
+                '<td>' + Math.ceil(s.bytes / ME_CACHE_LINE) + '</td>' +
+                '<td>' + (s.cacheAligned ? '<span style="color:#47b475;">✓</span>' : '<span style="color:#e74c3c;">✗ +' + (s.offset % ME_CACHE_LINE) + 'B</span>') + '</td>' +
+            '</tr>';
+        }
+        headHTML =
+            '<div class="me-detail-section">' +
+                '<h4 style="color:#e6a23c;">Head Parallelism Split</h4>' +
+                '<p style="color:var(--text-muted,#888); font-size:0.85em;">' +
+                    hp.heads + ' heads × ' + meFmtBytes(hp.headBytes) + '/head (head_dim=' + hp.headDim + ')' +
+                '</p>' +
+                '<table class="me-detail-tbl">' +
+                    '<thead><tr><th>Head</th><th>Offset</th><th>Size</th><th>Cache Lines</th><th>Aligned</th></tr></thead>' +
+                    '<tbody>' + hrows + '</tbody>' +
+                '</table>' +
+            '</div>';
+    }
+
+    panel.innerHTML =
+        '<div class="me-detail-hdr">' +
+            '<span class="me-detail-name">' + meEsc(t.id) + '</span>' +
+            '<span class="me-detail-badge" style="color:' + rc.border + ';">⬤ ' + t.region + '</span>' +
+            (t.requires_grad ? '<span class="me-detail-badge" style="color:#e74c3c;">∇ grad</span>' : '') +
+            (t.persistent ? '<span class="me-detail-badge" style="color:#47b475;">persistent</span>' : '<span class="me-detail-badge" style="color:#888;">ephemeral</span>') +
+        '</div>' +
+        '<div class="me-detail-grid">' +
+            '<div class="me-kv"><span class="me-k">Kind</span><span class="me-v">' + t.kind + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">End</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.end) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Size</span><span class="me-v">' + meFmtBytes(t.bytes) + ' (' + t.bytes.toLocaleString() + ' B)</span></div>' +
+            '<div class="me-kv"><span class="me-k">BUMP offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.bump_offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">BUMP size</span><span class="me-v">' + meFmtBytes(t.bump_size) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Dtype</span><span class="me-v">' + t.dtype + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Shape</span><span class="me-v">[' + t.shape.join(', ') + ']</span></div>' +
+            '<div class="me-kv"><span class="me-k">Elements</span><span class="me-v">' + t.numel.toLocaleString() + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Cache Lines</span><span class="me-v">' + cacheLines.toLocaleString() + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Pages (4KB)</span><span class="me-v">' + pages.toLocaleString() + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Cache Align</span><span class="me-v">' +
+                (mod === 0
+                    ? '<span style="color:#47b475;">✓ aligned (mod 64 = 0)</span>'
+                    : '<span style="color:#e74c3c;">✗ misaligned (mod 64 = ' + mod + ')</span>') +
+            '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Page Align</span><span class="me-v">' +
+                (pageMod === 0
+                    ? '<span style="color:#47b475;">✓ page-aligned</span>'
+                    : '<span style="color:#ffb400;">mod 4096 = ' + pageMod + '</span>') +
+            '</span></div>' +
+            (t.producer ? '<div class="me-kv"><span class="me-k">Producer</span><span class="me-v">' + meEsc(t.producer) + '</span></div>' : '') +
+        '</div>' +
+        headHTML;
+}
+
+/* ─── Global Controls ───────────────────────────────────── */
+
+if (typeof window !== 'undefined') {
+    window.meSetZoom = function(v) {
+        meState.zoomLevel = v;
+        meRenderGrid();
+    };
+    window.meSetColor = function(v) {
+        meState.colorMode = v;
+        meRenderGrid();
+        meUpdateLegend();
+    };
+    window.meSetRegion = function(v) {
+        meState.viewRegion = v;
+        meRenderGrid();
+    };
+    window.meClearSelection = function() {
+        meState.selectedTensor = null;
+        var allSel = document.querySelectorAll('.me-sel');
+        for (var i = 0; i < allSel.length; i++) allSel[i].classList.remove('me-sel');
+        var p = document.getElementById('meDetail');
+        if (p) p.innerHTML = '<div class="me-detail-empty">Click a cell to inspect a tensor</div>';
+    };
+    window.renderMemoryExplorer = renderMemoryExplorer;
+}
+
+/* ─── Legend ─────────────────────────────────────────────── */
+
+function meUpdateLegend() {
+    var el = document.getElementById('meLegend');
+    if (!el) return;
+
+    var html = '<div class="me-legend-title">Legend</div><div class="me-legend-items">';
+
+    switch (meState.colorMode) {
+    case 'region':
+        for (var i = 0; i < meState.regions.length; i++) {
+            var r = meState.regions[i];
+            var rcc = ME_REGION_COLORS[r.name] || ME_REGION_COLORS.params;
+            html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + rcc.bg + '; border:1px solid ' + rcc.border + ';"></div>' + r.name + ' (' + r.count + ')</div>';
+        }
+        if (meState.regions.length === 0) {
+            var seenRegions = {};
+            for (var j = 0; j < meState.tensors.length; j++) {
+                seenRegions[meState.tensors[j].region] = (seenRegions[meState.tensors[j].region] || 0) + 1;
+            }
+            for (var rName in seenRegions) {
+                var colors = ME_REGION_COLORS[rName] || ME_REGION_COLORS.params;
+                html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + colors.bg + '; border:1px solid ' + colors.border + ';"></div>' + rName + ' (' + seenRegions[rName] + ')</div>';
+            }
+        }
+        break;
+
+    case 'dtype':
+        var dtypes = [
+            ['Q4_x', '#c0392b'], ['Q5_x', '#e74c3c'], ['Q6_x', '#e67e22'], ['Q8_x', '#f39c12'],
+            ['BF16', '#9b59b6'], ['FP16', '#8e44ad'], ['FP32', '#3498db'], ['I32', '#1abc9c'], ['U8', '#7f8c8d'],
+        ];
+        for (var di = 0; di < dtypes.length; di++) {
+            html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + dtypes[di][1] + ';"></div>' + dtypes[di][0] + '</div>';
+        }
+        break;
+
+    case 'alignment':
+        html += '<div class="me-legend-item"><div class="me-swatch" style="background:#47b475;"></div>Cache-aligned (mod 64 = 0)</div>';
+        html += '<div class="me-legend-item"><div class="me-swatch" style="background:#e74c3c;"></div>Misaligned</div>';
+        break;
+
+    case 'tensor':
+    default:
+        var shown = meState.tensors.slice(0, 20);
+        for (var ti = 0; ti < shown.length; ti++) {
+            var tc = ME_TENSOR_HUES[shown[ti].colorIdx % ME_TENSOR_HUES.length];
+            var tlbl = shown[ti].id.length > 32 ? shown[ti].id.slice(0, 29) + '...' : shown[ti].id;
+            html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + tc + ';"></div>' + meEsc(tlbl) + '</div>';
+        }
+        if (meState.tensors.length > 20) {
+            html += '<div class="me-legend-item" style="color:var(--text-muted,#888);">...and ' + (meState.tensors.length - 20) + ' more</div>';
+        }
+        break;
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
 }
 
 /* ===== main.js ===== */

@@ -25,6 +25,7 @@ FILES=(
   "training_memory_diag.js"
   "question_headers.js"
   "mode_ui.js"
+  "memory_explorer.js"
   "main.js"
 )
 
