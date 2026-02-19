@@ -1,0 +1,187 @@
+<svg width="1200" height="720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }</style>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="gpu-row" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6b6b" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ff6b6b" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="cpu-row" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="btl-h" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6b6b" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#ffb400" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.35"/>
+    </linearGradient>
+    <marker id="aw" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0, 7 2.5, 0 5" fill="#404040"/>
+    </marker>
+    <marker id="ag" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0, 7 2.5, 0 5" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <!-- Background + accent line -->
+  <rect width="1200" height="720" fill="#1a1a1a"/>
+  <rect width="1200" height="3" fill="#ffb400"/>
+
+  <!-- Header -->
+  <text x="600" y="45" text-anchor="middle" font-size="22" font-weight="700" fill="#f0f0f0">AI Is a <tspan fill="#ffb400">Systems Problem</tspan>, Not a <tspan fill="#ff6b6b">FLOPS Competition</tspan></text>
+  <text x="600" y="68" text-anchor="middle" font-size="12" fill="#484848">Two first principles that define how compute actually scales</text>
+  <line x1="40" y1="80" x2="1160" y2="80" stroke="#222" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════════
+       LEFT PANEL — Principle 1: 0 × ∞ = 0
+       ══════════════════════════════════════════════════ -->
+  <rect x="28" y="90" width="558" height="518" rx="10" fill="#1e1e1e" stroke="#2c2c2c" stroke-width="1" filter="url(#sh)"/>
+  <!-- Title strip -->
+  <rect x="28" y="90" width="558" height="32" rx="10" fill="#ffb40014"/>
+  <rect x="28" y="108" width="558" height="14" fill="#ffb40014"/>
+  <text x="307" y="112" text-anchor="middle" font-size="11" font-weight="700" fill="#ffb400" letter-spacing="2">PRINCIPLE 1  ·  0 &#xD7; &#x221E; = 0</text>
+
+  <!-- Formula card -->
+  <rect x="50" y="132" width="514" height="84" rx="7" fill="#131313" stroke="#ffb40025" stroke-width="1"/>
+  <!-- 0 (infeasible) -->
+  <text x="148" y="194" text-anchor="middle" font-size="58" font-weight="800" fill="#ff6b6b" filter="url(#glow)">0</text>
+  <!-- × operator -->
+  <text x="224" y="190" text-anchor="middle" font-size="40" font-weight="300" fill="#363636">&#xD7;</text>
+  <!-- ∞ (FLOPS) -->
+  <text x="307" y="194" text-anchor="middle" font-size="58" font-weight="800" fill="#ffb400" filter="url(#glow)">&#x221E;</text>
+  <!-- = operator -->
+  <text x="390" y="190" text-anchor="middle" font-size="40" font-weight="300" fill="#363636">=</text>
+  <!-- 0 (result) -->
+  <text x="466" y="194" text-anchor="middle" font-size="58" font-weight="800" fill="#ff6b6b" filter="url(#glow)">0</text>
+  <!-- Labels under formula -->
+  <text x="148" y="210" text-anchor="middle" font-size="9" fill="#553535">memory = infeasible</text>
+  <text x="307" y="210" text-anchor="middle" font-size="9" fill="#554020">FLOPS</text>
+  <text x="466" y="210" text-anchor="middle" font-size="9" fill="#553535">utility = zero</text>
+
+  <!-- Principle statement -->
+  <text x="307" y="232" text-anchor="middle" font-size="12" font-weight="600" fill="#c8c8c8">If the model doesn&#x27;t fit in memory, compute speed is irrelevant.</text>
+
+  <!-- GPU PATH row -->
+  <rect x="50" y="248" width="514" height="96" rx="6" fill="url(#gpu-row)" stroke="#ff6b6b22" stroke-width="1"/>
+  <rect x="50" y="248" width="4" height="96" rx="2" fill="#ff6b6b"/>
+  <text x="68" y="265" font-size="10" font-weight="700" fill="#ff6b6b" letter-spacing="1">GPU PATH</text>
+  <!-- memory cap -->
+  <rect x="68" y="272" width="120" height="44" rx="4" fill="#131313" stroke="#ff6b6b40" stroke-width="1"/>
+  <text x="128" y="289" text-anchor="middle" font-size="9" fill="#777">VRAM per GPU</text>
+  <text x="128" y="308" text-anchor="middle" font-size="13" font-weight="700" fill="#ff6b6b">80&#x2013;192 GB</text>
+  <line x1="190" y1="294" x2="210" y2="294" stroke="#404040" stroke-width="1.5" marker-end="url(#aw)"/>
+  <!-- model size -->
+  <rect x="212" y="272" width="120" height="44" rx="4" fill="#131313" stroke="#333" stroke-width="1"/>
+  <text x="272" y="289" text-anchor="middle" font-size="9" fill="#777">Model size</text>
+  <text x="272" y="308" text-anchor="middle" font-size="13" font-weight="700" fill="#888">1 TB+</text>
+  <!-- cross -->
+  <text x="354" y="302" text-anchor="middle" font-size="26" fill="#ff6b6b">&#x2717;</text>
+  <!-- result -->
+  <rect x="372" y="272" width="184" height="44" rx="4" fill="#ff6b6b09" stroke="#ff6b6b25" stroke-width="1"/>
+  <text x="464" y="291" text-anchor="middle" font-size="10" fill="#cc5555">Won&#x27;t load &#x2192; cluster required</text>
+  <text x="464" y="308" text-anchor="middle" font-size="10" font-weight="600" fill="#cc5555">FLOPS = irrelevant</text>
+
+  <!-- CPU PATH row -->
+  <rect x="50" y="354" width="514" height="96" rx="6" fill="url(#cpu-row)" stroke="#47b47522" stroke-width="1"/>
+  <rect x="50" y="354" width="4" height="96" rx="2" fill="#47b475"/>
+  <text x="68" y="371" font-size="10" font-weight="700" fill="#47b475" letter-spacing="1">CPU PATH</text>
+  <!-- memory cap -->
+  <rect x="68" y="378" width="120" height="44" rx="4" fill="#131313" stroke="#47b47540" stroke-width="1"/>
+  <text x="128" y="395" text-anchor="middle" font-size="9" fill="#777">RAM (server)</text>
+  <text x="128" y="414" text-anchor="middle" font-size="13" font-weight="700" fill="#47b475">2&#x2013;4 TB</text>
+  <line x1="190" y1="400" x2="210" y2="400" stroke="#47b475" stroke-width="1.5" marker-end="url(#ag)"/>
+  <!-- model size -->
+  <rect x="212" y="378" width="120" height="44" rx="4" fill="#131313" stroke="#333" stroke-width="1"/>
+  <text x="272" y="395" text-anchor="middle" font-size="9" fill="#777">Model size</text>
+  <text x="272" y="414" text-anchor="middle" font-size="13" font-weight="700" fill="#888">1 TB+</text>
+  <!-- check -->
+  <text x="354" y="407" text-anchor="middle" font-size="26" fill="#47b475">&#x2713;</text>
+  <!-- result -->
+  <rect x="372" y="378" width="184" height="44" rx="4" fill="#47b47509" stroke="#47b47525" stroke-width="1"/>
+  <text x="464" y="397" text-anchor="middle" font-size="10" fill="#3d9460">Loads on one server</text>
+  <text x="464" y="414" text-anchor="middle" font-size="10" font-weight="600" fill="#3d9460">FLOPS fully utilized</text>
+
+  <!-- Left conclusion box -->
+  <rect x="50" y="462" width="514" height="130" rx="6" fill="#121212" stroke="#ffb40016" stroke-width="1"/>
+  <text x="307" y="486" text-anchor="middle" font-size="12" font-weight="700" fill="#ffb400">Memory is the gate.</text>
+  <text x="307" y="506" text-anchor="middle" font-size="11" fill="#767676">FLOPS only matter after the gate opens.</text>
+  <text x="307" y="524" text-anchor="middle" font-size="11" fill="#767676">GPU VRAM increases each generation &#x2014; so does the cost per GB.</text>
+  <text x="307" y="542" text-anchor="middle" font-size="11" fill="#767676">CPU DDR5 scales independently, cheaply, already exists</text>
+  <text x="307" y="560" text-anchor="middle" font-size="11" fill="#767676">in every data center at 2&#x2013;4 TB per server.</text>
+  <text x="307" y="580" text-anchor="middle" font-size="10" fill="#484848">Once model size exceeds single-GPU VRAM, cluster becomes mandatory.</text>
+
+  <!-- ══════════════════════════════════════════════════
+       RIGHT PANEL — Principle 2: Theory of Constraints
+       ══════════════════════════════════════════════════ -->
+  <rect x="614" y="90" width="558" height="518" rx="10" fill="#1e1e1e" stroke="#2c2c2c" stroke-width="1" filter="url(#sh)"/>
+  <!-- Title strip -->
+  <rect x="614" y="90" width="558" height="32" rx="10" fill="#07adf812"/>
+  <rect x="614" y="108" width="558" height="14" fill="#07adf812"/>
+  <text x="893" y="112" text-anchor="middle" font-size="11" font-weight="700" fill="#07adf8" letter-spacing="2">PRINCIPLE 2  ·  THEORY OF CONSTRAINTS</text>
+
+  <!-- Section title -->
+  <text x="893" y="148" text-anchor="middle" font-size="13" font-weight="600" fill="#b8b8b8">Your system is only as fast as its slowest component</text>
+
+  <!-- Intra-node zone label -->
+  <text x="893" y="172" text-anchor="middle" font-size="9" fill="#3a3a3a" letter-spacing="2">INTRA-NODE</text>
+
+  <!-- GPU node box -->
+  <rect x="639" y="180" width="188" height="56" rx="5" fill="#ff6b6b0c" stroke="#ff6b6b28" stroke-width="1"/>
+  <text x="733" y="199" text-anchor="middle" font-size="11" font-weight="700" fill="#ff6b6b">GPU Node</text>
+  <text x="733" y="217" text-anchor="middle" font-size="10" fill="#888">NVIDIA NVLink (proprietary)</text>
+  <text x="733" y="231" text-anchor="middle" font-size="9" fill="#664040">intra-node only &#xB7; NVIDIA exclusive</text>
+
+  <!-- CPU node box -->
+  <rect x="959" y="180" width="188" height="56" rx="5" fill="#47b4750c" stroke="#47b47528" stroke-width="1"/>
+  <text x="1053" y="199" text-anchor="middle" font-size="11" font-weight="700" fill="#47b475">CPU Node</text>
+  <text x="1053" y="217" text-anchor="middle" font-size="10" fill="#888">DDR5 memory bus</text>
+  <text x="1053" y="231" text-anchor="middle" font-size="9" fill="#3a6045">open standard &#xB7; commodity</text>
+
+  <!-- Flow indicators -->
+  <rect x="714" y="236" width="38" height="16" rx="3" fill="#ff6b6b14"/>
+  <text x="733" y="248" text-anchor="middle" font-size="9" fill="#ff6b6b50">&#x25BC; fast</text>
+  <rect x="1034" y="236" width="38" height="16" rx="3" fill="#47b47514"/>
+  <text x="1053" y="248" text-anchor="middle" font-size="9" fill="#47b47550">&#x25BC; fast</text>
+
+  <!-- Converging paths -->
+  <path d="M733,252 L733,284 L893,284" stroke="#ff6b6b30" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1053,252 L1053,284 L893,284" stroke="#47b47530" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="893" y1="284" x2="893" y2="300" stroke="#ffb40045" stroke-width="2"/>
+
+  <!-- BOTTLENECK BOX -->
+  <rect x="636" y="300" width="514" height="72" rx="6" fill="url(#btl-h)"/>
+  <rect x="636" y="300" width="514" height="72" rx="6" stroke="#ffb400" stroke-width="1.5" fill="none"/>
+  <text x="893" y="325" text-anchor="middle" font-size="15" font-weight="800" fill="#ffb400">ETHERNET BOUNDARY</text>
+  <text x="893" y="345" text-anchor="middle" font-size="11" fill="#c0b080">100&#x2013;400 Gbps &#xB7; same constraint for GPU and CPU clusters</text>
+  <text x="893" y="362" text-anchor="middle" font-size="10" fill="#888">NVLink stops at the node edge &#x2014; the network is the system bottleneck</text>
+
+  <!-- Flow out of bottleneck -->
+  <line x1="893" y1="372" x2="893" y2="388" stroke="#ffb40045" stroke-width="2"/>
+
+  <!-- Equal zone -->
+  <rect x="636" y="388" width="514" height="52" rx="5" fill="#07adf80a" stroke="#07adf825" stroke-width="1"/>
+  <text x="893" y="410" text-anchor="middle" font-size="13" font-weight="700" fill="#07adf8">Both face identical constraints</text>
+  <text x="893" y="428" text-anchor="middle" font-size="10" fill="#4a5a60">GPU FLOPS advantage becomes invisible past this boundary</text>
+
+  <!-- Right conclusion box -->
+  <rect x="636" y="454" width="514" height="140" rx="6" fill="#121212" stroke="#07adf815" stroke-width="1"/>
+  <text x="893" y="478" text-anchor="middle" font-size="12" font-weight="700" fill="#07adf8">The Equalizer at Scale</text>
+  <text x="893" y="498" text-anchor="middle" font-size="11" fill="#767676">Inside a node, GPU NVLink is fast &#x2014; and NVIDIA proprietary.</text>
+  <text x="893" y="516" text-anchor="middle" font-size="11" fill="#767676">It requires specialized hardware and NVIDIA-specific skills.</text>
+  <text x="893" y="534" text-anchor="middle" font-size="11" fill="#767676">Cross the node boundary and NVLink disappears entirely.</text>
+  <text x="893" y="552" text-anchor="middle" font-size="11" fill="#767676">What remains is Ethernet &#x2014; CPUs speak it natively.</text>
+  <text x="893" y="572" text-anchor="middle" font-size="10" fill="#484848">At cluster scale, AI is a networking and coordination problem.</text>
+  <text x="893" y="588" text-anchor="middle" font-size="10" fill="#484848">Memory + network determine real-world throughput, not peak FLOPS.</text>
+
+  <!-- BOTTOM CONCLUSION -->
+  <line x1="40" y1="626" x2="1160" y2="626" stroke="#222" stroke-width="1"/>
+  <rect x="28" y="636" width="1144" height="68" rx="8" fill="#161616" stroke="#ffb40012" stroke-width="1"/>
+  <text x="600" y="663" text-anchor="middle" font-size="14" font-weight="700" fill="#ffb400">Memory is the gate. The network is the wall. Optimize for the constraint, not the headline FLOPS.</text>
+  <text x="600" y="685" text-anchor="middle" font-size="11" fill="#424242">C-Kernel-Engine: fit large models in commodity CPU RAM. Scale horizontally across open Ethernet.</text>
+</svg>

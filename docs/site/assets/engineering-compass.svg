@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" font-family="'Inter', 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <!-- Card gradients -->
+    <linearGradient id="card1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a2332"/>
+      <stop offset="100%" stop-color="#1c2a3a"/>
+    </linearGradient>
+    <linearGradient id="card2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e2a1e"/>
+      <stop offset="100%" stop-color="#1a2e1a"/>
+    </linearGradient>
+    <linearGradient id="loopGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#07adf8"/>
+      <stop offset="25%" stop-color="#47b475"/>
+      <stop offset="50%" stop-color="#ffb400"/>
+      <stop offset="75%" stop-color="#ff6b6b"/>
+      <stop offset="100%" stop-color="#07adf8"/>
+    </linearGradient>
+    <linearGradient id="arrowUp" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softShadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <!-- Circular arrow for the loop -->
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="820" fill="url(#bg)" rx="16"/>
+  <rect x="0" y="0" width="1200" height="820" rx="16" fill="none" stroke="#30363d" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="600" y="52" text-anchor="middle" fill="#07adf8" font-size="28" font-weight="700" letter-spacing="1">🧭 ENGINEERING COMPASS</text>
+  <text x="600" y="78" text-anchor="middle" fill="#8b949e" font-size="14" letter-spacing="2">PROFILE · MEASURE · FIX · REPEAT — FOLLOW THE DATA, NOT THE HYPE</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- LEFT SIDE: Hardware Spectrum (vertical bar) -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g transform="translate(40, 105)">
+    <!-- Section label -->
+    <text x="175" y="0" text-anchor="middle" fill="#ffb400" font-size="15" font-weight="700" letter-spacing="1">HARDWARE SPECTRUM</text>
+    <text x="175" y="18" text-anchor="middle" fill="#6e7681" font-size="11">Same engine, different silicon — numbers scale with hardware</text>
+
+    <!-- Vertical rising bar -->
+    <rect x="18" y="38" width="6" height="310" rx="3" fill="#21262d"/>
+    <rect x="18" y="248" width="6" height="100" rx="3" fill="url(#arrowUp)"/>
+    <!-- Arrow tip -->
+    <polygon points="21,34 15,48 27,48" fill="#47b475" opacity="0.6"/>
+
+    <!-- Tier 1: Old 4-core -->
+    <g transform="translate(48, 300)">
+      <rect x="0" y="0" width="310" height="68" rx="10" fill="url(#card1)" stroke="#30363d" filter="url(#softShadow)"/>
+      <circle cx="24" cy="34" r="14" fill="#30363d" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="24" y="39" text-anchor="middle" fill="#ff6b6b" font-size="13" font-weight="700">1</text>
+      <text x="50" y="24" fill="#cdd9e5" font-size="14" font-weight="600">Older Gen · 4-Core</text>
+      <text x="50" y="42" fill="#8b949e" font-size="11">SSE2 / AVX2 · Limited cache</text>
+      <text x="50" y="58" fill="#ff6b6b" font-size="13" font-weight="700">~20–25 tok/s</text>
+      <text x="150" y="58" fill="#6e7681" font-size="11">(depends on system load)</text>
+    </g>
+
+    <!-- Tier 2: Alder Lake -->
+    <g transform="translate(48, 195)">
+      <rect x="0" y="0" width="310" height="80" rx="10" fill="url(#card1)" stroke="#47b475" stroke-width="1.5" filter="url(#softShadow)"/>
+      <circle cx="24" cy="40" r="14" fill="#1a3a1a" stroke="#47b475" stroke-width="2"/>
+      <text x="24" y="45" text-anchor="middle" fill="#47b475" font-size="13" font-weight="700">2</text>
+      <text x="50" y="24" fill="#cdd9e5" font-size="14" font-weight="600">12th-Gen Alder Lake · 12-Core</text>
+      <text x="50" y="42" fill="#8b949e" font-size="11">AVX2 · Hybrid P+E cores</text>
+      <text x="50" y="58" fill="#47b475" font-size="16" font-weight="700">~100 tok/s</text>
+      <text x="148" y="58" fill="#6e7681" font-size="11">(system idle)</text>
+      <rect x="236" y="64" width="65" height="14" rx="4" fill="#47b475" opacity="0.15"/>
+      <text x="268" y="74" text-anchor="middle" fill="#47b475" font-size="9" font-weight="600">CURRENT</text>
+    </g>
+
+    <!-- Tier 3: Xeon 5th gen -->
+    <g transform="translate(48, 80)">
+      <rect x="0" y="0" width="310" height="90" rx="10" fill="url(#card1)" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="6 3" filter="url(#softShadow)"/>
+      <circle cx="24" cy="45" r="14" fill="#0d2840" stroke="#07adf8" stroke-width="2"/>
+      <text x="24" y="50" text-anchor="middle" fill="#07adf8" font-size="13" font-weight="700">3</text>
+      <text x="50" y="24" fill="#cdd9e5" font-size="14" font-weight="600">5th-Gen Xeon · AVX-512 + AMX</text>
+      <text x="50" y="42" fill="#8b949e" font-size="11">Server-grade · BF16/INT8 matrix accel</text>
+      <text x="50" y="60" fill="#07adf8" font-size="16" font-weight="700">??? tok/s</text>
+      <text x="116" y="60" fill="#6e7681" font-size="11">(testing underway)</text>
+      <rect x="218" y="66" width="82" height="14" rx="4" fill="#07adf8" opacity="0.15"/>
+      <text x="259" y="76" text-anchor="middle" fill="#07adf8" font-size="9" font-weight="600">RESEARCHING</text>
+    </g>
+
+    <!-- Rising label -->
+    <text x="8" y="180" fill="#47b475" font-size="10" font-weight="600" transform="rotate(-90, 8, 180)" text-anchor="middle" opacity="0.7">PERFORMANCE ▲</text>
+  </g>
+
+  <!-- ═════════════════════════════════════════ -->
+  <!-- RIGHT SIDE: Engineering Loop (circular)  -->
+  <!-- ═════════════════════════════════════════ -->
+  <g transform="translate(480, 100)">
+    <text x="340" y="0" text-anchor="middle" fill="#47b475" font-size="15" font-weight="700" letter-spacing="1">THE ENGINEERING LOOP</text>
+    <text x="340" y="18" text-anchor="middle" fill="#6e7681" font-size="11">One bottleneck → one fix → one measurement → repeat</text>
+
+    <!-- Central circular loop -->
+    <g transform="translate(340, 220)">
+      <!-- Outer ring glow -->
+      <circle cx="0" cy="0" r="140" fill="none" stroke="#47b475" stroke-width="1" opacity="0.15"/>
+      <circle cx="0" cy="0" r="142" fill="none" stroke="#47b475" stroke-width="0.5" opacity="0.08"/>
+      
+      <!-- Animated-looking circular arrows (4 arcs with gaps) -->
+      <!-- Top-right arc -->
+      <path d="M 12,-138 A 138,138 0 0,1 138,-12" fill="none" stroke="#07adf8" stroke-width="3" opacity="0.8"/>
+      <polygon points="138,-12 130,-20 132,-4" fill="#07adf8" opacity="0.8"/>
+      <!-- Bottom-right arc -->
+      <path d="M 138,12 A 138,138 0 0,1 12,138" fill="none" stroke="#47b475" stroke-width="3" opacity="0.8"/>
+      <polygon points="12,138 20,130 4,132" fill="#47b475" opacity="0.8"/>
+      <!-- Bottom-left arc -->
+      <path d="M -12,138 A 138,138 0 0,1 -138,12" fill="none" stroke="#ffb400" stroke-width="3" opacity="0.8"/>
+      <polygon points="-138,12 -130,20 -132,4" fill="#ffb400" opacity="0.8"/>
+      <!-- Top-left arc -->
+      <path d="M -138,-12 A 138,138 0 0,1 -12,-138" fill="none" stroke="#ff6b6b" stroke-width="3" opacity="0.8"/>
+      <polygon points="-12,-138 -20,-130 -4,-132" fill="#ff6b6b" opacity="0.8"/>
+
+      <!-- Center text -->
+      <circle cx="0" cy="0" r="52" fill="#161b22" stroke="#30363d"/>
+      <text x="0" y="-10" text-anchor="middle" fill="#cdd9e5" font-size="12" font-weight="700">FOLLOW</text>
+      <text x="0" y="8" text-anchor="middle" fill="#cdd9e5" font-size="12" font-weight="700">THE DATA</text>
+      <text x="0" y="28" text-anchor="middle" fill="#6e7681" font-size="9">not the hype</text>
+
+      <!-- Step 1: PROFILE (top) -->
+      <g transform="translate(0, -185)">
+        <rect x="-72" y="-24" width="144" height="48" rx="10" fill="#0d2840" stroke="#07adf8" stroke-width="1.5"/>
+        <text x="0" y="-4" text-anchor="middle" fill="#07adf8" font-size="11" font-weight="700">1 · PROFILE</text>
+        <text x="0" y="12" text-anchor="middle" fill="#8b949e" font-size="9">VTune · perf · FlameGraph</text>
+      </g>
+
+      <!-- Step 2: FIND BOTTLENECK (right) -->
+      <g transform="translate(185, 0)">
+        <rect x="-72" y="-24" width="144" height="48" rx="10" fill="#1e1a0d" stroke="#ffb400" stroke-width="1.5"/>
+        <text x="0" y="-4" text-anchor="middle" fill="#ffb400" font-size="11" font-weight="700">2 · FIND SLOWEST</text>
+        <text x="0" y="12" text-anchor="middle" fill="#8b949e" font-size="9">Roofline · hotspot · stall</text>
+      </g>
+
+      <!-- Step 3: FIX KERNEL (bottom) -->
+      <g transform="translate(0, 185)">
+        <rect x="-72" y="-24" width="144" height="48" rx="10" fill="#1a2e1a" stroke="#47b475" stroke-width="1.5"/>
+        <text x="0" y="-4" text-anchor="middle" fill="#47b475" font-size="11" font-weight="700">3 · FIX ONE KERNEL</text>
+        <text x="0" y="12" text-anchor="middle" fill="#8b949e" font-size="9">SIMD · cache · alignment</text>
+      </g>
+
+      <!-- Step 4: MEASURE (left) -->
+      <g transform="translate(-185, 0)">
+        <rect x="-72" y="-24" width="144" height="48" rx="10" fill="#1e0d0d" stroke="#ff6b6b" stroke-width="1.5"/>
+        <text x="0" y="-4" text-anchor="middle" fill="#ff6b6b" font-size="11" font-weight="700">4 · MEASURE</text>
+        <text x="0" y="12" text-anchor="middle" fill="#8b949e" font-size="9">tok/s · IPC · bandwidth</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ═══════════════════════════════ -->
+  <!-- BOTTOM: Tools + Honest Footer  -->
+  <!-- ═══════════════════════════════ -->
+  
+  <!-- Tool belt -->
+  <g transform="translate(40, 545)">
+    <rect x="0" y="0" width="1120" height="95" rx="12" fill="#161b22" stroke="#30363d"/>
+    <text x="560" y="24" text-anchor="middle" fill="#8b949e" font-size="13" font-weight="600" letter-spacing="1">PROFILING TOOLKIT — THE INSTRUMENTS THAT KEEP US HONEST</text>
+    
+    <!-- Tool badges -->
+    <g transform="translate(60, 48)">
+      <rect x="0" y="0" width="120" height="32" rx="8" fill="#0d2840" stroke="#07adf8" stroke-width="1"/>
+      <text x="60" y="21" text-anchor="middle" fill="#07adf8" font-size="12" font-weight="600">Intel VTune</text>
+    </g>
+    <g transform="translate(200, 48)">
+      <rect x="0" y="0" width="120" height="32" rx="8" fill="#0d2840" stroke="#07adf8" stroke-width="1"/>
+      <text x="60" y="21" text-anchor="middle" fill="#07adf8" font-size="12" font-weight="600">Intel Advisor</text>
+    </g>
+    <g transform="translate(340, 48)">
+      <rect x="0" y="0" width="120" height="32" rx="8" fill="#1a2e1a" stroke="#47b475" stroke-width="1"/>
+      <text x="60" y="21" text-anchor="middle" fill="#47b475" font-size="12" font-weight="600">FlameGraph</text>
+    </g>
+    <g transform="translate(480, 48)">
+      <rect x="0" y="0" width="100" height="32" rx="8" fill="#1e1a0d" stroke="#ffb400" stroke-width="1"/>
+      <text x="50" y="21" text-anchor="middle" fill="#ffb400" font-size="12" font-weight="600">perf stat</text>
+    </g>
+    <g transform="translate(600, 48)">
+      <rect x="0" y="0" width="100" height="32" rx="8" fill="#1e1a0d" stroke="#ffb400" stroke-width="1"/>
+      <text x="50" y="21" text-anchor="middle" fill="#ffb400" font-size="12" font-weight="600">Roofline</text>
+    </g>
+    <g transform="translate(720, 48)">
+      <rect x="0" y="0" width="140" height="32" rx="8" fill="#1e0d0d" stroke="#ff6b6b" stroke-width="1"/>
+      <text x="70" y="21" text-anchor="middle" fill="#ff6b6b" font-size="12" font-weight="600">Microbenchmarks</text>
+    </g>
+    <g transform="translate(880, 48)">
+      <rect x="0" y="0" width="160" height="32" rx="8" fill="#1a1a2e" stroke="#a371f7" stroke-width="1"/>
+      <text x="80" y="21" text-anchor="middle" fill="#a371f7" font-size="12" font-weight="600">Kernel Unit Tests</text>
+    </g>
+  </g>
+
+  <!-- Bottom message -->
+  <g transform="translate(40, 665)">
+    <rect x="0" y="0" width="1120" height="130" rx="12" fill="url(#card2)" stroke="#2d4a2d" stroke-width="1"/>
+    
+    <!-- Left: the honest take -->
+    <g transform="translate(30, 20)">
+      <text x="0" y="14" fill="#47b475" font-size="15" font-weight="700">The Honest Take</text>
+      <text x="0" y="38" fill="#cdd9e5" font-size="12.5" font-weight="400">
+        <tspan x="0" dy="0">Critics will say this can't compete with GPUs. Maybe they're right.</tspan>
+        <tspan x="0" dy="20">But the engineering process is sound: measure, identify, fix, verify.</tspan>
+        <tspan x="0" dy="20">Step by step. Kernel by kernel. Measurement by measurement.</tspan>
+      </text>
+      <text x="0" y="106" fill="#6e7681" font-size="11" font-style="italic">"Who knows where it leads — but at least the path is honest."</text>
+    </g>
+
+    <!-- Right: current focus checklist -->
+    <g transform="translate(680, 20)">
+      <text x="0" y="14" fill="#ffb400" font-size="14" font-weight="700">Current Focus</text>
+      <text x="0" y="40" fill="#8b949e" font-size="12">▸ <tspan fill="#cdd9e5">Close the gap with llama.cpp</tspan></text>
+      <text x="0" y="60" fill="#8b949e" font-size="12">▸ <tspan fill="#cdd9e5">AVX-512 / AMX kernel paths</tspan></text>
+      <text x="0" y="80" fill="#8b949e" font-size="12">▸ <tspan fill="#cdd9e5">SIMD utilization: 6% → target 60%+</tspan></text>
+      <text x="0" y="100" fill="#8b949e" font-size="12">▸ <tspan fill="#cdd9e5">Memory-bound → compute-bound</tspan></text>
+    </g>
+  </g>
+</svg>

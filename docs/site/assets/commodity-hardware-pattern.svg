@@ -1,0 +1,140 @@
+<svg width="1200" height="700" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    </style>
+    <marker id="arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#47b475"/>
+    </marker>
+    <marker id="arr-o" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#ffb400"/>
+    </marker>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="700" fill="#1a1a1a"/>
+  <rect width="1200" height="3" fill="#ffb400"/>
+
+  <!-- HEADER -->
+  <text x="600" y="48" text-anchor="middle" font-size="26" font-weight="700" fill="#ffb400">AI Is Linear Algebra + Calculus</text>
+  <text x="600" y="72" text-anchor="middle" font-size="13" fill="#606060">Not quantum mechanics. Not unsolved mathematics. 18th&#x2013;19th century math, running on 21st century commodity silicon.</text>
+  <line x1="60" y1="86" x2="1140" y2="86" stroke="#2a2a2a" stroke-width="1"/>
+
+  <!-- ═══ LEFT PANEL: THE MATH ═══ -->
+  <rect x="40" y="98" width="520" height="468" rx="10" fill="#222" stroke="#333" stroke-width="1" filter="url(#sh)"/>
+  <text x="300" y="122" text-anchor="middle" font-size="10" font-weight="600" fill="#555" letter-spacing="2">WHAT AI ACTUALLY COMPUTES</text>
+  <line x1="58" y1="131" x2="542" y2="131" stroke="#2d2d2d" stroke-width="1"/>
+
+  <!-- Op 1: GEMM -->
+  <rect x="58" y="140" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <rect x="58" y="140" width="4" height="62" rx="2" fill="#ffb400"/>
+  <text x="76" y="161" font-size="13" font-weight="600" fill="#e8e8e8">Matrix Multiply (GEMM / GEMV)</text>
+  <text x="76" y="181" font-size="11" fill="#555" font-family="'JetBrains Mono','Courier New',monospace">y = W &#xB7; x + b</text>
+  <rect x="450" y="149" width="86" height="18" rx="3" fill="#ffb40012" stroke="#ffb40035" stroke-width="1"/>
+  <text x="493" y="162" text-anchor="middle" font-size="10" fill="#ffb400">Linear Algebra</text>
+
+  <!-- Op 2: Attention -->
+  <rect x="58" y="210" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <rect x="58" y="210" width="4" height="62" rx="2" fill="#07adf8"/>
+  <text x="76" y="231" font-size="13" font-weight="600" fill="#e8e8e8">Scaled Dot-Product Attention</text>
+  <text x="76" y="251" font-size="11" fill="#555" font-family="'JetBrains Mono','Courier New',monospace">softmax(QK&#x1D40; / &#x221A;d) &#xB7; V</text>
+  <rect x="450" y="219" width="86" height="18" rx="3" fill="#07adf812" stroke="#07adf835" stroke-width="1"/>
+  <text x="493" y="232" text-anchor="middle" font-size="10" fill="#07adf8">Calculus</text>
+
+  <!-- Op 3: Softmax + Cross-Entropy -->
+  <rect x="58" y="280" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <rect x="58" y="280" width="4" height="62" rx="2" fill="#47b475"/>
+  <text x="76" y="301" font-size="13" font-weight="600" fill="#e8e8e8">Softmax + Cross-Entropy Loss</text>
+  <text x="76" y="321" font-size="11" fill="#555" font-family="'JetBrains Mono','Courier New',monospace">e&#x2E3;&#x2071;/&#x3A3;e&#x2E3;&#x02B2;  &#xB7;  &#x2212;&#x3A3; y&#xB7;log(&#x177;)</text>
+  <rect x="450" y="289" width="86" height="18" rx="3" fill="#47b47512" stroke="#47b47535" stroke-width="1"/>
+  <text x="493" y="302" text-anchor="middle" font-size="10" fill="#47b475">Calculus</text>
+
+  <!-- Op 4: LayerNorm -->
+  <rect x="58" y="350" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <rect x="58" y="350" width="4" height="62" rx="2" fill="#a78bfa"/>
+  <text x="76" y="371" font-size="13" font-weight="600" fill="#e8e8e8">Layer Normalization</text>
+  <text x="76" y="391" font-size="11" fill="#555" font-family="'JetBrains Mono','Courier New',monospace">(x &#x2212; &#x3BC;) / &#x3C3; &#xB7; &#x3B3; + &#x3B2;</text>
+  <rect x="450" y="359" width="86" height="18" rx="3" fill="#a78bfa12" stroke="#a78bfa35" stroke-width="1"/>
+  <text x="493" y="372" text-anchor="middle" font-size="10" fill="#a78bfa">Statistics</text>
+
+  <!-- Op 5: Backprop -->
+  <rect x="58" y="420" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <rect x="58" y="420" width="4" height="62" rx="2" fill="#f97316"/>
+  <text x="76" y="441" font-size="13" font-weight="600" fill="#e8e8e8">Backpropagation</text>
+  <text x="76" y="461" font-size="11" fill="#555" font-family="'JetBrains Mono','Courier New',monospace">&#x2202;L/&#x2202;x = &#x2202;L/&#x2202;y &#xB7; W  (chain rule)</text>
+  <rect x="390" y="429" width="146" height="18" rx="3" fill="#f9731612" stroke="#f9731635" stroke-width="1"/>
+  <text x="463" y="442" text-anchor="middle" font-size="10" fill="#f97316">Calculus &#x2014; Leibniz, 1677</text>
+
+  <!-- Left panel footer -->
+  <rect x="58" y="496" width="484" height="54" rx="5" fill="#0d1a0d" stroke="#47b47528" stroke-width="1"/>
+  <text x="300" y="520" text-anchor="middle" font-size="13" font-weight="700" fill="#47b475">Standard math. Runs on any SIMD-capable CPU.</text>
+  <text x="300" y="540" text-anchor="middle" font-size="11" fill="#4a6a4a">Matrix multiply and chain rule are not GPU-exclusive operations.</text>
+
+  <!-- ═══ RIGHT PANEL: THE PATTERN ═══ -->
+  <rect x="640" y="98" width="520" height="468" rx="10" fill="#222" stroke="#333" stroke-width="1" filter="url(#sh)"/>
+  <text x="900" y="122" text-anchor="middle" font-size="10" font-weight="600" fill="#555" letter-spacing="2">THE HARDWARE DISPLACEMENT PATTERN</text>
+  <line x1="658" y1="131" x2="1142" y2="131" stroke="#2d2d2d" stroke-width="1"/>
+
+  <!-- Column labels -->
+  <text x="760" y="150" text-anchor="middle" font-size="9" fill="#444" letter-spacing="1">PROPRIETARY</text>
+  <text x="960" y="150" text-anchor="middle" font-size="9" fill="#444" letter-spacing="1">COMMODITY</text>
+  <text x="1100" y="150" text-anchor="middle" font-size="9" fill="#444" letter-spacing="1">RESULT</text>
+
+  <!-- Row 1: 1990s -->
+  <rect x="658" y="158" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <text x="670" y="177" font-size="10" fill="#444">1990s</text>
+  <rect x="668" y="181" width="168" height="22" rx="3" fill="#ff6b6b14" stroke="#ff6b6b38" stroke-width="1"/>
+  <text x="752" y="196" text-anchor="middle" font-size="10" fill="#ff6b6b">SPARC &#xB7; Alpha &#xB7; PA-RISC</text>
+  <line x1="838" y1="192" x2="866" y2="192" stroke="#47b475" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="868" y="181" width="104" height="22" rx="3" fill="#47b47514" stroke="#47b47538" stroke-width="1"/>
+  <text x="920" y="196" text-anchor="middle" font-size="10" fill="#47b475">x86 commodity</text>
+  <text x="1100" y="196" text-anchor="middle" font-size="10" fill="#4a6a4a">Proprietary RISC faded</text>
+
+  <!-- Row 2: 1998 -->
+  <rect x="658" y="228" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <text x="670" y="247" font-size="10" fill="#444">1998</text>
+  <rect x="668" y="251" width="168" height="22" rx="3" fill="#ff6b6b14" stroke="#ff6b6b38" stroke-width="1"/>
+  <text x="752" y="266" text-anchor="middle" font-size="10" fill="#ff6b6b">Sun/SGI servers ($500K+)</text>
+  <line x1="838" y1="262" x2="866" y2="262" stroke="#47b475" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="868" y="251" width="104" height="22" rx="3" fill="#47b47514" stroke="#47b47538" stroke-width="1"/>
+  <text x="920" y="266" text-anchor="middle" font-size="10" fill="#47b475">x86 + GFS</text>
+  <text x="1100" y="266" text-anchor="middle" font-size="10" fill="#4a6a4a">Sun bankrupt 2010</text>
+
+  <!-- Row 3: 2009 -->
+  <rect x="658" y="298" width="484" height="62" rx="5" fill="#1e1e1e" stroke="#2d2d2d" stroke-width="1"/>
+  <text x="670" y="317" font-size="10" fill="#444">2009</text>
+  <rect x="668" y="321" width="168" height="22" rx="3" fill="#ff6b6b14" stroke="#ff6b6b38" stroke-width="1"/>
+  <text x="752" y="336" text-anchor="middle" font-size="10" fill="#ff6b6b">Teradata ($1M+)</text>
+  <line x1="838" y1="332" x2="866" y2="332" stroke="#47b475" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <rect x="868" y="321" width="104" height="22" rx="3" fill="#47b47514" stroke="#47b47538" stroke-width="1"/>
+  <text x="920" y="336" text-anchor="middle" font-size="10" fill="#47b475">Hadoop clusters</text>
+  <text x="1100" y="336" text-anchor="middle" font-size="10" fill="#4a6a4a">Big data democratized</text>
+
+  <!-- Row 4: NOW (active, dashed) -->
+  <rect x="658" y="368" width="484" height="62" rx="5" fill="#191920" stroke="#ffb40028" stroke-width="1.5"/>
+  <text x="670" y="387" font-size="10" fill="#ffb400">Now</text>
+  <rect x="668" y="391" width="168" height="22" rx="3" fill="#ff6b6b14" stroke="#ff6b6b38" stroke-width="1"/>
+  <text x="752" y="406" text-anchor="middle" font-size="10" fill="#ff6b6b">GPU clusters ($M+)</text>
+  <line x1="838" y1="402" x2="866" y2="402" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-o)"/>
+  <rect x="868" y="391" width="104" height="22" rx="3" fill="#ffb40012" stroke="#ffb40035" stroke-width="1"/>
+  <text x="920" y="406" text-anchor="middle" font-size="10" fill="#ffb400">CPU clusters</text>
+  <text x="1100" y="406" text-anchor="middle" font-size="10" fill="#ffb400">&#x2192; ?</text>
+
+  <!-- Right panel footer -->
+  <rect x="658" y="444" width="484" height="106" rx="5" fill="#0f1419" stroke="#ffb40020" stroke-width="1"/>
+  <text x="900" y="470" text-anchor="middle" font-size="13" font-weight="700" fill="#ffb400">The Pattern Has Never Failed</text>
+  <text x="900" y="492" text-anchor="middle" font-size="11" fill="#909090">Proprietary hardware wins early.</text>
+  <text x="900" y="510" text-anchor="middle" font-size="11" fill="#909090">Commodity hardware + software wins eventually.</text>
+  <line x1="678" y1="522" x2="1122" y2="522" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="900" y="540" text-anchor="middle" font-size="11" fill="#555">The compute itself isn&#x27;t exotic. The hardware advantage is temporary.</text>
+
+  <!-- ═══ BOTTOM CONCLUSION ═══ -->
+  <line x1="60" y1="584" x2="1140" y2="584" stroke="#2a2a2a" stroke-width="1"/>
+  <rect x="40" y="594" width="1120" height="88" rx="8" fill="#1a1a1a" stroke="#ffb40020" stroke-width="1"/>
+  <text x="600" y="624" text-anchor="middle" font-size="15" font-weight="700" fill="#ffb400">If the computation isn&#x27;t physically exotic, exotic hardware is a temporary market condition</text>
+  <text x="600" y="648" text-anchor="middle" font-size="12" fill="#606060">GPU clusters are the Sun Microsystems of the 2020s.</text>
+  <text x="600" y="668" text-anchor="middle" font-size="12" fill="#606060">The C-Kernel-Engine is the x86 cluster with the right software.</text>
+</svg>

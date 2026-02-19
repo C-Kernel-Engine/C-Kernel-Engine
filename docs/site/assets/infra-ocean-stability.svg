@@ -1,73 +1,256 @@
-<svg width="1200" height="520" viewBox="0 0 1200 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ocean depth metaphor showing fast-changing surface tech and stable mathematical foundations">
+<svg width="1200" height="920" viewBox="0 0 1200 920" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ocean depth metaphor showing fast-changing surface tech hype and stable mathematical foundations down to physics">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#1b2a3a"/>
-      <stop offset="100%" stop-color="#0f151c"/>
+      <stop offset="0%" stop-color="#2a1520"/>
+      <stop offset="100%" stop-color="#1a0f16"/>
+    </linearGradient>
+    <linearGradient id="storm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a1a1a"/>
+      <stop offset="100%" stop-color="#1a0f16"/>
     </linearGradient>
     <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#123a52"/>
-      <stop offset="45%" stop-color="#0f2b3d"/>
-      <stop offset="100%" stop-color="#0b1c26"/>
+      <stop offset="30%" stop-color="#0f2b3d"/>
+      <stop offset="70%" stop-color="#0b1c26"/>
+      <stop offset="100%" stop-color="#081418"/>
     </linearGradient>
     <linearGradient id="bedrock" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#1d1a16"/>
       <stop offset="100%" stop-color="#16120f"/>
     </linearGradient>
+    <linearGradient id="bedrockGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.05"/>
+    </linearGradient>
     <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="1.2"/>
     </filter>
+    <filter id="churn" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="2" result="turb"/>
+      <feDisplacementMap in="SourceGraphic" in2="turb" scale="3"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Silver line gradient for CK-Engine depth -->
+    <linearGradient id="silverLine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8e8e8" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#c0c0c0" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#808080" stop-opacity="0.4"/>
+    </linearGradient>
+    <filter id="silverGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
 
-  <rect x="0" y="0" width="1200" height="520" fill="url(#sky)"/>
-  <rect x="0" y="90" width="1200" height="430" fill="url(#ocean)"/>
+  <!-- Storm sky -->
+  <rect x="0" y="0" width="1200" height="920" fill="url(#sky)"/>
+  <rect x="0" y="0" width="1200" height="200" fill="url(#storm)" opacity="0.5"/>
+  <rect x="0" y="180" width="1200" height="740" fill="url(#ocean)"/>
 
-  <!-- Surface waves -->
-  <path d="M0,95 C80,70 160,120 240,95 C320,70 400,120 480,95 C560,70 640,120 720,95 C800,70 880,120 960,95 C1040,70 1120,120 1200,95 L1200,120 L0,120 Z"
-        fill="#1b4a67" opacity="0.7"/>
-  <path d="M0,105 C100,85 200,125 300,105 C400,85 500,125 600,105 C700,85 800,125 900,105 C1000,85 1100,125 1200,105 L1200,130 L0,130 Z"
-        fill="#1d5675" opacity="0.6"/>
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- SURFACE: The Chaos Layer — changes every second -->
+  <!-- ═══════════════════════════════════════════════ -->
 
-  <!-- Surface noise labels -->
-  <text x="80" y="78" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">agents</text>
-  <text x="165" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">subagents</text>
-  <text x="260" y="82" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">prompts</text>
-  <text x="345" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">contexts</text>
-  <text x="430" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">memory</text>
-  <text x="510" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">modes</text>
-  <text x="580" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">permissions</text>
-  <text x="700" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">tools</text>
-  <text x="760" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">plugins</text>
-  <text x="835" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">skills</text>
-  <text x="900" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">hooks</text>
-  <text x="955" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">MCP/LSP</text>
-  <text x="1040" y="84" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">slash cmds</text>
-  <text x="1125" y="70" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">workflows</text>
-  <text x="1040" y="106" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#bfe8ff">IDE integrations</text>
+  <!-- Choppy waves (multiple overlapping) -->
+  <path d="M0,175 C40,152 80,198 120,175 C160,152 200,198 240,175 C280,152 320,198 360,175 C400,152 440,198 480,175 C520,152 560,198 600,175 C640,152 680,198 720,175 C760,152 800,198 840,175 C880,152 920,198 960,175 C1000,152 1040,198 1080,175 C1120,152 1160,198 1200,175 L1200,210 L0,210 Z"
+        fill="#2a1a2a" opacity="0.6"/>
+  <path d="M0,185 C60,162 120,208 180,185 C240,162 300,208 360,185 C420,162 480,208 540,185 C600,162 660,208 720,185 C780,162 840,208 900,185 C960,162 1020,208 1080,185 C1140,162 1200,208 1200,185 L1200,220 L0,220 Z"
+        fill="#1b4a67" opacity="0.5"/>
+  <path d="M0,195 C80,178 160,215 240,195 C320,178 400,215 480,195 C560,178 640,215 720,195 C800,178 880,215 960,195 C1040,178 1120,215 1200,195 L1200,225 L0,225 Z"
+        fill="#1d5675" opacity="0.4"/>
 
-  <!-- Depth bands -->
-  <rect x="80" y="140" width="1040" height="70" rx="12" fill="#16384d" stroke="#2a4a62"/>
-  <rect x="80" y="230" width="1040" height="80" rx="12" fill="#132f42" stroke="#244258"/>
-  <rect x="80" y="330" width="1040" height="80" rx="12" fill="#102533" stroke="#1f374a"/>
-  <rect x="80" y="430" width="1040" height="70" rx="12" fill="url(#bedrock)" stroke="#2b241c"/>
+  <!-- Title -->
+  <text x="600" y="28" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#ff6b6b" font-weight="700" letter-spacing="2">THE OCEAN OF STABILITY</text>
+  <text x="600" y="50" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#8b6060" letter-spacing="1">What changes every week vs. what hasn't changed in 40 years</text>
 
-  <!-- Labels -->
-  <text x="110" y="182" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#d7ecff">
-    Surface churn: model UX, toolchains, eval stacks (changes weekly)
+  <!-- ─── Surface buzzword storm (chaotic, crowded, noisy) ─── -->
+  <!-- Row 1: Models -->
+  <text x="30" y="80" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" opacity="0.9">GPT-5</text>
+  <text x="85" y="72" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ff8888" opacity="0.7">GPT-4o</text>
+  <text x="140" y="84" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#ff6b6b" opacity="0.8">Claude 4</text>
+  <text x="220" y="74" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ff9999" opacity="0.6">Gemini 2.5</text>
+  <text x="310" y="82" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" opacity="0.8">Llama 4</text>
+  <text x="385" y="72" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ff8888" opacity="0.7">Mistral Large</text>
+  <text x="490" y="84" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ff9999" opacity="0.6">DeepSeek v3</text>
+  <text x="580" y="74" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" opacity="0.9">Qwen3</text>
+  <text x="645" y="82" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ff8888" opacity="0.7">Grok 3</text>
+  <text x="710" y="72" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ff9999" opacity="0.6">Command R+</text>
+  <text x="800" y="84" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" opacity="0.8">Phi-4</text>
+  <text x="860" y="74" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ff8888" opacity="0.7">Gemma 3</text>
+  <text x="940" y="82" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ff9999" opacity="0.6">Cohere</text>
+  <text x="1010" y="72" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" opacity="0.8">Yi-1.5</text>
+  <text x="1080" y="84" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ff8888" opacity="0.7">DBRX</text>
+  <text x="1140" y="74" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ff9999" opacity="0.6">Jamba</text>
+
+  <!-- Row 2: Agents & Frameworks -->
+  <text x="40" y="105" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#ffb400" opacity="0.9">agents</text>
+  <text x="110" y="97" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ffcc44" opacity="0.7">sub-agents</text>
+  <text x="205" y="107" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ffb400" opacity="0.8">LangChain</text>
+  <text x="290" y="97" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ffcc44" opacity="0.7">LangGraph</text>
+  <text x="375" y="107" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ffdd66" opacity="0.6">CrewAI</text>
+  <text x="440" y="97" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#ffb400" opacity="0.9">AutoGen</text>
+  <text x="520" y="107" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ffcc44" opacity="0.7">Semantic Kernel</text>
+  <text x="650" y="97" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ffdd66" opacity="0.6">Haystack</text>
+  <text x="725" y="107" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ffb400" opacity="0.8">DSPy</text>
+  <text x="780" y="97" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ffcc44" opacity="0.7">OpenAI SDK</text>
+  <text x="875" y="107" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ffdd66" opacity="0.6">Vercel AI</text>
+  <text x="955" y="97" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#ffb400" opacity="0.8">n8n</text>
+  <text x="1000" y="107" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ffcc44" opacity="0.7">Flowise</text>
+  <text x="1080" y="97" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#ffdd66" opacity="0.6">Dify</text>
+  <text x="1130" y="107" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#ffb400" opacity="0.7">Rivet</text>
+
+  <!-- Row 3: IDE / Dev tooling -->
+  <text x="30" y="128" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#bfe8ff" opacity="0.8">Copilot</text>
+  <text x="100" y="120" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#99d4ff" opacity="0.7">Cursor</text>
+  <text x="160" y="130" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#bfe8ff" opacity="0.6">Windsurf</text>
+  <text x="235" y="120" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#99d4ff" opacity="0.8">Cline</text>
+  <text x="290" y="130" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#bfe8ff" opacity="0.7">Aider</text>
+  <text x="345" y="120" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#99d4ff" opacity="0.6">Continue</text>
+  <text x="420" y="130" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#bfe8ff" opacity="0.9">plan mode</text>
+  <text x="510" y="120" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#99d4ff" opacity="0.7">spec-driven dev</text>
+  <text x="630" y="130" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#bfe8ff" opacity="0.6">vibe coding</text>
+  <text x="720" y="120" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#99d4ff" opacity="0.8">MCP</text>
+  <text x="762" y="130" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#bfe8ff" opacity="0.7">LSP</text>
+  <text x="800" y="120" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#99d4ff" opacity="0.6">slash cmds</text>
+  <text x="890" y="130" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#bfe8ff" opacity="0.8">workflows</text>
+  <text x="980" y="120" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#99d4ff" opacity="0.7">custom rules</text>
+  <text x="1080" y="130" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#bfe8ff" opacity="0.6">contexts</text>
+  <text x="1145" y="120" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#99d4ff" opacity="0.7">modes</text>
+
+  <!-- Row 4: APIs / Bloat / "Best Practices" -->
+  <text x="40" y="152" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#c98bff" opacity="0.9">REST APIs</text>
+  <text x="130" y="144" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#d9a0ff" opacity="0.7">GraphQL</text>
+  <text x="205" y="154" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#c98bff" opacity="0.6">gRPC</text>
+  <text x="255" y="144" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#d9a0ff" opacity="0.8">OpenAPI</text>
+  <text x="330" y="154" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c98bff" opacity="0.7">webhooks</text>
+  <text x="410" y="144" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#d9a0ff" opacity="0.6">streaming</text>
+  <text x="490" y="155" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#c98bff" opacity="0.9">"best practices"</text>
+  <text x="625" y="144" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#d9a0ff" opacity="0.7">function calling</text>
+  <text x="740" y="155" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#c98bff" opacity="0.6">tool use</text>
+  <text x="810" y="144" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#d9a0ff" opacity="0.8">RAG</text>
+  <text x="850" y="155" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#c98bff" opacity="0.7">vector DBs</text>
+  <text x="940" y="144" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#d9a0ff" opacity="0.6">embeddings</text>
+  <text x="1030" y="155" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#c98bff" opacity="0.8">fine-tuning</text>
+  <text x="1120" y="144" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#d9a0ff" opacity="0.6">RLHF</text>
+
+  <!-- Surface annotation -->
+  <rect x="380" y="162" width="440" height="24" rx="6" fill="#ff6b6b" opacity="0.12"/>
+  <text x="600" y="179" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#ff6b6b" font-weight="600" font-style="italic">
+    ↑ All of this changes every 3 months — somehow always "best practice" ↑
   </text>
-  <text x="110" y="276" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#cfe1f1">
-    Deep water: kernels, memory layouts, inference contracts (changes yearly)
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- DEPTH BANDS: The layers that actually matter -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- Depth marker line -->
+  <line x1="60" y1="215" x2="60" y2="860" stroke="#2a4a62" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="55" y="530" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#4a6a82" transform="rotate(-90, 55, 530)" letter-spacing="2">DEPTH / STABILITY →</text>
+
+  <!-- Band 1: Runtime & Inference (changes yearly) -->
+  <rect x="80" y="215" width="1040" height="85" rx="12" fill="#16384d" stroke="#2a4a62" stroke-width="1"/>
+  <text x="110" y="245" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#7bcfff" font-weight="600">Runtime &amp; Inference Layer</text>
+  <text x="110" y="268" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#8bafc4">Quantization formats · Weight loading · Threadpool scheduling · Memory arena</text>
+  <text x="110" y="288" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#5a7a8e" font-style="italic">Changes: ~yearly, driven by profiling data</text>
+  <rect x="960" y="232" width="140" height="22" rx="6" fill="#07adf8" opacity="0.15"/>
+  <text x="1030" y="248" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#07adf8" font-weight="600">CK-Engine lives here</text>
+
+  <!-- Band 2: Kernels (changes rarely) -->
+  <rect x="80" y="320" width="1040" height="95" rx="12" fill="#132f42" stroke="#244258" stroke-width="1"/>
+  <text x="110" y="352" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#47b475" font-weight="600">Kernel Layer — SIMD, GEMV, GEMM</text>
+  <text x="110" y="375" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#7aaa8e">AVX2 · AVX-512 · AMX · SSE2 · VNNI · Cache-line alignment · Loop tiling</text>
+  <text x="110" y="398" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#5a8a6e" font-style="italic">Changes: when Intel/AMD ship new ISA extensions (~5 year cycles)</text>
+  <rect x="880" y="340" width="220" height="22" rx="6" fill="#47b475" opacity="0.15"/>
+  <text x="990" y="356" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#47b475" font-weight="600">70+ hand-written kernels here</text>
+
+  <!-- Band 3: Memory hierarchy (changes almost never) -->
+  <rect x="80" y="435" width="1040" height="85" rx="12" fill="#102533" stroke="#1f374a" stroke-width="1"/>
+  <text x="110" y="465" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#c7d6e4" font-weight="600">Memory Hierarchy</text>
+  <text x="110" y="488" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#8a9aaa">L1/L2/L3 cache · DRAM bandwidth · NUMA topology · Prefetch patterns</text>
+  <text x="110" y="508" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#6a7a8a" font-style="italic">Changes: the physics of caches haven't changed since the 1960s</text>
+
+  <!-- Band 4: Bedrock Mathematics -->
+  <rect x="80" y="540" width="1040" height="100" rx="12" fill="url(#bedrock)" stroke="#2b241c" stroke-width="1"/>
+  <rect x="80" y="540" width="1040" height="100" rx="12" fill="url(#bedrockGlow)"/>
+  <text x="110" y="572" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#e6d6c7" font-weight="700">⛰ Bedrock Mathematics — Literally Does Not Change</text>
+  <text x="110" y="598" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#c4b4a0">
+    Matrix multiply · Softmax · Layer norm · Attention · Backpropagation
   </text>
-  <text x="110" y="376" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#c7d6e4">
-    Bedrock math: stable foundations that rarely change
+  <text x="110" y="625" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#8a7a60">
+    Calculus (1665) · Linear algebra (1848) · Backprop (1986) · Attention (2017) — that's the whole stack
   </text>
 
-  <!-- Bedrock timeline -->
-  <text x="110" y="468" font-family="Inter, Segoe UI, Arial" font-size="16" fill="#e6d6c7">
-    Calculus (1665–1687) · Matrix theory / linear algebra (1848–1858) · AI field (1956) · Backprop (1986)
-  </text>
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- BELOW BEDROCK: The metal layers                -->
+  <!-- ═══════════════════════════════════════════ -->
 
-  <!-- Accent marks -->
-  <circle cx="1040" cy="175" r="6" fill="#6bd1ff" filter="url(#soft)"/>
-  <circle cx="1020" cy="265" r="5" fill="#7bdcff" filter="url(#soft)"/>
-  <circle cx="1060" cy="360" r="4" fill="#9adfff" filter="url(#soft)"/>
+  <!-- Band 5: Compilers — GCC, ICX, Clang -->
+  <rect x="80" y="650" width="1040" height="60" rx="10" fill="#1a1612" stroke="#3a3020" stroke-width="1"/>
+  <text x="110" y="678" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#b8a080" font-weight="600">Compilers — GCC · ICX · Clang</text>
+  <text x="110" y="698" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#7a6a50" font-style="italic">Translate C to machine code · optimization passes · register allocation · vectorization</text>
+  <!-- Arrow showing CK-Engine reaching down -->
+  <rect x="910" y="660" width="190" height="18" rx="5" fill="#07adf8" opacity="0.1"/>
+  <text x="1005" y="673" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#07adf8" font-weight="600" opacity="0.8">CK-Engine reaches here ▼</text>
+
+  <!-- Band 6: Assembly & Machine Code -->
+  <rect x="80" y="720" width="1040" height="55" rx="10" fill="#16120e" stroke="#302818" stroke-width="1"/>
+  <text x="110" y="748" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#a09070" font-weight="600">Assembly &amp; Machine Code</text>
+  <text x="110" y="766" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#6a5a40" font-style="italic">x86 ISA · instruction encoding · register files · pipeline stages · µops</text>
+
+  <!-- Band 7: Silicon / SoC -->
+  <rect x="80" y="785" width="1040" height="50" rx="10" fill="#120e0a" stroke="#282018" stroke-width="1"/>
+  <text x="110" y="813" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#8a7a60" font-weight="600">Silicon — SoC · Transistors · Die Layout</text>
+  <text x="110" y="830" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#5a4a30" font-style="italic">Execution units · cache SRAM · interconnect · power delivery</text>
+
+  <!-- Band 8: Physics — The absolute source of truth -->
+  <rect x="80" y="845" width="1040" height="55" rx="10" fill="#0a0806" stroke="#47b475" stroke-width="1.5" opacity="0.9"/>
+  <!-- Subtle glow under physics -->
+  <rect x="82" y="847" width="1036" height="51" rx="9" fill="#47b475" opacity="0.04"/>
+  <text x="110" y="873" font-family="Inter, Segoe UI, Arial" font-size="15" fill="#47b475" font-weight="700">⚛ Physics — The Absolute Source of Truth</text>
+  <text x="110" y="892" font-family="Inter, Segoe UI, Arial" font-size="11" fill="#3a8a5a" font-style="italic">Electromagnetism · Quantum mechanics · Thermodynamics · Speed of light · Conservation laws</text>
+  <!-- Glow dot -->
+  <circle cx="1050" cy="870" r="8" fill="#47b475" filter="url(#glow)" opacity="0.5"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SILVER LINE: CK-Engine tech stack depth     -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g opacity="0.95">
+    <!-- Main silver vertical line -->
+    <line x1="1145" y1="225" x2="1145" y2="700" stroke="url(#silverLine)" stroke-width="2.5" filter="url(#silverGlow)"/>
+    
+    <!-- Top bracket tick -->
+    <line x1="1135" y1="225" x2="1155" y2="225" stroke="#e0e0e0" stroke-width="2" opacity="0.8"/>
+    <!-- Bottom bracket tick -->
+    <line x1="1135" y1="700" x2="1155" y2="700" stroke="#808080" stroke-width="2" opacity="0.5"/>
+    
+    <!-- Diamond markers at each layer -->
+    <polygon points="1145,255 1151,261 1145,267 1139,261" fill="#c0c0c0" opacity="0.7"/>  <!-- Runtime -->
+    <polygon points="1145,365 1151,371 1145,377 1139,371" fill="#c0c0c0" opacity="0.7"/>  <!-- Kernels -->
+    <polygon points="1145,475 1151,481 1145,487 1139,481" fill="#b0b0b0" opacity="0.6"/>  <!-- Memory -->
+    <polygon points="1145,585 1151,591 1145,597 1139,591" fill="#a0a0a0" opacity="0.6"/>  <!-- Math -->
+    <polygon points="1145,680 1151,686 1145,692 1139,686" fill="#909090" opacity="0.5"/>  <!-- Compilers -->
+    
+    <!-- Label at top -->
+    <text x="1145" y="218" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="10" fill="#d0d0d0" font-weight="700" letter-spacing="1">CK-ENGINE</text>
+    <!-- Label rotated along the line -->
+    <text x="1160" y="465" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="9" fill="#a0a0a0" font-weight="600" transform="rotate(90, 1160, 465)" letter-spacing="1.5">TECH STACK DEPTH</text>
+  </g>
+
+  <!-- Accent glow dots at depth -->
+  <circle cx="1050" cy="258" r="5" fill="#07adf8" filter="url(#glow)" opacity="0.6"/>
+  <circle cx="1050" cy="370" r="6" fill="#47b475" filter="url(#glow)" opacity="0.7"/>
+  <circle cx="1050" cy="480" r="4" fill="#c7d6e4" filter="url(#glow)" opacity="0.5"/>
+  <circle cx="1050" cy="580" r="7" fill="#e6d6c7" filter="url(#glow)" opacity="0.8"/>
+  <circle cx="1050" cy="680" r="4" fill="#b8a080" filter="url(#glow)" opacity="0.4"/>
+  <circle cx="1050" cy="750" r="3" fill="#a09070" filter="url(#glow)" opacity="0.3"/>
+  <circle cx="1050" cy="810" r="3" fill="#8a7a60" filter="url(#glow)" opacity="0.3"/>
+
+  <!-- Bottom bar: the punchline -->
+  <rect x="140" y="905" width="920" height="2" rx="1" fill="#47b475" opacity="0.15"/>
+  <text x="600" y="916" text-anchor="middle" font-family="Inter, Segoe UI, Arial" font-size="12" fill="#47b475" font-weight="600" opacity="0.7">
+    The deeper you build, the longer it lasts. Unless physics is wrong, this stack holds.
+  </text>
 </svg>
