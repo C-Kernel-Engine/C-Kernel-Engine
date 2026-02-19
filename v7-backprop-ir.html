@@ -1055,8 +1055,14 @@ forward()
 backward()
 g_accum_step += 1
 if g_accum_step >= CK_GRAD_ACCUM_STEPS:
+    scale_grads(1 / g_accum_step)  # avg over accumulation window
     optimizer_step()
     g_accum_step = 0</pre>
+</div>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Grad-Accum Math (N vs K)</h3>
+  <p style="margin: 0;">For an exact explanation of CE token normalization (<code>/N</code>) versus accumulation-window normalization (<code>/K</code>), plus CPU effective-batch examples and variable-length caveats, see <a href="v7-grad-accum-windows.html"><code>v7-grad-accum-windows.html</code></a>.</p>
 </div>
 
 <div class="card">
@@ -1633,7 +1639,7 @@ version/v7/scripts/cks-v7-run init \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-16</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
             </div>
         </div>
     </footer>

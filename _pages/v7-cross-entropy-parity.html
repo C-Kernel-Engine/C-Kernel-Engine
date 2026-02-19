@@ -79,7 +79,17 @@ p_i = \frac{e^{z_i}}{\sum_j e^{z_j}}, \quad
     <td>Often below tolerance early</td>
     <td>Can cross tolerance threshold at later steps</td>
   </tr>
+  <tr>
+    <td>Missing grad-accum window averaging (<code>/K</code>) before optimizer step</td>
+    <td>Looks like CE drift because loss starts diverging later</td>
+    <td>Effective update scale inflates by ~<code>K</code>; can dominate late-horizon instability</td>
+  </tr>
 </table>
+
+<div class="card">
+  <h3 style="margin-top: 0;">CE <code>/N</code> vs Accum <code>/K</code></h3>
+  <p style="margin: 0;">This page focuses on CE internals. But in production drift triage, also verify accumulation-window scaling before AdamW. See <a href="v7-grad-accum-windows.html"><code>v7-grad-accum-windows.html</code></a> for the full <code>N</code> vs <code>K</code> model and CPU effective-batch examples.</p>
+</div>
 
 <h2>PyTorch CE Semantics We Matched</h2>
 

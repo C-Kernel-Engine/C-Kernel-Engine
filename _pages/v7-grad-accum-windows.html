@@ -1,0 +1,158 @@
+<!-- TITLE: v7 Grad Accum Windows -->
+<!-- NAV: research -->
+
+<h1>v7 Gradient Accumulation Windows on CPU</h1>
+
+<p>This page explains one of the most common training confusions in v7: CE token normalization (<code>/N</code>) versus gradient-accumulation window normalization (<code>/K</code>), and how they combine to set the true optimizer update scale.</p>
+
+<div class="alert alert-info">
+  <div class="alert-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+  </div>
+  <div>
+    <strong>Key Point</strong><br>
+    <code>N</code> and <code>K</code> are different: <code>N</code> is valid targets inside one micro-step; <code>K</code> is the number of micro-steps accumulated before one optimizer update.
+  </div>
+</div>
+
+<div class="img-container svg-viewer" data-title="v7 Grad-Accum Window">
+  <img src="assets/v7-grad-accum-window.svg" alt="Gradient accumulation window and optimizer boundary in v7">
+</div>
+
+<h2>Terminology</h2>
+
+<table>
+  <tr>
+    <th>Term</th>
+    <th>Meaning</th>
+    <th>Typical v7 knob</th>
+  </tr>
+  <tr>
+    <td><strong>Micro-batch</strong></td>
+    <td>One forward+backward pass worth of tokens</td>
+    <td><code>seq_len</code> (and token stream chunking)</td>
+  </tr>
+  <tr>
+    <td><strong><code>N</code> (CE denominator)</strong></td>
+    <td>Valid targets in one micro-step (ignore rows excluded)</td>
+    <td>Derived at runtime</td>
+  </tr>
+  <tr>
+    <td><strong><code>K</code> (accumulation window)</strong></td>
+    <td>Micro-steps before one optimizer update</td>
+    <td><code>--train-grad-accum</code></td>
+  </tr>
+  <tr>
+    <td><strong>Effective tokens per optimizer update</strong></td>
+    <td>Total tokens represented by one update</td>
+    <td><code>micro_tokens * K</code></td>
+  </tr>
+</table>
+
+<h2>The Two Normalizations You Need</h2>
+
+<p>Per micro-step CE with mean reduction gives:</p>
+
+<p>\[
+\nabla z = \frac{p - \text{one\_hot}}{N}
+\]</p>
+
+<p>After accumulating <code>K</code> micro-steps, the optimizer must consume the <em>average</em> gradient:</p>
+
+<p>\[
+g_{\text{step}} = \frac{1}{K}\sum_{m=1}^{K} g_m
+\]</p>
+
+<p>If each micro-step has similar <code>N</code>, update scale is effectively proportional to <code>1 / (N * K)</code>.</p>
+
+<div class="card card-accent">
+  <h3 style="margin-top: 0;">What Was Missing in the Drift Repro</h3>
+  <p style="margin: 0;">CE <code>/N</code> was already present. The missing piece was window averaging <code>/K</code> before AdamW in generated runtime when <code>grad_accum &gt; 1</code>.</p>
+</div>
+
+<h2>Concrete CPU Examples</h2>
+
+<table>
+  <tr>
+    <th>Micro tokens</th>
+    <th><code>K</code> (<code>grad_accum</code>)</th>
+    <th>Effective tokens / optimizer step</th>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>4</td>
+    <td>32</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>8</td>
+    <td>64</td>
+  </tr>
+  <tr>
+    <td>16</td>
+    <td>8</td>
+    <td>128</td>
+  </tr>
+</table>
+
+<pre># Example: simulate larger batch on CPU memory budget
+# micro-step tokens = 8
+# grad_accum K      = 4
+# effective tokens/update = 32
+
+for each micro-step:
+    forward()
+    backward()                 # accumulate gradients
+
+at accumulation boundary:
+    grad *= 1/K               # or equivalently, backward(loss/K) each micro-step
+    adamw_step()
+    zero_grad()</pre>
+
+<h2>Why This Mattered at lr = 1e-3</h2>
+
+<p>If accumulated gradients are not divided by <code>K</code>, optimizer input is approximately <code>K</code> times too large.</p>
+
+<ul>
+  <li><code>K=8</code> with <code>lr=1e-3</code> behaves closer to an effective step size like <code>~8e-3</code> in magnitude.</li>
+  <li>This can look fine early, then destabilize later as AdamW moments integrate the oversized updates.</li>
+  <li>Restoring <code>/K</code> moved the long-horizon run from late blow-up to stable descent in the same repro setup.</li>
+</ul>
+
+<h2>Where It Lives in v7</h2>
+
+<ul>
+  <li>Train runtime codegen source: <code>version/v7/scripts/codegen_train_runtime_v7.py</code></li>
+  <li>Generated optimizer boundary in run-dir: <code>generated_train_runtime_v7.c</code></li>
+  <li>Related deep dives:
+    <a href="v7-backprop-ir.html"><code>v7-backprop-ir.html</code></a>,
+    <a href="v7-cross-entropy-parity.html"><code>v7-cross-entropy-parity.html</code></a>
+  </li>
+</ul>
+
+<h2>Variable Context Length Caveat (Important on CPU)</h2>
+
+<p>When sequence lengths vary per micro-step, <code>N</code> can vary too. That means naive fixed scaling can bias updates.</p>
+
+<div class="card">
+  <h3 style="margin-top: 0;">Robust Strategy for Variable-Length Windows</h3>
+  <ul style="margin-bottom: 0;">
+    <li>Track valid-token counts per micro-step (post-ignore filtering).</li>
+    <li>Accumulate gradients in numerator form or keep per-step weighted scaling.</li>
+    <li>Normalize by total valid targets in the full accumulation window, not a fixed constant.</li>
+  </ul>
+</div>
+
+<h2>Operator Checklist</h2>
+
+<ol>
+  <li>Set <code>grad_accum</code> from memory budget and desired effective batch.</li>
+  <li>Confirm one optimizer update per full window.</li>
+  <li>Confirm accumulated gradient averaging (<code>/K</code>) before AdamW.</li>
+  <li>Use long-horizon parity checks with fixed token stream for drift triage.</li>
+</ol>
+
+<div class="card card-green">
+  <h3 style="margin-top: 0;">Bottom Line</h3>
+  <p style="margin: 0;">CE math correctness (<code>p - one_hot</code>, <code>/N</code>) is necessary but not sufficient. Production-stable backprop also requires window-correct optimizer scaling (<code>/K</code>) so CPU batch simulation behaves like true larger-batch training.</p>
+</div>
