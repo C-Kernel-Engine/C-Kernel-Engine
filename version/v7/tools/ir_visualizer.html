@@ -2595,6 +2595,11 @@ python test_gemv_q8_0_q8_0.py</pre>
             <div class="stats-grid" id="trainingStatsGrid"></div>
 
             <div class="parity-section" style="margin-top: 1rem;">
+                <h3><span class="badge badge-green">Pipeline</span> Pipeline & Data Lineage</h3>
+                <div id="trainingPipelinePanel" style="color: var(--text-muted);">No pipeline provenance loaded.</div>
+            </div>
+
+            <div class="parity-section" style="margin-top: 1rem;">
                 <h3><span class="badge badge-orange">Coverage</span> Backward Coverage + Unresolved Rules</h3>
                 <div id="trainingCoveragePanel" style="color: var(--text-muted);">No train IR artifacts loaded.</div>
             </div>
@@ -2610,6 +2615,27 @@ python test_gemv_q8_0_q8_0.py</pre>
                 </div>
                 <div id="trainingBackwardGraph" style="width:100%;height:430px;border:1px solid var(--grey);border-radius:8px;background:var(--dark);overflow:hidden;"></div>
                 <div id="trainingLinkedDetails" style="margin-top:0.65rem;color:var(--text-muted);font-size:0.8rem;">Click a backward node or table row to inspect and jump to its forward op.</div>
+            </div>
+
+            <div class="parity-section" style="margin-top: 1rem;">
+                <h3><span class="badge badge-green">Runtime Stitch</span> Train Exec Plan (Forward -> Backward -> Accum -> Optimizer)</h3>
+                <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin:0.55rem 0 0.75rem;">
+                    <label style="color:var(--text-secondary);font-size:0.8rem;">Stage:</label>
+                    <select id="trainingExecStageFilter" onchange="renderTrainingRuntimeGraph()" style="padding:0.4rem 0.55rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:4px;min-width:140px;">
+                        <option value="all">All Stages</option>
+                        <option value="forward">Forward</option>
+                        <option value="backward">Backward</option>
+                        <option value="accum">Grad Accum</option>
+                        <option value="optimizer">Optimizer</option>
+                    </select>
+                    <label style="color:var(--text-secondary);font-size:0.8rem;">Layer:</label>
+                    <select id="trainingExecLayerFilter" onchange="renderTrainingRuntimeGraph()" style="padding:0.4rem 0.55rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:4px;min-width:120px;">
+                        <option value="all">All Layers</option>
+                    </select>
+                    <span id="trainingExecGraphStats" style="color:var(--text-muted);font-size:0.78rem;">No train exec plan loaded.</span>
+                </div>
+                <div id="trainingRuntimeGraph" style="width:100%;height:430px;border:1px solid var(--grey);border-radius:8px;background:var(--dark);overflow:hidden;"></div>
+                <div id="trainingExecDetails" style="margin-top:0.65rem;color:var(--text-muted);font-size:0.8rem;">Click a runtime node to inspect dispatch, reduction, and phase stitching.</div>
             </div>
 
             <div class="parity-section" style="margin-top: 1rem;">
@@ -2739,6 +2765,8 @@ python test_gemv_q8_0_q8_0.py</pre>
         let trainRuntimeParityRealisticData = null;
         let trainRuntimeParityStressData = null;
         let trainReplayData = null;
+        let trainPipelineData = null;
+        let trainExecPlanData = null;
         let ir1Data = null;
         let currentDfLayer = -1;
         let loadedFiles = {};
@@ -2759,6 +2787,11 @@ python test_gemv_q8_0_q8_0.py</pre>
             layerFilter: 'all',
             selectedBackwardOpId: null,
             selectedForwardRef: null,
+        };
+        const trainingExecGraphState = {
+            stageFilter: 'all',
+            layerFilter: 'all',
+            selectedNodeId: null,
         };
 
         function formatBytes(bytes) {
@@ -3822,6 +3855,8 @@ python test_gemv_q8_0_q8_0.py</pre>
             trainRuntimeParityRealisticData = files.train_runtime_parity_realistic || trainRuntimeParityRealisticData;
             trainRuntimeParityStressData = files.train_runtime_parity_stress || trainRuntimeParityStressData;
             trainReplayData = files.replay_determinism || trainReplayData;
+            trainPipelineData = files.training_pipeline || trainPipelineData;
+            trainExecPlanData = files.train_exec_plan || trainExecPlanData;
 
             window.__ckAnalysisCheckpoints = files.analysis_checkpoints || null;
             window.__ckTrainE2E =
@@ -5088,6 +5123,288 @@ function getTrainingBackwardList() {
     return [];
 }
 
+function getTrainingExecPlanOps() {
+    if (Array.isArray(trainExecPlanData?.ops)) return trainExecPlanData.ops;
+    return [];
+}
+
+function classifyTrainingExecStage(op) {
+    const opName = String(op?.op || '').toLowerCase();
+    const phase = String(op?.phase || '').toLowerCase();
+    if (opName.includes('grad_accumulate')) return 'accum';
+    if (opName.includes('optimizer') || opName.includes('adamw') || opName.includes('adam')) return 'optimizer';
+    if (phase === 'forward') return 'forward';
+    if (phase === 'backward') return 'backward';
+    return 'other';
+}
+
+function populateTrainingExecLayerFilter(execOps) {
+    const select = document.getElementById('trainingExecLayerFilter');
+    if (!select) return;
+    const prev = String(trainingExecGraphState.layerFilter || 'all');
+    const layers = [...new Set((execOps || []).map(op => Number(op?.layer)).filter(v => Number.isFinite(v) && v >= 0))]
+        .sort((a, b) => a - b);
+    select.innerHTML = '<option value="all">All Layers</option>' +
+        layers.map(layer => `<option value="${layer}">Layer ${layer}</option>`).join('');
+    const next = layers.includes(Number(prev)) ? prev : 'all';
+    trainingExecGraphState.layerFilter = next;
+    select.value = next;
+}
+
+function trainingExecNodeColor(stage, isSynthetic = false) {
+    if (isSynthetic) return '#9ad0ff';
+    if (stage === 'forward') return '#07adf8';
+    if (stage === 'backward') return '#f39c12';
+    if (stage === 'accum') return '#47b475';
+    if (stage === 'optimizer') return '#7ddc7b';
+    return '#7d7d7d';
+}
+
+function updateTrainingExecDetails(selectedNode, statsText) {
+    const details = document.getElementById('trainingExecDetails');
+    if (!details) return;
+    if (!selectedNode) {
+        details.textContent = statsText || 'Click a runtime node to inspect dispatch, reduction, and phase stitching.';
+        return;
+    }
+    if (selectedNode.synthetic) {
+        details.innerHTML = `
+            <div><strong>${escapeHtml(String(selectedNode.label || 'optimizer'))}</strong> (synthetic runtime stitch node)</div>
+            <div style="margin-top:0.25rem;">Use this node to inspect grad-accum -> optimizer -> weight update transition.</div>
+        `;
+        return;
+    }
+    const op = selectedNode.op || {};
+    const dispatch = op.dispatch && typeof op.dispatch === 'object'
+        ? Object.entries(op.dispatch).map(([k, v]) => `${k}=${v}`).join(', ')
+        : '-';
+    const reduction = op.reduction && typeof op.reduction === 'object'
+        ? Object.entries(op.reduction).map(([k, v]) => `${k}=${v}`).join(', ')
+        : '-';
+    details.innerHTML = `
+        <div><strong>Runtime op #${escapeHtml(String(op.op_id ?? '-'))}</strong> • ${escapeHtml(String(op.op || '-'))}</div>
+        <div style="margin-top:0.25rem;">kernel=<code>${escapeHtml(String(op.kernel_id || '-'))}</code> phase=${escapeHtml(String(op.phase || '-'))} stage=${escapeHtml(String(selectedNode.stage || '-'))} layer=${escapeHtml(String(op.layer ?? '-'))} role=${escapeHtml(String(op.role || '-'))}</div>
+        <div style="margin-top:0.25rem;">dispatch: <code>${escapeHtml(dispatch)}</code></div>
+        <div style="margin-top:0.25rem;">reduction: <code>${escapeHtml(reduction)}</code></div>
+    `;
+}
+
+function renderTrainingRuntimeGraph() {
+    const container = document.getElementById('trainingRuntimeGraph');
+    const stats = document.getElementById('trainingExecGraphStats');
+    const stageSelect = document.getElementById('trainingExecStageFilter');
+    const layerSelect = document.getElementById('trainingExecLayerFilter');
+    if (!container) return;
+
+    const rawOps = getTrainingExecPlanOps();
+    container.innerHTML = '';
+    if (!Array.isArray(rawOps) || rawOps.length === 0) {
+        if (stats) stats.textContent = 'No train exec plan loaded.';
+        updateTrainingExecDetails(null, 'No train exec plan loaded.');
+        return;
+    }
+
+    const normalized = rawOps.map((op, idx) => ({
+        ...op,
+        _idx: idx,
+        _stage: classifyTrainingExecStage(op),
+    }));
+
+    if (stageSelect) {
+        trainingExecGraphState.stageFilter = String(stageSelect.value || trainingExecGraphState.stageFilter || 'all');
+    }
+    if (layerSelect) {
+        trainingExecGraphState.layerFilter = String(layerSelect.value || trainingExecGraphState.layerFilter || 'all');
+    }
+    const stageFilter = String(trainingExecGraphState.stageFilter || 'all');
+    const layerFilter = String(trainingExecGraphState.layerFilter || 'all');
+
+    const filtered = normalized.filter((op) => {
+        const stageOk = stageFilter === 'all' ? true : op._stage === stageFilter;
+        const layerOk = layerFilter === 'all' ? true : String(op.layer) === layerFilter;
+        return stageOk && layerOk;
+    });
+
+    const nodes = filtered.map((op) => ({
+        id: `op:${op._idx}`,
+        op,
+        stage: op._stage,
+        synthetic: false,
+        label: `${Number(op.op_id)}:${String(op.op || op.kernel_id || 'op').trim()}`,
+    }));
+    const nodeByOpId = new Map();
+    filtered.forEach((op) => {
+        const id = Number(op.op_id);
+        if (Number.isFinite(id) && !nodeByOpId.has(id)) {
+            nodeByOpId.set(id, `op:${op._idx}`);
+        }
+    });
+
+    const links = [];
+    const linkSeen = new Set();
+    const addLink = (src, dst, type) => {
+        if (!src || !dst || src === dst) return;
+        const key = `${src}->${dst}:${type}`;
+        if (linkSeen.has(key)) return;
+        linkSeen.add(key);
+        links.push({ source: src, target: dst, type });
+    };
+
+    for (let i = 0; i < filtered.length - 1; i++) {
+        addLink(`op:${filtered[i]._idx}`, `op:${filtered[i + 1]._idx}`, 'seq');
+    }
+
+    filtered.forEach((op) => {
+        const dst = `op:${op._idx}`;
+        const inputs = op?.dataflow?.inputs || {};
+        Object.values(inputs).forEach((info) => {
+            const srcOpId = Number(info?.from_op);
+            const src = nodeByOpId.get(srcOpId);
+            if (src) addLink(src, dst, 'data');
+        });
+    });
+
+    if (stageFilter === 'all') {
+        const lastForward = [...filtered].reverse().find(op => op._stage === 'forward');
+        const firstBackward = filtered.find(op => op._stage === 'backward' || op._stage === 'accum');
+        if (lastForward && firstBackward) {
+            addLink(`op:${lastForward._idx}`, `op:${firstBackward._idx}`, 'phase');
+        }
+    }
+
+    const optimizerName = String(trainPipelineData?.optimizer?.name || 'optimizer_step');
+    const hasOptimizerMeta = Boolean(trainPipelineData?.optimizer?.name || trainPipelineData?.execution?.optimizer_steps);
+    if (hasOptimizerMeta && (stageFilter === 'all' || stageFilter === 'optimizer')) {
+        const optimizerNode = {
+            id: 'synthetic:optimizer',
+            synthetic: true,
+            stage: 'optimizer',
+            label: optimizerName,
+        };
+        const weightNode = {
+            id: 'synthetic:weights',
+            synthetic: true,
+            stage: 'optimizer',
+            label: 'weights.bump',
+        };
+        nodes.push(optimizerNode, weightNode);
+        const sourceOp = [...filtered].reverse().find(op => op._stage === 'accum')
+            || [...filtered].reverse().find(op => op._stage === 'backward');
+        if (sourceOp) addLink(`op:${sourceOp._idx}`, optimizerNode.id, 'optimizer');
+        addLink(optimizerNode.id, weightNode.id, 'update');
+    }
+
+    if (nodes.length === 0) {
+        if (stats) stats.textContent = 'No runtime nodes for selected filters.';
+        updateTrainingExecDetails(null, 'No runtime nodes for selected filters.');
+        return;
+    }
+
+    if (!nodes.some(n => n.id === trainingExecGraphState.selectedNodeId)) {
+        trainingExecGraphState.selectedNodeId = null;
+    }
+
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<div style="padding:0.8rem;color:var(--text-muted);">D3 unavailable: cannot render runtime stitch graph.</div>';
+        updateTrainingExecDetails(null, 'D3 unavailable for runtime stitch graph.');
+        return;
+    }
+
+    const width = container.clientWidth || 980;
+    const height = container.clientHeight || 430;
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('background', 'var(--dark)');
+    const g = svg.append('g');
+    svg.call(
+        d3.zoom().scaleExtent([0.35, 3]).on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        })
+    );
+
+    const link = g.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter().append('line')
+        .attr('stroke', d => {
+            if (d.type === 'data') return '#ffb400';
+            if (d.type === 'phase') return '#4ec9ff';
+            if (d.type === 'optimizer' || d.type === 'update') return '#47b475';
+            return '#585858';
+        })
+        .attr('stroke-width', d => (d.type === 'data' ? 1.9 : 1.2))
+        .attr('stroke-opacity', d => (d.type === 'seq' ? 0.45 : 0.85));
+
+    const node = g.append('g')
+        .selectAll('g')
+        .data(nodes)
+        .enter().append('g')
+        .style('cursor', 'pointer')
+        .on('click', (_evt, d) => {
+            trainingExecGraphState.selectedNodeId = d.id;
+            const msg = `nodes: ${nodes.length} | links: ${links.length} | stage: ${stageFilter} | layer: ${layerFilter}`;
+            updateTrainingExecDetails(d, msg);
+            renderTrainingRuntimeGraph();
+        })
+        .call(d3.drag()
+            .on('start', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0.25).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            })
+            .on('drag', (event, d) => {
+                d.fx = event.x;
+                d.fy = event.y;
+            })
+            .on('end', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            })
+        );
+
+    node.append('circle')
+        .attr('r', d => d.synthetic ? 11.5 : 10.5)
+        .attr('fill', d => trainingExecNodeColor(d.stage, d.synthetic))
+        .attr('stroke', d => d.id === trainingExecGraphState.selectedNodeId ? '#ffffff' : 'rgba(255,255,255,0.55)')
+        .attr('stroke-width', d => d.id === trainingExecGraphState.selectedNodeId ? 2.3 : 1.1);
+
+    node.append('text')
+        .attr('x', 14)
+        .attr('y', 3)
+        .attr('fill', '#d6d6d6')
+        .attr('font-size', '10.2px')
+        .attr('font-family', "'JetBrains Mono', monospace")
+        .text(d => shortenLabel(String(d.label || d.id), 28));
+
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
+            if (d.type === 'optimizer' || d.type === 'update') return 80;
+            if (d.type === 'data') return 72;
+            if (d.type === 'phase') return 88;
+            return 46;
+        }).strength(d => (d.type === 'seq' ? 0.2 : 0.46)))
+        .force('charge', d3.forceManyBody().strength(-125))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(18))
+        .on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+    const statsText = `nodes: ${nodes.length} | links: ${links.length} | stage: ${stageFilter} | layer: ${layerFilter}`;
+    if (stats) stats.textContent = statsText;
+    const selectedNode = nodes.find(n => n.id === trainingExecGraphState.selectedNodeId) || null;
+    updateTrainingExecDetails(selectedNode, statsText);
+}
+
 function getTrainingForwardOpById(forwardRef) {
     const ref = Number(forwardRef);
     if (!Number.isFinite(ref)) return null;
@@ -5393,8 +5710,131 @@ function renderTrainingBackwardGraph() {
     refreshTrainingSelectionUI(backwardList);
 }
 
+function renderTrainingPipelinePanel(panel) {
+    if (!panel) return;
+    const pipeline = (trainPipelineData && typeof trainPipelineData === 'object') ? trainPipelineData : null;
+    if (!pipeline) {
+        panel.innerHTML = '<span style="color: var(--text-muted);">No training_pipeline.json loaded.</span>';
+        return;
+    }
+
+    const activeStage = String(pipeline.active_stage || pipeline.mode || 'pretrain');
+    const timeline = Array.isArray(pipeline.stage_timeline)
+        ? pipeline.stage_timeline.filter((row) => row && typeof row === 'object')
+        : [];
+    const timelineRows = timeline.length > 0 ? timeline : [{
+        stage: activeStage,
+        status: 'active',
+        active: true,
+    }];
+    const timelineHtml = timelineRows.map((row) => {
+        const stage = String(row.stage || '-');
+        const status = String(row.status || '-');
+        const isActive = row.active === true || stage === activeStage;
+        const bg = isActive ? 'rgba(71,180,117,0.20)' : 'rgba(114,114,114,0.24)';
+        const fg = isActive ? '#7de59f' : '#d0d0d0';
+        return `<span class="graph-chip" style="background:${bg};border:1px solid rgba(255,255,255,0.15);color:${fg};">${escapeHtml(stage)} · ${escapeHtml(status)}</span>`;
+    }).join('');
+
+    const dataRows = Array.isArray(pipeline.data_provenance)
+        ? pipeline.data_provenance.filter((row) => row && typeof row === 'object')
+        : [];
+    const dataTable = dataRows.length > 0
+        ? `
+            <table>
+                <thead><tr><th>Stage</th><th>Dataset</th><th>Source</th><th>Split</th><th>Tokens</th><th>Hash</th><th>Sampling/Packing</th></tr></thead>
+                <tbody>
+                    ${dataRows.map((row) => {
+                        const hashValue = (row.hash && typeof row.hash === 'object')
+                            ? (row.hash.value || row.hash.sha256 || '-')
+                            : (row.hash || '-');
+                        const sampling = row.sampling && typeof row.sampling === 'object'
+                            ? Object.entries(row.sampling).map(([k, v]) => `${k}=${v}`).join(', ')
+                            : '-';
+                        const packing = row.packing && typeof row.packing === 'object'
+                            ? Object.entries(row.packing).map(([k, v]) => `${k}=${v}`).join(', ')
+                            : '-';
+                        const sourceVal = row.source_path || row.source_uri || '-';
+                        return `
+                            <tr>
+                                <td>${escapeHtml(String(row.stage || activeStage))}</td>
+                                <td style="max-width:220px;overflow-wrap:anywhere;">${escapeHtml(String(row.dataset_name || '-'))}</td>
+                                <td style="max-width:320px;overflow-wrap:anywhere;"><code>${escapeHtml(String(sourceVal))}</code></td>
+                                <td>${escapeHtml(String(row.split || 'train'))}</td>
+                                <td>${escapeHtml(String(row.token_count ?? '-'))}</td>
+                                <td style="max-width:210px;overflow-wrap:anywhere;"><code>${escapeHtml(String(hashValue))}</code></td>
+                                <td style="max-width:360px;overflow-wrap:anywhere;">${escapeHtml(`${sampling}${packing !== '-' ? ` | ${packing}` : ''}`)}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `
+        : '<div style="color: var(--text-muted);">No data provenance rows available.</div>';
+
+    const tokenizer = pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object'
+        ? pipeline.tokenizer_lineage
+        : {};
+    const tokenizerRows = [
+        ['type', tokenizer.type],
+        ['vocab_size', tokenizer.vocab_size],
+        ['template', tokenizer.template],
+        ['chat_template', tokenizer.chat_template],
+        ['bos_token_id', tokenizer.bos_token_id],
+        ['eos_token_id', tokenizer.eos_token_id],
+        ['pad_token_id', tokenizer.pad_token_id],
+        ['tokenizer_path', tokenizer.tokenizer_path],
+        ['tokenizer_sha256', tokenizer.tokenizer_sha256],
+    ].filter((row) => row[1] !== undefined && row[1] !== null && String(row[1]).trim() !== '');
+
+    const execution = pipeline.execution && typeof pipeline.execution === 'object' ? pipeline.execution : {};
+    const optimizer = pipeline.optimizer && typeof pipeline.optimizer === 'object' ? pipeline.optimizer : {};
+    const optimizerHparams = optimizer.hparams && typeof optimizer.hparams === 'object' ? optimizer.hparams : {};
+
+    panel.innerHTML = `
+        <div style="display:grid;gap:0.75rem;">
+            <div style="display:flex;gap:0.45rem;flex-wrap:wrap;">${timelineHtml}</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.5rem;">
+                <div><strong>Active Stage:</strong> ${escapeHtml(activeStage)}</div>
+                <div><strong>Backend:</strong> ${escapeHtml(String(pipeline.backend || '-'))}</div>
+                <div><strong>Optimizer:</strong> ${escapeHtml(String(optimizer.name || '-'))}</div>
+                <div><strong>LR:</strong> ${escapeHtml(String(optimizer.lr ?? '-'))}</div>
+                <div><strong>Epochs:</strong> ${escapeHtml(String(execution.epochs ?? '-'))}</div>
+                <div><strong>Steps:</strong> ${escapeHtml(String(execution.steps ?? '-'))}</div>
+                <div><strong>Micro Steps:</strong> ${escapeHtml(String(execution.micro_steps ?? '-'))}</div>
+                <div><strong>Processed Tokens:</strong> ${escapeHtml(String(execution.processed_tokens ?? execution.tokens_total ?? '-'))}</div>
+            </div>
+            <div>
+                <strong>Data Provenance</strong>
+                <div style="margin-top:0.35rem;overflow:auto;">${dataTable}</div>
+            </div>
+            <div>
+                <strong>Tokenizer Lineage</strong>
+                <div style="margin-top:0.35rem;">
+                    ${
+                        tokenizerRows.length > 0
+                            ? `<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>${
+                                tokenizerRows.map((row) => `
+                                    <tr>
+                                        <td>${escapeHtml(String(row[0]))}</td>
+                                        <td style="max-width:520px;overflow-wrap:anywhere;"><code>${escapeHtml(String(row[1]))}</code></td>
+                                    </tr>
+                                `).join('')
+                            }</tbody></table>`
+                            : '<div style="color:var(--text-muted);">No tokenizer lineage metadata available.</div>'
+                    }
+                </div>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.8rem;">
+                optimizer_hparams source: ${escapeHtml(String(optimizerHparams.source || '-'))}
+            </div>
+        </div>
+    `;
+}
+
 function renderTraining() {
     const statsGrid = document.getElementById('trainingStatsGrid');
+    const pipelinePanel = document.getElementById('trainingPipelinePanel');
     const coveragePanel = document.getElementById('trainingCoveragePanel');
     const tableBody = document.querySelector('#trainingBackwardTable tbody');
     const gradSummary = document.getElementById('trainingGradSummary');
@@ -5404,14 +5844,19 @@ function renderTraining() {
     const trainingLayerFilter = document.getElementById('trainingLayerFilter');
     const trainingGraphStats = document.getElementById('trainingGraphStats');
     const trainingLinkedDetails = document.getElementById('trainingLinkedDetails');
-    if (!statsGrid || !coveragePanel || !tableBody || !gradSummary || !runGatePanel || !gradChecksPanel || !trainingGraphContainer || !trainingLayerFilter || !trainingGraphStats || !trainingLinkedDetails) return;
+    const trainingExecGraphContainer = document.getElementById('trainingRuntimeGraph');
+    const trainingExecStageFilter = document.getElementById('trainingExecStageFilter');
+    const trainingExecLayerFilter = document.getElementById('trainingExecLayerFilter');
+    const trainingExecGraphStats = document.getElementById('trainingExecGraphStats');
+    const trainingExecDetails = document.getElementById('trainingExecDetails');
+    if (!statsGrid || !pipelinePanel || !coveragePanel || !tableBody || !gradSummary || !runGatePanel || !gradChecksPanel || !trainingGraphContainer || !trainingLayerFilter || !trainingGraphStats || !trainingLinkedDetails || !trainingExecGraphContainer || !trainingExecStageFilter || !trainingExecLayerFilter || !trainingExecGraphStats || !trainingExecDetails) return;
 
     const ir1 = ir1TrainData || null;
     const ir2 = ir2TrainData || null;
     const inv = irTrainInvariantsData || null;
     const summary = ir2TrainSummaryData || null;
 
-    const hasTrainGraph = !!(ir1 || ir2 || inv || summary);
+    const hasTrainGraph = !!(ir1 || ir2 || inv || summary || trainExecPlanData);
     const hasTrainGates = !!(
         trainContractData ||
         trainParity1TokenData ||
@@ -5421,7 +5866,8 @@ function renderTraining() {
         trainParityEpoch5Data ||
         trainRuntimeParityRealisticData ||
         trainRuntimeParityStressData ||
-        trainReplayData
+        trainReplayData ||
+        trainPipelineData
     );
 
     if (!hasTrainGraph && !hasTrainGates) {
@@ -5431,6 +5877,7 @@ function renderTraining() {
             <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Grad Weights</div></div>
             <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Unresolved</div></div>
         `;
+        pipelinePanel.innerHTML = '<span style="color: var(--text-muted);">No pipeline provenance loaded.</span>';
         coveragePanel.innerHTML = '<span style="color: var(--text-muted);">No train IR artifacts loaded.</span>';
         tableBody.innerHTML = '<tr><td colspan="6" style="color: var(--text-muted);">No backward graph loaded.</td></tr>';
         gradSummary.innerHTML = '<span style="color: var(--text-muted);">No gradient summary available.</span>';
@@ -5439,13 +5886,19 @@ function renderTraining() {
         trainingGraphContainer.innerHTML = '';
         trainingGraphStats.textContent = 'No backward graph loaded.';
         trainingLinkedDetails.textContent = 'No backward graph loaded.';
+        trainingExecGraphContainer.innerHTML = '';
+        trainingExecGraphStats.textContent = 'No train exec plan loaded.';
+        trainingExecDetails.textContent = 'No train exec plan loaded.';
         return;
     }
+
+    renderTrainingPipelinePanel(pipelinePanel);
 
     const ir1Forward = Array.isArray(ir1?.ops) ? ir1.ops.filter(op => op && op.phase === 'forward').length : 0;
     const ir2Forward = Array.isArray(ir2?.forward) ? ir2.forward.length : 0;
     const forwardOps = ir1Forward || ir2Forward || 0;
     const backwardOps = Array.isArray(ir2?.backward) ? ir2.backward.length : (summary?.stats?.backward_ops || 0);
+    const runtimePlanOps = Array.isArray(trainExecPlanData?.ops) ? trainExecPlanData.ops.length : 0;
     const unresolvedCount = (Array.isArray(ir2?.unresolved) ? ir2.unresolved.length : 0) || (summary?.stats?.unresolved || 0);
 
     const gradWeightTensors = Array.isArray(ir2?.gradient_summary?.grad_weight_tensors)
@@ -5474,6 +5927,7 @@ function renderTraining() {
     statsGrid.innerHTML = `
         <div class="stat-card"><div class="stat-value">${forwardOps}</div><div class="stat-label">Forward Ops (IR1)</div></div>
         <div class="stat-card"><div class="stat-value">${backwardOps}</div><div class="stat-label">Backward Ops (IR2)</div></div>
+        <div class="stat-card"><div class="stat-value">${runtimePlanOps}</div><div class="stat-label">Runtime Ops (Exec Plan)</div></div>
         <div class="stat-card"><div class="stat-value">${gradWeightTensors}</div><div class="stat-label">Grad Weight Tensors</div></div>
         <div class="stat-card"><div class="stat-value">${gradActivationTensors}</div><div class="stat-label">Grad Activation Tensors</div></div>
         <div class="stat-card"><div class="stat-value">${unresolvedCount}</div><div class="stat-label">Unresolved Coverage</div></div>
@@ -5521,6 +5975,7 @@ function renderTraining() {
 
     const backwardList = getTrainingBackwardList();
     populateTrainingLayerFilter(backwardList);
+    populateTrainingExecLayerFilter(getTrainingExecPlanOps());
 
     tableBody.innerHTML = '';
     if (backwardList.length === 0) {
@@ -5689,6 +6144,7 @@ function renderTraining() {
     }
     renderTrainingBackwardGraph();
     refreshTrainingSelectionUI(backwardList);
+    renderTrainingRuntimeGraph();
 }
 
         function filterKernels(query) {
@@ -6962,6 +7418,8 @@ function renderTraining() {
             if (name.includes('memory_signoff') || name.includes('perf_gate_report') || name.includes('asan_summary') || name.includes('memory_verification')) return 'validation';
             if (name.includes('ir_train_invariants') || name.includes('ir2_train_summary')) return 'training';
             if (name.includes('ir1_train') || name.includes('ir2_train')) return 'training';
+            if (name.includes('training_pipeline')) return 'training';
+            if (name.includes('train_exec_plan')) return 'training';
             if (name.includes('train_parity') || name.includes('gradient_summary')) return 'training';
             if (name.includes('fd_gradients') || name.includes('replay_determinism')) return 'training';
             if (name.includes('parity_1token') || name.includes('qk_norm_backward_parity')) return 'training';
@@ -7089,6 +7547,12 @@ function renderTraining() {
                     } else if (name.includes('replay_determinism')) {
                         trainReplayData = info.data;
                         console.log('Auto-loaded: replay determinism');
+                    } else if (name.includes('train_exec_plan')) {
+                        trainExecPlanData = info.data;
+                        console.log('Auto-loaded: train exec plan');
+                    } else if (name.includes('training_pipeline')) {
+                        trainPipelineData = info.data;
+                        console.log('Auto-loaded: training pipeline');
                     }
                 }
             });

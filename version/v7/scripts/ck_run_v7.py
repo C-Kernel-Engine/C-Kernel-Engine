@@ -18,6 +18,7 @@ Usage:
 
 import argparse
 import ctypes
+import hashlib
 import json
 import math
 import os
@@ -1573,6 +1574,207 @@ def run_parity_tests() -> None:
         sys.exit(1)
 
 
+def _hash_sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _hash_sha256_file(path: Path) -> Optional[str]:
+    if not path.exists() or not path.is_file():
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _load_json_dict(path: Path) -> Optional[dict]:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> dict:
+    mode = str(summary.get("train_mode") or summary.get("mode") or "pretrain").strip().lower()
+    if not mode:
+        mode = "pretrain"
+
+    stage_order = ["pretrain", "sft", "dpo", "grpo", "ppo"]
+    if mode not in stage_order:
+        stage_order = [mode] + stage_order
+    active_idx = stage_order.index(mode)
+    stage_timeline = []
+    for idx, stage in enumerate(stage_order):
+        if idx < active_idx:
+            status = "completed"
+        elif idx == active_idx:
+            status = "active"
+        else:
+            status = "planned"
+        stage_timeline.append(
+            {
+                "stage": stage,
+                "order": idx,
+                "status": status,
+                "active": stage == mode,
+            }
+        )
+
+    step_profile = summary.get("step_profile") if isinstance(summary.get("step_profile"), dict) else {}
+    processed_tokens = int(step_profile.get("processed_tokens", summary.get("total_tokens", 0)) or 0)
+    seq_len = int(summary.get("seq_len", 0) or 0)
+    grad_accum = int(summary.get("grad_accum", 0) or 0)
+    tokens_per_update = int(summary.get("tokens_per_update", seq_len * max(1, grad_accum)) or 0)
+    seed = int(summary.get("seed", 0) or 0)
+
+    data_entries: list[dict] = []
+    raw_data_entries = summary.get("data_provenance")
+    if isinstance(raw_data_entries, list):
+        data_entries = [row for row in raw_data_entries if isinstance(row, dict)]
+    if not data_entries:
+        data_source = summary.get("data_source") if isinstance(summary.get("data_source"), dict) else {}
+        if data_source:
+            data_entries = [
+                {
+                    "stage": mode,
+                    "dataset_name": data_source.get("dataset_name") or data_source.get("name") or "train_data",
+                    "source_uri": data_source.get("source_uri"),
+                    "source_path": data_source.get("source_path"),
+                    "split": data_source.get("split") or "train",
+                    "token_count": int(data_source.get("token_count", processed_tokens) or 0),
+                    "hash": {
+                        "algo": "sha256",
+                        "value": data_source.get("sha256") or data_source.get("text_sha256"),
+                    },
+                    "sampling": data_source.get("sampling")
+                    if isinstance(data_source.get("sampling"), dict)
+                    else {
+                        "strategy": "repeat_to_budget",
+                        "seed": seed,
+                        "shuffle": False,
+                    },
+                    "packing": data_source.get("packing")
+                    if isinstance(data_source.get("packing"), dict)
+                    else {
+                        "seq_len": seq_len,
+                        "grad_accum": grad_accum,
+                        "tokens_per_update": tokens_per_update,
+                    },
+                }
+            ]
+    if not data_entries:
+        data_entries = [
+            {
+                "stage": mode,
+                "dataset_name": "unspecified",
+                "source_uri": None,
+                "source_path": None,
+                "split": "train",
+                "token_count": processed_tokens,
+                "hash": {"algo": "sha256", "value": None},
+                "sampling": {"strategy": "repeat_to_budget", "seed": seed, "shuffle": False},
+                "packing": {
+                    "seq_len": seq_len,
+                    "grad_accum": grad_accum,
+                    "tokens_per_update": tokens_per_update,
+                },
+            }
+        ]
+
+    tokenizer_lineage = summary.get("tokenizer_lineage") if isinstance(summary.get("tokenizer_lineage"), dict) else {}
+    if not tokenizer_lineage:
+        config_doc = _load_json_dict(run_dir / "config.json") if run_dir else None
+        manifest_doc = _load_json_dict(run_dir / "weights_manifest.json") if run_dir else None
+        train_init_doc = _load_json_dict(run_dir / "train_init_config.json") if run_dir else None
+        operator_doc = _load_json_dict(run_dir / "operator_train_run.json") if run_dir else None
+        manifest_cfg = manifest_doc.get("config") if isinstance(manifest_doc, dict) and isinstance(manifest_doc.get("config"), dict) else {}
+        train_dims = summary.get("train_dims") if isinstance(summary.get("train_dims"), dict) else {}
+        effective_dims = train_dims.get("effective") if isinstance(train_dims.get("effective"), dict) else {}
+
+        vocab_size = (
+            effective_dims.get("vocab")
+            or (config_doc.get("vocab_size") if isinstance(config_doc, dict) else None)
+            or manifest_cfg.get("vocab_size")
+        )
+        template_name = None
+        if isinstance(operator_doc, dict):
+            template_name = operator_doc.get("template")
+        if not template_name and isinstance(train_init_doc, dict):
+            template_name = train_init_doc.get("template")
+        if not template_name and isinstance(manifest_cfg, dict):
+            template_name = manifest_cfg.get("model")
+
+        tokenizer_path = run_dir / "tokenizer.json" if run_dir else None
+        tokenizer_hash = _hash_sha256_file(tokenizer_path) if tokenizer_path else None
+        tokenizer_lineage = {
+            "source": "run_dir" if run_dir else "summary_fallback",
+            "type": "synthetic_utf8_mod_vocab",
+            "vocab_size": int(vocab_size) if vocab_size is not None else None,
+            "bos_token_id": (
+                config_doc.get("bos_token_id")
+                if isinstance(config_doc, dict)
+                else manifest_cfg.get("bos_token_id")
+            ),
+            "eos_token_id": (
+                config_doc.get("eos_token_id")
+                if isinstance(config_doc, dict)
+                else manifest_cfg.get("eos_token_id")
+            ),
+            "pad_token_id": (
+                config_doc.get("pad_token_id")
+                if isinstance(config_doc, dict)
+                else manifest_cfg.get("pad_token_id")
+            ),
+            "chat_template": (
+                config_doc.get("chat_template")
+                if isinstance(config_doc, dict)
+                else None
+            ),
+            "template": template_name,
+            "tokenizer_path": str(tokenizer_path) if tokenizer_path and tokenizer_path.exists() else None,
+            "tokenizer_sha256": tokenizer_hash,
+        }
+
+    optimizer_hparams = summary.get("optimizer_hparams") if isinstance(summary.get("optimizer_hparams"), dict) else {}
+    payload = {
+        "schema": "ck.training_pipeline.v1",
+        "generated_at": _utc_now_iso(),
+        "active_stage": mode,
+        "stage_timeline": stage_timeline,
+        "backend": str(summary.get("backend") or ""),
+        "optimizer": {
+            "name": str(summary.get("optimizer") or ""),
+            "lr": float(summary.get("lr", 0.0) or 0.0),
+            "hparams": optimizer_hparams,
+        },
+        "execution": {
+            "epochs": int(summary.get("epochs", 0) or 0),
+            "steps": int(summary.get("steps", 0) or 0),
+            "micro_steps": int(summary.get("micro_steps", 0) or 0),
+            "optimizer_steps": int(summary.get("optimizer_steps", 0) or 0),
+            "seq_len": seq_len,
+            "grad_accum": grad_accum,
+            "tokens_total": int(summary.get("total_tokens", 0) or 0),
+            "tokens_per_update": tokens_per_update,
+            "processed_tokens": processed_tokens,
+        },
+        "train_dims": summary.get("train_dims") if isinstance(summary.get("train_dims"), dict) else {},
+        "data_provenance": data_entries,
+        "tokenizer_lineage": tokenizer_lineage,
+        "sources": {
+            "summary": "train_e2e_latest.json",
+            "run_dir": str(run_dir) if run_dir else None,
+        },
+    }
+    return payload
+
+
 def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict] = None) -> None:
     if not summary_json.exists():
         return
@@ -1653,6 +1855,7 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         "latest_step": int(ckpt_info.get("latest_step", 0) or 0),
         "files": ckpt_info.get("files", []),
     }
+    training_pipeline = _build_training_pipeline_payload(s, None)
 
     payloads = {
         "training_loss_curve_latest.json": training_loss_curve,
@@ -1660,6 +1863,7 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         "training_grad_norms_latest.json": training_grad_norms,
         "training_step_profile_latest.json": training_step_profile,
         "training_checkpoint_policy_latest.json": training_checkpoint_policy,
+        "training_pipeline_latest.json": training_pipeline,
     }
     for name, payload in payloads.items():
         with (report_dir / name).open("w", encoding="utf-8") as f:
@@ -1690,6 +1894,27 @@ def _resolve_train_text(args: argparse.Namespace) -> Optional[str]:
 
     prompt = getattr(args, "prompt", None)
     return str(prompt) if prompt else None
+
+
+def _resolve_train_token_stream(args: argparse.Namespace) -> tuple[Optional[list[int]], Optional[Path]]:
+    """Resolve optional pre-tokenized integer stream file."""
+    token_file = getattr(args, "train_token_file", None)
+    if not token_file:
+        return None, None
+    path = Path(token_file).expanduser().resolve()
+    if not path.exists():
+        log_error(f"Training token file not found: {path}")
+        sys.exit(2)
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except Exception as e:
+        log_error(f"Failed to read training token file from {path}: {e}")
+        sys.exit(2)
+    vals = [int(m.group(0)) for m in re.finditer(r"[+-]?\d+", text)]
+    if len(vals) <= 1:
+        log_error(f"Training token file must contain at least 2 integers: {path}")
+        sys.exit(2)
+    return vals, path
 
 
 def _resolve_train_mode(args: argparse.Namespace) -> str:
@@ -1772,12 +1997,28 @@ def _assess_train_safety(args: argparse.Namespace, train_backend: str) -> dict:
 
 
 
-def _build_train_token_batches(train_text: Optional[str], total_tokens: int, seq_len: int, vocab: int, seed: int) -> list[tuple[list[int], list[int]]]:
+def _build_train_token_batches(
+    train_text: Optional[str],
+    total_tokens: int,
+    seq_len: int,
+    vocab: int,
+    seed: int,
+    token_stream: Optional[list[int]] = None,
+) -> list[tuple[list[int], list[int]]]:
     """Build deterministic token/target batches for CK runtime train stepping."""
     if seq_len < 1:
         return []
     needed = max(int(total_tokens) + 1, int(seq_len) + 1)
-    if train_text:
+    if token_stream:
+        base = [int(v) for v in token_stream]
+        bad = next((v for v in base if v < 0 or v >= int(vocab)), None)
+        if bad is not None:
+            raise ValueError(
+                f"train token id out of range for model vocab: token={bad}, vocab={int(vocab)}"
+            )
+        repeats = (needed + len(base) - 1) // len(base)
+        stream = (base * repeats)[:needed]
+    elif train_text:
         raw = train_text.encode("utf-8", errors="ignore")
         if len(raw) < 2:
             raw = b"hello"
@@ -3450,6 +3691,95 @@ def _run_ck_train_runtime(
     train_num_layers = int(effective_train_dims.get("num_layers", 1) or 1)
     optimizer = str(getattr(args, "train_optimizer", "adamw") or "adamw")
 
+    train_data_arg = getattr(args, "train_data", None)
+    train_data_path = Path(train_data_arg).expanduser().resolve() if train_data_arg else None
+    token_stream_vals, token_stream_path = _resolve_train_token_stream(args)
+    if token_stream_path is not None and train_text:
+        log("  train-token-file provided: ignoring --data/--prompt text tokenization path", C_DIM)
+        train_text = None
+    if token_stream_vals is not None and len(token_stream_vals) > 0:
+        tok_min = int(min(token_stream_vals))
+        tok_max = int(max(token_stream_vals))
+        if tok_min < 0 or tok_max >= int(vocab):
+            log_error(
+                "Token stream has ids outside model vocab range: "
+                f"min={tok_min} max={tok_max} vocab={int(vocab)}"
+            )
+            log_error(
+                "Re-init run-dir with vocab >= tokenizer vocab, or provide a token file "
+                "that matches run vocab."
+            )
+            sys.exit(2)
+    train_data_kind = (
+        "token_file"
+        if token_stream_path
+        else ("file" if train_data_path else ("inline_text" if train_text else "synthetic"))
+    )
+    if token_stream_path:
+        dataset_name = token_stream_path.name
+        source_uri = token_stream_path.as_uri()
+        source_path = str(token_stream_path)
+    elif train_data_path:
+        dataset_name = train_data_path.name
+        source_uri = train_data_path.as_uri()
+        source_path = str(train_data_path)
+    elif train_text:
+        if getattr(args, "train_text", None):
+            dataset_name = "inline_train_text"
+            source_uri = "inline://train_text"
+        elif getattr(args, "prompt", None):
+            dataset_name = "prompt_text"
+            source_uri = "inline://prompt"
+        else:
+            dataset_name = "inline_text"
+            source_uri = "inline://text"
+        source_path = None
+    else:
+        dataset_name = "synthetic_seeded"
+        source_uri = "synthetic://seeded"
+        source_path = None
+    train_text_bytes = train_text.encode("utf-8", errors="ignore") if train_text else b""
+    train_text_hash = _hash_sha256_bytes(train_text_bytes) if train_text_bytes else None
+    train_data_source = {
+        "kind": train_data_kind,
+        "dataset_name": dataset_name,
+        "source_uri": source_uri,
+        "source_path": source_path,
+        "split": "train",
+        "token_count": int(total_tokens),
+        "text_chars": int(len(train_text)) if train_text else 0,
+        "text_sha256": train_text_hash,
+        "sampling": {
+            "strategy": "repeat_to_budget",
+            "seed": int(seed),
+            "shuffle": False,
+        },
+        "packing": {
+            "seq_len": int(seq_len),
+            "grad_accum": int(grad_accum),
+            "tokens_per_update": int(seq_len * grad_accum),
+        },
+    }
+    config_doc = _load_json_dict(run_dir / "config.json") or {}
+    tokenizer_path = run_dir / "tokenizer.json"
+    tokenizer_lineage = {
+        "source": "run_dir",
+        "type": "pretokenized_stream" if token_stream_path else "synthetic_utf8_mod_vocab",
+        "vocab_size": int(vocab),
+        "bos_token_id": config_doc.get("bos_token_id"),
+        "eos_token_id": config_doc.get("eos_token_id"),
+        "pad_token_id": config_doc.get("pad_token_id"),
+        "chat_template": config_doc.get("chat_template"),
+        "template": None,
+        "tokenizer_path": str(tokenizer_path) if tokenizer_path.exists() else None,
+        "tokenizer_sha256": _hash_sha256_file(tokenizer_path) if tokenizer_path.exists() else None,
+    }
+    run_meta = _load_json_dict(run_dir / "operator_train_run.json") or {}
+    if isinstance(run_meta, dict) and run_meta.get("template"):
+        tokenizer_lineage["template"] = run_meta.get("template")
+    elif isinstance(config_doc, dict) and config_doc.get("model"):
+        tokenizer_lineage["template"] = config_doc.get("model")
+
     parity_on = bool(getattr(args, "parity_on", False))
     parity_profile = str(getattr(args, "parity_profile", "balanced") or "balanced")
     parity_every = int(getattr(args, "parity_every", 50) or 0)
@@ -3494,7 +3824,18 @@ def _run_ck_train_runtime(
     )
     runtime_grad_accum_steps = int(lib.ck_train_get_accum_steps()) if has_accum_steps_api else int(grad_accum)
 
-    batches = _build_train_token_batches(train_text, total_tokens, seq_len, vocab, seed)
+    try:
+        batches = _build_train_token_batches(
+            train_text,
+            total_tokens,
+            seq_len,
+            vocab,
+            seed,
+            token_stream=token_stream_vals,
+        )
+    except ValueError as e:
+        log_error(str(e))
+        sys.exit(2)
     total_steps = epochs * len(batches)
 
     if bool(getattr(args, "train_verify_memory", False)):
@@ -4657,6 +4998,7 @@ def _run_ck_train_runtime(
         "seq_len": seq_len,
         "total_tokens": total_tokens,
         "grad_accum": grad_accum,
+        "seed": seed,
         "optimizer": optimizer,
         "optimizer_hparams": {
             "source": str(adamw_cfg.get("source") or "defaults"),
@@ -4725,6 +5067,21 @@ def _run_ck_train_runtime(
             "effective": effective_train_dims,
             "mismatches": resolved_train_dims.get("mismatches"),
         },
+        "data_source": train_data_source,
+        "data_provenance": [
+            {
+                "stage": train_mode,
+                "dataset_name": train_data_source.get("dataset_name"),
+                "source_uri": train_data_source.get("source_uri"),
+                "source_path": train_data_source.get("source_path"),
+                "split": train_data_source.get("split"),
+                "token_count": train_data_source.get("token_count"),
+                "hash": {"algo": "sha256", "value": train_data_source.get("text_sha256")},
+                "sampling": train_data_source.get("sampling"),
+                "packing": train_data_source.get("packing"),
+            }
+        ],
+        "tokenizer_lineage": tokenizer_lineage,
         "backend": train_backend,
         "train_mode": train_mode,
         "source": "ck_runtime_generated",
@@ -4887,6 +5244,7 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         "latest_step": int(ckpt_info.get("latest_step", 0) or 0),
         "files": ckpt_info.get("files", []),
     }
+    training_pipeline = _build_training_pipeline_payload(s, run_dir)
 
     payloads = {
         "training_loss_curve.json": training_loss_curve,
@@ -4894,6 +5252,7 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         "training_grad_norms.json": training_grad_norms,
         "training_step_profile.json": training_step_profile,
         "training_checkpoint_policy.json": training_checkpoint_policy,
+        "training_pipeline.json": training_pipeline,
     }
     for name, payload in payloads.items():
         (run_dir / name).write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -6685,6 +7044,8 @@ Examples:
                         help='Run directory for artifacts (single source of truth)')
         sp.add_argument('--data', dest='train_data', default=None,
                         help='Path to UTF-8 training text file (repeated to fill token budget)')
+        sp.add_argument('--train-token-file', dest='train_token_file', default=None,
+                        help='Path to pre-tokenized integer stream file (overrides --data/--prompt tokenization)')
         sp.add_argument('--prompt', dest='train_text', default='Hello!',
                         help='Inline training text (used when --data is not set)')
         sp.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain',
@@ -6821,6 +7182,8 @@ Examples:
                            help='Optional run directory for train-e2e artifact output')
     run_parser.add_argument('--train-data', default=None,
                            help='Training text file for --train-e2e (UTF-8)')
+    run_parser.add_argument('--train-token-file', default=None,
+                           help='Pre-tokenized integer stream file for --train-e2e (overrides --train-data/--train-text)')
     run_parser.add_argument('--train-text', type=str, default=None,
                            help='Optional training text (UTF-8) for --train-e2e; falls back to --prompt')
     run_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')

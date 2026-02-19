@@ -498,7 +498,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 $(BUILD_STAMP): | $(BUILD_DIR)
-	@printf 'CC=%s\nCFLAGS=%s\n' "$(CC)" "$(CFLAGS)" > $@.tmp
+	@printf 'CC=%s\nCFLAGS=%s\nLDFLAGS=%s\n' "$(CC)" "$(CFLAGS)" "$(LDFLAGS)" > $@.tmp
 	@if [ ! -f $@ ] || ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm $@.tmp; fi
 
 $(LIB): $(BUILD_STAMP) $(SRCS)
@@ -3360,6 +3360,18 @@ CK_TEST_V7_WITH_ADVISOR ?= 0
 CK_TEST_V7_VTUNE_DEEP ?= 0
 CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
 V7_CKTOP_RUN ?= /tmp/v7_runtime_parity
+V7_PIPELINE_RUN ?= /tmp/v7_pipeline_run
+V7_PIPELINE_TOKENIZER ?= byte
+V7_PIPELINE_DATASET_REPEATS ?= 10
+V7_PIPELINE_EPOCHS ?= 10
+V7_PIPELINE_SEQ_LEN ?= 32
+V7_PIPELINE_TOTAL_TOKENS ?= 1024
+V7_PIPELINE_GRAD_ACCUM ?= 1
+V7_PIPELINE_LR ?= 5e-4
+V7_PIPELINE_WITH_TORCH ?= 1
+V7_PIPELINE_OPEN_VIS ?= 0
+V7_PIPELINE_WORK_DIR ?=
+V7_PIPELINE_JSON ?= $(V7_REPORT_DIR)/train_data_pipeline_latest.json
 
 .PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict v7-rms-swiglu-backward-parity \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
@@ -3367,6 +3379,7 @@ V7_CKTOP_RUN ?= /tmp/v7_runtime_parity
 	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
 	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum \
 	v7-backprop-plumbing v7-backprop-stitch-runtime v7-backprop-stitch-runtime-accum test-v7-svg-overfit-regression \
+	v7-train-data-pipeline \
 	v7-ctop v7-ctop-demo
 
 v7-help:
@@ -3404,6 +3417,8 @@ v7-help:
 	@echo "  make v7-train-parity-5"
 	@echo "  make test-v7-bpe-train-parity"
 	@echo "  make test-v7-svg-overfit-regression"
+	@echo "  make v7-train-data-pipeline"
+	@echo "     knobs: V7_PIPELINE_TOKENIZER=byte|bpe V7_PIPELINE_WITH_TORCH=0|1 V7_PIPELINE_OPEN_VIS=0|1"
 	@echo "  make v7-train-parity-drift-smoke"
 	@echo "  make v7-train-parity-drift-localize"
 	@echo "  make v7-train-parity-long-horizon"
@@ -3838,6 +3853,24 @@ test-v7-bpe-train-parity: tokenizer ck-bpe-train
 
 test-v7-svg-overfit-regression:
 	@$(PYTHON) version/v7/scripts/test_svg_overfit_regression_v7.py --json-out "$(V7_SVG_OVERFIT_JSON)"
+
+v7-train-data-pipeline:
+	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_PIPELINE_RUN))"; \
+	WORK_DIR="$(if $(V7_PIPELINE_WORK_DIR),$(V7_PIPELINE_WORK_DIR),$$RUN_DIR/.ck_pipeline/latest)"; \
+	$(PYTHON) version/v7/scripts/train_data_pipeline_v7.py \
+		--run "$$RUN_DIR" \
+		--init-if-missing \
+		--tokenizer "$(V7_PIPELINE_TOKENIZER)" \
+		--dataset-repeats "$(V7_PIPELINE_DATASET_REPEATS)" \
+		--epochs "$(V7_PIPELINE_EPOCHS)" \
+		--seq-len "$(V7_PIPELINE_SEQ_LEN)" \
+		--total-tokens "$(V7_PIPELINE_TOTAL_TOKENS)" \
+		--grad-accum "$(V7_PIPELINE_GRAD_ACCUM)" \
+		--lr "$(V7_PIPELINE_LR)" \
+		--work-dir "$$WORK_DIR" \
+		--json-out "$(V7_PIPELINE_JSON)" \
+		$(if $(filter 1,$(V7_PIPELINE_WITH_TORCH)),--with-torch-ref,) \
+		$(if $(filter 1,$(V7_PIPELINE_OPEN_VIS)),--open-visualizer,)
 
 v7-gate-train:
 	@$(MAKE) --no-print-directory v7-inference-smoke
