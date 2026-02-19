@@ -933,40 +933,72 @@
 <h1>Scaling Philosophy</h1>
 
 <div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
-    <h2 style="margin-top: 0; color: #ffb400;">The Myth That Created This Project</h2>
+    <h2 style="margin-top: 0; color: #ffb400;">The Bet Behind This Project</h2>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        The GPU marketing machine has been so effective that the industry has internalized a belief that borders on religious doctrine:
-        <strong>"AI cannot run on CPUs."</strong> Not "AI is slower on CPUs" or "GPUs are better suited" &mdash; but that the laws of physics
-        somehow forbid a CPU from performing matrix multiplication and softmax. That running inference on a CPU would violate
-        some fundamental constraint of the universe.
+        Every generation, proprietary hardware dominates a new workload — and every generation, commodity hardware catches up once the software gets good enough.
+        The bet behind C-Kernel-Engine is that AI is no different. The operations are matrix multiply, softmax, layer norm, attention, and backprop.
+        <strong>Standard linear algebra and calculus. Not quantum mechanics. Not unsolved mathematics.</strong>
+        Nothing physically exotic — which means there is no permanent hardware moat.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        <strong>This is not a technical argument. It is marketing.</strong> And many smart people have been made to believe it.
+        The reality: different CPU architectures, different generations, and different system configurations give different results &mdash;
+        but the numbers are already practical. A quantized 0.6B model (Qwen3&ndash;0.6B Q8_0) on a 12th-gen Intel Alder Lake (12-core, AVX2) has hit
+        <strong>~100 tokens/sec when the system is otherwise idle</strong>.
+        On an older-gen 4-core machine, the same model runs at <strong>~20&ndash;25 tokens/sec</strong> depending on available compute capacity.
+        No GPU. No CUDA. No special hardware. AVX2 and SSE2 &mdash;
+        instructions that have existed in x86 for over a decade.
+        <strong>That's well into human-readable speed</strong> &mdash; fast enough for a local assistant, a natural language interface
+        to your Linux command line, or a utility running on hardware already in every data center.
+        <em>(Run the Qwen3 model on your machine and see for yourself.)</em>
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        The reality: <strong>A quantized Qwen2 0.5B model running llama.cpp achieves ~30 tokens/sec on a
-        12-year-old Intel Core i7.</strong> No GPU. No CUDA. No special hardware. A consumer CPU from 2012 with only AVX and SSE2 &mdash;
-        not even AVX2. Instructions that have existed in x86 chips since 2011. The C-Kernel-Engine is still closing
-        the performance gap with llama.cpp, but the physics of the underlying hardware proves the capability is there.
-        The math works. The tokens come out.
+        And before anyone says <em>"you're running on commodity laptop hardware and comparing it to server-grade H300 GPUs"</em> &mdash;
+        the laptop numbers above are the floor, not the ceiling.
+        <strong>Research and testing is currently underway on 5th-gen Intel Xeon Scalable processors with AVX-512 and AMX</strong> &mdash;
+        the same server-grade silicon sitting in data center racks today.
+        AMX gives us native BF16/INT8 matrix-multiply acceleration in hardware, and AVX-512 doubles the SIMD width.
+        When those numbers land, the comparison to GPU clusters will be apples-to-apples: server CPU vs. server GPU.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        And 30 tokens/sec is <strong>human-readable speed</strong>. That's fast enough for real, practical work. Imagine a natural language
-        interface to your Linux command line &mdash; instead of memorizing <code>find / -name "*.log" -mtime +7 -exec rm {} \;</code>,
-        you describe what you want in plain English and the model translates it. At 30 tok/sec on a 12-year-old CPU,
-        that response arrives faster than you can read it. This isn't a research demo &mdash; it's an accessible utility that makes Linux navigable
-        for everyone, running on hardware that's already in every data center and most desktops.
-    </p>
-    <p style="font-size: 1.15em; line-height: 1.7;">
-        <strong>The C-Kernel-Engine exists to challenge and disprove the GPU-only narrative.</strong> Not just to show that AI <em>can</em>
-        run on CPUs, but that CPU-only inference and training can be practical, competitive, and at scale &mdash;
-        dramatically cheaper. Every section on this page is evidence against a myth that has cost the industry
-        billions in unnecessary GPU spending.
+        C-Kernel-Engine is actively closing the gap with llama.cpp. We use Intel VTune, FlameGraph, Intel Advisor,
+        <code>perf stat</code>, and roofline analysis to identify exactly where cycles are being left on the table &mdash;
+        and we fix them, kernel by kernel. The profiling infrastructure is as much a part of this project as the kernels themselves.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7; border-top: 1px solid #333; padding-top: 1.5rem; margin-bottom: 0;">
         With hand-tuned SIMD kernels, a custom memory planner, and weight stitching built from scratch &mdash;
-        the math is settled. We know mathematically that GPUs are not required.
+        the math is settled. We know the computation works on commodity hardware.
         <strong>The rest is all hardcore engineering.</strong>
+        Distributed computing is on the horizon &mdash; and when we get there, this page will be updated with real measured numbers.
+    </p>
+</div>
+
+<div style="margin: 2.5rem 0 0.5rem 0; text-align: center;">
+    <img src="assets/engineering-compass.svg" alt="Engineering Compass — Profile, Find Bottleneck, Fix Kernel, Measure, Repeat" style="width: 100%; max-width: 1200px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);" />
+</div>
+
+<div style="background: linear-gradient(135deg, #1a2332 0%, #1a1a2e 100%); border: 1px solid #334; border-left: 4px solid #07adf8; border-radius: 12px; padding: 2rem 2.5rem; margin: 0.5rem 0 2rem 0;">
+    <h3 style="margin-top: 0; color: #07adf8; font-size: 1.3em;">
+        🧭 Engineering Compass &mdash; What This Page Is Really For
+    </h3>
+    <p style="font-size: 1.1em; line-height: 1.7; color: #ccc;">
+        Honestly? This page is mostly for me. It's the guiding light &mdash; the thing that keeps me focused
+        on what to work on next with C-Kernel-Engine. The scaling story is the <em>direction</em>, not a press release.
+    </p>
+    <p style="font-size: 1.1em; line-height: 1.7; color: #ccc; margin-bottom: 0.5rem;">
+        The engineering discipline is simple and repeatable:
+    </p>
+    <ol style="font-size: 1.05em; line-height: 2; color: #ddd; padding-left: 1.5rem;">
+        <li><strong style="color: #47b475;">Find the slowest-moving part.</strong> Profile it. Understand <em>why</em> it's slow.</li>
+        <li><strong style="color: #47b475;">Find the fastest-moving part.</strong> Understand what makes it fast. Replicate the pattern.</li>
+        <li><strong style="color: #47b475;">Get more RAM, more cores.</strong> Test on bigger hardware. See if the architecture holds.</li>
+        <li><strong style="color: #47b475;">Keep profiling.</strong> VTune, perf stat, roofline, FlameGraph &mdash; every run, every change.</li>
+        <li><strong style="color: #47b475;">Fix one kernel at a time.</strong> Don't boil the ocean. One bottleneck, one fix, one measurement.</li>
+    </ol>
+    <p style="font-size: 1.1em; line-height: 1.7; color: #999; border-top: 1px solid #333; padding-top: 1rem; margin-bottom: 0;">
+        Will people criticize this project? Absolutely. But there is strong engineering behind it &mdash;
+        step by step, measurement by measurement, kernel by kernel.
+        That's the process. Follow the data, not the hype.
+        <em>Who knows where it leads &mdash; but at least the path is honest.</em>
     </p>
 </div>
 
@@ -983,19 +1015,8 @@
 
 <h2>The Two First Principles</h2>
 
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Principle 1: 0 × ∞ = 0</h3>
-        <p><strong>If your model doesn't fit in memory, compute speed is irrelevant.</strong></p>
-        <p>Here, "0" means infeasible under the operational constraints: memory capacity, KV cache size, optimizer states, and reliability requirements. A GPU with 80GB VRAM running at infinite FLOPS still equals zero if your 70B model requires 140GB+ for weights alone.</p>
-        <p><strong>The cost implication:</strong> You're FORCED to buy 8+ GPUs ($320K+) just to fit the model. With CPUs and 4TB RAM per server, you need 1-2 servers ($60K).</p>
-    </div>
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Principle 2: Theory of Constraints</h3>
-        <p><strong>Your system is only as fast as its slowest component.</strong></p>
-        <p>NVLink is fast (900 GB/s) <em>within a node</em>. But NVLink doesn't scale infinitely—at cluster scale, the dominant cost shifts to network + coordination, and Ethernet becomes the first-class design constraint.</p>
-        <p><strong>The equalizer:</strong> At the Ethernet boundary, CPUs and GPUs face the same interconnect constraint. In memory-bound or low-batch regimes where compute utilization is low, GPUs often underutilize their theoretical FLOPS advantage.</p>
-    </div>
+<div class="img-container svg-viewer" data-title="Two First Principles: Memory Gate + Theory of Constraints">
+    <img src="assets/two-principles.svg" alt="Principle 1: 0 × ∞ = 0 — memory gates everything. Principle 2: Theory of Constraints — Ethernet equalizes GPUs and CPUs at cluster scale.">
 </div>
 
 <div class="alert alert-success">
@@ -1003,115 +1024,87 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
     </div>
     <div>
-        <strong>The Proof of Infinite CPU Scaling</strong><br>
-        The internet itself. Billions of CPUs, connected by Ethernet, scaling infinitely. No NVLink required.
+        <strong>CPU Horizontal Scaling Is Truly Linear</strong><br>
+        Add a server: add compute. No topology planning, no NVLink fabric, no cluster pre-configuration. Each node is independent. GPU clusters require upfront coordination architecture — fixed cluster sizes, NVLink topology constraints, and tightly coupled scheduling. CPU clusters are just servers on Ethernet.
     </div>
 </div>
 
-<h2>History Repeats: Commodity Always Wins</h2>
+<h2>The Computation Is Not Exotic</h2>
 
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">The Pattern That Never Fails</h3>
-    <p>Every generation, expensive proprietary hardware dominates... until commodity hardware + brilliant software disrupts it.</p>
-    <p><strong>We've seen this movie before. We know how it ends.</strong></p>
-</div>
-
-<div class="table-container">
-    <table>
-        <thead>
-            <tr><th>Era</th><th>Incumbent</th><th>Disruptor</th><th>Result</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><strong>1998</strong></td>
-                <td>Sun/SGI servers ($500K+)</td>
-                <td>x86 PCs + MapReduce/GFS</td>
-                <td style="color: #4ade80;">Sun bankrupt (2010)</td>
-            </tr>
-            <tr>
-                <td><strong>1990s</strong></td>
-                <td>SPARC, Alpha, PA-RISC</td>
-                <td>Intel x86 commodity chips</td>
-                <td style="color: #4ade80;">RISC dead ends</td>
-            </tr>
-            <tr>
-                <td><strong>2009</strong></td>
-                <td>Teradata, Netezza ($1M+)</td>
-                <td>Hadoop on commodity clusters</td>
-                <td style="color: #4ade80;">Big data democratized</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<p style="margin-top: 1rem; color: #a0b0c0; font-size: 15px; line-height: 1.6;">
-    <strong style="color: #fbbf24;">1998: "Serious" computing meant Sun Enterprise servers.</strong>
-    Google used cheap x86 PCs with software that expected hardware to fail—and scaled horizontally.
-    <strong>Result:</strong> Sun bankrupt in 2010.
-    The pattern is repeating: as models hit hundreds of gigabytes, costs shift from compute to memory + coordination.
-    CPUs—built for exactly this regime—are positioned to disrupt GPU-centric assumptions.
+<p style="font-size: 1.1em; line-height: 1.75; margin-bottom: 1.5rem;">
+    AI training and inference reduce to five operations: matrix multiply, attention, softmax, layer normalization, and backpropagation.
+    These are linear algebra and calculus — mathematics developed in the 17th through 19th centuries, long before the first computer.
+    <strong>Nothing about the computation requires physically exotic hardware.</strong> A CPU with SIMD instructions executes every one of these operations natively.
+    If the math isn't exotic, the hardware requirement isn't permanent — it's a market condition.
+    And market conditions change.
 </p>
 
-<div class="alert alert-warning">
+<div class="img-container svg-viewer" data-title="AI Is Standard Math — Commodity Hardware Always Wins">
+    <img src="assets/commodity-hardware-pattern.svg" alt="Left: AI operations are standard linear algebra and calculus. Right: hardware displacement pattern showing proprietary always loses to commodity.">
+</div>
+
+<div class="alert alert-warning" style="margin-top: 1.5rem;">
     <div class="alert-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>The Inevitable Question</strong><br>
+        <strong>The same pattern, repeating</strong><br>
         In 1995, "You can't run serious workloads on cheap PCs" was conventional wisdom.<br>
-        In 2024, "You can't run serious AI on cheap CPUs" is conventional wisdom.<br>
-        <strong>The pattern suggests one of these beliefs will age poorly.</strong>
+        In 2025, "You can't run serious AI on cheap CPUs" is conventional wisdom.<br>
+        <strong>One of these beliefs aged very poorly. The pattern suggests which way this one goes.</strong>
     </div>
 </div>
+
+<details style="margin-top: 1rem;">
+    <summary style="cursor: pointer; color: #a0a0a0; font-size: 0.9em; padding: 0.5rem 0;">Historical reference</summary>
+    <div class="table-container" style="margin-top: 0.75rem;">
+        <table>
+            <thead>
+                <tr><th>Era</th><th>Proprietary Incumbent</th><th>Commodity Disruptor</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1990s</strong></td>
+                    <td>SPARC, Alpha, PA-RISC</td>
+                    <td>x86 commodity chips</td>
+                    <td style="color: #4ade80;">Proprietary RISC faded</td>
+                </tr>
+                <tr>
+                    <td><strong>1998</strong></td>
+                    <td>Sun/SGI servers (&#36;500K+)</td>
+                    <td>x86 PCs + MapReduce/GFS</td>
+                    <td style="color: #4ade80;">Sun bankrupt (2010)</td>
+                </tr>
+                <tr>
+                    <td><strong>2009</strong></td>
+                    <td>Teradata, Netezza (&#36;1M+)</td>
+                    <td>Hadoop on commodity clusters</td>
+                    <td style="color: #4ade80;">Big data democratized</td>
+                </tr>
+                <tr style="opacity: 0.7; border-top: 1px dashed #333;">
+                    <td><strong>Now</strong></td>
+                    <td>GPU clusters ($M+)</td>
+                    <td>CPU clusters + software</td>
+                    <td style="color: #ffb400;">→ ?</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</details>
 
 <h2>Principle 1: The Cost of 0 × ∞ = 0</h2>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">The GPU Memory Trap</h3>
     <p>Yes, you CAN fit a 70B model on GPUs using tensor/pipeline parallelism. That's not the point.</p>
-    <p><strong>The point is: you're now FORCED to buy 8+ GPUs.</strong></p>
-</div>
-
-<div class="alert alert-info" style="margin-bottom: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid #3b82f6;">
-    <strong>Assumptions:</strong> BF16 precision for weights; inference workloads (no optimizer states unless noted); 2024-2025 street pricing; tensor parallelism for multi-GPU; DDR5 ECC RAM for CPU servers. Costs are hardware-only, excluding networking, cooling, and housing.
-</div>
-
-<div class="table-container">
-    <table>
-        <thead>
-            <tr><th>Model Size</th><th>GPU Requirement</th><th>GPU Cost</th><th>CPU Requirement</th><th>CPU Cost</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>7B (14GB weights)</td>
-                <td>1× 80GB GPU</td>
-                <td>$40,000</td>
-                <td>1× server, 128GB RAM</td>
-                <td>$8,000</td>
-            </tr>
-            <tr>
-                <td>70B (140GB weights)</td>
-                <td>2-4× 80GB GPUs + NVLink</td>
-                <td>$160,000+</td>
-                <td>1× server, 512GB RAM</td>
-                <td>$15,000</td>
-            </tr>
-            <tr>
-                <td>70B (with optimizer states)</td>
-                <td>8× 80GB GPUs + NVLink</td>
-                <td>$480,000+</td>
-                <td>1-2× servers, 2TB RAM each</td>
-                <td>$60,000</td>
-            </tr>
-            <tr>
-                <td>405B (Llama 3.1 scale)</td>
-                <td>32+ GPUs across nodes</td>
-                <td>$2,000,000+</td>
-                <td>4-8× servers, 4TB RAM each</td>
-                <td>$200,000</td>
-            </tr>
-        </tbody>
-    </table>
+    <p><strong>The point is: you're now FORCED to buy 8+ GPUs in a cluster.</strong></p>
+    <p><strong>And GPUs are:</strong></p>
+    <ul>
+        <li><strong>Proprietary</strong> — locked to NVIDIA (CUDA), no open ecosystem</li>
+        <li><strong>Export-controlled</strong> — H100/H200 blocked in many countries, supply constrained</li>
+        <li><strong>Cluster-required</strong> — single GPUs can't handle large models, need NVLink infrastructure</li>
+        <li><strong>Expensive</strong> — &#36;40K+ per GPU, &#36;200K+ for NVLink switches</li>
+    </ul>
 </div>
 
 <div class="card">
@@ -1207,66 +1200,8 @@ CPU Path:
     </ul>
 </div>
 
-<div class="card">
-    <h3 style="margin-top: 0;">Target CPU Families</h3>
-    <div class="table-container">
-        <table class="table">
-        <thead>
-            <tr><th>CPU</th><th>Cores</th><th>AVX-512</th><th>AMX</th><th>DDR5 Channels</th><th>DSA</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>AMD EPYC 9004 (Genoa)</td>
-                <td>Up to 128</td>
-                <td>Yes</td>
-                <td>No</td>
-                <td>12</td>
-                <td>No</td>
-            </tr>
-            <tr>
-                <td>AMD EPYC 9005 (Turin)</td>
-                <td>Up to 192</td>
-                <td>Yes</td>
-                <td>No</td>
-                <td>12</td>
-                <td>No</td>
-            </tr>
-            <tr>
-                <td>Intel Xeon Sapphire Rapids</td>
-                <td>Up to 60</td>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td>8</td>
-                <td>Yes</td>
-            </tr>
-            <tr>
-                <td>Intel Xeon Emerald Rapids</td>
-                <td>Up to 64</td>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td>8</td>
-                <td>Yes</td>
-            </tr>
-            <tr>
-                <td>Intel Xeon Granite Rapids</td>
-                <td>Up to 128</td>
-                <td>Yes</td>
-                <td>Yes</td>
-                <td>8</td>
-                <td>Yes</td>
-            </tr>
-            <tr>
-                <td>Ampere Altra Max</td>
-                <td>128</td>
-                <td>No (ARM)</td>
-                <td>No</td>
-                <td>8</td>
-                <td>No</td>
-            </tr>
-        </tbody>
-    </table>
-    </div>
-    <p><strong>Note:</strong> C-Kernel-Engine detects available instruction sets at compile time using <code>ck_features.h</code>. See <code>include/ck_features.h</code> for the feature detection macros.</p>
+<div class="card card-green">
+    <p>C-Kernel-Engine targets by <strong>instruction set capability</strong>, not CPU model. Any server-grade CPU with AVX2+FMA or better is a valid target — specific models change, the instruction sets don't. See <code>include/ck_features.h</code> for detection logic.</p>
 </div>
 
 <h2>Why CPU-Only?</h2>
@@ -1280,7 +1215,7 @@ CPU Path:
         <h3 style="margin-top: 0;">Advantages</h3>
         <ul>
             <li><strong>No vendor lock-in</strong> - Works on any x86/ARM CPU</li>
-            <li><strong>Commodity hardware</strong> - Standard servers, not $40K GPUs</li>
+            <li><strong>Commodity hardware</strong> - Standard servers, not &#36;40K GPUs</li>
             <li><strong>Larger memory</strong> - 2TB RAM per node, no 80GB VRAM limit</li>
             <li><strong>Better debugging</strong> - GDB, Valgrind, perf all work</li>
             <li><strong>Simpler deployment</strong> - No CUDA, no driver hell</li>
@@ -1317,19 +1252,20 @@ CPU Path:
     <div class="card card-green">
         <h3 style="margin-top: 0;">CPU: Memory Wins</h3>
         <ul>
-            <li><strong>Dual Xeon:</strong> 4-6TB DDR5</li>
+            <li><strong>Dual-socket server:</strong> 4-6TB DDR5</li>
             <li><strong>Can train:</strong> 1TB model in BF16</li>
-            <li><strong>Math:</strong> 4-6TB × Dual Socket = Non-zero</li>
-            <li><strong>Result:</strong> Actually trains the model!</li>
+            <li><strong>Math:</strong> 4-6TB × dual socket = non-zero, model loads</li>
+            <li><strong>Result:</strong> Actually trains the model</li>
         </ul>
     </div>
     <div class="card card-blue">
         <h3 style="margin-top: 0;">GPU: Compute Fast, Memory Fails</h3>
         <ul>
-            <li><strong>A100:</strong> 80GB VRAM</li>
-            <li><strong>Can't train:</strong> 1TB model</li>
-            <li><strong>Math:</strong> 80GB × ∞ GPUs = 0 (won't fit)</li>
-            <li><strong>Result:</strong> Fast but useless for large models</li>
+            <li><strong>Single GPU VRAM:</strong> tops out well below what large models need</li>
+            <li><strong>Each GPU generation:</strong> more HBM — at exponentially higher price per unit</li>
+            <li><strong>The constraint:</strong> 1TB model ÷ per-GPU VRAM = many GPUs, minimum, just for weights</li>
+            <li><strong>Math:</strong> 0 utility per GPU (model won't fit alone) × fast FLOPS = 0 — compute speed doesn't solve a memory problem</li>
+            <li><strong>Result:</strong> You buy more GPUs. Cost compounds. Complexity compounds. Memory is still the bottleneck.</li>
         </ul>
     </div>
 </div>
@@ -1338,81 +1274,17 @@ CPU Path:
     <img src="assets/cpu-gpu-analysis.svg" alt="CPU vs GPU Memory Analysis">
 </div>
 
-<h2>GPU Performance Comparison: Reality Check</h2>
+<h2>The GPU Cluster Reality</h2>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">GPU Specifications and Real-World Performance</h3>
-    <p>Let's examine actual GPU capabilities and their limitations for large-scale ML training.</p>
-</div>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3 style="margin-top: 0; text-align: center;">RTX 3090</h3>
-        <div style="text-align: center; padding: 1rem 0;">
-            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
-            <div style="color: #a0a0a0;">VRAM</div>
-        </div>
-        <ul style="list-style: none; padding: 0;">
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 936 GB/s</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 10,496</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 35</li>
-            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,500</li>
-        </ul>
-        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
-            <strong style="color: #ff6b6b;">Reality:</strong> Can't fit 70B+ models. Max practical: 13B in FP16.
-        </div>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top: 0; text-align: center;">RTX 4090</h3>
-        <div style="text-align: center; padding: 1rem 0;">
-            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">24GB</div>
-            <div style="color: #a0a0a0;">VRAM</div>
-        </div>
-        <ul style="list-style: none; padding: 0;">
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1008 GB/s</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,384</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 83</li>
-            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$1,600</li>
-        </ul>
-        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
-            <strong style="color: #ff6b6b;">Reality:</strong> Same VRAM as 3090. Still can't fit large models.
-        </div>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top: 0; text-align: center;">A100</h3>
-        <div style="text-align: center; padding: 1rem 0;">
-            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
-            <div style="color: #a0a0a0;">HBM2e</div>
-        </div>
-        <ul style="list-style: none; padding: 0;">
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 1,935 GB/s</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 6,912</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 312</li>
-            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$15,000</li>
-        </ul>
-        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
-            <strong style="color: #ff6b6b;">Reality:</strong> Can fit up to ~40B models. Needs 25+ GPUs for 70B+.
-        </div>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top: 0; text-align: center;">H100</h3>
-        <div style="text-align: center; padding: 1rem 0;">
-            <div style="font-size: 2rem; font-weight: bold; color: #ffb400;">80GB</div>
-            <div style="color: #a0a0a0;">HBM3</div>
-        </div>
-        <ul style="list-style: none; padding: 0;">
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>Memory Bandwidth:</strong> 3,350 GB/s</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>CUDA Cores:</strong> 16,896</li>
-            <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;"><strong>FP32 TFLOPS:</strong> 989</li>
-            <li style="padding: 0.5rem 0;"><strong>Cost:</strong> ~$40,000</li>
-        </ul>
-        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255,107,107,0.1); border-left: 3px solid #ff6b6b; border-radius: 4px;">
-            <strong style="color: #ff6b6b;">Reality:</strong> Same 80GB VRAM limit. Needs 12+ GPUs for 70B+ models.
-        </div>
-    </div>
+    <h3 style="margin-top: 0;">GPUs Require Clusters</h3>
+    <p>Here's the fundamental problem: no single GPU can handle large models. You need a cluster.</p>
+    <ul>
+        <li><strong>Even the biggest GPU:</strong> 80GB VRAM max—can't fit 70B+ models</li>
+        <li><strong>Multi-GPU needed:</strong> 8-32 GPUs for practical workloads</li>
+        <li><strong>NVLink required:</strong> &#36;200K+ in interconnects for fast GPU-to-GPU communication</li>
+        <li><strong>DGX systems:</strong> Pre-configured clusters start at &#36;250K+</li>
+    </ul>
 </div>
 
 <div class="alert alert-warning">
@@ -1420,8 +1292,8 @@ CPU Path:
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     </div>
     <div>
-        <strong>The Pattern is Clear</strong><br>
-        Every GPU hits the same VRAM wall. Whether 24GB or 80GB, large models require massive GPU counts. This is the fundamental constraint that CPU-only architecture bypasses entirely.
+        <strong>The VRAM Wall</strong><br>
+        Every GPU hits the same VRAM wall. Whether 24GB or 80GB per GPU, large models require massive GPU counts in coordinated clusters. This is the fundamental constraint that CPU-only architecture bypasses entirely.
     </div>
 </div>
 
@@ -1455,8 +1327,8 @@ CPU Path:
     <div class="card" style="border-left: 4px solid #ff6b6b;">
         <h3 style="margin-top: 0;">GPU: Always Hungry</h3>
         <ul>
-            <li><strong>H100 at idle:</strong> ~150W (just sitting there)</li>
-            <li><strong>H100 at compute:</strong> ~700W</li>
+            <li><strong>High-end GPU at idle:</strong> ~150W (just sitting there)</li>
+            <li><strong>High-end GPU at compute:</strong> ~700W</li>
             <li><strong>PCIe overhead:</strong> +50W for data transfer</li>
             <li><strong>VRAM stays powered:</strong> Weights must remain loaded</li>
         </ul>
@@ -1513,7 +1385,7 @@ CPU Path:
 <div class="card card-green">
     <h3 style="margin-top: 0;">The Utilization Math</h3>
     <pre>
-GPU (6× H100) for 6-department enterprise:
+GPU Cluster (6× high-end GPUs) for 6-department enterprise:
   6 departments × 1 GPU each = 4,200W continuous
   Even when only 1-2 departments are active.
   Plus: $240,000+ in hardware, NVLink complexity.
@@ -1534,7 +1406,7 @@ Net difference: 4-5x less power, 10x lower hardware cost
     <pre>
 Scenario: 6 models, 24/7 operation, mixed workload
 
-GPU Cluster (6× H100):
+GPU Cluster (6× high-end GPUs):
   Idle power: 6 × 150W = 900W
   Compute power: 6 × 700W = 4,200W (when all busy)
   Average (typical 20% compute): ~1,500W
@@ -1564,7 +1436,7 @@ Net difference: 4-5x less power = ~$1,000+/year savings
             <li><strong>No GPU manufacturing impact</strong> (TSMC 4nm vs 5nm)</li>
             <li><strong>Lower cooling</strong> due to lower heat output</li>
             <li><strong>Uses existing infrastructure</strong> - no new hardware needed</li>
-            <li><strong>10x lower hardware cost</strong> ($60K vs $600K+)</li>
+            <li><strong>10x lower hardware cost</strong> (&#36;60K vs &#36;600K+)</li>
         </ul>
     </div>
     <div class="card">
@@ -1736,7 +1608,68 @@ AT SCALE, THEY HIT THE SAME WALL.
     </div>
     <div>
         <strong>Without NVLink, GPUs Are Often Slower</strong><br>
-        If you can't afford NVLink switches ($200K+), your GPUs communicate over PCIe → Ethernet. That's 12.5-50 GB/s. A server-grade CPU with DDR5 has 460 GB/s to its own memory. For memory-bound workloads, the CPU wins.
+        If you can't afford NVLink switches (&#36;200K+), your GPUs communicate over PCIe → Ethernet. That's 12.5-50 GB/s. A server-grade CPU with DDR5 has 460 GB/s to its own memory. For memory-bound workloads, the CPU wins.
+    </div>
+</div>
+
+<h2>The Compute-to-Bandwidth Chasm</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+    </div>
+    <div>
+        <strong>The Ethernet Equalizer Shows Both Hit the Same Wall &mdash; But the Pain Is Wildly Different</strong><br>
+        Every system has a fastest thing (compute) and a slowest thing (cross-node data movement). C-Kernel-Engine's entire goal is to bring these two into sync. On CPUs, they're close enough that software can bridge the gap. On GPUs, they're orders of magnitude apart &mdash; no software fixes that.
+    </div>
+</div>
+
+<p style="font-size: 1.1em; line-height: 1.75; margin-bottom: 1.5rem;">
+    On CPUs, the gap between the fastest thing the system can do (compute) and the slowest thing it must do (move data across the network) is <strong>close</strong>.
+    Peak FLOPS and Ethernet bandwidth live in the same neighborhood.
+    That means the remaining optimization work is pure engineering &mdash; tiling, prefetching, computation-communication overlap &mdash; real techniques that bring compute and data movement closer to sync.
+    <strong>That's what C-Kernel-Engine is built to do.</strong>
+</p>
+<p style="font-size: 1.1em; line-height: 1.75; margin-bottom: 1.5rem;">
+    On GPUs, the fastest and slowest are worlds apart. GPU peak compute is orders of magnitude faster than the Ethernet pipe that feeds it at cluster scale.
+    It's the difference between the summit of <strong>Mt. Everest</strong> and the floor of the <strong>Mariana Trench</strong>.
+    Most of that compute sits permanently idle, burning power, waiting for data that will never arrive fast enough. No amount of software engineering changes the physics.
+</p>
+
+<div class="img-container svg-viewer" data-title="The Compute-to-Bandwidth Chasm: CPU Rolling Hills vs GPU Everest-to-Mariana">
+    <img src="assets/compute-bandwidth-chasm.svg" alt="On CPUs the gap between compute speed and network speed is small — C-Kernel-Engine bridges it. On GPUs the gap is orders of magnitude — unbridgeable at scale.">
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">CPU: Rolling Hills &mdash; Bridgeable</h3>
+        <ul>
+            <li><strong>Fastest (compute)</strong> and <strong>slowest (network)</strong> are close</li>
+            <li><strong>Local memory bandwidth</strong> sits in between &mdash; a smooth gradient, not a cliff</li>
+            <li><strong>Software can bridge the remaining gap:</strong> tiling, prefetch, overlap</li>
+            <li><strong>Every hardware generation</strong> makes the gap smaller (more bandwidth, same physics)</li>
+        </ul>
+        <p>The terrain is gentle enough to walk. C-Kernel-Engine's job is to build the bridge: bring compute throughput and data movement into sync through aggressive kernel engineering.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid #ff6b6b;">
+        <h3 style="margin-top: 0;">GPU: Everest to Mariana &mdash; Unbridgeable</h3>
+        <ul>
+            <li><strong>Fastest (compute)</strong> and <strong>slowest (network)</strong> are orders of magnitude apart</li>
+            <li><strong>Intra-node interconnects</strong> are fast, but only reach a handful of GPUs</li>
+            <li><strong>At cluster scale</strong>, everything hits the same Ethernet wall</li>
+            <li><strong>Most compute capacity</strong> sits permanently idle, starved for data</li>
+        </ul>
+        <p>The terrain is a cliff face. No bridge spans from the peak of Everest to the bottom of the Mariana Trench. The gap is structural &mdash; physics, not engineering.</p>
+    </div>
+</div>
+
+<div class="alert alert-success" style="margin-top: 1.5rem;">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
+    </div>
+    <div>
+        <strong>C-Kernel-Engine's Optimization Thesis</strong><br>
+        The goal is straightforward: bring the fastest-moving thing and the slowest-moving thing as close to sync as possible. On CPUs, they're already neighbors &mdash; the remaining work is tiling, cache management, prefetching, and overlapping computation with communication. That is a solvable engineering problem, and it's exactly what this project is built to solve. On GPUs at cluster scale, the gap between compute and data movement is structural. No kernel optimization closes it.
     </div>
 </div>
 
@@ -2056,36 +1989,14 @@ token 3 &rarr; 80 layers &rarr; token 4
     <p><strong>Every one of these is a workaround for the same problem:</strong> you're running a sequential, memory-hungry workload on hardware designed for embarrassingly parallel, compute-bound pixel shading.</p>
 </div>
 
-<h3>MoE Is Just Branch Prediction</h3>
+<h3>MoE: The Right Hardware for Dynamic Routing</h3>
 
 <div class="card card-green">
-    <h3 style="margin-top: 0;">CPUs Have Done This Natively Since the 1960s</h3>
-    <p>Mixture of Experts says: "route this token to expert 3 instead of expert 7." That's a conditional branch. What MoE does in software with learned routing networks, CPUs do in hardware natively.</p>
-    <div class="grid grid-2">
-        <div>
-            <h4>MoE (Software Routing)</h4>
-            <pre>
-// Learned gating function
-scores = gate(token)
-expert = top_k(scores, k=2)
-output = experts[expert](token)
-            </pre>
-            <p style="color: #888;">Requires routing network, load balancing losses, expert dropout, capacity factors...</p>
-        </div>
-        <div>
-            <h4>CPU (Hardware Routing)</h4>
-            <pre>
-// Branch prediction + speculative execution
-if (condition) {
-    path_a(data);  // predicted path
-} else {
-    path_b(data);  // alternate path
-}
-            </pre>
-            <p style="color: #888;">Built into the instruction pipeline. No learned gating. No routing overhead. Just hardware.</p>
-        </div>
-    </div>
-    <p><strong>AVX-512 computes 16 FP32 multiply-accumulates per cycle per core.</strong> Across 128 cores that's 2048 parallel operations. That's not qualitatively different from what a GPU does &mdash; it's quantitatively different, and less so than people think when you account for GPU memory stalls.</p>
+    <h3 style="margin-top: 0;">Native Fit vs. Forced Workaround</h3>
+    <p>Yes, MoE runs on GPUs — frontier models do it at scale. But <em>runs on</em> is not the same as <em>naturally fits</em>. The same argument made against CPUs for AI ("it works, but it's not the right tool") applies equally to GPUs for MoE.</p>
+    <p>MoE routing is conditional: for each token, a gating function decides which experts activate. GPUs — designed for dense, predictable, lockstep computation — handle this through software workarounds: load balancing losses, capacity factors, expert dropout, and auxiliary training objectives just to keep GPU utilization from collapsing under sparse activation patterns.</p>
+    <p>Consider fixed-function inference chips. They prefer dense computation above all else. The minute you introduce dynamic routing — conditional branching, variable expert selection — they require architectural hacks. GPUs face the same underlying tension, just with more memory headroom to absorb it.</p>
+    <p>CPUs have handled conditional branching natively since the beginning: branch prediction, out-of-order execution, speculative paths. The hardware was built for exactly this. <strong>AVX-512 computes 16 FP32 multiply-accumulates per cycle per core</strong> — across 128 cores that's 2048 parallel operations — and the dynamic routing overhead that GPUs must paper over in software is just normal control flow on a CPU.</p>
 </div>
 
 <h3>Training: Batch Size Is Not What You Think</h3>
@@ -2125,14 +2036,14 @@ GPU VRAM budget (80GB):
         <h3 style="margin-top: 0;">CPU: No Tradeoff Required</h3>
         <p>With 2-4TB of RAM, all three fit simultaneously:</p>
         <ul>
-            <li><strong>Model size</strong> &mdash; even 405B fits (810GB in FP16)</li>
+            <li><strong>Model size</strong> &mdash; even 400B+ models fit (800GB+ in FP16)</li>
             <li><strong>Context length</strong> &mdash; variable, up to 1M+ tokens</li>
             <li><strong>Batch size</strong> &mdash; whatever you need</li>
         </ul>
         <p>You can have <strong>variable context length AND batch greater than one</strong> at the same time. No balancing act required.</p>
         <pre>
 CPU RAM budget (4TB):
-  Model weights:    810GB (405B FP16)
+  Model weights:    810GB (400B+ FP16)
   KV cache:         500GB (long context)
   Activations:      200GB (large batch)
   Remaining:        2,538GB (room to spare)
@@ -2305,7 +2216,7 @@ CPU RAM budget (4TB):
     <div class="card card-green">
         <h3 style="margin-top: 0;">Why CPU Economics Win</h3>
         <ul>
-            <li><strong>Competition:</strong> Intel vs AMD vs ARM vs RISC-V</li>
+            <li><strong>Competition:</strong> Intel vs AMD vs ARM</li>
             <li><strong>Volume:</strong> Billions of CPUs vs millions of GPUs</li>
             <li><strong>Supply:</strong> Multiple fabs, no bottlenecks</li>
             <li><strong>Standards:</strong> DDR5 is an industry standard, not proprietary</li>
@@ -2642,7 +2553,7 @@ CPU Kubernetes Deployment:
 
 <div class="card">
     <h4 style="margin-top: 0;">Memory Writes Per Token</h4>
-    <p>For Qwen2-0.5B (hidden=896, intermediate=4864, 24 layers):</p>
+    <p>For a typical 0.5B parameter model (hidden=896, intermediate=4864, 24 layers):</p>
     <div class="table-container">
         <table>
             <thead>
@@ -2669,7 +2580,7 @@ CPU Kubernetes Deployment:
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>Real-world profile (Qwen3-0.6B Q8_0, AVX-only CPU):</strong> decode time is dominated by memory-moving kernels --
+        <strong>Real-world profile (0.6B model, Q8_0 quantization, AVX-only CPU):</strong> decode time is dominated by memory-moving kernels --
         ~48% MLP (gate/up + down), ~21% logits, ~29% attention projections (q/k/v + out), and ~2% attention core. This matches the
         bandwidth thesis: most time is spent streaming weights/activations, not math.
     </div>
@@ -2687,7 +2598,7 @@ CPU Kubernetes Deployment:
 <div class="table-container">
     <table>
         <thead>
-            <tr><th>Context</th><th>KV Cache (FP16)</th><th>+ Model (140GB)</th><th>Fits H100 (80GB)?</th><th>Fits 2TB Server?</th></tr>
+            <tr><th>Context</th><th>KV Cache (FP16)</th><th>+ Model (140GB)</th><th>Fits 80GB GPU?</th><th>Fits 2TB Server?</th></tr>
         </thead>
         <tbody>
             <tr>
@@ -2727,7 +2638,7 @@ CPU Kubernetes Deployment:
         📐 Show the Math: How We Calculated This
     </summary>
     <div style="padding: 0 20px 20px 20px;">
-        <h4 style="color: #4ade80; margin-top: 15px;">Model Architecture (Llama 3.1 70B)</h4>
+        <h4 style="color: #4ade80; margin-top: 15px;">Model Architecture (70B Dense Model)</h4>
         <div class="table-container">
             <table>
                 <thead>
@@ -2787,10 +2698,10 @@ KV_per_token = 2 × n_layers × n_kv_heads × head_dim × bytes
 Model weights (70B params × 2 bytes FP16) = <span style="color: #fbbf24; font-weight: bold;">140 GB</span>
 
 Total Memory = Model Weights + KV Cache
-  8K context:   140 + 2.6  = 143 GB  → need 2× H100s
-  32K context:  140 + 10.5 = 150 GB  → need 2× H100s
-  128K context: 140 + 42   = 182 GB  → need 3× H100s
-  1M context:   140 + 335  = 475 GB  → need 6× H100s</pre>
+  8K context:   140 + 2.6  = 143 GB  → need 2× 80GB GPUs
+  32K context:  140 + 10.5 = 150 GB  → need 2× 80GB GPUs
+  128K context: 140 + 42   = 182 GB  → need 3× 80GB GPUs
+  1M context:   140 + 335  = 475 GB  → need 6× 80GB GPUs</pre>
 
         <h4 style="color: #4ade80;">Why GQA Matters</h4>
         <p style="color: #a0a0b0;">Grouped Query Attention (GQA) reduces KV cache by sharing KV heads across Q heads:</p>
@@ -2831,7 +2742,7 @@ Total Memory = Model Weights + KV Cache
     </div>
     <div>
         <strong>The Long Context Reality</strong><br>
-        70B model + 1M context needs ~475 GB. That's 6× H100s ($240K+) vs one 2TB CPU server ($30K). This isn't about FLOPS - it's about <strong>where the data can physically exist</strong>.
+        70B model + 1M context needs ~475 GB. That's 6× 80GB GPUs (&#36;240K+) vs one 2TB CPU server (&#36;30K). This isn't about FLOPS - it's about <strong>where the data can physically exist</strong>.
     </div>
 </div>
 
@@ -3177,9 +3088,9 @@ That's it. For any model size.
     </blockquote>
     <p>Beyond the open-source concerns:</p>
     <ul>
-        <li><strong>Cost</strong> - H100 = $40,000. EPYC server with 2TB RAM = $15,000</li>
+        <li><strong>Cost</strong> - High-end GPU cluster = $200K+. EPYC server with 2TB RAM = $15,000</li>
         <li><strong>Memory</strong> - 80GB VRAM vs 2TB+ system RAM</li>
-        <li><strong>Availability</strong> - GPU shortages vs commodity CPUs</li>
+        <li><strong>Availability</strong> - Export-controlled, supply constrained vs commodity CPUs</li>
         <li><strong>Flexibility</strong> - Run anywhere: cloud, on-prem, edge, embedded</li>
         <li><strong>Debugging</strong> - printf works. GDB works. Valgrind works.</li>
         <li><strong>Longevity</strong> - C code compiles forever. CUDA versions break.</li>
@@ -3423,7 +3334,7 @@ That's it. For any model size.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
             </div>
         </div>
     </footer>

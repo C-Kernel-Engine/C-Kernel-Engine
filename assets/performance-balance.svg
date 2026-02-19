@@ -1,0 +1,131 @@
+<svg width="1200" height="640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }</style>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="gc" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffb400" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffb400" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="gh" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#07adf8" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#07adf8" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="cc" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="cd" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="640" fill="#1a1a1a"/>
+  <rect width="1200" height="3" fill="#ffb400"/>
+
+  <!-- HEADER -->
+  <text x="600" y="44" text-anchor="middle" font-size="21" font-weight="700" fill="#f0f0f0">The Performance Gap: FLOPS vs. Data Movement Speed</text>
+  <text x="600" y="66" text-anchor="middle" font-size="12" fill="#484848">Log&#x2082; scale — equal bar height = 2&#xD7; bandwidth. Same Ethernet floor. Very different spans.</text>
+  <line x1="40" y1="78" x2="1160" y2="78" stroke="#222" stroke-width="1"/>
+
+  <!-- Column titles -->
+  <text x="180" y="104" text-anchor="middle" font-size="13" font-weight="700" fill="#ff6b6b">GPU SYSTEM</text>
+  <text x="1020" y="104" text-anchor="middle" font-size="13" font-weight="700" fill="#47b475">CPU SYSTEM</text>
+  <text x="600" y="118" text-anchor="middle" font-size="9" fill="#343434" letter-spacing="2">LOG SCALE &#x2195; &#x2014; HEIGHT IS PROPORTIONAL TO log&#x2082;(BANDWIDTH)</text>
+
+  <!-- ══════════════════════════════════
+       GPU BAR (x=90&#x2013;270, center=180)
+       Compute: y=154&#x2013;278 (124px, = 20&#xD7; above HBM)
+       HBM:     y=278&#x2013;520 (242px, = 268&#xD7; above Network)
+       ══════════════════════════════════ -->
+
+  <!-- GPU Compute section -->
+  <rect x="90" y="154" width="180" height="124" rx="4" fill="url(#gc)" stroke="#ffb400" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="180" y="196" text-anchor="middle" font-size="12" font-weight="700" fill="#ffb400">GPU Compute</text>
+  <text x="180" y="214" text-anchor="middle" font-size="11" fill="#b08020" font-family="'JetBrains Mono','Courier New',monospace">67,000 GB/s eq.</text>
+  <text x="180" y="230" text-anchor="middle" font-size="9" fill="#706010">(67 TFLOPS at 1 B/FLOP)</text>
+  <!-- Drop indicator at step boundary -->
+  <text x="180" y="268" text-anchor="middle" font-size="11" font-weight="700" fill="#ffb400">&#x25BC; 20&#xD7; drop</text>
+
+  <!-- GPU HBM section -->
+  <rect x="90" y="278" width="180" height="242" rx="4" fill="url(#gh)" stroke="#07adf8" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="180" y="352" text-anchor="middle" font-size="12" font-weight="700" fill="#07adf8">HBM Bandwidth</text>
+  <text x="180" y="370" text-anchor="middle" font-size="11" fill="#0a80c0" font-family="'JetBrains Mono','Courier New',monospace">3,350 GB/s</text>
+  <text x="180" y="386" text-anchor="middle" font-size="9" fill="#065880">(HBM3, on-package)</text>
+  <!-- Drop at floor -->
+  <text x="180" y="508" text-anchor="middle" font-size="11" font-weight="700" fill="#07adf8">&#x25BC; 268&#xD7; drop to network</text>
+
+  <!-- GPU span bracket (dashed, right side) -->
+  <line x1="280" y1="154" x2="280" y2="520" stroke="#ffb40030" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="275" y1="154" x2="292" y2="154" stroke="#ffb40060" stroke-width="1.5"/>
+  <line x1="275" y1="520" x2="292" y2="520" stroke="#ffb40060" stroke-width="1.5"/>
+  <text x="338" y="316" text-anchor="middle" font-size="20" font-weight="800" fill="#ffb400" filter="url(#glow)">5,360&#xD7;</text>
+  <text x="338" y="334" text-anchor="middle" font-size="10" fill="#806020">total GPU span</text>
+  <text x="338" y="350" text-anchor="middle" font-size="9" fill="#604010">compute &#x2192; network</text>
+
+  <!-- ══════════════════════════════════
+       CPU BAR (x=930&#x2013;1110, center=1020)
+       Compute: y=305&#x2013;364 (59px,  = 4&#xD7; above DDR5)
+       DDR5:    y=364&#x2013;520 (156px, = 37&#xD7; above Network)
+       ══════════════════════════════════ -->
+
+  <!-- CPU Compute section (thin &#x2014; short gap to DDR5) -->
+  <rect x="930" y="305" width="180" height="59" rx="4" fill="url(#cc)" stroke="#47b475" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="1020" y="321" text-anchor="middle" font-size="10" font-weight="700" fill="#47b475">CPU Compute</text>
+  <text x="1020" y="337" text-anchor="middle" font-size="10" fill="#2a8050" font-family="'JetBrains Mono','Courier New',monospace">~1,800 GB/s eq.</text>
+  <text x="1020" y="353" text-anchor="middle" font-size="9" fill="#1a5030">&#x25BC; 4&#xD7; drop</text>
+
+  <!-- CPU DDR5 section -->
+  <rect x="930" y="364" width="180" height="156" rx="4" fill="url(#cd)" stroke="#2d7a50" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="1020" y="420" text-anchor="middle" font-size="12" font-weight="700" fill="#47b475">DDR5 Bandwidth</text>
+  <text x="1020" y="438" text-anchor="middle" font-size="11" fill="#2a6040" font-family="'JetBrains Mono','Courier New',monospace">460 GB/s</text>
+  <text x="1020" y="454" text-anchor="middle" font-size="9" fill="#1a4030">(12-channel DDR5)</text>
+  <text x="1020" y="508" text-anchor="middle" font-size="11" font-weight="700" fill="#2d7a50">&#x25BC; 37&#xD7; drop to network</text>
+
+  <!-- CPU span bracket (dashed, left side) -->
+  <line x1="920" y1="305" x2="920" y2="520" stroke="#47b47530" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="908" y1="305" x2="925" y2="305" stroke="#47b47560" stroke-width="1.5"/>
+  <line x1="908" y1="520" x2="925" y2="520" stroke="#47b47560" stroke-width="1.5"/>
+  <text x="862" y="396" text-anchor="middle" font-size="20" font-weight="800" fill="#47b475" filter="url(#glow)">144&#xD7;</text>
+  <text x="862" y="414" text-anchor="middle" font-size="10" fill="#2a7050">total CPU span</text>
+  <text x="862" y="430" text-anchor="middle" font-size="9" fill="#1a5040">compute &#x2192; network</text>
+
+  <!-- ══════════════════════════════════
+       NETWORK FLOOR
+       ══════════════════════════════════ -->
+  <rect x="80" y="520" width="1040" height="18" rx="3" fill="#1e1e1e" stroke="#3a3a3a" stroke-width="1"/>
+  <text x="600" y="533" text-anchor="middle" font-size="10" font-weight="600" fill="#555">ETHERNET &#x2014; 12.5 GB/s &#x2014; same floor for every cluster</text>
+
+  <!-- ══════════════════════════════════
+       CENTER THESIS BOX
+       ══════════════════════════════════ -->
+  <rect x="385" y="168" width="430" height="188" rx="8" fill="#141414" stroke="#282828" stroke-width="1"/>
+
+  <text x="600" y="196" text-anchor="middle" font-size="12" font-weight="700" fill="#ff6b6b">GPU: Mt. Everest &#x2192; Mariana Trench</text>
+  <text x="600" y="216" text-anchor="middle" font-size="11" fill="#686868">Peak FLOPS and network are thousands-to-one apart.</text>
+  <text x="600" y="234" text-anchor="middle" font-size="11" fill="#686868">At cluster scale, GPU compute sits idle &#x2014; starved for data.</text>
+  <text x="600" y="252" text-anchor="middle" font-size="11" fill="#686868">Software cannot bridge a structural 5,000&#xD7; gap.</text>
+
+  <line x1="405" y1="264" x2="795" y2="264" stroke="#252525" stroke-width="1"/>
+
+  <text x="600" y="288" text-anchor="middle" font-size="12" font-weight="700" fill="#47b475">CPU: A Closeable Engineering Gap</text>
+  <text x="600" y="308" text-anchor="middle" font-size="11" fill="#686868">SIMD FLOPS and network speed are same order of magnitude.</text>
+  <text x="600" y="326" text-anchor="middle" font-size="11" fill="#686868">Optimize kernels to close the gap. The target is reachable.</text>
+  <text x="600" y="344" text-anchor="middle" font-size="11" fill="#686868">The physics is cooperative.</text>
+
+  <!-- ══════════════════════════════════
+       BOTTOM CONCLUSION
+       ══════════════════════════════════ -->
+  <line x1="40" y1="552" x2="1160" y2="552" stroke="#222" stroke-width="1"/>
+  <rect x="80" y="562" width="1040" height="62" rx="7" fill="#161616" stroke="#ffb40012" stroke-width="1"/>
+  <text x="600" y="585" text-anchor="middle" font-size="13" font-weight="700" fill="#ffb400">Match FLOPS to data movement speed. Optimize for the constraint, not the headline.</text>
+  <text x="600" y="605" text-anchor="middle" font-size="11" fill="#484848">For CPU-only inference: every kernel optimization closes the compute-to-network gap. It is an engineering problem.</text>
+  <text x="600" y="622" text-anchor="middle" font-size="11" fill="#484848">For GPU clusters: 5,000&#xD7; is not an engineering problem &#x2014; it is a structural mismatch baked into the hardware design.</text>
+</svg>

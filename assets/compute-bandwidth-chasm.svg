@@ -1,0 +1,276 @@
+<svg width="1200" height="720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }</style>
+    <filter id="sh">
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="cpu-terrain" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#47b475" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#47b475" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="gpu-terrain-peak" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#ff6b6b" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ff6b6b" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="gpu-terrain-trench" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a3a5c" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0a1a3c" stop-opacity="0.8"/>
+    </linearGradient>
+    <linearGradient id="ocean" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#07adf8" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#07adf8" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="sky-cpu" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#47b475" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#1a1a1a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="sky-gpu" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#1a1a1a" stop-opacity="0"/>
+    </linearGradient>
+    <!-- CK-Engine "bridge" gradient -->
+    <linearGradient id="ck-bridge" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffb400" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#47b475" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb400" stop-opacity="0.7"/>
+    </linearGradient>
+    <clipPath id="clip-cpu"><rect x="28" y="108" width="558" height="440"/></clipPath>
+    <clipPath id="clip-gpu"><rect x="614" y="108" width="558" height="440"/></clipPath>
+    <marker id="arr-up-g" markerWidth="8" markerHeight="8" refX="4" refY="8" orient="auto">
+      <polygon points="0 8, 4 0, 8 8" fill="#47b475"/>
+    </marker>
+    <marker id="arr-dn-g" markerWidth="8" markerHeight="8" refX="4" refY="0" orient="auto">
+      <polygon points="0 0, 4 8, 8 0" fill="#47b475"/>
+    </marker>
+    <marker id="arr-up-r" markerWidth="8" markerHeight="8" refX="4" refY="8" orient="auto">
+      <polygon points="0 8, 4 0, 8 8" fill="#ff6b6b"/>
+    </marker>
+    <marker id="arr-dn-r" markerWidth="8" markerHeight="8" refX="4" refY="0" orient="auto">
+      <polygon points="0 0, 4 8, 8 0" fill="#ff6b6b"/>
+    </marker>
+  </defs>
+
+  <!-- Background + accent line -->
+  <rect width="1200" height="720" fill="#1a1a1a"/>
+  <rect width="1200" height="3" fill="#ffb400"/>
+
+  <!-- ═══ HEADER ═══ -->
+  <text x="600" y="42" text-anchor="middle" font-size="24" font-weight="700" fill="#f0f0f0">
+    The Compute-to-Bandwidth <tspan fill="#ffb400">Chasm</tspan>
+  </text>
+  <text x="600" y="66" text-anchor="middle" font-size="13" fill="#555">
+    C-Kernel-Engine's goal: bring the fastest thing (compute) and slowest thing (network) into sync. On CPUs, the gap is bridgeable.
+  </text>
+  <line x1="40" y1="82" x2="1160" y2="82" stroke="#222" stroke-width="1"/>
+
+  <!-- ═══════════════════════════════════════════
+       LEFT PANEL — CPU: Rolling Hills (Bridgeable)
+       ═══════════════════════════════════════════ -->
+  <rect x="28" y="94" width="558" height="504" rx="10" fill="#1e1e1e" stroke="#2c2c2c" stroke-width="1" filter="url(#sh)"/>
+  <!-- Title strip -->
+  <rect x="28" y="94" width="558" height="30" rx="10" fill="#47b47514"/>
+  <rect x="28" y="110" width="558" height="14" fill="#47b47514"/>
+  <text x="307" y="115" text-anchor="middle" font-size="11" font-weight="700" fill="#47b475" letter-spacing="2">
+    CPU AT SCALE  &#xB7;  THE GAP IS CLOSE
+  </text>
+
+  <!-- Sky gradient behind CPU terrain -->
+  <rect x="28" y="124" width="558" height="200" fill="url(#sky-cpu)" clip-path="url(#clip-cpu)"/>
+
+  <!-- Sea level reference (Network bandwidth) — positioned at y=390 -->
+  <line x1="38" y1="390" x2="576" y2="390" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.6"/>
+  <!-- Ocean fill below sea level -->
+  <rect x="38" y="390" width="538" height="150" fill="url(#ocean)" clip-path="url(#clip-cpu)" rx="0"/>
+
+  <!-- CPU terrain profile — gentle rolling hills -->
+  <path d="M 38 390
+           C 80 388, 100 385, 130 370
+           C 160 355, 180 330, 210 310
+           C 240 290, 260 275, 280 262
+           C 295 255, 305 250, 307 248
+           C 310 250, 320 255, 335 262
+           C 365 275, 385 290, 415 310
+           C 445 330, 465 355, 495 370
+           C 525 385, 545 388, 576 390"
+        fill="url(#cpu-terrain)" stroke="#47b475" stroke-width="2"/>
+
+  <!-- Peak label: Compute Speed -->
+  <line x1="307" y1="248" x2="307" y2="200" stroke="#47b475" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <rect x="230" y="178" width="154" height="22" rx="4" fill="#0d1a0d" stroke="#47b47540" stroke-width="1"/>
+  <text x="307" y="194" text-anchor="middle" font-size="12" font-weight="700" fill="#47b475">&#x25B2; Fastest: Compute</text>
+  <text x="307" y="168" text-anchor="middle" font-size="9" fill="#47b475" opacity="0.7">Peak FLOPS</text>
+
+  <!-- Local memory label — shoulder of hill -->
+  <line x1="165" y1="345" x2="115" y2="330" stroke="#4ade80" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <rect x="52" y="314" width="116" height="22" rx="4" fill="#0d1a0d" stroke="#4ade8040" stroke-width="1"/>
+  <text x="110" y="330" text-anchor="middle" font-size="11" font-weight="600" fill="#4ade80">Local Memory</text>
+  <text x="110" y="308" text-anchor="middle" font-size="9" fill="#4ade80" opacity="0.7">DDR Bandwidth</text>
+
+  <!-- Network label at sea level -->
+  <text x="570" y="386" text-anchor="end" font-size="9" fill="#07adf8" opacity="0.8">&#x25BC; SLOWEST</text>
+  <rect x="52" y="394" width="140" height="22" rx="4" fill="#071a2a" stroke="#07adf840" stroke-width="1"/>
+  <text x="122" y="410" text-anchor="middle" font-size="11" font-weight="600" fill="#07adf8">&#x25BC; Slowest: Network</text>
+  <text x="122" y="426" text-anchor="middle" font-size="9" fill="#07adf8" opacity="0.7">Ethernet / Cross-Node</text>
+
+  <!-- Gap annotation — small, bridgeable -->
+  <line x1="500" y1="256" x2="500" y2="385" stroke="#47b475" stroke-width="2" marker-start="url(#arr-up-g)" marker-end="url(#arr-dn-g)"/>
+  <rect x="508" y="298" width="68" height="40" rx="5" fill="#0d1a0d" stroke="#47b47560" stroke-width="1"/>
+  <text x="542" y="314" text-anchor="middle" font-size="11" font-weight="800" fill="#47b475">Small</text>
+  <text x="542" y="330" text-anchor="middle" font-size="9" font-weight="600" fill="#47b475" opacity="0.7">gap</text>
+
+  <!-- ═══ CK-ENGINE BRIDGE ═══ -->
+  <!-- A bridge connecting peak to sea level — the whole point -->
+  <rect x="140" y="244" width="116" height="150" rx="4" fill="none" stroke="#ffb400" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.35"/>
+  <!-- Bridge arch -->
+  <path d="M 145 390 C 155 340, 165 300, 198 260 C 210 248, 230 248, 250 390"
+        fill="none" stroke="url(#ck-bridge)" stroke-width="2.5" opacity="0.7"/>
+  <!-- Bridge label -->
+  <rect x="148" y="300" width="100" height="36" rx="5" fill="#1a1400" stroke="#ffb40060" stroke-width="1"/>
+  <text x="198" y="314" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb400">C-KERNEL-ENGINE</text>
+  <text x="198" y="328" text-anchor="middle" font-size="8" fill="#ffb400" opacity="0.7">bridges the gap</text>
+
+  <!-- Verdict -->
+  <rect x="58" y="450" width="498" height="134" rx="6" fill="#0d1a0d" stroke="#47b47528" stroke-width="1"/>
+  <text x="307" y="474" text-anchor="middle" font-size="14" font-weight="700" fill="#47b475">
+    &#x2714; Gentle terrain &#x2014; software can sync compute to data movement
+  </text>
+  <text x="307" y="498" text-anchor="middle" font-size="11" fill="#47b475" opacity="0.8">
+    On CPUs, peak compute and network bandwidth live in the same neighborhood.
+  </text>
+  <text x="307" y="518" text-anchor="middle" font-size="11" fill="#47b475" opacity="0.8">
+    Tiling, prefetching, computation-communication overlap &#x2014;
+  </text>
+  <text x="307" y="536" text-anchor="middle" font-size="11" fill="#47b475" opacity="0.8">
+    real engineering techniques bring them into sync.
+  </text>
+  <text x="307" y="560" text-anchor="middle" font-size="12" font-weight="700" fill="#ffb400">
+    That&#x27;s what C-Kernel-Engine is built to do.
+  </text>
+
+  <!-- ═══════════════════════════════════════════
+       RIGHT PANEL — GPU: Everest to Mariana (Unbridgeable)
+       ═══════════════════════════════════════════ -->
+  <rect x="614" y="94" width="558" height="504" rx="10" fill="#1e1e1e" stroke="#2c2c2c" stroke-width="1" filter="url(#sh)"/>
+  <!-- Title strip -->
+  <rect x="614" y="94" width="558" height="30" rx="10" fill="#ff6b6b14"/>
+  <rect x="614" y="110" width="558" height="14" fill="#ff6b6b14"/>
+  <text x="893" y="115" text-anchor="middle" font-size="11" font-weight="700" fill="#ff6b6b" letter-spacing="2">
+    GPU AT SCALE  &#xB7;  EVEREST TO MARIANA
+  </text>
+
+  <!-- Sky gradient behind GPU terrain -->
+  <rect x="614" y="124" width="558" height="200" fill="url(#sky-gpu)" clip-path="url(#clip-gpu)"/>
+
+  <!-- Sea level reference (Network bandwidth) — same y=390 -->
+  <line x1="624" y1="390" x2="1162" y2="390" stroke="#07adf8" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.6"/>
+  <!-- Ocean fill below sea level -->
+  <rect x="624" y="390" width="538" height="150" fill="url(#ocean)" clip-path="url(#clip-gpu)" rx="0"/>
+
+  <!-- GPU terrain profile — dramatic Everest peak -->
+  <path d="M 624 390
+           C 650 388, 670 385, 690 375
+           C 710 365, 730 340, 750 300
+           C 770 260, 790 210, 820 170
+           C 840 150, 860 137, 880 130
+           C 893 124, 900 124, 906 130
+           C 920 137, 940 150, 960 170
+           C 990 210, 1010 260, 1030 300
+           C 1050 340, 1070 365, 1090 375
+           C 1110 385, 1130 388, 1162 390"
+        fill="url(#gpu-terrain-peak)" stroke="#ff6b6b" stroke-width="2"/>
+
+  <!-- Trench below sea level — where the starved FLOPS go -->
+  <path d="M 624 390
+           C 660 392, 700 398, 740 412
+           C 780 432, 820 458, 860 474
+           C 880 480, 890 484, 893 486
+           C 896 484, 906 480, 926 474
+           C 966 458, 1006 432, 1046 412
+           C 1086 398, 1126 392, 1162 390"
+        fill="url(#gpu-terrain-trench)" stroke="#1a5a9c" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+  <!-- Trench depth label -->
+  <text x="893" y="504" text-anchor="middle" font-size="9" fill="#3a8ad0" opacity="0.7">&#x25BC; Starved compute &#x2014; data can never arrive fast enough</text>
+
+  <!-- Snow cap on peak -->
+  <path d="M 870 140 C 878 132, 886 127, 893 124 C 900 127, 908 132, 916 140 L 910 144 C 904 138, 898 135, 893 133 C 888 135, 882 138, 876 144 Z"
+        fill="#ffffff" opacity="0.25"/>
+
+  <!-- Peak label: Compute Speed — way up high -->
+  <rect x="812" y="98" width="162" height="22" rx="5" fill="#2a0a0a" stroke="#ff6b6b60" stroke-width="1"/>
+  <text x="893" y="114" text-anchor="middle" font-size="12" font-weight="800" fill="#ff6b6b" filter="url(#glow)">&#x25B2; Fastest: Compute</text>
+  <text x="990" y="114" font-size="9" fill="#ffb400" opacity="0.8">Everest</text>
+
+  <!-- Intra-node shelf label -->
+  <line x1="750" y1="300" x2="700" y2="285" stroke="#ffb400" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+  <rect x="634" y="268" width="130" height="22" rx="4" fill="#1a1400" stroke="#ffb40040" stroke-width="1"/>
+  <text x="699" y="284" text-anchor="middle" font-size="11" font-weight="600" fill="#ffb400">Intra-Node BW</text>
+  <text x="699" y="262" text-anchor="middle" font-size="9" fill="#ffb400" opacity="0.7">Only within 1 machine</text>
+
+  <!-- Network label at sea level -->
+  <text x="1156" y="386" text-anchor="end" font-size="9" fill="#07adf8" opacity="0.8">&#x25BC; SLOWEST</text>
+  <rect x="634" y="394" width="140" height="22" rx="4" fill="#071a2a" stroke="#07adf840" stroke-width="1"/>
+  <text x="704" y="410" text-anchor="middle" font-size="11" font-weight="600" fill="#07adf8">&#x25BC; Slowest: Network</text>
+  <text x="704" y="426" text-anchor="middle" font-size="9" fill="#07adf8" opacity="0.7">Ethernet / Cross-Node</text>
+
+  <!-- Gap annotation — massive, unbridgeable -->
+  <line x1="1086" y1="132" x2="1086" y2="385" stroke="#ff6b6b" stroke-width="2" marker-start="url(#arr-up-r)" marker-end="url(#arr-dn-r)"/>
+  <rect x="1094" y="230" width="68" height="50" rx="5" fill="#2a0a0a" stroke="#ff6b6b60" stroke-width="1"/>
+  <text x="1128" y="249" text-anchor="middle" font-size="12" font-weight="800" fill="#ff6b6b">Orders of</text>
+  <text x="1128" y="264" text-anchor="middle" font-size="12" font-weight="800" fill="#ff6b6b">magnitude</text>
+  <text x="1128" y="276" text-anchor="middle" font-size="8" font-weight="600" fill="#ff6b6b" opacity="0.7">apart</text>
+
+  <!-- "No bridge possible" X mark -->
+  <line x1="770" y1="310" x2="810" y2="350" stroke="#ff6b6b" stroke-width="3" opacity="0.3"/>
+  <line x1="810" y1="310" x2="770" y2="350" stroke="#ff6b6b" stroke-width="3" opacity="0.3"/>
+  <text x="790" y="370" text-anchor="middle" font-size="9" fill="#ff6b6b" opacity="0.5">no bridge</text>
+
+  <!-- Verdict -->
+  <rect x="644" y="450" width="498" height="134" rx="6" fill="#1a0a0a" stroke="#ff6b6b28" stroke-width="1"/>
+  <text x="893" y="474" text-anchor="middle" font-size="14" font-weight="700" fill="#ff6b6b">
+    &#x2718; Cliff face &#x2014; no software bridges this chasm
+  </text>
+  <text x="893" y="498" text-anchor="middle" font-size="11" fill="#ff6b6b" opacity="0.8">
+    GPU compute speed and network speed are orders of magnitude apart.
+  </text>
+  <text x="893" y="518" text-anchor="middle" font-size="11" fill="#ff6b6b" opacity="0.8">
+    At scale, most of that compute sits permanently idle,
+  </text>
+  <text x="893" y="536" text-anchor="middle" font-size="11" fill="#ff6b6b" opacity="0.8">
+    burning power, waiting for bytes that will never arrive fast enough.
+  </text>
+  <text x="893" y="560" text-anchor="middle" font-size="12" font-weight="700" fill="#ff6b6b" opacity="0.6">
+    No amount of software engineering changes the physics.
+  </text>
+
+  <!-- ═══════════════════════════════════════════
+       BOTTOM INSIGHT BAR
+       ═══════════════════════════════════════════ -->
+  <rect x="28" y="612" width="1144" height="96" rx="8" fill="#111" stroke="#ffb40030" stroke-width="1.5"/>
+  <rect x="28" y="612" width="1144" height="4" rx="2" fill="#ffb400" opacity="0.4"/>
+
+  <!-- The core idea -->
+  <text x="600" y="640" text-anchor="middle" font-size="14" font-weight="700" fill="#f0f0f0">
+    The Goal: Sync the Fastest and Slowest
+  </text>
+
+  <!-- CPU line -->
+  <rect x="55" y="654" width="14" height="14" rx="3" fill="#47b475"/>
+  <text x="78" y="666" font-size="12" font-weight="700" fill="#47b475">CPU:</text>
+  <text x="113" y="666" font-size="12" fill="#b0b0b0">
+    Fastest and slowest are close. C-Kernel-Engine brings them into sync with tiling, prefetch, and overlap.
+  </text>
+
+  <!-- GPU line -->
+  <rect x="55" y="678" width="14" height="14" rx="3" fill="#ff6b6b"/>
+  <text x="78" y="690" font-size="12" font-weight="700" fill="#ff6b6b">GPU:</text>
+  <text x="113" y="690" font-size="12" fill="#b0b0b0">
+    Fastest and slowest are worlds apart. The gap is structural &#x2014; physics, not engineering.
+  </text>
+
+</svg>
