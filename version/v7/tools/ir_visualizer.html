@@ -331,6 +331,115 @@
         .dtype-q4_k { background: rgba(243, 156, 18, 0.2); color: #f39c12; }
         .dtype-q6_k { background: rgba(52, 152, 219, 0.2); color: #3498db; }
 
+        /* Dtype badges — hover hint */
+        .dtype[data-qmath] {
+            cursor: help;
+            position: relative;
+        }
+
+        /* Quantization math hover popup */
+        .qmath-popup {
+            position: fixed;
+            z-index: 9999;
+            width: 420px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding: 0;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 180, 0, 0.35);
+            background:
+                radial-gradient(circle at 18% 0%, rgba(255, 180, 0, 0.08), transparent 48%),
+                radial-gradient(circle at 90% 15%, rgba(7, 173, 248, 0.06), transparent 40%),
+                #1a1e28;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 180, 0, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            font-family: Inter, system-ui, sans-serif;
+        }
+        .qmath-popup.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .qmath-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.7rem 0.9rem 0.55rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .qmath-popup-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+        }
+        .qmath-popup-badge {
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+        }
+        .qmath-popup-body {
+            padding: 0.65rem 0.9rem 0.8rem;
+        }
+        .qmath-popup-desc {
+            color: #b0b0b0;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin: 0 0 0.65rem;
+        }
+        .qmath-popup-formula {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 0.5rem 0.65rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: #ddd;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin: 0 0 0.6rem;
+        }
+        .qmath-popup-struct {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.35rem 0.8rem;
+            font-size: 0.75rem;
+            margin: 0 0 0.55rem;
+        }
+        .qmath-popup-struct dt {
+            color: #888;
+            margin: 0;
+        }
+        .qmath-popup-struct dd {
+            color: #e0e0e0;
+            font-weight: 600;
+            margin: 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+        }
+        .qmath-popup-svg {
+            width: 100%;
+            height: 100px;
+            margin: 0 0 0.5rem;
+        }
+        .qmath-popup-link {
+            display: inline-block;
+            color: var(--orange);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-decoration: none;
+            opacity: 0.85;
+        }
+        .qmath-popup-link:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
         /* Folder button */
         .controls label[title*="folder"] {
             background: var(--dark-card);
@@ -902,6 +1011,76 @@
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
             word-break: break-word;
+        }
+
+        /* ── Model Architecture Card ────────────────────────── */
+        .arch-panel {
+            background: rgba(28, 32, 42, 0.92);
+            border: 1.5px solid rgba(100, 160, 255, 0.28);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 0.9rem;
+        }
+        .arch-panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.6rem;
+        }
+        .arch-panel-head h3 {
+            margin: 0;
+            font-size: 0.95rem;
+            color: #8cb4ff;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .arch-panel-head .arch-badge {
+            font-size: 0.68rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            background: rgba(100, 160, 255, 0.14);
+            color: #8cb4ff;
+            border: 1px solid rgba(100, 160, 255, 0.3);
+            font-weight: 600;
+        }
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.5rem;
+        }
+        .arch-cell {
+            background: rgba(42, 48, 60, 0.72);
+            border: 1px solid rgba(100, 160, 255, 0.12);
+            border-radius: 6px;
+            padding: 0.5rem 0.65rem;
+        }
+        .arch-cell-label {
+            color: #7a8da8;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .arch-cell-value {
+            color: #f0f4ff;
+            font-size: 1.0rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 0.15rem;
+            word-break: break-word;
+        }
+        .arch-cell-value.arch-highlight {
+            color: #ffb400;
+        }
+        .arch-cell-value a {
+            color: #8cb4ff;
+            text-decoration: none;
+            font-size: 0.82rem;
+        }
+        .arch-cell-value a:hover {
+            text-decoration: underline;
+        }
+        .arch-hidden {
+            display: none;
         }
 
         .infographic-grid {
@@ -1845,7 +2024,7 @@
         <div class="tab active" data-tab="memory" data-mode="inference,training" onclick="showTab('memory')">Memory Layout</div>
         <div class="tab" data-tab="kernels" data-mode="inference,training" onclick="showTab('kernels')">Kernel Flow</div>
         <div class="tab" data-tab="interpretability" data-mode="inference" onclick="showTab('interpretability')">Interpretability</div>
-        <div class="tab" data-tab="quantization" data-mode="inference" onclick="showTab('quantization')">Quantization Audit</div>
+        <div class="tab" data-tab="quantization" data-mode="inference" onclick="showTab('quantization')">Weight Dtype Audit</div>
         <div class="tab" data-tab="parity" data-mode="inference" onclick="showTab('parity')">Parity Debug</div>
         <div class="tab" data-tab="dataflow" data-mode="inference" onclick="showTab('dataflow')">Dataflow Graph</div>
         <div class="tab" data-tab="tests" data-mode="inference" onclick="showTab('tests')">Tests</div>
@@ -1895,6 +2074,60 @@
                     <div class="brief-card">
                         <div class="brief-label">Optional Files</div>
                         <div class="brief-value" id="summaryOptional">-</div>
+                    </div>
+                </div>
+
+                <!-- ── Model Architecture Card ──────────────────── -->
+                <div class="arch-panel arch-hidden" id="archPanel">
+                    <div class="arch-panel-head">
+                        <h3>Model Architecture</h3>
+                        <span class="arch-badge" id="archBadge">-</span>
+                    </div>
+                    <div class="arch-grid">
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Layers</div>
+                            <div class="arch-cell-value arch-highlight" id="archLayers">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Embed Dim</div>
+                            <div class="arch-cell-value arch-highlight" id="archEmbedDim">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Vocab Size</div>
+                            <div class="arch-cell-value" id="archVocabSize">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Attention Heads</div>
+                            <div class="arch-cell-value" id="archNumHeads">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">KV Heads (GQA)</div>
+                            <div class="arch-cell-value" id="archKVHeads">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Head Dim</div>
+                            <div class="arch-cell-value" id="archHeadDim">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">FFN Hidden</div>
+                            <div class="arch-cell-value" id="archIntermediateSize">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Context Length</div>
+                            <div class="arch-cell-value" id="archContextLen">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">RoPE &theta;</div>
+                            <div class="arch-cell-value" id="archRopeTheta">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Norm &epsilon;</div>
+                            <div class="arch-cell-value" id="archNormEps">-</div>
+                        </div>
+                        <div class="arch-cell">
+                            <div class="arch-cell-label">Tokenizer</div>
+                            <div class="arch-cell-value" id="archTokenizer">-</div>
+                        </div>
                     </div>
                 </div>
 
@@ -2172,10 +2405,26 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
             </div>
         </div>
 
+        <!-- Quantization Math Hover Popup (shared, positioned via JS) -->
+        <div id="qmathPopup" class="qmath-popup">
+            <div class="qmath-popup-header">
+                <h4 class="qmath-popup-title" id="qmathTitle">Q8_0</h4>
+                <span class="qmath-popup-badge" id="qmathBadge" style="background:#27ae60;color:#fff;">8.5 bpw</span>
+            </div>
+            <div class="qmath-popup-body">
+                <svg id="qmathSvg" class="qmath-popup-svg" viewBox="0 0 380 90"></svg>
+                <p class="qmath-popup-desc" id="qmathDesc"></p>
+                <div class="qmath-popup-formula" id="qmathFormula"></div>
+                <dl class="qmath-popup-struct" id="qmathStruct"></dl>
+                <a class="qmath-popup-link" id="qmathLink" href="#">See full quantization docs →</a>
+            </div>
+        </div>
+
         <div id="quantization" class="panel">
-            <h2 style="margin-bottom: 1rem;">Quantization Chain Audit</h2>
+            <h2 style="margin-bottom: 1rem;">Weight Dtype Audit</h2>
             <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-                Verify that each weight uses the correct quantization kernel through IR1 → IR3 → Codegen pipeline.
+                Inspect every weight's dtype and verify the correct kernel is used through the IR1 → IR3 → Codegen pipeline.
+                <span style="font-size:0.82rem;color:#ffb400;">ℹ Hover any dtype badge for math &amp; bit layout.</span>
             </p>
 
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.3rem 0 1rem;">
@@ -3472,6 +3721,97 @@ python test_gemv_q8_0_q8_0.py</pre>
                 coverageArc.setAttribute('stroke-dasharray', `${filled.toFixed(2)} ${circumference.toFixed(2)}`);
             }
 
+            /* ── Populate Model Architecture card ──────────────── */
+            (function populateArchCard() {
+                const panel = document.getElementById('archPanel');
+                if (!panel) return;
+
+                // Merge: prefer layout/ops/manifest config, then fall back to
+                // trainPipelineData.train_dims for training-only views
+                const tDims = (trainPipelineData && trainPipelineData.train_dims) || {};
+                const c = Object.assign({}, tDims, cfg);
+
+                // Resolve fields with alias fallbacks
+                const numLayers  = c.num_layers || c.n_layers || 0;
+                const embedDim   = c.embed_dim || c.hidden_size || 0;
+                const vocabSz    = c.vocab_size || 0;
+                const numHeads   = c.num_heads || c.num_attention_heads || 0;
+                const numKV      = c.num_kv_heads || c.num_key_value_heads || numHeads;
+                const headD      = c.head_dim || (numHeads > 0 ? Math.floor(embedDim / numHeads) : 0);
+                const interSize  = c.intermediate_size || c.hidden_dim || 0;
+                const ctxLen     = c.context_length || c.context_window || c.context_len || c.max_position_embeddings || 0;
+                const ropeTheta  = c.rope_theta || 0;
+                const normEps    = c.rms_norm_eps || c.layer_norm_eps || 0;
+
+                // Only show the card if we have at least one meaningful field
+                const hasData = numLayers || embedDim || vocabSz || numHeads;
+                panel.classList.toggle('arch-hidden', !hasData);
+                if (!hasData) return;
+
+                const fmt = (v) => v ? Number(v).toLocaleString() : '-';
+                const fmtSci = (v) => {
+                    if (!v) return '-';
+                    const n = Number(v);
+                    if (n >= 1e6) return n.toExponential(1);
+                    if (n < 0.001) return n.toExponential(1);
+                    return n.toLocaleString();
+                };
+
+                // GQA ratio
+                let gqaLabel = '';
+                if (numHeads && numKV) {
+                    if (numKV === 1) gqaLabel = ' (MQA)';
+                    else if (numKV === numHeads) gqaLabel = ' (MHA)';
+                    else gqaLabel = ` (GQA ${numHeads}:${numKV})`;
+                }
+
+                // Badge text: e.g. "24L / 64d" or model name
+                const badgeEl = document.getElementById('archBadge');
+                if (badgeEl) {
+                    const parts = [];
+                    if (numLayers) parts.push(`${numLayers}L`);
+                    if (embedDim) parts.push(`${embedDim}d`);
+                    if (numHeads) parts.push(`${numHeads}H`);
+                    badgeEl.textContent = parts.length > 0 ? parts.join(' / ') : modelName;
+                }
+
+                const set = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = val;
+                };
+
+                set('archLayers', fmt(numLayers));
+                set('archEmbedDim', fmt(embedDim));
+                set('archVocabSize', fmt(vocabSz));
+                set('archNumHeads', fmt(numHeads));
+                set('archKVHeads', numKV ? `${fmt(numKV)}${gqaLabel}` : '-');
+                set('archHeadDim', fmt(headD));
+                set('archIntermediateSize', fmt(interSize));
+                set('archContextLen', fmt(ctxLen));
+                set('archRopeTheta', fmtSci(ropeTheta));
+                set('archNormEps', fmtSci(normEps));
+
+                // Tokenizer link — check multiple sources for the path
+                const tokEl = document.getElementById('archTokenizer');
+                if (tokEl) {
+                    const tokLineage = (trainPipelineData && trainPipelineData.tokenizer_lineage) || {};
+                    const tokPath = (embeddedMeta && embeddedMeta.tokenizer_path) ||
+                                    tokLineage.tokenizer_path || '';
+                    if (tokPath) {
+                        tokEl.innerHTML = `<a href="file://${tokPath}" title="${tokPath}">tokenizer.json</a>`;
+                    } else {
+                        // Infer from run_dir if available
+                        const runDir = (embeddedMeta && embeddedMeta.run_dir) ||
+                                       (trainPipelineData && trainPipelineData.sources && trainPipelineData.sources.run_dir) || '';
+                        if (runDir) {
+                            tokEl.innerHTML = `<a href="file://${runDir}/tokenizer.json" title="${runDir}/tokenizer.json">tokenizer.json</a>`;
+                        } else {
+                            tokEl.textContent = vocabSz ? `${fmt(vocabSz)} tokens` : '-';
+                        }
+                    }
+                }
+            })();
+
             const warnings = [];
             const missingRequired = required.filter(x => !x.ready).map(x => x.label);
             if (missingRequired.length > 0) {
@@ -3613,19 +3953,8 @@ python test_gemv_q8_0_q8_0.py</pre>
                 closeNodeDetails();
             }
 
-            // Render specific tabs when shown
-            if (tabId === 'quantization') {
-                renderQuantizationAudit();
-            }
-            if (tabId === 'dataflow') {
-                renderDataflow();
-            }
-            if (tabId === 'profile') {
-                renderProfile();
-            }
-            if (tabId === 'training') {
-                renderTraining();
-            }
+            // Lazy render: only render if data changed since last render of this tab
+            renderTabIfDirty(tabId);
 
             if (tabId === 'memory') {
                 // Lazy-render explorer if explorer subtab is active
@@ -3973,14 +4302,68 @@ python test_gemv_q8_0_q8_0.py</pre>
         }
 
         function renderAll() {
-            renderMemory();
-            renderMemorySignoffPanel();
-            renderKernelFlow();
-            renderStats();
-            renderTraining();
-            renderQuantizationAudit();
-            renderDataflow();
-            renderOperatorMathIntuition();
+            markAllTabsDirty();
+            renderActiveTab();
+        }
+
+        /* ── Lazy render / dirty-flag system ────────────────────── */
+        var _dirtyTabs = {};
+
+        function markAllTabsDirty() {
+            _dirtyTabs = {
+                memory: true, kernels: true, stats: true, training: true,
+                quantization: true, dataflow: true, interpretability: true,
+                profile: true, tests: true, parity: true,
+                'train-dashboard': true, 'train-grad-flow': true,
+                'train-weights': true, 'train-attention': true,
+                'train-compare': true, 'train-memory-canary': true,
+                'train-gradient': true, 'train-parity': true
+            };
+        }
+
+        function renderActiveTab() {
+            var active = document.querySelector('.tabs .tab.active');
+            var tabId = active ? (active.dataset.tab || '') : '';
+            if (tabId) renderTabIfDirty(tabId);
+        }
+
+        function renderTabIfDirty(tabId) {
+            if (!_dirtyTabs[tabId]) return;
+            _dirtyTabs[tabId] = false;
+            switch (tabId) {
+                case 'memory':
+                    renderMemory();
+                    renderMemorySignoffPanel();
+                    break;
+                case 'kernels':
+                    renderKernelFlow();
+                    break;
+                case 'stats':
+                    renderStats();
+                    break;
+                case 'training':
+                    renderTraining();
+                    break;
+                case 'quantization':
+                    renderQuantizationAudit();
+                    break;
+                case 'dataflow':
+                    renderDataflow();
+                    break;
+                case 'interpretability':
+                    renderOperatorMathIntuition();
+                    break;
+                case 'profile':
+                    renderProfile();
+                    break;
+                default:
+                    /* train-* extension tabs: render directly so renderAll()
+                       refreshes them when they are the active tab. */
+                    if (tabId.startsWith('train-') && typeof renderTrainingTab === 'function') {
+                        renderTrainingTab(tabId);
+                    }
+                    break;
+            }
             updateOperatorSummary();
         }
 
@@ -4268,7 +4651,7 @@ python test_gemv_q8_0_q8_0.py</pre>
                     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 
                 if (nodes.length === 0) {
-                    return `<svg class="quant-flow-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(layerLabelText)} flow graph"><text x="20" y="${Math.round(height / 2)}" fill="#808080" font-size="12">No quantized nodes in this layer.</text></svg>`;
+                    return `<svg class="quant-flow-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(layerLabelText)} flow graph"><text x="20" y="${Math.round(height / 2)}" fill="#808080" font-size="12">No weight nodes in this layer.</text></svg>`;
                 }
 
                 const left = 36;
@@ -4307,7 +4690,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             const kernelTraceAvailable = Object.keys(kernelUsageByWeight).length > 0;
 
             const quantWeights = weightEntries
-                .filter(entry => String(entry.dtype || '').toLowerCase().startsWith('q'))
+                .filter(entry => String(entry.dtype || '').trim() !== '')
                 .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
             const quantRows = quantWeights.map(entry => {
@@ -4327,7 +4710,11 @@ python test_gemv_q8_0_q8_0.py</pre>
                 else if (observedKernels.length === 0) status = 'no-trace';
                 else {
                     const matched = observedKernels.some(kernel => expectedFragments.some(fragment => kernel.includes(fragment)));
-                    if (!matched) status = 'mismatch';
+                    if (!matched) {
+                        // FP32 is the default dtype — generic kernels won't include 'f32' in their name.
+                        // BF16, FP16, and all quant types are explicit and must match.
+                        status = isDefaultDtype(dtype) ? 'ok' : 'mismatch';
+                    }
                 }
 
                 return {
@@ -4393,14 +4780,26 @@ python test_gemv_q8_0_q8_0.py</pre>
             const auditDiv = document.getElementById('quantAuditResults');
             if (auditDiv) {
                 if (quantRows.length === 0) {
-                    auditDiv.innerHTML = '<span style="color: var(--text-muted);">No quantized weights found in loaded artifacts.</span>';
+                    auditDiv.innerHTML = '<span style="color: var(--text-muted);">No weights found in loaded artifacts.</span>';
                 } else {
                     const sampleRows = quantRows.slice(0, 200);
+                    const profileLabel = (() => {
+                        const allLower = quantDtypes.map(d => d.toLowerCase());
+                        const hasQuant = allLower.some(d => d.startsWith('q'));
+                        if (quantDtypes.length === 1) {
+                            if (allLower[0] === 'f32' || allLower[0] === 'fp32') return 'Full-precision (FP32)';
+                            if (allLower[0] === 'bf16') return 'BF16 half-precision';
+                            if (allLower[0] === 'f16' || allLower[0] === 'fp16') return 'FP16 half-precision';
+                            return `Single dtype (${quantDtypes[0]})`;
+                        }
+                        if (hasQuant) return 'Mixed quantization';
+                        return 'Mixed precision';
+                    })();
                     let auditHtml = `
                         <div style="margin-bottom: 0.7rem; color: var(--text-secondary); font-size: 0.82rem;">
-                            <strong>Quantized weights:</strong> ${quantRows.length}
+                            <strong>Weights:</strong> ${quantRows.length}
                             &nbsp;|&nbsp;<strong>Dtypes:</strong> ${formatCounts(quantDtypeCounts) || '-'}
-                            ${quantDtypes.length === 1 ? '&nbsp;|&nbsp;<strong>Profile:</strong> single-quant model' : ''}
+                            &nbsp;|&nbsp;<strong>Profile:</strong> ${profileLabel}
                             ${!kernelTraceAvailable ? '&nbsp;|&nbsp;<strong>Kernel Trace:</strong> unavailable (load lowered_*.json for full chain check)' : ''}
                         </div>
                         <table>
@@ -4428,7 +4827,7 @@ python test_gemv_q8_0_q8_0.py</pre>
                         auditHtml += `
                             <tr>
                                 <td colspan="5" style="color: var(--text-muted); text-align: center;">
-                                    Showing ${sampleRows.length} of ${quantRows.length} quantized weights.
+                                    Showing ${sampleRows.length} of ${quantRows.length} weights.
                                 </td>
                             </tr>
                         `;
@@ -4441,12 +4840,12 @@ python test_gemv_q8_0_q8_0.py</pre>
             const issuesDiv = document.getElementById('quantIssues');
             if (issuesDiv) {
                 if (quantRows.length === 0) {
-                    issuesDiv.innerHTML = '<span style="color: var(--text-muted);">No quantized weights present in loaded artifacts.</span>';
+                    issuesDiv.innerHTML = '<span style="color: var(--text-muted);">No weights present in loaded artifacts.</span>';
                 } else if (!kernelTraceAvailable) {
                     issuesDiv.innerHTML = '<span style="color: #ffc66d;">Kernel chain check unavailable. Load <code>lowered_decode.json</code>/<code>lowered_prefill.json</code> (not only call IR) for full dtype-to-kernel tracing.</span>';
                 } else if (issues.length === 0) {
                     const singleQuantNote = quantDtypes.length === 1
-                        ? `<div style="color: #9fb4c8; margin-top: 0.35rem;">Observed single quantized dtype: <code>${escapeHtml(quantDtypes[0])}</code> (this can be expected for Q8_0 model variants).</div>`
+                        ? `<div style="color: #9fb4c8; margin-top: 0.35rem;">All weights use single dtype: <code>${escapeHtml(quantDtypes[0])}</code></div>`
                         : '';
                     issuesDiv.innerHTML = `<span style="color: var(--green);">✓ No dtype-kernel mismatches detected</span>${singleQuantNote}`;
                 } else {
@@ -4472,7 +4871,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             const accordion = document.getElementById('quantLayerAccordion');
             if (accordion) {
                 if (sortedLayerEntries.length === 0) {
-                    accordion.innerHTML = '<div style="color: var(--text-muted);">No quantized chain rows to display.</div>';
+                    accordion.innerHTML = '<div style="color: var(--text-muted);">No weight chain rows to display.</div>';
                 } else {
                     let html = '';
                     sortedLayerEntries.forEach(([layerLabelText, rows], idx) => {
@@ -4578,7 +4977,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             const flowGrid = document.getElementById('quantFlowGrid');
             if (flowGrid) {
                 if (sortedLayerEntries.length === 0) {
-                    flowGrid.innerHTML = '<div style="color: var(--text-muted);">No per-layer quantized flows available.</div>';
+                    flowGrid.innerHTML = '<div style="color: var(--text-muted);">No per-layer dtype flows available.</div>';
                 } else {
                     flowGrid.className = 'quant-flow-grid';
                     let html = '';
@@ -4609,14 +5008,405 @@ python test_gemv_q8_0_q8_0.py</pre>
             switchQuantView(currentQuantView);
         }
 
+        /* ══════════════════════════════════════════════════════════════
+           Quantization Math Popup — data + hover logic
+           ══════════════════════════════════════════════════════════════ */
+        const QUANT_MATH = {
+            q4_0: {
+                title: 'Q4_0 — 4-bit Block Quantization',
+                badge: '4.5 bpw', badgeBg: '#e74c3c',
+                desc: 'Simplest 4-bit format. Each block of 32 weights shares one FP16 scale factor. Each weight is stored as a 4-bit unsigned nibble, dequantized by subtracting 8 and multiplying by the scale.',
+                formula: 'struct block_q4_0 {\n  ggml_fp16_t d;    // 2 bytes: FP16 scale\n  uint8_t qs[16];   // 16 bytes: 32 packed nibbles\n};  // 18 bytes / 32 weights\n\nweight[j] = d × (nibble[j] − 8)',
+                struct: { 'Block size': '32 weights', 'Bytes/block': '18', 'Bits/weight': '4.5', 'Scale': 'FP16 (1 per block)', 'Offset': 'Fixed −8', 'SIMD': 'AVX2/AVX-512' },
+                svgFn: drawQ4_0Block,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q5_0: {
+                title: 'Q5_0 — 5-bit Block Quantization',
+                badge: '5.5 bpw', badgeBg: '#9b59b6',
+                desc: '5-bit format with split storage: 4 low bits packed in nibbles + 1 high bit per weight stored in a separate 32-bit field. More accurate than Q4_0 with moderate size increase.',
+                formula: 'struct block_q5_0 {\n  ggml_fp16_t d;    // 2 bytes: FP16 scale\n  uint32_t qh;      // 4 bytes: 32 high bits\n  uint8_t qs[16];   // 16 bytes: packed nibbles\n};  // 22 bytes / 32 weights\n\nweight[j] = d × ((nibble[j] | (qh_bit << 4)) − 16)',
+                struct: { 'Block size': '32 weights', 'Bytes/block': '22', 'Bits/weight': '5.5', 'Scale': 'FP16 (1 per block)', 'High bits': 'uint32 bitmask', 'Offset': 'Fixed −16' },
+                svgFn: drawQ5_0Block,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q5_1: {
+                title: 'Q5_1 — 5-bit with Min',
+                badge: '5.5 bpw', badgeBg: '#8e44ad',
+                desc: 'Like Q5_0 but adds a minimum value per block for asymmetric quantization. Slightly larger but better accuracy for weights with non-zero-centered distributions.',
+                formula: 'struct block_q5_1 {\n  ggml_fp16_t d;    // 2 bytes: scale\n  ggml_fp16_t m;    // 2 bytes: minimum\n  uint32_t qh;      // 4 bytes: high bits\n  uint8_t qs[16];   // 16 bytes: nibbles\n};  // 24 bytes / 32 weights\n\nweight[j] = d × (nibble[j] | (qh_bit << 4)) + m',
+                struct: { 'Block size': '32 weights', 'Bytes/block': '24', 'Bits/weight': '6.0', 'Scale': 'FP16', 'Minimum': 'FP16', 'Offset': 'Per-block m' },
+                svgFn: drawQ5_1Block,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q8_0: {
+                title: 'Q8_0 — 8-bit Block Quantization',
+                badge: '8.5 bpw', badgeBg: '#27ae60',
+                desc: 'Highest quality block format. Each weight is one signed int8, multiplied by a shared FP16 scale. Nearly lossless for most architectures. Fast integer dot products with VNNI/AVX-512.',
+                formula: 'struct block_q8_0 {\n  ggml_fp16_t d;    // 2 bytes: FP16 scale\n  int8_t qs[32];    // 32 bytes: 32 weights\n};  // 34 bytes / 32 weights\n\nweight[j] = d × qs[j]',
+                struct: { 'Block size': '32 weights', 'Bytes/block': '34', 'Bits/weight': '8.5', 'Scale': 'FP16 (1 per block)', 'Storage': 'Signed int8', 'SIMD': 'VNNI/maddubs' },
+                svgFn: drawQ8_0Block,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-math-temp.html'
+            },
+            q4_k: {
+                title: 'Q4_K — 4-bit K-Quant (Superblock)',
+                badge: '4.5 bpw', badgeBg: '#f39c12',
+                desc: 'K-quant format with nested quantization: a superblock of 256 weights divided into 8 sub-blocks of 32, each with its own 6-bit scale and minimum. Much better accuracy than Q4_0 at the same bit rate.',
+                formula: 'struct block_q4_K {\n  ggml_fp16_t d;       // super-block scale\n  ggml_fp16_t dmin;    // super-block minimum\n  uint8_t scales[12];  // 6-bit sub-block scales\n  uint8_t qs[128];     // 4-bit weights\n};  // 144 bytes / 256 weights\n\nweight = d × sc[sub] × q − dmin × m[sub]',
+                struct: { 'Super-block': '256 weights', 'Sub-blocks': '8 × 32', 'Bytes/block': '144', 'Bits/weight': '4.5', 'Sub-scales': '6-bit packed', 'Accuracy': '> Q4_0' },
+                svgFn: drawQ4_KBlock,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q5_k: {
+                title: 'Q5_K — 5-bit K-Quant (Superblock)',
+                badge: '5.5 bpw', badgeBg: '#8e44ad',
+                desc: 'K-quant variant of Q5. Superblock of 256 weights with 8 sub-blocks, each with 6-bit scale and minimum. Best balance of quality and size for most use cases.',
+                formula: 'struct block_q5_K {\n  ggml_fp16_t d;       // super-block scale\n  ggml_fp16_t dmin;    // super-block minimum\n  uint8_t scales[12];  // 6-bit sub-block sc/min\n  uint8_t qh[32];      // high bits (1 per weight)\n  uint8_t qs[128];     // 4-bit low nibbles\n};  // 176 bytes / 256 weights\n\nweight = d × sc[sub] × (q | qh) − dmin × m[sub]',
+                struct: { 'Super-block': '256 weights', 'Sub-blocks': '8 × 32', 'Bytes/block': '176', 'Bits/weight': '5.5', 'Sub-scales': '6-bit packed', 'High bits': 'qh byte array' },
+                svgFn: drawQ5_KBlock,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q6_k: {
+                title: 'Q6_K — 6-bit K-Quant (Superblock)',
+                badge: '6.6 bpw', badgeBg: '#3498db',
+                desc: '6-bit K-quant for maximum quantized quality. 256-weight superblocks with 16 sub-blocks. Used for critical layers where accuracy matters most (e.g., attention projections).',
+                formula: 'struct block_q6_K {\n  uint8_t ql[128];   // low 4 bits\n  uint8_t qh[64];    // high 2 bits\n  int8_t scales[16]; // sub-block scales\n  ggml_fp16_t d;     // super-block scale\n};  // 210 bytes / 256 weights\n\nweight = d × scales[sub] × q6_val',
+                struct: { 'Super-block': '256 weights', 'Sub-blocks': '16 × 16', 'Bytes/block': '210', 'Bits/weight': '6.56', 'Sub-scales': 'int8 (16)', 'Quality': 'Near-FP16' },
+                svgFn: drawQ6_KBlock,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-visuals.html'
+            },
+            q8_k: {
+                title: 'Q8_K — 8-bit K-Quant (Superblock)',
+                badge: '8.5 bpw', badgeBg: '#27ae60',
+                desc: 'K-quant with 8-bit precision. Generally used as an intermediate format for activation quantization. Virtually lossless.',
+                formula: 'struct block_q8_K {\n  float d;           // scale (FP32)\n  int8_t qs[256];    // 256 signed int8 weights\n  int16_t bsums[16]; // block sums for dot product\n};  // 292 bytes / 256 weights\n\nweight[j] = d × qs[j]',
+                struct: { 'Super-block': '256 weights', 'Bytes/block': '292', 'Bits/weight': '~9.1', 'Scale': 'FP32', 'Storage': 'int8 + bsums', 'Use': 'Activations' },
+                svgFn: drawQ8_KBlock,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization-math-temp.html'
+            },
+            f16: {
+                title: 'FP16 — Half Precision Float',
+                badge: '16 bpw', badgeBg: '#1abc9c',
+                desc: 'IEEE 754 half-precision floating point. No quantization — each weight is a full 16-bit float. Used for embeddings, norms, and LM head where precision matters.',
+                formula: 'FP16 layout:\n  sign(1) | exponent(5) | mantissa(10)\n\n  Range: ±65504\n  Precision: ~3.3 decimal digits\n  Smallest normal: 6.1e-5',
+                struct: { 'Bits/weight': '16', 'Dynamic range': '±65504', 'Precision': '~3.3 digits', 'Use case': 'Norms/Embed/Head', 'SIMD': 'F16C convert', 'Loss': 'None' },
+                svgFn: drawFP16Layout,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization.html'
+            },
+            fp16: { alias: 'f16' },
+            f32: {
+                title: 'FP32 — Single Precision Float',
+                badge: '32 bpw', badgeBg: '#47b475',
+                desc: 'Full IEEE 754 single-precision. No quantization at all. Used for master weights during training, optimizer states, and loss computation.',
+                formula: 'FP32 layout:\n  sign(1) | exponent(8) | mantissa(23)\n\n  Range: ±3.4e38\n  Precision: ~7.2 decimal digits\n  The baseline all quants are measured against.',
+                struct: { 'Bits/weight': '32', 'Dynamic range': '±3.4e38', 'Precision': '~7.2 digits', 'Use case': 'Training/Optim', 'SIMD': 'Native', 'Loss': 'None' },
+                svgFn: drawFP32Layout,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization.html'
+            },
+            fp32: { alias: 'f32' },
+            bf16: {
+                title: 'BF16 — Brain Floating Point',
+                badge: '16 bpw', badgeBg: '#e67e22',
+                desc: 'Google Brain\'s 16-bit format. Same exponent range as FP32 (8-bit exponent) but only 7-bit mantissa. Trades precision for dynamic range, making it ideal for training where large gradients matter more than fine precision.',
+                formula: 'BF16 layout:\n  sign(1) | exponent(8) | mantissa(7)\n\n  Range: ±3.4e38 (same as FP32!)\n  Precision: ~2.4 decimal digits\n  Simply truncate FP32 mantissa to 7 bits.',
+                struct: { 'Bits/weight': '16', 'Dynamic range': '±3.4e38', 'Precision': '~2.4 digits', 'Exponent': '8 bits (=FP32)', 'Use case': 'Training/Mixed-prec', 'Loss': 'Minimal' },
+                svgFn: drawBF16Layout,
+                link: 'https://antshiv.github.io/C-Kernel-Engine/quantization.html'
+            },
+            bfloat16: { alias: 'bf16' },
+        };
+
+        /* ── Mini SVG renderers for each format ── */
+        function drawBlockTemplate(svg, label, color, segments) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="${color}" font-size="10" font-weight="700" font-family="Inter,sans-serif">${label}</text>`;
+            let x = 8;
+            const y = 28, h = 36, gap = 3;
+            segments.forEach(seg => {
+                const w = seg.w || 40;
+                html += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${seg.fill}" stroke="${seg.stroke || '#555'}" stroke-width="1"/>`;
+                html += `<text x="${x + w/2}" y="${y + 14}" text-anchor="middle" fill="${seg.textColor || '#ddd'}" font-size="8" font-weight="600" font-family="'JetBrains Mono',monospace">${seg.label}</text>`;
+                if (seg.sub) html += `<text x="${x + w/2}" y="${y + 27}" text-anchor="middle" fill="#888" font-size="7" font-family="Inter,sans-serif">${seg.sub}</text>`;
+                x += w + gap;
+            });
+            // Bottom formula line
+            html += `<text x="8" y="82" fill="#888" font-size="8" font-family="'JetBrains Mono',monospace">Total: ${segments.reduce((s,seg) => s + (seg.bytes||0), 0)} bytes → ${label.split(' ')[0]} per 32 weights</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawQ4_0Block(svg) {
+            drawBlockTemplate(svg, 'Q4_0 Block (18 B / 32 weights)', '#e74c3c', [
+                { label: 'd', sub: 'FP16 scale', w: 45, fill: '#2a1e10', stroke: '#e74c3c88', textColor: '#e74c3c', bytes: 2 },
+                { label: 'qs[0]', sub: '2 nibbles', w: 38, fill: '#1e2738', stroke: '#e74c3c44', bytes: 1 },
+                { label: 'qs[1]', sub: '2 nibbles', w: 38, fill: '#1e2738', stroke: '#e74c3c44', bytes: 1 },
+                { label: '...', sub: '', w: 28, fill: '#151b26', stroke: '#333', textColor: '#555' },
+                { label: 'qs[15]', sub: '2 nibbles', w: 44, fill: '#1e2738', stroke: '#e74c3c44', bytes: 1 },
+                { label: '→ 4 bits/w', sub: '−8 offset', w: 68, fill: '#2a1010', stroke: '#e74c3c66', textColor: '#ff8a8a' },
+            ]);
+        }
+
+        function drawQ5_0Block(svg) {
+            drawBlockTemplate(svg, 'Q5_0 Block (22 B / 32 weights)', '#9b59b6', [
+                { label: 'd', sub: 'FP16 scale', w: 40, fill: '#2a1028', stroke: '#9b59b688', textColor: '#9b59b6', bytes: 2 },
+                { label: 'qh', sub: '32 hi bits', w: 55, fill: '#1e1428', stroke: '#9b59b666', textColor: '#bb79d6', bytes: 4 },
+                { label: 'qs[0..15]', sub: '32 nibbles', w: 90, fill: '#1e2738', stroke: '#9b59b644', bytes: 16 },
+                { label: '→ 5 bits/w', sub: '4+1 split', w: 68, fill: '#1e1028', stroke: '#9b59b666', textColor: '#d6a0ff' },
+            ]);
+        }
+
+        function drawQ5_1Block(svg) {
+            drawBlockTemplate(svg, 'Q5_1 Block (24 B / 32 weights)', '#8e44ad', [
+                { label: 'd', sub: 'scale', w: 36, fill: '#2a1028', stroke: '#8e44ad88', textColor: '#8e44ad', bytes: 2 },
+                { label: 'm', sub: 'minimum', w: 36, fill: '#2a1028', stroke: '#8e44ad88', textColor: '#c77dff', bytes: 2 },
+                { label: 'qh', sub: '32 hi bits', w: 50, fill: '#1e1428', stroke: '#8e44ad66', bytes: 4 },
+                { label: 'qs[0..15]', sub: '32 nibbles', w: 85, fill: '#1e2738', stroke: '#8e44ad44', bytes: 16 },
+                { label: '→ 5+min', sub: 'asymmetric', w: 60, fill: '#1e1028', stroke: '#8e44ad66', textColor: '#d6a0ff' },
+            ]);
+        }
+
+        function drawQ8_0Block(svg) {
+            drawBlockTemplate(svg, 'Q8_0 Block (34 B / 32 weights)', '#27ae60', [
+                { label: 'd', sub: 'FP16 scale', w: 45, fill: '#0e2418', stroke: '#27ae6088', textColor: '#27ae60', bytes: 2 },
+                { label: 'qs[0]', sub: 'int8', w: 34, fill: '#1e2738', stroke: '#27ae6044', bytes: 1 },
+                { label: 'qs[1]', sub: 'int8', w: 34, fill: '#1e2738', stroke: '#27ae6044', bytes: 1 },
+                { label: '...', sub: '', w: 25, fill: '#151b26', stroke: '#333', textColor: '#555' },
+                { label: 'qs[31]', sub: 'int8', w: 40, fill: '#1e2738', stroke: '#27ae6044', bytes: 1 },
+                { label: '→ 8 bits/w', sub: 'signed', w: 68, fill: '#0e2418', stroke: '#27ae6066', textColor: '#7de59f' },
+            ]);
+        }
+
+        function drawQ4_KBlock(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#f39c12" font-size="10" font-weight="700" font-family="Inter,sans-serif">Q4_K Superblock (144 B / 256 weights)</text>`;
+            // Top row: superblock header
+            html += `<rect x="8" y="24" width="50" height="24" rx="3" fill="#2a1e10" stroke="#f39c1266"/>`;
+            html += `<text x="33" y="38" text-anchor="middle" fill="#f39c12" font-size="7.5" font-weight="600" font-family="'JetBrains Mono',monospace">d (FP16)</text>`;
+            html += `<rect x="62" y="24" width="56" height="24" rx="3" fill="#2a1e10" stroke="#f39c1266"/>`;
+            html += `<text x="90" y="38" text-anchor="middle" fill="#f39c12" font-size="7.5" font-weight="600" font-family="'JetBrains Mono',monospace">dmin (FP16)</text>`;
+            html += `<rect x="122" y="24" width="72" height="24" rx="3" fill="#1e2738" stroke="#f39c1244"/>`;
+            html += `<text x="158" y="38" text-anchor="middle" fill="#ddd" font-size="7.5" font-weight="600" font-family="'JetBrains Mono',monospace">scales[12]</text>`;
+            html += `<rect x="198" y="24" width="170" height="24" rx="3" fill="#1e2738" stroke="#f39c1244"/>`;
+            html += `<text x="283" y="38" text-anchor="middle" fill="#ddd" font-size="7.5" font-weight="600" font-family="'JetBrains Mono',monospace">qs[128] — 256 × 4-bit nibbles</text>`;
+            // Sub-block row
+            const colors = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63'];
+            for (let i = 0; i < 8; i++) {
+                const x = 8 + i * 46;
+                html += `<rect x="${x}" y="54" width="43" height="20" rx="3" fill="${colors[i]}22" stroke="${colors[i]}66"/>`;
+                html += `<text x="${x+21.5}" y="67" text-anchor="middle" fill="${colors[i]}" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">sub ${i}</text>`;
+            }
+            html += `<text x="8" y="86" fill="#888" font-size="7.5" font-family="Inter,sans-serif">8 sub-blocks × 32 weights, each with 6-bit scale + 6-bit min → nested quantization</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawQ5_KBlock(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#8e44ad" font-size="10" font-weight="700" font-family="Inter,sans-serif">Q5_K Superblock (176 B / 256 weights)</text>`;
+            html += `<rect x="8" y="24" width="46" height="22" rx="3" fill="#2a1028" stroke="#8e44ad66"/>`;
+            html += `<text x="31" y="38" text-anchor="middle" fill="#8e44ad" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">d</text>`;
+            html += `<rect x="58" y="24" width="46" height="22" rx="3" fill="#2a1028" stroke="#8e44ad66"/>`;
+            html += `<text x="81" y="38" text-anchor="middle" fill="#c77dff" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">dmin</text>`;
+            html += `<rect x="108" y="24" width="62" height="22" rx="3" fill="#1e1428" stroke="#8e44ad44"/>`;
+            html += `<text x="139" y="38" text-anchor="middle" fill="#ddd" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">sc[12]</text>`;
+            html += `<rect x="174" y="24" width="60" height="22" rx="3" fill="#1e1428" stroke="#9b59b644"/>`;
+            html += `<text x="204" y="38" text-anchor="middle" fill="#d6a0ff" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">qh[32]</text>`;
+            html += `<rect x="238" y="24" width="130" height="22" rx="3" fill="#1e2738" stroke="#8e44ad44"/>`;
+            html += `<text x="303" y="38" text-anchor="middle" fill="#ddd" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">qs[128] 4-bit</text>`;
+            html += `<text x="8" y="66" fill="#c77dff" font-size="8" font-family="'JetBrains Mono',monospace">weight = d × sc[sub] × (q4 | qh_bit) − dmin × m[sub]</text>`;
+            html += `<text x="8" y="82" fill="#888" font-size="7.5" font-family="Inter,sans-serif">5 bits per weight with K-quant nested scales — excellent quality/size ratio</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawQ6_KBlock(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#3498db" font-size="10" font-weight="700" font-family="Inter,sans-serif">Q6_K Superblock (210 B / 256 weights)</text>`;
+            html += `<rect x="8" y="24" width="90" height="22" rx="3" fill="#0e1e28" stroke="#3498db44"/>`;
+            html += `<text x="53" y="38" text-anchor="middle" fill="#8cb4ff" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">ql[128] 4-bit lo</text>`;
+            html += `<rect x="102" y="24" width="72" height="22" rx="3" fill="#0e1e28" stroke="#3498db44"/>`;
+            html += `<text x="138" y="38" text-anchor="middle" fill="#8cb4ff" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">qh[64] 2-bit hi</text>`;
+            html += `<rect x="178" y="24" width="60" height="22" rx="3" fill="#1e2738" stroke="#3498db44"/>`;
+            html += `<text x="208" y="38" text-anchor="middle" fill="#ddd" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">sc[16] int8</text>`;
+            html += `<rect x="242" y="24" width="46" height="22" rx="3" fill="#2a1e10" stroke="#3498db66"/>`;
+            html += `<text x="265" y="38" text-anchor="middle" fill="#3498db" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">d FP16</text>`;
+            html += `<text x="8" y="66" fill="#8cb4ff" font-size="8" font-family="'JetBrains Mono',monospace">weight = d × scales[sub] × q6_value  (4+2 bit split)</text>`;
+            html += `<text x="8" y="82" fill="#888" font-size="7.5" font-family="Inter,sans-serif">16 sub-blocks × 16 weights — near-FP16 quality at 6.6 bits/weight</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawQ8_KBlock(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#27ae60" font-size="10" font-weight="700" font-family="Inter,sans-serif">Q8_K Superblock (292 B / 256 weights)</text>`;
+            html += `<rect x="8" y="24" width="46" height="22" rx="3" fill="#0e2418" stroke="#27ae6066"/>`;
+            html += `<text x="31" y="38" text-anchor="middle" fill="#27ae60" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">d FP32</text>`;
+            html += `<rect x="58" y="24" width="170" height="22" rx="3" fill="#1e2738" stroke="#27ae6044"/>`;
+            html += `<text x="143" y="38" text-anchor="middle" fill="#ddd" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">qs[256] — 256 × int8</text>`;
+            html += `<rect x="232" y="24" width="100" height="22" rx="3" fill="#1e2738" stroke="#27ae6044"/>`;
+            html += `<text x="282" y="38" text-anchor="middle" fill="#7de59f" font-size="7" font-weight="600" font-family="'JetBrains Mono',monospace">bsums[16] int16</text>`;
+            html += `<text x="8" y="66" fill="#7de59f" font-size="8" font-family="'JetBrains Mono',monospace">weight[j] = d × qs[j]   |   bsums for fast dot product</text>`;
+            html += `<text x="8" y="82" fill="#888" font-size="7.5" font-family="Inter,sans-serif">Virtually lossless — primarily used for intermediate activation quantization</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawFP16Layout(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#1abc9c" font-size="10" font-weight="700" font-family="Inter,sans-serif">FP16 — IEEE 754 Half Precision (16 bits)</text>`;
+            // Bit layout
+            html += `<rect x="8" y="26" width="24" height="30" rx="3" fill="#e74c3c33" stroke="#e74c3c88"/>`;
+            html += `<text x="20" y="44" text-anchor="middle" fill="#e74c3c" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">S</text>`;
+            html += `<text x="20" y="22" text-anchor="middle" fill="#888" font-size="6">1 bit</text>`;
+            html += `<rect x="36" y="26" width="90" height="30" rx="3" fill="#f39c1233" stroke="#f39c1288"/>`;
+            html += `<text x="81" y="44" text-anchor="middle" fill="#f39c12" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Exponent</text>`;
+            html += `<text x="81" y="22" text-anchor="middle" fill="#888" font-size="6">5 bits</text>`;
+            html += `<rect x="130" y="26" width="170" height="30" rx="3" fill="#1abc9c33" stroke="#1abc9c88"/>`;
+            html += `<text x="215" y="44" text-anchor="middle" fill="#1abc9c" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Mantissa (Significand)</text>`;
+            html += `<text x="215" y="22" text-anchor="middle" fill="#888" font-size="6">10 bits</text>`;
+            html += `<text x="8" y="74" fill="#1abc9c" font-size="8" font-family="'JetBrains Mono',monospace">value = (−1)^S × 2^(E−15) × (1 + M/1024)</text>`;
+            html += `<text x="8" y="86" fill="#888" font-size="7.5" font-family="Inter,sans-serif">Range ±65504 · Precision ~3.3 digits · Norms, embeddings, LM head</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawBF16Layout(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#e67e22" font-size="10" font-weight="700" font-family="Inter,sans-serif">BF16 — Brain Float (16 bits, FP32 range)</text>`;
+            html += `<rect x="8" y="26" width="20" height="30" rx="3" fill="#e74c3c33" stroke="#e74c3c88"/>`;
+            html += `<text x="18" y="44" text-anchor="middle" fill="#e74c3c" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">S</text>`;
+            html += `<text x="18" y="22" text-anchor="middle" fill="#888" font-size="6">1</text>`;
+            html += `<rect x="32" y="26" width="140" height="30" rx="3" fill="#f39c1233" stroke="#f39c1288"/>`;
+            html += `<text x="102" y="44" text-anchor="middle" fill="#f39c12" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Exp (8 bits — same as FP32)</text>`;
+            html += `<rect x="176" y="26" width="192" height="30" rx="3" fill="#e67e2233" stroke="#e67e2288"/>`;
+            html += `<text x="272" y="44" text-anchor="middle" fill="#e67e22" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Mantissa (7 bits)</text>`;
+            html += `<text x="8" y="74" fill="#e67e22" font-size="8" font-family="'JetBrains Mono',monospace">value = (−1)^S × 2^(E−127) × (1 + M/128)</text>`;
+            html += `<text x="8" y="86" fill="#888" font-size="7.5" font-family="Inter,sans-serif">Range ±3.4e38 · Precision ~2.4 digits · Training sweet spot</text>`;
+            svg.innerHTML = html;
+        }
+
+        function drawFP32Layout(svg) {
+            let html = `<rect width="380" height="90" rx="8" fill="#151b26"/>`;
+            html += `<text x="8" y="16" fill="#47b475" font-size="10" font-weight="700" font-family="Inter,sans-serif">FP32 — IEEE 754 Single Precision (32 bits)</text>`;
+            html += `<rect x="8" y="26" width="20" height="30" rx="3" fill="#e74c3c33" stroke="#e74c3c88"/>`;
+            html += `<text x="18" y="44" text-anchor="middle" fill="#e74c3c" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">S</text>`;
+            html += `<text x="18" y="22" text-anchor="middle" fill="#888" font-size="6">1</text>`;
+            html += `<rect x="32" y="26" width="70" height="30" rx="3" fill="#f39c1233" stroke="#f39c1288"/>`;
+            html += `<text x="67" y="44" text-anchor="middle" fill="#f39c12" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Exp (8)</text>`;
+            html += `<rect x="106" y="26" width="262" height="30" rx="3" fill="#47b47533" stroke="#47b47588"/>`;
+            html += `<text x="237" y="44" text-anchor="middle" fill="#47b475" font-size="8" font-weight="700" font-family="'JetBrains Mono',monospace">Mantissa (23 bits)</text>`;
+            html += `<text x="8" y="74" fill="#47b475" font-size="8" font-family="'JetBrains Mono',monospace">value = (−1)^S × 2^(E−127) × (1 + M/8388608)</text>`;
+            html += `<text x="8" y="86" fill="#888" font-size="7.5" font-family="Inter,sans-serif">Range ±3.4e38 · Precision ~7.2 digits · Training baseline</text>`;
+            svg.innerHTML = html;
+        }
+
+        /* ── Popup show/hide logic ── */
+        const qmathPopup = document.getElementById('qmathPopup');
+        let qmathHideTimer = null;
+
+        function resolveQuantMath(key) {
+            const entry = QUANT_MATH[key];
+            if (!entry) return null;
+            if (entry.alias) return QUANT_MATH[entry.alias] || null;
+            return entry;
+        }
+
+        function showQmathPopup(badge, dtypeKey) {
+            const data = resolveQuantMath(dtypeKey);
+            if (!data) return;
+
+            clearTimeout(qmathHideTimer);
+
+            document.getElementById('qmathTitle').textContent = data.title;
+            const badgeEl = document.getElementById('qmathBadge');
+            badgeEl.textContent = data.badge;
+            badgeEl.style.background = data.badgeBg;
+
+            document.getElementById('qmathDesc').textContent = data.desc;
+            document.getElementById('qmathFormula').textContent = data.formula;
+
+            const structDl = document.getElementById('qmathStruct');
+            structDl.innerHTML = Object.entries(data.struct).map(([k, v]) =>
+                `<dt>${k}</dt><dd>${v}</dd>`
+            ).join('');
+
+            const svg = document.getElementById('qmathSvg');
+            if (data.svgFn) data.svgFn(svg);
+
+            const link = document.getElementById('qmathLink');
+            link.href = data.link || '#';
+
+            // Position near the badge
+            const rect = badge.getBoundingClientRect();
+            let top = rect.bottom + 8;
+            let left = rect.left;
+
+            // Keep within viewport
+            const popW = 420, popH = 520;
+            if (left + popW > window.innerWidth - 16) left = window.innerWidth - popW - 16;
+            if (left < 8) left = 8;
+            if (top + popH > window.innerHeight - 16) top = rect.top - popH - 8;
+
+            qmathPopup.style.top = top + 'px';
+            qmathPopup.style.left = left + 'px';
+            qmathPopup.classList.add('visible');
+        }
+
+        function hideQmathPopup() {
+            qmathHideTimer = setTimeout(() => {
+                qmathPopup.classList.remove('visible');
+            }, 200);
+        }
+
+        // Keep popup open when mouse enters it
+        qmathPopup.addEventListener('mouseenter', () => clearTimeout(qmathHideTimer));
+        qmathPopup.addEventListener('mouseleave', () => hideQmathPopup());
+
+        /* ── Attach hover events to .dtype badges ── */
+        function attachQmathHovers(root) {
+            const badges = (root || document).querySelectorAll('.dtype');
+            badges.forEach(badge => {
+                // Extract dtype from class or text
+                const classes = badge.className.split(/\s+/);
+                let dtypeKey = '';
+                for (const cls of classes) {
+                    const m = cls.match(/^dtype-(.+)$/);
+                    if (m && m[1] !== '-' && m[1] !== '') {
+                        dtypeKey = m[1];
+                        break;
+                    }
+                }
+                if (!dtypeKey) dtypeKey = badge.textContent.trim().toLowerCase();
+                if (!resolveQuantMath(dtypeKey)) return;
+
+                badge.setAttribute('data-qmath', dtypeKey);
+                badge.addEventListener('mouseenter', function() {
+                    showQmathPopup(this, dtypeKey);
+                });
+                badge.addEventListener('mouseleave', function() {
+                    hideQmathPopup();
+                });
+            });
+        }
+
+        // Initial attach + re-attach after render
+        const _origRenderQuant = renderQuantizationAudit;
+        renderQuantizationAudit = function() {
+            _origRenderQuant.apply(this, arguments);
+            setTimeout(() => attachQmathHovers(document.getElementById('quantization')), 50);
+        };
+        // Also attach on any existing badges now
+        attachQmathHovers();
+
         function getExpectedKernelSuffix(dtype) {
             const map = {
                 'q4_0': 'q4_0', 'q4_1': 'q4_1', 'q4_k': 'q4_k',
                 'q5_0': 'q5_0', 'q5_1': 'q5_1', 'q5_k': 'q5_k',
                 'q6_k': 'q6_k', 'q8_0': 'q8_0', 'q8_k': 'q8_k',
-                'fp32': 'f32', 'f32': 'f32', 'fp16': 'f16', 'f16': 'f16'
+                'fp32': 'f32', 'f32': 'f32',
+                'fp16': 'f16', 'f16': 'f16',
+                'bf16': 'bf16', 'bfloat16': 'bf16'
             };
             return map[(dtype || '').toLowerCase()] || dtype;
+        }
+
+        /** FP32 is the default dtype — generic kernels (matmul, linear, gemm) won't carry a dtype suffix */
+        function isDefaultDtype(dtype) {
+            return ['f32', 'fp32'].includes((dtype || '').toLowerCase());
         }
 
         function getExpectedKernelFragments(dtype) {
@@ -4625,6 +5415,7 @@ python test_gemv_q8_0_q8_0.py</pre>
             const fragments = [suffix];
             if (suffix === 'f32') fragments.push('fp32');
             if (suffix === 'f16') fragments.push('fp16');
+            if (suffix === 'bf16') fragments.push('bfloat16');
             return [...new Set(fragments)];
         }
 
@@ -7042,7 +7833,7 @@ function renderTraining() {
                 .on('zoom', (event) => {
                     graphCurrentZoom = event.transform.k;
                     graphG.attr('transform', event.transform);
-                    if (graphLabelSelection) updateGraphVisibility();
+                    if (graphLabelSelection) updateGraphLabelsForZoom();
                 });
 
             svg.call(graphZoom);
@@ -7632,6 +8423,27 @@ function renderTraining() {
             syncLayerFlowControls();
         }
 
+        /* Cheap zoom-only pass: updates labels + zoom text (called ~60x/sec during zoom) */
+        var _graphVisibleCount = 0;
+        var _graphVisibleEdges = 0;
+
+        function updateGraphLabelsForZoom() {
+            if (graphLabelSelection) {
+                graphLabelSelection
+                    .attr('opacity', d => shouldShowGraphLabel(d) ? 1 : 0)
+                    .attr('display', d => shouldShowGraphLabel(d) ? null : 'none');
+            }
+            const focus = document.getElementById('graphFocusSummary');
+            if (focus) {
+                const zoomTxt = `${graphCurrentZoom.toFixed(2)}x`;
+                const layerTxt = graphFilterState.layerFlowEnabled && Number.isInteger(graphFilterState.layerFocus)
+                    ? ` | L${graphFilterState.layerFocus}`
+                    : '';
+                focus.textContent = `focus: ${_graphVisibleCount} ops | ${_graphVisibleEdges} edges${layerTxt} | zoom ${zoomTxt}`;
+            }
+        }
+
+        /* Full visibility recompute: nodes, edges, counts (called on filter/state changes only) */
         function updateGraphVisibility() {
             if (graphSvg && graphNodeSelection && graphLinkSelection) {
                 graphNodeSelection.select('circle')
@@ -7675,15 +8487,15 @@ function renderTraining() {
                     });
             }
 
-            const visibleCount = graphData.nodes.filter(n => n.visible).length;
-            const visibleEdges = graphData.links.filter(link => {
+            _graphVisibleCount = graphData.nodes.filter(n => n.visible).length;
+            _graphVisibleEdges = graphData.links.filter(link => {
                 const src = resolveGraphEndpoint(link.source);
                 const tgt = resolveGraphEndpoint(link.target);
                 return src && tgt && (src.visible || tgt.visible) && isEdgeTypeVisible(link.type);
             }).length;
             const nodeCountEl = document.getElementById('graphNodeCount');
             if (nodeCountEl) {
-                nodeCountEl.textContent = `${visibleCount}/${graphData.nodes.length} nodes, ${visibleEdges}/${graphData.links.length} edges | ${graphLayerCount} layers`;
+                nodeCountEl.textContent = `${_graphVisibleCount}/${graphData.nodes.length} nodes, ${_graphVisibleEdges}/${graphData.links.length} edges | ${graphLayerCount} layers`;
             }
             const focus = document.getElementById('graphFocusSummary');
             if (focus) {
@@ -7691,7 +8503,7 @@ function renderTraining() {
                 const layerTxt = graphFilterState.layerFlowEnabled && Number.isInteger(graphFilterState.layerFocus)
                     ? ` | L${graphFilterState.layerFocus}`
                     : '';
-                focus.textContent = `focus: ${visibleCount} ops | ${visibleEdges} edges${layerTxt} | zoom ${zoomTxt}`;
+                focus.textContent = `focus: ${_graphVisibleCount} ops | ${_graphVisibleEdges} edges${layerTxt} | zoom ${zoomTxt}`;
             }
         }
 
@@ -8806,14 +9618,14 @@ function renderTraining() {
                 node.y = Math.floor(i / cols) * (nodeHeight + rowGap) + 58;
             });
 
-            // Draw links
+            // Draw links (reuse nodeMap from above for O(1) lookups)
             const link = g.append('g')
                 .selectAll('path')
                 .data(links)
                 .enter().append('path')
                 .attr('d', d => {
-                    const source = nodes.find(n => n.id === d.source);
-                    const target = nodes.find(n => n.id === d.target);
+                    const source = nodeMap.get(d.source);
+                    const target = nodeMap.get(d.target);
                     if (!source || !target) return '';
                     return `M${source.x},${source.y} Q${(source.x + target.x) / 2},${Math.min(source.y, target.y) - 30} ${target.x},${target.y}`;
                 })
@@ -8830,13 +9642,13 @@ function renderTraining() {
                 .enter().append('text')
                 .text(d => d.inputName)
                 .attr('x', d => {
-                    const source = nodes.find(n => n.id === d.source);
-                    const target = nodes.find(n => n.id === d.target);
+                    const source = nodeMap.get(d.source);
+                    const target = nodeMap.get(d.target);
                     return source && target ? (source.x + target.x) / 2 : 0;
                 })
                 .attr('y', d => {
-                    const source = nodes.find(n => n.id === d.source);
-                    const target = nodes.find(n => n.id === d.target);
+                    const source = nodeMap.get(d.source);
+                    const target = nodeMap.get(d.target);
                     return source && target ? Math.min(source.y, target.y) - 35 : 0;
                 })
                 .attr('text-anchor', 'middle')
@@ -12678,10 +13490,13 @@ const ME_REGION_COLORS = {
     grad_activations:  { bg: '#885522', border: '#e67e22' },
     saved:             { bg: '#7a5a1a', border: '#f39c12' },
     scratch:           { bg: '#555555', border: '#888888' },
+    rope_cache:        { bg: '#2d6a4f', border: '#52b788' },
+    kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
+    logits:            { bg: '#365d8a', border: '#76a5e8' },
+    io:                { bg: '#6b5f2a', border: '#c8b46b' },
     /* v7 inference layout uses role names rather than region names */
     weight:            { bg: '#2a5599', border: '#4a90d9' },
     activation:        { bg: '#1a7a3a', border: '#2ecc71' },
-    kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
     gap:               { bg: '#111',    border: '#222'    },
 };
 
@@ -12697,6 +13512,10 @@ const ME_TENSOR_HUES = [
 const meState = {
     zoomLevel:      0,
     colorMode:      'region',    // 'tensor' | 'region' | 'dtype' | 'alignment'
+    addressMode:    'absolute',  // 'absolute' | 'pool'
+    effectiveAddressMode: 'pool',
+    supportsAbsolute: false,
+    dataMode:       'unknown',   // 'training' | 'inference'
     viewRegion:     'all',       // 'all' | region name
     selectedTensor: null,
     gridCols:       128,
@@ -12715,6 +13534,7 @@ function meExtractData(ld) {
     const tensors = [];
     const regions = [];
     let totalBytes = 0;
+    let inferenceMode = false;
 
     /* v7 layout-train format (primary) */
     if (ld.format && ld.format.startsWith('layout-train')) {
@@ -12731,15 +13551,22 @@ function meExtractData(ld) {
         if (Array.isArray(ld.tensors)) {
             ld.tensors.forEach(function(t, idx) {
                 if (!t) return;
+                var off = Number(t.offset) || 0;
+                var end = Number(t.end) || (Number(t.offset || 0) + Number(t.bytes || 0));
                 tensors.push({
                     id:            t.id || t.name || 'tensor_' + idx,
-                    offset:        Number(t.offset) || 0,
-                    end:           Number(t.end)    || (Number(t.offset || 0) + Number(t.bytes || 0)),
+                    offset:        off,
+                    end:           end,
+                    offset_local:  off,
+                    end_local:     end,
+                    offset_abs:    off,
+                    end_abs:       end,
                     bytes:         Number(t.bytes)  || 0,
-                    bump_offset:   Number(t.bump_offset) || 0,
+                    bump_offset:   Number(t.bump_offset) || off,
                     bump_size:     Number(t.bump_size)   || 0,
                     kind:          t.kind || '',
                     region:        t.region || '',
+                    pool:          'train',
                     dtype:         t.dtype || 'fp32',
                     shape:         t.shape || [],
                     persistent:    !!t.persistent,
@@ -12758,15 +13585,16 @@ function meExtractData(ld) {
 
     /* v7 inference format: memory.weights.entries + memory.activations.buffers */
     if (tensors.length === 0) {
+        inferenceMode = true;
         var memory = ld.memory || ld;
         var wEntries = ((memory.weights || {}).entries || []);
         var aBuffers = ((memory.activations || {}).buffers || []);
 
         wEntries.forEach(function(e, idx) {
-            tensors.push(meParseFlatEntry(e, 'params', idx));
+            tensors.push(meParseFlatEntry(e, 'params', idx, 'weights'));
         });
         aBuffers.forEach(function(e, idx) {
-            tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx));
+            tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx, 'activations'));
         });
 
         /* v7 tensors[] flat array (e.g. from ir1 or lowered IR) */
@@ -12779,11 +13607,16 @@ function meExtractData(ld) {
                     id:       t.name || t.id || 'tensor_' + idx,
                     offset:   off,
                     end:      off + b,
+                    offset_local: off,
+                    end_local: off + b,
+                    offset_abs: off,
+                    end_abs: off + b,
                     bytes:    b,
                     bump_offset: Number(t.bump_offset) || 0,
                     bump_size:   Number(t.bump_size) || 0,
                     kind:     t.kind || '',
                     region:   t.region || meInferRegion(t.kind || ''),
+                    pool:     'flat',
                     dtype:    t.dtype || 'fp32',
                     shape:    t.shape || [],
                     persistent: !!t.persistent,
@@ -12799,7 +13632,50 @@ function meExtractData(ld) {
             var last = tensors.reduce(function(a, b) { return a.end > b.end ? a : b; });
             totalBytes = last.end;
         }
-        if (memory.total_bytes) totalBytes = memory.total_bytes;
+        if (memory.total_bytes) totalBytes = Number(memory.total_bytes) || totalBytes;
+    }
+
+    /* Address mode handling:
+     * - pool: use local pool offsets (weights + activations each start at 0)
+     * - absolute: use abs_offset for a single contiguous address space
+     */
+    var hasAbs = false;
+    for (var ai = 0; ai < tensors.length; ai++) {
+        var ta = tensors[ai];
+        if (typeof ta.offset_abs === 'number' && typeof ta.offset_local === 'number' && ta.offset_abs !== ta.offset_local) {
+            hasAbs = true;
+            break;
+        }
+    }
+    meState.dataMode = inferenceMode ? 'inference' : 'training';
+    meState.supportsAbsolute = hasAbs;
+    if (!inferenceMode) {
+        meState.effectiveAddressMode = 'pool';
+    } else {
+        meState.effectiveAddressMode = (meState.addressMode === 'absolute' && hasAbs) ? 'absolute' : 'pool';
+    }
+
+    for (var si = 0; si < tensors.length; si++) {
+        var tsel = tensors[si];
+        var useAbs = meState.effectiveAddressMode === 'absolute';
+        tsel.offset = useAbs ? tsel.offset_abs : tsel.offset_local;
+        tsel.end = useAbs ? tsel.end_abs : tsel.end_local;
+        if (typeof tsel.bump_offset !== 'number' || !isFinite(tsel.bump_offset)) {
+            tsel.bump_offset = tsel.offset_local;
+        }
+    }
+
+    if (!regions.length) {
+        if (tensors.length) {
+            var maxEnd = 0;
+            for (var ti = 0; ti < tensors.length; ti++) {
+                if (tensors[ti].end > maxEnd) maxEnd = tensors[ti].end;
+            }
+            totalBytes = Math.max(totalBytes, maxEnd);
+        }
+    } else if (meState.effectiveAddressMode === 'absolute') {
+        // layout-train already uses absolute-like arena offsets; keep region-based total.
+        totalBytes = regions.reduce(function(mx, r) { return Math.max(mx, Number(r.offset || 0) + Number(r.bytes || 0)); }, 0);
     }
 
     /* Sort by offset */
@@ -12815,16 +13691,27 @@ function meExtractData(ld) {
 
 function meParseFlatEntry(e, region, idx) {
     var off = meParseHex(e.offset || e.bump_offset || 0);
+    var abs = (typeof e.abs_offset !== 'undefined' && e.abs_offset !== null) ? meParseHex(e.abs_offset) : off;
     var sz  = Number(e.size || e.bytes || 0);
+    var pool = arguments.length >= 4 ? (arguments[3] || '') : '';
+    var inferredRegion = region;
+    if (pool === 'activations') {
+        inferredRegion = meInferActivationRegion(e.name || e.key || '');
+    }
     return {
         id:       e.name || e.key || 'tensor_' + idx,
         offset:   off,
         end:      off + sz,
+        offset_local: off,
+        end_local: off + sz,
+        offset_abs: abs,
+        end_abs: abs + sz,
         bytes:    sz,
         bump_offset: Number(e.bump_offset) || off,
         bump_size:   sz,
         kind:     e.kind || e.role || '',
-        region:   region,
+        region:   inferredRegion,
+        pool:     pool,
         dtype:    e.dtype || 'fp32',
         shape:    e.shape || [],
         persistent: true,
@@ -12833,6 +13720,16 @@ function meParseFlatEntry(e, region, idx) {
         numel:    0,
         colorIdx: idx,
     };
+}
+
+function meInferActivationRegion(name) {
+    var n = String(name || '').toLowerCase();
+    if (n.includes('kv_cache')) return 'kv_cache';
+    if (n.includes('rope_cache') || n.includes('rope')) return 'rope_cache';
+    if (n.includes('scratch')) return 'scratch';
+    if (n.includes('text_input') || n.includes('token_ids')) return 'io';
+    if (n.includes('logits')) return 'logits';
+    return 'activations';
 }
 
 function meInferRegion(kind) {
@@ -13003,14 +13900,41 @@ function renderMemoryExplorer(containerId) {
     /* ── Controls Bar ── */
     var ctrl = document.createElement('div');
     ctrl.className = 'me-controls';
-    var regionOpts = meState.regions.length
-        ? meState.regions.map(function(r) { return '<option value="' + r.name + '"' + (meState.viewRegion === r.name ? ' selected' : '') + '>' + r.name + ' (' + meFmtBytes(r.bytes) + ')</option>'; }).join('')
-        : '';
+    var regionRows = [];
+    if (meState.regions.length) {
+        regionRows = meState.regions.map(function(r) {
+            return { name: r.name, bytes: Number(r.bytes) || 0, count: Number(r.count) || 0 };
+        });
+    } else {
+        var regionAgg = {};
+        for (var ri0 = 0; ri0 < meState.tensors.length; ri0++) {
+            var tr = meState.tensors[ri0];
+            var rn = tr.region || 'unknown';
+            if (!regionAgg[rn]) regionAgg[rn] = { name: rn, bytes: 0, count: 0 };
+            regionAgg[rn].bytes += Number(tr.bytes) || 0;
+            regionAgg[rn].count += 1;
+        }
+        regionRows = Object.keys(regionAgg).sort().map(function(k) { return regionAgg[k]; });
+    }
+    var regionOpts = regionRows.map(function(r) {
+        return '<option value="' + r.name + '"' + (meState.viewRegion === r.name ? ' selected' : '') + '>' +
+            r.name + ' (' + meFmtBytes(r.bytes) + ', ' + r.count + ')</option>';
+    }).join('');
+    var regionLabel = meState.effectiveAddressMode === 'absolute' ? 'Full Address Space' : 'Full Arena';
+    var addrAbsSelected = meState.effectiveAddressMode === 'absolute';
+    var addrPoolSelected = !addrAbsSelected;
     ctrl.innerHTML =
         '<div class="me-ctrl-group">' +
             '<label>Zoom</label>' +
             '<select onchange="meSetZoom(+this.value)">' +
                 ME_ZOOM_LEVELS.map(function(z, i) { return '<option value="' + i + '"' + (i === meState.zoomLevel ? ' selected' : '') + '>' + z.label + '</option>'; }).join('') +
+            '</select>' +
+        '</div>' +
+        '<div class="me-ctrl-group">' +
+            '<label>Address</label>' +
+            '<select onchange="meSetAddressMode(this.value)">' +
+                '<option value="absolute"' + (addrAbsSelected ? ' selected' : '') + (meState.supportsAbsolute ? '' : ' disabled') + '>Absolute (Contiguous)</option>' +
+                '<option value="pool"' + (addrPoolSelected ? ' selected' : '') + '>Pool Offset</option>' +
             '</select>' +
         '</div>' +
         '<div class="me-ctrl-group">' +
@@ -13025,7 +13949,7 @@ function renderMemoryExplorer(containerId) {
         '<div class="me-ctrl-group">' +
             '<label>Region</label>' +
             '<select onchange="meSetRegion(this.value)">' +
-                '<option value="all"' + (meState.viewRegion === 'all' ? ' selected' : '') + '>Full Arena (' + meFmtBytes(meState.totalBytes) + ')</option>' +
+                '<option value="all"' + (meState.viewRegion === 'all' ? ' selected' : '') + '>' + regionLabel + ' (' + meFmtBytes(meState.totalBytes) + ')</option>' +
                 regionOpts +
             '</select>' +
         '</div>' +
@@ -13038,10 +13962,21 @@ function renderMemoryExplorer(containerId) {
     var sumDiv = document.createElement('div');
     sumDiv.className = 'me-summary';
 
+    var regionCount = 0;
+    if (meState.regions.length) {
+        regionCount = meState.regions.length;
+    } else {
+        var rcSeen = {};
+        for (var rcIdx = 0; rcIdx < meState.tensors.length; rcIdx++) {
+            rcSeen[meState.tensors[rcIdx].region || 'unknown'] = true;
+        }
+        regionCount = Object.keys(rcSeen).length;
+    }
+
     var sumHTML =
         '<div class="me-card"><div class="me-card-val">' + meFmtBytes(meState.totalBytes) + '</div><div class="me-card-lbl">Arena</div></div>' +
         '<div class="me-card"><div class="me-card-val">' + meState.tensors.length + '</div><div class="me-card-lbl">Tensors</div></div>' +
-        '<div class="me-card"><div class="me-card-val">' + (meState.regions.length || Object.keys(ME_REGION_COLORS).length) + '</div><div class="me-card-lbl">Regions</div></div>';
+        '<div class="me-card"><div class="me-card-val">' + regionCount + '</div><div class="me-card-lbl">Regions</div></div>';
 
     for (var ri = 0; ri < meState.regions.length; ri++) {
         var r = meState.regions[ri];
@@ -13178,6 +14113,11 @@ function meRenderGrid() {
     /* Byte range */
     var minOff = regionFilter ? regionFilter.offset : 0;
     var maxOff = regionFilter ? (regionFilter.offset + regionFilter.bytes) : meState.totalBytes;
+    if (!regionFilter && meState.viewRegion !== 'all' && tensors.length > 0) {
+        minOff = tensors.reduce(function(mn, t) { return Math.min(mn, t.offset); }, Number.POSITIVE_INFINITY);
+        maxOff = tensors.reduce(function(mx, t) { return Math.max(mx, t.end); }, 0);
+        if (!isFinite(minOff)) minOff = 0;
+    }
     var totalCells = Math.ceil((maxOff - minOff) / bpc);
     var rows = Math.ceil(totalCells / cols);
 
@@ -13417,8 +14357,10 @@ function meShowDetail(t) {
         '</div>' +
         '<div class="me-detail-grid">' +
             '<div class="me-kv"><span class="me-k">Kind</span><span class="me-v">' + t.kind + '</span></div>' +
-            '<div class="me-kv"><span class="me-k">Offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset) + '</span></div>' +
-            '<div class="me-kv"><span class="me-k">End</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.end) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (view)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">End (view)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.end) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (pool)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset_local || t.offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (abs)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset_abs || t.offset) + '</span></div>' +
             '<div class="me-kv"><span class="me-k">Size</span><span class="me-v">' + meFmtBytes(t.bytes) + ' (' + t.bytes.toLocaleString() + ' B)</span></div>' +
             '<div class="me-kv"><span class="me-k">BUMP offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.bump_offset) + '</span></div>' +
             '<div class="me-kv"><span class="me-k">BUMP size</span><span class="me-v">' + meFmtBytes(t.bump_size) + '</span></div>' +
@@ -13448,6 +14390,10 @@ if (typeof window !== 'undefined') {
     window.meSetZoom = function(v) {
         meState.zoomLevel = v;
         meRenderGrid();
+    };
+    window.meSetAddressMode = function(v) {
+        meState.addressMode = (v === 'pool') ? 'pool' : 'absolute';
+        renderMemoryExplorer();
     };
     window.meSetColor = function(v) {
         meState.colorMode = v;
@@ -13563,21 +14509,6 @@ function renderTrainingTab(tabId) {
     renderTrainingExtensionTab(tabId, files);
 }
 
-function patchShowTab() {
-    if (window.__ckV7ShowTabPatched) return;
-    const original = window.showTab;
-    if (typeof original !== 'function') return;
-
-    window.showTab = function patchedShowTab(tabId) {
-        const result = original(tabId);
-        if (trainingTabIds().includes(tabId)) {
-            renderTrainingTab(tabId);
-        }
-        return result;
-    };
-    window.__ckV7ShowTabPatched = true;
-}
-
 function installListeners() {
     window.addEventListener('ck:tab-shown', (event) => {
         const tabId = event && event.detail ? event.detail.tabId : '';
@@ -13599,7 +14530,6 @@ function installListeners() {
 function init() {
     initModeUI();
     applyQuestionHeaders();
-    patchShowTab();
     installListeners();
 
     const active = document.querySelector('.tabs .tab.active');

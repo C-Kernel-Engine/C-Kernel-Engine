@@ -1,0 +1,40 @@
+{
+  "format": "v7-train-data-pipeline",
+  "run_dir": "/tmp/v7_svg_full_glory",
+  "dataset": "/tmp/v7_svg_assets_train.txt",
+  "tokenizer": "bpe",
+  "training": {
+    "epochs": 10,
+    "seq_len": 32,
+    "total_tokens": 65536,
+    "grad_accum": 1,
+    "lr": 0.0005,
+    "max_grad_norm": 1.0,
+    "seed": 42
+  },
+  "artifacts": {
+    "work_dir": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406",
+    "ck_json": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406/train_ck.json",
+    "torch_json": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406/train_torch_ref.json",
+    "bpe": {
+      "tokenizer_json": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406/tokenizer.json",
+      "binary_dir": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406/bpe_bin",
+      "token_file": "/tmp/v7_svg_full_glory/.ck_pipeline/bpe_20260219_180406/train_tokens.txt",
+      "token_count": 860705
+    }
+  },
+  "ck_loss": {
+    "steps": 20480,
+    "first": 5.803768157958984,
+    "final": 0.0881289467215538,
+    "min": 0.0004641573177650571,
+    "min_step": 19685
+  },
+  "torch_loss": {
+    "steps": 20480,
+    "first": 5.803767681121826,
+    "final": 0.16028505563735962,
+    "min": 0.0004213160427752882,
+    "min_step": 19685
+  }
+}

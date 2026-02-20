@@ -344,6 +344,7 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "train_parity_epochs_3_latest.json",
         "train_parity_epochs_5_latest.json",
         "replay_determinism_latest.json",
+        "backprop_stitch_runtime_latest.json",
     ]
     copied = 0
     dst_model_dir.mkdir(parents=True, exist_ok=True)
@@ -655,6 +656,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "train_runtime_parity_realistic",
         "train_runtime_parity_stress",
         "replay_determinism",
+        "backprop_stitch_runtime",
         "grad_rules",
         "manifest",
         "kernel_registry",
@@ -712,6 +714,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "train_runtime_parity_realistic": model_candidates("train_runtime_parity_realistic_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_realistic_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_realistic_latest.json"],
         "train_runtime_parity_stress": model_candidates("train_runtime_parity_stress_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_stress_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_stress_latest.json"],
         "replay_determinism": model_candidates("replay_determinism_latest.json") + [V7_REPORT_PATH / "replay_determinism_latest.json", V7_REPORT_PATH_LEGACY / "replay_determinism_latest.json"],
+        "backprop_stitch_runtime": model_candidates("backprop_stitch_runtime_latest.json") + model_candidates("backprop_stitch_runtime.json") + [V7_REPORT_PATH / "backprop_stitch_runtime_latest.json", V7_REPORT_PATH_LEGACY / "backprop_stitch_runtime_latest.json"],
         "grad_rules": [V7_ROOT / "scripts" / "grad_rules_v7.json"],
         "manifest": model_candidates("weights_manifest.json"),
         "profile_summary": model_candidates("profile_summary.json"),
@@ -948,7 +951,7 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
 
     advisor = data["files"].get("advisor_summary")
     if isinstance(advisor, dict):
-        for key in ("project_dir", "project_path", "report_path"):
+        for key in ("project_dir", "project_path", "report_path", "csv_path", "html_path"):
             raw = advisor.get(key)
             if not isinstance(raw, str):
                 continue

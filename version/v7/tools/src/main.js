@@ -42,21 +42,6 @@ function renderTrainingTab(tabId) {
     renderTrainingExtensionTab(tabId, files);
 }
 
-function patchShowTab() {
-    if (window.__ckV7ShowTabPatched) return;
-    const original = window.showTab;
-    if (typeof original !== 'function') return;
-
-    window.showTab = function patchedShowTab(tabId) {
-        const result = original(tabId);
-        if (trainingTabIds().includes(tabId)) {
-            renderTrainingTab(tabId);
-        }
-        return result;
-    };
-    window.__ckV7ShowTabPatched = true;
-}
-
 function installListeners() {
     window.addEventListener('ck:tab-shown', (event) => {
         const tabId = event && event.detail ? event.detail.tabId : '';
@@ -78,7 +63,6 @@ function installListeners() {
 function init() {
     initModeUI();
     applyQuestionHeaders();
-    patchShowTab();
     installListeners();
 
     const active = document.querySelector('.tabs .tab.active');

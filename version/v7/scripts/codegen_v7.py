@@ -344,14 +344,28 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
             vocab_strings_size = int(e.get("size", 0))
             break
     lines.append("/* Header weight offsets */")
+    header_field_by_name: Dict[str, str] = {}
+    used_header_fields = set()
+    for e in header_entries:
+        base = _sanitize_macro(e.get("name", "header_weight")).lower()
+        field = base
+        suffix = 2
+        while field in used_header_fields:
+            field = f"{base}_{suffix}"
+            suffix += 1
+        used_header_fields.add(field)
+        header_field_by_name[e.get("name", "")] = field
+
     lines.append("typedef struct {")
     for e in header_entries:
-        lines.append(f"    size_t {e['name']};  /* {e.get('dtype', 'unknown')}, {e.get('size', 0)} bytes */")
+        field = header_field_by_name.get(e.get("name", ""), _sanitize_macro(e.get("name", "header_weight")).lower())
+        lines.append(f"    size_t {field};  /* {e.get('dtype', 'unknown')}, {e.get('size', 0)} bytes */")
     lines.append("} HeaderOffsets;")
     lines.append("")
     lines.append("static const HeaderOffsets L_HEADER = {")
     for e in header_entries:
-        lines.append(f"    .{e['name']} = {e.get('offset', 0)},")
+        field = header_field_by_name.get(e.get("name", ""), _sanitize_macro(e.get("name", "header_weight")).lower())
+        lines.append(f"    .{field} = {e.get('offset', 0)},")
     lines.append("};")
     lines.append("")
     if vocab_merges_size:
@@ -1146,14 +1160,34 @@ CK_EXPORT int ck_model_decode(int32_t token, float *output) {{
 
 /* Getters */
 CK_EXPORT int ck_model_get_vocab_size(void) {{ return VOCAB_SIZE; }}
-CK_EXPORT int ck_model_get_vocab_strings_size(void) {{ return VOCAB_STRINGS_SIZE; }}
+CK_EXPORT int ck_model_get_vocab_strings_size(void) {{
+#ifdef VOCAB_STRINGS_SIZE
+    return VOCAB_STRINGS_SIZE;
+#else
+    return 0;
+#endif
+}}
 CK_EXPORT const int32_t* ck_model_get_vocab_offsets(void) {{
+#ifdef W_VOCAB_OFFSETS
     return g_model ? (const int32_t*)(g_model->bump + W_VOCAB_OFFSETS) : NULL;
+#else
+    return NULL;
+#endif
 }}
 CK_EXPORT const uint8_t* ck_model_get_vocab_strings(void) {{
+#ifdef W_VOCAB_STRINGS
     return g_model ? (const uint8_t*)(g_model->bump + W_VOCAB_STRINGS) : NULL;
+#else
+    return NULL;
+#endif
 }}
-CK_EXPORT int ck_model_get_num_merges(void) {{ return VOCAB_MERGES_COUNT; }}
+CK_EXPORT int ck_model_get_num_merges(void) {{
+#ifdef VOCAB_MERGES_COUNT
+    return VOCAB_MERGES_COUNT;
+#else
+    return 0;
+#endif
+}}
 CK_EXPORT int ck_model_get_context_window(void) {{ return MAX_SEQ_LEN; }}
 CK_EXPORT int ck_model_get_active_tokens(void) {{ return g_model ? g_model->pos : 0; }}
 CK_EXPORT int ck_model_get_logits_stride(void) {{ return {logits_stride}; }}

@@ -11,9 +11,9 @@
  *   - Emits tokenizer.json + optional binary artifacts for v7 pipelines
  *
  * Notes on token representation:
- *   - Base symbols are GPT-2 byte-level UTF-8 pieces (same style as ByteLevel BPE).
- *   - Learned merges concatenate those pieces into larger token strings.
- *   - This keeps artifacts compatible with HuggingFace tokenizers + CK true_bpe runtime.
+ *   - Default mode: GPT-2 byte-level UTF-8 pieces (ByteLevel-compatible).
+ *   - --ascii-only mode: raw ASCII bytes (\t,\n,\r,0x20-0x7E) with no UTF-8 marker mapping.
+ *   - Learned merges concatenate base symbols into larger token strings.
  */
 
 #define _GNU_SOURCE
@@ -43,6 +43,9 @@
 #define ID_PAD 3
 #define BASE_BYTE_ID 4
 #define BASE_BYTE_COUNT 256
+#define ASCII_PRINT_MIN 0x20
+#define ASCII_PRINT_MAX 0x7E
+#define ASCII_BASE_COUNT (3 + (ASCII_PRINT_MAX - ASCII_PRINT_MIN + 1))  /* \\t,\\n,\\r + printable */
 
 #define DEFAULT_VOCAB_SIZE 1024
 #define DEFAULT_MIN_FREQ 2
@@ -111,6 +114,7 @@ typedef struct {
     int min_freq;
     int threads;
     int verbose;
+    int ascii_only;
 } Options;
 
 typedef struct Trainer {
@@ -131,6 +135,8 @@ typedef struct Trainer {
     SymbolNode *symbols;
     int num_symbols;
     int max_symbols;
+    int base_symbol_count;
+    int32_t byte_to_symbol[256]; /* byte -> token id (or -1 if disallowed in mode) */
 
     MergeRule *merges;
     int num_merges;
@@ -543,25 +549,52 @@ static size_t total_active_tokens(const Trainer *tr) {
     return sum;
 }
 
+static bool is_ascii_train_byte(uint8_t b) {
+    return b == '\t' || b == '\n' || b == '\r' ||
+           (b >= ASCII_PRINT_MIN && b <= ASCII_PRINT_MAX);
+}
+
 static void init_symbols(Trainer *tr) {
+    for (int i = 0; i < 256; i++) tr->byte_to_symbol[i] = -1;
+
     tr->symbols[ID_UNK].left = -1;
     tr->symbols[ID_UNK].right = -1;
+    tr->symbols[ID_UNK].is_base = 0;
     tr->symbols[ID_BOS].left = -1;
     tr->symbols[ID_BOS].right = -1;
+    tr->symbols[ID_BOS].is_base = 0;
     tr->symbols[ID_EOS].left = -1;
     tr->symbols[ID_EOS].right = -1;
+    tr->symbols[ID_EOS].is_base = 0;
     tr->symbols[ID_PAD].left = -1;
     tr->symbols[ID_PAD].right = -1;
+    tr->symbols[ID_PAD].is_base = 0;
 
-    for (int b = 0; b < BASE_BYTE_COUNT; b++) {
-        int id = BASE_BYTE_ID + b;
-        tr->symbols[id].left = -1;
-        tr->symbols[id].right = -1;
-        tr->symbols[id].byte = (uint8_t)b;
-        tr->symbols[id].is_base = 1;
+    int next_id = BASE_BYTE_ID;
+    if (tr->opt.ascii_only) {
+        for (int b = 0; b < 256; b++) {
+            if (!is_ascii_train_byte((uint8_t)b)) continue;
+            tr->symbols[next_id].left = -1;
+            tr->symbols[next_id].right = -1;
+            tr->symbols[next_id].byte = (uint8_t)b;
+            tr->symbols[next_id].is_base = 1;
+            tr->byte_to_symbol[b] = next_id;
+            next_id++;
+        }
+    } else {
+        for (int b = 0; b < BASE_BYTE_COUNT; b++) {
+            int id = BASE_BYTE_ID + b;
+            tr->symbols[id].left = -1;
+            tr->symbols[id].right = -1;
+            tr->symbols[id].byte = (uint8_t)b;
+            tr->symbols[id].is_base = 1;
+            tr->byte_to_symbol[b] = id;
+            next_id++;
+        }
     }
 
-    tr->num_symbols = BASE_BYTE_ID + BASE_BYTE_COUNT;
+    tr->base_symbol_count = next_id - BASE_BYTE_ID;
+    tr->num_symbols = next_id;
     tr->num_merges = 0;
 }
 
@@ -657,6 +690,12 @@ static int byte_to_gpt2_piece(uint8_t byte, char out[4]) {
     return 3;
 }
 
+static int byte_to_ascii_piece(uint8_t byte, char out[2]) {
+    out[0] = (char)byte;
+    out[1] = '\0';
+    return 1;
+}
+
 static const char *special_name(int id) {
     switch (id) {
         case ID_UNK: return "<|unk|>";
@@ -698,9 +737,15 @@ static int emit_symbol_text_recursive(const Trainer *tr, int32_t id, StrBuilder 
 
     const SymbolNode *s = &tr->symbols[id];
     if (s->is_base) {
-        char seg[4];
-        byte_to_gpt2_piece((uint8_t)s->byte, seg);
-        sb_append(sb, seg);
+        if (tr->opt.ascii_only) {
+            char seg_ascii[2];
+            byte_to_ascii_piece((uint8_t)s->byte, seg_ascii);
+            sb_append(sb, seg_ascii);
+        } else {
+            char seg[4];
+            byte_to_gpt2_piece((uint8_t)s->byte, seg);
+            sb_append(sb, seg);
+        }
         return sb->overflow ? -1 : 0;
     }
 
@@ -765,6 +810,7 @@ static void write_tokenizer_json(const char *path, const Trainer *tr) {
 
     fprintf(f, "{\n");
     fprintf(f, "  \"version\": \"1.0\",\n");
+    fprintf(f, "  \"ck_mode\": \"%s\",\n", tr->opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     fprintf(f, "  \"truncation\": null,\n");
     fprintf(f, "  \"padding\": null,\n");
     fprintf(f, "  \"added_tokens\": [\n");
@@ -775,9 +821,15 @@ static void write_tokenizer_json(const char *path, const Trainer *tr) {
     fprintf(f, "  ],\n");
 
     fprintf(f, "  \"normalizer\": null,\n");
-    fprintf(f, "  \"pre_tokenizer\": {\"type\": \"Sequence\", \"pretokenizers\": [{\"type\": \"Split\", \"pattern\": {\"Regex\": \"%s\"}, \"behavior\": \"Isolated\", \"invert\": false}, {\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": false, \"use_regex\": false}]},\n", gpt2_regex_json);
-    fprintf(f, "  \"post_processor\": null,\n");
-    fprintf(f, "  \"decoder\": {\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": false, \"use_regex\": false},\n");
+    if (tr->opt.ascii_only) {
+        fprintf(f, "  \"pre_tokenizer\": null,\n");
+        fprintf(f, "  \"post_processor\": null,\n");
+        fprintf(f, "  \"decoder\": null,\n");
+    } else {
+        fprintf(f, "  \"pre_tokenizer\": {\"type\": \"Sequence\", \"pretokenizers\": [{\"type\": \"Split\", \"pattern\": {\"Regex\": \"%s\"}, \"behavior\": \"Isolated\", \"invert\": false}, {\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": false, \"use_regex\": false}]},\n", gpt2_regex_json);
+        fprintf(f, "  \"post_processor\": null,\n");
+        fprintf(f, "  \"decoder\": {\"type\": \"ByteLevel\", \"add_prefix_space\": false, \"trim_offsets\": false, \"use_regex\": false},\n");
+    }
 
     fprintf(f, "  \"model\": {\n");
     fprintf(f, "    \"type\": \"BPE\",\n");
@@ -870,6 +922,7 @@ static void write_binary_exports(const char *out_dir, const Trainer *tr) {
     if (!f) fatalf("cannot write %s", path_meta);
     fprintf(f, "{\n");
     fprintf(f, "  \"schema\": \"ck.bpe.binary.v1\",\n");
+    fprintf(f, "  \"mode\": \"%s\",\n", tr->opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     fprintf(f, "  \"vocab_size\": %d,\n", tr->num_symbols);
     fprintf(f, "  \"num_merges\": %d,\n", tr->num_merges);
     fprintf(f, "  \"offsets\": \"%s\",\n", path_offsets);
@@ -901,6 +954,8 @@ static void print_help(const char *prog) {
         "  --ext LIST               Comma-separated file extensions (default: %s)\n"
         "                           Use '*' for all regular files\n"
         "  --binary-out-dir DIR     Also write vocab_offsets.bin, vocab_strings.bin, vocab_merges.bin\n"
+        "  --ascii-only             Train ASCII-identity BPE (no ByteLevel UTF-8 mapping)\n"
+        "                           Allowed bytes: \\t, \\n, \\r, and 0x20-0x7E\n"
         "  --verbose                Print training progress\n"
         "  --help                   Show this help\n",
         CK_BPE_VERSION, prog, DEFAULT_VOCAB_SIZE, DEFAULT_MIN_FREQ, DEFAULT_EXTS);
@@ -932,6 +987,8 @@ static void parse_args(int argc, char **argv, Options *opt) {
             opt->threads = atoi(argv[++i]);
         } else if (!strcmp(a, "--ext") && i + 1 < argc) {
             opt->exts_csv = argv[++i];
+        } else if (!strcmp(a, "--ascii-only")) {
+            opt->ascii_only = 1;
         } else if (!strcmp(a, "--verbose") || !strcmp(a, "-v")) {
             opt->verbose = 1;
         } else {
@@ -942,8 +999,9 @@ static void parse_args(int argc, char **argv, Options *opt) {
     if (!opt->corpus_dir || !*opt->corpus_dir) fatalf("missing --corpus-dir");
     if (!opt->out_json || !*opt->out_json) fatalf("missing --out");
     if (!path_exists(opt->corpus_dir)) fatalf("corpus dir not found: %s", opt->corpus_dir);
-    if (opt->vocab_size < (SPECIAL_COUNT + BASE_BYTE_COUNT)) {
-        fatalf("--vocab-size must be >= %d", SPECIAL_COUNT + BASE_BYTE_COUNT);
+    int base_count = opt->ascii_only ? ASCII_BASE_COUNT : BASE_BYTE_COUNT;
+    if (opt->vocab_size < (SPECIAL_COUNT + base_count)) {
+        fatalf("--vocab-size must be >= %d for selected mode", SPECIAL_COUNT + base_count);
     }
     if (opt->min_freq < 1) opt->min_freq = 1;
     if (opt->threads <= 0) {
@@ -972,7 +1030,16 @@ static void load_corpus_into_sequences(const FileList *fl, Trainer *tr) {
                 fclose(f);
                 fatalf("corpus grew during read; rerun training");
             }
-            tr->seq_a[cursor++] = BASE_BYTE_ID + ((unsigned char)c);
+            uint8_t b = (uint8_t)c;
+            int32_t id = tr->byte_to_symbol[b];
+            if (id < 0) {
+                fclose(f);
+                if (tr->opt.ascii_only) {
+                    fatalf("non-ASCII byte in --ascii-only corpus: file=%s byte=0x%02X", fl->items[i].path, (unsigned)b);
+                }
+                fatalf("unmapped byte in corpus: file=%s byte=0x%02X", fl->items[i].path, (unsigned)b);
+            }
+            tr->seq_a[cursor++] = id;
             len++;
         }
         fclose(f);
@@ -1045,8 +1112,8 @@ int main(int argc, char **argv) {
 
     PairSlot *local_tables = (PairSlot *)arena_alloc(&arena, (size_t)nthreads * local_cap * sizeof(PairSlot), 64);
 
-    load_corpus_into_sequences(&files, &tr);
     init_symbols(&tr);
+    load_corpus_into_sequences(&files, &tr);
 
     pthread_mutex_init(&tr.mu, NULL);
     pthread_cond_init(&tr.cv_job, NULL);
@@ -1084,6 +1151,7 @@ int main(int argc, char **argv) {
     printf("ck-bpe-train complete\n");
     printf("  corpus_dir: %s\n", opt.corpus_dir);
     printf("  files:      %d\n", tr.num_files);
+    printf("  mode:       %s\n", opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     printf("  vocab_size: %d\n", tr.num_symbols);
     printf("  merges:     %d\n", tr.num_merges);
     printf("  out:        %s\n", opt.out_json);

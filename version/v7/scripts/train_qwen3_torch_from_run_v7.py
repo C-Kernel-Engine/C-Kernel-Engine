@@ -413,6 +413,8 @@ def main() -> int:
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
 
+    if not args.run_dir.exists():
+        raise SystemExit(f"ERROR: run-dir not found: {args.run_dir}")
     if args.epochs < 1:
         raise ValueError("--epochs must be >= 1")
     if args.seq_len < 1:

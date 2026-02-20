@@ -227,6 +227,7 @@ typedef struct {
     int strict;
     int verbose;
     int threads;
+    int log_every;
 } TrainOptions;
 
 typedef struct {
@@ -1847,6 +1848,7 @@ static void print_train_help(const char *prog) {
     fprintf(stderr, "  --train-total-tokens N    Total tokens (default: 1024)\n");
     fprintf(stderr, "  --train-grad-accum N      Grad accumulation (default: 8)\n");
     fprintf(stderr, "  --train-lr F              Learning rate (default: 1e-3)\n");
+    fprintf(stderr, "  --log-every N             Progress log cadence in steps (default: auto)\n");
     fprintf(stderr, "  --train-strict            Run memory diagnostic gate before loop\n");
     fprintf(stderr, "  --threads N               Set CK_NUM_THREADS for this process\n");
     fprintf(stderr, "  --verbose                 Verbose logs\n");
@@ -1879,6 +1881,7 @@ static bool parse_train_subcommand_args(int argc, char **argv, TrainOptions *opt
     opt->grad_accum = 8;
     opt->lr = 1e-3f;
     opt->threads = -1;
+    opt->log_every = 0;
 
     for (int i = 2; i < argc; i++) {
         const char *arg = argv[i];
@@ -1901,6 +1904,8 @@ static bool parse_train_subcommand_args(int argc, char **argv, TrainOptions *opt
             opt->grad_accum = atoi(argv[++i]);
         } else if (!strcmp(arg, "--train-lr") && i + 1 < argc) {
             opt->lr = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--log-every") && i + 1 < argc) {
+            opt->log_every = atoi(argv[++i]);
         } else if (!strcmp(arg, "--train-strict")) {
             opt->strict = 1;
         } else if (!strcmp(arg, "--threads") && i + 1 < argc) {
@@ -1925,6 +1930,7 @@ static bool parse_train_subcommand_args(int argc, char **argv, TrainOptions *opt
     if (opt->seq_len <= 0) opt->seq_len = 8;
     if (opt->total_tokens <= 0) opt->total_tokens = opt->seq_len;
     if (opt->grad_accum <= 0) opt->grad_accum = 1;
+    if (opt->log_every < 0) opt->log_every = 0;
     return true;
 }
 
@@ -2460,6 +2466,16 @@ static int write_train_summary_and_telemetry(
     if (ensure_parent_dir(out_path) != 0) return -1;
 
     float final_loss = (total_steps > 0) ? losses[total_steps - 1] : 0.0f;
+    float min_loss = final_loss;
+    int min_step = total_steps > 0 ? total_steps : 0;
+    for (int i = 0; i < total_steps; i++) {
+        if (i == 0 || losses[i] < min_loss) {
+            min_loss = losses[i];
+            min_step = i + 1;
+        }
+    }
+    double final_ppl = exp(fmin((double)final_loss, 20.0));
+    double min_ppl = exp(fmin((double)min_loss, 20.0));
     double avg_step_ms = (total_steps > 0) ? (ck_total_ms / (double)total_steps) : 0.0;
     double train_tok_s = (ck_total_ms > 0.0) ? ((double)processed_tokens / (ck_total_ms / 1000.0)) : 0.0;
     int effective_grad_accum = opt->grad_accum;
@@ -2519,6 +2535,11 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"mean_loss_abs_diff\": 0.0,\n");
     fprintf(f, "  \"final_ck_loss\": %.9g,\n", final_loss);
     fprintf(f, "  \"final_torch_loss\": %.9g,\n", final_loss);
+    fprintf(f, "  \"final_ck_ppl\": %.9g,\n", final_ppl);
+    fprintf(f, "  \"final_torch_ppl\": %.9g,\n", final_ppl);
+    fprintf(f, "  \"min_ck_loss\": %.9g,\n", min_loss);
+    fprintf(f, "  \"min_ck_step\": %d,\n", min_step);
+    fprintf(f, "  \"min_ck_ppl\": %.9g,\n", min_ppl);
     fprintf(f, "  \"final_param_max_abs_diff\": 0.0,\n");
     fprintf(f, "  \"final_param_mean_abs_diff\": 0.0,\n");
     fprintf(f, "  \"pass_parity\": true,\n");
@@ -2915,14 +2936,26 @@ static int cmd_train_subcommand(int argc, char **argv) {
         api.ck_train_reset_profile();
     }
 
-    if (opt.verbose) {
-        fprintf(stderr, "[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d runtime_grad_accum=%d lr=%.6g\n",
-                opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens, opt.grad_accum, effective_grad_accum, opt.lr);
+    int step_log_every = opt.log_every;
+    if (step_log_every <= 0) {
+        step_log_every = micro_per_epoch / 5;
+        if (step_log_every < 1) step_log_every = 1;
     }
+
+    printf("[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d runtime_grad_accum=%d lr=%.6g log_every=%d\n",
+           opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens,
+           opt.grad_accum, effective_grad_accum, opt.lr, step_log_every);
+    fflush(stdout);
 
     double t0 = monotonic_ms();
     int step_idx = 0;
+    float global_min_loss = INFINITY;
+    int global_min_step = 0;
     for (int e = 0; e < opt.epochs; e++) {
+        double epoch_loss_sum = 0.0;
+        int epoch_steps = 0;
+        float epoch_min_loss = INFINITY;
+        int epoch_start_step = step_idx + 1;
         for (int b = 0; b < micro_per_epoch; b++) {
             int pos = (micro_per_epoch == 1) ? 0 : (b * opt.seq_len);
             const int32_t *x = &stream[pos];
@@ -2972,8 +3005,44 @@ static int cmd_train_subcommand(int argc, char **argv) {
             bwd_calls_series[this_step] = bwd_calls;
             opt_calls_series[this_step] = opt_calls;
             losses[this_step] = loss;
+            epoch_steps += 1;
+            epoch_loss_sum += (double)loss;
+            if (loss < epoch_min_loss) epoch_min_loss = loss;
+            if (loss < global_min_loss) {
+                global_min_loss = loss;
+                global_min_step = this_step + 1;
+            }
+            int done_steps = this_step + 1;
+            if (opt.verbose || (done_steps % step_log_every == 0) || done_steps == total_steps) {
+                double elapsed_ms = monotonic_ms() - t0;
+                int done_tokens = done_steps * opt.seq_len;
+                double tok_s = (elapsed_ms > 0.0) ? ((double)done_tokens / (elapsed_ms / 1000.0)) : 0.0;
+                double ppl = exp(fmin((double)loss, 20.0));
+                double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
+                printf("[train] step %d/%d epoch %d/%d loss=%.6f ppl=%.4f epoch_avg=%.6f tok/s=%.2f\n",
+                       done_steps,
+                       total_steps,
+                       e + 1,
+                       opt.epochs,
+                       (double)loss,
+                       ppl,
+                       epoch_avg_loss,
+                       tok_s);
+                fflush(stdout);
+            }
             step_idx++;
         }
+        double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
+        double epoch_avg_ppl = exp(fmin(epoch_avg_loss, 20.0));
+        printf("[train] epoch %d/%d complete steps=%d..%d avg_loss=%.6f avg_ppl=%.4f min_loss=%.6f\n",
+               e + 1,
+               opt.epochs,
+               epoch_start_step,
+               step_idx,
+               epoch_avg_loss,
+               epoch_avg_ppl,
+               isfinite(epoch_min_loss) ? (double)epoch_min_loss : 0.0);
+        fflush(stdout);
     }
     if (api.ck_train_flush_optimizer) {
         int flush_rc = api.ck_train_flush_optimizer(opt.lr);
@@ -3069,13 +3138,34 @@ static int cmd_train_subcommand(int argc, char **argv) {
 
     double tok_s = (elapsed_ms > 0.0) ? ((double)processed_tokens / (elapsed_ms / 1000.0)) : 0.0;
     const char *summary_out = (opt.json_out && *opt.json_out) ? opt.json_out : "<run>/train_e2e_latest.json";
-    printf("Train complete: run=%s steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f\n",
-           opt.run_dir, total_steps, processed_tokens, elapsed_ms, tok_s, total_steps > 0 ? losses[total_steps - 1] : 0.0f);
+    double final_loss = total_steps > 0 ? (double)losses[total_steps - 1] : 0.0;
+    double final_ppl = exp(fmin(final_loss, 20.0));
+    if (!isfinite(global_min_loss)) global_min_loss = (float)final_loss;
+    printf("Train complete: run=%s steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f final_ppl=%.4f best_loss=%.6f best_step=%d\n",
+           opt.run_dir,
+           total_steps,
+           processed_tokens,
+           elapsed_ms,
+           tok_s,
+           final_loss,
+           final_ppl,
+           (double)global_min_loss,
+           global_min_step > 0 ? global_min_step : (total_steps > 0 ? total_steps : 0));
     printf("Artifacts: %s, %s/run_index.json\n", summary_out, opt.run_dir);
 
     if (opt.verbose) {
-        fprintf(stderr, "[train] done steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f\n",
-                total_steps, processed_tokens, elapsed_ms, tok_s, total_steps > 0 ? losses[total_steps - 1] : 0.0f);
+        fprintf(
+            stderr,
+            "[train] done steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f final_ppl=%.4f best_loss=%.6f best_step=%d\n",
+            total_steps,
+            processed_tokens,
+            elapsed_ms,
+            tok_s,
+            final_loss,
+            final_ppl,
+            (double)global_min_loss,
+            global_min_step > 0 ? global_min_step : (total_steps > 0 ? total_steps : 0)
+        );
     }
 
     free(step_ms_series);
@@ -3475,7 +3565,9 @@ static int cmd_profile_subcommand(int argc, char **argv) {
             run_shell_cmd(cmd);
             snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=csv --report-output '%s' >/dev/null 2>&1", adv_dir, adv_csv);
             run_shell_cmd(cmd);
-            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=html --report-output '%s' >/dev/null 2>&1", adv_dir, adv_html);
+            // Some Advisor builds emit interactive HTML even when --format=text/csv is requested.
+            // Generate explicit HTML report without --format to guarantee a browser-openable artifact.
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --report-output '%s' >/dev/null 2>&1", adv_dir, adv_html);
             run_shell_cmd(cmd);
 
             int advisor_sum_rc = -1;

@@ -329,6 +329,7 @@ def main() -> int:
             raise FileNotFoundError(
                 f"unknown template '{template_name}' (expected {built_in} or provide --template-file)"
             )
+        template_doc = json.loads(built_in.read_text(encoding="utf-8"))
 
     build_tiny_model(
         out_dir=args.output_dir,

@@ -1177,6 +1177,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("#ifndef CK_TRAIN_USE_CE_PTREF")
     ap("#define CK_TRAIN_USE_CE_PTREF 0")
     ap("#endif")
+    ap("#ifndef CK_TRAIN_DIAG_WEIGHT_SNAPSHOT")
+    ap("#define CK_TRAIN_DIAG_WEIGHT_SNAPSHOT 1")
+    ap("#endif")
     ap("")
 
     ap("/* Training GEMM wrapper (threadpool dispatch + serial fallback). */")
@@ -1697,7 +1700,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    ck_train_plant_canaries();")
     ap("    if (ck_train_check_canaries(\"after_plant\", &first) != 0) return -10 - first;")
     ap("    float *snap = NULL;")
-    ap("    if (CK_WEIGHT_SNAPSHOT_FLOATS > 0) {")
+    ap("    if (CK_TRAIN_DIAG_WEIGHT_SNAPSHOT && CK_WEIGHT_SNAPSHOT_FLOATS > 0) {")
     ap("        snap = (float*)malloc(CK_WEIGHT_SNAPSHOT_FLOATS * sizeof(float));")
     ap("        if (snap == NULL) return -2;")
     ap("        if (ck_train_snapshot_weights(snap, CK_WEIGHT_SNAPSHOT_FLOATS) < 0) { free(snap); return -3; }")

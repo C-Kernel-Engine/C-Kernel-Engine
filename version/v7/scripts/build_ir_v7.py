@@ -63,6 +63,35 @@ RESET = '\033[0m'
 from memory_planner_v7 import plan_memory, MemoryPlanner
 
 
+def _entry_offset(entry: Dict[str, Any]) -> int:
+    """Read manifest offset, accepting both file_offset (v7) and offset (tiny train init)."""
+    try:
+        return int(entry.get("file_offset", entry.get("offset", 0)) or 0)
+    except Exception:
+        return 0
+
+
+def _entry_size(entry: Dict[str, Any]) -> int:
+    try:
+        return int(entry.get("size", entry.get("size_bytes", 0)) or 0)
+    except Exception:
+        return 0
+
+
+def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[Dict[str, Any]]:
+    name = str(template_name or "").strip().lower()
+    if not name:
+        return None
+    path = V7_ROOT / "templates" / f"{name}.json"
+    if not path.exists():
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATAFLOW DEFINITIONS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1098,6 +1127,7 @@ WEIGHT_TO_KERNEL_INPUT = {
     "q_norm": "q_gamma", "k_norm": "k_gamma",
     # Embeddings
     "token_emb": "weight",
+    "lm_head": "W",
     # Footer
     "final_ln_weight": "gamma", "final_ln_bias": "bias",
 }
@@ -1224,7 +1254,13 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     num_heads = _pick("num_heads", "num_attention_heads", "n_head")
     num_kv_heads = _pick("num_kv_heads", "num_key_value_heads", "n_kv_head", default=num_heads)
     head_dim = _pick("head_dim")
-    context_length = _pick("context_length", "max_seq_len", "max_position_embeddings", "context_window")
+    context_length = _pick(
+        "context_length",
+        "context_len",
+        "max_seq_len",
+        "max_position_embeddings",
+        "context_window",
+    )
 
     if embed_dim is not None:
         embed_dim = int(embed_dim)
@@ -1641,8 +1677,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # are absent (common for HF fp32 conversions).
     if "token_emb" not in header_quant and "token_emb" in entry_dtype:
         header_quant["token_emb"] = entry_dtype["token_emb"]
-    if "lm_head" not in header_quant and "lm_head" in entry_dtype:
-        header_quant["lm_head"] = entry_dtype["lm_head"]
+    if "lm_head" not in header_quant:
+        lm_head_entry = (
+            entry_dtype.get("lm_head")
+            or entry_dtype.get("lm_head.weight")
+            or entry_dtype.get("output.weight")
+        )
+        if lm_head_entry:
+            header_quant["lm_head"] = lm_head_entry
     config = manifest.get("config", {})
     # Default to Q8 activation preference for v7 baseline parity and stable Qwen behavior.
     # Model-specific overrides can still force FP32 by setting config["prefer_q8_activation"]=false.
@@ -1655,59 +1697,57 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
     num_layers = config.get("num_layers", 0)
 
-    # If template is missing or in old format, auto-bump to update it
-    # The converter will automatically pull the latest template from templates/ folder
+    # If template is missing or in old format, try built-in template first.
+    # This commonly occurs for tiny training manifests that intentionally only carry
+    # config+entries and no embedded template document.
     if not template or "sequence" not in template:
         print(f"\n⚠️  Template missing or outdated (no 'sequence' field)")
-        print(f"   Triggering auto-bump to update manifest with latest template...")
-
-        # Find the .bump or .gguf file (should be in same dir as manifest)
-        manifest_dir = manifest_path.parent
-        bump_file = None
-
-        # Look for .bump file
-        for f in manifest_dir.glob("*.bump"):
-            bump_file = f
-            break
-
-        if not bump_file:
-            # Try looking for original GGUF
-            for f in manifest_dir.glob("*.gguf"):
-                gguf_file = f
-                print(f"   Found GGUF: {gguf_file}")
-                print(f"   Running converter...")
-
-                converter_script = SCRIPT_DIR / "convert_gguf_to_bump_v7.py"
-                bump_output = manifest_dir / "weights.bump"
-
-                cmd = [
-                    sys.executable,
-                    str(converter_script),
-                    str(gguf_file),
-                    "--output", str(bump_output),
-                    "--bump-version=5"
-                ]
-
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    print(f"\n❌ HARD FAULT: Converter failed!")
-                    print(result.stderr)
-                    raise RuntimeError("Failed to re-bump model")
-
-                print(f"   ✅ Converter succeeded - reloading manifest...")
-
-                # Reload manifest
-                manifest_path_new = manifest_dir / "weights_manifest.json"
-                manifest = load_manifest(manifest_path_new)
-                template = manifest.get("template", {})
-                quant_summary = manifest.get("quant_summary", {})
-                config = manifest.get("config", {})
-
-                break
+        template_name = str(config.get("model", "") or "").strip().lower()
+        builtin = _load_builtin_template_doc(template_name)
+        if builtin and "sequence" in builtin:
+            print(f"   Loaded built-in template: {template_name}")
+            template = builtin
+            manifest["template"] = template
         else:
-            print(f"\n❌ HARD FAULT: Cannot auto-bump - no .gguf or .bump file found")
-            print(f"   Searched in: {manifest_dir}")
-            raise RuntimeError("Template missing and cannot auto-bump")
+            print(f"   Built-in template not found for model '{template_name}', trying GGUF re-bump...")
+
+            manifest_dir = manifest_path.parent
+            gguf_files = list(manifest_dir.glob("*.gguf"))
+            if not gguf_files:
+                print(f"\n❌ HARD FAULT: Cannot recover template")
+                print(f"   No built-in template for '{template_name}' and no GGUF available to re-bump.")
+                print(f"   Searched in: {manifest_dir}")
+                raise RuntimeError("Template missing and cannot be recovered")
+
+            gguf_file = gguf_files[0]
+            print(f"   Found GGUF: {gguf_file}")
+            print(f"   Running converter...")
+
+            converter_script = SCRIPT_DIR / "convert_gguf_to_bump_v7.py"
+            bump_output = manifest_dir / "weights.bump"
+
+            cmd = [
+                sys.executable,
+                str(converter_script),
+                str(gguf_file),
+                "--output", str(bump_output),
+                "--bump-version=5"
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"\n❌ HARD FAULT: Converter failed!")
+                print(result.stderr)
+                raise RuntimeError("Failed to re-bump model")
+
+            print(f"   ✅ Converter succeeded - reloading manifest...")
+
+            # Reload manifest
+            manifest_path_new = manifest_dir / "weights_manifest.json"
+            manifest = load_manifest(manifest_path_new)
+            template = manifest.get("template", {})
+            quant_summary = manifest.get("quant_summary", {})
+            config = manifest.get("config", {})
 
     template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
     template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
@@ -2318,8 +2358,28 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     FOOTER_OP_WEIGHTS = {
         "rmsnorm": ["final_ln_weight", "final_ln_bias"],
         "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
-        "logits": ["token_emb"],  # Weight-tied models use token_emb as lm_head
+        # Use lm_head aliases (lm_head.weight/output.weight/token_emb).
+        "logits": ["lm_head"],
     }
+
+    def resolve_weight_name(weight_key: str, op_section: str, op_layer: int) -> Optional[str]:
+        patterns = WEIGHT_PATTERNS.get(weight_key, [weight_key])
+        candidates: List[str] = []
+        for pattern in patterns:
+            name = str(pattern)
+            if op_section == "body":
+                name = name.replace("{L}", str(op_layer))
+            candidates.append(name)
+
+        # Back-compat direct fallback.
+        direct = f"layer.{op_layer}.{weight_key}" if op_section == "body" else str(weight_key)
+        if direct not in candidates:
+            candidates.append(direct)
+
+        for cand in candidates:
+            if cand in weight_index:
+                return cand
+        return None
 
     for ir_op in arranged_kernels:
         op = ir_op["op"]
@@ -2340,24 +2400,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         ir_op["weights"] = {}
 
         for wkey in weight_keys:
-            # Build weight name based on section/layer
-            if section == "header":
-                # Header weights: token_emb, etc (no layer prefix)
-                weight_name = wkey
-            elif section == "footer":
-                # Footer weights: final_ln_weight, etc (no layer prefix)
-                weight_name = wkey
-            else:
-                # Body weights: layer.X.wq, etc
-                weight_name = f"layer.{layer}.{wkey}"
+            weight_name = resolve_weight_name(str(wkey), section, int(layer))
 
             # Look up in manifest entries
-            if weight_name in weight_index:
+            if weight_name and weight_name in weight_index:
                 entry = weight_index[weight_name]
                 ir_op["weights"][wkey] = {
                     "name": weight_name,
-                    "offset": entry.get("file_offset", 0),
-                    "size": entry.get("size", 0),
+                    "offset": _entry_offset(entry),
+                    "size": _entry_size(entry),
                     "dtype": entry.get("dtype", "unknown"),
                 }
             else:
@@ -2766,8 +2817,8 @@ def insert_bias_add_ops(
         if dtype not in ("fp32", "f32", "float32"):
             bias_zero_cache[weight_name] = False
             return False
-        size = int(entry.get("size", 0) or 0)
-        file_offset = entry.get("file_offset")
+        size = _entry_size(entry)
+        file_offset = _entry_offset(entry)
         if size <= 0 or file_offset is None:
             bias_zero_cache[weight_name] = False
             return False
@@ -3284,6 +3335,7 @@ WEIGHT_PATTERNS = {
     "vocab_merges": ["vocab_merges"],
 
     # Footer weights
+    "lm_head": ["lm_head.weight", "output.weight", "token_emb"],
     "final_ln_weight": ["final_ln_weight", "norm.weight"],
     "final_ln_bias": ["final_ln_bias", "norm.bias"],
     "output_weight": ["output.weight", "lm_head.weight"],
@@ -3327,9 +3379,8 @@ TEMPLATE_OP_WEIGHTS = {
 
     # Footer
     "weight_tying": [],  # Metadata only
-    # For weight tying: logits uses token_emb (embedding matrix) transposed
-    # output_weight is for models without weight tying
-    "logits": ["token_emb"],  # Uses embedding matrix for weight tying
+    # logits uses lm_head when present, otherwise falls back to token_emb via aliases.
+    "logits": ["lm_head"],
 }
 
 
@@ -3388,10 +3439,10 @@ def generate_memory_layout(
     all_weights = {}  # name -> {dtype, size, offset, ...}
     total_weight_size = 0
 
-    # First pass: collect all entries and find min file_offset (weights base)
+    # First pass: collect all entries and find min file_offset/offset (weights base)
     min_file_offset = None
     for entry in entries:
-        fo = entry.get("file_offset", 0)
+        fo = _entry_offset(entry)
         if min_file_offset is None or fo < min_file_offset:
             min_file_offset = fo
 
@@ -3399,8 +3450,8 @@ def generate_memory_layout(
 
     for entry in entries:
         name = entry["name"]
-        size = entry.get("size", entry.get("size_bytes", 0))
-        file_offset = entry.get("file_offset", 0)
+        size = _entry_size(entry)
+        file_offset = _entry_offset(entry)
 
         # Compute relative offset from weights base
         relative_offset = file_offset - weights_base_offset
@@ -3494,8 +3545,18 @@ def generate_memory_layout(
 
     all_weight_names = set(all_weights.keys())
 
-    # Weights in manifest that are NOT model weights (tokenizer data)
+    # Weights in manifest that are NOT inference model weights.
+    # tiny.* entries are parity-harness tensors emitted by tiny train init.
     non_model_weights = {"vocab_offsets", "vocab_strings", "vocab_merges", "vocab_scores", "vocab_types"}
+    for wname in all_weight_names:
+        if str(wname).startswith("tiny."):
+            non_model_weights.add(wname)
+    training_cfg = config.get("training") if isinstance(config.get("training"), dict) else {}
+    tiny_cfg = training_cfg.get("tiny_parity") if isinstance(training_cfg.get("tiny_parity"), dict) else {}
+    state_tensors = tiny_cfg.get("state_tensors") if isinstance(tiny_cfg.get("state_tensors"), dict) else {}
+    for v in state_tensors.values():
+        if isinstance(v, str) and v:
+            non_model_weights.add(v)
     model_weights = all_weight_names - non_model_weights
 
     # Weights expected but not used by IR1
@@ -3896,7 +3957,7 @@ def generate_memory_layout_packed(
             "size": size,
             "offset": off,
             "abs_offset": off,
-            "file_offset": entry.get("file_offset", 0),
+            "file_offset": _entry_offset(entry),
             "define": f"W_{_sanitize_macro(name)}",
         })
         weight_offset = off + size
@@ -4074,8 +4135,8 @@ def write_manifest_map(layout: Dict, manifest: Dict, output_path: Path) -> None:
             m = entry_by_name.get(name)
             if not m:
                 continue
-            file_off = int(m.get("file_offset", 0))
-            size = int(m.get("size", m.get("size_bytes", 0)))
+            file_off = _entry_offset(m)
+            size = _entry_size(m)
             dtype = m.get("dtype", w.get("dtype", "unknown"))
             rt_off = rt_by_name.get(name, 0)
             f.write(f"{name}|{dtype}|0x{file_off:016X}|0x{size:016X}|0x{rt_off:016X}\n")
