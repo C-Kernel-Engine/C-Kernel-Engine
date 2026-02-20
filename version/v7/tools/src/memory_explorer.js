@@ -47,11 +47,23 @@ const ME_REGION_COLORS = {
     grad_activations:  { bg: '#885522', border: '#e67e22' },
     saved:             { bg: '#7a5a1a', border: '#f39c12' },
     scratch:           { bg: '#555555', border: '#888888' },
+    rope_cache:        { bg: '#2d6a4f', border: '#52b788' },
+    kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
+    logits:            { bg: '#365d8a', border: '#76a5e8' },
+    io:                { bg: '#6b5f2a', border: '#c8b46b' },
     /* v7 inference layout uses role names rather than region names */
     weight:            { bg: '#2a5599', border: '#4a90d9' },
     activation:        { bg: '#1a7a3a', border: '#2ecc71' },
-    kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
     gap:               { bg: '#111',    border: '#222'    },
+};
+
+/* Execution-stage palette (header/body/footer/runtime) */
+const ME_STAGE_COLORS = {
+    header:   { bg: '#2c6eae', border: '#7ab7ff' },
+    body:     { bg: '#8a6a20', border: '#ffcb6b' },
+    footer:   { bg: '#8c3b37', border: '#ff9f93' },
+    runtime:  { bg: '#4f4f4f', border: '#a7a7a7' },
+    unmapped: { bg: '#3f3f3f', border: '#777777' },
 };
 
 /* Per-tensor hue rotation */
@@ -65,12 +77,17 @@ const ME_TENSOR_HUES = [
 /* ─── State ─────────────────────────────────────────────── */
 const meState = {
     zoomLevel:      0,
-    colorMode:      'region',    // 'tensor' | 'region' | 'dtype' | 'alignment'
+    colorMode:      'region',    // 'tensor' | 'region' | 'dtype' | 'alignment' | 'sequence'
+    addressMode:    'absolute',  // 'absolute' | 'pool'
+    effectiveAddressMode: 'pool',
+    supportsAbsolute: false,
+    dataMode:       'unknown',   // 'training' | 'inference'
     viewRegion:     'all',       // 'all' | region name
     selectedTensor: null,
     gridCols:       128,
     tensors:        [],          // processed [{id, offset, end, bytes, kind, region, dtype, shape, persistent, requires_grad, colorIdx}]
     regions:        [],          // [{name, offset, bytes, count}]
+    pools:          [],          // [{name, offset, bytes, count}]
     totalBytes:     0,
     config:         {},
     lookup:         null,        // (byteOffset) => tensor or null
@@ -84,6 +101,7 @@ function meExtractData(ld) {
     const tensors = [];
     const regions = [];
     let totalBytes = 0;
+    let inferenceMode = false;
 
     /* v7 layout-train format (primary) */
     if (ld.format && ld.format.startsWith('layout-train')) {
@@ -100,16 +118,23 @@ function meExtractData(ld) {
         if (Array.isArray(ld.tensors)) {
             ld.tensors.forEach(function(t, idx) {
                 if (!t) return;
+                var off = Number(t.offset) || 0;
+                var end = Number(t.end) || (Number(t.offset || 0) + Number(t.bytes || 0));
                 tensors.push({
                     id:            t.id || t.name || 'tensor_' + idx,
-                    offset:        Number(t.offset) || 0,
-                    end:           Number(t.end)    || (Number(t.offset || 0) + Number(t.bytes || 0)),
+                    offset:        off,
+                    end:           end,
+                    offset_local:  off,
+                    end_local:     end,
+                    offset_abs:    off,
+                    end_abs:       end,
                     bytes:         Number(t.bytes)  || 0,
-                    bump_offset:   Number(t.bump_offset) || 0,
+                    bump_offset:   Number(t.bump_offset) || off,
                     bump_size:     Number(t.bump_size)   || 0,
                     kind:          t.kind || '',
                     region:        t.region || '',
-                    dtype:         t.dtype || 'fp32',
+                    pool:          'train',
+                    dtype:         meNormalizeDtype(t.dtype || t.weight_dtype || t.activation_dtype || ''),
                     shape:         t.shape || [],
                     persistent:    !!t.persistent,
                     requires_grad: !!t.requires_grad,
@@ -127,15 +152,16 @@ function meExtractData(ld) {
 
     /* v7 inference format: memory.weights.entries + memory.activations.buffers */
     if (tensors.length === 0) {
+        inferenceMode = true;
         var memory = ld.memory || ld;
         var wEntries = ((memory.weights || {}).entries || []);
         var aBuffers = ((memory.activations || {}).buffers || []);
 
         wEntries.forEach(function(e, idx) {
-            tensors.push(meParseFlatEntry(e, 'params', idx));
+            tensors.push(meParseFlatEntry(e, 'params', idx, 'weights'));
         });
         aBuffers.forEach(function(e, idx) {
-            tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx));
+            tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx, 'activations'));
         });
 
         /* v7 tensors[] flat array (e.g. from ir1 or lowered IR) */
@@ -148,12 +174,17 @@ function meExtractData(ld) {
                     id:       t.name || t.id || 'tensor_' + idx,
                     offset:   off,
                     end:      off + b,
+                    offset_local: off,
+                    end_local: off + b,
+                    offset_abs: off,
+                    end_abs: off + b,
                     bytes:    b,
                     bump_offset: Number(t.bump_offset) || 0,
                     bump_size:   Number(t.bump_size) || 0,
                     kind:     t.kind || '',
                     region:   t.region || meInferRegion(t.kind || ''),
-                    dtype:    t.dtype || 'fp32',
+                    pool:     'flat',
+                    dtype:    meNormalizeDtype(t.dtype || t.weight_dtype || t.activation_dtype || ''),
                     shape:    t.shape || [],
                     persistent: !!t.persistent,
                     requires_grad: !!t.requires_grad,
@@ -168,15 +199,106 @@ function meExtractData(ld) {
             var last = tensors.reduce(function(a, b) { return a.end > b.end ? a : b; });
             totalBytes = last.end;
         }
-        if (memory.total_bytes) totalBytes = memory.total_bytes;
+        if (memory.total_bytes) totalBytes = Number(memory.total_bytes) || totalBytes;
+    }
+
+    /* Address mode handling:
+     * - pool: use local pool offsets (weights + activations each start at 0)
+     * - absolute: use abs_offset for a single contiguous address space
+     */
+    var hasAbs = false;
+    for (var ai = 0; ai < tensors.length; ai++) {
+        var ta = tensors[ai];
+        if (ta.has_abs || (typeof ta.offset_abs === 'number' && typeof ta.offset_local === 'number' && ta.offset_abs !== ta.offset_local)) {
+            hasAbs = true;
+            break;
+        }
+    }
+    meState.dataMode = inferenceMode ? 'inference' : 'training';
+    meState.supportsAbsolute = hasAbs;
+    if (!inferenceMode) {
+        meState.effectiveAddressMode = 'pool';
+    } else {
+        meState.effectiveAddressMode = (meState.addressMode === 'absolute' && hasAbs) ? 'absolute' : 'pool';
+    }
+
+    var pools = [];
+    if (inferenceMode && meState.effectiveAddressMode === 'pool') {
+        var poolAgg = {};
+        for (var pi = 0; pi < tensors.length; pi++) {
+            var pt = tensors[pi];
+            var pn = pt.pool || 'unknown';
+            if (!poolAgg[pn]) {
+                poolAgg[pn] = { name: pn, bytes: 0, count: 0 };
+            }
+            poolAgg[pn].bytes = Math.max(poolAgg[pn].bytes, Number(pt.end_local) || 0);
+            poolAgg[pn].count += 1;
+        }
+        var poolOrder = { weights: 0, activations: 1, flat: 2, train: 3, unknown: 99 };
+        var poolNames = Object.keys(poolAgg).sort(function(a, b) {
+            var ao = Object.prototype.hasOwnProperty.call(poolOrder, a) ? poolOrder[a] : 50;
+            var bo = Object.prototype.hasOwnProperty.call(poolOrder, b) ? poolOrder[b] : 50;
+            if (ao !== bo) return ao - bo;
+            return a.localeCompare(b);
+        });
+        var poolPad = ME_CACHE_LINE;
+        var cursor = 0;
+        var poolBase = {};
+        for (var pni = 0; pni < poolNames.length; pni++) {
+            var pName = poolNames[pni];
+            var pInfo = poolAgg[pName];
+            pools.push({
+                name: pName,
+                offset: cursor,
+                bytes: pInfo.bytes,
+                count: pInfo.count,
+            });
+            poolBase[pName] = cursor;
+            cursor += pInfo.bytes + poolPad;
+        }
+        totalBytes = Math.max(0, cursor - (poolNames.length ? poolPad : 0));
+        for (var si0 = 0; si0 < tensors.length; si0++) {
+            var tsel0 = tensors[si0];
+            var pb = poolBase[tsel0.pool || 'unknown'] || 0;
+            tsel0.offset = pb + tsel0.offset_local;
+            tsel0.end = pb + tsel0.end_local;
+            if (typeof tsel0.bump_offset !== 'number' || !isFinite(tsel0.bump_offset)) {
+                tsel0.bump_offset = tsel0.offset_local;
+            }
+        }
+    } else {
+        for (var si = 0; si < tensors.length; si++) {
+            var tsel = tensors[si];
+            var useAbs = meState.effectiveAddressMode === 'absolute';
+            tsel.offset = useAbs ? tsel.offset_abs : tsel.offset_local;
+            tsel.end = useAbs ? tsel.end_abs : tsel.end_local;
+            if (typeof tsel.bump_offset !== 'number' || !isFinite(tsel.bump_offset)) {
+                tsel.bump_offset = tsel.offset_local;
+            }
+        }
+    }
+
+    if (!regions.length) {
+        if (tensors.length) {
+            var maxEnd = 0;
+            for (var ti = 0; ti < tensors.length; ti++) {
+                if (tensors[ti].end > maxEnd) maxEnd = tensors[ti].end;
+            }
+            totalBytes = Math.max(totalBytes, maxEnd);
+        }
+    } else if (meState.effectiveAddressMode === 'absolute') {
+        // layout-train already uses absolute-like arena offsets; keep region-based total.
+        totalBytes = regions.reduce(function(mx, r) { return Math.max(mx, Number(r.offset || 0) + Number(r.bytes || 0)); }, 0);
     }
 
     /* Sort by offset */
     tensors.sort(function(a, b) { return a.offset - b.offset; });
     tensors.forEach(function(t, i) { t.colorIdx = i; });
+    meAnnotateSequence(tensors);
 
     meState.tensors   = tensors;
     meState.regions   = regions;
+    meState.pools     = pools;
     meState.totalBytes = totalBytes;
     meState.config    = ld.config || {};
     meState.lookup    = meBuildLookup(tensors);
@@ -184,17 +306,30 @@ function meExtractData(ld) {
 
 function meParseFlatEntry(e, region, idx) {
     var off = meParseHex(e.offset || e.bump_offset || 0);
+    var hasAbs = (typeof e.abs_offset !== 'undefined' && e.abs_offset !== null);
+    var abs = hasAbs ? meParseHex(e.abs_offset) : off;
     var sz  = Number(e.size || e.bytes || 0);
+    var pool = arguments.length >= 4 ? (arguments[3] || '') : '';
+    var inferredRegion = region;
+    if (pool === 'activations') {
+        inferredRegion = meInferActivationRegion(e.name || e.key || '');
+    }
     return {
         id:       e.name || e.key || 'tensor_' + idx,
         offset:   off,
         end:      off + sz,
+        offset_local: off,
+        end_local: off + sz,
+        offset_abs: abs,
+        end_abs: abs + sz,
+        has_abs:  hasAbs,
         bytes:    sz,
         bump_offset: Number(e.bump_offset) || off,
         bump_size:   sz,
         kind:     e.kind || e.role || '',
-        region:   region,
-        dtype:    e.dtype || 'fp32',
+        region:   inferredRegion,
+        pool:     pool,
+        dtype:    meNormalizeDtype(e.dtype || e.weight_dtype || e.activation_dtype || ''),
         shape:    e.shape || [],
         persistent: true,
         requires_grad: false,
@@ -202,6 +337,25 @@ function meParseFlatEntry(e, region, idx) {
         numel:    0,
         colorIdx: idx,
     };
+}
+
+function meNormalizeDtype(dtype) {
+    var d = String(dtype || '').trim().toLowerCase();
+    if (!d || d === 'unknown' || d === 'none' || d === 'null' || d === 'n/a' || d === 'na') return 'fp32';
+    if (d === 'float32' || d === 'f32') return 'fp32';
+    if (d === 'float16' || d === 'f16' || d === 'half') return 'fp16';
+    if (d === 'bfloat16') return 'bf16';
+    return d;
+}
+
+function meInferActivationRegion(name) {
+    var n = String(name || '').toLowerCase();
+    if (n.includes('kv_cache') || n.includes('k_cache') || n.includes('v_cache') || n.includes('cache_k') || n.includes('cache_v')) return 'kv_cache';
+    if (n.includes('rope_cache') || n.includes('cos_cache') || n.includes('sin_cache') || n.includes('rope')) return 'rope_cache';
+    if (n.includes('scratch') || n.includes('workspace') || n.includes('tmp') || n.includes('temp')) return 'scratch';
+    if (n.includes('text_input') || n.includes('token_ids') || n.includes('prompt') || n.includes('input_ids')) return 'io';
+    if (n.includes('logits') || n.includes('lm_head')) return 'logits';
+    return 'activations';
 }
 
 function meInferRegion(kind) {
@@ -214,6 +368,86 @@ function meInferRegion(kind) {
     if (k.includes('activation') || k.includes('act_')) return 'activations';
     if (k.includes('scratch') || k.includes('temp')) return 'scratch';
     return 'params';
+}
+
+function meNormTensorName(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
+function meInferSeqSection(opName, layer) {
+    var op = String(opName || '').toLowerCase();
+    var l = Number(layer);
+    if (Number.isFinite(l) && l >= 0) return 'body';
+    if (op.includes('embed') || op.includes('token')) return 'header';
+    if (op.includes('logits') || op.includes('lm_head') || op.includes('final')) return 'footer';
+    return 'runtime';
+}
+
+function meBuildOpSequenceIndex() {
+    var index = {};
+    var ops = [];
+    if (typeof ir1Data !== 'undefined' && ir1Data && Array.isArray(ir1Data.ops)) {
+        ops = ir1Data.ops;
+    }
+
+    function addOne(name, meta) {
+        var key = meNormTensorName(name);
+        if (!key) return;
+        var prev = index[key];
+        if (!prev || meta.opId < prev.opId) index[key] = meta;
+    }
+
+    for (var i = 0; i < ops.length; i++) {
+        var op = ops[i] || {};
+        var opId = Number.isFinite(Number(op.op_id)) ? Number(op.op_id) : i;
+        var opName = String(op.op || op.kernel || ('op_' + opId));
+        var section = meInferSeqSection(op.section || opName, op.layer);
+        var meta = { section: section, op: opName, opId: opId, source: 'ir1' };
+
+        if (op.weights && typeof op.weights === 'object') {
+            var wkeys = Object.keys(op.weights);
+            for (var wi = 0; wi < wkeys.length; wi++) {
+                var wk = wkeys[wi];
+                var wv = op.weights[wk] || {};
+                addOne(wk, meta);
+                addOne(wv.name, meta);
+            }
+        }
+    }
+
+    return index;
+}
+
+function meInferTensorSequenceMeta(t) {
+    var n = meNormTensorName(t && t.id);
+    if (!n) return { section: 'unmapped', op: '-', opId: null, source: 'heuristic' };
+
+    if (n.includes('token_emb') || n.includes('token_embedding') || n.includes('text_input') || n.includes('token_ids') || n.includes('embedded_input')) {
+        return { section: 'header', op: 'embedding', opId: 0, source: 'heuristic' };
+    }
+    if (n.includes('lm_head') || n.includes('logits') || n.includes('final_ln') || n.includes('final_norm')) {
+        return { section: 'footer', op: 'final', opId: null, source: 'heuristic' };
+    }
+    if (n.includes('kv_cache') || n.includes('rope_cache') || n.includes('scratch') || n.includes('layer.') || n.includes('layer_') || n.includes('residual') || n.includes('attn') || n.includes('mlp')) {
+        return { section: 'body', op: 'layer_body', opId: null, source: 'heuristic' };
+    }
+    if (String((t && t.pool) || '') === 'weights') return { section: 'body', op: 'weights', opId: null, source: 'heuristic' };
+    if (String((t && t.pool) || '') === 'activations') return { section: 'runtime', op: 'activation', opId: null, source: 'heuristic' };
+    return { section: 'unmapped', op: '-', opId: null, source: 'heuristic' };
+}
+
+function meAnnotateSequence(tensors) {
+    var seqIndex = meBuildOpSequenceIndex();
+    for (var i = 0; i < tensors.length; i++) {
+        var t = tensors[i];
+        var key = meNormTensorName(t.id);
+        var meta = key ? seqIndex[key] : null;
+        if (!meta) meta = meInferTensorSequenceMeta(t);
+        t.seq_section = meta.section || 'unmapped';
+        t.seq_op = meta.op || '-';
+        t.seq_op_id = Number.isFinite(Number(meta.opId)) ? Number(meta.opId) : null;
+        t.seq_source = meta.source || 'heuristic';
+    }
 }
 
 function meParseHex(val) {
@@ -258,6 +492,117 @@ function meAnalyzeAlignment(tensors) {
         }
     }
     return { aligned: aligned, misaligned: misaligned, issues: issues, total: aligned + misaligned };
+}
+
+function meAnalyzeSequenceLocality(tensors) {
+    var ordered = (tensors || []).slice().sort(function(a, b) { return a.offset - b.offset; });
+    var stageSwitches = 0;
+    var opRegressions = 0;
+    var mapped = 0;
+    var prevStage = null;
+    var lastOpId = -1;
+
+    for (var i = 0; i < ordered.length; i++) {
+        var t = ordered[i];
+        var st = t.seq_section || 'unmapped';
+        if (st !== 'unmapped') {
+            mapped++;
+            if (prevStage !== null && st !== prevStage) stageSwitches++;
+            prevStage = st;
+        }
+        if (t.seq_op_id !== null && t.seq_op_id !== undefined) {
+            var opId = Number(t.seq_op_id);
+            if (Number.isFinite(opId)) {
+                if (opId < lastOpId) opRegressions++;
+                if (opId > lastOpId) lastOpId = opId;
+            }
+        }
+    }
+
+    return {
+        mapped: mapped,
+        stageSwitches: stageSwitches,
+        opRegressions: opRegressions,
+    };
+}
+
+function meBuildProfilerHints(alignment, seqLocality) {
+    var hints = [];
+    var byCmd = {};
+    var levelRank = { info: 0, recommended: 1, high: 2, critical: 3 };
+
+    function addHint(tool, cmd, reason, level) {
+        if (!cmd || !reason) return;
+        var lvl = level || 'recommended';
+        if (!byCmd[cmd]) {
+            var item = { tool: tool || 'profile', cmd: cmd, reasons: [reason], level: lvl };
+            byCmd[cmd] = item;
+            hints.push(item);
+            return;
+        }
+        byCmd[cmd].reasons.push(reason);
+        if ((levelRank[lvl] || 0) > (levelRank[byCmd[cmd].level] || 0)) {
+            byCmd[cmd].level = lvl;
+            if (tool) byCmd[cmd].tool = tool;
+        }
+    }
+
+    addHint(
+        'perf stat',
+        'make profile-v7-perf-stat',
+        'Collect baseline IPC/cache/branch metrics before deep profiling.',
+        'recommended'
+    );
+
+    if (alignment && alignment.misaligned > 0) {
+        addHint(
+            'VTune',
+            'make profile-v7-vtune',
+            'Investigate ' + alignment.misaligned + ' misaligned tensor' + (alignment.misaligned === 1 ? '' : 's') + ' with hotspot + memory analysis.',
+            'high'
+        );
+    } else {
+        addHint(
+            'VTune',
+            'make profile-v7-vtune',
+            'Validate whether runtime is compute-bound or memory-bound in top kernels.',
+            'recommended'
+        );
+    }
+
+    if (seqLocality && seqLocality.mapped > 0 && (seqLocality.opRegressions > 0 || seqLocality.stageSwitches > 24)) {
+        addHint(
+            'FlameGraph',
+            'make profile-v7-flamegraph',
+            'Operation order churn detected; confirm dispatch overhead and hotspot spread.',
+            'high'
+        );
+    } else {
+        addHint(
+            'FlameGraph',
+            'make profile-v7-flamegraph',
+            'Capture a visual call-stack baseline for operator time distribution.',
+            'recommended'
+        );
+    }
+
+    if (meState.dataMode === 'training' || (alignment && alignment.misaligned > 32)) {
+        addHint(
+            'Advisor',
+            'make profile-v7-advisor',
+            'Check vectorization and memory roofline headroom for training kernels.',
+            'recommended'
+        );
+    }
+
+    addHint(
+        'Perf Gate',
+        'make v7-perf-gate',
+        'Re-run full perf gate after fixes to verify no regression.',
+        'info'
+    );
+
+    return hints;
 }
 
 /* ─── Head Parallelism Analysis ─────────────────────────── */
@@ -320,6 +665,10 @@ function meCellColor(tensor) {
         if (dt.includes('u8'))   return '#7f8c8d';
         return '#555';
 
+    case 'sequence':
+        var sc = ME_STAGE_COLORS[tensor.seq_section || 'unmapped'] || ME_STAGE_COLORS.unmapped;
+        return sc.bg;
+
     case 'alignment':
         return (tensor.offset % ME_CACHE_LINE === 0) ? '#47b475' : '#e74c3c';
 
@@ -367,14 +716,40 @@ function renderMemoryExplorer(containerId) {
     }
 
     var alignment = meAnalyzeAlignment(meState.tensors);
+    var seqLocality = meAnalyzeSequenceLocality(meState.tensors);
     container.innerHTML = '';
 
     /* ── Controls Bar ── */
     var ctrl = document.createElement('div');
     ctrl.className = 'me-controls';
-    var regionOpts = meState.regions.length
-        ? meState.regions.map(function(r) { return '<option value="' + r.name + '"' + (meState.viewRegion === r.name ? ' selected' : '') + '>' + r.name + ' (' + meFmtBytes(r.bytes) + ')</option>'; }).join('')
-        : '';
+    var regionRows = [];
+    if (meState.regions.length) {
+        regionRows = meState.regions.map(function(r) {
+            return { name: r.name, bytes: Number(r.bytes) || 0, count: Number(r.count) || 0 };
+        });
+    } else {
+        var regionAgg = {};
+        for (var ri0 = 0; ri0 < meState.tensors.length; ri0++) {
+            var tr = meState.tensors[ri0];
+            var rn = tr.region || 'unknown';
+            if (!regionAgg[rn]) regionAgg[rn] = { name: rn, bytes: 0, count: 0 };
+            regionAgg[rn].bytes += Number(tr.bytes) || 0;
+            regionAgg[rn].count += 1;
+        }
+        regionRows = Object.keys(regionAgg).sort().map(function(k) { return regionAgg[k]; });
+    }
+    var regionOpts = regionRows.map(function(r) {
+        return '<option value="' + r.name + '"' + (meState.viewRegion === r.name ? ' selected' : '') + '>' +
+            r.name + ' (' + meFmtBytes(r.bytes) + ', ' + r.count + ')</option>';
+    }).join('');
+    var regionLabel = 'Full Arena';
+    if (meState.effectiveAddressMode === 'absolute') {
+        regionLabel = 'Full Address Space';
+    } else if (meState.dataMode === 'inference' && meState.pools.length > 0) {
+        regionLabel = 'All Pools (Split)';
+    }
+    var addrAbsSelected = meState.effectiveAddressMode === 'absolute';
+    var addrPoolSelected = !addrAbsSelected;
     ctrl.innerHTML =
         '<div class="me-ctrl-group">' +
             '<label>Zoom</label>' +
@@ -383,9 +758,17 @@ function renderMemoryExplorer(containerId) {
             '</select>' +
         '</div>' +
         '<div class="me-ctrl-group">' +
+            '<label>Address</label>' +
+            '<select onchange="meSetAddressMode(this.value)">' +
+                '<option value="absolute"' + (addrAbsSelected ? ' selected' : '') + (meState.supportsAbsolute ? '' : ' disabled') + '>Absolute (Contiguous)</option>' +
+                '<option value="pool"' + (addrPoolSelected ? ' selected' : '') + '>Pool (Split)</option>' +
+            '</select>' +
+        '</div>' +
+        '<div class="me-ctrl-group">' +
             '<label>Color</label>' +
             '<select onchange="meSetColor(this.value)">' +
                 '<option value="region"' + (meState.colorMode === 'region' ? ' selected' : '') + '>By Region</option>' +
+                '<option value="sequence"' + (meState.colorMode === 'sequence' ? ' selected' : '') + '>By Op Stage</option>' +
                 '<option value="tensor"' + (meState.colorMode === 'tensor' ? ' selected' : '') + '>Per Tensor</option>' +
                 '<option value="dtype"'  + (meState.colorMode === 'dtype'  ? ' selected' : '') + '>By Dtype</option>' +
                 '<option value="alignment"' + (meState.colorMode === 'alignment' ? ' selected' : '') + '>Alignment Audit</option>' +
@@ -394,7 +777,7 @@ function renderMemoryExplorer(containerId) {
         '<div class="me-ctrl-group">' +
             '<label>Region</label>' +
             '<select onchange="meSetRegion(this.value)">' +
-                '<option value="all"' + (meState.viewRegion === 'all' ? ' selected' : '') + '>Full Arena (' + meFmtBytes(meState.totalBytes) + ')</option>' +
+                '<option value="all"' + (meState.viewRegion === 'all' ? ' selected' : '') + '>' + regionLabel + ' (' + meFmtBytes(meState.totalBytes) + ')</option>' +
                 regionOpts +
             '</select>' +
         '</div>' +
@@ -407,10 +790,24 @@ function renderMemoryExplorer(containerId) {
     var sumDiv = document.createElement('div');
     sumDiv.className = 'me-summary';
 
+    var regionCount = 0;
+    if (meState.regions.length) {
+        regionCount = meState.regions.length;
+    } else {
+        var rcSeen = {};
+        for (var rcIdx = 0; rcIdx < meState.tensors.length; rcIdx++) {
+            rcSeen[meState.tensors[rcIdx].region || 'unknown'] = true;
+        }
+        regionCount = Object.keys(rcSeen).length;
+    }
+
     var sumHTML =
         '<div class="me-card"><div class="me-card-val">' + meFmtBytes(meState.totalBytes) + '</div><div class="me-card-lbl">Arena</div></div>' +
         '<div class="me-card"><div class="me-card-val">' + meState.tensors.length + '</div><div class="me-card-lbl">Tensors</div></div>' +
-        '<div class="me-card"><div class="me-card-val">' + (meState.regions.length || Object.keys(ME_REGION_COLORS).length) + '</div><div class="me-card-lbl">Regions</div></div>';
+        '<div class="me-card"><div class="me-card-val">' + regionCount + '</div><div class="me-card-lbl">Regions</div></div>';
+    if (meState.pools.length) {
+        sumHTML += '<div class="me-card"><div class="me-card-val">' + meState.pools.length + '</div><div class="me-card-lbl">Pools</div></div>';
+    }
 
     for (var ri = 0; ri < meState.regions.length; ri++) {
         var r = meState.regions[ri];
@@ -420,9 +817,47 @@ function renderMemoryExplorer(containerId) {
     var alignCls = alignment.misaligned > 0 ? 'me-card-warn' : 'me-card-ok';
     sumHTML += '<div class="me-card ' + alignCls + '"><div class="me-card-val">' + alignment.aligned + '/' + alignment.total + '</div><div class="me-card-lbl">Cache-Aligned' + (alignment.misaligned > 0 ? ' ⚠' : ' ✓') + '</div></div>';
     sumHTML += '<div class="me-card"><div class="me-card-val">' + Math.ceil(meState.totalBytes / ME_CACHE_LINE).toLocaleString() + '</div><div class="me-card-lbl">Cache Lines</div></div>';
+    if (seqLocality.mapped > 0) {
+        var seqCls = seqLocality.opRegressions > 0 ? 'me-card-warn' : 'me-card-ok';
+        sumHTML += '<div class="me-card"><div class="me-card-val">' + seqLocality.stageSwitches + '</div><div class="me-card-lbl">Stage Switches</div></div>';
+        sumHTML += '<div class="me-card ' + seqCls + '"><div class="me-card-val">' + seqLocality.opRegressions + '</div><div class="me-card-lbl">Op-Order Regressions</div></div>';
+    }
 
     sumDiv.innerHTML = sumHTML;
     container.appendChild(sumDiv);
+
+    /* ── Profiler Guidance ── */
+    var profilerHints = meBuildProfilerHints(alignment, seqLocality);
+    if (profilerHints.length > 0) {
+        var hintDiv = document.createElement('div');
+        hintDiv.className = 'me-profiler-guide';
+        var signalBits = [];
+        signalBits.push('misaligned=' + alignment.misaligned);
+        if (seqLocality.mapped > 0) {
+            signalBits.push('stage_switches=' + seqLocality.stageSwitches);
+            signalBits.push('op_regressions=' + seqLocality.opRegressions);
+        }
+        var hintRows = profilerHints.map(function(h) {
+            var badgeCls = 'me-profiler-badge';
+            if (h.level === 'high' || h.level === 'critical') badgeCls += ' me-profiler-badge-warn';
+            else if (h.level === 'recommended') badgeCls += ' me-profiler-badge-good';
+            var reasons = h.reasons.map(function(r) {
+                return '<div class="me-profiler-reason">• ' + meEsc(r) + '</div>';
+            }).join('');
+            return '<div class="me-profiler-item">' +
+                '<div class="' + badgeCls + '">' + meEsc(h.tool) + '</div>' +
+                '<div class="me-profiler-body">' +
+                    reasons +
+                    '<code class="me-profiler-cmd">' + meEsc(h.cmd) + '</code>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+        hintDiv.innerHTML =
+            '<div class="me-profiler-title">Profiler Next Steps</div>' +
+            '<div class="me-profiler-subtitle">Signals: ' + meEsc(signalBits.join(', ')) + '. Indicators suggest where to inspect first; they are not proof of bottleneck.</div>' +
+            '<div class="me-profiler-list">' + hintRows + '</div>';
+        container.appendChild(hintDiv);
+    }
 
     /* ── Alignment Issues ── */
     if (alignment.misaligned > 0) {
@@ -481,6 +916,31 @@ function renderMemoryExplorer(containerId) {
         }
         regionBar.appendChild(barInner);
         container.appendChild(regionBar);
+    } else if (meState.pools.length > 1) {
+        var poolBar = document.createElement('div');
+        poolBar.className = 'me-region-bar';
+        poolBar.innerHTML = '<div class="me-region-bar-label">Address Pools</div>';
+        var poolInner = document.createElement('div');
+        poolInner.className = 'me-region-bar-inner';
+        for (var pbi = 0; pbi < meState.pools.length; pbi++) {
+            var pool = meState.pools[pbi];
+            var pPct = meState.totalBytes > 0 ? (pool.bytes / meState.totalBytes * 100) : 0;
+            var poolKey = pool.name === 'weights' ? 'weight' : (pool.name === 'activations' ? 'activation' : 'scratch');
+            var poolColor = ME_REGION_COLORS[poolKey] || ME_REGION_COLORS.scratch;
+            var pSeg = document.createElement('div');
+            pSeg.className = 'me-region-seg';
+            pSeg.style.width = Math.max(pPct, 0.5) + '%';
+            pSeg.style.backgroundColor = poolColor.bg;
+            pSeg.style.borderLeft = '1px solid ' + poolColor.border;
+            pSeg.title = pool.name + ': ' + meHex(pool.offset) + ' — ' + meHex(pool.offset + pool.bytes) + ' (' + meFmtBytes(pool.bytes) + ', ' + pool.count + ' tensors)';
+            var pLbl = document.createElement('span');
+            pLbl.className = 'me-region-seg-lbl';
+            pLbl.textContent = pPct > 5 ? pool.name : '';
+            pSeg.appendChild(pLbl);
+            poolInner.appendChild(pSeg);
+        }
+        poolBar.appendChild(poolInner);
+        container.appendChild(poolBar);
     }
 
     /* ── Grid Wrapper ── */
@@ -547,6 +1007,11 @@ function meRenderGrid() {
     /* Byte range */
     var minOff = regionFilter ? regionFilter.offset : 0;
     var maxOff = regionFilter ? (regionFilter.offset + regionFilter.bytes) : meState.totalBytes;
+    if (!regionFilter && meState.viewRegion !== 'all' && tensors.length > 0) {
+        minOff = tensors.reduce(function(mn, t) { return Math.min(mn, t.offset); }, Number.POSITIVE_INFINITY);
+        maxOff = tensors.reduce(function(mx, t) { return Math.max(mx, t.end); }, 0);
+        if (!isFinite(minOff)) minOff = 0;
+    }
     var totalCells = Math.ceil((maxOff - minOff) / bpc);
     var rows = Math.ceil(totalCells / cols);
 
@@ -559,6 +1024,13 @@ function meRenderGrid() {
         var rb = meState.regions[rbi2];
         regionBoundsArr.push(rb.offset);
         regionBoundsArr.push(rb.offset + rb.bytes);
+    }
+    if (regionBoundsArr.length === 0 && meState.pools.length) {
+        for (var pbi2 = 0; pbi2 < meState.pools.length; pbi2++) {
+            var pb2 = meState.pools[pbi2];
+            regionBoundsArr.push(pb2.offset);
+            regionBoundsArr.push(pb2.offset + pb2.bytes);
+        }
     }
 
     /* Virtual scroll sizing */
@@ -708,6 +1180,9 @@ function meCellHover(e) {
     c.title = [
         t.id,
         'Region: ' + t.region,
+        'Stage: ' + (t.seq_section || 'unmapped') +
+            (t.seq_op ? ('   Op: ' + t.seq_op) : '') +
+            (t.seq_op_id !== null ? (' (#' + t.seq_op_id + ')') : ''),
         'Offset: ' + meHex(off) + '   Tensor start: ' + meHex(t.offset),
         'Cache line: #' + cl.toLocaleString(),
         'Size: ' + meFmtBytes(t.bytes) + ' (' + t.bytes.toLocaleString() + ' B)',
@@ -781,13 +1256,19 @@ function meShowDetail(t) {
         '<div class="me-detail-hdr">' +
             '<span class="me-detail-name">' + meEsc(t.id) + '</span>' +
             '<span class="me-detail-badge" style="color:' + rc.border + ';">⬤ ' + t.region + '</span>' +
+            '<span class="me-detail-badge" style="color:' + (ME_STAGE_COLORS[t.seq_section || 'unmapped'] || ME_STAGE_COLORS.unmapped).border + ';">' + (t.seq_section || 'unmapped') + '</span>' +
             (t.requires_grad ? '<span class="me-detail-badge" style="color:#e74c3c;">∇ grad</span>' : '') +
             (t.persistent ? '<span class="me-detail-badge" style="color:#47b475;">persistent</span>' : '<span class="me-detail-badge" style="color:#888;">ephemeral</span>') +
         '</div>' +
         '<div class="me-detail-grid">' +
             '<div class="me-kv"><span class="me-k">Kind</span><span class="me-v">' + t.kind + '</span></div>' +
-            '<div class="me-kv"><span class="me-k">Offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset) + '</span></div>' +
-            '<div class="me-kv"><span class="me-k">End</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.end) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Op Stage</span><span class="me-v">' + (t.seq_section || 'unmapped') + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">First Op</span><span class="me-v">' + (t.seq_op || '-') + (t.seq_op_id !== null ? (' #' + t.seq_op_id) : '') + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Pool</span><span class="me-v">' + (t.pool || '-') + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (view)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">End (view)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.end) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (pool)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(typeof t.offset_local === 'number' ? t.offset_local : t.offset) + '</span></div>' +
+            '<div class="me-kv"><span class="me-k">Offset (abs)</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(typeof t.offset_abs === 'number' ? t.offset_abs : t.offset) + '</span></div>' +
             '<div class="me-kv"><span class="me-k">Size</span><span class="me-v">' + meFmtBytes(t.bytes) + ' (' + t.bytes.toLocaleString() + ' B)</span></div>' +
             '<div class="me-kv"><span class="me-k">BUMP offset</span><span class="me-v" style="font-family:var(--font-mono,monospace);">' + meHex(t.bump_offset) + '</span></div>' +
             '<div class="me-kv"><span class="me-k">BUMP size</span><span class="me-v">' + meFmtBytes(t.bump_size) + '</span></div>' +
@@ -817,6 +1298,10 @@ if (typeof window !== 'undefined') {
     window.meSetZoom = function(v) {
         meState.zoomLevel = v;
         meRenderGrid();
+    };
+    window.meSetAddressMode = function(v) {
+        meState.addressMode = (v === 'pool') ? 'pool' : 'absolute';
+        renderMemoryExplorer();
     };
     window.meSetColor = function(v) {
         meState.colorMode = v;
@@ -861,6 +1346,22 @@ function meUpdateLegend() {
                 var colors = ME_REGION_COLORS[rName] || ME_REGION_COLORS.params;
                 html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + colors.bg + '; border:1px solid ' + colors.border + ';"></div>' + rName + ' (' + seenRegions[rName] + ')</div>';
             }
+        }
+        break;
+
+    case 'sequence':
+        var stageCounts = { header: 0, body: 0, footer: 0, runtime: 0, unmapped: 0 };
+        for (var si = 0; si < meState.tensors.length; si++) {
+            var sk = meState.tensors[si].seq_section || 'unmapped';
+            if (!Object.prototype.hasOwnProperty.call(stageCounts, sk)) sk = 'unmapped';
+            stageCounts[sk] += 1;
+        }
+        var stageOrder = ['header', 'body', 'footer', 'runtime', 'unmapped'];
+        for (var soi = 0; soi < stageOrder.length; soi++) {
+            var sname = stageOrder[soi];
+            if (stageCounts[sname] <= 0) continue;
+            var sc2 = ME_STAGE_COLORS[sname] || ME_STAGE_COLORS.unmapped;
+            html += '<div class="me-legend-item"><div class="me-swatch" style="background:' + sc2.bg + '; border:1px solid ' + sc2.border + ';"></div>' + sname + ' (' + stageCounts[sname] + ')</div>';
         }
         break;
 
