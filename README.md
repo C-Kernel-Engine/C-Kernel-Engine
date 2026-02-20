@@ -15,6 +15,7 @@ This project focuses on a **small, high-impact set of kernel shapes** that appea
 See `docs/01-llm-kernel-shapes.md` for the core math that drives the design.
 
 **Start here:** `docs/00-quickstart.md` (build, tests, and codegen).
+**v7 SVG training plan:** `docs/v7-svg-training-ablation.md` (tokenizer/data/model ablation flow).
 
 The code generator (`build/ck_ir_demo`) can emit a `libmodel.so` that supports:
 - Prompt **prefill** (full forward)

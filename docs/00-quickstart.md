@@ -119,3 +119,9 @@ Training uses the full forward+backward graph and does **not** use KV-cache deco
 - Run `ck_model_forward(NULL)` then `ck_model_backward(tokens, targets, &loss)`
 
 KV-cache decode is explicitly **disabled when training is enabled**.
+
+## v7 SVG Training Docs
+
+For tokenizer/data/model-size ablations and next-step criteria:
+- `docs/v7-svg-training-ablation.md` (quick guide)
+- `version/v7/reports/SVG_ABLATION_PLAN_2026-02-20.md` (canonical detailed matrix)

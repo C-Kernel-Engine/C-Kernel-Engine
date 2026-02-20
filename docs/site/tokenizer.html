@@ -899,6 +899,7 @@
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -932,350 +933,1146 @@
 
 <div class="hero">
     <span class="badge badge-green">100% HuggingFace Parity</span>
-    <h1>C-Kernel Tokenizer</h1>
-    <p>High-performance tokenizer with True BPE algorithm achieving 100% parity with HuggingFace. Includes Trie-based greedy matcher for 100x faster performance.</p>
+    <h1>C-Kernel BPE Tokenizer</h1>
+    <p>From raw bytes to token IDs — one beautiful merge at a time. A visual, Feynman-style walkthrough of Byte Pair Encoding.</p>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 1 — THE ONE-SENTENCE IDEA
+     ═══════════════════════════════════════════════════════════ -->
+<h2>The One-Sentence Idea</h2>
+<p style="font-size:1.15rem;max-width:54rem;">
+    <strong>Find the most common pair of adjacent symbols, replace every occurrence with a single new symbol, and repeat.</strong>
+    That's the entire algorithm.
+</p>
+
+<div class="card" style="padding:1.2rem;overflow-x:auto;">
+<svg viewBox="0 0 900 130" width="100%" height="130" font-family="Inter,system-ui,sans-serif" aria-label="BPE high-level pipeline">
+  <!-- background -->
+  <rect width="900" height="130" rx="12" fill="#181e28"/>
+  <!-- stages -->
+  <g fill="#ffb400" font-size="11" font-weight="700" text-anchor="middle">
+    <rect x="24" y="22" width="166" height="86" rx="10" fill="#1e2736" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="107" y="44" fill="#ffb400">1  Raw Text</text>
+    <text x="107" y="64" fill="#b0b0b0" font-weight="400" font-size="10">"low lower newest"</text>
+    <text x="107" y="80" fill="#667" font-weight="400" font-size="9">UTF-8 bytes</text>
+
+    <rect x="220" y="22" width="166" height="86" rx="10" fill="#1e2736" stroke="#47b475" stroke-width="1.5"/>
+    <text x="303" y="44" fill="#47b475">2  Byte Symbols</text>
+    <text x="303" y="64" fill="#b0b0b0" font-weight="400" font-size="10">l o w · l o w e r ...</text>
+    <text x="303" y="80" fill="#667" font-weight="400" font-size="9">256 base IDs (0x00–0xFF)</text>
+
+    <rect x="416" y="22" width="196" height="86" rx="10" fill="#1e2736" stroke="#07adf8" stroke-width="1.5"/>
+    <text x="514" y="44" fill="#07adf8">3  Merge Loop</text>
+    <text x="514" y="64" fill="#b0b0b0" font-weight="400" font-size="10">count pairs → pick top → merge</text>
+    <text x="514" y="80" fill="#667" font-weight="400" font-size="9">repeat until vocab_size</text>
+
+    <rect x="642" y="22" width="136" height="86" rx="10" fill="#1e2736" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="710" y="44" fill="#ffb400">4  Vocab</text>
+    <text x="710" y="64" fill="#b0b0b0" font-weight="400" font-size="10">320 tokens</text>
+    <text x="710" y="80" fill="#667" font-weight="400" font-size="9">tokenizer.json</text>
+
+    <rect x="808" y="22" width="72" height="86" rx="10" fill="#1e2736" stroke="#47b475" stroke-width="1.5"/>
+    <text x="844" y="44" fill="#47b475">5  IDs</text>
+    <text x="844" y="64" fill="#b0b0b0" font-weight="400" font-size="10">[42, 7,</text>
+    <text x="844" y="78" fill="#b0b0b0" font-weight="400" font-size="10"> 91 …]</text>
+  </g>
+  <!-- arrows -->
+  <g stroke="#ffb40088" stroke-width="2" fill="none" marker-end="url(#arrowGold)">
+    <line x1="192" y1="65" x2="218" y2="65"/>
+    <line x1="388" y1="65" x2="414" y2="65"/>
+    <line x1="614" y1="65" x2="640" y2="65"/>
+    <line x1="780" y1="65" x2="806" y2="65"/>
+  </g>
+  <defs><marker id="arrowGold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffb400"/></marker></defs>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 2 — STEP-BY-STEP (using SVG dataset example)
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Step-by-Step: BPE on Our SVG Dataset</h2>
+<p>Our BPE trainer (<code>ck-bpe-train</code>) feeds on <code>.svg</code>, <code>.txt</code>, <code>.html</code>, <code>.md</code>, and <code>.json</code> files from the corpus. Let's trace the algorithm on a tiny SVG fragment:</p>
+
+<div class="card card-accent" style="margin-bottom:1.2rem;">
+<pre style="margin:0;"><code>&lt;svg viewBox="0 0 24 24"&gt;
+  &lt;path d="M12 2L2 22h20z"/&gt;
+&lt;/svg&gt;</code></pre>
+</div>
+
+<h3>Step 1 — Split Into Bytes</h3>
+<p>Every byte of every file in the corpus becomes a <strong>base symbol</strong>. IDs 0–3 are reserved for special tokens; IDs 4–259 cover all 256 byte values.</p>
+
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 200" width="100%" height="200" font-family="'JetBrains Mono',monospace" aria-label="Byte symbol table">
+  <rect width="900" height="200" rx="10" fill="#151b26"/>
+
+  <!-- Title -->
+  <text x="20" y="28" fill="#ffb400" font-size="13" font-weight="700" font-family="Inter,sans-serif">Initial Symbol Table  (260 entries: 4 special + 256 bytes)</text>
+
+  <!-- Special tokens -->
+  <g font-size="10.5">
+    <rect x="20"  y="42" width="80" height="30" rx="5" fill="#3a2020" stroke="#e74c3c" stroke-width="1"/>
+    <text x="60"  y="62" fill="#ffb8b0" text-anchor="middle">ID 0: &lt;unk&gt;</text>
+    <rect x="108" y="42" width="80" height="30" rx="5" fill="#3a2020" stroke="#e74c3c" stroke-width="1"/>
+    <text x="148" y="62" fill="#ffb8b0" text-anchor="middle">ID 1: &lt;bos&gt;</text>
+    <rect x="196" y="42" width="80" height="30" rx="5" fill="#3a2020" stroke="#e74c3c" stroke-width="1"/>
+    <text x="236" y="62" fill="#ffb8b0" text-anchor="middle">ID 2: &lt;eos&gt;</text>
+    <rect x="284" y="42" width="80" height="30" rx="5" fill="#3a2020" stroke="#e74c3c" stroke-width="1"/>
+    <text x="324" y="62" fill="#ffb8b0" text-anchor="middle">ID 3: &lt;pad&gt;</text>
+  </g>
+
+  <!-- Byte row -->
+  <g font-size="10">
+    <text x="20" y="99" fill="#667" font-size="9" font-family="Inter,sans-serif">Byte-level tokens (IDs 4–259):</text>
+    <rect x="20"  y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="44"  y="125" fill="#8cb4ff" text-anchor="middle">ID 4</text>
+    <text x="44"  y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">0x00</text>
+
+    <rect x="74"  y="106" width="52" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="100" y="125" fill="#8cb4ff" text-anchor="middle">ID 36</text>
+    <text x="100" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">' ' sp</text>
+
+    <rect x="132" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="156" y="125" fill="#8cb4ff" text-anchor="middle">ID 52</text>
+    <text x="156" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'0'</text>
+
+    <rect x="186" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="210" y="125" fill="#8cb4ff" text-anchor="middle">ID 69</text>
+    <text x="210" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'A'</text>
+
+    <rect x="240" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="264" y="125" fill="#8cb4ff" text-anchor="middle">ID 101</text>
+    <text x="264" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'a'</text>
+
+    <rect x="294" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="318" y="125" fill="#8cb4ff" text-anchor="middle">ID 126</text>
+    <text x="318" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'z'</text>
+
+    <text x="352" y="126" fill="#667" font-size="11">…</text>
+
+    <rect x="372" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="396" y="125" fill="#8cb4ff" text-anchor="middle">ID 64</text>
+    <text x="396" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'&lt;'</text>
+
+    <rect x="426" y="106" width="48" height="28" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="450" y="125" fill="#8cb4ff" text-anchor="middle">ID 66</text>
+    <text x="450" y="115" fill="#f0f4ff" text-anchor="middle" font-size="8">'&gt;'</text>
+  </g>
+
+  <!-- formula -->
+  <text x="20" y="160" fill="#b0b0b0" font-size="11" font-family="Inter,sans-serif">
+    Token ID for byte <tspan fill="#ffb400">b</tspan> = <tspan fill="#ffb400">BASE_BYTE_ID</tspan> (4) + <tspan fill="#ffb400">b</tspan>
+  </text>
+  <text x="20" y="180" fill="#667" font-size="10" font-family="Inter,sans-serif">
+    So byte 0x3C ('&lt;') → ID 4 + 60 = 64.   Our SVG snippet becomes [64, 119, 122, 107, …]
+  </text>
+</svg>
+</div>
+
+<h3>Step 2 — Count Every Adjacent Pair</h3>
+<p>Scan the entire corpus (multi-threaded, one shard per file). For every position <em>i</em>, record the pair <code>(seq[i], seq[i+1])</code> in a hash table.</p>
+
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 320" width="100%" height="320" font-family="Inter,system-ui,sans-serif" aria-label="Pair counting illustration">
+  <rect width="900" height="320" rx="10" fill="#151b26"/>
+
+  <text x="20" y="26" fill="#ffb400" font-size="13" font-weight="700">Pair Counting — Iteration 1</text>
+  <text x="20" y="46" fill="#667" font-size="10">Corpus: all .svg files from docs/site/assets/ (100+ SVGs)</text>
+
+  <!-- Sequence strip -->
+  <text x="20" y="72" fill="#b0b0b0" font-size="10" font-weight="600">Sequence fragment from tokenizer-architecture.svg:</text>
+  <g font-size="12" font-family="'JetBrains Mono',monospace">
+    <rect x="20"  y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="36"  y="101" fill="#f0f4ff" text-anchor="middle">&lt;</text>
+    <rect x="56"  y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="72"  y="101" fill="#f0f4ff" text-anchor="middle">s</text>
+    <rect x="92"  y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="108" y="101" fill="#f0f4ff" text-anchor="middle">v</text>
+    <rect x="128" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="144" y="101" fill="#f0f4ff" text-anchor="middle">g</text>
+    <rect x="164" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#47b47566" stroke-width="1"/>
+    <text x="180" y="101" fill="#f0f4ff" text-anchor="middle"> </text>
+    <rect x="200" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="216" y="101" fill="#f0f4ff" text-anchor="middle">v</text>
+    <rect x="236" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="252" y="101" fill="#f0f4ff" text-anchor="middle">i</text>
+    <rect x="272" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="288" y="101" fill="#f0f4ff" text-anchor="middle">e</text>
+    <rect x="308" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="324" y="101" fill="#f0f4ff" text-anchor="middle">w</text>
+    <rect x="344" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="360" y="101" fill="#f0f4ff" text-anchor="middle">B</text>
+    <rect x="380" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="396" y="101" fill="#f0f4ff" text-anchor="middle">o</text>
+    <rect x="416" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="432" y="101" fill="#f0f4ff" text-anchor="middle">x</text>
+    <rect x="452" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="468" y="101" fill="#f0f4ff" text-anchor="middle">=</text>
+    <rect x="488" y="80" width="32" height="32" rx="4" fill="#1e2738" stroke="#07adf866" stroke-width="1"/>
+    <text x="504" y="101" fill="#f0f4ff" text-anchor="middle">"</text>
+  </g>
+
+  <!-- Pair arcs -->
+  <g fill="none" stroke-width="1.5">
+    <path d="M36,115 Q36,130 54,130 Q72,130 72,115" stroke="#ffb400"/>
+    <text x="54" y="144" fill="#ffb400" font-size="8" text-anchor="middle">&lt;s</text>
+    <path d="M72,115 Q72,130 90,130 Q108,130 108,115" stroke="#47b475"/>
+    <text x="90" y="144" fill="#47b475" font-size="8" text-anchor="middle">sv</text>
+    <path d="M108,115 Q108,130 126,130 Q144,130 144,115" stroke="#07adf8"/>
+    <text x="126" y="144" fill="#07adf8" font-size="8" text-anchor="middle">vg</text>
+    <path d="M216,115 Q216,130 234,130 Q252,130 252,115" stroke="#47b475"/>
+    <text x="234" y="144" fill="#47b475" font-size="8" text-anchor="middle">vi</text>
+    <path d="M252,115 Q252,130 270,130 Q288,130 288,115" stroke="#07adf8"/>
+    <text x="270" y="144" fill="#07adf8" font-size="8" text-anchor="middle">ie</text>
+    <path d="M288,115 Q288,130 306,130 Q324,130 324,115" stroke="#ffb400"/>
+    <text x="306" y="144" fill="#ffb400" font-size="8" text-anchor="middle">ew</text>
+    <path d="M360,115 Q360,130 378,130 Q396,130 396,115" stroke="#47b475"/>
+    <text x="378" y="144" fill="#47b475" font-size="8" text-anchor="middle">Bo</text>
+    <path d="M396,115 Q396,130 414,130 Q432,130 432,115" stroke="#07adf8"/>
+    <text x="414" y="144" fill="#07adf8" font-size="8" text-anchor="middle">ox</text>
+  </g>
+
+  <!-- Hash table viz -->
+  <text x="20" y="178" fill="#ffb400" font-size="12" font-weight="700">Global Pair Table (top pairs from SVG corpus):</text>
+  <g font-size="10" font-weight="600">
+    <text x="28"  y="196" fill="#667">Rank</text>
+    <text x="80"  y="196" fill="#667">Pair</text>
+    <text x="200" y="196" fill="#667">Count</text>
+    <text x="280" y="196" fill="#667">Bar</text>
+  </g>
+  <line x1="20" y1="200" x2="620" y2="200" stroke="#333" stroke-width="1"/>
+
+  <!-- row 1 -->
+  <text x="36" y="218" fill="#ffb400" font-size="11" font-weight="700" text-anchor="middle">1</text>
+  <rect x="70" y="206" width="110" height="20" rx="3" fill="#2a1e00"/>
+  <text x="125" y="220" fill="#ffb400" text-anchor="middle" font-size="11" font-family="'JetBrains Mono',monospace">' ' + '&lt;'  (sp &lt;)</text>
+  <text x="210" y="218" fill="#f0f4ff" font-size="11" font-family="'JetBrains Mono',monospace">4,217</text>
+  <rect x="280" y="208" width="320" height="12" rx="3" fill="#ffb400"/>
+
+  <!-- row 2 -->
+  <text x="36" y="242" fill="#47b475" font-size="11" font-weight="700" text-anchor="middle">2</text>
+  <rect x="70" y="230" width="110" height="20" rx="3" fill="#0e2418"/>
+  <text x="125" y="244" fill="#47b475" text-anchor="middle" font-size="11" font-family="'JetBrains Mono',monospace">'s' + 't'  (st)</text>
+  <text x="210" y="242" fill="#f0f4ff" font-size="11" font-family="'JetBrains Mono',monospace">3,841</text>
+  <rect x="280" y="232" width="292" height="12" rx="3" fill="#47b475"/>
+
+  <!-- row 3 -->
+  <text x="36" y="266" fill="#07adf8" font-size="11" font-weight="700" text-anchor="middle">3</text>
+  <rect x="70" y="254" width="110" height="20" rx="3" fill="#0e1e28"/>
+  <text x="125" y="268" fill="#07adf8" text-anchor="middle" font-size="11" font-family="'JetBrains Mono',monospace">'=' + '"'  (=")</text>
+  <text x="210" y="266" fill="#f0f4ff" font-size="11" font-family="'JetBrains Mono',monospace">3,502</text>
+  <rect x="280" y="256" width="266" height="12" rx="3" fill="#07adf8"/>
+
+  <!-- row 4 -->
+  <text x="36" y="290" fill="#b0b0b0" font-size="11" font-weight="700" text-anchor="middle">4</text>
+  <rect x="70" y="278" width="110" height="20" rx="3" fill="#1e1e1e"/>
+  <text x="125" y="292" fill="#b0b0b0" text-anchor="middle" font-size="11" font-family="'JetBrains Mono',monospace">'a' + 't'  (at)</text>
+  <text x="210" y="290" fill="#f0f4ff" font-size="11" font-family="'JetBrains Mono',monospace">2,987</text>
+  <rect x="280" y="280" width="227" height="12" rx="3" fill="#808080"/>
+
+  <text x="620" y="218" fill="#667" font-size="9" font-family="Inter,sans-serif">← SVGs have lots of sp+&lt;</text>
+  <text x="620" y="242" fill="#667" font-size="9" font-family="Inter,sans-serif">← "stroke", "style", "text"</text>
+  <text x="620" y="266" fill="#667" font-size="9" font-family="Inter,sans-serif">← attribute values everywhere</text>
+</svg>
 </div>
 
 <div class="alert alert-success">
     <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
     </div>
     <div>
-        <strong>True BPE Parity:</strong> The True BPE implementation achieves <strong>100% token-exact parity</strong> with HuggingFace tokenizers (Qwen, GPT-2, LLaMA) while being <strong>10-80x faster</strong>.
+        <strong>Why does this matter for SVGs?</strong> SVG files repeat patterns like <code>&lt;path d="</code>, <code>stroke="</code>, <code>fill="#</code> thousands of times. BPE naturally discovers these — the most frequent byte pairs in SVGs become the first merged tokens.
     </div>
 </div>
 
-<h2>Evolution: Hash Table → Trie → True BPE</h2>
+<h3>Step 3 — Pick the Top Pair &amp; Merge It</h3>
+<p>The pair with the <strong>highest count</strong> wins (ties broken by smallest ID pair for determinism). It gets assigned the next available token ID, and every occurrence in the corpus is replaced in one pass.</p>
 
-<p>The C-Kernel tokenizer evolved through three implementations, each solving a different problem:</p>
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 360" width="100%" height="360" font-family="Inter,system-ui,sans-serif" aria-label="Merge step-by-step">
+  <rect width="900" height="360" rx="10" fill="#151b26"/>
 
-<div class="grid grid-3">
-    <div class="card">
-        <div class="feature-icon grey">1</div>
-        <h3 style="margin-top: 0;">Hash Table (v1)</h3>
-        <p><strong>O(n × k) complexity</strong></p>
-        <ul>
-            <li>MurmurHash3-based lookup</li>
-            <li>Greedy longest-match</li>
-            <li>Slow: memcpy + hash per length trial</li>
-        </ul>
-        <p style="color: var(--text-muted);">~2K chars/ms</p>
-    </div>
-    <div class="card card-blue">
-        <div class="feature-icon blue">2</div>
-        <h3 style="margin-top: 0;">Trie (v2)</h3>
-        <p><strong>O(k) complexity</strong></p>
-        <ul>
-            <li>256-way branching trie</li>
-            <li>Single traversal per token</li>
-            <li>No memcpy or hashing</li>
-        </ul>
-        <p style="color: var(--blue);">~100K chars/ms (50x faster)</p>
-    </div>
-    <div class="card card-accent">
-        <div class="feature-icon orange">3</div>
-        <h3 style="margin-top: 0;">True BPE (v3)</h3>
-        <p><strong>100% HuggingFace Parity</strong></p>
-        <ul>
-            <li>Merge-rule based encoding</li>
-            <li>GPT-2 pretokenizer</li>
-            <li>Byte-level encoding</li>
-        </ul>
-        <p style="color: var(--orange);">10-80x faster than HuggingFace</p>
-    </div>
+  <text x="20" y="26" fill="#ffb400" font-size="13" font-weight="700">Merge #1: (' ', '&lt;') → new token ID 260</text>
+
+  <!-- Before -->
+  <text x="20" y="56" fill="#b0b0b0" font-size="11" font-weight="600">BEFORE  (fragment):</text>
+  <g font-size="13" font-family="'JetBrains Mono',monospace">
+    <rect x="20"  y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="37"  y="84" fill="#f0f4ff" text-anchor="middle">.</text>
+    <rect x="58"  y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="75"  y="84" fill="#f0f4ff" text-anchor="middle">.</text>
+    <rect x="96"  y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="113" y="84" fill="#f0f4ff" text-anchor="middle">g</text>
+    <!-- the pair to merge, highlighted -->
+    <rect x="134" y="64" width="34" height="30" rx="4" fill="#3a2e00" stroke="#ffb400" stroke-width="2"/>
+    <text x="151" y="84" fill="#ffb400" text-anchor="middle" font-weight="700"> </text>
+    <rect x="172" y="64" width="34" height="30" rx="4" fill="#3a2e00" stroke="#ffb400" stroke-width="2"/>
+    <text x="189" y="84" fill="#ffb400" text-anchor="middle" font-weight="700">&lt;</text>
+    <rect x="210" y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="227" y="84" fill="#f0f4ff" text-anchor="middle">p</text>
+    <rect x="248" y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="265" y="84" fill="#f0f4ff" text-anchor="middle">a</text>
+    <rect x="286" y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="303" y="84" fill="#f0f4ff" text-anchor="middle">t</text>
+    <rect x="324" y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="341" y="84" fill="#f0f4ff" text-anchor="middle">h</text>
+    <!-- another pair -->
+    <rect x="362" y="64" width="34" height="30" rx="4" fill="#3a2e00" stroke="#ffb400" stroke-width="2"/>
+    <text x="379" y="84" fill="#ffb400" text-anchor="middle" font-weight="700"> </text>
+    <rect x="400" y="64" width="34" height="30" rx="4" fill="#3a2e00" stroke="#ffb400" stroke-width="2"/>
+    <text x="417" y="84" fill="#ffb400" text-anchor="middle" font-weight="700">&lt;</text>
+    <rect x="438" y="64" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="455" y="84" fill="#f0f4ff" text-anchor="middle">t</text>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="250" y1="100" x2="250" y2="126" stroke="#ffb400" stroke-width="2" marker-end="url(#arrowGold)"/>
+  <text x="264" y="118" fill="#ffb400" font-size="10" font-weight="600">replace all</text>
+
+  <!-- After -->
+  <text x="20" y="148" fill="#47b475" font-size="11" font-weight="600">AFTER:</text>
+  <g font-size="13" font-family="'JetBrains Mono',monospace">
+    <rect x="20"  y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="37"  y="176" fill="#f0f4ff" text-anchor="middle">.</text>
+    <rect x="58"  y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="75"  y="176" fill="#f0f4ff" text-anchor="middle">.</text>
+    <rect x="96"  y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="113" y="176" fill="#f0f4ff" text-anchor="middle">g</text>
+    <!-- merged token -->
+    <rect x="134" y="156" width="50" height="30" rx="4" fill="#2a3a10" stroke="#47b475" stroke-width="2"/>
+    <text x="159" y="176" fill="#47b475" text-anchor="middle" font-weight="700"> &lt;</text>
+    <rect x="188" y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="205" y="176" fill="#f0f4ff" text-anchor="middle">p</text>
+    <rect x="226" y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="243" y="176" fill="#f0f4ff" text-anchor="middle">a</text>
+    <rect x="264" y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="281" y="176" fill="#f0f4ff" text-anchor="middle">t</text>
+    <rect x="302" y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="319" y="176" fill="#f0f4ff" text-anchor="middle">h</text>
+    <!-- merged token 2 -->
+    <rect x="340" y="156" width="50" height="30" rx="4" fill="#2a3a10" stroke="#47b475" stroke-width="2"/>
+    <text x="365" y="176" fill="#47b475" text-anchor="middle" font-weight="700"> &lt;</text>
+    <rect x="394" y="156" width="34" height="30" rx="4" fill="#1e2738" stroke="#07adf866"/>
+    <text x="411" y="176" fill="#f0f4ff" text-anchor="middle">t</text>
+  </g>
+
+  <!-- Sequence length shrink annotation -->
+  <text x="470" y="176" fill="#667" font-size="10">← sequence shortened! 2 tokens → 1 each time</text>
+
+  <!-- Merge tree diagram -->
+  <text x="560" y="26" fill="#07adf8" font-size="12" font-weight="700">Symbol Tree (binary merge log)</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="11">
+    <rect x="680" y="44" width="80" height="28" rx="6" fill="#2a3a10" stroke="#47b475" stroke-width="1.5"/>
+    <text x="720" y="63" fill="#47b475" text-anchor="middle" font-weight="700">260: " &lt;"</text>
+    <rect x="630" y="100" width="60" height="26" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="660" y="118" fill="#8cb4ff" text-anchor="middle">36: ' '</text>
+    <rect x="720" y="100" width="60" height="26" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="750" y="118" fill="#8cb4ff" text-anchor="middle">64: '&lt;'</text>
+    <line x1="700" y1="72" x2="660" y2="100" stroke="#47b47588" stroke-width="1.5"/>
+    <line x1="740" y1="72" x2="750" y2="100" stroke="#47b47588" stroke-width="1.5"/>
+  </g>
+
+  <!-- Now show iteration 2+ -->
+  <line x1="20" y1="204" x2="880" y2="204" stroke="#333" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <text x="20" y="228" fill="#ffb400" font-size="13" font-weight="700">Merge #2: ('s', 't') → ID 261</text>
+  <text x="20" y="248" fill="#667" font-size="10">"stroke", "style", "text", "start" — SVG attribute goldmine</text>
+
+  <text x="20" y="276" fill="#07adf8" font-size="13" font-weight="700">Merge #3: ('=', '"') → ID 262</text>
+  <text x="20" y="296" fill="#667" font-size="10">Every SVG attribute assignment: fill="...", stroke="...", d="..."</text>
+
+  <text x="20" y="324" fill="#47b475" font-size="13" font-weight="700">Merge #4: ('p', 'a') → ID 263</text>
+  <text x="20" y="344" fill="#667" font-size="10">"path", "padding", "param" — the 'pa' pair is everywhere in SVG + HTML</text>
+</svg>
 </div>
 
-<h2>Why Greedy Longest-Match Fails</h2>
+<h3>Step 4 — Repeat Until vocab_size</h3>
+<p>Each iteration: count → pick → merge → shrink. Pairs can now include <strong>previously merged tokens</strong>, so the algorithm builds longer and longer pieces.</p>
 
-<p>Hash table and Trie implementations use <strong>greedy longest-match</strong>, which doesn't achieve 100% parity with BPE tokenizers:</p>
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 280" width="100%" height="280" font-family="Inter,system-ui,sans-serif" aria-label="Recursive merge growth">
+  <rect width="900" height="280" rx="10" fill="#151b26"/>
 
-<div class="card">
-    <h4 style="margin-top: 0;">The Problem</h4>
-<pre><code>Text: "lower"
+  <text x="20" y="26" fill="#ffb400" font-size="13" font-weight="700">How Merges Compose — Building "path" from bytes</text>
 
-Greedy Longest-Match:
-  → Found "lower" in vocab → [12345]  (1 token)
+  <!-- Level 0: individual bytes -->
+  <text x="20" y="60" fill="#667" font-size="10" font-weight="600">INITIAL BYTES:</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="14">
+    <rect x="160" y="44" width="40" height="32" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="180" y="66" fill="#8cb4ff" text-anchor="middle">p</text>
+    <rect x="220" y="44" width="40" height="32" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="240" y="66" fill="#8cb4ff" text-anchor="middle">a</text>
+    <rect x="300" y="44" width="40" height="32" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="320" y="66" fill="#8cb4ff" text-anchor="middle">t</text>
+    <rect x="360" y="44" width="40" height="32" rx="5" fill="#1e2738" stroke="#07adf866"/>
+    <text x="380" y="66" fill="#8cb4ff" text-anchor="middle">h</text>
+  </g>
 
-True BPE (with merge rules):
-  → Initial: ['l', 'o', 'w', 'e', 'r']
-  → Apply merges in priority order:
-    • Merge 'e' + 'r' → 'er' (priority 50)
-    • Merge 'o' + 'w' → 'ow' (priority 100)
-    • Merge 'l' + 'ow' → 'low' (priority 200)
-    • Merge 'low' + 'er' → 'lower' (priority 500)
-  → Final: [12345]
+  <!-- arrows down to level 1 -->
+  <line x1="200" y1="78" x2="210" y2="100" stroke="#47b47588" stroke-width="1.5"/>
+  <line x1="240" y1="78" x2="230" y2="100" stroke="#47b47588" stroke-width="1.5"/>
+  <line x1="320" y1="78" x2="350" y2="100" stroke="#ffb40066" stroke-width="1.5"/>
+  <line x1="380" y1="78" x2="370" y2="100" stroke="#ffb40066" stroke-width="1.5"/>
 
-// But for "lowest":
-Greedy: "low" + "est" → different tokens than HF
-BPE:    Apply merges → matches HF exactly</code></pre>
-    <p>The difference: <strong>greedy always picks the longest token</strong>, but BPE applies <strong>merges in priority order</strong>, which can produce different tokenizations.</p>
+  <!-- Level 1: first merge -->
+  <text x="20" y="118" fill="#667" font-size="10" font-weight="600">MERGE #4:</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="14">
+    <rect x="190" y="100" width="60" height="32" rx="5" fill="#2a3a10" stroke="#47b475" stroke-width="1.5"/>
+    <text x="220" y="122" fill="#47b475" text-anchor="middle" font-weight="700">pa</text>
+    <text x="260" y="118" fill="#667" font-size="9">ID 263</text>
+    <rect x="330" y="100" width="60" height="32" rx="5" fill="#2a2a10" stroke="#ffb400" stroke-width="1.5"/>
+    <text x="360" y="122" fill="#ffb400" text-anchor="middle" font-weight="700">th</text>
+    <text x="400" y="118" fill="#667" font-size="9">ID 271</text>
+  </g>
+
+  <!-- arrows down to level 2 -->
+  <line x1="230" y1="134" x2="290" y2="166" stroke="#07adf888" stroke-width="2"/>
+  <line x1="360" y1="134" x2="330" y2="166" stroke="#07adf888" stroke-width="2"/>
+
+  <!-- Level 2: second merge -->
+  <text x="20" y="184" fill="#667" font-size="10" font-weight="600">MERGE #39:</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="16">
+    <rect x="270" y="160" width="80" height="36" rx="6" fill="#0e1e28" stroke="#07adf8" stroke-width="2"/>
+    <text x="310" y="184" fill="#07adf8" text-anchor="middle" font-weight="700">path</text>
+    <text x="362" y="180" fill="#667" font-size="10">ID 299</text>
+  </g>
+
+  <!-- Grand result callout -->
+  <rect x="480" y="48" width="390" height="200" rx="10" fill="#1a1e28" stroke="#ffb40044" stroke-width="1"/>
+  <text x="500" y="74" fill="#ffb400" font-size="12" font-weight="700">What the algorithm discovers from SVGs:</text>
+  <g font-size="11" font-family="'JetBrains Mono',monospace">
+    <text x="510" y="100" fill="#47b475">ID 260:</text><text x="590" y="100" fill="#b0b0b0">" &lt;"    (space + open tag)</text>
+    <text x="510" y="120" fill="#47b475">ID 261:</text><text x="590" y="120" fill="#b0b0b0">"st"    (stroke, style, start)</text>
+    <text x="510" y="140" fill="#47b475">ID 262:</text><text x="590" y="140" fill="#b0b0b0">'="'    (every attribute)</text>
+    <text x="510" y="160" fill="#47b475">ID 263:</text><text x="590" y="160" fill="#b0b0b0">"pa"    (path, padding)</text>
+    <text x="510" y="180" fill="#ffb400">…</text>
+    <text x="510" y="200" fill="#47b475">ID 299:</text><text x="590" y="200" fill="#b0b0b0">"path"  (full word)</text>
+    <text x="510" y="220" fill="#47b475">ID 315:</text><text x="590" y="220" fill="#b0b0b0">"&lt;/svg" (common close tag)</text>
+    <text x="510" y="240" fill="#ffb400">…</text>
+  </g>
+</svg>
 </div>
 
-<h2>True BPE: 100% HuggingFace Parity</h2>
-
-<p>The True BPE implementation achieves exact token-for-token parity with HuggingFace by implementing the actual BPE algorithm:</p>
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 3 — THE ALGORITHM IN PSEUDOCODE
+     ═══════════════════════════════════════════════════════════ -->
+<h2>The Algorithm — Clean Pseudocode</h2>
 
 <div class="grid grid-2">
     <div class="card card-accent">
-        <h3 style="margin-top: 0;">The Algorithm</h3>
-        <ol>
-            <li><strong>Pretokenize</strong>: Split text using GPT-2 regex patterns</li>
-            <li><strong>Byte-Level Encode</strong>: Convert bytes to GPT-2 characters (space → Ġ)</li>
-            <li><strong>Initialize</strong>: Split into individual characters</li>
-            <li><strong>Merge Loop</strong>: Find and apply highest-priority merge</li>
-            <li><strong>Lookup</strong>: Convert final tokens to IDs</li>
-        </ol>
+        <h3 style="margin-top: 0;">BPE Training</h3>
+<pre style="font-size:0.85rem;"><code>symbols ← {0: &lt;unk&gt;, 1: &lt;bos&gt;, 2: &lt;eos&gt;, 3: &lt;pad&gt;}
+symbols ← symbols ∪ {4..259: all 256 bytes}
+merges  ← []
+
+corpus ← load all files as byte-ID sequences
+
+while |symbols| < vocab_size:
+    pairs ← count_all_adjacent_pairs(corpus)
+    (L, R) ← argmax pairs by count
+                  (tiebreak: smallest ID pair)
+    if pairs[(L,R)] < min_freq:
+        break
+    M ← |symbols|          # next available ID
+    symbols[M] ← (L, R)    # new merged symbol
+    merges.append((L, R, M))
+    corpus ← replace_all(corpus, L, R → M)
+
+emit tokenizer.json with vocab + merges</code></pre>
     </div>
     <div class="card card-green">
-        <h3 style="margin-top: 0;">Test Results</h3>
-<pre><code>Model: Qwen/Qwen2.5-0.5B-Instruct
-Tests: 8/8 (100% parity)
+        <h3 style="margin-top: 0;">BPE Encoding (at inference)</h3>
+<pre style="font-size:0.85rem;"><code>function encode(text):
+    # 1. Pretokenize (GPT-2 regex)
+    words ← split text by regex
 
-"Hello"           PASS  13.5x faster
-"Hello world"     PASS  15.6x faster
-"Pangram"         PASS  15.5x faster
-"Python code"     PASS  11.4x faster
-"C code"          PASS  12.0x faster</code></pre>
+    for each word:
+        # 2. Byte-level encode
+        symbols ← map bytes to GPT-2 chars
+
+        # 3. Apply merges in priority order
+        for (L, R, M) in merge_rules:
+            while (L, R) adjacent in symbols:
+                replace L, R with M
+
+        # 4. Look up final token IDs
+        ids ← [vocab[s] for s in symbols]
+
+    return ids</code></pre>
     </div>
 </div>
 
-<h3>GPT-2 Pretokenizer</h3>
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 4 — GPT-2 BYTE-LEVEL MAPPING
+     ═══════════════════════════════════════════════════════════ -->
+<h2>GPT-2 Byte-Level Encoding</h2>
+<p>Raw bytes can't go directly into tokenizer JSON (control characters break JSON/display). GPT-2 defines a <strong>bijective mapping</strong> from every byte (0x00–0xFF) to a printable Unicode codepoint:</p>
 
-<p>HuggingFace tokenizers use a <strong>regex-based pretokenizer</strong> that splits text BEFORE applying BPE. This is crucial for parity:</p>
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 240" width="100%" height="240" font-family="Inter,system-ui,sans-serif" aria-label="GPT-2 byte-level mapping">
+  <rect width="900" height="240" rx="10" fill="#151b26"/>
+
+  <text x="20" y="26" fill="#ffb400" font-size="13" font-weight="700">byte_to_gpt2_piece() — The Bijective Mapping</text>
+  <text x="20" y="44" fill="#667" font-size="10">Every byte gets a visible Unicode codepoint. This is how tokenizer.json stores byte-level tokens.</text>
+
+  <!-- Range boxes -->
+  <g font-size="10">
+    <!-- Range 1: printable ASCII -->
+    <rect x="20" y="58" width="260" height="68" rx="6" fill="#1e2738" stroke="#07adf844"/>
+    <text x="30" y="76" fill="#07adf8" font-weight="700" font-size="11">0x21 – 0x7E  (printable ASCII)</text>
+    <text x="30" y="94" fill="#b0b0b0">Identity mapping: byte = codepoint</text>
+    <text x="30" y="112" fill="#47b475" font-family="'JetBrains Mono',monospace">'A' (0x41) → 'A' (U+0041)</text>
+
+    <!-- Range 2: control + space -->
+    <rect x="300" y="58" width="280" height="68" rx="6" fill="#2a1e10" stroke="#ffb40044"/>
+    <text x="310" y="76" fill="#ffb400" font-weight="700" font-size="11">0x00 – 0x20  (control + space)</text>
+    <text x="310" y="94" fill="#b0b0b0">Shifted: codepoint = 0x100 + byte</text>
+    <text x="310" y="112" fill="#ffb400" font-family="'JetBrains Mono',monospace">' ' (0x20) → 'Ġ' (U+0120)</text>
+
+    <!-- Range 3: DEL + C1 -->
+    <rect x="600" y="58" width="280" height="68" rx="6" fill="#1e1428" stroke="#a070ff44"/>
+    <text x="610" y="76" fill="#a070ff" font-weight="700" font-size="11">0x7F – 0xA0  (DEL + C1 controls)</text>
+    <text x="610" y="94" fill="#b0b0b0">Shifted: codepoint = 0x100 + byte</text>
+    <text x="610" y="112" fill="#a070ff" font-family="'JetBrains Mono',monospace">DEL (0x7F) → U+017F</text>
+
+    <!-- Range 4: Latin-1 supplement -->
+    <rect x="20" y="140" width="260" height="68" rx="6" fill="#1e2818" stroke="#47b47544"/>
+    <text x="30" y="158" fill="#47b475" font-weight="700" font-size="11">0xA1 – 0xFF  (Latin-1 supplement)</text>
+    <text x="30" y="176" fill="#b0b0b0">Identity: already valid Unicode</text>
+    <text x="30" y="194" fill="#47b475" font-family="'JetBrains Mono',monospace">'é' (0xE9) → 'é' (U+00E9)</text>
+  </g>
+
+  <!-- The key insight -->
+  <rect x="300" y="140" width="580" height="68" rx="6" fill="#1a1e10" stroke="#ffb40066"/>
+  <text x="310" y="162" fill="#ffb400" font-weight="700" font-size="12">Key Insight</text>
+  <text x="310" y="182" fill="#b0b0b0" font-size="11">Space (0x20) becomes Ġ in tokenizer.json.  So when you see token "Ġhello",</text>
+  <text x="310" y="198" fill="#b0b0b0" font-size="11">it means " hello" (with leading space).  This is why HF tokenizers show "Ġ" everywhere.</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 4b — ASCII: THE FOUNDATION LAYER
+     ═══════════════════════════════════════════════════════════ -->
+<h2>ASCII — The Foundation Layer</h2>
+<p>Before BPE can merge anything, it needs a <strong>base alphabet</strong>. That alphabet is bytes — and for English text, SVG, HTML, JSON, and code, almost every byte is <strong>ASCII</strong>. Understanding ASCII is understanding the ground floor on which all BPE merges are built.</p>
+
+<div class="card" style="padding:1.2rem;overflow-x:auto;">
+<svg viewBox="0 0 900 520" width="100%" height="520" font-family="Inter,system-ui,sans-serif" aria-label="ASCII table and BPE foundation">
+  <rect width="900" height="520" rx="12" fill="#151b26"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="900" height="36" rx="12" fill="#1e2738"/>
+  <rect x="0" y="20" width="900" height="16" fill="#1e2738"/>
+  <circle cx="16" cy="14" r="5" fill="#e74c3c"/>
+  <circle cx="32" cy="14" r="5" fill="#ffb400"/>
+  <circle cx="48" cy="14" r="5" fill="#47b475"/>
+  <text x="72" y="19" fill="#ffb400" font-size="12" font-weight="700">ASCII — American Standard Code for Information Interchange (1963)</text>
+  <text x="630" y="19" fill="#667" font-size="9">7 bits → 128 characters → the universal text foundation</text>
+
+  <!-- ─── What IS ASCII ─── -->
+  <text x="20" y="60" fill="#07adf8" font-size="12" font-weight="700">What is ASCII?</text>
+  <text x="20" y="78" fill="#b0b0b0" font-size="10">A 7-bit encoding (values 0–127) that maps numbers to characters. Every computer since the 1970s speaks ASCII.</text>
+  <text x="20" y="94" fill="#b0b0b0" font-size="10">It defines 95 printable characters (letters, digits, symbols) + 33 control characters (tab, newline, null, etc).</text>
+
+  <!-- ─── The 4 ranges ─── -->
+  <text x="20" y="122" fill="#ffb400" font-size="12" font-weight="700">The 128 Characters — Four Ranges</text>
+
+  <!-- Range 1: Control characters 0x00-0x1F -->
+  <rect x="20" y="134" width="200" height="92" rx="8" fill="#2a1818" stroke="#e74c3c66" stroke-width="1"/>
+  <text x="30" y="152" fill="#e74c3c" font-size="10" font-weight="700">Control Chars  (0x00–0x1F)</text>
+  <text x="30" y="168" fill="#888" font-size="9">32 non-printable characters</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#ff8a8a">
+    <text x="30" y="184">0x00 NUL  0x09 TAB</text>
+    <text x="30" y="198">0x0A LF   0x0D CR</text>
+    <text x="30" y="212">0x1B ESC  0x1F ...</text>
+  </g>
+
+  <!-- Range 2: Space + Printable 0x20-0x7E -->
+  <rect x="240" y="134" width="320" height="92" rx="8" fill="#1a2a10" stroke="#47b47566" stroke-width="1"/>
+  <text x="250" y="152" fill="#47b475" font-size="10" font-weight="700">Printable ASCII  (0x20–0x7E)</text>
+  <text x="250" y="168" fill="#888" font-size="9">95 characters — letters, digits, symbols, space</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#7de59f">
+    <text x="250" y="184">0x20 SP   0x30 '0'  0x41 'A'  0x61 'a'</text>
+    <text x="250" y="198">0x21 '!'  0x3C '&lt;'  0x3D '='  0x22 '"'</text>
+    <text x="250" y="212">0x2F '/'  0x3E '&gt;'  0x7B '{'  0x7D '}'</text>
+  </g>
+
+  <!-- Range 3: DEL -->
+  <rect x="580" y="134" width="80" height="92" rx="8" fill="#1e1428" stroke="#a070ff44" stroke-width="1"/>
+  <text x="590" y="152" fill="#a070ff" font-size="10" font-weight="700">DEL</text>
+  <text x="590" y="168" fill="#888" font-size="9">0x7F</text>
+  <text x="590" y="184" fill="#b0a0d0" font-size="8.5" font-family="'JetBrains Mono',monospace">1 control</text>
+  <text x="590" y="198" fill="#b0a0d0" font-size="8.5" font-family="'JetBrains Mono',monospace">char</text>
+
+  <!-- Range 4: Extended bytes -->
+  <rect x="680" y="134" width="200" height="92" rx="8" fill="#1e2738" stroke="#07adf844" stroke-width="1"/>
+  <text x="690" y="152" fill="#07adf8" font-size="10" font-weight="700">Extended  (0x80–0xFF)</text>
+  <text x="690" y="168" fill="#888" font-size="9">128 more byte values</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#8cb4ff">
+    <text x="690" y="184">NOT ASCII — used by</text>
+    <text x="690" y="198">UTF-8 continuation bytes,</text>
+    <text x="690" y="212">Latin-1 supplement, etc.</text>
+  </g>
+
+  <!-- ─── Visual byte map (heat-strip) ─── -->
+  <text x="20" y="248" fill="#ffb400" font-size="11" font-weight="700">Byte Heat Map — Which bytes appear in a typical SVG corpus?</text>
+  <text x="470" y="248" fill="#667" font-size="9">Each cell = one byte value (0x00 → 0xFF, left to right, top to bottom)</text>
+
+  <!-- Row 0x00-0x0F (control) -->
+  <g font-size="6" text-anchor="middle">
+    <!-- Row labels -->
+    <text x="10" y="270" fill="#667" font-size="7" text-anchor="end">0x0_</text>
+    <text x="10" y="288" fill="#667" font-size="7" text-anchor="end">0x1_</text>
+    <text x="10" y="306" fill="#667" font-size="7" text-anchor="end">0x2_</text>
+    <text x="10" y="324" fill="#667" font-size="7" text-anchor="end">0x3_</text>
+    <text x="10" y="342" fill="#667" font-size="7" text-anchor="end">0x4_</text>
+    <text x="10" y="360" fill="#667" font-size="7" text-anchor="end">0x5_</text>
+    <text x="10" y="378" fill="#667" font-size="7" text-anchor="end">0x6_</text>
+    <text x="10" y="396" fill="#667" font-size="7" text-anchor="end">0x7_</text>
+    <text x="10" y="414" fill="#667" font-size="7" text-anchor="end">0x8_</text>
+    <text x="10" y="432" fill="#667" font-size="7" text-anchor="end">0x9_</text>
+    <text x="10" y="450" fill="#667" font-size="7" text-anchor="end">0xA_</text>
+    <text x="10" y="468" fill="#667" font-size="7" text-anchor="end">0xB_</text>
+    <text x="10" y="486" fill="#667" font-size="7" text-anchor="end">0xC_</text>
+    <text x="10" y="504" fill="#667" font-size="7" text-anchor="end">0xD_</text>
+  </g>
+
+  <!-- Control chars row 0x00-0x0F — mostly cold -->
+  <g>
+    <rect x="18" y="260" width="14" height="14" rx="2" fill="#1a1012"/>  <!-- NUL -->
+    <rect x="34" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="50" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="66" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="82" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="98" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="114" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="130" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="146" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="162" y="260" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- TAB hot -->
+    <rect x="178" y="260" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- LF very hot -->
+    <rect x="194" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="210" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="226" y="260" width="14" height="14" rx="2" fill="#301810" opacity="0.3"/>  <!-- CR warm-ish -->
+    <rect x="242" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="258" y="260" width="14" height="14" rx="2" fill="#1a1012"/>
+  </g>
+  <!-- Control chars row 0x10-0x1F — dead cold -->
+  <g>
+    <rect x="18" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="34" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="50" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="66" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="82" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="98" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="114" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="130" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="146" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="162" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="178" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="194" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="210" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="226" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="242" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+    <rect x="258" y="278" width="14" height="14" rx="2" fill="#1a1012"/>
+  </g>
+  <!-- 0x20-0x2F — SPACE very hot, ! " # $ through / -->
+  <g>
+    <rect x="18" y="296" width="14" height="14" rx="2" fill="#ff3010" opacity="0.95"/>  <!-- SP — hottest -->
+    <rect x="34" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="50" y="296" width="14" height="14" rx="2" fill="#ffb400" opacity="0.8"/>  <!-- " hot -->
+    <rect x="66" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>  <!-- # -->
+    <rect x="82" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="98" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="114" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="130" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="146" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="162" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="178" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="194" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="210" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="226" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="242" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.6"/>  <!-- . -->
+    <rect x="258" y="296" width="14" height="14" rx="2" fill="#47b475" opacity="0.6"/>  <!-- / -->
+  </g>
+  <!-- 0x30-0x3F — digits + : ; < = > ? -->
+  <g>
+    <rect x="18" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>  <!-- 0 -->
+    <rect x="34" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>
+    <rect x="50" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>
+    <rect x="66" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.5"/>
+    <rect x="82" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.5"/>
+    <rect x="98" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.5"/>
+    <rect x="114" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.5"/>
+    <rect x="130" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.4"/>
+    <rect x="146" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.4"/>
+    <rect x="162" y="314" width="14" height="14" rx="2" fill="#ffb400" opacity="0.4"/>
+    <rect x="178" y="314" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>  <!-- : -->
+    <rect x="194" y="314" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="210" y="314" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- < very hot in SVG -->
+    <rect x="226" y="314" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- = very hot -->
+    <rect x="242" y="314" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- > very hot -->
+    <rect x="258" y="314" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+  </g>
+  <!-- 0x40-0x4F — @ A-O uppercase -->
+  <g>
+    <rect x="18" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="34" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="50" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="66" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="82" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="98" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="114" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="130" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="146" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="162" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="178" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="194" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="210" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="226" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="242" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="258" y="332" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+  </g>
+  <!-- 0x50-0x5F — P-Z _ uppercase + special -->
+  <g>
+    <rect x="18" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="34" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="50" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="66" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="82" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="98" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="114" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="130" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="146" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="162" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="178" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="194" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="210" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="226" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="242" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="258" y="350" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+  </g>
+  <!-- 0x60-0x6F — ` a-o lowercase — hot for text -->
+  <g>
+    <rect x="18" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="34" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- a -->
+    <rect x="50" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="66" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- c -->
+    <rect x="82" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- d -->
+    <rect x="98" y="368" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- e — very common -->
+    <rect x="114" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="130" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="146" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="162" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>  <!-- i -->
+    <rect x="178" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="194" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="210" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>  <!-- l -->
+    <rect x="226" y="368" width="14" height="14" rx="2" fill="#47b475" opacity="0.5"/>
+    <rect x="242" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- n -->
+    <rect x="258" y="368" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- o -->
+  </g>
+  <!-- 0x70-0x7F — p-z + DEL -->
+  <g>
+    <rect x="18" y="386" width="14" height="14" rx="2" fill="#ffb400" opacity="0.6"/>  <!-- p -->
+    <rect x="34" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="50" y="386" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- r -->
+    <rect x="66" y="386" width="14" height="14" rx="2" fill="#ffb400" opacity="0.7"/>  <!-- s -->
+    <rect x="82" y="386" width="14" height="14" rx="2" fill="#ff6030" opacity="0.8"/>  <!-- t — very common -->
+    <rect x="98" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="114" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="130" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="146" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.4"/>
+    <rect x="162" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="178" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.3"/>
+    <rect x="194" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="210" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="226" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="242" y="386" width="14" height="14" rx="2" fill="#47b475" opacity="0.2"/>
+    <rect x="258" y="386" width="14" height="14" rx="2" fill="#1a1012"/>  <!-- DEL — unused -->
+  </g>
+  <!-- 0x80-0xFF rows — all cold (not used in ASCII text) -->
+  <g opacity="0.15">
+    <rect x="18" y="404" width="256" height="14" rx="2" fill="#07adf8"/>
+    <rect x="18" y="422" width="256" height="14" rx="2" fill="#07adf8"/>
+    <rect x="18" y="440" width="256" height="14" rx="2" fill="#07adf8"/>
+    <rect x="18" y="458" width="256" height="14" rx="2" fill="#07adf8"/>
+    <rect x="18" y="476" width="256" height="14" rx="2" fill="#07adf8"/>
+    <rect x="18" y="494" width="256" height="14" rx="2" fill="#07adf8"/>
+  </g>
+  <!-- Extended range labels -->
+  <text x="140" y="416" fill="#07adf8" font-size="7" text-anchor="middle" opacity="0.6">← 0x80–0xFF: unused in pure ASCII corpora →</text>
+
+  <!-- Legend for heat map -->
+  <text x="290" y="270" fill="#667" font-size="9" font-weight="600">Heat Legend:</text>
+  <rect x="290" y="278" width="20" height="10" rx="2" fill="#ff3010" opacity="0.95"/>
+  <text x="316" y="287" fill="#b0b0b0" font-size="8">Very hot (space, &lt;, =, e, t)</text>
+  <rect x="290" y="294" width="20" height="10" rx="2" fill="#ffb400" opacity="0.7"/>
+  <text x="316" y="303" fill="#b0b0b0" font-size="8">Hot (common letters, digits, ")</text>
+  <rect x="290" y="310" width="20" height="10" rx="2" fill="#47b475" opacity="0.4"/>
+  <text x="316" y="319" fill="#b0b0b0" font-size="8">Warm (less common printable)</text>
+  <rect x="290" y="326" width="20" height="10" rx="2" fill="#1a1012"/>
+  <text x="316" y="335" fill="#b0b0b0" font-size="8">Cold / unused</text>
+
+  <!-- ─── Right panel: --ascii-only mode ─── -->
+  <rect x="478" y="258" width="402" height="248" rx="10" fill="#1a1e28" stroke="#ffb40044" stroke-width="1"/>
+  <text x="498" y="282" fill="#ffb400" font-size="12" font-weight="700">--ascii-only Mode</text>
+  <text x="498" y="300" fill="#667" font-size="9">Built into ck-bpe-train — activated with one flag</text>
+
+  <!-- Comparison: Default vs ASCII-only -->
+  <text x="498" y="324" fill="#07adf8" font-size="10" font-weight="700">Default (full byte mode):</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="9">
+    <text x="508" y="340" fill="#b0b0b0">4 special + 256 bytes = <tspan fill="#07adf8" font-weight="700">260</tspan> base tokens</text>
+    <text x="508" y="356" fill="#667">All 256 byte values get a slot</text>
+    <text x="508" y="372" fill="#667">GPT-2 Unicode remapping for JSON</text>
+  </g>
+
+  <line x1="498" y1="380" x2="858" y2="380" stroke="#333" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <text x="498" y="400" fill="#47b475" font-size="10" font-weight="700">ASCII-only mode:</text>
+  <g font-family="'JetBrains Mono',monospace" font-size="9">
+    <text x="508" y="416" fill="#b0b0b0">4 special + <tspan fill="#47b475" font-weight="700">98</tspan> base = <tspan fill="#47b475" font-weight="700">102</tspan> base tokens</text>
+    <text x="508" y="432" fill="#667">\t (0x09) + \n (0x0A) + \r (0x0D)</text>
+    <text x="508" y="448" fill="#667">+ printable 0x20–0x7E (95 chars)</text>
+    <text x="508" y="464" fill="#667">Identity mapping (no GPT-2 remap)</text>
+  </g>
+
+  <!-- Savings callout -->
+  <rect x="498" y="474" width="370" height="24" rx="4" fill="#2a3a10" stroke="#47b47566"/>
+  <text x="683" y="491" fill="#47b475" font-size="10" font-weight="700" text-anchor="middle">→ 158 fewer wasted slots = more room for merges!</text>
+</svg>
+</div>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Why ASCII matters for BPE:</strong> In an SVG/HTML/code corpus, 99%+ of your bytes are printable ASCII. The <code>--ascii-only</code> flag skips the 158 byte values that <em>never appear</em> in your data — giving the merge algorithm 158 extra vocab slots to discover useful patterns like <code>&lt;path</code>, <code>stroke=</code>, and <code>fill="#</code>. For a 320-token vocab, that's <strong>nearly 50% more merges</strong>.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top:0;">When to use each mode</h3>
+    <div class="grid grid-2" style="gap:1rem;">
+        <div>
+            <strong style="color:var(--blue);">Default (256 bytes)</strong>
+            <ul style="margin:0.5rem 0;padding-left:1.2rem;">
+                <li>Multi-language text (Japanese, Arabic, etc.)</li>
+                <li>Binary data or UTF-8 heavy corpora</li>
+                <li>HuggingFace ecosystem compatibility</li>
+            </ul>
+            <code style="font-size:0.85rem;">./ck-bpe-train --corpus-dir data/</code>
+        </div>
+        <div>
+            <strong style="color:var(--green);">ASCII-only (98 bytes)</strong>
+            <ul style="margin:0.5rem 0;padding-left:1.2rem;">
+                <li>SVG, HTML, XML, JSON corpora</li>
+                <li>Source code (C, Python, JavaScript)</li>
+                <li>English-only text</li>
+            </ul>
+            <code style="font-size:0.85rem;">./ck-bpe-train --ascii-only --corpus-dir data/</code>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 5 — THE MERGE TREE VISUALIZATION
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Visualizing the Merge Tree</h2>
+<p>Every token in the final vocabulary is a <strong>binary tree</strong> of merges. The leaves are base bytes. Here's the token <code>" &lt;path"</code> (common in our SVG dataset):</p>
+
+<div class="card" style="padding:1.2rem;overflow-x:auto;">
+<svg viewBox="0 0 680 290" width="100%" height="290" font-family="'JetBrains Mono',monospace" aria-label="Merge tree for token: space-path">
+  <rect width="680" height="290" rx="10" fill="#151b26"/>
+
+  <!-- Root -->
+  <rect x="260" y="12" width="140" height="32" rx="8" fill="#2a3a10" stroke="#47b475" stroke-width="2"/>
+  <text x="330" y="33" fill="#47b475" text-anchor="middle" font-size="13" font-weight="700">" &lt;path"  ID 312</text>
+
+  <!-- Level 1 -->
+  <line x1="300" y1="44" x2="180" y2="72" stroke="#47b47588" stroke-width="1.5"/>
+  <line x1="360" y1="44" x2="460" y2="72" stroke="#47b47588" stroke-width="1.5"/>
+  <rect x="120" y="72" width="120" height="28" rx="6" fill="#0e1e28" stroke="#07adf8"/>
+  <text x="180" y="91" fill="#07adf8" text-anchor="middle" font-size="11">" &lt;"  ID 260</text>
+  <rect x="400" y="72" width="120" height="28" rx="6" fill="#0e1e28" stroke="#07adf8"/>
+  <text x="460" y="91" fill="#07adf8" text-anchor="middle" font-size="11">"path"  ID 299</text>
+
+  <!-- Level 2 left -->
+  <line x1="155" y1="100" x2="90" y2="132" stroke="#ffb40066" stroke-width="1.5"/>
+  <line x1="205" y1="100" x2="230" y2="132" stroke="#ffb40066" stroke-width="1.5"/>
+  <rect x="56" y="132" width="68" height="26" rx="5" fill="#1e2738" stroke="#88888844"/>
+  <text x="90" y="150" fill="#8cb4ff" text-anchor="middle" font-size="10">' '  ID 36</text>
+  <rect x="200" y="132" width="68" height="26" rx="5" fill="#1e2738" stroke="#88888844"/>
+  <text x="234" y="150" fill="#8cb4ff" text-anchor="middle" font-size="10">'&lt;'  ID 64</text>
+
+  <!-- Level 2 right -->
+  <line x1="430" y1="100" x2="360" y2="132" stroke="#ffb40066" stroke-width="1.5"/>
+  <line x1="490" y1="100" x2="560" y2="132" stroke="#ffb40066" stroke-width="1.5"/>
+  <rect x="316" y="132" width="88" height="26" rx="5" fill="#2a2a10" stroke="#ffb40088"/>
+  <text x="360" y="150" fill="#ffb400" text-anchor="middle" font-size="10">"pa"  ID 263</text>
+  <rect x="516" y="132" width="88" height="26" rx="5" fill="#2a2a10" stroke="#ffb40088"/>
+  <text x="560" y="150" fill="#ffb400" text-anchor="middle" font-size="10">"th"  ID 271</text>
+
+  <!-- Level 3 -->
+  <line x1="340" y1="158" x2="300" y2="188" stroke="#88888844" stroke-width="1"/>
+  <line x1="380" y1="158" x2="400" y2="188" stroke="#88888844" stroke-width="1"/>
+  <line x1="540" y1="158" x2="500" y2="188" stroke="#88888844" stroke-width="1"/>
+  <line x1="580" y1="158" x2="600" y2="188" stroke="#88888844" stroke-width="1"/>
+  <rect x="270" y="188" width="56" height="24" rx="4" fill="#1e2738" stroke="#88888833"/>
+  <text x="298" y="205" fill="#8cb4ff" text-anchor="middle" font-size="9">'p' ID 116</text>
+  <rect x="372" y="188" width="56" height="24" rx="4" fill="#1e2738" stroke="#88888833"/>
+  <text x="400" y="205" fill="#8cb4ff" text-anchor="middle" font-size="9">'a' ID 101</text>
+  <rect x="472" y="188" width="56" height="24" rx="4" fill="#1e2738" stroke="#88888833"/>
+  <text x="500" y="205" fill="#8cb4ff" text-anchor="middle" font-size="9">'t' ID 120</text>
+  <rect x="572" y="188" width="56" height="24" rx="4" fill="#1e2738" stroke="#88888833"/>
+  <text x="600" y="205" fill="#8cb4ff" text-anchor="middle" font-size="9">'h' ID 108</text>
+
+  <!-- Legend -->
+  <g font-family="Inter,sans-serif" font-size="10">
+    <rect x="20" y="234" width="10" height="10" rx="2" fill="#47b475"/>
+    <text x="36" y="243" fill="#b0b0b0">Final token (used at encode time)</text>
+    <rect x="20" y="252" width="10" height="10" rx="2" fill="#07adf8"/>
+    <text x="36" y="261" fill="#b0b0b0">Intermediate merge</text>
+    <rect x="20" y="270" width="10" height="10" rx="2" fill="#1e2738"/>
+    <text x="36" y="279" fill="#b0b0b0">Base byte (leaf)</text>
+    <rect x="300" y="234" width="10" height="10" rx="2" fill="#ffb400"/>
+    <text x="316" y="243" fill="#b0b0b0">Every token is a SymbolNode binary tree — left child + right child = new token</text>
+  </g>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 6 — OUR IMPLEMENTATION
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Our Implementation: ck-bpe-train</h2>
+
+<p>Written in pure C with pthreads parallelism. Key optimizations:</p>
+
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 310" width="100%" height="310" font-family="Inter,system-ui,sans-serif" aria-label="Implementation architecture">
+  <rect width="900" height="310" rx="10" fill="#151b26"/>
+
+  <text x="20" y="26" fill="#ffb400" font-size="13" font-weight="700">ck_bpe_train.c — Architecture Overview</text>
+
+  <!-- Arena -->
+  <rect x="20" y="42" width="860" height="50" rx="8" fill="#1a1e28" stroke="#ffb40044" stroke-width="1"/>
+  <text x="30" y="62" fill="#ffb400" font-size="11" font-weight="700">Arena Allocator</text>
+  <text x="30" y="80" fill="#667" font-size="10">Single calloc() for all state: sequences, symbols, merges, hash tables, threads.  Zero fragmentation.</text>
+
+  <!-- Double buffer -->
+  <rect x="20" y="102" width="420" height="56" rx="8" fill="#1e2738" stroke="#07adf844" stroke-width="1"/>
+  <text x="30" y="122" fill="#07adf8" font-size="11" font-weight="700">Double-Buffered Sequences</text>
+  <g font-size="10">
+    <rect x="30" y="130" width="90" height="18" rx="3" fill="#07adf822"/>
+    <text x="75" y="143" fill="#8cb4ff" text-anchor="middle">seq_a (read)</text>
+    <text x="130" y="143" fill="#667">⟷</text>
+    <rect x="148" y="130" width="90" height="18" rx="3" fill="#07adf822"/>
+    <text x="193" y="143" fill="#8cb4ff" text-anchor="middle">seq_b (write)</text>
+    <text x="260" y="143" fill="#667">ping-pong each iteration</text>
+  </g>
+
+  <!-- Thread pool -->
+  <rect x="460" y="102" width="420" height="56" rx="8" fill="#2a3a10" stroke="#47b47544" stroke-width="1"/>
+  <text x="470" y="122" fill="#47b475" font-size="11" font-weight="700">Persistent Thread Pool</text>
+  <g font-size="10">
+    <rect x="470" y="130" width="50" height="18" rx="3" fill="#47b47522"/>
+    <text x="495" y="143" fill="#7de59f" text-anchor="middle">T0</text>
+    <rect x="526" y="130" width="50" height="18" rx="3" fill="#47b47522"/>
+    <text x="551" y="143" fill="#7de59f" text-anchor="middle">T1</text>
+    <rect x="582" y="130" width="50" height="18" rx="3" fill="#47b47522"/>
+    <text x="607" y="143" fill="#7de59f" text-anchor="middle">T2</text>
+    <rect x="638" y="130" width="50" height="18" rx="3" fill="#47b47522"/>
+    <text x="663" y="143" fill="#7de59f" text-anchor="middle">T3</text>
+    <text x="700" y="143" fill="#667">condvar signaling</text>
+  </g>
+
+  <!-- Per-iteration flow -->
+  <text x="20" y="186" fill="#ffb400" font-size="12" font-weight="700">Each Iteration (repeated vocab_size − 260 times):</text>
+  <g font-size="10">
+    <rect x="20" y="196" width="120" height="40" rx="6" fill="#1e2738" stroke="#07adf866"/>
+    <text x="80" y="214" fill="#07adf8" text-anchor="middle" font-weight="600">COUNT</text>
+    <text x="80" y="228" fill="#667" text-anchor="middle" font-size="9">threaded, per-file</text>
+
+    <line x1="142" y1="216" x2="158" y2="216" stroke="#ffb40066" stroke-width="1.5" marker-end="url(#arrowGold)"/>
+
+    <rect x="160" y="196" width="120" height="40" rx="6" fill="#1e2738" stroke="#47b47566"/>
+    <text x="220" y="214" fill="#47b475" text-anchor="middle" font-weight="600">MERGE TABLES</text>
+    <text x="220" y="228" fill="#667" text-anchor="middle" font-size="9">local → global</text>
+
+    <line x1="282" y1="216" x2="298" y2="216" stroke="#ffb40066" stroke-width="1.5" marker-end="url(#arrowGold)"/>
+
+    <rect x="300" y="196" width="120" height="40" rx="6" fill="#1e2738" stroke="#ffb40066"/>
+    <text x="360" y="214" fill="#ffb400" text-anchor="middle" font-weight="600">SELECT BEST</text>
+    <text x="360" y="228" fill="#667" text-anchor="middle" font-size="9">max count, tiebreak</text>
+
+    <line x1="422" y1="216" x2="438" y2="216" stroke="#ffb40066" stroke-width="1.5" marker-end="url(#arrowGold)"/>
+
+    <rect x="440" y="196" width="120" height="40" rx="6" fill="#1e2738" stroke="#07adf866"/>
+    <text x="500" y="214" fill="#07adf8" text-anchor="middle" font-weight="600">REPLACE</text>
+    <text x="500" y="228" fill="#667" text-anchor="middle" font-size="9">threaded rewrite</text>
+
+    <line x1="562" y1="216" x2="578" y2="216" stroke="#ffb40066" stroke-width="1.5" marker-end="url(#arrowGold)"/>
+
+    <rect x="580" y="196" width="100" height="40" rx="6" fill="#1e2738" stroke="#47b47566"/>
+    <text x="630" y="214" fill="#47b475" text-anchor="middle" font-weight="600">FLIP BUFFER</text>
+    <text x="630" y="228" fill="#667" text-anchor="middle" font-size="9">a ↔ b</text>
+
+    <!-- Loop arrow -->
+    <path d="M680,216 Q720,216 720,250 Q720,284 400,284 Q80,284 80,250 Q80,240 20,240" fill="none" stroke="#ffb40044" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowGold)"/>
+    <text x="400" y="278" fill="#ffb400" font-size="9" text-anchor="middle">loop until vocab full</text>
+  </g>
+
+  <!-- Data structures -->
+  <g font-size="10">
+    <rect x="700" y="196" width="180" height="80" rx="6" fill="#1a1028" stroke="#a070ff44"/>
+    <text x="710" y="212" fill="#a070ff" font-weight="700" font-size="10">Key Data Structures</text>
+    <text x="710" y="228" fill="#b0b0b0">SymbolNode — merge tree</text>
+    <text x="710" y="244" fill="#b0b0b0">MergeRule — (L, R, M, freq)</text>
+    <text x="710" y="260" fill="#b0b0b0">PairSlot — hash table entry</text>
+    <text x="710" y="276" fill="#b0b0b0">splitmix64 — hash function</text>
+  </g>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 7 — EVOLUTION TIMELINE
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Evolution: Hash Table → Trie → True BPE</h2>
+
+<div class="card" style="padding:1rem;overflow-x:auto;">
+<svg viewBox="0 0 900 160" width="100%" height="160" font-family="Inter,system-ui,sans-serif" aria-label="Tokenizer evolution timeline">
+  <rect width="900" height="160" rx="10" fill="#151b26"/>
+  <!-- Timeline line -->
+  <line x1="40" y1="70" x2="860" y2="70" stroke="#555" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- v1: Hash -->
+  <g>
+    <circle cx="120" cy="70" r="18" fill="#1e2738" stroke="#808080" stroke-width="2"/>
+    <text x="120" y="75" fill="#808080" text-anchor="middle" font-size="12" font-weight="700">v1</text>
+    <text x="120" y="106" fill="#b0b0b0" text-anchor="middle" font-size="10" font-weight="600">Hash Table</text>
+    <text x="120" y="120" fill="#667" text-anchor="middle" font-size="9">O(n × k)</text>
+    <text x="120" y="134" fill="#667" text-anchor="middle" font-size="9">~2K chars/ms</text>
+    <text x="120" y="44" fill="#e74c3c" text-anchor="middle" font-size="9" font-weight="600">~85% parity</text>
+  </g>
+
+  <!-- v2: Trie -->
+  <g>
+    <circle cx="420" cy="70" r="18" fill="#1e2738" stroke="#07adf8" stroke-width="2"/>
+    <text x="420" y="75" fill="#07adf8" text-anchor="middle" font-size="12" font-weight="700">v2</text>
+    <text x="420" y="106" fill="#07adf8" text-anchor="middle" font-size="10" font-weight="600">256-way Trie</text>
+    <text x="420" y="120" fill="#667" text-anchor="middle" font-size="9">O(k)</text>
+    <text x="420" y="134" fill="#667" text-anchor="middle" font-size="9">~100K chars/ms</text>
+    <text x="420" y="44" fill="#e74c3c" text-anchor="middle" font-size="9" font-weight="600">~85% parity</text>
+    <text x="270" y="60" fill="#47b475" font-size="9" font-weight="600">50x faster →</text>
+  </g>
+
+  <!-- v3: True BPE -->
+  <g>
+    <circle cx="720" cy="70" r="22" fill="#2a3a10" stroke="#47b475" stroke-width="3"/>
+    <text x="720" y="75" fill="#47b475" text-anchor="middle" font-size="12" font-weight="700">v3</text>
+    <text x="720" y="106" fill="#47b475" text-anchor="middle" font-size="10" font-weight="600">True BPE</text>
+    <text x="720" y="120" fill="#667" text-anchor="middle" font-size="9">Merge-rule based</text>
+    <text x="720" y="134" fill="#667" text-anchor="middle" font-size="9">10-80x faster than HF</text>
+    <text x="720" y="44" fill="#47b475" text-anchor="middle" font-size="10" font-weight="700">100% parity ✓</text>
+    <text x="570" y="60" fill="#ffb400" font-size="9" font-weight="600">exact parity →</text>
+  </g>
+</svg>
+</div>
+
+<p>Hash table and Trie both use <strong>greedy longest-match</strong>, which picks the longest token at each position. True BPE applies <strong>merges in priority order</strong>, which can produce different (correct) tokenizations:</p>
 
 <div class="card">
-<pre><code>// GPT-2 pretokenizer patterns (from HuggingFace):
-Pattern 1:  \'s|\'t|\'re|\'ve|\'m|\'ll|\'d     // Contractions
-Pattern 2:  [^\r\n\p{L}\p{N}]?\p{L}+          // Words with optional prefix
-Pattern 3:  \p{N}{1,3}                        // Numbers (1-3 digits)
-Pattern 4:   ?[^\s\p{L}\p{N}]+[\r\n]*         // Punctuation with space
-Pattern 5:  \s*[\r\n]+                        // Newlines
-Pattern 6:  \s+(?!\S)                         // Trailing spaces
-Pattern 7:  \s+                               // Other whitespace
+    <h4 style="margin-top: 0;">Why Greedy Longest-Match Fails</h4>
+<pre><code>Text: "lowest"
 
-// Example: "def fibonacci(n):"
-Pretokenized: ["def", " fib", "onacci", "(", "n", "):"]
-               ↑       ↑                 ↑
-             word   space+word      punctuation</code></pre>
+Greedy Longest-Match:
+  "low" is in vocab → [7]  then "est" → [42]  → [7, 42]
+
+True BPE (merge rules applied in order):
+  Initial: ['l', 'o', 'w', 'e', 's', 't']
+  Merge 'e'+'s' (priority 12)  → ['l', 'o', 'w', 'es', 't']
+  Merge 'es'+'t' (priority 45) → ['l', 'o', 'w', 'est']
+  Merge 'l'+'o' (priority 80)  → ['lo', 'w', 'est']
+  Merge 'lo'+'w' (priority 120)→ ['low', 'est']
+  → Same result HERE, but on other words the order matters!</code></pre>
 </div>
 
-<h3>Byte-Level Encoding</h3>
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 8 — OUTPUT FORMAT
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Output: tokenizer.json</h2>
+<p>The trainer emits a <strong>HuggingFace-compatible</strong> <code>tokenizer.json</code>:</p>
 
-<p>GPT-2 uses a byte-to-character mapping where control characters become visible Unicode:</p>
-
-<table>
-    <thead>
-        <tr><th>Byte</th><th>Character</th><th>Unicode</th><th>Description</th></tr>
-    </thead>
-    <tbody>
-        <tr><td><code>0x20</code></td><td>Ġ</td><td>U+0120</td><td>Space prefix</td></tr>
-        <tr><td><code>0x0A</code></td><td>Ċ</td><td>U+010A</td><td>Newline</td></tr>
-        <tr><td><code>0x09</code></td><td>ĉ</td><td>U+0109</td><td>Tab</td></tr>
-        <tr><td><code>0x00-0x20</code></td><td>Various</td><td>U+0100+</td><td>Control chars</td></tr>
-    </tbody>
-</table>
-
-<h2>Architecture Overview</h2>
-
-<div class="img-container svg-viewer" data-title="Tokenizer Architecture">
-    <img src="assets/tokenizer-architecture.svg" alt="Tokenizer Architecture: Input → Vocabulary Lookup → Longest-Match → Output">
+<div class="card">
+<pre><code>{
+  "version": "1.0",
+  "model": {
+    "type": "BPE",
+    "vocab": {
+      "&lt;|unk|&gt;": 0, "&lt;|bos|&gt;": 1, "&lt;|eos|&gt;": 2, "&lt;|pad|&gt;": 3,
+      "Ā": 4,     // byte 0x00 → U+0100
+      "ā": 5,     // byte 0x01 → U+0101
+      ...
+      "Ġ": 36,    // byte 0x20 (space) → U+0120
+      ...
+      "st": 261,  // merged token
+      ...
+    },
+    "merges": [
+      "Ġ &lt;",       // merge #1: space + '<'
+      "s t",        // merge #2
+      "= \"",       // merge #3
+      "p a",        // merge #4
+      ...
+    ]
+  },
+  "pre_tokenizer": {
+    "type": "ByteLevel",
+    "add_prefix_space": false,
+    "use_regex": true
+  }
+}</code></pre>
 </div>
 
-<p>The C-Kernel tokenizer is designed for high-performance tokenization with the following key features:</p>
+<p>Also emits binary exports for the C runtime: <code>vocab_offsets.bin</code>, <code>vocab_strings.bin</code>, <code>vocab_merges.bin</code>, and <code>tokenizer_meta.json</code>.</p>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 9 — QUICK REFERENCE
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Quick Reference</h2>
 
 <div class="grid grid-3">
     <div class="card">
-        <h3 style="margin-top: 0;">BPE Tokenization</h3>
-        <ul>
-            <li>Byte-Pair Encoding (GPT-2, LLaMA, Qwen)</li>
-            <li>True BPE with merge rules</li>
-            <li>Special token handling (BOS, EOS, UNK, PAD)</li>
-            <li>Full UTF-8 multilingual support</li>
-        </ul>
+        <h3 style="margin-top:0;">Train a tokenizer</h3>
+<pre><code>./build/ck-bpe-train \
+  --corpus-dir docs/site/assets \
+  --vocab-size 320 \
+  --min-freq 2 \
+  --out tokenizer.json</code></pre>
     </div>
     <div class="card">
-        <h3 style="margin-top: 0;">WordPiece</h3>
-        <ul>
-            <li>BERT, RoBERTa compatible</li>
-            <li>Prefix-aware tokenization</li>
-            <li>Unknown token handling</li>
-            <li>Case sensitivity options</li>
-        </ul>
+        <h3 style="margin-top:0;">Constants</h3>
+        <table>
+            <tr><td><code>SPECIAL_COUNT</code></td><td>4</td></tr>
+            <tr><td><code>BASE_BYTE_ID</code></td><td>4</td></tr>
+            <tr><td><code>BASE_BYTE_COUNT</code></td><td>256</td></tr>
+            <tr><td><code>Initial vocab</code></td><td>260</td></tr>
+        </table>
     </div>
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">SentencePiece</h3>
-        <ul>
-            <li>Unigram language model</li>
-            <li>Viterbi DP (globally optimal)</li>
-            <li>Byte fallback (no UNK)</li>
-            <li>Reversible tokenization</li>
-        </ul>
-        <p><a href="sentencepiece.html" style="color: var(--green); font-weight: 600;">Deep Dive &rarr;</a></p>
-    </div>
-</div>
-
-<h2>Hash Table vs Trie: The Performance Journey</h2>
-
-<p>Our tokenizer went through a major optimization from hash table to trie-based lookups:</p>
-
-<div class="img-container svg-viewer" data-title="Hash vs Trie Comparison">
-    <img src="assets/tokenizer-hash-vs-trie.svg" alt="Hash Table vs Trie comparison showing 43.6x speedup">
-</div>
-
-<h3>Why the Hash Table Was Slow</h3>
-
-<p>The original hash table approach had O(n × k) complexity for longest-match tokenization:</p>
-
-<pre><code>// For each position, try all possible lengths
-for (size_t len = max_len; len >= 1; len--) {
-    char tmp[65];
-    memcpy(tmp, text + pos, len);    // Copy bytes
-    tmp[len] = '\0';                  // Null terminate
-
-    TokenInfo *info = hash_table_lookup(vocab, tmp);
-    if (info) {
-        best_id = info->id;           // Found!
-        break;
-    }
-}</code></pre>
-
-<h3>Why Trie is Fast</h3>
-
-<p>The trie approach has O(k) complexity for each position:</p>
-
-<pre><code>// Single traversal through trie
-CKTrieNode *node = trie->root;
-CKTrieNode *last_token = NULL;
-size_t pos = start_pos;
-
-while (pos < text_len && node->children[text[pos]]) {
-    node = node->children[text[pos]];
-    pos++;
-
-    if (node->token_id >= 0) {
-        last_token = node;           // Remember last valid token
-        last_token_len = pos - start_pos;
-    }
-}</code></pre>
-
-<h2>API Reference</h2>
-
-<h3>True BPE API (Recommended for HuggingFace Parity)</h3>
-
-<pre><code>// Create True BPE tokenizer
-CKTrueBPE *bpe = ck_true_bpe_create();
-
-// Add tokens from vocabulary
-ck_true_bpe_add_token(bpe, "hello", 100, 0.0f);
-ck_true_bpe_add_token(bpe, "Ġworld", 101, 0.0f);  // Ġ = space prefix
-
-// Add merge rules (from tokenizer.json)
-ck_true_bpe_add_merge_by_tokens(bpe, "he", "llo", 0);  // priority 0 = first
-ck_true_bpe_add_merge_by_tokens(bpe, "hel", "lo", 1);  // priority 1 = second
-
-// Set special tokens
-ck_true_bpe_set_special_ids(bpe, unk_id, bos_id, eos_id, pad_id);
-
-// Encode text
-int32_t ids[1024];
-int num_ids = ck_true_bpe_encode(bpe, text, strlen(text), ids, 1024);
-
-// Cleanup
-ck_true_bpe_free(bpe);</code></pre>
-
-<h3>Greedy Matcher API (Faster, ~85% Parity)</h3>
-
-<pre><code>// Create BPE tokenizer
-CKTokenizer *tok = ck_tokenizer_create(CK_TOKENIZER_BPE);
-
-// Create WordPiece tokenizer
-CKTokenizer *tok = ck_tokenizer_create(CK_TOKENIZER_WORDPIECE);
-
-// Create SentencePiece tokenizer
-CKTokenizer *tok = ck_tokenizer_create(CK_TOKENIZER_SPM);</code></pre>
-
-<h3>Adding Tokens</h3>
-
-<pre><code>// Add regular token
-ck_tokenizer_add_token(tok, "hello", 100, 0.0f);
-
-// Add special token
-ck_tokenizer_add_special_token(tok, "&lt;unk&gt;", 0);
-ck_tokenizer_add_special_token(tok, "&lt;s&gt;", 1);
-ck_tokenizer_add_special_token(tok, "&lt;/s&gt;", 2);</code></pre>
-
-<h3>Encoding Text</h3>
-
-<pre><code>// Encode text to token IDs
-int32_t ids[100];
-int num_ids = ck_tokenizer_encode(tok, text, -1, ids, 100);
-
-// num_ids contains the number of tokens written
-// ids[0..num_ids-1] contains the token IDs</code></pre>
-
-<h3>Switching Lookup Methods</h3>
-
-<pre><code>// Enable trie-based lookups (DEFAULT - faster)
-ck_tokenizer_set_use_trie(tok, true);
-
-// Use hash table lookups (slower, for comparison)
-ck_tokenizer_set_use_trie(tok, false);</code></pre>
-
-<h2>Test Results</h2>
-
-<p>Run the unified test suite with: <code>make test-tokenizer</code></p>
-
-<div class="grid grid-3">
     <div class="card card-accent">
-        <h4 style="margin-top: 0;">Foundation Tests</h4>
-        <p><strong>9/9 (100%)</strong></p>
-        <ul>
-            <li>ASCII tokenization</li>
-            <li>UTF-8 multilingual</li>
-            <li>Emoji support</li>
-            <li>Space handling</li>
-        </ul>
-    </div>
-    <div class="card card-green">
-        <h4 style="margin-top: 0;">True BPE Parity</h4>
-        <p><strong>8/8 (100%)</strong></p>
-        <ul>
-            <li>Single words</li>
-            <li>Punctuation</li>
-            <li>Python code</li>
-            <li>C code</li>
-        </ul>
-    </div>
-    <div class="card card-blue">
-        <h4 style="margin-top: 0;">Performance</h4>
-        <p><strong>4/4 (100%)</strong></p>
-        <ul>
-            <li>Trie: 27-156x vs Hash</li>
-            <li>Trie: 20-104x vs Python</li>
-            <li>~100K chars/ms</li>
-        </ul>
+        <h3 style="margin-top:0;">Supported corpus extensions</h3>
+        <p><code>.svg</code> <code>.txt</code> <code>.xml</code> <code>.html</code> <code>.md</code> <code>.json</code></p>
+        <p style="color:var(--text-muted);font-size:0.85rem;">Files discovered recursively, sorted alphabetically for determinism.</p>
     </div>
 </div>
-
-<h3>Running Tests</h3>
-
-<pre><code># Full test suite
-make test-tokenizer
-
-# Quick test (no performance benchmarks)
-make test-tokenizer-quick
-
-# Or directly with Python
-python unittest/test_tokenizer_unified.py --verbose</code></pre>
 
 <h2>Related Documentation</h2>
-
 <ul>
-    <li><a href="sentencepiece.html">SentencePiece Deep Dive</a> - Viterbi DP algorithm, byte fallback, space encoding</li>
-    <li><a href="concepts.html">Core Concepts</a> - Tokenization fundamentals</li>
-    <li><a href="kernels.html">Kernel Catalog</a> - Available operations</li>
-    <li><a href="gguf-conversion.html">GGUF Format</a> - Model file format</li>
-    <li><a href="testing.html">Testing Guide</a> - Running tests</li>
+    <li><a href="sentencepiece.html">SentencePiece Deep Dive</a> — Viterbi DP, byte fallback</li>
+    <li><a href="concepts.html">Core Concepts</a> — Tokenization fundamentals</li>
+    <li><a href="training-intuition.html">Training Intuition</a> — How tokens flow into the model</li>
+    <li><a href="kernels.html">Kernel Catalog</a> — Available operations</li>
 </ul>
     </main>
 
@@ -1505,7 +2302,7 @@ python unittest/test_tokenizer_unified.py --verbose</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-20</p>
             </div>
         </div>
     </footer>

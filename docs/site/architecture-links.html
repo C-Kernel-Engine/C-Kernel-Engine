@@ -899,6 +899,7 @@
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -930,9 +931,85 @@
     </header>
     <main>
 
+<style>
+.runbook-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 0.75rem 0 1.5rem;
+}
+.runbook-card {
+    background: linear-gradient(145deg, rgba(255,180,0,0.09), rgba(7,173,248,0.06));
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+}
+.runbook-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.45rem;
+}
+.runbook-card p {
+    margin-bottom: 0.8rem;
+}
+.runbook-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.85rem;
+}
+.runbook-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: rgba(255,180,0,0.12);
+    border: 1px solid rgba(255,180,0,0.3);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+}
+.runbook-link {
+    display: inline-block;
+    text-decoration: none;
+    background: var(--orange);
+    color: var(--dark);
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+}
+.runbook-link:hover {
+    background: var(--orange-light);
+    color: var(--dark);
+}
+</style>
+
 <h1>Architecture Links</h1>
 
 <p>A comprehensive guide to all architecture documentation in C-Kernel-Engine.</p>
+
+<h2>Runbooks</h2>
+
+<div class="runbook-grid">
+    <div class="runbook-card">
+        <h3>v7 Inference + Training Runbook</h3>
+        <p>Copy/paste workflow for HF GGUF inference plus <code>true_bpe</code> training and train->infer handoff.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">ck_run_v7.py run</span>
+            <span class="runbook-tag">train_data_pipeline_v7.py</span>
+            <span class="runbook-tag">ck_chat.py</span>
+        </div>
+        <a class="runbook-link" href="v7-runbook.html">Open v7 Runbook</a>
+    </div>
+    <div class="runbook-card">
+        <h3>v7 Profiling Runbook</h3>
+        <p>Repeatable performance workflow for v7 training kernels with <code>perf</code>, VTune, flamegraphs, and Advisor.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">perf</span>
+            <span class="runbook-tag">vtune</span>
+            <span class="runbook-tag">advisor</span>
+        </div>
+        <a class="runbook-link" href="v7-profiling.html">Open v7 Profiling</a>
+    </div>
+</div>
 
 <div class="grid grid-2">
     <div class="card card-accent">
@@ -952,6 +1029,8 @@
                 <span class="subtitle">One-command dataset -> tokenizer -> train orchestration</span></li>
             <li><a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>
                 <span class="subtitle">Function-level forward/backward/accum/optimizer stitching view</span></li>
+            <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
+                <span class="subtitle">Copy/paste commands for HF GGUF inference + true_bpe training</span></li>
             <li><a href="model-kernel-matrix.html">Model + Kernel Matrix</a>
                 <span class="subtitle">Qwen2/Qwen3/Gemma + kernel coverage</span></li>
             <li><a href="tokenizer.html">Tokenizer</a>
@@ -1014,6 +1093,8 @@
                 <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
             <li><a href="v7-profiling.html">v7 Profiling Runbook</a>
                 <span class="subtitle">VTune + Advisor + perf/flamegraph on train kernels</span></li>
+            <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
+                <span class="subtitle">Operational workflow from dataset to chat output</span></li>
             <li><a href="testing.html">Testing</a>
                 <span class="subtitle">Numerical parity verification</span></li>
         </ul>
@@ -1057,7 +1138,7 @@
         </tr>
         <tr>
             <td><strong>Understanding the system</strong></td>
-            <td><a href="architecture.html">System Overview</a>, <a href="concepts.html">Concepts</a>, <a href="v7-backprop-ir.html">v7 Backprop IR</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity</a>, <a href="v7-grad-accum-windows.html">v7 Grad-Accum Windows</a></td>
+            <td><a href="architecture.html">System Overview</a>, <a href="concepts.html">Concepts</a>, <a href="v7-backprop-ir.html">v7 Backprop IR</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity</a>, <a href="v7-grad-accum-windows.html">v7 Grad-Accum Windows</a>, <a href="v7-runbook.html">v7 Runbook</a></td>
         </tr>
         <tr>
             <td><strong>Implementing new kernels</strong></td>
@@ -1073,7 +1154,7 @@
         </tr>
         <tr>
             <td><strong>Debugging & profiling</strong></td>
-            <td><a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a></td>
+            <td><a href="profiling.html">Profiling</a>, <a href="v7-profiling.html">v7 Profiling Runbook</a>, <a href="testing.html">Testing</a>, <a href="v7-cross-entropy-parity.html">v7 CE Parity Deep Dive</a>, <a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>, <a href="v7-runbook.html">v7 Runbook</a></td>
         </tr>
     </table>
 </div>
@@ -1305,7 +1386,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-20</p>
             </div>
         </div>
     </footer>

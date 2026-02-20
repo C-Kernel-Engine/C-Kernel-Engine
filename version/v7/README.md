@@ -74,6 +74,9 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 
 - `v7` is intentionally strict and minimal: correctness first, optimization later.
 - `v7-gate` should remain deterministic and reproducible on CPU-only environments.
+- SVG training ablation guidance:
+  `reports/SVG_ABLATION_PLAN_2026-02-20.md` (canonical matrix) and
+  `../../docs/v7-svg-training-ablation.md` (quick decision guide).
 - `v7-validate-contracts` now verifies that training-required kernels are both registered and bound in
   `kernel_maps/KERNEL_REGISTRY.json` and `kernel_maps/kernel_bindings.json`.
 - `v7-train-ir-smoke` defaults to strict unresolved policy (`V7_TRAIN_STRICT_UNRESOLVED=1`) and

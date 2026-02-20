@@ -899,6 +899,7 @@
                         <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -950,6 +951,7 @@
         <li><a href="#make-targets">Make Targets Reference</a></li>
         <li><a href="#prefill-decode">Prefill + Decode (KV Cache)</a></li>
         <li><a href="#first-run">Your First Run</a></li>
+        <li><a href="#ir-visualizer-quick">Quick IR Visualizer</a></li>
         <li><a href="#training-parity">Training Parity Test</a></li>
         <li><a href="#profiling-quick">Quick Profiling</a></li>
     </ul>
@@ -1263,6 +1265,23 @@ CKIRGraph: layers=2, hidden_size=64 ...
   ...</pre>
 </div>
 
+<h2 id="ir-visualizer-quick">Quick IR Visualizer</h2>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Generate + Open in 1 Step</h3>
+    <pre>RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1
+
+if [ ! -d "$RUN" ]; then
+  echo "[ERROR] Run directory not found: $RUN"
+  echo "Use v7-runbook.html to create a run first."
+else
+  .venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only
+  echo "[OK] Visualizer generated: $RUN/ir_report.html"
+  xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true
+fi</pre>
+    <p style="margin-bottom: 0;">For full training+inference flow, see <a href="v7-runbook.html"><code>v7-runbook.html</code></a>.</p>
+</div>
+
 <h2 id="training-parity">Training Parity Test</h2>
 
 <p>The ultimate test: verify that our C kernels produce the same gradients and weight updates as PyTorch.</p>
@@ -1562,7 +1581,7 @@ firefox build/flamegraph.svg</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-20</p>
             </div>
         </div>
     </footer>
