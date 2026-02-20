@@ -31,7 +31,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Configuration
@@ -593,6 +593,251 @@ def _resolve_train_dims_for_run(args: argparse.Namespace, run_dir: Optional[Path
         "manifest": manifest_path,
         "mismatches": mismatches,
     }
+
+
+def _is_ck_runtime_dir(path: Path) -> bool:
+    """Detect local dirs that already contain runnable CK artifacts."""
+    return bool((path / "weights.bump").exists() and (path / "weights_manifest.json").exists())
+
+
+def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[dict]:
+    name = str(template_name or "").strip().lower()
+    if not name:
+        return None
+    path = V7_ROOT / "templates" / f"{name}.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _manifest_entry_offset(entry: dict) -> int:
+    try:
+        return int(entry.get("file_offset", entry.get("offset", 0)) or 0)
+    except Exception:
+        return 0
+
+
+def _manifest_entry_size(entry: dict) -> int:
+    try:
+        return int(entry.get("size", entry.get("size_bytes", 0)) or 0)
+    except Exception:
+        return 0
+
+
+def _normalize_manifest_for_inference(src_manifest: dict) -> dict:
+    """
+    Normalize train/runtime manifests into build_ir_v7-compatible shape.
+
+    - Adds file_offset fallback from offset
+    - Drops tiny parity-only tensors from inference manifest
+    - Ensures template and quant_summary are present
+    """
+    out = dict(src_manifest or {})
+    cfg = out.get("config") if isinstance(out.get("config"), dict) else {}
+    cfg = dict(cfg)
+    # Normalize config aliases expected by build_ir/codegen.
+    context_len = cfg.get("context_length", cfg.get("context_len", cfg.get("max_seq_len")))
+    if context_len is not None:
+        try:
+            context_len_i = int(context_len)
+            cfg["context_length"] = context_len_i
+            cfg.setdefault("context_len", context_len_i)
+            cfg.setdefault("max_seq_len", context_len_i)
+        except Exception:
+            pass
+    if "rms_eps" not in cfg:
+        eps = cfg.get("rms_norm_eps", cfg.get("layer_norm_eps", 1e-5))
+        try:
+            eps_f = float(eps)
+            cfg["rms_eps"] = eps_f
+            cfg.setdefault("rms_norm_eps", eps_f)
+        except Exception:
+            cfg["rms_eps"] = 1e-5
+            cfg.setdefault("rms_norm_eps", 1e-5)
+    if "intermediate_size" not in cfg and cfg.get("hidden_size") is not None:
+        cfg["intermediate_size"] = int(cfg["hidden_size"])
+    out["config"] = cfg
+    entries_in = out.get("entries") if isinstance(out.get("entries"), list) else []
+
+    tiny_state_names = set()
+    training_cfg = cfg.get("training") if isinstance(cfg.get("training"), dict) else {}
+    tiny_cfg = training_cfg.get("tiny_parity") if isinstance(training_cfg.get("tiny_parity"), dict) else {}
+    state_tensors = tiny_cfg.get("state_tensors") if isinstance(tiny_cfg.get("state_tensors"), dict) else {}
+    for v in state_tensors.values():
+        if isinstance(v, str) and v:
+            tiny_state_names.add(v)
+
+    entries_out: list[dict] = []
+    for row in entries_in:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name", "") or "")
+        if not name:
+            continue
+        # tiny.* tensors are parity harness state, not inference model weights.
+        if name.startswith("tiny.") or name in tiny_state_names:
+            continue
+
+        e = dict(row)
+        e["file_offset"] = _manifest_entry_offset(e)
+        if "offset" not in e:
+            e["offset"] = int(e["file_offset"])
+        e["size"] = _manifest_entry_size(e)
+        entries_out.append(e)
+    out["entries"] = entries_out
+
+    template = out.get("template") if isinstance(out.get("template"), dict) else None
+    if not template or "sequence" not in template:
+        template_name = (
+            str(cfg.get("model", "")).strip().lower()
+            if isinstance(cfg, dict)
+            else ""
+        )
+        built_in = _load_builtin_template_doc(template_name)
+        if built_in:
+            out["template"] = built_in
+
+    quant_summary = out.get("quant_summary")
+    if not isinstance(quant_summary, dict) or not quant_summary:
+        entry_dtype: dict[str, str] = {}
+        for e in entries_out:
+            name = str(e.get("name", "") or "")
+            if not name:
+                continue
+            entry_dtype[name] = str(e.get("dtype", "fp32") or "fp32").lower()
+
+        inferred: dict[str, object] = {}
+        tok_dtype = entry_dtype.get("token_emb")
+        if tok_dtype:
+            inferred["token_emb"] = tok_dtype
+        lm_dtype = (
+            entry_dtype.get("lm_head.weight")
+            or entry_dtype.get("output.weight")
+            or entry_dtype.get("lm_head")
+            or tok_dtype
+        )
+        if lm_dtype:
+            inferred["lm_head"] = lm_dtype
+
+        num_layers = int(cfg.get("num_layers", 0) or 0) if isinstance(cfg, dict) else 0
+        layer_keys = ("wq", "wk", "wv", "wo", "w1", "w2", "w3")
+        for layer_idx in range(max(0, num_layers)):
+            layer_q: dict[str, str] = {}
+            for key in layer_keys:
+                dt = entry_dtype.get(f"layer.{layer_idx}.{key}")
+                if dt:
+                    layer_q[key] = dt
+            if layer_q:
+                inferred[f"layer.{layer_idx}"] = layer_q
+
+        out["quant_summary"] = inferred
+
+    return out
+
+
+def _link_or_copy_file(src: Path, dst: Path) -> None:
+    if dst.exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(src, dst)
+    except Exception:
+        shutil.copy2(src, dst)
+
+
+def _prepare_runtime_dir_from_local_ck_artifacts(model_dir: Path, work_dir: Path) -> tuple[Path, Path, Path]:
+    """Materialize build inputs in work_dir from a pre-existing local CK runtime dir."""
+    src_manifest = model_dir / "weights_manifest.json"
+    src_bump = model_dir / "weights.bump"
+    src_config = model_dir / "config.json"
+    if not src_manifest.exists() or not src_bump.exists():
+        raise RuntimeError(f"Missing local runtime artifacts in {model_dir}")
+
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    dst_bump = work_dir / "weights.bump"
+    bump_shift = 0
+    with src_bump.open("rb") as f:
+        magic = f.read(8)
+    if magic in (b"BUMPWGT4", b"BUMPWGT5"):
+        _link_or_copy_file(src_bump, dst_bump)
+    else:
+        # Tiny train run artifacts are raw contiguous fp32 blobs.
+        # Wrap them with a BUMPWGT4 header so inference loader accepts them.
+        if dst_bump.exists():
+            dst_bump.unlink()
+        with src_bump.open("rb") as fin, dst_bump.open("wb") as fout:
+            fout.write(b"BUMPWGT4")
+            if HEADER_SIZE > 8:
+                fout.write(b"\x00" * (HEADER_SIZE - 8))
+            shutil.copyfileobj(fin, fout)
+        bump_shift = HEADER_SIZE
+
+    manifest_doc = json.loads(src_manifest.read_text(encoding="utf-8"))
+    normalized = _normalize_manifest_for_inference(manifest_doc)
+    if bump_shift:
+        for row in normalized.get("entries", []):
+            if not isinstance(row, dict):
+                continue
+            try:
+                base_off = int(row.get("file_offset", row.get("offset", 0)) or 0)
+            except Exception:
+                base_off = 0
+            shifted = base_off + int(bump_shift)
+            row["file_offset"] = shifted
+            row["offset"] = shifted
+    dst_manifest = work_dir / "weights_manifest.json"
+    dst_manifest.write_text(json.dumps(normalized, indent=2), encoding="utf-8")
+
+    dst_config = work_dir / "config.json"
+    if src_config.exists():
+        shutil.copy2(src_config, dst_config)
+    else:
+        cfg = normalized.get("config") if isinstance(normalized.get("config"), dict) else {}
+        dst_config.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+
+    src_tok = model_dir / "tokenizer.json"
+    if not src_tok.exists():
+        pipe_dir = model_dir / ".ck_pipeline"
+        if pipe_dir.exists():
+            candidates = []
+            for p in pipe_dir.glob("*/tokenizer.json"):
+                if p.is_file():
+                    candidates.append(p)
+            if candidates:
+                candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                src_tok = candidates[0]
+    if src_tok.exists():
+        dst_tok = work_dir / "tokenizer.json"
+        if not dst_tok.exists():
+            shutil.copy2(src_tok, dst_tok)
+
+    # Copy CK true_bpe binary artifacts when available so Python chat fallback
+    # can use the exact same tokenizer path as training.
+    bpe_candidates: list[Path] = []
+    for p in (model_dir / "tokenizer_bin", model_dir / "bpe_bin"):
+        if p.is_dir():
+            bpe_candidates.append(p)
+    pipe_dir = model_dir / ".ck_pipeline"
+    if pipe_dir.exists():
+        for patt in ("*/tokenizer_bin", "*/bpe_bin"):
+            for p in pipe_dir.glob(patt):
+                if p.is_dir():
+                    bpe_candidates.append(p)
+    if bpe_candidates:
+        bpe_candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        src_bin = bpe_candidates[0]
+        dst_bin = work_dir / "tokenizer_bin"
+        dst_bin.mkdir(parents=True, exist_ok=True)
+        for name in ("tokenizer_meta.json", "vocab_offsets.bin", "vocab_strings.bin", "vocab_merges.bin"):
+            src_file = src_bin / name
+            if src_file.exists():
+                shutil.copy2(src_file, dst_bin / name)
+
+    return dst_bump, dst_config, dst_manifest
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1910,7 +2155,23 @@ def _resolve_train_token_stream(args: argparse.Namespace) -> tuple[Optional[list
     except Exception as e:
         log_error(f"Failed to read training token file from {path}: {e}")
         sys.exit(2)
-    vals = [int(m.group(0)) for m in re.finditer(r"[+-]?\d+", text)]
+    # Parse one integer per line, ignoring blank lines and '#' comments.
+    vals: list[int] = []
+    for line_no, raw_line in enumerate(text.splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            vals.append(int(line))
+        except ValueError:
+            log_error(
+                f"Training token file {path}:{line_no}: expected one integer per line, got: {raw_line!r}"
+            )
+            sys.exit(2)
+    if any(v < 0 for v in vals):
+        bad = next(v for v in vals if v < 0)
+        log_error(f"Training token file contains negative token id ({bad}): {path}")
+        sys.exit(2)
     if len(vals) <= 1:
         log_error(f"Training token file must contain at least 2 integers: {path}")
         sys.exit(2)
@@ -3387,7 +3648,13 @@ def _run_ck_train_runtime(
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
 
     seq_len = int(getattr(args, "train_seq_len", 16) or 16)
-    grad_accum = max(1, int(getattr(args, "train_grad_accum", 8) or 8))
+    if seq_len < 1:
+        log_error(f"--train-seq-len must be >= 1, got {seq_len}")
+        sys.exit(2)
+    grad_accum = int(getattr(args, "train_grad_accum", 8) or 8)
+    if grad_accum < 1:
+        log_error(f"--train-grad-accum must be >= 1, got {grad_accum}")
+        sys.exit(2)
 
     runtime_defines: dict = {
         "CK_NUM_TOKENS": max(1, int(seq_len)),
@@ -3410,6 +3677,10 @@ def _run_ck_train_runtime(
         log("  backend=ck CE note: --ck-loss-backend=torch maps to ptref C CE in generated runtime", C_ORANGE)
     max_grad_norm = float(getattr(args, "train_max_grad_norm", 0.0) or 0.0)
     runtime_defines["CK_MAX_GRAD_NORM"] = f"{max_grad_norm:.9g}"
+    # Strict memory diagnostics can snapshot all weights via malloc().
+    # Production runs may disable this while keeping the diagnostic entrypoint.
+    if bool(getattr(args, "train_disable_diag_snapshot", False) or getattr(args, "enforce_production_safety", False)):
+        runtime_defines["CK_TRAIN_DIAG_WEIGHT_SNAPSHOT"] = 0
     try:
         adamw_cfg = _resolve_train_adamw_hparams(args, run_dir)
     except ValueError as e:
@@ -3488,6 +3759,62 @@ def _run_ck_train_runtime(
             f"qk_norm_backward={int(bool(getattr(args, 'ablate_qk_norm_backward', False)))}",
             C_ORANGE,
         )
+
+    try:  # ensure bitwise_runtime_env_prev is restored on any exception
+        _json_out = _run_ck_train_runtime_body(
+            args=args,
+            run_dir=run_dir,
+            json_out=json_out,
+            train_text=train_text,
+            train_mode=train_mode,
+            train_backend=train_backend,
+            profile_meta=profile_meta,
+            seq_len=seq_len,
+            grad_accum=grad_accum,
+            runtime_defines=runtime_defines,
+            bitwise_parity_enabled=bitwise_parity_enabled,
+            bitwise_compile_flags=bitwise_compile_flags,
+            bitwise_runtime_env=bitwise_runtime_env,
+            runtime_ce_backend=runtime_ce_backend,
+            ck_loss_backend=ck_loss_backend,
+            python_exec=python_exec,
+            parity_python=parity_python,
+            adamw_cfg=adamw_cfg,
+            adamw_effective=adamw_effective,
+        )
+    finally:
+        if bitwise_runtime_env_prev:
+            for env_k, prev_v in bitwise_runtime_env_prev.items():
+                if prev_v is None:
+                    os.environ.pop(env_k, None)
+                else:
+                    os.environ[env_k] = str(prev_v)
+    return _json_out
+
+
+def _run_ck_train_runtime_body(
+    args: argparse.Namespace,
+    run_dir: Path,
+    json_out: Path,
+    train_text: Optional[str],
+    train_mode: str,
+    train_backend: str,
+    profile_meta: dict,
+    seq_len: int,
+    grad_accum: int,
+    runtime_defines: dict,
+    bitwise_parity_enabled: bool,
+    bitwise_compile_flags: list[str],
+    bitwise_runtime_env: dict[str, str],
+    runtime_ce_backend: str,
+    ck_loss_backend: str,
+    python_exec: str,
+    parity_python: Path,
+    adamw_cfg: dict[str, Any],
+    adamw_effective: dict[str, Any],
+) -> Path:
+    """Inner body of _run_ck_train_runtime (extracted for try/finally env guard)."""
+    parity_on = bitwise_parity_enabled  # alias for existing references
 
     c_src, libtrain_so = _ensure_train_runtime_artifacts(
         run_dir=run_dir,
@@ -5167,13 +5494,6 @@ def _run_ck_train_runtime(
     if checkpoint_artifacts:
         profile_meta.setdefault("artifacts", []).append({"label": "train_checkpoints", "path": str(run_dir / "checkpoints")})
 
-    if bitwise_runtime_env_prev:
-        for env_k, prev_v in bitwise_runtime_env_prev.items():
-            if prev_v is None:
-                os.environ.pop(env_k, None)
-            else:
-                os.environ[env_k] = str(prev_v)
-
     return json_out
 
 
@@ -5283,6 +5603,122 @@ def _run_train_strict_preflight(python_exec: str) -> None:
     ]
     log("  train-strict preflight: validate_v7_contracts.py", C_DIM)
     run_cmd(cmd, cwd=PROJECT_ROOT)
+
+
+def _run_ck_profile_via_cli(
+    *,
+    args: argparse.Namespace,
+    run_dir: Path,
+    json_out: Path,
+    profile_mode: str,
+    profile_dir: Path,
+    profile_meta: dict,
+) -> Path:
+    """Run native CK training profiler flow through ck-cli-v7 profile."""
+    tool = str(profile_mode or "none").strip().lower()
+    if tool not in {"perf", "vtune", "advisor", "cachegrind", "asan"}:
+        raise ValueError(f"unsupported profile tool '{tool}'")
+
+    token_file_arg = getattr(args, "train_token_file", None)
+    if not token_file_arg:
+        raise ValueError("--profile-train with backend=ck requires --train-token-file")
+    token_file = Path(str(token_file_arg)).expanduser().resolve()
+    if not token_file.exists():
+        raise FileNotFoundError(f"Training token file not found: {token_file}")
+
+    profile_dir.mkdir(parents=True, exist_ok=True)
+
+    # Profilers like VTune refuse to reuse non-empty result dirs.
+    stale_result_dirs = {
+        "vtune": ("vtune_hotspots", "vtune_memory"),
+        "advisor": ("advisor_run",),
+    }.get(tool, ())
+    for rel in stale_result_dirs:
+        stale = profile_dir / rel
+        if stale.exists():
+            shutil.rmtree(stale, ignore_errors=True)
+
+    # Keep ck-cli-v7 current so profiling always reflects latest runtime plumbing.
+    run_cmd(["make", "--no-print-directory", "ck-cli-v7"], cwd=PROJECT_ROOT)
+    ck_cli = BUILD_DIR / "ck-cli-v7"
+    if not ck_cli.exists():
+        raise RuntimeError(f"Native profiler runner missing after build: {ck_cli}")
+
+    cli_cmd = [
+        str(ck_cli),
+        "profile",
+        "--run",
+        str(run_dir),
+        "--tool",
+        tool,
+        "--output-dir",
+        str(profile_dir),
+        "--train-token-file",
+        str(token_file),
+        "--train-epochs",
+        str(int(getattr(args, "train_epochs", 3) or 3)),
+        "--train-seq-len",
+        str(int(getattr(args, "train_seq_len", 16) or 16)),
+        "--train-total-tokens",
+        str(int(getattr(args, "train_total_tokens", 1024) or 1024)),
+        "--train-grad-accum",
+        str(max(1, int(getattr(args, "train_grad_accum", 8) or 8))),
+        "--train-lr",
+        str(float(getattr(args, "train_lr", 1e-3) or 1e-3)),
+    ]
+    if bool(getattr(args, "train_strict", False)):
+        cli_cmd.append("--train-strict")
+
+    ck_threads = os.environ.get("CK_NUM_THREADS", "").strip()
+    if ck_threads:
+        try:
+            threads_n = int(ck_threads)
+            if threads_n > 0:
+                cli_cmd.extend(["--threads", str(threads_n)])
+        except ValueError:
+            log(f"  Warning: ignoring invalid CK_NUM_THREADS='{ck_threads}' for ck-cli-v7 profile", C_ORANGE)
+
+    log(f"  backend=ck profiler: ck-cli-v7 profile --tool {tool}", C_DIM)
+    run_cmd(cli_cmd, cwd=PROJECT_ROOT)
+
+    summary_src = run_dir / "train_e2e_latest.json"
+    if not summary_src.exists():
+        raise RuntimeError(f"ck-cli-v7 profile completed but summary missing: {summary_src}")
+
+    json_out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        same = summary_src.resolve() == json_out.resolve()
+    except Exception:
+        same = str(summary_src) == str(json_out)
+    if not same:
+        shutil.copy2(summary_src, json_out)
+
+    profile_meta["driver"] = "ck-cli-v7 profile"
+    profile_meta.setdefault("artifacts", []).append({"label": "ck_cli_profile_output_dir", "path": str(profile_dir)})
+
+    # Persist profiler summaries + primary human-readable artifacts for dashboards.
+    summary_candidates = {
+        "perf": ["perf_stat_summary.json", "flamegraph_manifest.json"],
+        "vtune": ["vtune_summary.json"],
+        "advisor": ["advisor_summary.json"],
+        "cachegrind": ["cachegrind_summary.json"],
+        "asan": ["asan_summary.json", "memory_verification_latest.json", "memory_diagnostic_latest.json"],
+    }.get(tool, [])
+    for name in summary_candidates:
+        p = run_dir / name
+        if p.exists():
+            profile_meta.setdefault("artifacts", []).append({"label": name, "path": str(p)})
+
+    for name in ("advisor_roofline.html", "advisor_roofline.txt", "advisor_roofline.csv"):
+        p = profile_dir / name
+        if p.exists():
+            profile_meta.setdefault("artifacts", []).append({"label": name, "path": str(p)})
+    for name in ("vtune_hotspots.txt", "vtune_hotspots.csv", "vtune_memory_summary.txt", "vtune_memory_summary.csv"):
+        p = profile_dir / name
+        if p.exists():
+            profile_meta.setdefault("artifacts", []).append({"label": name, "path": str(p)})
+
+    return json_out
 
 
 def step_run_train_e2e(args: argparse.Namespace) -> Path:
@@ -5487,17 +5923,31 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
         if run_dir is None:
             log_error("--backend ck requires --run <run_dir> so runtime artifacts can be generated")
             sys.exit(2)
-        if profile_mode in ("perf", "vtune"):
-            log(f"  Warning: --profile-train={profile_mode} for backend=ck is not wired yet; running direct CK runtime", C_ORANGE)
-        _run_ck_train_runtime(
-            args=args,
-            run_dir=run_dir,
-            json_out=Path(json_out),
-            train_text=train_text,
-            train_mode=train_mode,
-            train_backend=train_backend,
-            profile_meta=profile_meta,
-        )
+        if profile_mode in ("perf", "vtune", "advisor", "cachegrind", "asan"):
+            try:
+                _run_ck_profile_via_cli(
+                    args=args,
+                    run_dir=run_dir,
+                    json_out=Path(json_out),
+                    profile_mode=profile_mode,
+                    profile_dir=profile_dir,
+                    profile_meta=profile_meta,
+                )
+            except Exception as e:
+                log_error(f"CK profiler dispatch failed (--profile-train={profile_mode}): {e}")
+                sys.exit(2)
+        else:
+            if profile_mode not in ("none", ""):
+                log(f"  Warning: unknown --profile-train mode '{profile_mode}', using none", C_ORANGE)
+            _run_ck_train_runtime(
+                args=args,
+                run_dir=run_dir,
+                json_out=Path(json_out),
+                train_text=train_text,
+                train_mode=train_mode,
+                train_backend=train_backend,
+                profile_meta=profile_meta,
+            )
     else:
         if profile_mode == "perf":
             perf_bin = shutil.which("perf")
@@ -5551,6 +6001,9 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
             else:
                 log("  Warning: vtune not found; running without external profiler", C_ORANGE)
                 run_cmd(cmd, cwd=PROJECT_ROOT)
+        elif profile_mode == "advisor":
+            log("  Warning: --profile-train=advisor is only wired for backend=ck; running without external profiler", C_ORANGE)
+            run_cmd(cmd, cwd=PROJECT_ROOT)
         else:
             if profile_mode not in ("none", ""):
                 log(f"  Warning: unknown --profile-train mode '{profile_mode}', using none", C_ORANGE)
@@ -6471,6 +6924,28 @@ def _generate_profile_summary(work_dir: Path):
             log(f"    {op:20s} {us/1000:8.2f} ms ({pct:5.1f}%)")
 
 
+def _generate_visualizer_html(work_dir: Path) -> Path:
+    """Generate ir_report.html for a run directory without running probes/profile."""
+    vis_script = V7_ROOT / "tools" / "open_ir_visualizer.py"
+    if not vis_script.exists():
+        raise RuntimeError(f"Visualizer script not found: {vis_script}")
+    cmd = [
+        sys.executable,
+        str(vis_script),
+        "--generate",
+        "--run",
+        str(work_dir),
+        "--html-only",
+    ]
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+    report_path = work_dir / "ir_report.html"
+    if report_path.exists():
+        log(f"  Visualizer: {report_path}", C_GREEN)
+    else:
+        log(f"  Warning: visualizer generation completed but report missing at {report_path}", C_ORANGE)
+    return report_path
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6580,20 +7055,33 @@ def run_pipeline(args: argparse.Namespace):
         work_dir = model_dir / ".ck_build"
         config_path = model_dir / "config.json"
 
-        # Convert weights
-        if v7_mode:
-            manifest_input_path = step_inspect_weights_v7(
-                input_type, model_dir, None, work_dir, force=args.force_inspect
-            )
+        # Local CK runtime/train run dir: reuse existing bump+manifest directly.
+        if _is_ck_runtime_dir(model_dir):
+            try:
+                weights_path, config_path, manifest_path = _prepare_runtime_dir_from_local_ck_artifacts(
+                    model_dir, work_dir
+                )
+            except Exception as e:
+                log_error(f"failed to prepare local CK runtime dir: {e}")
+                sys.exit(1)
             if args.inspect_only:
+                log(f"  Local CK runtime manifest: {manifest_path}", C_GREEN)
                 return
-        weights_path = step_convert_hf(
-            model_dir, work_dir,
-            weight_dtype=args.weight_dtype or "float32",
-            force=args.force_convert,
-            tokenizer_json=(model_dir / "tokenizer.json") if (model_dir / "tokenizer.json").exists() else None
-        )
-        manifest_path = work_dir / "weights_manifest.json"
+        else:
+            # Convert local HF checkpoint weights
+            if v7_mode:
+                manifest_input_path = step_inspect_weights_v7(
+                    input_type, model_dir, None, work_dir, force=args.force_inspect
+                )
+                if args.inspect_only:
+                    return
+            weights_path = step_convert_hf(
+                model_dir, work_dir,
+                weight_dtype=args.weight_dtype or "float32",
+                force=args.force_convert,
+                tokenizer_json=(model_dir / "tokenizer.json") if (model_dir / "tokenizer.json").exists() else None
+            )
+            manifest_path = work_dir / "weights_manifest.json"
 
     elif input_type == 'local_config':
         config_path = info['path']
@@ -6809,6 +7297,12 @@ def run_pipeline(args: argparse.Namespace):
         else:
             log("  Skipping parity tests (build/libckernel_engine.so missing)", C_DIM)
 
+    # Optional: generate IR visualizer HTML in the same run directory.
+    # Must run before chat because non-profile chat path exec()s and does not return.
+    if getattr(args, "generate_visualizer", False):
+        log(f"\n{C_ORANGE}[viz]{C_RESET} Generating IR visualizer HTML", C_DIM)
+        _generate_visualizer_html(work_dir)
+
     # Determine effective context length for parity tools (prefer explicit CLI override).
     effective_ctx = getattr(args, "context_len", None)
 
@@ -6855,7 +7349,6 @@ def run_pipeline(args: argparse.Namespace):
     # Generate profile summary if profiling was enabled
     if getattr(args, 'profile', False):
         _generate_profile_summary(work_dir)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Interactive Model Selector
@@ -7058,6 +7551,8 @@ Examples:
                         help='Deprecated alias for --backend (kept for compatibility)')
         sp.add_argument('--train-strict', action='store_true',
                         help='Enable strict training preflight checks before running training commands')
+        sp.add_argument('--train-disable-diag-snapshot', action='store_true',
+                        help='Disable strict memory-diagnostic weight snapshot malloc path in generated runtime')
         sp.add_argument('--parity-on', action='store_true',
                         help='Enable scheduled oracle parity checks (metadata/config for training pipeline)')
         sp.add_argument('--kernel-strict-math', action='store_true',
@@ -7154,7 +7649,7 @@ Examples:
                         help='Optional JSON output path (default: run_dir/train_e2e_latest.json or v7/.cache/reports)')
 
         if include_profile:
-            sp.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
+            sp.add_argument('--profile-train', choices=['none', 'perf', 'vtune', 'advisor'], default='none',
                             help='Optional external profiler for training command')
             sp.add_argument('--train-profile-dir', default=None,
                             help='Output directory for train profiler artifacts')
@@ -7194,6 +7689,8 @@ Examples:
                            help='Deprecated alias for --backend')
     run_parser.add_argument('--train-strict', action='store_true',
                            help='Enable strict training preflight checks before --train-e2e')
+    run_parser.add_argument('--train-disable-diag-snapshot', action='store_true',
+                           help='Disable strict memory-diagnostic weight snapshot malloc path in generated runtime')
     run_parser.add_argument('--parity-on', action='store_true',
                            help='Enable scheduled oracle parity checks metadata for --train-e2e')
     run_parser.add_argument('--kernel-strict-math', action='store_true',
@@ -7263,8 +7760,8 @@ Examples:
     run_parser.add_argument('--train-param-tol', type=float, default=3e-5)
     run_parser.add_argument('--train-json-out', default=None,
                            help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or version/v7/.cache/reports/train_e2e_latest.json)')
-    run_parser.add_argument('--profile-train', choices=['none', 'perf', 'vtune'], default='none',
-                           help='Optional external profiler for --train-e2e (none, perf, vtune)')
+    run_parser.add_argument('--profile-train', choices=['none', 'perf', 'vtune', 'advisor'], default='none',
+                           help='Optional external profiler for --train-e2e (none, perf, vtune, advisor)')
     run_parser.add_argument('--train-profile-dir', default=None,
                            help='Output directory for train profiler artifacts (default: run_dir/profile_train_latest)')
     run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma'], default='auto',
@@ -7281,6 +7778,8 @@ Examples:
                            help='Re-generate and recompile')
     run_parser.add_argument('--generate-only', action='store_true',
                            help='Generate C code only, do not run')
+    run_parser.add_argument('--generate-visualizer', action='store_true',
+                           help='Generate ir_report.html in the same run directory after pipeline completion')
     run_parser.add_argument('--test', action='store_true',
                            help='Run smoke tests after build')
     run_parser.add_argument('--test-only', action='store_true',
