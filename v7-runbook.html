@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>v7Inference+TrainingRunbook | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<style>
+.runbook-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+}
+.runbook-hero-card {
+    background: linear-gradient(145deg, rgba(255,180,0,0.12), rgba(7,173,248,0.08));
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+}
+.runbook-hero-card h2 {
+    margin-top: 0;
+}
+.runbook-hero-card h2::before {
+    display: none;
+}
+.runbook-hero-card p {
+    margin: 0;
+}
+.runbook-hero-svg {
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.6rem;
+}
+
+.cmd-block {
+    position: relative;
+}
+.cmd-block pre {
+    margin-top: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+.copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-45%);
+    border: 1px solid var(--grey-light);
+    background: var(--dark-lighter);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    color: var(--white);
+    border-color: var(--orange);
+}
+
+.path-table code {
+    font-size: 0.8rem;
+}
+
+.mini-note {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+.variant-box {
+    border: 1px solid var(--grey);
+    border-radius: 8px;
+    padding: 0.7rem 0.8rem 0.2rem;
+    margin: 0.6rem 0;
+    background: rgba(21, 27, 38, 0.85);
+}
+.variant-box h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.98rem;
+    color: var(--orange);
+}
+.variant-box p {
+    margin: 0;
+}
+
+@media (max-width: 920px) {
+    .runbook-hero {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<h1>v7 Inference + Training Runbook</h1>
+
+<p>Single place to run v7 inference from GGUF and v7 training with <code>true_bpe</code> as the tokenizer source of truth across train + infer.</p>
+
+<div class="runbook-hero">
+    <div class="runbook-hero-card">
+        <h2 style="margin-bottom: 0.5rem;">One Pipeline, Two Paths</h2>
+        <p><strong>Inference path:</strong> GGUF -> run dir -> IR/codegen -> <code>.ck_build</code> -> <code>ck_chat.py</code>.</p>
+        <p><strong>Training path:</strong> text data -> true_bpe train -> token stream -> <code>ck_run_v7.py train</code> -> reuse same tokenizer artifacts for inference.</p>
+    </div>
+    <div class="runbook-hero-svg">
+        <svg viewBox="0 0 760 280" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v7 runbook flow" font-family="Inter,system-ui,sans-serif">
+            <defs>
+                <linearGradient id="g1" x1="0" x2="1">
+                    <stop offset="0%" stop-color="#ffb400" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#07adf8" stop-opacity="0.18"/>
+                </linearGradient>
+                <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#ffb400"/>
+                </marker>
+                <marker id="arrG" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#47b475"/>
+                </marker>
+                <marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#07adf8"/>
+                </marker>
+                <filter id="glow1"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <rect width="760" height="280" rx="12" fill="#181e28"/>
+
+            <!-- Title bar -->
+            <rect x="0" y="0" width="760" height="36" rx="12" fill="#1a2030"/>
+            <rect x="0" y="18" width="760" height="18" fill="#1a2030"/><!-- cover bottom radius -->
+            <circle cx="20" cy="18" r="5" fill="#e74c3c" opacity="0.7"/>
+            <circle cx="38" cy="18" r="5" fill="#ffb400" opacity="0.7"/>
+            <circle cx="56" cy="18" r="5" fill="#47b475" opacity="0.7"/>
+            <text x="380" y="22" fill="#667" text-anchor="middle" font-size="10" font-weight="600">v7 Pipeline — Two Paths, One Runtime</text>
+
+            <!-- Center hub -->
+            <rect x="280" y="52" width="200" height="50" rx="10" fill="#1e2736" stroke="#ffb400" stroke-width="1.5" filter="url(#glow1)"/>
+            <text x="380" y="74" fill="#ffb400" text-anchor="middle" font-size="13" font-weight="700">v7 Script Orchestrator</text>
+            <text x="380" y="90" fill="#b0b0b0" text-anchor="middle" font-size="9" font-family="'JetBrains Mono',monospace">ck_run_v7.py  •  train_data_pipeline_v7.py</text>
+
+            <!-- Left input: Data -->
+            <rect x="24" y="56" width="180" height="42" rx="8" fill="#1e2738" stroke="#07adf866"/>
+            <text x="114" y="74" fill="#07adf8" text-anchor="middle" font-size="11" font-weight="600">Data Input</text>
+            <text x="114" y="88" fill="#667" text-anchor="middle" font-size="9" font-family="'JetBrains Mono',monospace">text / JSONL / hf:// GGUF</text>
+            <line x1="206" y1="77" x2="278" y2="77" stroke="#ffb400" stroke-width="1.8" marker-end="url(#arr)"/>
+
+            <!-- Right output: Artifacts -->
+            <rect x="556" y="56" width="180" height="42" rx="8" fill="#1e2738" stroke="#47b47566"/>
+            <text x="646" y="74" fill="#47b475" text-anchor="middle" font-size="11" font-weight="600">Run Artifacts</text>
+            <text x="646" y="88" fill="#667" text-anchor="middle" font-size="9" font-family="'JetBrains Mono',monospace">tokenizer_bin + .ck_build</text>
+            <line x1="482" y1="77" x2="554" y2="77" stroke="#47b475" stroke-width="1.8" marker-end="url(#arrG)"/>
+
+            <!-- Training path (bottom left) -->
+            <rect x="24" y="124" width="350" height="136" rx="10" fill="#1a2818" stroke="#47b47544"/>
+            <rect x="24" y="124" width="350" height="30" rx="10" fill="#243828"/>
+            <rect x="24" y="144" width="350" height="10" fill="#243828"/><!-- cover bottom radius -->
+            <text x="199" y="144" fill="#47b475" text-anchor="middle" font-size="12" font-weight="700">Training Path (true_bpe)</text>
+
+            <g font-size="9.5" font-family="'JetBrains Mono',monospace">
+              <rect x="38" y="164" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="86" y="181" fill="#7de59f" text-anchor="middle">Data Prep</text>
+              <line x1="136" y1="177" x2="150" y2="177" stroke="#47b47566" stroke-width="1.2" marker-end="url(#arrG)"/>
+              <rect x="152" y="164" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="200" y="181" fill="#7de59f" text-anchor="middle">BPE Train</text>
+              <line x1="250" y1="177" x2="264" y2="177" stroke="#47b47566" stroke-width="1.2" marker-end="url(#arrG)"/>
+              <rect x="266" y="164" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="314" y="181" fill="#7de59f" text-anchor="middle">Tokenize</text>
+
+              <rect x="38" y="200" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="86" y="217" fill="#7de59f" text-anchor="middle">CK Train</text>
+              <line x1="136" y1="213" x2="150" y2="213" stroke="#47b47566" stroke-width="1.2" marker-end="url(#arrG)"/>
+              <rect x="152" y="200" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="200" y="217" fill="#7de59f" text-anchor="middle">Checkpoint</text>
+              <line x1="250" y1="213" x2="264" y2="213" stroke="#47b47566" stroke-width="1.2" marker-end="url(#arrG)"/>
+              <rect x="266" y="200" width="96" height="26" rx="5" fill="#1e2738" stroke="#47b47544"/>
+              <text x="314" y="217" fill="#7de59f" text-anchor="middle">Promote</text>
+            </g>
+            <line x1="314" y1="190" x2="86" y2="200" stroke="#47b47533" stroke-width="1" stroke-dasharray="3,2"/>
+            <text x="199" y="248" fill="#47b47588" text-anchor="middle" font-size="8">Steps 0 → 5</text>
+
+            <!-- Inference path (bottom right) -->
+            <rect x="392" y="124" width="344" height="136" rx="10" fill="#0e1a28" stroke="#07adf844"/>
+            <rect x="392" y="124" width="344" height="30" rx="10" fill="#142838"/>
+            <rect x="392" y="144" width="344" height="10" fill="#142838"/>
+            <text x="564" y="144" fill="#07adf8" text-anchor="middle" font-size="12" font-weight="700">Inference Path (GGUF / trained)</text>
+
+            <g font-size="9.5" font-family="'JetBrains Mono',monospace">
+              <rect x="406" y="164" width="96" height="26" rx="5" fill="#1e2738" stroke="#07adf844"/>
+              <text x="454" y="181" fill="#8cb4ff" text-anchor="middle">GGUF / Run</text>
+              <line x1="504" y1="177" x2="518" y2="177" stroke="#07adf866" stroke-width="1.2" marker-end="url(#arrB)"/>
+              <rect x="520" y="164" width="96" height="26" rx="5" fill="#1e2738" stroke="#07adf844"/>
+              <text x="568" y="181" fill="#8cb4ff" text-anchor="middle">IR Codegen</text>
+              <line x1="618" y1="177" x2="632" y2="177" stroke="#07adf866" stroke-width="1.2" marker-end="url(#arrB)"/>
+              <rect x="634" y="164" width="90" height="26" rx="5" fill="#1e2738" stroke="#07adf844"/>
+              <text x="679" y="181" fill="#8cb4ff" text-anchor="middle">.ck_build</text>
+
+              <rect x="460" y="208" width="130" height="30" rx="6" fill="#0e1e28" stroke="#07adf866"/>
+              <text x="525" y="225" fill="#07adf8" text-anchor="middle" font-size="10">ck_chat.py</text>
+              <text x="525" y="237" fill="#667" text-anchor="middle" font-size="8">interactive / batch</text>
+            </g>
+            <line x1="679" y1="190" x2="592" y2="208" stroke="#07adf844" stroke-width="1" stroke-dasharray="3,2"/>
+            <text x="564" y="248" fill="#07adf888" text-anchor="middle" font-size="8">Steps 6 → 8</text>
+
+            <!-- Cross-path arrow: training → inference -->
+            <path d="M362,230 Q380,260 420,220" fill="none" stroke="#ffb40066" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+            <text x="392" y="256" fill="#ffb40088" text-anchor="middle" font-size="7.5">promote weights</text>
+        </svg>
+    </div>
+</div>
+
+<nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+        <li><a href="#step-0-prereqs">Step 0: Prereqs + Paths</a></li>
+        <li><a href="#step-0-data-prep">Step 0.5: Data Preparation (Training)</a></li>
+        <li><a href="#step-0-data-view">Step 0.6: Preview Dataset</a></li>
+        <li><a href="#step-0-tokenize">Step 0.7: Tokenize Dataset (true_bpe preview)</a></li>
+        <li><a href="#step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</a></li>
+        <li><a href="#step-2-training-setup">Step 2: Training Setup (true_bpe)</a></li>
+        <li><a href="#step-3-train">Step 3: Run Training Pipeline</a></li>
+        <li><a href="#step-4-artifacts">Step 4: Artifact Locations + Data Format</a></li>
+        <li><a href="#step-5-promote">Step 5: Promote Latest Checkpoint to Inference Weights</a></li>
+        <li><a href="#step-6-infer-trained">Step 6: Build Inference from Trained Run</a></li>
+        <li><a href="#step-7-visualizer">Step 7: Open IR Visualizer</a></li>
+        <li><a href="#step-8-inference">Step 8: Inference from GGUF (HF URLs)</a></li>
+        <li><a href="#step-8-visualize-hf">Step 8.1: Generate IR Visualizer for HF GGUF Runs</a></li>
+        <li><a href="#step-9-quality-phases">Step 9: Quality Improvement Phases (SVG)</a></li>
+        <li><a href="#step-10-ablation">Step 10: Ablation Matrix Sweep (one command)</a></li>
+        <li><a href="#options">CLI Options Cheat Sheet</a></li>
+        <li><a href="#human-readable">Human-Readable Output Check</a></li>
+    </ul>
+</nav>
+
+<div class="grid grid-2">
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">Training Path (true_bpe)</h3>
+        <p style="margin-bottom: 0.5rem;">Dataset prep -> ASCII/SVG cleanup -> ascii_bpe tokenizer -> train -> run-local inference.</p>
+        <p style="margin-bottom: 0;"><a href="#step-0-prereqs">Start training flow at Step 0</a></p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Inference Path (GGUF)</h3>
+        <p style="margin-bottom: 0.5rem;">No training needed. Pull a GGUF from HF and run directly in v7 runtime.</p>
+        <p style="margin-bottom: 0;"><a href="#step-8-inference">Jump to Step 8 (GGUF inference)</a></p>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SVG INFOGRAPHIC: End-to-End Workflow Overview
+     ═══════════════════════════════════════════════════════════ -->
+<div class="card" style="padding:1.2rem;overflow-x:auto;margin-bottom:1.5rem;">
+<svg viewBox="0 0 940 200" width="100%" height="200" font-family="Inter,system-ui,sans-serif" aria-label="End-to-end v7 workflow">
+  <rect width="940" height="200" rx="12" fill="#181e28"/>
+  <text x="470" y="24" fill="#ffb400" text-anchor="middle" font-size="13" font-weight="700">Complete v7 Workflow — From Raw Data to Interactive Chat</text>
+  <defs>
+    <marker id="wfArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffb400"/></marker>
+    <marker id="wfArrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#47b475"/></marker>
+  </defs>
+
+  <!-- Step bubbles -->
+  <g font-size="9" font-weight="600">
+    <!-- Step 0: Data -->
+    <rect x="16" y="46" width="100" height="56" rx="8" fill="#1e2738" stroke="#07adf866" stroke-width="1.2"/>
+    <text x="66" y="66" fill="#07adf8" text-anchor="middle" font-size="10" font-weight="700">Step 0</text>
+    <text x="66" y="80" fill="#b0b0b0" text-anchor="middle">Data Prep</text>
+    <text x="66" y="92" fill="#667" text-anchor="middle" font-size="8">UTF-8 text file</text>
+    <line x1="118" y1="74" x2="138" y2="74" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#wfArr)"/>
+
+    <!-- Step 0.7: Tokenize -->
+    <rect x="140" y="46" width="100" height="56" rx="8" fill="#1e2738" stroke="#47b47566" stroke-width="1.2"/>
+    <text x="190" y="66" fill="#47b475" text-anchor="middle" font-size="10" font-weight="700">Step 0.7</text>
+    <text x="190" y="80" fill="#b0b0b0" text-anchor="middle">BPE Train</text>
+    <text x="190" y="92" fill="#667" text-anchor="middle" font-size="8">tokenizer.json</text>
+    <line x1="242" y1="74" x2="262" y2="74" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#wfArr)"/>
+
+    <!-- Step 0.8: Roundtrip -->
+    <rect x="264" y="46" width="100" height="56" rx="8" fill="#1e2738" stroke="#ffb40044" stroke-width="1.2"/>
+    <text x="314" y="66" fill="#ffb400" text-anchor="middle" font-size="10" font-weight="700">Step 0.8</text>
+    <text x="314" y="80" fill="#b0b0b0" text-anchor="middle">Roundtrip</text>
+    <text x="314" y="92" fill="#667" text-anchor="middle" font-size="8">determinism gate</text>
+    <line x1="366" y1="74" x2="386" y2="74" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#wfArr)"/>
+
+    <!-- Step 3: Train -->
+    <rect x="388" y="46" width="100" height="56" rx="8" fill="#1a2818" stroke="#47b475" stroke-width="1.5"/>
+    <text x="438" y="66" fill="#47b475" text-anchor="middle" font-size="10" font-weight="700">Step 3</text>
+    <text x="438" y="80" fill="#b0b0b0" text-anchor="middle">CK Train</text>
+    <text x="438" y="92" fill="#667" text-anchor="middle" font-size="8">loss drops</text>
+    <line x1="490" y1="74" x2="510" y2="74" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#wfArr)"/>
+
+    <!-- Step 5: Promote -->
+    <rect x="512" y="46" width="100" height="56" rx="8" fill="#1e2738" stroke="#ffb40066" stroke-width="1.2"/>
+    <text x="562" y="66" fill="#ffb400" text-anchor="middle" font-size="10" font-weight="700">Step 5</text>
+    <text x="562" y="80" fill="#b0b0b0" text-anchor="middle">Promote</text>
+    <text x="562" y="92" fill="#667" text-anchor="middle" font-size="8">ckpt → weights</text>
+    <line x1="614" y1="74" x2="634" y2="74" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#wfArr)"/>
+
+    <!-- Step 6: Build -->
+    <rect x="636" y="46" width="100" height="56" rx="8" fill="#1e2738" stroke="#07adf866" stroke-width="1.2"/>
+    <text x="686" y="66" fill="#07adf8" text-anchor="middle" font-size="10" font-weight="700">Step 6</text>
+    <text x="686" y="80" fill="#b0b0b0" text-anchor="middle">IR + Build</text>
+    <text x="686" y="92" fill="#667" text-anchor="middle" font-size="8">.ck_build/</text>
+    <line x1="738" y1="74" x2="758" y2="74" stroke="#47b47588" stroke-width="1.5" marker-end="url(#wfArrG)"/>
+
+    <!-- Step 8: Chat -->
+    <rect x="760" y="42" width="160" height="64" rx="10" fill="#0e1e28" stroke="#47b475" stroke-width="2"/>
+    <text x="840" y="66" fill="#47b475" text-anchor="middle" font-size="12" font-weight="700">ck_chat.py</text>
+    <text x="840" y="82" fill="#b0b0b0" text-anchor="middle" font-size="9">Interactive Generation</text>
+    <text x="840" y="96" fill="#667" text-anchor="middle" font-size="8">Step 8 — "&lt;svg" → valid SVG</text>
+  </g>
+
+  <!-- GGUF shortcut arrow -->
+  <path d="M66,104 Q66,150 400,150 Q760,150 840,108" fill="none" stroke="#07adf844" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#wfArrG)"/>
+  <rect x="360" y="138" width="160" height="22" rx="4" fill="#181e28"/>
+  <text x="440" y="153" fill="#07adf8" text-anchor="middle" font-size="9" font-weight="600">GGUF shortcut: skip to Step 8 →</text>
+
+  <!-- Bottom legend -->
+  <g font-size="8.5" y="180">
+    <rect x="200" y="172" width="10" height="10" rx="2" fill="#47b475"/>
+    <text x="216" y="181" fill="#b0b0b0">Training path (Steps 0–5)</text>
+    <rect x="360" y="172" width="10" height="10" rx="2" fill="#07adf8"/>
+    <text x="376" y="181" fill="#b0b0b0">Inference path (Steps 6–8)</text>
+    <rect x="520" y="172" width="10" height="10" rx="2" fill="#ffb400"/>
+    <text x="536" y="181" fill="#b0b0b0">GGUF shortcut (data → chat directly)</text>
+  </g>
+</svg>
+</div>
+
+<h2 id="step-0-prereqs">Step 0: Prereqs + Paths</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Use these canonical local paths:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>ROOT=/home/antshiv/Workspace/C-Kernel-Engine
+RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1
+DATA_DIR=$ROOT/version/v7/data
+DATA_TXT=$DATA_DIR/svg_assets_train.txt
+
+mkdir -p "$RUN" "$DATA_DIR"
+if [ ! -f "$DATA_TXT" ]; then
+  echo "[ERROR] Missing data file: $DATA_TXT"
+  echo "Set DATA_TXT to a real file or create one in $DATA_DIR."
+else
+  echo "[OK] Found data file: $DATA_TXT"
+fi</pre>
+    </div>
+    <p class="mini-note">Important: use <code>$HOME/.cache/...</code>, not <code>/.cache/...</code>. The repo now includes a bundled demo file at <code>version/v7/data/svg_assets_train.txt</code>.</p>
+</div>
+
+<h2 id="step-0-data-prep">Step 0.5: Data Preparation (Training)</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Training path expects a <strong>UTF-8 plain text file</strong>. For a quick demo, use the bundled <code>$DATA_TXT</code>. For strict SVG + ASCII mode, treat cleanup as required before training.</p>
+    <ul>
+        <li>Fast path: use bundled demo file in this repo (no conversion step).</li>
+        <li>Recommended: one logical sample per line (for SVG data, one SVG per line).</li>
+        <li>JSONL is fine as source, but flatten to text first with an explicit source path.</li>
+        <li>ASCII-only requirement for <code>--tokenizer ascii_bpe</code>: convert non-ASCII chars to XML escapes (<code>&amp;#xNNNN;</code>) before tokenization.</li>
+        <li>Training now has dataset QC gates: ASCII is enforced by default for <code>ascii_bpe</code>; add <code>--require-svg-rows</code> to fail on non-<code>&lt;svg</code> lines.</li>
+        <li>Avoid binary data; normalize line endings to <code>\n</code>.</li>
+    </ul>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Fast path: bundled demo dataset (already in repo)
+if [ ! -s "$DATA_TXT" ]; then
+  echo "[ERROR] Bundled dataset missing or empty: $DATA_TXT"
+  echo "Fix: git pull, or set DATA_TXT to your own text file."
+else
+  echo "[OK] Using bundled dataset: $DATA_TXT"
+  wc -l -c "$DATA_TXT"
+  head -n 3 "$DATA_TXT"
+fi
+
+# Optional: replace with your own JSONL source
+# Leave SRC_JSONL empty to skip this section.
+SRC_JSONL=""
+if [ -n "$SRC_JSONL" ]; then
+  if [ ! -f "$SRC_JSONL" ]; then
+    echo "[ERROR] Missing JSONL source: $SRC_JSONL"
+    echo "Set SRC_JSONL to a real path, or keep it empty to use bundled data."
+  else
+    jq -r '.text // empty' "$SRC_JSONL" | sed '/^[[:space:]]*$/d' > "$DATA_TXT"
+    perl -pe 's/\r\n?/\n/g' "$DATA_TXT" > "$DATA_TXT.tmp" && mv "$DATA_TXT.tmp" "$DATA_TXT"
+    echo "[OK] Replaced DATA_TXT from JSONL: $DATA_TXT"
+    wc -l -c "$DATA_TXT"
+    head -n 3 "$DATA_TXT"
+  fi
+else
+  echo "[INFO] SRC_JSONL not set; keeping current DATA_TXT."
+fi</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Required for strict SVG + ASCII path
+# This cleanup keeps bytes ASCII-only and drops non-SVG rows.
+SRC_DATA="$DATA_TXT"      # or /absolute/path/raw.jsonl
+SRC_FMT="text"            # text | jsonl | auto
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$SRC_DATA" \
+  --output "$DATA_TXT" \
+  --input-format "$SRC_FMT" \
+  --jsonl-text-key text \
+  --ascii-mode xml_escape \
+  --svg-only
+
+wc -l -c "$DATA_TXT"
+head -n 3 "$DATA_TXT"</pre>
+    </div>
+    <p class="mini-note"><code>xml_escape</code> preserves semantics while keeping file bytes ASCII-only. Example: <code>é</code> becomes <code>&amp;#xE9;</code>.</p>
+    <p class="mini-note">At runtime, v7 training uses next-token windows from the token stream, not "one JSONL row = one batch sample".</p>
+</div>
+
+<h2 id="step-0-data-view">Step 0.6: Preview Dataset</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Quick sanity pass before training to confirm file size/content shape.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>echo "[INFO] DATA_TXT=$DATA_TXT"
+ls -lh "$DATA_TXT"
+wc -l -c "$DATA_TXT"
+head -n 5 "$DATA_TXT"
+tail -n 5 "$DATA_TXT"
+
+# Optional: show any non-SVG-looking lines
+grep -nEv '^[[:space:]]*<svg' "$DATA_TXT" | head -n 10 || true
+
+# Optional: show lines that still contain non-ASCII chars (should be empty)
+perl -ne 'if (/[^\x00-\x7F]/) { print "$.:$_"; $c++; exit if $c >= 20 }' "$DATA_TXT" || true</pre>
+    </div>
+</div>
+
+<h2 id="step-0-tokenize">Step 0.7: Tokenize Dataset (true_bpe preview)</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Create tokenizer artifacts and a token stream in an isolated preview run, then inspect them before full training.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>TOKENIZE_RUN="${RUN}_tokenize_preview"
+TOKENIZE_WORK="$TOKENIZE_RUN/.ck_pipeline/bpe_preview_$(date -u +%Y%m%d_%H%M%S)"
+mkdir -p "$TOKENIZE_RUN"
+
+cd "$ROOT"
+# Use strict ASCII tokenizer mode:
+#   --tokenizer ascii_bpe
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$TOKENIZE_RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 2 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 8 --total-tokens 64 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --work-dir "$TOKENIZE_WORK" \
+  --json-out "$TOKENIZE_WORK/pipeline_report.json" \
+  --prepare-only
+
+echo "[OK] tokenizer: $TOKENIZE_WORK/tokenizer.json"
+echo "[OK] tokens:    $TOKENIZE_WORK/train_tokens.txt"
+wc -l "$TOKENIZE_WORK/train_tokens.txt"
+head -n 40 "$TOKENIZE_WORK/train_tokens.txt"</pre>
+    </div>
+    <p class="mini-note">This is a preflight path. <code>--prepare-only</code> builds tokenizer + token stream without launching training. Your main run <code>$RUN</code> remains untouched.</p>
+</div>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.4rem;">Open IR visualizer for tokenization preview run:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$TOKENIZE_RUN" --html-only
+echo "[OK] Visualizer: $TOKENIZE_RUN/ir_report.html"
+xdg-open "$TOKENIZE_RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
+    </div>
+    <p class="mini-note">In the report, check: <strong>Architecture -> Tokenizer</strong> (click <code>tokenizer.json</code>) and <strong>Training -> Tokenizer Lineage</strong> (path + hash).</p>
+</div>
+
+<h2 id="step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Most accurate correctness check for <code>ascii_bpe</code>: encode the full dataset, decode it back, and compare to original bytes.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/test_ascii_bpe_roundtrip_v7.py \
+  --run "$TOKENIZE_RUN" \
+  --dataset "$DATA_TXT" \
+  --require-ascii</pre>
+    </div>
+    <p class="mini-note">Pass condition: <code>ascii_bpe roundtrip PASS</code> and matching byte counts.</p>
+</div>
+
+<h2 id="step-2-training-setup">Step 2: Training Setup (true_bpe)</h2>
+
+<div class="card">
+    <p>Training input must be a <strong>UTF-8 text file</strong>. If you use the bundled demo file, skip this section and go straight to Step 3.</p>
+    <div class="grid grid-2">
+        <div>
+            <h3 style="margin-top: 0;">JSONL -> text with <code>jq</code></h3>
+            <div class="cmd-block">
+                <button class="copy-btn" type="button">Copy</button>
+<pre>SRC_JSONL=/absolute/path/to/raw.jsonl
+if [ ! -f "$SRC_JSONL" ]; then
+  echo "[ERROR] Missing JSONL source: $SRC_JSONL"
+  echo "Set SRC_JSONL to a real path. Example: SRC_JSONL=$HOME/data/train.jsonl"
+else
+  jq -r '.text // empty' "$SRC_JSONL" > "$DATA_TXT"
+  echo "[OK] Wrote DATA_TXT from JSONL: $DATA_TXT"
+fi</pre>
+            </div>
+        </div>
+        <div>
+            <h3 style="margin-top: 0;">JSONL -> text with Python</h3>
+            <div class="cmd-block">
+                <button class="copy-btn" type="button">Copy</button>
+<pre>python3 - <<PY
+import json
+from pathlib import Path
+src = Path("/absolute/path/to/raw.jsonl")
+dst = Path("$DATA_TXT")
+lines = []
+for line in src.read_text(encoding="utf-8").splitlines():
+    if not line.strip():
+        continue
+    obj = json.loads(line)
+    t = obj.get("text")
+    if isinstance(t, str) and t.strip():
+        lines.append(t)
+dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print(f"wrote {len(lines)} lines -> {dst}")
+PY</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h2 id="step-3-train">Step 3: Run Training Pipeline</h2>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SVG INFOGRAPHIC: Training Pipeline Architecture
+     ═══════════════════════════════════════════════════════════ -->
+<div class="card" style="padding:1rem;overflow-x:auto;margin-bottom:1rem;">
+<svg viewBox="0 0 940 300" width="100%" height="300" font-family="Inter,system-ui,sans-serif" aria-label="Training pipeline architecture">
+  <rect width="940" height="300" rx="10" fill="#151b26"/>
+  <text x="470" y="24" fill="#47b475" text-anchor="middle" font-size="14" font-weight="700">train_data_pipeline_v7.py — What Happens Inside</text>
+  <defs>
+    <marker id="tpArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#47b475"/></marker>
+    <marker id="tpArrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffb400"/></marker>
+  </defs>
+
+  <!-- Phase 1: Init -->
+  <rect x="20" y="44" width="160" height="100" rx="8" fill="#1e2738" stroke="#07adf866"/>
+  <text x="100" y="64" fill="#07adf8" text-anchor="middle" font-size="11" font-weight="700">1. Init Model</text>
+  <line x1="30" y1="72" x2="170" y2="72" stroke="#07adf833" stroke-width="1"/>
+  <text x="100" y="88" fill="#b0b0b0" text-anchor="middle" font-size="9">--init-if-missing</text>
+  <text x="100" y="102" fill="#667" text-anchor="middle" font-size="8.5">xavier_uniform init</text>
+  <text x="100" y="116" fill="#667" text-anchor="middle" font-size="8.5">qwen3 template dims</text>
+  <text x="100" y="130" fill="#47b47588" text-anchor="middle" font-size="8">→ weights.bump</text>
+  <line x1="182" y1="94" x2="208" y2="94" stroke="#47b47588" stroke-width="1.5" marker-end="url(#tpArr)"/>
+
+  <!-- Phase 2: BPE Train -->
+  <rect x="210" y="44" width="160" height="100" rx="8" fill="#1a2818" stroke="#47b475" stroke-width="1.5"/>
+  <text x="290" y="64" fill="#47b475" text-anchor="middle" font-size="11" font-weight="700">2. BPE Train</text>
+  <line x1="220" y1="72" x2="360" y2="72" stroke="#47b47533" stroke-width="1"/>
+  <text x="290" y="88" fill="#b0b0b0" text-anchor="middle" font-size="9">ck-bpe-train (C)</text>
+  <text x="290" y="102" fill="#667" text-anchor="middle" font-size="8.5">corpus → byte pairs</text>
+  <text x="290" y="116" fill="#667" text-anchor="middle" font-size="8.5">merge loop × vocab_size</text>
+  <text x="290" y="130" fill="#47b47588" text-anchor="middle" font-size="8">→ tokenizer.json + bins</text>
+  <line x1="372" y1="94" x2="398" y2="94" stroke="#47b47588" stroke-width="1.5" marker-end="url(#tpArr)"/>
+
+  <!-- Phase 3: Tokenize -->
+  <rect x="400" y="44" width="160" height="100" rx="8" fill="#1e2738" stroke="#ffb40066"/>
+  <text x="480" y="64" fill="#ffb400" text-anchor="middle" font-size="11" font-weight="700">3. Tokenize Data</text>
+  <line x1="410" y1="72" x2="550" y2="72" stroke="#ffb40033" stroke-width="1"/>
+  <text x="480" y="88" fill="#b0b0b0" text-anchor="middle" font-size="9">encode full dataset</text>
+  <text x="480" y="102" fill="#667" text-anchor="middle" font-size="8.5">apply merge rules</text>
+  <text x="480" y="116" fill="#667" text-anchor="middle" font-size="8.5">GPT-2 pretokenizer</text>
+  <text x="480" y="130" fill="#ffb40088" text-anchor="middle" font-size="8">→ train_tokens.txt</text>
+  <line x1="562" y1="94" x2="588" y2="94" stroke="#ffb40088" stroke-width="1.5" marker-end="url(#tpArrO)"/>
+
+  <!-- Phase 4: CK Runtime Train -->
+  <rect x="590" y="44" width="160" height="100" rx="8" fill="#1e2738" stroke="#07adf866"/>
+  <text x="670" y="64" fill="#07adf8" text-anchor="middle" font-size="11" font-weight="700">4. CK Train</text>
+  <line x1="600" y1="72" x2="740" y2="72" stroke="#07adf833" stroke-width="1"/>
+  <text x="670" y="88" fill="#b0b0b0" text-anchor="middle" font-size="9">C runtime training</text>
+  <text x="670" y="102" fill="#667" text-anchor="middle" font-size="8.5">seq_len windows</text>
+  <text x="670" y="116" fill="#667" text-anchor="middle" font-size="8.5">AdamW + grad clip</text>
+  <text x="670" y="130" fill="#07adf888" text-anchor="middle" font-size="8">→ checkpoints/</text>
+  <line x1="752" y1="94" x2="778" y2="94" stroke="#47b47588" stroke-width="1.5" marker-end="url(#tpArr)"/>
+
+  <!-- Phase 5: Report -->
+  <rect x="780" y="44" width="140" height="100" rx="8" fill="#2a3a10" stroke="#47b475" stroke-width="1.5"/>
+  <text x="850" y="64" fill="#47b475" text-anchor="middle" font-size="11" font-weight="700">5. Report</text>
+  <line x1="790" y1="72" x2="910" y2="72" stroke="#47b47533" stroke-width="1"/>
+  <text x="850" y="88" fill="#b0b0b0" text-anchor="middle" font-size="9">pipeline_report.json</text>
+  <text x="850" y="102" fill="#667" text-anchor="middle" font-size="8.5">loss stats + SHA256</text>
+  <text x="850" y="116" fill="#667" text-anchor="middle" font-size="8.5">IR visualizer</text>
+  <text x="850" y="130" fill="#47b47588" text-anchor="middle" font-size="8">→ ir_report.html</text>
+
+  <!-- Data flow bottom strip -->
+  <rect x="20" y="164" width="900" height="54" rx="8" fill="#1a1e28" stroke="#33333366"/>
+  <text x="470" y="182" fill="#ffb400" text-anchor="middle" font-size="11" font-weight="700">Data Flow</text>
+  <g font-size="9" font-family="'JetBrains Mono',monospace">
+    <text x="40" y="202" fill="#07adf8">svg_train.txt</text>
+    <text x="155" y="202" fill="#667">→</text>
+    <text x="172" y="202" fill="#47b475">tokenizer.json</text>
+    <text x="292" y="202" fill="#667">→</text>
+    <text x="310" y="202" fill="#ffb400">train_tokens.txt</text>
+    <text x="448" y="202" fill="#667">→</text>
+    <text x="465" y="202" fill="#07adf8">ck_train(seq_len windows)</text>
+    <text x="645" y="202" fill="#667">→</text>
+    <text x="662" y="202" fill="#47b475">checkpoints/step_N.bin</text>
+    <text x="830" y="202" fill="#667">→</text>
+    <text x="846" y="202" fill="#ffb400">report</text>
+  </g>
+
+  <!-- Key flags -->
+  <rect x="20" y="232" width="900" height="54" rx="8" fill="#1a1028" stroke="#a070ff33"/>
+  <text x="40" y="252" fill="#a070ff" font-size="10" font-weight="700">Key Flags</text>
+  <g font-size="8.5" font-family="'JetBrains Mono',monospace">
+    <text x="40" y="270" fill="#b0b0b0">--tokenizer ascii_bpe</text>
+    <text x="200" y="270" fill="#667">|</text>
+    <text x="212" y="270" fill="#b0b0b0">--vocab-size 320</text>
+    <text x="344" y="270" fill="#667">|</text>
+    <text x="356" y="270" fill="#b0b0b0">--seq-len 32</text>
+    <text x="460" y="270" fill="#667">|</text>
+    <text x="472" y="270" fill="#b0b0b0">--total-tokens 841472</text>
+    <text x="636" y="270" fill="#667">|</text>
+    <text x="648" y="270" fill="#b0b0b0">--lr 5e-4</text>
+    <text x="736" y="270" fill="#667">|</text>
+    <text x="748" y="270" fill="#b0b0b0">--grad-accum 1</text>
+  </g>
+</svg>
+</div>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.25rem;">Same pipeline, two train executors. Pick one:</p>
+    <div class="variant-box">
+        <h3>C Variant (ck-cli)</h3>
+        <p class="mini-note">Native training loop in <code>build/ck-cli-v7</code> with live step/epoch loss + perplexity logs.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 32 --total-tokens 841472 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_full_e1_latest.json</pre>
+        </div>
+    </div>
+
+    <div class="variant-box">
+        <h3>Python Variant (ck_run)</h3>
+        <p class="mini-note">Python harness path (<code>ck_run_v7.py train --backend ck</code>) with parity/debug flexibility.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 32 --total-tokens 841472 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_run \
+  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_full_e1_latest.json</pre>
+        </div>
+    </div>
+</div>
+
+<h2 id="step-4-artifacts">Step 4: Artifact Locations + Data Format</h2>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SVG INFOGRAPHIC: Artifact Map
+     ═══════════════════════════════════════════════════════════ -->
+<div class="card" style="padding:1rem;overflow-x:auto;margin-bottom:1rem;">
+<svg viewBox="0 0 940 260" width="100%" height="260" font-family="Inter,system-ui,sans-serif" aria-label="Artifact directory map">
+  <rect width="940" height="260" rx="10" fill="#151b26"/>
+  <text x="470" y="24" fill="#ffb400" text-anchor="middle" font-size="13" font-weight="700">Artifact Map — Where Everything Lives</text>
+
+  <!-- $RUN root -->
+  <rect x="340" y="40" width="260" height="36" rx="8" fill="#2a3a10" stroke="#47b475" stroke-width="1.5"/>
+  <text x="470" y="64" fill="#47b475" text-anchor="middle" font-size="12" font-weight="700" font-family="'JetBrains Mono',monospace">$RUN/</text>
+
+  <!-- Level 1 branches -->
+  <line x1="350" y1="76" x2="100" y2="106" stroke="#47b47566" stroke-width="1.2"/>
+  <line x1="430" y1="76" x2="330" y2="106" stroke="#07adf866" stroke-width="1.2"/>
+  <line x1="470" y1="76" x2="530" y2="106" stroke="#ffb40066" stroke-width="1.2"/>
+  <line x1="510" y1="76" x2="700" y2="106" stroke="#a070ff66" stroke-width="1.2"/>
+  <line x1="590" y1="76" x2="870" y2="106" stroke="#07adf866" stroke-width="1.2"/>
+
+  <!-- tokenizer.json -->
+  <rect x="20" y="106" width="168" height="60" rx="6" fill="#1e2738" stroke="#47b47544"/>
+  <text x="104" y="126" fill="#47b475" text-anchor="middle" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">tokenizer.json</text>
+  <text x="104" y="140" fill="#b0b0b0" text-anchor="middle" font-size="8">HF-compatible vocab + merges</text>
+  <text x="104" y="154" fill="#667" text-anchor="middle" font-size="8">Source of truth for inference</text>
+
+  <!-- tokenizer_bin/ -->
+  <rect x="210" y="106" width="168" height="60" rx="6" fill="#1e2738" stroke="#07adf844"/>
+  <text x="294" y="126" fill="#07adf8" text-anchor="middle" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">tokenizer_bin/</text>
+  <text x="294" y="140" fill="#b0b0b0" text-anchor="middle" font-size="8">vocab_offsets.bin</text>
+  <text x="294" y="154" fill="#b0b0b0" text-anchor="middle" font-size="8">vocab_strings.bin + merges.bin</text>
+
+  <!-- weights -->
+  <rect x="400" y="106" width="168" height="60" rx="6" fill="#2a2a10" stroke="#ffb40044"/>
+  <text x="484" y="126" fill="#ffb400" text-anchor="middle" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">weights.bump</text>
+  <text x="484" y="140" fill="#b0b0b0" text-anchor="middle" font-size="8">Model weights (promoted)</text>
+  <text x="484" y="154" fill="#667" text-anchor="middle" font-size="8">+ weights_manifest.json</text>
+
+  <!-- .ck_pipeline/ -->
+  <rect x="590" y="106" width="168" height="60" rx="6" fill="#1a1028" stroke="#a070ff44"/>
+  <text x="674" y="126" fill="#a070ff" text-anchor="middle" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">.ck_pipeline/</text>
+  <text x="674" y="140" fill="#b0b0b0" text-anchor="middle" font-size="8">bpe_&lt;ts&gt;/tokenizer.json</text>
+  <text x="674" y="154" fill="#b0b0b0" text-anchor="middle" font-size="8">bpe_&lt;ts&gt;/train_tokens.txt</text>
+
+  <!-- .ck_build/ -->
+  <rect x="780" y="106" width="140" height="60" rx="6" fill="#0e1e28" stroke="#07adf866"/>
+  <text x="850" y="126" fill="#07adf8" text-anchor="middle" font-size="10" font-weight="600" font-family="'JetBrains Mono',monospace">.ck_build/</text>
+  <text x="850" y="140" fill="#b0b0b0" text-anchor="middle" font-size="8">Compiled IR + runtime</text>
+  <text x="850" y="154" fill="#667" text-anchor="middle" font-size="8">Used by ck_chat.py</text>
+
+  <!-- Second level: checkpoints -->
+  <line x1="484" y1="168" x2="484" y2="188" stroke="#ffb40044" stroke-width="1" stroke-dasharray="3,2"/>
+  <rect x="400" y="188" width="168" height="40" rx="5" fill="#1e2738" stroke="#ffb40033"/>
+  <text x="484" y="208" fill="#ffb400" text-anchor="middle" font-size="9" font-weight="600" font-family="'JetBrains Mono',monospace">checkpoints/</text>
+  <text x="484" y="220" fill="#667" text-anchor="middle" font-size="8">step_N.bin (promote → weights.bump)</text>
+
+  <!-- Legend -->
+  <g font-size="8">
+    <rect x="20" y="192" width="8" height="8" rx="2" fill="#47b475"/>
+    <text x="34" y="200" fill="#b0b0b0">Tokenizer artifacts</text>
+    <rect x="140" y="192" width="8" height="8" rx="2" fill="#ffb400"/>
+    <text x="154" y="200" fill="#b0b0b0">Model weights</text>
+    <rect x="244" y="192" width="8" height="8" rx="2" fill="#a070ff"/>
+    <text x="258" y="200" fill="#b0b0b0">Pipeline working dir</text>
+
+    <rect x="20" y="210" width="8" height="8" rx="2" fill="#07adf8"/>
+    <text x="34" y="218" fill="#b0b0b0">Binary / runtime</text>
+    <text x="140" y="218" fill="#667">All paths relative to $RUN (your --run dir)</text>
+  </g>
+</svg>
+</div>
+
+<table class="path-table">
+    <tr>
+        <th>Artifact</th>
+        <th>Path Pattern</th>
+        <th>Purpose</th>
+    </tr>
+    <tr>
+        <td>Training BPE JSON</td>
+        <td><code>$RUN/.ck_pipeline/bpe_&lt;ts&gt;/tokenizer.json</code></td>
+        <td>Tokenizer produced by BPE training pass.</td>
+    </tr>
+    <tr>
+        <td>Training BPE binary</td>
+        <td><code>$RUN/.ck_pipeline/bpe_&lt;ts&gt;/bpe_bin/*</code></td>
+        <td>Binary artifacts consumed by CK true_bpe runtime.</td>
+    </tr>
+    <tr>
+        <td>Canonical run tokenizer</td>
+        <td><code>$RUN/tokenizer.json</code> + <code>$RUN/tokenizer_bin/*</code></td>
+        <td>Single source of truth copied into run dir for infer reuse.</td>
+    </tr>
+    <tr>
+        <td>Token stream file</td>
+        <td><code>$RUN/.ck_pipeline/bpe_&lt;ts&gt;/train_tokens.txt</code></td>
+        <td>One integer token id per line. Used by <code>--train-token-file</code>.</td>
+    </tr>
+    <tr>
+        <td>Train report</td>
+        <td><code>.../train_ck.json</code> + your <code>--json-out</code> file</td>
+        <td>Loss stats + pipeline metadata.</td>
+    </tr>
+</table>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>How training consumes data</strong><br>
+        Training is next-token LM over the token stream in <code>seq_len</code> windows; it is not "one JSONL row = one sample" at runtime.
+    </div>
+</div>
+
+<h2 id="step-5-promote">Step 5: Promote Latest Checkpoint to Inference Weights</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Training writes runtime checkpoints under <code>$RUN/checkpoints</code>, while inference consumes <code>$RUN/weights.bump</code> + <code>$RUN/weights_manifest.json</code>. Promote the latest checkpoint before Step 6 to guarantee post-train inference weights.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Promote latest checkpoint
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN"
+
+# Optional: preview selected checkpoint only
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --dry-run
+
+# Optional: promote a specific step
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --step 1234</pre>
+    </div>
+    <p class="mini-note">This helper picks the latest checkpoint by step and atomically updates <code>weights.bump</code> + <code>weights_manifest.json</code> in <code>$RUN</code>.</p>
+</div>
+
+<h2 id="step-6-infer-trained">Step 6: Build Inference from Trained Run</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Generate runtime and chat from the same run</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run "$RUN" --generate-only --context-len 128
+
+.venv/bin/python scripts/ck_chat.py \
+  --model-dir "$RUN/.ck_build" \
+  --python-tokenizer --chat-template none \
+  --show-token-ids --prompt "&lt;svg" --max-tokens 80 --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">Use <code>$RUN/.ck_build</code> for chat so model + tokenizer artifacts come from the same run.</p>
+</div>
+
+<h2 id="step-7-visualizer">Step 7: Open IR Visualizer</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.4rem;">Generate a fresh visualizer report for this run and open it locally.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only
+echo "[OK] Visualizer: $RUN/ir_report.html"
+
+# Optional: open in browser
+xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
+    </div>
+    <p class="mini-note">The training pipeline already generates this by default; this command regenerates it on demand.</p>
+    <table>
+        <tr><th>Checkpoint</th><th>Run Path</th><th>What to inspect</th></tr>
+        <tr><td>After Step 0.7 tokenization preview</td><td><code>$TOKENIZE_RUN</code></td><td><code>Architecture -> Tokenizer</code>, <code>Training -> Tokenizer Lineage</code></td></tr>
+        <tr><td>After Step 3 training</td><td><code>$RUN</code></td><td><code>Training -> Data Provenance</code>, loss/grad tabs, runtime coverage</td></tr>
+        <tr><td>After Step 6 inference build</td><td><code>$RUN</code></td><td>kernel graph, runtime files, and artifact links</td></tr>
+    </table>
+</div>
+
+<h2 id="step-8-inference">Step 8: Inference from GGUF (HF URLs)</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
+    <h3 style="margin-top: 0;">Gemma 3 270M</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/ck_run_v7.py run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=none \
+  --generate-visualizer</pre>
+    </div>
+
+    <h3>Qwen2 0.5B Instruct</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/ck_run_v7.py run \
+  hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --generate-visualizer</pre>
+    </div>
+
+    <h3>Qwen3 0.6B</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/ck_run_v7.py run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --generate-visualizer</pre>
+    </div>
+
+    <h3 id="step-8-visualize-hf">Step 8.1: Generate IR Visualizer for these HF GGUF runs</h3>
+    <p style="margin-bottom: 0.4rem;">
+        <code>ck_run_v7.py run hf://...</code> stores each model under
+        <code>${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}/&lt;org--repo&gt;</code>.
+        If you used <code>--generate-visualizer</code> in Step 8, <code>ir_report.html</code> is already in the same folder.
+        Otherwise generate visualizer reports directly from those run directories:
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>CACHE_MODELS="${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}"
+GEMMA_RUN="$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF"
+QWEN2_RUN="$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF"
+QWEN3_RUN="$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF"
+
+for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN"; do
+  if [ ! -d "$RUN_DIR" ]; then
+    echo "[Missing] $RUN_DIR (run Step 8 command first)"
+    continue
+  fi
+  python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN_DIR" --html-only
+  echo "[OK] $RUN_DIR/ir_report.html"
+done</pre>
+    </div>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Optional: open generated reports
+CACHE_MODELS="${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}"
+xdg-open "$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF/ir_report.html" >/dev/null 2>&1 || true
+xdg-open "$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF/ir_report.html" >/dev/null 2>&1 || true
+xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 || true</pre>
+    </div>
+    <p class="mini-note">
+        Report files are written to each run root as <code>ir_report.html</code> (not inside <code>.ck_build</code>).
+    </p>
+</div>
+
+<h2 id="step-9-quality-phases">Step 9: Quality Improvement Phases (SVG)</h2>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SVG INFOGRAPHIC: Quality Phases Timeline
+     ═══════════════════════════════════════════════════════════ -->
+<div class="card" style="padding:1rem;overflow-x:auto;margin-bottom:1rem;">
+<svg viewBox="0 0 940 310" width="100%" height="310" font-family="Inter,system-ui,sans-serif" aria-label="Quality improvement phases">
+  <rect width="940" height="310" rx="10" fill="#151b26"/>
+  <text x="470" y="24" fill="#ffb400" text-anchor="middle" font-size="14" font-weight="700">Quality Improvement Roadmap — Small Dataset, Big Results</text>
+
+  <!-- Timeline line -->
+  <line x1="60" y1="60" x2="880" y2="60" stroke="#444" stroke-width="3" stroke-linecap="round"/>
+  <defs>
+    <marker id="qArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#47b475"/></marker>
+  </defs>
+
+  <!-- Phase 1 -->
+  <circle cx="160" cy="60" r="22" fill="#1e2738" stroke="#ffb400" stroke-width="2.5"/>
+  <text x="160" y="65" fill="#ffb400" text-anchor="middle" font-size="13" font-weight="700">1</text>
+  <rect x="60" y="96" width="200" height="196" rx="8" fill="#1e2738" stroke="#ffb40044"/>
+  <rect x="60" y="96" width="200" height="30" rx="8" fill="#2a2a10"/>
+  <rect x="60" y="118" width="200" height="8" fill="#2a2a10"/>
+  <text x="160" y="116" fill="#ffb400" text-anchor="middle" font-size="12" font-weight="700">Make It Work</text>
+  <g font-size="9" fill="#b0b0b0">
+    <text x="76" y="144">Goal: Get baseline running</text>
+    <text x="76" y="162" fill="#667">• Roundtrip passes</text>
+    <text x="76" y="178" fill="#667">• Loss drops steadily</text>
+    <text x="76" y="194" fill="#667">• Some valid SVG output</text>
+    <text x="76" y="214" fill="#47b475" font-weight="600">Config:</text>
+    <text x="76" y="230" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">vocab 320 | seq 32</text>
+    <text x="76" y="244" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">layers 24 | lr 5e-4</text>
+    <text x="76" y="258" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">1 epoch | grad_accum 1</text>
+    <text x="76" y="278" fill="#e74c3c" font-size="8" font-weight="600">If fails: fix data, not hyperparams</text>
+  </g>
+
+  <!-- Arrow 1→2 -->
+  <text x="310" y="56" fill="#47b475" font-size="9" font-weight="600">tune →</text>
+
+  <!-- Phase 2 -->
+  <circle cx="470" cy="60" r="22" fill="#1e2738" stroke="#47b475" stroke-width="2.5"/>
+  <text x="470" y="65" fill="#47b475" text-anchor="middle" font-size="13" font-weight="700">2</text>
+  <rect x="370" y="96" width="200" height="196" rx="8" fill="#1a2818" stroke="#47b47544"/>
+  <rect x="370" y="96" width="200" height="30" rx="8" fill="#243828"/>
+  <rect x="370" y="118" width="200" height="8" fill="#243828"/>
+  <text x="470" y="116" fill="#47b475" text-anchor="middle" font-size="12" font-weight="700">Make It Better</text>
+  <g font-size="9" fill="#b0b0b0">
+    <text x="386" y="144">Goal: Improve structure</text>
+    <text x="386" y="162" fill="#667">• Higher valid-SVG rate</text>
+    <text x="386" y="178" fill="#667">• Fewer broken tails</text>
+    <text x="386" y="194" fill="#667">• Better tag closure</text>
+    <text x="386" y="214" fill="#47b475" font-weight="600">Config changes:</text>
+    <text x="386" y="230" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">vocab 640 | seq 96</text>
+    <text x="386" y="244" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">4 epochs | lr 2e-4</text>
+    <text x="386" y="258" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">grad_accum 4</text>
+    <text x="386" y="278" fill="#07adf8" font-size="8" font-weight="600">Key: bigger vocab + longer context</text>
+  </g>
+
+  <!-- Arrow 2→3 -->
+  <text x="620" y="56" fill="#47b475" font-size="9" font-weight="600">scale →</text>
+
+  <!-- Phase 3 -->
+  <circle cx="780" cy="60" r="24" fill="#2a3a10" stroke="#47b475" stroke-width="3"/>
+  <text x="780" y="65" fill="#47b475" text-anchor="middle" font-size="13" font-weight="700">3</text>
+  <rect x="680" y="96" width="240" height="196" rx="8" fill="#0e1a28" stroke="#07adf844"/>
+  <rect x="680" y="96" width="240" height="30" rx="8" fill="#142838"/>
+  <rect x="680" y="118" width="240" height="8" fill="#142838"/>
+  <text x="800" y="116" fill="#07adf8" text-anchor="middle" font-size="12" font-weight="700">Make It Generalize</text>
+  <g font-size="9" fill="#b0b0b0">
+    <text x="696" y="144">Goal: Not just memorize</text>
+    <text x="696" y="162" fill="#667">• Clean holdout outputs</text>
+    <text x="696" y="178" fill="#667">• Reduced exact-copy rate</text>
+    <text x="696" y="194" fill="#667">• Novel valid SVGs</text>
+    <text x="696" y="214" fill="#47b475" font-weight="600">Strategy:</text>
+    <text x="696" y="230" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">90/10 train/holdout split</text>
+    <text x="696" y="244" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">more data + diversity</text>
+    <text x="696" y="258" fill="#667" font-family="'JetBrains Mono',monospace" font-size="8">ablation matrix sweep</text>
+    <text x="696" y="278" fill="#ffb400" font-size="8" font-weight="600">Use: run_ablation_matrix_v7.py</text>
+  </g>
+
+  <!-- Loss curve sketch -->
+  <g opacity="0.5">
+    <text x="160" y="58" fill="#ffb40066" text-anchor="middle" font-size="7" dy="-30">loss: 4.2→2.8</text>
+    <text x="470" y="58" fill="#47b47566" text-anchor="middle" font-size="7" dy="-30">loss: 2.8→1.5</text>
+    <text x="780" y="58" fill="#07adf866" text-anchor="middle" font-size="7" dy="-30">loss: 1.5→0.8</text>
+  </g>
+</svg>
+</div>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Use this phased path for small custom datasets. The goal is not "ChatGPT quality"; the goal is stable, valid SVG generation that improves step-by-step.</p>
+    <table>
+        <tr><th>Phase</th><th>Goal</th><th>Pass Criteria</th></tr>
+        <tr><td>Phase 1</td><td>Get baseline working</td><td>Roundtrip passes, loss drops, and at least some valid SVG samples are generated</td></tr>
+        <tr><td>Phase 2</td><td>Improve structure stability</td><td>Higher valid-SVG rate and fewer broken tails in longer generations</td></tr>
+        <tr><td>Phase 3</td><td>Generalize (not memorize only)</td><td>Cleaner outputs on holdout prompts/data and reduced exact-copy rate</td></tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Phase 1: Make It Work (Baseline)</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 32 --total-tokens 841472 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_full_e1_latest.json
+
+.venv/bin/python version/v7/scripts/test_ascii_bpe_roundtrip_v7.py \
+  --run "$RUN" \
+  --dataset "$DATA_TXT" \
+  --require-ascii</pre>
+    </div>
+    <p class="mini-note">If this phase fails, do not tune hyperparameters yet. First fix data cleanliness and tokenizer roundtrip.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Phase 2: Make It Better (Quality Tuning)</h3>
+    <p style="margin-bottom: 0.4rem;">For small SVG corpora, increase tokenizer capacity and sequence window before adding complex tricks.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>RUN2=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_phase2
+mkdir -p "$RUN2"
+
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN2" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --data "$DATA_TXT" \
+  --vocab-size 640 --bpe-vocab-size 640 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 4 --seq-len 96 --total-tokens 1200000 \
+  --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 400 \
+  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_phase2_latest.json</pre>
+    </div>
+    <p class="mini-note">Typical improvement from Phase 1 -> Phase 2: fewer malformed tails and better tag closure consistency.</p>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Phase 3: Add Data + Check Memorization</h3>
+    <p style="margin-bottom: 0.4rem;">More data helps only when it stays clean and you measure train-vs-holdout behavior.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Build a simple 90/10 line split for memorization checks
+SHUF="$RUN/svg_all_shuf.txt"
+TRAIN_TXT="$RUN/svg_train_90.txt"
+HOLDOUT_TXT="$RUN/svg_holdout_10.txt"
+
+shuf "$DATA_TXT" > "$SHUF"
+TOTAL=$(wc -l < "$SHUF")
+HOLDOUT=$(( TOTAL / 10 ))
+TRAIN=$(( TOTAL - HOLDOUT ))
+head -n "$TRAIN" "$SHUF" > "$TRAIN_TXT"
+tail -n "$HOLDOUT" "$SHUF" > "$HOLDOUT_TXT"
+
+echo "[split] train_lines=$(wc -l < "$TRAIN_TXT") holdout_lines=$(wc -l < "$HOLDOUT_TXT")"
+echo "[next] retrain using --data \"$TRAIN_TXT\" and compare sample quality against holdout prompts"</pre>
+    </div>
+    <p class="mini-note">If outputs are mostly exact copies of training lines, you are memorizing. If outputs stay valid and varied on holdout prompts, you are generalizing.</p>
+</div>
+
+<h2 id="step-10-ablation">Step 10: Ablation Matrix Sweep (one command)</h2>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SVG INFOGRAPHIC: Ablation Matrix Dimensions
+     ═══════════════════════════════════════════════════════════ -->
+<div class="card" style="padding:1rem;overflow-x:auto;margin-bottom:1rem;">
+<svg viewBox="0 0 940 190" width="100%" height="190" font-family="Inter,system-ui,sans-serif" aria-label="Ablation sweep dimensions">
+  <rect width="940" height="190" rx="10" fill="#151b26"/>
+  <text x="470" y="24" fill="#a070ff" text-anchor="middle" font-size="13" font-weight="700">Ablation Matrix — Sweep These Dimensions</text>
+  <text x="470" y="40" fill="#667" text-anchor="middle" font-size="9">Each combination is an independent training run. Results ranked by final loss.</text>
+
+  <!-- Dimension cards -->
+  <g font-size="9">
+    <!-- Embed dim -->
+    <rect x="20" y="56" width="140" height="76" rx="6" fill="#1e2738" stroke="#ffb40044"/>
+    <text x="90" y="76" fill="#ffb400" text-anchor="middle" font-weight="700" font-size="10">Embed Dim</text>
+    <text x="90" y="94" fill="#b0b0b0" text-anchor="middle" font-family="'JetBrains Mono',monospace">64, 96</text>
+    <text x="90" y="110" fill="#667" text-anchor="middle" font-size="8">Model capacity width</text>
+    <text x="90" y="124" fill="#ffb40066" text-anchor="middle" font-size="8">--embed-dims</text>
+
+    <!-- Layers -->
+    <rect x="174" y="56" width="140" height="76" rx="6" fill="#1e2738" stroke="#47b47544"/>
+    <text x="244" y="76" fill="#47b475" text-anchor="middle" font-weight="700" font-size="10">Layers</text>
+    <text x="244" y="94" fill="#b0b0b0" text-anchor="middle" font-family="'JetBrains Mono',monospace">12, 24</text>
+    <text x="244" y="110" fill="#667" text-anchor="middle" font-size="8">Model capacity depth</text>
+    <text x="244" y="124" fill="#47b47566" text-anchor="middle" font-size="8">--layers-list</text>
+
+    <!-- Vocab -->
+    <rect x="328" y="56" width="140" height="76" rx="6" fill="#1e2738" stroke="#07adf844"/>
+    <text x="398" y="76" fill="#07adf8" text-anchor="middle" font-weight="700" font-size="10">BPE Vocab</text>
+    <text x="398" y="94" fill="#b0b0b0" text-anchor="middle" font-family="'JetBrains Mono',monospace">320, 640</text>
+    <text x="398" y="110" fill="#667" text-anchor="middle" font-size="8">Token granularity</text>
+    <text x="398" y="124" fill="#07adf866" text-anchor="middle" font-size="8">--bpe-vocab-sizes</text>
+
+    <!-- Dataset frac -->
+    <rect x="482" y="56" width="140" height="76" rx="6" fill="#1e2738" stroke="#a070ff44"/>
+    <text x="552" y="76" fill="#a070ff" text-anchor="middle" font-weight="700" font-size="10">Dataset Frac</text>
+    <text x="552" y="94" fill="#b0b0b0" text-anchor="middle" font-family="'JetBrains Mono',monospace">0.5, 1.0</text>
+    <text x="552" y="110" fill="#667" text-anchor="middle" font-size="8">Data scaling check</text>
+    <text x="552" y="124" fill="#a070ff66" text-anchor="middle" font-size="8">--dataset-fracs</text>
+
+    <!-- KV divisor -->
+    <rect x="636" y="56" width="140" height="76" rx="6" fill="#1e2738" stroke="#e74c3c44"/>
+    <text x="706" y="76" fill="#e74c3c" text-anchor="middle" font-weight="700" font-size="10">KV Divisor</text>
+    <text x="706" y="94" fill="#b0b0b0" text-anchor="middle" font-family="'JetBrains Mono',monospace">1, 2</text>
+    <text x="706" y="110" fill="#667" text-anchor="middle" font-size="8">MHA vs GQA</text>
+    <text x="706" y="124" fill="#e74c3c66" text-anchor="middle" font-size="8">--kv-divisors</text>
+
+    <!-- Combinatorics -->
+    <rect x="790" y="56" width="130" height="76" rx="8" fill="#2a3a10" stroke="#47b475" stroke-width="1.5"/>
+    <text x="855" y="76" fill="#47b475" text-anchor="middle" font-weight="700" font-size="10">Combinations</text>
+    <text x="855" y="98" fill="#ffb400" text-anchor="middle" font-size="20" font-weight="700">32</text>
+    <text x="855" y="114" fill="#667" text-anchor="middle" font-size="8">total runs</text>
+    <text x="855" y="126" fill="#667" text-anchor="middle" font-size="7">2×2×2×2×2 = 32</text>
+  </g>
+
+  <!-- Output bar -->
+  <rect x="20" y="146" width="900" height="30" rx="6" fill="#1a1e28" stroke="#33333366"/>
+  <text x="40" y="166" fill="#47b475" font-size="10" font-weight="600">Outputs:</text>
+  <g font-size="9" font-family="'JetBrains Mono',monospace" fill="#b0b0b0">
+    <text x="110" y="166">ablation_results_ranked.json</text>
+    <text x="330" y="166" fill="#667">|</text>
+    <text x="346" y="166">ablation_results.csv</text>
+    <text x="510" y="166" fill="#667">|</text>
+    <text x="526" y="166">ablation_summary.md</text>
+    <text x="700" y="166" fill="#667">← ranked by final loss</text>
+  </g>
+</svg>
+</div>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;">Run a ranked matrix over embed dim, dataset size, token vocab size, layer count, and GQA ratio. This is the fastest way to see which configs stay stable and improve quality.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>AB_RUN_ROOT=$HOME/.cache/ck-engine-v7/models/train/v7_ablation_matrix_svg_ascii
+
+python3 version/v7/scripts/run_ablation_matrix_v7.py \
+  --run-root "$AB_RUN_ROOT" \
+  --data "$DATA_TXT" \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --embed-dims 64,96 \
+  --layers-list 12,24 \
+  --bpe-vocab-sizes 320,640 \
+  --dataset-fracs 0.5,1.0 \
+  --total-tokens-list 131072 \
+  --num-heads 8 \
+  --kv-divisors 1,2 \
+  --seq-len 96 \
+  --epochs 3 \
+  --grad-accum 4 \
+  --lr 2e-4 \
+  --max-grad-norm 1.0 \
+  --seed 42</pre>
+    </div>
+    <p class="mini-note">Outputs: <code>$AB_RUN_ROOT/ablation_results_ranked.json</code>, <code>$AB_RUN_ROOT/ablation_results.csv</code>, <code>$AB_RUN_ROOT/ablation_summary.md</code>.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Optional: dry-run preview (no training execution)
+python3 version/v7/scripts/run_ablation_matrix_v7.py \
+  --run-root "$AB_RUN_ROOT" \
+  --data "$DATA_TXT" \
+  --dry-run --max-runs 2</pre>
+    </div>
+</div>
+
+<h2 id="options">CLI Options Cheat Sheet</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">List all options</h3>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/ck_run_v7.py --help
+python3 version/v7/scripts/ck_run_v7.py run --help
+python3 version/v7/scripts/ck_run_v7.py train --help
+python3 version/v7/scripts/train_data_pipeline_v7.py --help
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --help
+python3 version/v7/scripts/run_ablation_matrix_v7.py --help
+python3 version/v7/tools/open_ir_visualizer.py --help
+python3 scripts/ck_chat.py --help</pre>
+        </div>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Most-used flags</h3>
+        <table>
+            <tr><th>Command</th><th>Useful flags</th></tr>
+            <tr><td><code>ck_run_v7.py run</code></td><td><code>--context-len</code>, <code>--force-compile</code>, <code>--force-convert</code>, <code>--chat-template</code>, <code>--generate-only</code>, <code>--generate-visualizer</code></td></tr>
+            <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen3</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code></td></tr>
+            <tr><td><code>promote_latest_checkpoint_v7.py</code></td><td><code>--run</code>, <code>--dry-run</code>, <code>--step</code></td></tr>
+            <tr><td><code>run_ablation_matrix_v7.py</code></td><td><code>--embed-dims</code>, <code>--layers-list</code>, <code>--bpe-vocab-sizes</code>, <code>--dataset-fracs</code>, <code>--kv-divisors</code>, <code>--resume</code></td></tr>
+            <tr><td><code>ck_chat.py</code></td><td><code>--python-tokenizer</code>, <code>--show-token-ids</code>, <code>--show-token-pieces</code>, <code>--ascii-display</code>, <code>--temperature</code></td></tr>
+        </table>
+    </div>
+</div>
+
+<h2 id="human-readable">Human-Readable Output Check</h2>
+
+<div class="card card-accent">
+    <ul>
+        <li>Human-readable output: run chat <strong>without</strong> <code>--show-token-ids</code>.</li>
+        <li>Debug token bytes/pieces: add <code>--show-token-ids --show-token-pieces --ascii-display</code>.</li>
+        <li>Tokenizer source-of-truth check: startup log should include <code>Loaded CK true_bpe tokenizer ...</code>.</li>
+    </ul>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python scripts/ck_chat.py \
+  --model-dir "$RUN/.ck_build" \
+  --python-tokenizer --chat-template none \
+  --prompt "&lt;svg" --max-tokens 120 --temperature 0.0</pre>
+    </div>
+</div>
+
+<script>
+(function () {
+    var buttons = document.querySelectorAll('.copy-btn');
+    buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pre = btn.parentElement.querySelector('pre');
+            if (!pre) return;
+            var text = pre.innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                var old = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(function () { btn.textContent = old; }, 1200);
+            }).catch(function () {
+                btn.textContent = 'Copy failed';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+            });
+        });
+    });
+
+})();
+</script>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-20</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
