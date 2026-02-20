@@ -312,10 +312,12 @@ CKSpacePrefixStyle ck_tokenizer_detect_space_prefix_style(CKTokenizer *tok) {
 
     /* Determine style based on counts */
     CKSpacePrefixStyle detected;
-    if (spm_count > gpt2_count * 2) {
+    if (spm_count > gpt2_count * 2 && spm_count > 0) {
         detected = CK_SPACE_PREFIX_SPM;
+    } else if (gpt2_count > 0) {
+        detected = CK_SPACE_PREFIX_GPT2;
     } else {
-        detected = CK_SPACE_PREFIX_GPT2;  /* Default to GPT-2 if similar counts */
+        detected = CK_SPACE_PREFIX_ASCII;
     }
 
     tok->config.space_prefix_style = detected;
@@ -393,6 +395,12 @@ static int32_t find_longest_match(const CKTokenizer *tok, const char *text, size
  * Returns new length, or -1 if buffer too small. */
 static int preprocess_bpe_spaces(const char *text, int text_len, char *out, int out_max, CKSpacePrefixStyle style) {
     int out_len = 0;
+
+    if (style == CK_SPACE_PREFIX_ASCII) {
+        if (text_len > out_max) return -1;
+        memcpy(out, text, (size_t)text_len);
+        return text_len;
+    }
 
     /* For SentencePiece, add ▁ at the start of text (unless text starts with space) */
     if (style == CK_SPACE_PREFIX_SPM && text_len > 0 && text[0] != ' ') {

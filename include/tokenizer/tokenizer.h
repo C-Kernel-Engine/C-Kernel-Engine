@@ -60,7 +60,8 @@ typedef enum {
 typedef enum {
     CK_SPACE_PREFIX_AUTO = 0,    /* Auto-detect from vocabulary */
     CK_SPACE_PREFIX_GPT2 = 1,    /* GPT-2 style: Ġ (U+0120, bytes 0xC4 0xA0) */
-    CK_SPACE_PREFIX_SPM = 2      /* SentencePiece style: ▁ (U+2581, bytes 0xE2 0x96 0x81) */
+    CK_SPACE_PREFIX_SPM = 2,     /* SentencePiece style: ▁ (U+2581, bytes 0xE2 0x96 0x81) */
+    CK_SPACE_PREFIX_ASCII = 3    /* ASCII identity mode: no UTF-8/byte remap */
 } CKSpacePrefixStyle;
 
 /* SentencePiece mode */

@@ -3369,7 +3369,7 @@ V7_PIPELINE_TOTAL_TOKENS ?= 1024
 V7_PIPELINE_GRAD_ACCUM ?= 1
 V7_PIPELINE_LR ?= 5e-4
 V7_PIPELINE_WITH_TORCH ?= 1
-V7_PIPELINE_OPEN_VIS ?= 0
+V7_PIPELINE_OPEN_VIS ?= 1
 V7_PIPELINE_WORK_DIR ?=
 V7_PIPELINE_JSON ?= $(V7_REPORT_DIR)/train_data_pipeline_latest.json
 
@@ -3418,7 +3418,7 @@ v7-help:
 	@echo "  make test-v7-bpe-train-parity"
 	@echo "  make test-v7-svg-overfit-regression"
 	@echo "  make v7-train-data-pipeline"
-	@echo "     knobs: V7_PIPELINE_TOKENIZER=byte|bpe V7_PIPELINE_WITH_TORCH=0|1 V7_PIPELINE_OPEN_VIS=0|1"
+	@echo "     knobs: V7_PIPELINE_TOKENIZER=byte|bpe V7_PIPELINE_WITH_TORCH=0|1 V7_PIPELINE_OPEN_VIS=0|1 (default: 1)"
 	@echo "  make v7-train-parity-drift-smoke"
 	@echo "  make v7-train-parity-drift-localize"
 	@echo "  make v7-train-parity-long-horizon"
@@ -3870,7 +3870,7 @@ v7-train-data-pipeline:
 		--work-dir "$$WORK_DIR" \
 		--json-out "$(V7_PIPELINE_JSON)" \
 		$(if $(filter 1,$(V7_PIPELINE_WITH_TORCH)),--with-torch-ref,) \
-		$(if $(filter 1,$(V7_PIPELINE_OPEN_VIS)),--open-visualizer,)
+		$(if $(filter 0,$(V7_PIPELINE_OPEN_VIS)),--no-open-visualizer,--open-visualizer)
 
 v7-gate-train:
 	@$(MAKE) --no-print-directory v7-inference-smoke

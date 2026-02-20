@@ -681,7 +681,15 @@ CKSpacePrefixStyle ck_true_bpe_detect_space_style(CKTrueBPE *bpe) {
         }
     }
 
-    CKSpacePrefixStyle detected = (spm_count > gpt2_count * 2) ? CK_SPACE_PREFIX_SPM : CK_SPACE_PREFIX_GPT2;
+    CKSpacePrefixStyle detected;
+    if (spm_count > gpt2_count * 2 && spm_count > 0) {
+        detected = CK_SPACE_PREFIX_SPM;
+    } else if (gpt2_count > 0) {
+        detected = CK_SPACE_PREFIX_GPT2;
+    } else {
+        /* No Ġ/▁ markers found: treat vocab as ASCII identity BPE. */
+        detected = CK_SPACE_PREFIX_ASCII;
+    }
     bpe->config.space_prefix_style = detected;
 
     return detected;
@@ -754,6 +762,12 @@ static int byte_to_gpt2(unsigned char byte, char *out) {
 static int preprocess_text(const CKTrueBPE *bpe, const char *text, int text_len, char *out, int out_max) {
     CKSpacePrefixStyle style = bpe->config.space_prefix_style;
     int out_len = 0;
+
+    if (style == CK_SPACE_PREFIX_ASCII) {
+        if (text_len > out_max) return -1;
+        memcpy(out, text, (size_t)text_len);
+        return text_len;
+    }
 
     /* For SentencePiece, add ▁ at start */
     if (style == CK_SPACE_PREFIX_SPM && text_len > 0 && text[0] != ' ') {
@@ -1126,9 +1140,16 @@ static int gpt2_pretokenize(const char *text, int text_len, PretokChunk *chunks,
 static int init_tokens_from_text(CKTrueBPE *bpe, CKBPETokenList *list, const char *text, int text_len) {
     token_list_clear(list);
 
+    CKSpacePrefixStyle style = bpe->config.space_prefix_style;
+    if (style == CK_SPACE_PREFIX_AUTO) {
+        style = ck_true_bpe_detect_space_style(bpe);
+    }
+
     int pos = 0;
     while (pos < text_len) {
-        int char_len = utf8_char_len((unsigned char)text[pos]);
+        int char_len = (style == CK_SPACE_PREFIX_ASCII)
+                           ? 1
+                           : utf8_char_len((unsigned char)text[pos]);
         if (pos + char_len > text_len) {
             char_len = text_len - pos;  /* Truncated UTF-8 */
         }
@@ -1245,6 +1266,7 @@ static int encode_chunk(CKTrueBPE *bpe, const char *chunk, int chunk_len,
 
     /* Extract token IDs from this chunk */
     int out_idx = 0;
+    CKSpacePrefixStyle style = bpe->config.space_prefix_style;
     for (size_t i = 0; i < list->count && out_idx < max_ids; i++) {
         int32_t id = list->tokens[i].id;
 
@@ -1254,14 +1276,22 @@ static int encode_chunk(CKTrueBPE *bpe, const char *chunk, int chunk_len,
                 /* Output each byte as separate token (byte fallback) */
                 for (size_t j = 0; j < list->tokens[i].len && out_idx < max_ids; j++) {
                     unsigned char raw_b = (unsigned char)list->tokens[i].str[j];
+                    int32_t byte_id = -1;
+
+                    if (style == CK_SPACE_PREFIX_ASCII) {
+                        char raw_tok[2] = { (char)raw_b, '\0' };
+                        byte_id = lookup_token_exact(bpe, raw_tok);
+                    }
 
                     /*
                      * Keep legacy <0xHH> fallback for older tokenizers,
                      * then try GPT-2 byte-level piece fallback for modern BPE vocabs.
                      */
-                    char byte_token[8];
-                    snprintf(byte_token, sizeof(byte_token), "<0x%02X>", raw_b);
-                    int32_t byte_id = lookup_token_exact(bpe, byte_token);
+                    if (byte_id < 0) {
+                        char byte_token[8];
+                        snprintf(byte_token, sizeof(byte_token), "<0x%02X>", raw_b);
+                        byte_id = lookup_token_exact(bpe, byte_token);
+                    }
 
                     if (byte_id < 0) {
                         char mapped[8];
@@ -1301,10 +1331,10 @@ static int encode_text_segment(CKTrueBPE *bpe, const char *text, int text_len,
     preprocessed[pp_len] = '\0';
 
     int out_idx = 0;
+    CKSpacePrefixStyle style = bpe->config.space_prefix_style;
 
     /* For GPT-2 style, use pretokenizer to split into chunks */
-    if (bpe->config.space_prefix_style == CK_SPACE_PREFIX_GPT2 ||
-        bpe->config.space_prefix_style == CK_SPACE_PREFIX_AUTO) {
+    if (style == CK_SPACE_PREFIX_GPT2 || style == CK_SPACE_PREFIX_AUTO) {
 
         /* Pretokenize */
         PretokChunk chunks[1024];
@@ -1425,40 +1455,64 @@ int ck_true_bpe_encode(CKTrueBPE *bpe, const char *text, int text_len, int32_t *
  * Decoding
  * ═══════════════════════════════════════════════════════════════════════════════ */
 
-/*
- * Decode GPT-2 byte-level BPE character back to original byte
- *
- * GPT-2 maps control characters and special bytes to Unicode codepoints:
- * - U+0100 to U+011F: bytes 0x00 to 0x1F (control chars)
- * - U+0120: byte 0x20 (space) -> Ġ
- * - U+017F to U+01A0: bytes 0x7F to 0xA0
- *
- * Returns: decoded byte, or -1 if not a GPT-2 byte encoding
- */
-static int gpt2_decode_byte(const unsigned char *s, int len) {
-    if (len < 2) return -1;
-
-    /* Check for 2-byte UTF-8 sequence: 110xxxxx 10xxxxxx */
-    if ((s[0] & 0xE0) == 0xC0 && (s[1] & 0xC0) == 0x80) {
-        unsigned int codepoint = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
-
-        /* GPT-2 byte range: U+0100 to U+01FF */
-        if (codepoint >= 0x100 && codepoint <= 0x1FF) {
-            /* Decode back to original byte */
-            if (codepoint <= 0x120) {
-                /* U+0100-U+0120 -> bytes 0x00-0x20 */
-                return codepoint - 0x100;
-            } else if (codepoint >= 0x17F && codepoint <= 0x1A0) {
-                /* U+017F-U+01A0 -> bytes 0x7F-0xA0 */
-                return codepoint - 0x100;
-            }
-        }
+/* Decode one UTF-8 scalar from s[0..len) and report codepoint + bytes consumed. */
+static int decode_utf8_scalar(const unsigned char *s, int len, int *out_cp, int *out_used) {
+    if (!s || len <= 0 || !out_cp || !out_used) return -1;
+    unsigned char c0 = s[0];
+    if ((c0 & 0x80) == 0) {
+        *out_cp = (int)c0;
+        *out_used = 1;
+        return 0;
     }
+    if ((c0 & 0xE0) == 0xC0) {
+        if (len < 2) return -1;
+        if ((s[1] & 0xC0) != 0x80) return -1;
+        *out_cp = ((int)(c0 & 0x1F) << 6) | (int)(s[1] & 0x3F);
+        *out_used = 2;
+        return 0;
+    }
+    if ((c0 & 0xF0) == 0xE0) {
+        if (len < 3) return -1;
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return -1;
+        *out_cp = ((int)(c0 & 0x0F) << 12) |
+                  ((int)(s[1] & 0x3F) << 6) |
+                  (int)(s[2] & 0x3F);
+        *out_used = 3;
+        return 0;
+    }
+    if ((c0 & 0xF8) == 0xF0) {
+        if (len < 4) return -1;
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return -1;
+        *out_cp = ((int)(c0 & 0x07) << 18) |
+                  ((int)(s[1] & 0x3F) << 12) |
+                  ((int)(s[2] & 0x3F) << 6) |
+                  (int)(s[3] & 0x3F);
+        *out_used = 4;
+        return 0;
+    }
+    return -1;
+}
+
+/* Invert byte_to_gpt2(): convert mapped codepoint back to original byte if possible. */
+static int gpt2_codepoint_to_byte(int cp) {
+    /* 0x00-0x20 -> U+0100-U+0120 */
+    if (cp >= 0x0100 && cp <= 0x0120) return cp - 0x0100;
+    /* 0x7F-0xA0 -> U+017F-U+01A0 */
+    if (cp >= 0x017F && cp <= 0x01A0) return cp - 0x0100;
+    /* 0xA1-0xFF are represented as U+00A1-U+00FF */
+    if (cp >= 0x00A1 && cp <= 0x00FF) return cp;
+    /* Printable ASCII bytes stay as-is. */
+    if (cp >= 0x0021 && cp <= 0x007E) return cp;
     return -1;
 }
 
 int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, char *text, int max_len) {
     if (!bpe || !ids || !text || max_len <= 0) return 0;
+
+    if (bpe->config.space_prefix_style == CK_SPACE_PREFIX_AUTO) {
+        ck_true_bpe_detect_space_style((CKTrueBPE *)bpe);
+    }
+    CKSpacePrefixStyle style = bpe->config.space_prefix_style;
 
     int len = 0;
     for (int i = 0; i < num_ids && len < max_len - 1; i++) {
@@ -1472,6 +1526,14 @@ int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, ch
 
         const char *token = ck_true_bpe_id_to_token(bpe, id);
         if (!token) continue;
+
+        if (style == CK_SPACE_PREFIX_ASCII) {
+            int token_len_ascii = (int)strlen(token);
+            for (int j = 0; j < token_len_ascii && len < max_len - 1; j++) {
+                text[len++] = token[j];
+            }
+            continue;
+        }
 
         int token_len = (int)strlen(token);
 
@@ -1489,30 +1551,24 @@ int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, ch
         /* Process rest of token, decoding GPT-2 byte-level encoding */
         int pos = 0;
         while (pos < token_len && len < max_len - 1) {
-            unsigned char c0 = (unsigned char)token[pos];
-
-            /* Try GPT-2 byte decoding for 2-byte UTF-8 sequences */
-            if (pos + 1 < token_len && (c0 & 0xE0) == 0xC0) {
-                int decoded = gpt2_decode_byte((unsigned char*)token + pos, token_len - pos);
+            int cp = 0;
+            int used = 0;
+            if (decode_utf8_scalar((const unsigned char *)token + pos, token_len - pos, &cp, &used) == 0) {
+                int decoded = gpt2_codepoint_to_byte(cp);
                 if (decoded >= 0) {
                     text[len++] = (char)decoded;
-                    pos += 2;
-                    continue;
+                } else {
+                    /* Not part of byte-level mapping: preserve original UTF-8 bytes. */
+                    for (int j = 0; j < used && pos + j < token_len && len < max_len - 1; j++) {
+                        text[len++] = token[pos + j];
+                    }
                 }
+                pos += used;
+            } else {
+                /* Invalid UTF-8 in token string: copy one byte to avoid stalling. */
+                text[len++] = token[pos];
+                pos += 1;
             }
-
-            /* Regular character - copy as-is */
-            int char_len = 1;
-            if ((c0 & 0x80) == 0) char_len = 1;       /* ASCII */
-            else if ((c0 & 0xE0) == 0xC0) char_len = 2;
-            else if ((c0 & 0xF0) == 0xE0) char_len = 3;
-            else if ((c0 & 0xF8) == 0xF0) char_len = 4;
-
-            /* Copy the character */
-            for (int j = 0; j < char_len && pos + j < token_len && len < max_len - 1; j++) {
-                text[len++] = token[pos + j];
-            }
-            pos += char_len;
         }
     }
 

@@ -2,7 +2,8 @@
 """
 C-Kernel-Engine Chat Interface
 
-Uses the HuggingFace tokenizer or GGUF tokenizer and calls the compiled C model library.
+Uses the embedded C tokenizer when available, otherwise CK true_bpe/HF/GGUF tokenizer
+fallbacks and calls the compiled C model library.
 
 Features:
 - Auto-validation: When gibberish is detected, automatically runs staged validation
@@ -13,6 +14,7 @@ from __future__ import annotations  # Python 3.9 compatibility
 import argparse
 import ctypes
 import json
+import struct
 import sys
 import time
 from pathlib import Path
@@ -42,6 +44,215 @@ except ImportError:
 
 # Always have GGUF tokenizer available
 from gguf_tokenizer import GGUFTokenizer, Tokenizer as GGUFTokenizerWrapper
+
+
+class _SimpleEncoding:
+    """Minimal tokenizers.Encoding-compatible container."""
+
+    def __init__(self, ids: List[int]):
+        self.ids = ids
+
+
+class CKTrueBPETokenizer:
+    """Python wrapper around CK true_bpe runtime using binary tokenizer artifacts."""
+
+    def __init__(self, lib_path: Path, bin_dir: Path):
+        self.lib_path = Path(lib_path)
+        self.bin_dir = Path(bin_dir)
+        self._lib = ctypes.CDLL(str(self.lib_path))
+        self._bpe = None
+        self._vocab_size = 0
+        self._num_merges = 0
+        self._setup_api()
+        self._load_from_binary_artifacts()
+
+    def _setup_api(self) -> None:
+        self._lib.ck_true_bpe_create.restype = ctypes.c_void_p
+        self._lib.ck_true_bpe_free.argtypes = [ctypes.c_void_p]
+        self._lib.ck_true_bpe_load_binary.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+        ]
+        self._lib.ck_true_bpe_load_binary.restype = ctypes.c_int
+        self._lib.ck_true_bpe_encode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+        ]
+        self._lib.ck_true_bpe_encode.restype = ctypes.c_int
+        self._lib.ck_true_bpe_decode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+        ]
+        self._lib.ck_true_bpe_decode.restype = ctypes.c_int
+        self._lib.ck_true_bpe_lookup.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self._lib.ck_true_bpe_lookup.restype = ctypes.c_int32
+        self._lib.ck_true_bpe_id_to_token.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+        self._lib.ck_true_bpe_id_to_token.restype = ctypes.c_char_p
+
+    def _load_from_binary_artifacts(self) -> None:
+        meta_path = self.bin_dir / "tokenizer_meta.json"
+        offsets_path = self.bin_dir / "vocab_offsets.bin"
+        strings_path = self.bin_dir / "vocab_strings.bin"
+        merges_path = self.bin_dir / "vocab_merges.bin"
+        required = [meta_path, offsets_path, strings_path, merges_path]
+        missing = [str(p) for p in required if not p.exists()]
+        if missing:
+            raise RuntimeError("missing tokenizer artifacts: " + ", ".join(missing))
+
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        vocab_size = int(meta.get("vocab_size") or 0)
+        num_merges = int(meta.get("num_merges") or 0)
+        if vocab_size <= 0 or num_merges < 0:
+            raise RuntimeError(f"invalid tokenizer_meta.json values: vocab_size={vocab_size}, num_merges={num_merges}")
+
+        offsets_b = offsets_path.read_bytes()
+        merges_b = merges_path.read_bytes()
+        strings_b = strings_path.read_bytes()
+
+        expected_offsets = vocab_size * 4
+        expected_merges = num_merges * 3 * 4
+        if len(offsets_b) != expected_offsets:
+            raise RuntimeError(f"bad offsets size: {len(offsets_b)} != {expected_offsets}")
+        if len(merges_b) != expected_merges:
+            raise RuntimeError(f"bad merges size: {len(merges_b)} != {expected_merges}")
+
+        offsets = list(struct.unpack("<" + ("i" * vocab_size), offsets_b))
+        merges = list(struct.unpack("<" + ("i" * (num_merges * 3)), merges_b)) if num_merges > 0 else []
+
+        self._offsets_arr = (ctypes.c_int32 * vocab_size)(*offsets)
+        self._merges_arr = (ctypes.c_int32 * (num_merges * 3))(*merges)
+        self._strings_buf = ctypes.create_string_buffer(strings_b + b"\x00")
+
+        self._bpe = self._lib.ck_true_bpe_create()
+        if not self._bpe:
+            raise RuntimeError("ck_true_bpe_create failed")
+
+        rc = self._lib.ck_true_bpe_load_binary(
+            self._bpe,
+            vocab_size,
+            self._offsets_arr,
+            ctypes.cast(self._strings_buf, ctypes.c_char_p),
+            num_merges,
+            self._merges_arr,
+        )
+        if rc != 0:
+            self._lib.ck_true_bpe_free(self._bpe)
+            self._bpe = None
+            raise RuntimeError(f"ck_true_bpe_load_binary failed rc={rc}")
+
+        self._vocab_size = vocab_size
+        self._num_merges = num_merges
+
+    @property
+    def vocab_size(self) -> int:
+        return self._vocab_size
+
+    def encode(self, text: str, add_special_tokens: bool = True) -> _SimpleEncoding:
+        # true_bpe special-token behavior is configured internally from artifacts.
+        _ = add_special_tokens
+        if not self._bpe:
+            return _SimpleEncoding([])
+        text_bytes = text.encode("utf-8")
+        max_ids = max(256, len(text_bytes) * 8)
+        out = (ctypes.c_int32 * max_ids)()
+        n = int(self._lib.ck_true_bpe_encode(self._bpe, text_bytes, -1, out, max_ids))
+        if n <= 0:
+            return _SimpleEncoding([])
+        return _SimpleEncoding([int(out[i]) for i in range(n)])
+
+    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
+        _ = skip_special_tokens
+        if not self._bpe or not ids:
+            return ""
+        arr = (ctypes.c_int32 * len(ids))(*[int(x) for x in ids])
+        cap = max(256, len(ids) * 32)
+        out = ctypes.create_string_buffer(cap)
+        n = int(self._lib.ck_true_bpe_decode(self._bpe, arr, len(ids), out, cap))
+        if n <= 0:
+            return ""
+        # Retry with larger buffer if decode appears truncated.
+        if n >= cap - 1:
+            cap = max(cap * 4, 4096)
+            out = ctypes.create_string_buffer(cap)
+            n = int(self._lib.ck_true_bpe_decode(self._bpe, arr, len(ids), out, cap))
+            if n <= 0:
+                return ""
+        return out.raw[:n].decode("utf-8", errors="replace")
+
+    def id_to_token(self, token_id: int) -> Optional[str]:
+        if not self._bpe:
+            return None
+        p = self._lib.ck_true_bpe_id_to_token(self._bpe, ctypes.c_int32(int(token_id)))
+        if not p:
+            return None
+        return p.decode("utf-8", errors="replace")
+
+    def lookup_token_id(self, token: str) -> int:
+        if not self._bpe:
+            return -1
+        return int(self._lib.ck_true_bpe_lookup(self._bpe, token.encode("utf-8")))
+
+    def free(self) -> None:
+        if self._bpe:
+            self._lib.ck_true_bpe_free(self._bpe)
+            self._bpe = None
+
+
+def _is_true_bpe_bin_dir(path: Path) -> bool:
+    required = ("tokenizer_meta.json", "vocab_offsets.bin", "vocab_strings.bin", "vocab_merges.bin")
+    return path.is_dir() and all((path / name).exists() for name in required)
+
+
+def _find_true_bpe_bin_dir(model_dir: Path) -> Optional[Path]:
+    model_root = model_dir.parent if model_dir.name == ".ck_build" else model_dir
+
+    # Prefer artifacts colocated with the loaded model first.
+    preferred = (
+        model_dir / "tokenizer_bin",
+        model_root / "tokenizer_bin",
+        model_dir / "bpe_bin",
+        model_root / "bpe_bin",
+    )
+    for p in preferred:
+        if _is_true_bpe_bin_dir(p):
+            return p
+
+    # Fallback: latest pipeline artifact if no colocated tokenizer exists.
+    pipe_dir = model_root / ".ck_pipeline"
+    candidates: List[Path] = []
+    if pipe_dir.exists():
+        for patt in ("*/tokenizer_bin", "*/bpe_bin"):
+            for p in pipe_dir.glob(patt):
+                if _is_true_bpe_bin_dir(p):
+                    candidates.append(p)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
+def _find_true_bpe_lib(model_dir: Path) -> Optional[Path]:
+    model_root = model_dir.parent if model_dir.name == ".ck_build" else model_dir
+    project_root = Path(__file__).resolve().parents[1]
+    candidates = (
+        model_dir / "libckernel_tokenizer.so",
+        model_root / "libckernel_tokenizer.so",
+        project_root / "build" / "libckernel_tokenizer.so",
+    )
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
 
 
 class CKModel:
@@ -80,8 +291,9 @@ class CKModel:
 
         Tokenizer priority (unless force_python_tokenizer=True):
         1. C tokenizer (BPE built into the model library) - fastest, preferred
-        2. Python HuggingFace tokenizer - if available
-        3. Python GGUF tokenizer - fallback
+        2. CK true_bpe via libckernel_tokenizer + tokenizer_bin artifacts
+        3. Python HuggingFace tokenizer - compatibility fallback
+        4. Python GGUF tokenizer - fallback
 
         Args:
             gguf_path: Path to GGUF file for tokenizer extraction
@@ -236,7 +448,19 @@ class CKModel:
             tokenizer_json = next((p for p in tokenizer_candidates if p.exists()), tokenizer_candidates[0])
             vocab_json = next((p for p in vocab_candidates if p.exists()), vocab_candidates[0])
 
-            if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
+            true_bpe_bin = _find_true_bpe_bin_dir(self.model_dir)
+            true_bpe_lib = _find_true_bpe_lib(self.model_dir)
+            if true_bpe_bin and true_bpe_lib:
+                try:
+                    self.tokenizer = CKTrueBPETokenizer(true_bpe_lib, true_bpe_bin)
+                    print(f"Loaded CK true_bpe tokenizer from {true_bpe_bin}")
+                except Exception as e:
+                    print(f"Warning: failed to load CK true_bpe tokenizer ({e})")
+                    self.tokenizer = None
+
+            if self.tokenizer is not None:
+                pass
+            elif tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
                 # Use HuggingFace tokenizer if available
                 self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
                 print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
@@ -431,6 +655,16 @@ class CKModel:
                 for name in self.EOS_TOKEN_NAMES:
                     if name in vocab:
                         self.eos_tokens.add(vocab[name])
+            else:
+                lookup = getattr(self.tokenizer, "lookup_token_id", None)
+                if callable(lookup):
+                    for name in self.EOS_TOKEN_NAMES:
+                        try:
+                            token_id = int(lookup(name))
+                        except Exception:
+                            token_id = -1
+                        if token_id >= 0:
+                            self.eos_tokens.add(token_id)
 
         # Model-family specific EOS tokens (when C tokenizer lookup fails)
         # These are hardcoded because special tokens like <|im_end|> may not
@@ -513,6 +747,31 @@ class CKModel:
             return out_buf.value[:out_len].decode('utf-8', errors='replace')
         else:
             return self.tokenizer.decode(token_ids)
+
+    def token_piece(self, token_id: int) -> Optional[str]:
+        """Return raw vocabulary piece for a token ID when Python tokenizer is active."""
+        if self.use_c_tokenizer or self.tokenizer is None:
+            return None
+        tid = int(token_id)
+
+        # HuggingFace tokenizers.Tokenizer API
+        id_to_token = getattr(self.tokenizer, "id_to_token", None)
+        if callable(id_to_token):
+            try:
+                piece = id_to_token(tid)
+                if isinstance(piece, str):
+                    return piece
+            except Exception:
+                pass
+
+        # GGUF wrapper fallback (scripts/gguf_tokenizer.py)
+        inner = getattr(self.tokenizer, "_tokenizer", None)
+        toks = getattr(inner, "tokens", None)
+        if isinstance(toks, list) and 0 <= tid < len(toks):
+            piece = toks[tid]
+            if isinstance(piece, str):
+                return piece
+        return None
 
     def format_chat_prompt(self, user_message: str, system_prompt: str = None) -> str:
         """Format user message with chat template for instruction models.
@@ -618,6 +877,9 @@ class CKModel:
 
     def free(self):
         """Free model resources."""
+        tok_free = getattr(self.tokenizer, "free", None)
+        if callable(tok_free):
+            tok_free()
         if self.lib:
             self.lib.ck_model_free()
 
@@ -644,12 +906,81 @@ def sample_top_k(logits: np.ndarray, k: int = 40, temperature: float = 0.7) -> i
     return int(top_k_indices[idx])
 
 
+def _escape_text_for_display(text: str, ascii_only: bool = False, escape_newlines: bool = False) -> str:
+    """Render text safely for terminal display (no control-char side effects)."""
+    if not text:
+        return ""
+    out: List[str] = []
+    for ch in text:
+        code = ord(ch)
+        if ch == "\n":
+            if escape_newlines:
+                out.append("\\n")
+            else:
+                out.append("\n")
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            continue
+        if code < 0x20 or code == 0x7F:
+            out.append(f"\\x{code:02x}")
+            continue
+        if ch == "\ufffd":
+            out.append("\\uFFFD")
+            continue
+        if ascii_only and code > 0x7E:
+            if code <= 0xFFFF:
+                out.append(f"\\u{code:04X}")
+            else:
+                out.append(f"\\U{code:08X}")
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _piece_for_debug(piece: str) -> str:
+    """Render raw vocab pieces in a byte/escape form for easier debugging."""
+    if not piece:
+        return ""
+    out: List[str] = []
+    for ch in piece:
+        code = ord(ch)
+        if ch == "\n":
+            out.append("\\n")
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            continue
+        if 0x20 <= code <= 0x7E:
+            out.append(ch)
+            continue
+        if code <= 0xFF:
+            out.append(f"\\x{code:02X}")
+            continue
+        if code <= 0xFFFF:
+            out.append(f"\\u{code:04X}")
+        else:
+            out.append(f"\\U{code:08X}")
+    return "".join(out)
+
+
 def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              temperature: float = 0.7, verbose: bool = False,
              show_stats: bool = True,
              validator: Optional['AutoValidator'] = None,
              check_every_n: int = 20,
-             no_prefill: bool = False) -> str:
+             no_prefill: bool = False,
+             safe_display: bool = True,
+             ascii_display: bool = False,
+             escape_newlines: bool = False,
+             show_token_ids: bool = False,
+             show_token_pieces: bool = False) -> str:
     """Generate text from prompt.
 
     Args:
@@ -704,7 +1035,18 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             token_ids.append(next_token)
             token_text = model.decode([next_token])
             generated_text += token_text
-            print(token_text, end='', flush=True)
+            display_text = _escape_text_for_display(
+                token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
+            ) if safe_display else token_text
+            if show_token_ids:
+                if show_token_pieces:
+                    piece = model.token_piece(next_token)
+                    piece_txt = _piece_for_debug(piece if piece is not None else "?")
+                    print(f"<{next_token}|{piece_txt}:{display_text}>", end='', flush=True)
+                else:
+                    print(f"<{next_token}:{display_text}>", end='', flush=True)
+            else:
+                print(display_text, end='', flush=True)
 
             # Periodic gibberish check
             if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
@@ -754,7 +1096,18 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             # Decode and print incrementally
             token_text = model.decode([next_token])
             generated_text += token_text
-            print(token_text, end='', flush=True)
+            display_text = _escape_text_for_display(
+                token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
+            ) if safe_display else token_text
+            if show_token_ids:
+                if show_token_pieces:
+                    piece = model.token_piece(next_token)
+                    piece_txt = _piece_for_debug(piece if piece is not None else "?")
+                    print(f"<{next_token}|{piece_txt}:{display_text}>", end='', flush=True)
+                else:
+                    print(f"<{next_token}:{display_text}>", end='', flush=True)
+            else:
+                print(display_text, end='', flush=True)
 
             # Periodic gibberish check
             if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
@@ -831,7 +1184,10 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
 def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               show_stats: bool = True, validator: Optional['AutoValidator'] = None,
-              no_prefill: bool = False):
+              no_prefill: bool = False, safe_display: bool = True,
+              ascii_display: bool = False, escape_newlines: bool = False,
+              show_token_ids: bool = False,
+              show_token_pieces: bool = False):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
@@ -885,7 +1241,12 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
         response = generate(model, prompt, max_tokens=max_tokens,
                           temperature=temperature, verbose=False,
                           show_stats=show_stats, validator=validator,
-                          no_prefill=no_prefill)
+                          no_prefill=no_prefill,
+                          safe_display=safe_display,
+                          ascii_display=ascii_display,
+                          escape_newlines=escape_newlines,
+                          show_token_ids=show_token_ids,
+                          show_token_pieces=show_token_pieces)
         print()
 
 
@@ -913,6 +1274,16 @@ def main():
                        help="Disable prefill; feed prompt tokens via decode (slow)")
     parser.add_argument("--python-tokenizer", action="store_true",
                        help="Force Python tokenizer instead of C tokenizer")
+    parser.add_argument("--unsafe-display", action="store_true",
+                       help="Print raw token text (may include control/invalid characters)")
+    parser.add_argument("--ascii-display", action="store_true",
+                       help="Escape all non-ASCII output as \\uXXXX sequences")
+    parser.add_argument("--escape-newlines", action="store_true",
+                       help="Render newline tokens as literal \\n instead of line breaks")
+    parser.add_argument("--show-token-ids", action="store_true",
+                       help="Print token IDs inline as <id:text>")
+    parser.add_argument("--show-token-pieces", action="store_true",
+                       help="With --show-token-ids, also show raw vocab piece as <id|piece:text>")
     parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "gemma"], default="auto",
                        help="Chat template mode: auto (from GGUF), none, qwen, or gemma")
     parser.add_argument("--no-chat-template", action="store_true",
@@ -964,13 +1335,23 @@ def main():
                     temperature=args.temperature, verbose=args.verbose,
                     show_stats=args.stats, validator=validator,
                     check_every_n=args.check_every,
-                    no_prefill=args.no_prefill)
+                    no_prefill=args.no_prefill,
+                    safe_display=not args.unsafe_display,
+                    ascii_display=args.ascii_display,
+                    escape_newlines=args.escape_newlines,
+                    show_token_ids=args.show_token_ids,
+                    show_token_pieces=args.show_token_pieces)
             print()
         else:
             # Interactive chat mode
             chat_loop(model, temperature=args.temperature, max_tokens=args.max_tokens,
                      show_stats=args.stats, validator=validator,
-                     no_prefill=args.no_prefill)
+                     no_prefill=args.no_prefill,
+                     safe_display=not args.unsafe_display,
+                     ascii_display=args.ascii_display,
+                     escape_newlines=args.escape_newlines,
+                     show_token_ids=args.show_token_ids,
+                     show_token_pieces=args.show_token_pieces)
     finally:
         model.free()
 
