@@ -1265,6 +1265,8 @@ unittest:
 	@echo "  make test-bf16        - Run BF16 kernel tests"
 	@echo "  make test-tokenizer   - Run tokenizer tests"
 	@echo "  make nightly          - Run full nightly test suite (scripts/nightly_runner.py)"
+	@echo "  make visualizer       - Run v7 IR visualizer E2E regression"
+	@echo "  make visualizer-full  - Run visualizer E2E + train-runtime ASan artifact checks"
 	@echo ""
 
 # Typo aliases
@@ -1360,7 +1362,9 @@ showtests:
 	@echo "  make nightly-kernels  Only kernel tests"
 	@echo "  make nightly-bf16     Only BF16 tests"
 	@echo "  make nightly-quant    Only quantization tests"
-	@echo "  make nightly-parity   Only parity tests (PyTorch + llama.cpp)"
+	@echo "  make nightly-parity   Only parity tests (PyTorch + llama.cpp + v7 visualizer E2E)"
+	@echo "  make visualizer       Run v7 IR visualizer E2E regression"
+	@echo "  make visualizer-full  Run visualizer E2E + train-runtime ASan artifact checks"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  LAYERED PIPELINE TESTS (Pinpoint Failures)"
@@ -1471,25 +1475,8 @@ test: $(LIB) test-libs
 	@echo "Running GEMM AVX vs scalar benchmark (quick)..."
 	@$(MAKE) --no-print-directory test-gemm-avx-bench-quick
 	@echo ""
-	@if [ "$(CK_TEST_WITH_V7_LONG_HORIZON)" = "1" ]; then \
-		echo "Running v7 long-horizon drift smoke..."; \
-		$(MAKE) --no-print-directory v7-train-parity-drift-smoke; \
-	else \
-		echo "Skipping v7 long-horizon drift smoke (set CK_TEST_WITH_V7_LONG_HORIZON=1 to enable)"; \
-	fi
-	@echo ""
-	@if [ "$(CK_TEST_WITH_V7_PERF)" = "1" ]; then \
-		echo "Running v7 perf gate (optional)..."; \
-		$(MAKE) --no-print-directory v7-perf-gate \
-			V7_MODEL="$(CK_TEST_V7_PERF_MODEL)" \
-			V7_PERF_RUNTIME=cli \
-			V7_PREP_WITH_PYTHON=0 \
-			V7_WITH_VTUNE=$(CK_TEST_V7_WITH_VTUNE) \
-			V7_WITH_ADVISOR=$(CK_TEST_V7_WITH_ADVISOR) \
-			V7_VTUNE_DEEP=$(CK_TEST_V7_VTUNE_DEEP); \
-	else \
-		echo "Skipping v7 perf gate (set CK_TEST_WITH_V7_PERF=1 to enable)"; \
-	fi
+	@echo "Kernel-focused suite complete."
+	@echo "For v7 visualizer runbook E2E use: make visualizer"
 
 # Run full benchmarks (including GEMM microkernel performance tests)
 test-bench: $(LIB) test-libs
@@ -3098,6 +3085,7 @@ report-md:
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
+.PHONY: visualizer visualizer-full v7-ir-visualizer-e2e
 .PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
@@ -3353,12 +3341,13 @@ V7_BACKPROP_STITCH_ACCUM ?= 4
 V7_BACKPROP_STITCH_TOTAL_TOKENS ?= 32
 V7_BACKPROP_PLUMBING_RUNTIME_REPORT ?=
 V7_BACKPROP_PLUMBING_RUNTIME_SUMMARY ?=
-CK_TEST_WITH_V7_LONG_HORIZON ?= 1
-CK_TEST_WITH_V7_PERF ?= 0
-CK_TEST_V7_WITH_VTUNE ?= 0
-CK_TEST_V7_WITH_ADVISOR ?= 0
-CK_TEST_V7_VTUNE_DEEP ?= 0
-CK_TEST_V7_PERF_MODEL ?= $(V7_MODEL)
+V7_VISUALIZER_E2E_MODEL ?= $(if $(wildcard $(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF),$(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF,$(if $(wildcard $(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen2-0.5B-Instruct-GGUF),$(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen2-0.5B-Instruct-GGUF,$(V7_SMOKE_MODEL_QWEN2)))
+V7_VISUALIZER_E2E_CONTEXT ?= 1024
+V7_VISUALIZER_E2E_MAX_TOKENS ?= 1
+V7_VISUALIZER_E2E_JSON ?= $(V7_REPORT_DIR)/ir_visualizer_e2e_latest.json
+V7_VISUALIZER_E2E_FORCE_COMPILE ?= 1
+V7_VISUALIZER_E2E_FORCE_CONVERT ?= 1
+V7_VISUALIZER_E2E_WITH_TRAIN ?= 0
 V7_CKTOP_RUN ?= /tmp/v7_runtime_parity
 V7_PIPELINE_RUN ?= /tmp/v7_pipeline_run
 V7_PIPELINE_TOKENIZER ?= byte
@@ -3379,7 +3368,7 @@ V7_PIPELINE_JSON ?= $(V7_REPORT_DIR)/train_data_pipeline_latest.json
 	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
 	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum \
 	v7-backprop-plumbing v7-backprop-stitch-runtime v7-backprop-stitch-runtime-accum test-v7-svg-overfit-regression \
-	v7-train-data-pipeline \
+	v7-train-data-pipeline v7-ir-visualizer-e2e \
 	v7-ctop v7-ctop-demo
 
 v7-help:
@@ -3393,6 +3382,8 @@ v7-help:
 	@echo "  make v7-perf-gate"
 	@echo "  make profile-v7-full"
 	@echo "  make profile-v7-advisor"
+	@echo "  make visualizer"
+	@echo "  make visualizer-full"
 	@echo "  make v7-validate-contracts"
 	@echo "  make v7-parity-1tok"
 	@echo "  make v7-qk-norm-backward-parity"
@@ -3853,6 +3844,24 @@ test-v7-bpe-train-parity: tokenizer ck-bpe-train
 
 test-v7-svg-overfit-regression:
 	@$(PYTHON) version/v7/scripts/test_svg_overfit_regression_v7.py --json-out "$(V7_SVG_OVERFIT_JSON)"
+
+visualizer: v7-ir-visualizer-e2e
+
+visualizer-full:
+	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1
+
+v7-ir-visualizer-e2e:
+	@set -e; \
+	extra_flags=""; \
+	if [ "$(V7_VISUALIZER_E2E_FORCE_COMPILE)" = "1" ]; then extra_flags="$$extra_flags --force-compile"; fi; \
+	if [ "$(V7_VISUALIZER_E2E_FORCE_CONVERT)" = "1" ]; then extra_flags="$$extra_flags --force-convert"; fi; \
+	if [ "$(V7_VISUALIZER_E2E_WITH_TRAIN)" = "1" ]; then extra_flags="$$extra_flags --with-train-runtime"; fi; \
+	$(PYTHON) version/v7/scripts/test_ir_visualizer_e2e_v7.py \
+		--model-input "$(V7_VISUALIZER_E2E_MODEL)" \
+		--context-len "$(V7_VISUALIZER_E2E_CONTEXT)" \
+		--max-tokens "$(V7_VISUALIZER_E2E_MAX_TOKENS)" \
+		--json-out "$(V7_VISUALIZER_E2E_JSON)" \
+		$$extra_flags
 
 v7-train-data-pipeline:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_PIPELINE_RUN))"; \
@@ -4323,10 +4332,7 @@ profile-v7-prepare-runtime:
 		echo "SKIP: python prep disabled (V7_PREP_WITH_PYTHON=$(V7_PREP_WITH_PYTHON))"; \
 	else \
 		prep_model="$(V7_MODEL)"; \
-		if [ -d "$$prep_model" ]; then \
-			gguf_path="$$(find "$$prep_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-			if [ -n "$$gguf_path" ]; then prep_model="$$gguf_path"; fi; \
-		fi; \
+		# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 		echo "Preparing runtime via ck_run_v7.py (model=$$prep_model, force_compile=$(V7_FORCE_COMPILE))"; \
 		CK_PROFILE=1 \
 		CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
@@ -4348,6 +4354,9 @@ profile-v7-decode:
 			runtime_dir="$$model_dir/.ck_build"; \
 		fi; \
 		needs_regen=0; regen_reason=""; \
+		if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+			needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+		fi; \
 		if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
 		elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
@@ -4358,10 +4367,7 @@ profile-v7-decode:
 		else \
 			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 			regen_model="$(V7_MODEL)"; \
-			if [ -d "$$regen_model" ]; then \
-				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-			fi; \
+			# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 			CK_PROFILE=1 \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -4416,6 +4422,9 @@ profile-v7-prefill:
 			runtime_dir="$$model_dir/.ck_build"; \
 		fi; \
 		needs_regen=0; regen_reason=""; \
+		if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+			needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+		fi; \
 		if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
 			needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
 		elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
@@ -4426,10 +4435,7 @@ profile-v7-prefill:
 		else \
 			echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 			regen_model="$(V7_MODEL)"; \
-			if [ -d "$$regen_model" ]; then \
-				gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-				if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-			fi; \
+			# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 			CK_PROFILE=1 \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 			CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -4477,21 +4483,21 @@ profile-v7-flamegraph:
 		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
 			runtime_dir="$$model_dir/.ck_build"; \
 		fi; \
-			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
-				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
-				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
-			fi; \
+				needs_regen=0; regen_reason=""; \
+				if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+					needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+				fi; \
+				if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
+					needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+				elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+					needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+				fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
 				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
-				if [ -d "$$regen_model" ]; then \
-					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-				fi; \
+				# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 				CK_PROFILE=1 \
 				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -4543,21 +4549,21 @@ profile-v7-perf-stat:
 		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
 			runtime_dir="$$model_dir/.ck_build"; \
 		fi; \
-			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
-				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
-				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
-			fi; \
+				needs_regen=0; regen_reason=""; \
+				if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+					needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+				fi; \
+				if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
+					needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+				elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+					needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+				fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
 				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
-				if [ -d "$$regen_model" ]; then \
-					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-				fi; \
+				# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 				CK_PROFILE=1 \
 				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -4624,21 +4630,21 @@ profile-v7-vtune:
 		if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
 			runtime_dir="$$model_dir/.ck_build"; \
 		fi; \
-			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
-				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
-				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
-			fi; \
+				needs_regen=0; regen_reason=""; \
+				if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+					needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+				fi; \
+				if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
+					needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+				elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+					needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+				fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
 				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
-				if [ -d "$$regen_model" ]; then \
-					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-				fi; \
+				# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 				CK_PROFILE=1 \
 				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \
@@ -4749,21 +4755,21 @@ profile-v7-advisor:
 			if [ -f "$$model_dir/.ck_build/libmodel.so" ] && [ -f "$$model_dir/.ck_build/weights.bump" ]; then \
 				runtime_dir="$$model_dir/.ck_build"; \
 			fi; \
-			needs_regen=0; regen_reason=""; \
-			if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
-				needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
-			elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
-				needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
-			fi; \
+				needs_regen=0; regen_reason=""; \
+				if [ "$(V7_FORCE_COMPILE)" = "1" ]; then \
+					needs_regen=1; regen_reason="V7_FORCE_COMPILE=1"; \
+				fi; \
+				if [ ! -f "$$runtime_dir/libmodel.so" ] || [ ! -f "$$runtime_dir/weights.bump" ]; then \
+					needs_regen=1; regen_reason="missing libmodel.so or weights.bump"; \
+				elif ldd "$$runtime_dir/libmodel.so" 2>/dev/null | grep -q "libimf.so => not found"; then \
+					needs_regen=1; regen_reason="libimf missing (rebuild with gcc)"; \
+				fi; \
 			if [ "$$needs_regen" -eq 0 ]; then \
 				echo "Using existing compiled runtime in $$runtime_dir"; \
 			else \
 				echo "Regenerating runtime in $$model_dir ($$regen_reason)"; \
 				regen_model="$(V7_MODEL)"; \
-				if [ -d "$$regen_model" ]; then \
-					gguf_path="$$(find "$$regen_model" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"; \
-					if [ -n "$$gguf_path" ]; then regen_model="$$gguf_path"; fi; \
-				fi; \
+				# Keep explicit model directory stable; do not remap to *.gguf stem cache dir. \
 				CK_PROFILE=1 \
 				CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
 				CK_V7_EXTRA_CFLAGS="$(PROFILE_V7_DEBUG_CFLAGS)" \

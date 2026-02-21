@@ -337,6 +337,18 @@ MAKE_TARGETS = {
         "target": "v7-backprop-long-epoch-nightly",
         "timeout_sec": 2400,
     },
+    "v7_kernel_parity_train": {
+        "name": "v7 Backprop Kernel Parity",
+        "category": "training",
+        "target": "v7-kernel-parity-train",
+        "timeout_sec": 1800,
+    },
+    "v7_ir_visualizer_e2e": {
+        "name": "v7 IR Visualizer E2E (full)",
+        "category": "parity",
+        "target": "visualizer-full",
+        "timeout_sec": 5400,
+    },
 }
 
 # Benchmark targets with perf extraction

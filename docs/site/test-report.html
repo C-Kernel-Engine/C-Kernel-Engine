@@ -1299,6 +1299,10 @@
       (<code>unittest/test_attention_sliding_contract.py</code>)</li>
     <li><strong>BF16 Tests</strong>: BFloat16 precision tests (when CPU supports it)</li>
     <li><strong>Quantization Tests</strong>: Q4_K, Q6_K quantized kernel tests</li>
+    <li><strong>v7 Backprop Kernel Parity</strong>: Optimizer + QK-norm backward ISA matrix + RMSNorm/SwiGLU backward + GEMM backward sweep
+      (<code>make v7-kernel-parity-train</code>)</li>
+    <li><strong>v7 IR Visualizer E2E</strong>: Runbook-path regression with explicit run-dir wiring, decode profile checks, and tiny train-runtime ASan artifact validation
+      (<code>make visualizer</code>, <code>make visualizer-full</code>)</li>
     <li><strong>llama.cpp Parity</strong>: CK vs llama.cpp kernel parity flow
       (<code>scripts/run_parity_smoketest.sh</code>, <code>make llamacpp-parity-full</code>)</li>
     <li><strong>v6.6 Preflight Gates</strong>: Tooling contracts + 3-model matrix validation
@@ -1309,9 +1313,9 @@
   <div class="alert alert-info" style="margin-top: 1rem;">
     <span class="alert-icon">💡</span>
     <div>
-      <strong>Run locally:</strong> <code>make e2e</code> runs the full E2E integration test suite.
+      <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
-      <span style="color: var(--text-muted);">Tests: Qwen2-0.5B or SmolLM2-360M with actual prompt/response verification.</span>
+      <span style="color: var(--text-muted);">Nightly coverage now includes v7 backprop kernel parity and visualizer runbook regression checks.</span>
     </div>
   </div>
 
