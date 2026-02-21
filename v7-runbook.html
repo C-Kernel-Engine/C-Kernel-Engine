@@ -1141,6 +1141,7 @@
         <li><a href="#step-0-data-view">Step 0.6: Preview Dataset</a></li>
         <li><a href="#step-0-tokenize">Step 0.7: Tokenize Dataset (true_bpe preview)</a></li>
         <li><a href="#step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</a></li>
+        <li><a href="#step-0-data-lab">Step 0.9: Data Lab Artifacts + Paths</a></li>
         <li><a href="#step-2-training-setup">Step 2: Training Setup (true_bpe)</a></li>
         <li><a href="#step-3-train">Step 3: Run Training Pipeline</a></li>
         <li><a href="#step-4-artifacts">Step 4: Artifact Locations + Data Format</a></li>
@@ -1375,6 +1376,8 @@ cd "$ROOT"
   --template qwen3 \
   --tokenizer ascii_bpe \
   --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
   --vocab-size 320 --bpe-vocab-size 320 \
   --layers 2 --embed-dim 64 --hidden-dim 128 \
@@ -1400,7 +1403,7 @@ head -n 40 "$TOKENIZE_WORK/train_tokens.txt"</pre>
 echo "[OK] Visualizer: $TOKENIZE_RUN/ir_report.html"
 xdg-open "$TOKENIZE_RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
-    <p class="mini-note">In the report, check: <strong>Architecture -> Tokenizer</strong> (click <code>tokenizer.json</code>) and <strong>Training -> Tokenizer Lineage</strong> (path + hash).</p>
+    <p class="mini-note">In the report, check: <strong>Architecture -> Tokenizer</strong> (click <code>tokenizer.json</code>) and <strong>Training -> Pipeline + Data Lab</strong> (dataset folder path + tokenizer path + roundtrip samples).</p>
 </div>
 
 <h2 id="step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</h2>
@@ -1415,6 +1418,23 @@ xdg-open "$TOKENIZE_RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
   --require-ascii</pre>
     </div>
     <p class="mini-note">Pass condition: <code>ascii_bpe roundtrip PASS</code> and matching byte counts.</p>
+</div>
+
+<h2 id="step-0-data-lab">Step 0.9: Data Lab Artifacts + Paths</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.4rem;">Pipeline now writes Data Lab JSON artifacts directly under <code>$RUN</code> so the visualizer can show dataset folder path, tokenizer JSON path, and row-level roundtrip samples.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>ls -lh "$TOKENIZE_RUN"/dataset_qc.json \
+       "$TOKENIZE_RUN"/dataset_profile.json \
+       "$TOKENIZE_RUN"/tokenizer_roundtrip.json || true
+
+jq '{status, path, dataset_dir, checks, non_empty_lines}' "$TOKENIZE_RUN/dataset_qc.json"
+jq '{dataset_dir, line_length, duplicates, top_chars: (.top_chars|length), top_tokens: (.top_tokens|length)}' "$TOKENIZE_RUN/dataset_profile.json"
+jq '{status, exact_match, tokenizer_json_path, line_eval, sample_rows: (.sample_rows|length)}' "$TOKENIZE_RUN/tokenizer_roundtrip.json"</pre>
+    </div>
+    <p class="mini-note">Visualizer path: switch to <strong>Training mode</strong> and open <strong>Data Lab</strong>. This tab shows: <code>dataset_dir</code>, <code>dataset_path</code>, <code>tokenizer_json_path</code>, and row → token-id → decoded previews.</p>
 </div>
 
 <h2 id="step-2-training-setup">Step 2: Training Setup (true_bpe)</h2>
@@ -1575,6 +1595,8 @@ PY</pre>
   --template qwen3 \
   --tokenizer ascii_bpe \
   --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
   --vocab-size 320 --bpe-vocab-size 320 \
   --layers 24 --embed-dim 64 --hidden-dim 128 \
@@ -1598,6 +1620,8 @@ PY</pre>
   --template qwen3 \
   --tokenizer ascii_bpe \
   --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
   --vocab-size 320 --bpe-vocab-size 320 \
   --layers 24 --embed-dim 64 --hidden-dim 128 \
@@ -1709,6 +1733,26 @@ PY</pre>
         <td>One integer token id per line. Used by <code>--train-token-file</code>.</td>
     </tr>
     <tr>
+        <td>Dataset QC artifact</td>
+        <td><code>$RUN/dataset_qc.json</code></td>
+        <td>ASCII/SVG gate status, row/byte counts, dataset path metadata.</td>
+    </tr>
+    <tr>
+        <td>Dataset profile artifact</td>
+        <td><code>$RUN/dataset_profile.json</code></td>
+        <td>Length histogram, duplicate rows, top chars/tokens.</td>
+    </tr>
+    <tr>
+        <td>Tokenizer roundtrip artifact</td>
+        <td><code>$RUN/tokenizer_roundtrip.json</code></td>
+        <td>Encode/decode exactness + per-line sample browser rows.</td>
+    </tr>
+    <tr>
+        <td>Post-train eval artifact</td>
+        <td><code>$RUN/post_train_eval.json</code></td>
+        <td>valid SVG rate, closure success, repetition/loop score.</td>
+    </tr>
+    <tr>
         <td>Train report</td>
         <td><code>.../train_ck.json</code> + your <code>--json-out</code> file</td>
         <td>Loss stats + pipeline metadata.</td>
@@ -1772,10 +1816,11 @@ echo "[OK] Visualizer: $RUN/ir_report.html"
 xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">The training pipeline already generates this by default; this command regenerates it on demand.</p>
+    <p class="mini-note"><strong>Regression gate:</strong> <code>make visualizer</code> validates run-dir path wiring + decode/profile artifact loading. <code>make visualizer-full</code> also validates train-runtime ASan artifact loading via a tiny fixture run.</p>
     <table>
         <tr><th>Checkpoint</th><th>Run Path</th><th>What to inspect</th></tr>
-        <tr><td>After Step 0.7 tokenization preview</td><td><code>$TOKENIZE_RUN</code></td><td><code>Architecture -> Tokenizer</code>, <code>Training -> Tokenizer Lineage</code></td></tr>
-        <tr><td>After Step 3 training</td><td><code>$RUN</code></td><td><code>Training -> Data Provenance</code>, loss/grad tabs, runtime coverage</td></tr>
+        <tr><td>After Step 0.7 tokenization preview</td><td><code>$TOKENIZE_RUN</code></td><td><code>Architecture -> Tokenizer</code>, <code>Training -> Data Lab</code> (dataset folder + tokenizer path + roundtrip samples + Tokenizer Internals merges/pieces)</td></tr>
+        <tr><td>After Step 3 training</td><td><code>$RUN</code></td><td><code>Training -> Data Lab</code> + <code>Train Dashboard</code> (valid SVG/closure/loop metrics)</td></tr>
         <tr><td>After Step 6 inference build</td><td><code>$RUN</code></td><td>kernel graph, runtime files, and artifact links</td></tr>
     </table>
 </div>
@@ -1957,6 +2002,8 @@ xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 ||
   --template qwen3 \
   --tokenizer ascii_bpe \
   --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
   --vocab-size 320 --bpe-vocab-size 320 \
   --layers 24 --embed-dim 64 --hidden-dim 128 \
@@ -1988,6 +2035,8 @@ mkdir -p "$RUN2"
   --template qwen3 \
   --tokenizer ascii_bpe \
   --require-svg-rows \
+  --strict-data-gates \
+  --roundtrip-max-lines 1024 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
   --vocab-size 640 --bpe-vocab-size 640 \
   --layers 24 --embed-dim 64 --hidden-dim 128 \
@@ -2150,7 +2199,7 @@ python3 scripts/ck_chat.py --help</pre>
         <table>
             <tr><th>Command</th><th>Useful flags</th></tr>
             <tr><td><code>ck_run_v7.py run</code></td><td><code>--context-len</code>, <code>--force-compile</code>, <code>--force-convert</code>, <code>--chat-template</code>, <code>--generate-only</code>, <code>--generate-visualizer</code></td></tr>
-            <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen3</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code></td></tr>
+            <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen3</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code>, <code>--roundtrip-max-lines</code>, <code>--strict-data-gates</code>, <code>--min-valid-svg-rate</code>, <code>--post-train-eval</code></td></tr>
             <tr><td><code>promote_latest_checkpoint_v7.py</code></td><td><code>--run</code>, <code>--dry-run</code>, <code>--step</code></td></tr>
             <tr><td><code>run_ablation_matrix_v7.py</code></td><td><code>--embed-dims</code>, <code>--layers-list</code>, <code>--bpe-vocab-sizes</code>, <code>--dataset-fracs</code>, <code>--kv-divisors</code>, <code>--resume</code></td></tr>
             <tr><td><code>ck_chat.py</code></td><td><code>--python-tokenizer</code>, <code>--show-token-ids</code>, <code>--show-token-pieces</code>, <code>--ascii-display</code>, <code>--temperature</code></td></tr>
@@ -2424,7 +2473,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-21</p>
             </div>
         </div>
     </footer>
