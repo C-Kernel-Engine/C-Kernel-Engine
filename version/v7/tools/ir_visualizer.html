@@ -16591,6 +16591,37 @@ const TRAINING_TABS = [
     'train-memory-canary',
 ];
 
+const TRAINING_SIGNAL_KEYS = [
+    'ir1_train',
+    'ir2_train',
+    'layout_train',
+    'train_exec_plan',
+    'training_loss_curve',
+    'training_parity',
+    'training_step_profile',
+    'training_pipeline',
+    'train_e2e',
+    'memory_diagnostic',
+    'memory_verification',
+    'backprop_stitch_runtime',
+];
+
+function detectTrainingModeAvailable() {
+    const embedded = window.EMBEDDED_IR_DATA && typeof window.EMBEDDED_IR_DATA === 'object'
+        ? window.EMBEDDED_IR_DATA
+        : {};
+    const meta = embedded.meta && typeof embedded.meta === 'object' ? embedded.meta : {};
+    if (meta.has_train_runtime === true) return true;
+
+    const files = getEmbeddedFiles();
+    return TRAINING_SIGNAL_KEYS.some((key) => {
+        const payload = files[key];
+        if (payload == null) return false;
+        if (typeof payload === 'object') return Object.keys(payload).length > 0;
+        return true;
+    });
+}
+
 function injectStyles() {
     if (document.getElementById('ck-v7-train-style')) return;
     const style = document.createElement('style');
@@ -16615,6 +16646,12 @@ function injectStyles() {
         .report-mode-toggle button.active {
             background: var(--orange);
             color: var(--dark);
+        }
+        .report-mode-toggle button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            background: var(--dark-card);
+            color: var(--text-muted);
         }
         .alert-item {
             border-left: 3px solid;
@@ -16805,6 +16842,11 @@ function installModeToggle() {
         <button type="button" data-mode="inference" class="active">Inference</button>
         <button type="button" data-mode="training">Training</button>
     `;
+    const trainingBtn = host.querySelector('button[data-mode="training"]');
+    if (trainingBtn && window.__ckTrainingModeAvailable === false) {
+        trainingBtn.disabled = true;
+        trainingBtn.title = 'Training mode unavailable: this report was generated from inference-only artifacts.';
+    }
     controls.appendChild(host);
 }
 
@@ -16818,7 +16860,10 @@ function firstVisibleTabId() {
 }
 
 function applyReportMode(mode) {
-    const normalized = mode === 'training' ? 'training' : 'inference';
+    let normalized = mode === 'training' ? 'training' : 'inference';
+    if (normalized === 'training' && window.__ckTrainingModeAvailable === false) {
+        normalized = 'inference';
+    }
     window.__ckReportMode = normalized;
 
     document.querySelectorAll('#ckReportModeToggle button').forEach((btn) => {
@@ -16843,6 +16888,7 @@ function applyReportMode(mode) {
 }
 
 function initModeUI() {
+    window.__ckTrainingModeAvailable = detectTrainingModeAvailable();
     injectStyles();
     ensureTabDataAttrs();
     setTabMode('memory', 'inference,training');
