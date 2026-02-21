@@ -4499,6 +4499,14 @@ python3 test_gemv_q8_0_q8_0.py</pre>
         }
 
         function showTab(tabId) {
+            const trainingDisabled = window.__ckTrainingModeAvailable === false;
+            const trainingOnlyTabs = Array.isArray(window.__ckTrainingOnlyTabs) && window.__ckTrainingOnlyTabs.length > 0
+                ? window.__ckTrainingOnlyTabs
+                : ['training', 'train-dashboard', 'train-data-lab', 'train-gradient', 'train-parity', 'train-grad-flow', 'train-weights', 'train-attention', 'train-compare', 'train-memory-canary'];
+            if (trainingDisabled && trainingOnlyTabs.includes(tabId)) {
+                tabId = 'memory';
+            }
+
             const tabs = Array.from(document.querySelectorAll('.tab'));
             tabs.forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -16590,10 +16598,9 @@ const TRAINING_TABS = [
     'train-compare',
     'train-memory-canary',
 ];
+const TRAINING_ONLY_TABS = ['training', ...TRAINING_TABS];
 
 const TRAINING_SIGNAL_KEYS = [
-    'ir1_train',
-    'ir2_train',
     'layout_train',
     'train_exec_plan',
     'training_loss_curve',
@@ -16888,6 +16895,7 @@ function applyReportMode(mode) {
 }
 
 function initModeUI() {
+    window.__ckTrainingOnlyTabs = [...TRAINING_ONLY_TABS];
     window.__ckTrainingModeAvailable = detectTrainingModeAvailable();
     injectStyles();
     ensureTabDataAttrs();

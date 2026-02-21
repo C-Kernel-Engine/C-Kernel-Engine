@@ -14,10 +14,9 @@ const TRAINING_TABS = [
     'train-compare',
     'train-memory-canary',
 ];
+const TRAINING_ONLY_TABS = ['training', ...TRAINING_TABS];
 
 const TRAINING_SIGNAL_KEYS = [
-    'ir1_train',
-    'ir2_train',
     'layout_train',
     'train_exec_plan',
     'training_loss_curve',
@@ -312,6 +311,7 @@ export function applyReportMode(mode) {
 }
 
 export function initModeUI() {
+    window.__ckTrainingOnlyTabs = [...TRAINING_ONLY_TABS];
     window.__ckTrainingModeAvailable = detectTrainingModeAvailable();
     injectStyles();
     ensureTabDataAttrs();
