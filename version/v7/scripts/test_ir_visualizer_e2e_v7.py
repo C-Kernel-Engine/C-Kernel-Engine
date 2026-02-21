@@ -92,6 +92,7 @@ SUPPORTED_ARTIFACT_FILES: dict[str, tuple[str, ...]] = {
     "advisor_summary": ("advisor_summary.json",),
     "memory_signoff": ("memory_signoff.json",),
     "perf_gate_report": ("perf_gate_report.json",),
+    "regression_ledger": ("regression_ledger.json", "REGRESSION_LEDGER.json"),
 }
 
 
@@ -179,6 +180,53 @@ def _artifact_roots_from_report(report_data: dict[str, Any], run_dir: Path) -> l
     return out
 
 
+def _path_under_roots(path: Path, roots: list[Path]) -> bool:
+    try:
+        resolved = path.resolve()
+    except Exception:
+        resolved = path
+    for root in roots:
+        try:
+            base = root.resolve()
+        except Exception:
+            base = root
+        if resolved == base or base in resolved.parents:
+            return True
+    return False
+
+
+def _check_strict_run_scoping(report_data: dict[str, Any], run_dir: Path) -> list[CheckResult]:
+    checks: list[CheckResult] = []
+    meta = report_data.get("meta", {}) or {}
+    loaded_paths = meta.get("loaded_paths", {}) or {}
+    roots = _artifact_roots_from_report(report_data, run_dir)
+    strict_flag = bool(meta.get("strict_run_artifacts"))
+    _record(
+        checks,
+        "strict_run_artifacts_enabled",
+        strict_flag,
+        f"strict_run_artifacts={meta.get('strict_run_artifacts')}",
+    )
+
+    # These are intentionally repo/global-scoped inputs rather than per-run artifacts.
+    exempt = {"grad_rules", "kernel_registry", "regression_ledger"}
+    off_root: list[str] = []
+    for key, raw in loaded_paths.items():
+        if key in exempt:
+            continue
+        p = Path(str(raw))
+        if not _path_under_roots(p, roots):
+            off_root.append(f"{key}:{p}")
+
+    _record(
+        checks,
+        "strict_run_scoped_loaded_paths",
+        not off_root,
+        f"off_root={off_root[:8]}",
+    )
+    return checks
+
+
 def _check_artifact_load_coverage(report_data: dict[str, Any], run_dir: Path) -> list[CheckResult]:
     checks: list[CheckResult] = []
     roots = _artifact_roots_from_report(report_data, run_dir)
@@ -227,6 +275,57 @@ def _check_artifact_load_coverage(report_data: dict[str, Any], run_dir: Path) ->
             f"missing={missing_keys[:8]} "
             f"mismatched={mismatched_keys[:8]}"
         ),
+    )
+    return checks
+
+
+def _check_vtune_path_resolution(report_data: dict[str, Any]) -> list[CheckResult]:
+    checks: list[CheckResult] = []
+    files = report_data.get("files", {})
+    vtune = files.get("vtune_summary")
+    if not isinstance(vtune, dict):
+        _record(
+            checks,
+            "vtune_path_resolution",
+            True,
+            "vtune_summary not loaded; check skipped",
+        )
+        return checks
+
+    def _is_relative(p: Any) -> bool:
+        if not isinstance(p, str):
+            return False
+        if p.startswith(("/", "http://", "https://", "file://")):
+            return False
+        if len(p) >= 3 and p[1] == ":" and p[2] in ("\\", "/"):
+            return False
+        return True
+
+    unresolved: list[str] = []
+    for key in ("result_dir", "report_path", "csv_path"):
+        raw = vtune.get(key)
+        if _is_relative(raw):
+            resolved = vtune.get(f"{key}_resolved")
+            if not isinstance(resolved, str) or not resolved.startswith("/"):
+                unresolved.append(key)
+
+    analyses = vtune.get("analyses")
+    if isinstance(analyses, list):
+        for idx, entry in enumerate(analyses):
+            if not isinstance(entry, dict):
+                continue
+            for key in ("result_dir", "report_text", "report_csv"):
+                raw = entry.get(key)
+                if _is_relative(raw):
+                    resolved = entry.get(f"{key}_resolved")
+                    if not isinstance(resolved, str) or not resolved.startswith("/"):
+                        unresolved.append(f"analyses[{idx}].{key}")
+
+    _record(
+        checks,
+        "vtune_path_resolution",
+        not unresolved,
+        f"unresolved={unresolved[:8]}",
     )
     return checks
 
@@ -415,6 +514,7 @@ def main() -> int:
         f"embedded={initial_meta.get('run_dir')} expected={resolved_model_dir}",
     )
     checks.extend(_check_decode_core_files(initial_data))
+    checks.extend(_check_strict_run_scoping(initial_data, resolved_model_dir))
 
     if not args.skip_profile:
         _run_operator_profile_compile_check_cmd(resolved_model_dir)
@@ -439,6 +539,12 @@ def main() -> int:
             "profile_summary" in refreshed_paths,
             f"profile_summary path={refreshed_paths.get('profile_summary')}",
         )
+        _record(
+            checks,
+            "regression_ledger_loaded_in_report",
+            "regression_ledger" in refreshed_paths,
+            f"regression_ledger path={refreshed_paths.get('regression_ledger')}",
+        )
         profile_summary = refreshed.get("files", {}).get("profile_summary")
         _record(
             checks,
@@ -446,6 +552,8 @@ def main() -> int:
             _is_renderable_profile_summary(profile_summary),
             "profile_summary has by_op+entries and is not embedded marker stub",
         )
+        checks.extend(_check_vtune_path_resolution(refreshed))
+        checks.extend(_check_strict_run_scoping(refreshed, resolved_model_dir))
         checks.extend(_check_artifact_load_coverage(refreshed, resolved_model_dir))
 
         if args.with_train_runtime:
@@ -491,6 +599,7 @@ def main() -> int:
                     isinstance(fixture_data.get("files", {}).get("asan_summary"), dict),
                     "asan_summary payload is a JSON object",
                 )
+                checks.extend(_check_strict_run_scoping(fixture_data, fixture_run_dir))
                 checks.extend(_check_artifact_load_coverage(fixture_data, fixture_run_dir))
 
     ok = all(c.passed for c in checks)

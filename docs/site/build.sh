@@ -90,6 +90,7 @@ for page in "$PAGES_DIR"/*.html; do
 
         # Clear all nav active states
         header="${header//\{\{NAV_INDEX\}\}/}"
+        header="${header//\{\{NAV_SPECTRUM\}\}/}"
         header="${header//\{\{NAV_QUICKSTART\}\}/}"
         header="${header//\{\{NAV_DEVGUIDE\}\}/}"
         header="${header//\{\{NAV_SCALING\}\}/}"

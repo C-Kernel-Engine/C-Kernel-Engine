@@ -887,6 +887,7 @@ xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">The training pipeline already generates this by default; this command regenerates it on demand.</p>
     <p class="mini-note"><strong>Regression gate:</strong> <code>make visualizer</code> validates run-dir path wiring + decode/profile artifact loading. <code>make visualizer-full</code> also validates train-runtime ASan artifact loading via a tiny fixture run.</p>
+    <p class="mini-note"><strong>Regression memory:</strong> the visualizer can load <code>version/v7/reports/REGRESSION_LEDGER.json</code> to show known root causes, detection gates, and proof artifacts directly in Training run-gates.</p>
     <table>
         <tr><th>Checkpoint</th><th>Run Path</th><th>What to inspect</th></tr>
         <tr><td>After Step 0.7 tokenization preview</td><td><code>$TOKENIZE_RUN</code></td><td><code>Architecture -> Tokenizer</code>, <code>Training -> Data Lab</code> (dataset folder + tokenizer path + roundtrip samples + Tokenizer Internals merges/pieces)</td></tr>

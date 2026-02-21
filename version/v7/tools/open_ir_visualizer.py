@@ -3,20 +3,20 @@
 IR Visualizer Launcher for C-Kernel-Engine v7
 
 Usage:
-    python version/v7/tools/open_ir_visualizer.py              # Open visualizer
-    python version/v7/tools/open_ir_visualizer.py --list       # List available models
-    python version/v7/tools/open_ir_visualizer.py <model>      # Generate and open report
-    python version/v7/tools/open_ir_visualizer.py --generate <model>  # Generate full report (profile+probes)
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --interactive
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --html-only  # Generate HTML only
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --with-profile
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --weight-dtype float32
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --perf-runtime cli
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --no-vtune
-    python version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline --with-probes --advisor
-    python version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --run-model hf://... --chat-template none
-    python version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline
+    python3 version/v7/tools/open_ir_visualizer.py              # Open visualizer
+    python3 version/v7/tools/open_ir_visualizer.py --list       # List available models
+    python3 version/v7/tools/open_ir_visualizer.py <model>      # Generate and open report
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model>  # Generate full report (profile+probes)
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --interactive
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --html-only  # Generate HTML only
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --with-profile
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --weight-dtype float32
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --perf-runtime cli
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --no-vtune
+    python3 version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline --with-probes --advisor
+    python3 version/v7/tools/open_ir_visualizer.py --generate <model> --with-probes --run-model hf://... --chat-template none
+    python3 version/v7/tools/open_ir_visualizer.py --generate --run ./runs/exp1_baseline
 """
 import os
 import sys
@@ -345,6 +345,7 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "train_parity_epochs_5_latest.json",
         "replay_determinism_latest.json",
         "backprop_stitch_runtime_latest.json",
+        "regression_ledger.json",
     ]
     copied = 0
     dst_model_dir.mkdir(parents=True, exist_ok=True)
@@ -521,6 +522,186 @@ def _trim_memory_signoff_payload(payload: dict, max_items: int = 120) -> dict:
     return out
 
 
+def _piece_display(piece: str, limit: int = 64) -> str:
+    disp = piece.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    if len(disp) > limit:
+        disp = disp[:limit] + "..."
+    return disp
+
+
+def _bytes_hex_preview(text: str, limit: int = 12) -> str:
+    raw = text.encode("utf-8", errors="replace")
+    chunk = raw[:limit]
+    hx = " ".join(f"{b:02X}" for b in chunk)
+    if len(raw) > limit:
+        hx += " ..."
+    return hx
+
+
+def _parse_merge_row(row) -> tuple[str, str]:
+    if isinstance(row, list) and len(row) >= 2:
+        return str(row[0]), str(row[1])
+    if isinstance(row, str):
+        parts = row.split(" ", 1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
+    return "", ""
+
+
+def _build_tokenizer_preview(
+    files: dict,
+    ck_build_path: Path,
+    model_root: Path,
+    run_dir: Path | None = None,
+) -> dict | None:
+    pipeline = files.get("training_pipeline") if isinstance(files.get("training_pipeline"), dict) else {}
+    data_lab = pipeline.get("data_lab") if isinstance(pipeline, dict) and isinstance(pipeline.get("data_lab"), dict) else {}
+    tokenizer_lineage = pipeline.get("tokenizer_lineage") if isinstance(pipeline, dict) and isinstance(pipeline.get("tokenizer_lineage"), dict) else {}
+
+    candidate_values: list[str] = []
+    for raw in (
+        data_lab.get("tokenizer_json_path"),
+        tokenizer_lineage.get("tokenizer_path"),
+        str((run_dir / "tokenizer.json")) if run_dir is not None else None,
+        str(model_root / "tokenizer.json"),
+        str(ck_build_path / "tokenizer.json"),
+    ):
+        if isinstance(raw, str) and raw.strip():
+            candidate_values.append(raw.strip())
+
+    tokenizer_json_path: Path | None = None
+    for raw in candidate_values:
+        resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+        if resolved and resolved.exists():
+            tokenizer_json_path = resolved
+            break
+    if tokenizer_json_path is None:
+        return None
+
+    try:
+        payload = json.loads(tokenizer_json_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {
+            "status": "error",
+            "path": str(tokenizer_json_path),
+            "error": f"failed_to_parse_tokenizer_json: {e}",
+        }
+
+    model = payload.get("model") if isinstance(payload, dict) else {}
+    if not isinstance(model, dict):
+        model = {}
+    model_type = str(model.get("type") or "unknown")
+    vocab_raw = model.get("vocab")
+    vocab_items: list[tuple[int, str]] = []
+    id_to_piece: dict[int, str] = {}
+    if isinstance(vocab_raw, dict):
+        for piece, idx in vocab_raw.items():
+            if isinstance(piece, str) and isinstance(idx, int) and idx >= 0:
+                vocab_items.append((int(idx), piece))
+                id_to_piece[int(idx)] = piece
+    vocab_items.sort(key=lambda kv: kv[0])
+
+    merges_raw = model.get("merges")
+    merge_samples: list[dict] = []
+    merge_count = 0
+    if isinstance(merges_raw, list):
+        merge_count = len(merges_raw)
+        for i, row in enumerate(merges_raw[:48]):
+            left, right = _parse_merge_row(row)
+            if not left and not right:
+                continue
+            merge_samples.append(
+                {
+                    "rank": int(i),
+                    "left": _piece_display(left),
+                    "right": _piece_display(right),
+                    "merged_hint": _piece_display(left + right),
+                }
+            )
+
+    non_ascii_piece_count = 0
+    for _, piece in vocab_items:
+        if any(ord(ch) > 127 for ch in piece):
+            non_ascii_piece_count += 1
+
+    vocab_samples = [
+        {
+            "id": int(idx),
+            "piece": _piece_display(piece),
+            "bytes_hex": _bytes_hex_preview(piece),
+        }
+        for idx, piece in vocab_items[:48]
+    ]
+
+    added_tokens = payload.get("added_tokens")
+    special_tokens: list[dict] = []
+    if isinstance(added_tokens, list):
+        for row in added_tokens[:32]:
+            if not isinstance(row, dict):
+                continue
+            content = row.get("content")
+            token_id = row.get("id")
+            if isinstance(content, str):
+                special_tokens.append(
+                    {
+                        "id": int(token_id) if isinstance(token_id, int) else None,
+                        "content": _piece_display(content),
+                        "special": bool(row.get("special")),
+                    }
+                )
+
+    pre_tokenizer = payload.get("pre_tokenizer")
+    decoder = payload.get("decoder")
+    pre_tokenizer_type = pre_tokenizer.get("type") if isinstance(pre_tokenizer, dict) else None
+    decoder_type = decoder.get("type") if isinstance(decoder, dict) else None
+
+    roundtrip = files.get("tokenizer_roundtrip") if isinstance(files.get("tokenizer_roundtrip"), dict) else {}
+    sample_rows = roundtrip.get("sample_rows") if isinstance(roundtrip.get("sample_rows"), list) else []
+    example = None
+    for row in sample_rows:
+        if not isinstance(row, dict):
+            continue
+        ids = row.get("token_ids")
+        if not isinstance(ids, list) or not ids:
+            continue
+        flow = []
+        for tid in ids[:48]:
+            if not isinstance(tid, int):
+                continue
+            piece = id_to_piece.get(int(tid))
+            flow.append(
+                {
+                    "id": int(tid),
+                    "piece": _piece_display(piece) if isinstance(piece, str) else "<missing>",
+                }
+            )
+        example = {
+            "line_no": row.get("line_no"),
+            "source": row.get("source"),
+            "decoded": row.get("decoded"),
+            "exact_match": row.get("exact_match"),
+            "token_flow": flow,
+        }
+        break
+
+    return {
+        "status": "ok",
+        "path": str(tokenizer_json_path),
+        "model_type": model_type,
+        "vocab_size": int(len(vocab_items)),
+        "merge_count": int(merge_count),
+        "pre_tokenizer_type": pre_tokenizer_type,
+        "decoder_type": decoder_type,
+        "bytelevel_mode": bool(pre_tokenizer_type == "ByteLevel" or decoder_type == "ByteLevel"),
+        "ascii_piece_count": int(len(vocab_items) - non_ascii_piece_count),
+        "non_ascii_piece_count": int(non_ascii_piece_count),
+        "vocab_samples": vocab_samples,
+        "merge_samples": merge_samples,
+        "special_tokens": special_tokens,
+        "encode_decode_example": example,
+    }
+
+
 def list_available_models():
     """List all models in cache."""
     models = []
@@ -585,14 +766,101 @@ def collect_analysis_checkpoints(search_roots: list[Path]) -> dict | None:
     }
 
 
-def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
+def _has_renderable_profile_payload(payload) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    entries = payload.get("entries")
+    if isinstance(entries, list) and len(entries) > 0:
+        return True
+    by_op = payload.get("by_op")
+    if isinstance(by_op, dict) and len(by_op) > 0:
+        return True
+    by_mode = payload.get("by_mode")
+    if isinstance(by_mode, dict) and len(by_mode) > 0:
+        return True
+    return False
+
+
+def _is_profile_summary_stub(payload) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if _has_renderable_profile_payload(payload):
+        return False
+    return str(payload.get("schema") or "") == "ck.profile.summary.v1"
+
+
+def _derive_profile_alias_roots(run_dir: Path | None, model_root: Path) -> list[Path]:
+    """
+    Derive sibling cache roots from local GGUF filenames.
+    Example:
+      run dir: .../Qwen--Qwen3-0.6B-GGUF
+      gguf:    Qwen3-0.6B-Q8_0.gguf
+      alias:   .../Qwen3-0.6B-Q8_0
+    """
+    bases: list[Path] = []
+    if run_dir is not None:
+        bases.append(run_dir)
+    bases.append(model_root)
+
+    roots: list[Path] = []
+    seen: set[str] = set()
+
+    def push(p: Path) -> None:
+        key = str(p)
+        if key in seen:
+            return
+        seen.add(key)
+        roots.append(p)
+
+    for base in bases:
+        if not base.exists() or not base.is_dir():
+            continue
+        parent = base.parent
+        for gguf in sorted(base.glob("*.gguf")):
+            stem = gguf.stem
+            if not stem:
+                continue
+            alias_root = parent / stem
+            if alias_root.exists() and alias_root.is_dir():
+                push(alias_root)
+                push(alias_root / "ck_build")
+                push(alias_root / ".ck_build")
+    return roots
+
+
+def _resolve_path_loose(path: Path) -> Path:
+    try:
+        return path.resolve(strict=False)
+    except TypeError:
+        # Python <3.10 compatibility (strict kw may be unavailable in some envs)
+        return path.resolve()
+    except Exception:
+        return path
+
+
+def _path_under_any_root(path: Path, roots: list[Path]) -> bool:
+    target = _resolve_path_loose(path)
+    for root in roots:
+        base = _resolve_path_loose(root)
+        if target == base or base in target.parents:
+            return True
+    return False
+
+
+def load_model_data(
+    ck_build_path: Path,
+    run_dir: Path | None = None,
+    strict_run_artifacts: bool = False,
+) -> dict:
     """Load all IR/profile/training data for a model or run directory."""
+    strict_run_scope = bool(strict_run_artifacts and run_dir is not None)
     if run_dir is not None:
         model_root = run_dir
         model_name = run_dir.name
     else:
         model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
         model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path
+    train_runtime_available = has_train_runtime_artifacts(run_dir if run_dir is not None else model_root)
 
     search_roots: list[Path] = []
     if run_dir is not None:
@@ -608,6 +876,18 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         seen_roots.add(key)
         deduped_roots.append(root)
     search_roots = deduped_roots
+
+    # Include canonical sibling cache roots derived from local GGUF stems.
+    # This handles cases like:
+    #   run_dir = .../Qwen--Qwen3-0.6B-GGUF
+    #   profile outputs in .../Qwen3-0.6B-Q8_0
+    profile_alias_roots = _derive_profile_alias_roots(run_dir, model_root)
+    for root in profile_alias_roots:
+        key = str(root)
+        if key in seen_roots:
+            continue
+        seen_roots.add(key)
+        search_roots.append(root)
 
     # Define required vs optional files
     REQUIRED_FILES = [
@@ -640,6 +920,10 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "training_step_profile",
         "training_checkpoint_policy",
         "training_pipeline",
+        "dataset_qc",
+        "dataset_profile",
+        "tokenizer_roundtrip",
+        "post_train_eval",
         "training_epoch_sweep",
         "analysis_checkpoints",
         "train_e2e",
@@ -669,6 +953,8 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "advisor_summary",
         "memory_signoff",
         "perf_gate_report",
+        "regression_ledger",
+        "embedding_dump",
     ]
 
     def model_candidates(name: str) -> list[Path]:
@@ -699,6 +985,10 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
         "training_pipeline": model_candidates("training_pipeline.json") + model_candidates("training_pipeline_latest.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
+        "dataset_qc": model_candidates("dataset_qc.json"),
+        "dataset_profile": model_candidates("dataset_profile.json"),
+        "tokenizer_roundtrip": model_candidates("tokenizer_roundtrip.json"),
+        "post_train_eval": model_candidates("post_train_eval.json"),
         "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
         "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
         "run_config": model_candidates("config.json"),
@@ -726,43 +1016,91 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
         "advisor_summary": model_candidates("advisor_summary.json") + [V7_REPORT_PATH / "advisor_summary.json", V7_REPORT_PATH_LEGACY / "advisor_summary.json"],
         "memory_signoff": model_candidates("memory_signoff.json") + [V7_REPORT_PATH / "memory_signoff.json", V7_REPORT_PATH_LEGACY / "memory_signoff.json"],
         "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_REPORT_PATH / "perf_gate_report.json", V7_REPORT_PATH_LEGACY / "perf_gate_report.json"],
+        "embedding_dump": model_candidates("embedding_dump.json") + model_candidates("embedding_dump_latest.json"),
+        "regression_ledger": (
+            model_candidates("regression_ledger.json")
+            + [V7_REPORT_PATH / "regression_ledger_latest.json", V7_REPORT_PATH_LEGACY / "regression_ledger_latest.json"]
+            + [V7_ROOT / "reports" / "REGRESSION_LEDGER.json"]
+        ),
         "kernel_registry": [V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
     }
+
+    if strict_run_scope:
+        # Keep run reports self-consistent: load artifacts only from the explicit
+        # run/model roots (plus derived alias roots), not global latest caches.
+        strict_exempt = {"grad_rules", "kernel_registry", "regression_ledger"}
+        for key, candidates in list(data_files.items()):
+            if key in strict_exempt:
+                continue
+            data_files[key] = [p for p in candidates if _path_under_any_root(p, search_roots)]
 
     data = {
         "meta": {
             "model": model_name,
             "path": str(ck_build_path),
             "run_dir": str(run_dir) if run_dir is not None else None,
+            "project_root": str(PROJECT_ROOT),
+            "has_train_runtime": bool(train_runtime_available),
+            "strict_run_artifacts": strict_run_scope,
             "warnings": [],
         },
         "files": {}
     }
 
     loaded = []
+    loaded_paths: dict[str, str] = {}
     missing_required = []
     missing_optional = []
 
     for key, candidates in data_files.items():
-        picked = None
+        picked_path = None
+        picked_payload = None
+        fallback_stub_path = None
+        fallback_stub_payload = None
+        first_error = None
+
         for path in candidates:
-            if path.exists():
-                picked = path
-                break
-        if picked is not None:
+            if not path.exists():
+                continue
             try:
-                with open(picked, "r") as f:
-                    data["files"][key] = json.load(f)
-                loaded.append(key)
+                with open(path, "r") as f:
+                    payload = json.load(f)
             except Exception as e:
-                print(f"  ! {key}: {e}")
+                if first_error is None:
+                    first_error = (path, e)
+                continue
+
+            # Prefer renderable profile payloads over marker stubs.
+            if key == "profile_summary" and _is_profile_summary_stub(payload):
+                if fallback_stub_payload is None:
+                    fallback_stub_path = path
+                    fallback_stub_payload = payload
+                continue
+
+            picked_path = path
+            picked_payload = payload
+            break
+
+        if picked_payload is None and fallback_stub_payload is not None:
+            picked_path = fallback_stub_path
+            picked_payload = fallback_stub_payload
+
+        if picked_payload is not None:
+            data["files"][key] = picked_payload
+            loaded.append(key)
+            loaded_paths[key] = str(picked_path)
         else:
+            if first_error is not None:
+                err_path, err = first_error
+                print(f"  ! {key} ({err_path}): {err}")
             if key in REQUIRED_FILES:
                 missing_required.append(key)
             else:
                 missing_optional.append(key)
 
-    analysis_roots = [*search_roots, V7_REPORT_PATH, V7_REPORT_PATH_LEGACY]
+    analysis_roots = list(search_roots)
+    if not strict_run_scope:
+        analysis_roots.extend([V7_REPORT_PATH, V7_REPORT_PATH_LEGACY])
     analysis_payload = collect_analysis_checkpoints(analysis_roots)
     if analysis_payload is not None:
         data["files"]["analysis_checkpoints"] = analysis_payload
@@ -884,6 +1222,55 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
     if aliased_optional:
         missing_optional = [k for k in missing_optional if k not in aliased_optional]
 
+    tokenizer_preview = _build_tokenizer_preview(data["files"], ck_build_path, model_root, run_dir=run_dir)
+    if isinstance(tokenizer_preview, dict):
+        data["files"]["tokenizer_preview"] = tokenizer_preview
+        loaded.append("tokenizer_preview(derived)")
+
+    # Merge stand-alone data-lab artifacts into training_pipeline so the UI can
+    # render a single structured view regardless of file-loading path.
+    pipeline = files.get("training_pipeline")
+    if isinstance(pipeline, dict):
+        data_lab = pipeline.get("data_lab")
+        if not isinstance(data_lab, dict):
+            data_lab = {}
+        for key in ("dataset_qc", "dataset_profile", "tokenizer_roundtrip", "post_train_eval", "embedding_dump"):
+            payload = files.get(key)
+            if isinstance(payload, dict):
+                data_lab[key] = payload
+        artifacts = data_lab.get("artifacts")
+        if not isinstance(artifacts, dict):
+            artifacts = {}
+        for src_key, dst_key in (
+            ("dataset_qc", "dataset_qc_json"),
+            ("dataset_profile", "dataset_profile_json"),
+            ("tokenizer_roundtrip", "tokenizer_roundtrip_json"),
+            ("post_train_eval", "post_train_eval_json"),
+            ("embedding_dump", "embedding_dump_json"),
+        ):
+            src_path = loaded_paths.get(src_key)
+            if isinstance(src_path, str) and src_path:
+                artifacts[dst_key] = src_path
+        if artifacts:
+            data_lab["artifacts"] = artifacts
+
+        if "dataset_path" not in data_lab:
+            qc = data_lab.get("dataset_qc")
+            if isinstance(qc, dict) and isinstance(qc.get("path"), str):
+                data_lab["dataset_path"] = qc.get("path")
+        if "dataset_dir" not in data_lab:
+            ds_path = data_lab.get("dataset_path")
+            if isinstance(ds_path, str) and ds_path:
+                data_lab["dataset_dir"] = str(Path(ds_path).parent)
+        if "tokenizer_json_path" not in data_lab:
+            tok = pipeline.get("tokenizer_lineage")
+            if isinstance(tok, dict) and isinstance(tok.get("tokenizer_path"), str):
+                data_lab["tokenizer_json_path"] = tok.get("tokenizer_path")
+        if isinstance(tokenizer_preview, dict) and tokenizer_preview:
+            data_lab["tokenizer_preview"] = tokenizer_preview
+
+        pipeline["data_lab"] = data_lab
+
     # Enrich artifacts for standalone report portability.
     flame = data["files"].get("flamegraph_manifest")
     if isinstance(flame, dict):
@@ -900,10 +1287,12 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
     vtune = data["files"].get("vtune_summary")
     if isinstance(vtune, dict):
         path_keys = [
+            "result_dir",
             "svg_path",
             "png_path",
             "image_path",
             "report_path",
+            "csv_path",
             "hotspots_svg",
             "hotspots_png",
         ]
@@ -948,6 +1337,23 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
                                 item2["data_uri"] = data_uri
                 enriched.append(item2)
             vtune["artifacts"] = enriched
+
+        analyses = vtune.get("analyses")
+        if isinstance(analyses, list):
+            enriched_analyses = []
+            for entry in analyses:
+                if not isinstance(entry, dict):
+                    continue
+                entry2 = dict(entry)
+                for key in ("result_dir", "report_text", "report_csv"):
+                    raw = entry2.get(key)
+                    if not isinstance(raw, str):
+                        continue
+                    resolved = _resolve_asset_path(raw, ck_build_path, model_root)
+                    if resolved:
+                        entry2[f"{key}_resolved"] = str(resolved)
+                enriched_analyses.append(entry2)
+            vtune["analyses"] = enriched_analyses
 
     advisor = data["files"].get("advisor_summary")
     if isinstance(advisor, dict):
@@ -1005,11 +1411,23 @@ def load_model_data(ck_build_path: Path, run_dir: Path | None = None) -> dict:
     if missing_optional:
         print(f"  - Missing optional files: {missing_optional}")
 
+    if loaded_paths:
+        data["meta"]["loaded_paths"] = loaded_paths
+    if profile_alias_roots:
+        data["meta"]["profile_roots"] = [str(p) for p in profile_alias_roots]
+    if strict_run_scope:
+        data["meta"]["artifact_roots"] = [str(p) for p in search_roots]
+
     print(f"  Loaded {len(loaded)} files")
     return data
 
 
-def generate_html_report(ck_build_path: Path, output_path: Path = None, run_dir: Path | None = None):
+def generate_html_report(
+    ck_build_path: Path,
+    output_path: Path = None,
+    run_dir: Path | None = None,
+    strict_run_artifacts: bool = False,
+):
     """Generate standalone HTML report."""
     from datetime import datetime
 
@@ -1017,7 +1435,11 @@ def generate_html_report(ck_build_path: Path, output_path: Path = None, run_dir:
     print(f"Generating report for: {model_name}")
 
     # Load data
-    data = load_model_data(ck_build_path, run_dir=run_dir)
+    data = load_model_data(
+        ck_build_path,
+        run_dir=run_dir,
+        strict_run_artifacts=strict_run_artifacts,
+    )
     data["meta"]["generated_at"] = datetime.now().isoformat()
     data["meta"]["engine_version"] = "v7"
 
@@ -1064,18 +1486,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python version/v7/tools/open_ir_visualizer.py              # Open visualizer
-    python version/v7/tools/open_ir_visualizer.py --list       # List available models
-    python version/v7/tools/open_ir_visualizer.py gemma3       # Generate and open report
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3  # Generate full report (profile+probes)
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --interactive
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --html-only  # Generate HTML only
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-profile
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --force-compile
-    python version/v7/tools/open_ir_visualizer.py --generate Qwen--Qwen3-0.6B --with-probes --run-model Qwen/Qwen3-0.6B --weight-dtype float32
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --perf-runtime cli
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --no-vtune
-    python version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --run-model hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf --chat-template none
+    python3 version/v7/tools/open_ir_visualizer.py              # Open visualizer
+    python3 version/v7/tools/open_ir_visualizer.py --list       # List available models
+    python3 version/v7/tools/open_ir_visualizer.py gemma3       # Generate and open report
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3  # Generate full report (profile+probes)
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --interactive
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --html-only  # Generate HTML only
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-profile
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --force-compile
+    python3 version/v7/tools/open_ir_visualizer.py --generate Qwen--Qwen3-0.6B --with-probes --run-model Qwen/Qwen3-0.6B --weight-dtype float32
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --perf-runtime cli
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --no-vtune
+    python3 version/v7/tools/open_ir_visualizer.py --generate gemma3 --with-probes --run-model hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf --chat-template none
         """
     )
 
@@ -1197,8 +1619,17 @@ Examples:
         default=True,
         help="Capture Advisor roofline artifacts for run-dir native train probes when available (default: enabled, use --no-advisor to skip)"
     )
+    parser.add_argument(
+        "--strict-run-artifacts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="When using --run, load artifacts only from run/model roots (default: enabled for --run)"
+    )
 
     args = parser.parse_args()
+
+    if args.strict_run_artifacts is None:
+        args.strict_run_artifacts = bool(args.run)
 
     # Operator-first default:
     # `--generate <model>` should produce a fully populated report unless explicitly disabled.
@@ -1564,7 +1995,12 @@ Examples:
 
         # Generate report
         output = args.output or ((run_dir or model_root) / "ir_report.html")
-        report_path = generate_html_report(ck_build, output, run_dir=run_dir)
+        report_path = generate_html_report(
+            ck_build,
+            output,
+            run_dir=run_dir,
+            strict_run_artifacts=bool(args.strict_run_artifacts),
+        )
         print(f"\nGenerated: {report_path}")
 
         if not args.generate:

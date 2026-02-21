@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuantizationMathDeepDive | C-Kernel-Engine</title>
+    <title>OperatorSpectrum | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -932,215 +932,598 @@
     </header>
     <main>
 
-<h1>Quantization Math Deep Dive</h1>
+<style>
+/* ── Spectrum Page Styles ─────────────────────────────────── */
 
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+/* Top-level pipeline row */
+.spectrum-pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 2rem 0 0.5rem;
+    position: relative;
+    overflow-x: auto;
+    padding-top: 14px;
+    padding-bottom: 0.5rem;
+}
+
+/* Each stage card */
+.spectrum-stage {
+    flex: 1 1 0;
+    min-width: 120px;
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1.25rem 0.75rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+.spectrum-stage:hover {
+    border-color: var(--stage-color, var(--orange));
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 2;
+}
+.spectrum-stage.active-pulse {
+    border-color: var(--stage-color, var(--orange));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--stage-color, var(--orange)) 40%, transparent);
+}
+
+/* Stage number badge */
+.stage-num {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--stage-color, var(--grey));
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 800;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+/* Stage icon */
+.stage-icon {
+    font-size: 1.75rem;
+    margin-top: 0.35rem;
+}
+
+/* Stage label */
+.stage-label {
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: var(--stage-color, var(--text-primary));
+    letter-spacing: 0.3px;
+}
+
+/* Stage sub-text */
+.stage-sub {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+/* Arrow connector between stages */
+.spectrum-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    flex-shrink: 0;
+    color: var(--grey-light);
+    font-size: 1.1rem;
+    user-select: none;
+}
+
+/* Refinement loop arc */
+.spectrum-loop {
+    position: relative;
+    margin: 0 0 2rem;
+    text-align: center;
+    padding: 1rem 0;
+}
+.spectrum-loop svg {
+    width: 100%;
+    max-width: 100%;
+    height: 60px;
+    overflow: visible;
+}
+
+/* Stage detail panel */
+.stage-detail {
+    background: var(--bg-dark);
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    display: none;
+    animation: fadeSlide 0.3s ease;
+}
+.stage-detail.visible { display: block; }
+
+@keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.stage-detail h3 {
+    margin: 0 0 0.75rem;
+    color: var(--detail-color, var(--orange));
+    font-size: 1.1rem;
+}
+.stage-detail p {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 0 0 1rem;
+}
+
+/* Links grid inside detail panel */
+.stage-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.stage-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--grey);
+    color: var(--text-secondary);
+    background: var(--dark-card);
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.stage-link:hover {
+    border-color: var(--detail-color, var(--orange));
+    color: var(--detail-color, var(--orange));
+    background: color-mix(in srgb, var(--detail-color, var(--orange)) 8%, var(--dark-card));
+}
+.stage-link .link-icon { font-size: 0.9rem; }
+
+/* Hint chips at bottom of each detail */
+.stage-hints {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--grey);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.stage-hints strong {
+    color: var(--text-secondary);
+}
+
+/* Mastery meter */
+.mastery-bar {
+    margin: 2rem 0 1.5rem;
+    background: var(--dark-card);
+    border-radius: 12px;
+    border: 1px solid var(--grey);
+    padding: 1.25rem 1.5rem;
+}
+.mastery-bar h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.mastery-track {
+    height: 8px;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+.mastery-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e74c3c 0%, #ffb400 25%, #47b475 50%, #07adf8 75%, #bc8cff 100%);
+    transition: width 0.6s ease;
+}
+.mastery-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.35rem;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    .spectrum-pipeline { flex-direction: column; gap: 0.5rem; }
+    .spectrum-arrow { transform: rotate(90deg); min-width: auto; min-height: 24px; }
+    .spectrum-stage { min-width: 0; }
+}
+</style>
+
+<h1>Operator Spectrum</h1>
+<p style="color: var(--text-secondary); font-size: 0.9rem; max-width: 720px;">
+    The full pipeline from raw data to inference — a continuous refinement loop.
+    <strong style="color: var(--orange);">Click any stage</strong> to see what it does, which docs pages cover it, and what to tune next.
+</p>
+
+<div class="spectrum-pipeline" id="spectrumPipeline">
+
+    <div class="spectrum-stage" data-stage="data" style="--stage-color:#e74c3c" tabindex="0">
+        <span class="stage-num">1</span>
+        <span class="stage-icon">📦</span>
+        <span class="stage-label">Data</span>
+        <span class="stage-sub">Raw corpus<br>SVG, text, JSON</span>
     </div>
-    <div>
-        <strong>Understanding Q5_0 and Q8_0 Formats</strong><br>
-        This page explains how 5-bit and 8-bit quantization works, the AVX-512 vectorization strategy, and the bugs we fixed during development.
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="tokenizer" style="--stage-color:#ff8c00" tabindex="0">
+        <span class="stage-num">2</span>
+        <span class="stage-icon">🔤</span>
+        <span class="stage-label">Tokenizer</span>
+        <span class="stage-sub">BPE / WordPiece<br>encode ↔ decode</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="dataprep" style="--stage-color:#ffb400" tabindex="0">
+        <span class="stage-num">3</span>
+        <span class="stage-icon">⚙️</span>
+        <span class="stage-label">Data Prep</span>
+        <span class="stage-sub">Batching, seq-len<br>train/val split</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="model" style="--stage-color:#47b475" tabindex="0">
+        <span class="stage-num">4</span>
+        <span class="stage-icon">🧠</span>
+        <span class="stage-label">AI Algorithm</span>
+        <span class="stage-sub">Transformer / GPT<br>IR → C kernels</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="forward" style="--stage-color:#07adf8" tabindex="0">
+        <span class="stage-num">5</span>
+        <span class="stage-icon">▶️</span>
+        <span class="stage-label">Forward</span>
+        <span class="stage-sub">Matmul, attention<br>layer-by-layer</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="backward" style="--stage-color:#bc8cff" tabindex="0">
+        <span class="stage-num">6</span>
+        <span class="stage-icon">◀️</span>
+        <span class="stage-label">Backward</span>
+        <span class="stage-sub">Gradients, chain rule<br>weight updates</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="loss" style="--stage-color:#ff6b9d" tabindex="0">
+        <span class="stage-num">7</span>
+        <span class="stage-icon">📉</span>
+        <span class="stage-label">Loss</span>
+        <span class="stage-sub">Cross-entropy<br>convergence signal</span>
+    </div>
+    <span class="spectrum-arrow">→</span>
+
+    <div class="spectrum-stage" data-stage="inference" style="--stage-color:#ffd700" tabindex="0">
+        <span class="stage-num">8</span>
+        <span class="stage-icon">✨</span>
+        <span class="stage-label">Inference</span>
+        <span class="stage-sub">Prompt → output<br>stop at &lt;/svg&gt; or &lt;eos&gt;</span>
     </div>
 </div>
 
-<h2>Memory Layout: Block Structures</h2>
-
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q8_0 Block (34 bytes)</h3>
-        <pre><code>struct block_q8_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    int8_t qs[32];      // 32 bytes: 32 weights
-};  // Total: 34 bytes / 32 weights
-
-// Dequantization:
-weight[i] = qs[i] * d</code></pre>
-        <p><strong>Compression:</strong> 8.5 bits/weight (vs 32 for FP32)</p>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Q5_0 Block (22 bytes)</h3>
-        <pre><code>struct block_q5_0 {
-    ggml_fp16_t d;      // 2 bytes: FP16 scale
-    uint32_t qh[4];     // 4 bytes: 32 high bits
-    uint8_t qs[16];     // 16 bytes: packed nibbles
-};  // Total: 22 bytes / 32 weights
-
-// Each 5-bit weight = 4 bits from qs + 1 bit from qh</code></pre>
-        <p><strong>Compression:</strong> 5.5 bits/weight</p>
-    </div>
+<div class="spectrum-loop">
+    <svg viewBox="0 0 1000 60" preserveAspectRatio="none">
+        <defs>
+            <linearGradient id="loopGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ffd700"/>
+                <stop offset="50%" stop-color="#ffb400"/>
+                <stop offset="100%" stop-color="#e74c3c"/>
+            </linearGradient>
+            <marker id="loopArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#e74c3c"/>
+            </marker>
+        </defs>
+        <!-- Curved return arrow from Inference back to Data -->
+        <path d="M940,5 C940,50 500,55 60,5" stroke="url(#loopGrad)" stroke-width="2" fill="none"
+              stroke-dasharray="8,4" marker-end="url(#loopArrow)" opacity="0.7">
+            <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1.5s" repeatCount="indefinite"/>
+        </path>
+        <text x="500" y="50" text-anchor="middle" fill="var(--text-muted)" font-size="11" font-family="Inter,sans-serif">
+            ← refine data, retrain, evaluate — the loop keeps getting tighter →
+        </text>
+    </svg>
 </div>
 
-<h2>Q8_0 Dequantization (Simple)</h2>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Straightforward FP16 Scale</h3>
-    <p>Q8_0 is simple: each weight is just <code>qs[i] * d</code> where d is the FP16 scale.</p>
-    <pre><code>// Q8_0 dequantization
-for (int j = 0; j < 32; j++) {
-    float weight = d * (float)block->qs[j];
-}</code></pre>
-</div>
-
-<h2>Q5_0 Dequantization (Complex)</h2>
-
-<div class="alert alert-warning">
-    <div class="alert-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+<div class="stage-detail" id="detail-data" style="--detail-color:#e74c3c">
+    <h3>📦 Stage 1 — Data</h3>
+    <p>
+        Everything starts here. The quality and structure of your raw corpus determines the ceiling for everything downstream.
+        For SVG training: validate ASCII-only, deduplicate near-identical rows, add explicit <code>&lt;eos&gt;</code> boundaries between samples.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="v7-runbook.html"><span class="link-icon">📖</span> v7 Runbook</a>
+        <a class="stage-link" href="tokenizer.html"><span class="link-icon">📖</span> Tokenizer Docs</a>
+        <a class="stage-link" href="training-intuition.html"><span class="link-icon">📖</span> Training Intuition</a>
     </div>
-    <div>
-        <strong>The 5-Bit Challenge</strong><br>
-        Q5_0 stores each weight in two pieces: 4 bits in <code>qs[]</code> (packed) and 1 high bit in <code>qh[]</code>. These must be combined before use.
+    <div class="stage-hints">
+        <strong>Tune next:</strong> ASCII validation gate · row deduplication · explicit end markers · train/val split ratio
     </div>
 </div>
 
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Q5_0 Bit Mapping</h3>
-    <table>
-        <tr>
-            <th>Weight Index</th>
-            <th>qs Source</th>
-            <th>qh Bit</th>
-        </tr>
-        <tr>
-            <td>0-15 (first half)</td>
-            <td><code>qs[j] & 0x0F</code> (low nibble)</td>
-            <td>bit j (0-15)</td>
-        </tr>
-        <tr>
-            <td>16-31 (second half)</td>
-            <td><code>qs[j] >> 4</code> (high nibble)</td>
-            <td>bit j+16 (16-31)</td>
-        </tr>
-    </table>
-</div>
-
-<div class="card">
-    <h3 style="margin-top: 0;">Q5_0 Scalar Reference</h3>
-    <pre><code>// Q5_0 dequantization - scalar reference
-for (int j = 0; j < 16; j++) {
-    // First 16 weights: low nibbles + qh bits 0-15
-    uint8_t xh_0 = ((qh >> j) & 1) << 4;
-    int32_t x0 = ((qs[j] & 0x0F) | xh_0) - 16;
-
-    // Second 16 weights: high nibbles + qh bits 16-31
-    uint8_t xh_1 = ((qh >> (j + 16)) & 1) << 4;
-    int32_t x1 = ((qs[j] >> 4) | xh_1) - 16;
-
-    weight[j] = d * x0;
-    weight[j + 16] = d * x1;
-}</code></pre>
-</div>
-
-<h2>AVX-512 Bugs We Found & Fixed</h2>
-
-<div class="grid grid-2">
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #1: 16x Multiplier</h3>
-        <p>Result was exactly 16x too large!</p>
-        <pre><code>// BUGGY:
-acc = _mm512_add_ps(acc, _mm512_set1_ps(d * sumi));
-*s = _mm512_reduce_add_ps(acc);
-// _mm512_set1_ps broadcasts to 16 lanes, then sum = 16x!</code></pre>
-        <p><strong>Fix:</strong> Use scalar accumulator instead of vector broadcast.</p>
+<div class="stage-detail" id="detail-tokenizer" style="--detail-color:#ff8c00">
+    <h3>🔤 Stage 2 — Tokenizer</h3>
+    <p>
+        Converts raw text into integer token sequences the model can process. BPE learns merge rules from the corpus; vocab size directly affects model capacity.
+        The encode→decode roundtrip must be lossless — any artifact here propagates through the entire pipeline.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="tokenizer.html"><span class="link-icon">📖</span> Tokenizer Deep Dive</a>
+        <a class="stage-link" href="sentencepiece.html"><span class="link-icon">📖</span> SentencePiece</a>
+        <a class="stage-link" href="v7-runbook.html"><span class="link-icon">📖</span> BPE Training (Runbook)</a>
     </div>
-    <div class="card" style="border-left: 4px solid #e74c3c;">
-        <h3 style="margin-top: 0; color: #e74c3c;">Bug #2: Wrong qh Bits</h3>
-        <p>Used bits 12-27 instead of bits 16-31!</p>
-        <pre><code>// BUGGY - used wrong bit range
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 27) & 1) << 4, ...,  // Wrong!
-    ((qh >> 12) & 1) << 4       // Wrong!
-);
-
-// FIXED - correct bit range 16-31
-__m512i qh_hi = _mm512_set_epi32(
-    ((qh >> 31) & 1) << 4, ...,  // Correct!
-    ((qh >> 16) & 1) << 4        // Correct!
-);</code></pre>
+    <div class="stage-hints">
+        <strong>Tune next:</strong> vocab size (640/1024) · merge count · special tokens (<code>&lt;eos&gt;</code>, <code>&lt;pad&gt;</code>) · roundtrip parity test
     </div>
 </div>
 
-<h2>AVX-512 Vectorization Strategy</h2>
-
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Processing 32 Weights in 2 Batches of 16</h3>
-    <pre><code>// AVX-512 vec_dot_q5_0_q8_0
-for (int ib = 0; ib < nb; ib++) {
-    // Load 16 packed bytes (32 nibbles)
-    __m128i qs = _mm_loadu_si128(x[ib].qs);
-
-    // First 16 weights
-    __m512i lo_nibbles = _mm512_cvtepu8_epi32(qs);
-    lo_nibbles = _mm512_and_epi32(lo_nibbles, mask_0f);
-    __m512i qh_lo = /* bits 0-15 of qh, shifted to bit 4 */;
-    __m512i q5_lo = _mm512_sub_epi32(_mm512_or_epi32(lo_nibbles, qh_lo), sixteen);
-
-    __m512i y32_lo = _mm512_cvtepi8_epi32(y[ib].qs[0:16]);
-    __m512i prod_lo = _mm512_mullo_epi32(q5_lo, y32_lo);
-
-    // Second 16 weights (similar, using high nibbles + qh bits 16-31)
-
-    int sumi = _mm512_reduce_add_epi32(_mm512_add_epi32(prod_lo, prod_hi));
-    sumf += d * (float)sumi;
-}</code></pre>
+<div class="stage-detail" id="detail-dataprep" style="--detail-color:#ffb400">
+    <h3>⚙️ Stage 3 — Data Preparation</h3>
+    <p>
+        Token sequences are chunked into fixed-length windows, batched, and optionally shuffled. Sequence length determines how much context the model sees per step;
+        batch size × grad accumulation steps = effective batch. A train/val split lets you detect memorization vs. generalization.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="v7-runbook.html"><span class="link-icon">📖</span> v7 Runbook</a>
+        <a class="stage-link" href="v7-grad-accum-windows.html"><span class="link-icon">📖</span> Grad Accum Windows</a>
+        <a class="stage-link" href="training-intuition.html"><span class="link-icon">📖</span> Training Intuition</a>
+    </div>
+    <div class="stage-hints">
+        <strong>Tune next:</strong> seq-len (96/128) · batch size · grad accumulation (4) · shuffle seed · train/val split (90/10)
+    </div>
 </div>
 
-<h2>Key AVX-512 Intrinsics Used</h2>
+<div class="stage-detail" id="detail-model" style="--detail-color:#47b475">
+    <h3>🧠 Stage 4 — AI Algorithm (Model Architecture)</h3>
+    <p>
+        The Transformer architecture — attention heads, feed-forward layers, embeddings. The IR defines the computational graph;
+        codegen compiles it to C kernels. This is where you choose how many layers, heads, embed dimensions, and what quantization format weights live in.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="architecture.html"><span class="link-icon">📖</span> Architecture</a>
+        <a class="stage-link" href="codegen.html"><span class="link-icon">📖</span> Codegen</a>
+        <a class="stage-link" href="ir-v2.html"><span class="link-icon">📖</span> IR v2 Format</a>
+        <a class="stage-link" href="v7-backprop-ir.html"><span class="link-icon">📖</span> v7 Backprop IR</a>
+        <a class="stage-link" href="concepts.html"><span class="link-icon">📖</span> Concepts (RoPE, GQA)</a>
+        <a class="stage-link" href="quantization.html"><span class="link-icon">📖</span> Quantization</a>
+    </div>
+    <div class="stage-hints">
+        <strong>IR Visualizer:</strong> Load your model's IR JSON → Architecture card, Dataflow tab, Weight Dtype Audit
+    </div>
+</div>
+
+<div class="stage-detail" id="detail-forward" style="--detail-color:#07adf8">
+    <h3>▶️ Stage 5 — Forward Pass</h3>
+    <p>
+        Input tokens flow through embedding → attention → FFN → output logits. Each kernel (matmul, softmax, layernorm, RoPE)
+        runs as optimized C with SIMD intrinsics. Memory layout (row-major vs. transposed) and tiling strategy determine throughput.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="kernels.html"><span class="link-icon">📖</span> Kernel Reference</a>
+        <a class="stage-link" href="gemm-memory-layout.html"><span class="link-icon">📖</span> GEMM Memory Layout</a>
+        <a class="stage-link" href="gemm-optimization.html"><span class="link-icon">📖</span> GEMM Optimization</a>
+        <a class="stage-link" href="simd-architecture.html"><span class="link-icon">📖</span> SIMD Architecture</a>
+        <a class="stage-link" href="flash_attention.html"><span class="link-icon">📖</span> Flash Attention</a>
+        <a class="stage-link" href="profiling.html"><span class="link-icon">📖</span> Profiling</a>
+    </div>
+    <div class="stage-hints">
+        <strong>IR Visualizer:</strong> Dataflow tab (kernel graph), Weight Dtype Audit (quant math hover popups)
+    </div>
+</div>
+
+<div class="stage-detail" id="detail-backward" style="--detail-color:#bc8cff">
+    <h3>◀️ Stage 6 — Backward Pass</h3>
+    <p>
+        Gradients flow backward through the chain rule. Each forward kernel has a corresponding backward kernel that computes <code>dL/dW</code> and <code>dL/dx</code>.
+        Gradient accumulation lets you simulate larger batches on limited memory. Watch for numerical drift — the cross-entropy parity test catches it.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="v7-backprop-ir.html"><span class="link-icon">📖</span> v7 Backprop IR</a>
+        <a class="stage-link" href="v7-cross-entropy-parity.html"><span class="link-icon">📖</span> Cross-Entropy Parity</a>
+        <a class="stage-link" href="v7-grad-accum-windows.html"><span class="link-icon">📖</span> Grad Accum Windows</a>
+        <a class="stage-link" href="pytorch-parity.html"><span class="link-icon">📖</span> PyTorch Parity</a>
+        <a class="stage-link" href="memory-safety.html"><span class="link-icon">📖</span> Memory Safety</a>
+    </div>
+    <div class="stage-hints">
+        <strong>Tune next:</strong> learning rate (2e-4 → 1e-4) · grad clipping · accumulation steps (4) · weight decay
+    </div>
+</div>
+
+<div class="stage-detail" id="detail-loss" style="--detail-color:#ff6b9d">
+    <h3>📉 Stage 7 — Loss &amp; Evaluation</h3>
+    <p>
+        Cross-entropy loss measures how far the model's predictions are from ground truth. Decreasing loss ≠ good model; you need eval metrics:
+        valid SVG rate, exact-match rate, prompt-to-SVG success. Compare train loss vs. val loss to detect overfitting.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="v7-cross-entropy-parity.html"><span class="link-icon">📖</span> Cross-Entropy Parity</a>
+        <a class="stage-link" href="training-intuition.html"><span class="link-icon">📖</span> Training Intuition</a>
+        <a class="stage-link" href="scaling.html"><span class="link-icon">📖</span> Scaling</a>
+        <a class="stage-link" href="v7-runbook.html"><span class="link-icon">📖</span> v7 Runbook</a>
+    </div>
+    <div class="stage-hints">
+        <strong>Track:</strong> train loss · val loss · valid SVG rate · exact-match rate · prompt→SVG success rate
+    </div>
+</div>
+
+<div class="stage-detail" id="detail-inference" style="--detail-color:#ffd700">
+    <h3>✨ Stage 8 — Inference</h3>
+    <p>
+        The payoff. Feed a prompt, generate tokens auto-regressively until <code>&lt;/svg&gt;</code> or <code>&lt;eos&gt;</code>.
+        Temperature and top-k control creativity vs. coherence. If the output loops or generates artifacts, the fix is usually upstream: better data boundaries, more diverse training samples, or explicit stop tokens.
+    </p>
+    <div class="stage-links">
+        <a class="stage-link" href="v7-runbook.html"><span class="link-icon">📖</span> v7 Runbook (Inference)</a>
+        <a class="stage-link" href="training-intuition.html"><span class="link-icon">📖</span> Training Intuition</a>
+        <a class="stage-link" href="v7-profiling.html"><span class="link-icon">📖</span> v7 Profiling</a>
+    </div>
+    <div class="stage-hints">
+        <strong>Tune next:</strong> temperature · top-k · stop tokens · repetition penalty · max-gen-len
+    </div>
+</div>
+
+<div class="mastery-bar">
+    <h3>🔬 Pipeline Mastery — where the refinement loop tightens</h3>
+    <div class="mastery-track">
+        <div class="mastery-fill" id="masteryFill" style="width: 0%"></div>
+    </div>
+    <div class="mastery-labels">
+        <span>Random noise</span>
+        <span>Coherent tokens</span>
+        <span>Structured output</span>
+        <span>Correct SVGs</span>
+        <span>Generalizes</span>
+    </div>
+</div>
+
+
+<h2>Refinement Checklist</h2>
+
+<p style="color: var(--text-secondary); font-size: 0.85rem;">
+    Each iteration through the loop targets a different part of the spectrum.
+    The operator's job is to identify <em>which</em> stage is the bottleneck, fix it, and re-enter the loop.
+</p>
 
 <table>
-    <tr>
-        <th>Intrinsic</th>
-        <th>Operation</th>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepu8_epi32</code></td>
-        <td>Expand 16 bytes → 16 int32s (zero extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_cvtepi8_epi32</code></td>
-        <td>Expand 16 int8 → 16 int32s (sign extension)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_mullo_epi32</code></td>
-        <td>Multiply 16 pairs of int32s (saturating)</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_reduce_add_epi32</code></td>
-        <td>Horizontal sum of all 16 lanes</td>
-    </tr>
-    <tr>
-        <td><code>_mm512_set_epi32</code></td>
-        <td>Build vector from 16 scalar values</td>
-    </tr>
+    <thead>
+        <tr>
+            <th>Symptom</th>
+            <th>Bottleneck Stage</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>UTF artifacts in output</td>
+            <td><span style="color:#ff8c00">② Tokenizer</span></td>
+            <td>Validate ASCII corpus, check roundtrip parity</td>
+        </tr>
+        <tr>
+            <td>Output is random noise</td>
+            <td><span style="color:#47b475">④ Model</span> / <span style="color:#bc8cff">⑥ Backward</span></td>
+            <td>Check weight init, verify gradient flow, reduce LR</td>
+        </tr>
+        <tr>
+            <td>Loops / repeats templates</td>
+            <td><span style="color:#e74c3c">① Data</span></td>
+            <td>Add <code>&lt;eos&gt;</code> boundaries, deduplicate rows</td>
+        </tr>
+        <tr>
+            <td>Boundary glitches (<code>/svg&gt;</code>, <code>00"</code>)</td>
+            <td><span style="color:#ffb400">③ Data Prep</span></td>
+            <td>Explicit end markers, stop at first <code>&lt;/svg&gt;</code></td>
+        </tr>
+        <tr>
+            <td>Loss plateaus</td>
+            <td><span style="color:#ff6b9d">⑦ Loss</span></td>
+            <td>LR schedule, more diverse data, increase seq-len</td>
+        </tr>
+        <tr>
+            <td>Memorizes but won't generalize</td>
+            <td><span style="color:#e74c3c">① Data</span> / <span style="color:#ffb400">③ Data Prep</span></td>
+            <td>Train/val split, more SVG variety, check overfitting</td>
+        </tr>
+        <tr>
+            <td>Inference is slow</td>
+            <td><span style="color:#07adf8">⑤ Forward</span></td>
+            <td>Profile hotspots, check SIMD paths, quantize weights</td>
+        </tr>
+        <tr>
+            <td>Numerical drift (C vs PyTorch)</td>
+            <td><span style="color:#bc8cff">⑥ Backward</span></td>
+            <td>Cross-entropy parity test, check accumulation order</td>
+        </tr>
+    </tbody>
 </table>
 
-<h2>Quick Reference</h2>
+<h2>Controlled Recipe Sweep</h2>
 
-<div class="grid grid-2">
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">Q8_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[i] = d × qs[i]
-        </p>
-    </div>
-    <div class="card card-accent">
-        <h3 style="margin-top: 0;">Q5_0 Formula</h3>
-        <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-            weight[j] = d × ((nibble | (qh_bit &lt;&lt; 4)) - 16)
-        </p>
-    </div>
+<div class="card card-accent">
+    <p>Once correctness gates pass, systematically sweep these knobs (one at a time):</p>
+    <div class="diagram">  Dimension       │  Values to try        │  Measured by
+ ─────────────────┼───────────────────────┼──────────────────────────
+  vocab           │  640  /  1024         │  roundtrip parity, loss
+  seq-len         │  96   /  128          │  loss curve, SVG validity
+  epochs          │  3    /  5            │  train vs val loss gap
+  lr              │  2e-4  →  1e-4        │  convergence speed
+  grad-accum      │  4                    │  effective batch stability
+  temperature     │  0.7  /  0.9  /  1.0  │  output diversity
+  top-k           │  10   /  40   /  80   │  coherence vs novelty</div>
 </div>
 
-<div class="card">
-    <h3 style="margin-top: 0;">vec_dot Computation</h3>
-    <p style="text-align: center; font-size: 1.2em; font-family: 'Times New Roman', serif;">
-        result = Σ (d_x × d_y × Σ (dequant_x[i] × y[i]))
-    </p>
-    <p style="text-align: center; margin-top: 1rem;">
-        Sum over all blocks, where each block contributes: scale × integer_dot_product
-    </p>
-</div>
+<script>
+(function() {
+    const pipeline = document.getElementById('spectrumPipeline');
+    const stages = pipeline.querySelectorAll('.spectrum-stage');
+    const details = document.querySelectorAll('.stage-detail');
+
+    // Click / keyboard handler for stages
+    stages.forEach(stage => {
+        function activate() {
+            const id = stage.dataset.stage;
+
+            // Toggle active-pulse on the clicked stage
+            stages.forEach(s => s.classList.remove('active-pulse'));
+            stage.classList.add('active-pulse');
+
+            // Show the matching detail panel, hide others
+            details.forEach(d => {
+                if (d.id === 'detail-' + id) {
+                    d.classList.toggle('visible');
+                    // Scroll into view
+                    if (d.classList.contains('visible')) {
+                        d.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else {
+                    d.classList.remove('visible');
+                }
+            });
+        }
+
+        stage.addEventListener('click', activate);
+        stage.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+        });
+    });
+
+    // Mastery meter animation
+    const fill = document.getElementById('masteryFill');
+    if (fill) {
+        setTimeout(() => { fill.style.width = '62%'; }, 400);
+    }
+
+    // Sequential pulse animation on load
+    stages.forEach((s, i) => {
+        setTimeout(() => {
+            s.classList.add('active-pulse');
+            setTimeout(() => s.classList.remove('active-pulse'), 600);
+        }, 200 + i * 150);
+    });
+})();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

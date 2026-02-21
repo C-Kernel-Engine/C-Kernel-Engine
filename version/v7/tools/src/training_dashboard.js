@@ -153,6 +153,16 @@ export function renderTrainingDashboard(files) {
     const layoutAuditState = layoutAudit && layoutAudit.passed === true
         ? 'PASS'
         : (Object.keys(layoutAudit).length ? 'FAIL' : '-');
+    const pipeline = files.training_pipeline || {};
+    const dataLab = pipeline && typeof pipeline === 'object' && pipeline.data_lab && typeof pipeline.data_lab === 'object'
+        ? pipeline.data_lab
+        : {};
+    const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object'
+        ? dataLab.post_train_eval
+        : (files.post_train_eval || {});
+    const validSvgRate = toNum(postEval.valid_svg_rate, NaN);
+    const closureRate = toNum(postEval.closure_success_rate, NaN);
+    const loopScore = toNum(postEval.repetition_loop_score, NaN);
 
     const reportCmd = runCtx.runDir
         ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
@@ -186,6 +196,9 @@ export function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
             <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
             <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-'}</div><div class="stat-label">Valid SVG Rate</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-'}</div><div class="stat-label">Closure Success</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-'}</div><div class="stat-label">Loop Score</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">

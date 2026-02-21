@@ -6936,6 +6936,7 @@ def _generate_visualizer_html(work_dir: Path) -> Path:
         "--run",
         str(work_dir),
         "--html-only",
+        "--strict-run-artifacts",
     ]
     run_cmd(cmd, cwd=PROJECT_ROOT)
     report_path = work_dir / "ir_report.html"

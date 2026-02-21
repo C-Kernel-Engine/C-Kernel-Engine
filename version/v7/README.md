@@ -97,6 +97,9 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json`,
   `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json`.
 - `v7-parity-1tok` now includes `qk_norm_backward` parity in addition to RMSNorm, SwiGLU, and CE.
+- Canonical regression ledger (bugs -> gate -> artifact proof):
+  `version/v7/reports/REGRESSION_LEDGER.md` and
+  `version/v7/reports/REGRESSION_LEDGER.json`.
 - CK generated-runtime train path supports `--bitwise-parity` for stricter diagnostics:
   single-thread runtime (`CK_NUM_THREADS=1`, `OMP_NUM_THREADS=1`) + strict FP compile flags for near-bitwise parity checks.
 - Long-horizon backprop targets now pass explicit train safety controls to parity harness:

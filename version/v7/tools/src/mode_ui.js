@@ -4,6 +4,7 @@ const SHARED_TABS = ['memory', 'kernels', 'profile'];
 const INFERENCE_ONLY = ['interpretability', 'quantization', 'parity', 'dataflow', 'tests', 'stats'];
 const TRAINING_TABS = [
     'train-dashboard',
+    'train-data-lab',
     'training',
     'train-gradient',
     'train-parity',
@@ -130,6 +131,7 @@ function appendTrainingTabs() {
     const insertBefore = tabsRoot.querySelector('.tab[data-tab="profile"]');
     const specs = [
         { id: 'train-dashboard', label: 'Train Dashboard' },
+        { id: 'train-data-lab', label: 'Data Lab' },
         { id: 'train-gradient', label: 'Gradient Health' },
         { id: 'train-parity', label: 'Parity Tracker' },
         { id: 'train-grad-flow', label: 'Gradient Flow' },
@@ -163,6 +165,11 @@ function ensureTrainingPanels() {
         'train-dashboard',
         'Training Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
+    );
+    ensurePanel(
+        'train-data-lab',
+        'Data Lab',
+        'Dataset quality, tokenizer roundtrip, and output quality evaluation.'
     );
     ensurePanel(
         'train-gradient',
@@ -201,6 +208,7 @@ function ensureTrainingPanels() {
     );
 
     ensurePanelRoot('train-dashboard', 'trainDashboardRoot');
+    ensurePanelRoot('train-data-lab', 'trainDataLabRoot');
     ensurePanelRoot('train-gradient', 'trainGradientRoot');
     ensurePanelRoot('train-parity', 'trainParityRoot');
     ensurePanelRoot('train-grad-flow', 'trainGradFlowRoot');

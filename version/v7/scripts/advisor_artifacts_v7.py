@@ -4,6 +4,10 @@ Generate advisor_summary.json for v7 IR visualizer.
 
 Primary goal: keep a stable, portable schema with artifact paths and lightweight
 summary metrics extracted from Advisor roofline reports when available.
+
+Enhanced: also parses advisor XML .advisum files (metrics, vectorization,
+threading) which always contain structured data even when the text/csv
+report exports are HTML-only.
 """
 
 from __future__ import annotations
@@ -12,9 +16,10 @@ import argparse
 import csv
 import json
 import re
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def utc_now_iso() -> str:
@@ -81,6 +86,224 @@ def parse_report_metrics(raw_text: str) -> Dict[str, float]:
         except ValueError:
             continue
     return metrics
+
+
+# ── XML .advisum parsers ──────────────────────────────────────────────
+
+
+def _find_advisum_files(project_dir: Path) -> Dict[str, Path]:
+    """Walk the advisor project dir and find .advisum XML summary files."""
+    found: Dict[str, Path] = {}
+    if not project_dir.is_dir():
+        return found
+    for p in project_dir.rglob("*.advisum"):
+        stem = p.stem.lower()  # e.g. "metrics", "vectorization", "threading"
+        if stem not in found:
+            found[stem] = p
+    return found
+
+
+def _parse_float_attr(elem: ET.Element, attr: str) -> Optional[float]:
+    """Extract a float from an attribute like double:bandwidth='28.98'."""
+    for key, val in elem.attrib.items():
+        if key.split("}")[-1] == attr or key == attr:
+            try:
+                return float(val)
+            except ValueError:
+                pass
+    # Also try namespace-prefixed keys like "double:bandwidth"
+    for key, val in elem.attrib.items():
+        if ":" in key and key.split(":", 1)[1] == attr:
+            try:
+                return float(val)
+            except ValueError:
+                pass
+    return None
+
+
+def parse_metrics_advisum(path: Path) -> Dict[str, Any]:
+    """Parse metrics.advisum → roofline ceilings + global metrics."""
+    result: Dict[str, Any] = {}
+    try:
+        tree = ET.parse(str(path))
+        root = tree.getroot()
+    except Exception:
+        return result
+
+    # Roof items (bandwidth ceilings)
+    roof_items: List[Dict[str, Any]] = []
+    for ri in root.iter("roofItem"):
+        name = ri.get("name", "")
+        bw = _parse_float_attr(ri, "bandwidth")
+        types_el = ri.find("types")
+        is_compute = False
+        is_memory = False
+        is_mt = False
+        is_st = False
+        if types_el is not None:
+            for k, v in types_el.attrib.items():
+                key = k.split("}")[-1] if "}" in k else k.split(":", 1)[-1] if ":" in k else k
+                if key == "compute" and v == "true":
+                    is_compute = True
+                if key == "memory" and v == "true":
+                    is_memory = True
+                if key == "multiThreaded" and v == "true":
+                    is_mt = True
+                if key == "singleThreaded" and v == "true":
+                    is_st = True
+        if name and bw is not None:
+            roof_items.append({
+                "name": name,
+                "bandwidth_gops": round(bw, 3),
+                "kind": "compute" if is_compute else ("memory" if is_memory else "unknown"),
+                "threading": "multi" if is_mt else ("single" if is_st else "unknown"),
+            })
+    if roof_items:
+        result["roof_items"] = roof_items
+
+    # Global metrics from <Metrics> element
+    for metrics_el in root.iter("Metrics"):
+        global_metrics: Dict[str, Any] = {}
+        for k, v in metrics_el.attrib.items():
+            # Strip namespace prefix: "double:ProgramTime" → "ProgramTime"
+            clean_key = k
+            if "}" in k:
+                clean_key = k.split("}")[-1]
+            elif ":" in k:
+                clean_key = k.split(":", 1)[-1]
+            try:
+                global_metrics[clean_key] = float(v)
+            except ValueError:
+                global_metrics[clean_key] = v
+        if global_metrics:
+            result["global_metrics"] = global_metrics
+        break  # only first
+
+    # Memory traffic
+    for level in root.iter("level"):
+        for k, v in level.attrib.items():
+            clean = k.split("}")[-1] if "}" in k else k.split(":", 1)[-1] if ":" in k else k
+            try:
+                result.setdefault("memory_traffic_gb", {})[clean] = round(float(v), 6)
+            except ValueError:
+                pass
+
+    return result
+
+
+def parse_vectorization_advisum(path: Path) -> List[Dict[str, Any]]:
+    """Parse vectorization.advisum → per-function hotspot list."""
+    hotspots: List[Dict[str, Any]] = []
+    try:
+        tree = ET.parse(str(path))
+        root = tree.getroot()
+    except Exception:
+        return hotspots
+
+    for hs in root.iter("hotspot"):
+        routine = hs.get("routine", "")
+        if not routine:
+            continue
+        is_vec = hs.get("is_vectorized", "0") == "1"
+        self_time = 0.0
+        total_time = 0.0
+        try:
+            self_time = float(hs.get("self_time", "0"))
+        except ValueError:
+            pass
+        try:
+            total_time = float(hs.get("total_time", "0"))
+        except ValueError:
+            pass
+        hotspots.append({
+            "routine": routine,
+            "is_vectorized": is_vec,
+            "self_time_s": round(self_time, 6),
+            "total_time_s": round(total_time, 6),
+        })
+    return hotspots
+
+
+def parse_threading_advisum(path: Path) -> List[Dict[str, Any]]:
+    """Parse threading.advisum → per-function threading hotspot list."""
+    return parse_vectorization_advisum(path)  # same XML schema
+
+
+def enrich_from_advisum(project_dir: Path) -> Dict[str, Any]:
+    """Walk advisor project, parse .advisum XML files, return enrichment dict."""
+    enrichment: Dict[str, Any] = {}
+    advisum_files = _find_advisum_files(project_dir)
+
+    if "metrics" in advisum_files:
+        enrichment["advisum_metrics"] = parse_metrics_advisum(advisum_files["metrics"])
+
+    if "vectorization" in advisum_files:
+        enrichment["vectorization_hotspots"] = parse_vectorization_advisum(
+            advisum_files["vectorization"]
+        )
+
+    if "threading" in advisum_files:
+        enrichment["threading_hotspots"] = parse_threading_advisum(
+            advisum_files["threading"]
+        )
+
+    # Build a flat summary_metrics dict from the advisum global metrics
+    # This is what the IR visualizer renders in the Advisor panel
+    gm = enrichment.get("advisum_metrics", {}).get("global_metrics", {})
+    flat: Dict[str, float] = {}
+    key_map = {
+        "ProgramTime": "elapsed_time_s",
+        "ElapsedTime": "elapsed_time_s",
+        "TotalGFLOPS": "total_gflops",
+        "TotalGFLOPCount": "total_gflop_count",
+        "TotalGINTOPS": "total_gintops",
+        "TotalGINTOPCount": "total_gintop_count",
+        "TotalGMixedOPS": "total_gmixed_ops",
+        "TotalGMixedOPCount": "total_gmixed_op_count",
+        "TotalFloatAI": "float_arithmetic_intensity",
+        "TotalIntAI": "int_arithmetic_intensity",
+        "TotalMixedAI": "mixed_arithmetic_intensity",
+        "TotalCPUTime": "total_cpu_time_s",
+        "TimeInVectorizedLoops": "time_in_vectorized_loops_s",
+        "TimeInScalarLoops": "time_in_scalar_loops_s",
+        "TimeOutsideOfAnyLoop": "time_outside_loops_s",
+        "VectorizedLoopsCount": "vectorized_loops_count",
+        "CPUThreads": "cpu_threads",
+    }
+    for gm_key, flat_key in key_map.items():
+        if gm_key in gm:
+            try:
+                flat[flat_key] = round(float(gm[gm_key]), 6)
+            except (ValueError, TypeError):
+                pass
+
+    # Add key roofline ceilings
+    roof = enrichment.get("advisum_metrics", {}).get("roof_items", [])
+    for item in roof:
+        name = item.get("name", "")
+        bw = item.get("bandwidth_gops")
+        if not name or bw is None:
+            continue
+        if name == "DRAM Bandwidth":
+            flat["dram_bw_gb_s"] = round(bw, 3)
+        elif name == "SP Vector FMA Peak":
+            flat["sp_fma_peak_gflops"] = round(bw, 3)
+        elif name == "DP Vector FMA Peak":
+            flat["dp_fma_peak_gflops"] = round(bw, 3)
+        elif name == "L1 Bandwidth":
+            flat["l1_bw_gb_s"] = round(bw, 3)
+        elif name == "L2 Bandwidth":
+            flat["l2_bw_gb_s"] = round(bw, 3)
+        elif name == "L3 Bandwidth":
+            flat["l3_bw_gb_s"] = round(bw, 3)
+
+    # Add ISA used
+    isa = gm.get("ISAUsed", "")
+    if isa:
+        flat["isa_used"] = str(isa)  # type: ignore[assignment]
+
+    enrichment["flat_summary_metrics"] = flat
+    return enrichment
 
 
 def parse_csv_preview(path: Path, max_rows: int = 32) -> List[Dict[str, str]]:
@@ -151,6 +374,27 @@ def main() -> int:
     if report_html:
         artifacts.append({"label": "Advisor report (html)", "path": str(report_html)})
 
+    # Try text-based metrics first
+    text_metrics = parse_report_metrics(raw_text)
+
+    # Always try to enrich from .advisum XML in the project dir
+    advisum_enrichment: Dict[str, Any] = {}
+    if args.project_dir and args.project_dir.is_dir():
+        advisum_enrichment = enrich_from_advisum(args.project_dir)
+        print(f"  advisum enrichment: {len(advisum_enrichment)} sections")
+
+    # Merge: prefer text metrics if available, fall back to advisum flat metrics
+    summary_metrics = text_metrics
+    flat_from_advisum = advisum_enrichment.get("flat_summary_metrics", {})
+    if not summary_metrics and flat_from_advisum:
+        summary_metrics = flat_from_advisum
+        print("  Using advisum XML metrics (text report had 0 parseable metrics)")
+    elif flat_from_advisum:
+        # Supplement: add advisum keys that text parsing missed
+        for k, v in flat_from_advisum.items():
+            if k not in summary_metrics:
+                summary_metrics[k] = v
+
     payload: Dict[str, object] = {
         "generated_at": utc_now_iso(),
         "analysis": str(args.analysis or "roofline"),
@@ -159,11 +403,19 @@ def main() -> int:
         "report_path": str(report_text) if report_text else None,
         "csv_path": str(report_csv) if report_csv else None,
         "html_path": str(report_html) if report_html else None,
-        "summary_metrics": parse_report_metrics(raw_text),
+        "summary_metrics": summary_metrics,
         "preview_rows": parse_csv_preview(report_csv) if report_csv else [],
         "raw_text": raw_text,
         "artifacts": artifacts,
     }
+
+    # Add advisum-specific sections when available
+    if "advisum_metrics" in advisum_enrichment:
+        payload["advisum_metrics"] = advisum_enrichment["advisum_metrics"]
+    if "vectorization_hotspots" in advisum_enrichment:
+        payload["vectorization_hotspots"] = advisum_enrichment["vectorization_hotspots"]
+    if "threading_hotspots" in advisum_enrichment:
+        payload["threading_hotspots"] = advisum_enrichment["threading_hotspots"]
 
     out_path = Path(out_dir) / "advisor_summary.json"
     write_json(out_path, payload)
