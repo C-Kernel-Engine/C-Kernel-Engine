@@ -481,6 +481,14 @@ echo "[OK] DATA_TXT=$DATA_TXT"</pre>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># Fast path: bundled demo dataset (already in repo)
+BASE_DATA_TXT="${DATA_DIR:-$ROOT/version/v7/data}/svg_assets_train.txt"
+if [ ! -s "$DATA_TXT" ] && [ -s "$BASE_DATA_TXT" ]; then
+  echo "[WARN] DATA_TXT missing or empty: $DATA_TXT"
+  echo "[WARN] Falling back to bundled dataset: $BASE_DATA_TXT"
+  DATA_TXT="$BASE_DATA_TXT"
+  export DATA_TXT
+fi
+
 if [ ! -s "$DATA_TXT" ]; then
   echo "[ERROR] Bundled dataset missing or empty: $DATA_TXT"
   echo "Fix: git pull, or set DATA_TXT to your own text file."
@@ -811,8 +819,9 @@ sed -n '1p' "$DATA_TXT" > "$PARITY_ROOT/svg_row1.txt"
 sed -n '2p' "$DATA_TXT" > "$PARITY_ROOT/svg_row2.txt"
 
 if [ ! -s "$PARITY_ROOT/svg_row1.txt" ] || [ ! -s "$PARITY_ROOT/svg_row2.txt" ]; then
-  echo "[WARN] Need at least 2 non-empty rows in DATA_TXT for parity canaries."
-  echo "[WARN] Skipping parity gate run."
+  echo "[FAIL] Need at least 2 non-empty rows in DATA_TXT for parity canaries."
+  echo "[FAIL] Re-run Step 1 and Step 0.5/0.55/0.56, then retry Step 3.1."
+  exit 1
 else
   for idx in 1 2; do
     ROW_FILE="$PARITY_ROOT/svg_row${idx}.txt"
