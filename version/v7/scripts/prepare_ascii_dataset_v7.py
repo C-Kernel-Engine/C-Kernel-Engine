@@ -13,6 +13,69 @@ from pathlib import Path
 from typing import Iterable
 
 
+COMMON_ASCII_MAP: tuple[tuple[str, str], ...] = (
+    ("→", "->"),
+    ("←", "&lt;-"),
+    ("↔", "&lt;-&gt;"),
+    ("⇒", "=>"),
+    ("⇐", "&lt;="),
+    ("±", "+/-"),
+    ("×", "x"),
+    ("÷", "/"),
+    ("≤", "&lt;="),
+    ("≥", ">="),
+    ("≠", "!="),
+    ("≈", "~"),
+    ("∞", "inf"),
+    ("—", "-"),
+    ("–", "-"),
+    ("−", "-"),
+    ("…", "..."),
+    ("•", "-"),
+    ("●", "o"),
+    ("○", "o"),
+    ("◆", "&lt;&gt;"),
+    ("■", "[]"),
+    ("▁", "_"),
+    ("µ", "u"),
+    ("°", "deg"),
+    ("α", "alpha"),
+    ("β", "beta"),
+    ("γ", "gamma"),
+    ("δ", "delta"),
+    ("Δ", "Delta"),
+    ("π", "pi"),
+    ("λ", "lambda"),
+    ("Ω", "Ohm"),
+    ("✅", "ok"),
+    ("❌", "x"),
+    ("⚠", "warn"),
+    ("✨", "*"),
+    ("⭐", "*"),
+    ("🙂", ":)"),
+    ("😊", ":)"),
+    ("😉", ";)"),
+    ("😐", ":|"),
+    ("😕", ":/"),
+    ("😢", ":("),
+    ("😭", ":'("),
+    ("😡", ">:("),
+    ("🔥", "fire"),
+)
+
+
+def _ascii_map_common(text: str) -> tuple[str, int]:
+    out = text
+    changed = 0
+    for src, dst in COMMON_ASCII_MAP:
+        if src not in out:
+            continue
+        count = out.count(src)
+        out = out.replace(src, dst)
+        changed += int(count)
+    return out, changed
+
+
 def _ascii_xml_escape(text: str) -> tuple[str, int]:
     out: list[str] = []
     changed = 0
@@ -94,6 +157,11 @@ def main() -> int:
         help="How to convert non-ASCII chars",
     )
     ap.add_argument(
+        "--ascii-map-common",
+        action="store_true",
+        help="Map common Unicode symbols to keyboard-style ASCII before --ascii-mode conversion",
+    )
+    ap.add_argument(
         "--svg-only",
         action="store_true",
         help="Keep only rows that start with <svg",
@@ -122,16 +190,22 @@ def main() -> int:
     dropped_non_svg = 0
     changed_rows = 0
     changed_chars = 0
+    mapped_chars = 0
     for row in rows:
         if args.svg_only and not row.lstrip().startswith("<svg"):
             dropped_non_svg += 1
             continue
+        mapped = 0
+        if args.ascii_map_common:
+            row, mapped = _ascii_map_common(row)
         conv, changed = convert(row)
         if conv.strip():
             kept.append(conv.strip())
-            if changed > 0:
+            total_changed = int(mapped) + int(changed)
+            if total_changed > 0:
                 changed_rows += 1
-                changed_chars += changed
+                changed_chars += total_changed
+                mapped_chars += int(mapped)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_text = ("\n".join(kept) + "\n") if kept else ""
@@ -140,9 +214,9 @@ def main() -> int:
     non_ascii_after = sum(1 for ch in out_text if ord(ch) >= 128)
     print(f"[OK] input:  {in_path}")
     print(f"[OK] output: {out_path}")
-    print(f"[INFO] input_format={fmt} ascii_mode={args.ascii_mode} svg_only={bool(args.svg_only)}")
+    print(f"[INFO] input_format={fmt} ascii_mode={args.ascii_mode} ascii_map_common={bool(args.ascii_map_common)} svg_only={bool(args.svg_only)}")
     print(f"[INFO] rows_in={len(rows)} rows_out={len(kept)} dropped_non_svg={dropped_non_svg}")
-    print(f"[INFO] rows_changed={changed_rows} non_ascii_chars_converted={changed_chars}")
+    print(f"[INFO] rows_changed={changed_rows} non_ascii_chars_converted={changed_chars} mapped_common_symbols={mapped_chars}")
     print(f"[INFO] output_non_ascii_chars={non_ascii_after}")
     if not kept:
         raise SystemExit("ERROR: output is empty after filtering/conversion")
@@ -153,4 +227,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

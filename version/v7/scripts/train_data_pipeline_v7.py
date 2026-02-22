@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CK_RUN = ROOT / "version" / "v7" / "scripts" / "ck_run_v7.py"
 TORCH_REF = ROOT / "version" / "v7" / "scripts" / "train_qwen3_torch_from_run_v7.py"
 OPEN_VIS = ROOT / "version" / "v7" / "tools" / "open_ir_visualizer.py"
+PROMOTE_CKPT = ROOT / "version" / "v7" / "scripts" / "promote_latest_checkpoint_v7.py"
 BPE_BIN = ROOT / "build" / "ck-bpe-train"
 TOKENIZER_LIB = ROOT / "build" / "libckernel_tokenizer.so"
 CK_CLI_BIN = ROOT / "build" / "ck-cli-v7"
@@ -76,6 +77,46 @@ def _run_capture(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
             msg += f"\n  stderr: {stderr_msg[-2000:]}"
         raise RuntimeError(msg)
     return result
+
+
+def _promote_latest_checkpoint_for_eval(
+    run_dir: Path,
+    *,
+    strict: bool,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "skipped",
+        "reason": "checkpoint_promotion_not_attempted",
+    }
+    if not PROMOTE_CKPT.exists():
+        payload = {"status": "skipped", "reason": f"missing_script:{PROMOTE_CKPT}"}
+        if strict:
+            raise SystemExit(
+                "ERROR: strict data gate requires checkpoint promotion before eval.\n"
+                f"  missing: {PROMOTE_CKPT}"
+            )
+        return payload
+    try:
+        _run(
+            [
+                _python_exec(),
+                str(PROMOTE_CKPT),
+                "--run",
+                str(run_dir),
+            ],
+            cwd=ROOT,
+        )
+        return {"status": "ok", "strategy": "latest_checkpoint"}
+    except Exception as exc:
+        payload = {"status": "error", "reason": str(exc)}
+        if strict:
+            raise SystemExit(
+                "ERROR: strict data gate failed (checkpoint promotion).\n"
+                f"  run_dir: {run_dir}\n"
+                f"  reason:  {exc}"
+            )
+        print(f"[WARN] checkpoint promotion skipped: {exc}")
+        return payload
 
 
 def _ensure_binary(path: Path, make_target: str) -> None:
@@ -721,6 +762,7 @@ def _run_post_train_svg_eval(
         "prompt": prompt,
         "max_tokens": int(getattr(args, "eval_max_tokens", 160)),
         "temperature": float(getattr(args, "eval_temperature", 0.0)),
+        "min_valid_svg_rate": float(getattr(args, "min_valid_svg_rate", 0.70)),
         "valid_svg_rate": 0.0,
         "closure_success_rate": 0.0,
         "repetition_loop_score": 1.0,
@@ -774,9 +816,26 @@ def _run_post_train_svg_eval(
         return eval_payload, None
 
     response_text = _extract_response_block(result.stdout or "")
-    open_tags = len(re.findall(r"<svg\b", response_text, flags=re.IGNORECASE))
-    close_tags = len(re.findall(r"</svg>", response_text, flags=re.IGNORECASE))
-    svg_fragments = re.findall(r"<svg\b.*?</svg>", response_text, flags=re.IGNORECASE | re.DOTALL)
+    if response_text:
+        # ck_chat may emit runtime log lines into stdout near "Response:".
+        # Remove known log-line prefixes so SVG parsing sees model text only.
+        cleaned_lines = [
+            ln for ln in response_text.splitlines()
+            if (not ln.startswith("[CK ")) and (not ln.startswith("[OpenMP]"))
+        ]
+        response_text = "\n".join(cleaned_lines).strip()
+
+    eval_text = response_text
+    prompt_norm = prompt.strip()
+    if args.require_svg_rows and prompt_norm.lower().startswith("<svg"):
+        # Prompt carries the opening tag in the default SVG eval flow.
+        # Evaluate SVG fragments on prompt+response so continuation generations
+        # are not misclassified as having zero <svg tags.
+        eval_text = f"{prompt_norm}{response_text}"
+
+    open_tags = len(re.findall(r"<svg\b", eval_text, flags=re.IGNORECASE))
+    close_tags = len(re.findall(r"</svg>", eval_text, flags=re.IGNORECASE))
+    svg_fragments = re.findall(r"<svg\b.*?</svg>", eval_text, flags=re.IGNORECASE | re.DOTALL)
 
     sample_cap = max(1, int(getattr(args, "eval_sample_limit", 12)))
     valid_count = 0
@@ -820,6 +879,7 @@ def _run_post_train_svg_eval(
         {
             "status": "ok",
             "response_chars": int(len(response_text)),
+            "eval_chars": int(len(eval_text)),
             "open_svg_tags": int(open_tags),
             "close_svg_tags": int(close_tags),
             "sample_count": int(sample_count),
@@ -832,6 +892,23 @@ def _run_post_train_svg_eval(
             "response_preview": _truncate_text_preview(response_text, limit=1000),
         }
     )
+    threshold = float(getattr(args, "min_valid_svg_rate", 0.70))
+    diagnosis: list[str] = []
+    if sample_count == 0:
+        diagnosis.append("no_complete_svg_output")
+    if valid_rate < threshold:
+        diagnosis.append("valid_svg_rate_below_threshold")
+    if closure_rate < 0.90:
+        diagnosis.append("svg_closure_incomplete")
+    if loop_score > 0.50:
+        diagnosis.append("repetition_or_looping_detected")
+    eval_payload["quality_diagnosis"] = diagnosis or ["ok"]
+    eval_payload["quality_recommendations"] = [
+        "This gate measures output quality and data/task fit, not CK-vs-PyTorch numerical parity.",
+        "Increase SVG corpus size/diversity and rebalance frequent templates.",
+        "Add instruction-to-SVG SFT pairs so the model learns prompt-conditioned structure.",
+        "Run another pretrain+SFT pass; keep strict gate enabled for production quality sign-off.",
+    ]
     return eval_payload, str(ck_build_dir)
 
 
@@ -972,13 +1049,23 @@ def _build_training_pipeline_payload(
     Schema: ``ck.training_pipeline.v1``  (see ck_run_v7.py _build_training_pipeline_payload).
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    active_stage = "pretrain"
-    stage_names = ["pretrain", "sft", "dpo", "grpo", "ppo"]
+    curriculum_raw = str(getattr(args, "curriculum_stage", "auto") or "auto").strip().lower()
+    if curriculum_raw in {"stage_b", "midtrain"}:
+        active_stage = "midtrain"
+        curriculum_stage = "stage_b"
+    elif curriculum_raw in {"stage_a", "pretrain"}:
+        active_stage = "pretrain"
+        curriculum_stage = "stage_a"
+    else:
+        active_stage = "pretrain"
+        curriculum_stage = "auto"
+    stage_names = ["pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"]
+    active_idx = stage_names.index(active_stage) if active_stage in stage_names else 0
     stage_timeline = [
         {
             "stage": s,
             "order": i,
-            "status": "active" if s == active_stage else ("planned" if i > 0 else "completed"),
+            "status": "active" if s == active_stage else ("planned" if i > active_idx else "completed"),
             "active": s == active_stage,
         }
         for i, s in enumerate(stage_names)
@@ -995,6 +1082,7 @@ def _build_training_pipeline_payload(
     data_provenance = [
         {
             "stage": active_stage,
+            "curriculum_stage": curriculum_stage,
             "dataset_name": dataset_path.name,
             "source_path": str(dataset_path),
             "split": "train",
@@ -1067,6 +1155,7 @@ def _build_training_pipeline_payload(
         "schema": "ck.training_pipeline.v1",
         "generated_at": now_iso,
         "active_stage": active_stage,
+        "curriculum_stage": curriculum_stage,
         "stage_timeline": stage_timeline,
         "backend": "ck",
         "optimizer": {
@@ -1087,6 +1176,7 @@ def _build_training_pipeline_payload(
             "tokens_total": int(args.total_tokens),
             "tokens_per_update": int(tokens_per_update),
             "processed_tokens": int(steps) * int(args.seq_len) if steps else 0,
+            "curriculum_stage": curriculum_stage,
         },
         "train_dims": train_dims,
         "data_provenance": data_provenance,
@@ -1209,10 +1299,50 @@ def _run_torch_ref(
     _run(cmd, cwd=ROOT)
 
 
+def _run_v7_init(args: argparse.Namespace, run_dir: Path) -> None:
+    init_vocab_size = int(args.vocab_size) if args.vocab_size is not None else (
+        int(args.bpe_vocab_size) if _is_bpe_tokenizer_mode(args.tokenizer) else 256
+    )
+    _run(
+        [
+            _python_exec(),
+            str(CK_RUN),
+            "init",
+            "--run",
+            str(run_dir),
+            "--init",
+            str(args.init),
+            "--layers",
+            str(args.layers),
+            "--vocab-size",
+            str(init_vocab_size),
+            "--embed-dim",
+            str(args.embed_dim),
+            "--hidden-dim",
+            str(args.hidden_dim),
+            "--num-heads",
+            str(args.num_heads),
+            "--num-kv-heads",
+            str(args.num_kv_heads),
+            "--context-len",
+            str(args.context_len),
+            "--template",
+            str(args.template),
+            "--train-seed",
+            str(args.seed),
+        ],
+        cwd=ROOT,
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="High-level v7 dataset/tokenizer/train pipeline")
     ap.add_argument("--run", required=True, help="Existing v7 run-dir (created by ck_run_v7.py init)")
-    ap.add_argument("--init-if-missing", action="store_true", help="Auto-run v7 init when --run does not exist")
+    ap.add_argument(
+        "--init-if-missing",
+        action="store_true",
+        help="Auto-run v7 init when --run is missing or missing weights_manifest.json/weights.bump",
+    )
     ap.add_argument("--init", default="xavier_uniform", choices=["normal_0p02", "xavier_uniform", "xavier_normal", "kaiming_uniform", "zeros"])
     ap.add_argument("--layers", type=int, default=2)
     ap.add_argument("--vocab-size", type=int, default=None, help="Run vocab size for init (default: 256 byte, bpe-vocab-size for bpe/ascii_bpe)")
@@ -1222,6 +1352,12 @@ def main() -> int:
     ap.add_argument("--num-kv-heads", type=int, default=4)
     ap.add_argument("--context-len", type=int, default=128)
     ap.add_argument("--template", default="qwen3")
+    ap.add_argument(
+        "--curriculum-stage",
+        choices=["auto", "stage_a", "stage_b"],
+        default="auto",
+        help="Annotate training_pipeline stage metadata for visualizer flow (stage_a=pretrain, stage_b=midtrain)",
+    )
     ap.add_argument("--data", default=None, help="UTF-8 training text file path")
     ap.add_argument("--dataset-repeats", type=int, default=10, help="If --data missing, create repeated SVG rows")
     ap.add_argument("--tokenizer", choices=["byte", "bpe", "ascii_bpe"], default="byte", help="Tokenization path for training")
@@ -1401,45 +1537,31 @@ def main() -> int:
         args.require_ascii_data = args.tokenizer == "ascii_bpe"
 
     run_dir = Path(args.run).expanduser().resolve()
-    if not run_dir.exists():
+    manifest = run_dir / "weights_manifest.json"
+    weights_bump = run_dir / "weights.bump"
+    needs_init = (not run_dir.exists()) or (not manifest.exists()) or (not weights_bump.exists())
+    if needs_init:
         if not args.init_if_missing:
+            if not run_dir.exists():
+                raise SystemExit(
+                    f"ERROR: run-dir not found: {run_dir}\n"
+                    "Hint: pass --init-if-missing to bootstrap automatically."
+                )
+            missing = []
+            if not manifest.exists():
+                missing.append(str(manifest))
+            if not weights_bump.exists():
+                missing.append(str(weights_bump))
+            missing_text = "\n  - ".join(missing) if missing else "unknown"
             raise SystemExit(
-                f"ERROR: run-dir not found: {run_dir}\n"
-                "Hint: pass --init-if-missing to bootstrap automatically."
+                "ERROR: run-dir exists but is not initialized for training.\n"
+                f"run-dir: {run_dir}\n"
+                f"missing:\n  - {missing_text}\n"
+                "Hint: pass --init-if-missing (or run ck_run_v7.py init first)."
             )
-        init_vocab_size = int(args.vocab_size) if args.vocab_size is not None else (
-            int(args.bpe_vocab_size) if _is_bpe_tokenizer_mode(args.tokenizer) else 256
-        )
-        _run(
-            [
-                _python_exec(),
-                str(CK_RUN),
-                "init",
-                "--run",
-                str(run_dir),
-                "--init",
-                str(args.init),
-                "--layers",
-                str(args.layers),
-                "--vocab-size",
-                str(init_vocab_size),
-                "--embed-dim",
-                str(args.embed_dim),
-                "--hidden-dim",
-                str(args.hidden_dim),
-                "--num-heads",
-                str(args.num_heads),
-                "--num-kv-heads",
-                str(args.num_kv_heads),
-                "--context-len",
-                str(args.context_len),
-                "--template",
-                str(args.template),
-                "--train-seed",
-                str(args.seed),
-            ],
-            cwd=ROOT,
-        )
+        if run_dir.exists() and (not manifest.exists() or not weights_bump.exists()):
+            print(f"[init] run-dir exists but missing manifest/weights, bootstrapping: {run_dir}")
+        _run_v7_init(args, run_dir)
 
     if args.work_dir:
         work_dir = Path(args.work_dir).expanduser().resolve()
@@ -1600,6 +1722,7 @@ def main() -> int:
             "run_dir": str(run_dir),
             "dataset": str(dataset_path),
             "tokenizer": str(args.tokenizer),
+            "curriculum_stage": str(args.curriculum_stage),
             "train_driver": str(args.train_driver),
             "prepare_only": True,
             "artifacts": {
@@ -1650,38 +1773,57 @@ def main() -> int:
     if args.with_torch_ref:
         _run_torch_ref(args, dataset_path, torch_json, token_file=token_file)
 
+    checkpoint_promotion = _promote_latest_checkpoint_for_eval(
+        run_dir,
+        strict=bool(args.strict_data_gates and args.require_svg_rows),
+    )
+
     post_train_eval, eval_model_dir = _run_post_train_svg_eval(args, run_dir)
     post_train_eval_path: str | None = None
     if isinstance(post_train_eval, dict) and post_train_eval:
         post_eval_doc = dict(post_train_eval)
         if eval_model_dir:
             post_eval_doc["model_dir"] = str(eval_model_dir)
+        post_eval_doc["checkpoint_promotion"] = dict(checkpoint_promotion)
         post_eval_doc.setdefault("generated_at", datetime.now(timezone.utc).isoformat())
         post_eval_file = run_dir / "post_train_eval.json"
         _atomic_write_text(post_eval_file, json.dumps(post_eval_doc, indent=2))
         post_train_eval_path = str(post_eval_file)
 
     if args.strict_data_gates and bool(args.require_svg_rows):
-        if post_train_eval.get("status") != "ok":
-            raise SystemExit(
-                "ERROR: strict data gate failed (post-train eval unavailable).\n"
-                f"  status: {post_train_eval.get('status')}\n"
-                f"  reason: {post_train_eval.get('reason')}"
+        if not bool(args.post_train_eval):
+            print(
+                "WARN: strict data gates requested with --no-post-train-eval; "
+                "skipping output-quality SVG gate for this run."
             )
-        valid_svg_rate = float(post_train_eval.get("valid_svg_rate", 0.0))
-        if valid_svg_rate < float(args.min_valid_svg_rate):
-            raise SystemExit(
-                "ERROR: strict data gate failed (valid SVG rate).\n"
-                f"  valid_svg_rate: {valid_svg_rate:.4f}\n"
-                f"  threshold:      {float(args.min_valid_svg_rate):.4f}\n"
-                f"  artifact:       {post_train_eval_path or (run_dir / 'post_train_eval.json')}"
-            )
+        else:
+            if post_train_eval.get("status") != "ok":
+                raise SystemExit(
+                    "ERROR: strict data gate failed (post-train eval unavailable).\n"
+                    f"  status: {post_train_eval.get('status')}\n"
+                    f"  reason: {post_train_eval.get('reason')}\n"
+                    "  note: this gate is output-quality/data-fit, not CK-vs-PyTorch math parity."
+                )
+            valid_svg_rate = float(post_train_eval.get("valid_svg_rate", 0.0))
+            if valid_svg_rate < float(args.min_valid_svg_rate):
+                diagnosis = post_train_eval.get("quality_diagnosis")
+                diag_text = ",".join([str(x) for x in diagnosis]) if isinstance(diagnosis, list) and diagnosis else "n/a"
+                raise SystemExit(
+                    "ERROR: strict data gate failed (valid SVG rate).\n"
+                    f"  valid_svg_rate: {valid_svg_rate:.4f}\n"
+                    f"  threshold:      {float(args.min_valid_svg_rate):.4f}\n"
+                    f"  diagnosis:      {diag_text}\n"
+                    f"  artifact:       {post_train_eval_path or (run_dir / 'post_train_eval.json')}\n"
+                    "  note: this is a data/task quality failure, not a numerical parity failure.\n"
+                    "  next: expand SVG data + add instruction-to-SVG SFT pairs, then rerun."
+                )
 
     report = {
         "format": "v7-train-data-pipeline",
         "run_dir": str(run_dir),
         "dataset": str(dataset_path),
         "tokenizer": str(args.tokenizer),
+        "curriculum_stage": str(args.curriculum_stage),
         "train_driver": str(args.train_driver),
         "training": {
             "epochs": int(args.epochs),
@@ -1705,6 +1847,7 @@ def main() -> int:
         "dataset_profile": dataset_profile,
         "tokenizer_roundtrip": tokenizer_roundtrip,
         "post_train_eval": post_train_eval,
+        "checkpoint_promotion": checkpoint_promotion,
         "ck_loss": {},
         "torch_loss": {},
     }

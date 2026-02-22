@@ -5721,6 +5721,84 @@ def _run_ck_profile_via_cli(
     return json_out
 
 
+def _maybe_run_training_parity_regimen(args: argparse.Namespace, *, run_dir: Optional[Path]) -> None:
+    """Optionally suggest/run/require staged training parity regimen after train-e2e."""
+    mode = str(getattr(args, "parity_regimen", "suggest") or "suggest").strip().lower()
+    if mode not in {"off", "suggest", "run", "require"}:
+        mode = "suggest"
+    if mode == "off":
+        return
+
+    regimen_script = SCRIPTS_DIR / "run_training_parity_regimen_v7.py"
+    if not regimen_script.exists():
+        msg = f"training parity regimen script missing: {regimen_script}"
+        if mode == "require":
+            log_error(msg)
+            sys.exit(2)
+        log(f"  Warning: {msg}", C_ORANGE)
+        return
+
+    if run_dir is None:
+        if mode == "suggest":
+            log("  parity regimen: skipped suggestion (no --run dir set for this train command)", C_DIM)
+            return
+        msg = "--parity-regimen run/require needs --run <run_dir> so artifacts can be persisted per run"
+        if mode == "require":
+            log_error(msg)
+            sys.exit(2)
+        log(f"  Warning: {msg}", C_ORANGE)
+        return
+
+    regimen_json = run_dir / "training_parity_regimen_latest.json"
+    regimen_md = run_dir / "training_parity_regimen_latest.md"
+    parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    python_exec = str(parity_python) if parity_python.exists() else sys.executable
+    cmd = [
+        python_exec,
+        str(regimen_script),
+        "--run-dir",
+        str(run_dir),
+        "--json-out",
+        str(regimen_json),
+        "--md-out",
+        str(regimen_md),
+    ]
+
+    if mode == "suggest":
+        if regimen_json.exists():
+            try:
+                payload = json.loads(regimen_json.read_text(encoding="utf-8"))
+                summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+                passed = bool(summary.get("passed", False))
+                if passed:
+                    log(f"  parity regimen: present/pass ({regimen_json})", C_DIM)
+                else:
+                    log(f"  parity regimen: present but not passing ({regimen_json})", C_ORANGE)
+                    log(f"  parity regimen: rerun with --parity-regimen run or command below", C_DIM)
+                    log(f"    {' '.join(cmd)}", C_DIM)
+            except Exception:
+                log(f"  parity regimen: unreadable report at {regimen_json}; rerun recommended", C_ORANGE)
+                log(f"    {' '.join(cmd)}", C_DIM)
+        else:
+            log("  parity regimen: not found for this run (recommended before long CK-only training)", C_ORANGE)
+            log("  parity regimen options:", C_DIM)
+            log("    --parity-regimen run      (run now, continue on failure)", C_DIM)
+            log("    --parity-regimen require  (run now, fail command if regimen fails)", C_DIM)
+            log(f"  parity regimen command: {' '.join(cmd)}", C_DIM)
+        return
+
+    log(f"  parity regimen: running ({mode})", C_DIM)
+    rc = run_cmd_allow_fail(cmd, cwd=PROJECT_ROOT).returncode
+    if rc == 0:
+        log(f"  parity regimen: PASS ({regimen_json})", C_GREEN)
+        return
+
+    if mode == "require":
+        log_error(f"parity regimen failed (mode=require): {regimen_json}")
+        sys.exit(1)
+    log(f"  Warning: parity regimen failed (mode=run), continuing: {regimen_json}", C_ORANGE)
+
+
 def step_run_train_e2e(args: argparse.Namespace) -> Path:
     """Run v7 train E2E using selected backend (ck runtime or parity harness)."""
     log_step(1, "Running train E2E")
@@ -6018,6 +6096,7 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
             _export_train_telemetry_to_run_dir(Path(json_out), run_dir)
         except Exception as e:
             log(f"  Warning: run_dir telemetry export failed: {e}", C_ORANGE)
+    _maybe_run_training_parity_regimen(args, run_dir=run_dir)
     log(f"  Train parity report: {json_out}", C_GREEN)
     return Path(json_out)
 
@@ -7745,6 +7824,8 @@ Examples:
         sp.set_defaults(train_use_init_bump=True)
         sp.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                         help='Do not load tiny parity init from run_dir/weights.bump')
+        sp.add_argument('--parity-regimen', choices=['off', 'suggest', 'run', 'require'], default='suggest',
+                        help='Post-train operator gate: suggest/run/require staged CK-vs-PyTorch parity regimen')
 
         sp.add_argument('--train-epochs', type=int, default=3)
         sp.add_argument('--train-seq-len', type=int, default=16)
@@ -7859,6 +7940,8 @@ Examples:
     run_parser.set_defaults(train_use_init_bump=True)
     run_parser.add_argument('--no-train-use-init-bump', dest='train_use_init_bump', action='store_false',
                            help='Do not load tiny parity init from run_dir/weights.bump')
+    run_parser.add_argument('--parity-regimen', choices=['off', 'suggest', 'run', 'require'], default='suggest',
+                           help='With --train-e2e: suggest/run/require staged CK-vs-PyTorch parity regimen')
     run_parser.add_argument('--train-epochs', type=int, default=3,
                            help='Epochs for --train-e2e (default: 3)')
     run_parser.add_argument('--train-seq-len', type=int, default=16,

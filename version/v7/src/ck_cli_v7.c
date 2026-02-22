@@ -2954,6 +2954,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
     for (int e = 0; e < opt.epochs; e++) {
         double epoch_loss_sum = 0.0;
         int epoch_steps = 0;
+        int epoch_opt_updates = 0;
         float epoch_min_loss = INFINITY;
         int epoch_start_step = step_idx + 1;
         for (int b = 0; b < micro_per_epoch; b++) {
@@ -3007,6 +3008,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
             losses[this_step] = loss;
             epoch_steps += 1;
             epoch_loss_sum += (double)loss;
+            if (opt_applied) epoch_opt_updates += 1;
             if (loss < epoch_min_loss) epoch_min_loss = loss;
             if (loss < global_min_loss) {
                 global_min_loss = loss;
@@ -3019,11 +3021,15 @@ static int cmd_train_subcommand(int argc, char **argv) {
                 double tok_s = (elapsed_ms > 0.0) ? ((double)done_tokens / (elapsed_ms / 1000.0)) : 0.0;
                 double ppl = exp(fmin((double)loss, 20.0));
                 double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
-                printf("[train] step %d/%d epoch %d/%d loss=%.6f ppl=%.4f epoch_avg=%.6f tok/s=%.2f\n",
+                int accum_slot = (effective_grad_accum > 0) ? (((done_steps - 1) % effective_grad_accum) + 1) : 1;
+                printf("[train] step %d/%d epoch %d/%d accum=%d/%d opt=%c loss=%.6f ppl=%.4f epoch_avg=%.6f tok/s=%.2f\n",
                        done_steps,
                        total_steps,
                        e + 1,
                        opt.epochs,
+                       accum_slot,
+                       effective_grad_accum > 0 ? effective_grad_accum : 1,
+                       opt_applied ? 'Y' : 'N',
                        (double)loss,
                        ppl,
                        epoch_avg_loss,
@@ -3034,11 +3040,12 @@ static int cmd_train_subcommand(int argc, char **argv) {
         }
         double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
         double epoch_avg_ppl = exp(fmin(epoch_avg_loss, 20.0));
-        printf("[train] epoch %d/%d complete steps=%d..%d avg_loss=%.6f avg_ppl=%.4f min_loss=%.6f\n",
+        printf("[train] epoch %d/%d complete steps=%d..%d opt_updates=%d avg_loss=%.6f avg_ppl=%.4f min_loss=%.6f\n",
                e + 1,
                opt.epochs,
                epoch_start_step,
                step_idx,
+               epoch_opt_updates,
                epoch_avg_loss,
                epoch_avg_ppl,
                isfinite(epoch_min_loss) ? (double)epoch_min_loss : 0.0);

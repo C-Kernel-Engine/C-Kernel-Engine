@@ -354,6 +354,8 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "train_parity_epochs_5_latest.json",
         "replay_determinism_latest.json",
         "backprop_stitch_runtime_latest.json",
+        "regimen_backend_xray.json",
+        "training_canary_summary.json",
         "regression_ledger.json",
     ]
     copied = 0
@@ -419,6 +421,20 @@ def has_train_runtime_artifacts(run_dir: Path) -> bool:
     has_manifest = (run_dir / "weights_manifest.json").exists()
     has_summary = (run_dir / "generated_train_runtime_summary_v7.json").exists()
     return bool(has_lib and has_weights and has_manifest and has_summary)
+
+
+def has_inference_runtime_artifacts(run_dir: Path) -> bool:
+    if not run_dir.exists() or not run_dir.is_dir():
+        return False
+    has_lib = (
+        (run_dir / "libmodel.so").exists()
+        or (run_dir / ".ck_build" / "libmodel.so").exists()
+        or (run_dir / "ck_build" / "libmodel.so").exists()
+        or (run_dir / ".ck_build" / "ck-kernel-inference.so").exists()
+    )
+    has_weights = (run_dir / "weights.bump").exists()
+    has_manifest = (run_dir / "weights_manifest.json").exists()
+    return bool(has_lib and has_weights and has_manifest)
 
 
 def infer_train_vocab_size(run_dir: Path, default_vocab: int = 1024) -> int:
@@ -566,34 +582,102 @@ def _build_tokenizer_preview(
     pipeline = files.get("training_pipeline") if isinstance(files.get("training_pipeline"), dict) else {}
     data_lab = pipeline.get("data_lab") if isinstance(pipeline, dict) and isinstance(pipeline.get("data_lab"), dict) else {}
     tokenizer_lineage = pipeline.get("tokenizer_lineage") if isinstance(pipeline, dict) and isinstance(pipeline.get("tokenizer_lineage"), dict) else {}
+    roundtrip = files.get("tokenizer_roundtrip") if isinstance(files.get("tokenizer_roundtrip"), dict) else {}
+    sample_rows = roundtrip.get("sample_rows") if isinstance(roundtrip.get("sample_rows"), list) else []
+
+    roundtrip_max_token_id: int | None = None
+    for row in sample_rows:
+        if not isinstance(row, dict):
+            continue
+        ids = row.get("token_ids")
+        if not isinstance(ids, list):
+            continue
+        for tid in ids:
+            if isinstance(tid, int) and tid >= 0:
+                if roundtrip_max_token_id is None or tid > roundtrip_max_token_id:
+                    roundtrip_max_token_id = tid
 
     candidate_values: list[str] = []
+    runbook_tokenizer_aliases: list[str] = []
+    if run_dir is not None:
+        sibling_preview = run_dir.parent / f"{run_dir.name}_tokenize_preview" / "tokenizer.json"
+        nested_preview = run_dir / "tokenize_preview" / "tokenizer.json"
+        runbook_tokenizer_aliases.extend([str(sibling_preview), str(nested_preview)])
+    # Prefer run-scoped tokenizer first; data-lab lineage can point to sub-runs.
     for raw in (
-        data_lab.get("tokenizer_json_path"),
-        tokenizer_lineage.get("tokenizer_path"),
         str((run_dir / "tokenizer.json")) if run_dir is not None else None,
         str(model_root / "tokenizer.json"),
         str(ck_build_path / "tokenizer.json"),
+        data_lab.get("tokenizer_json_path"),
+        tokenizer_lineage.get("tokenizer_path"),
+        *runbook_tokenizer_aliases,
     ):
         if isinstance(raw, str) and raw.strip():
             candidate_values.append(raw.strip())
 
-    tokenizer_json_path: Path | None = None
+    candidate_paths: list[Path] = []
+    seen_paths: set[str] = set()
     for raw in candidate_values:
         resolved = _resolve_asset_path(raw, ck_build_path, model_root)
-        if resolved and resolved.exists():
-            tokenizer_json_path = resolved
-            break
-    if tokenizer_json_path is None:
+        if not resolved or not resolved.exists():
+            continue
+        key = str(resolved)
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        candidate_paths.append(resolved)
+    if not candidate_paths:
         return None
 
-    try:
-        payload = json.loads(tokenizer_json_path.read_text(encoding="utf-8"))
-    except Exception as e:
+    def _vocab_max_id(payload_obj: dict) -> int | None:
+        model_obj = payload_obj.get("model") if isinstance(payload_obj, dict) else {}
+        if not isinstance(model_obj, dict):
+            return None
+        vocab_obj = model_obj.get("vocab")
+        if not isinstance(vocab_obj, dict):
+            return None
+        max_id: int | None = None
+        for idx in vocab_obj.values():
+            if isinstance(idx, int) and idx >= 0:
+                if max_id is None or idx > max_id:
+                    max_id = int(idx)
+        return max_id
+
+    tokenizer_json_path: Path | None = None
+    payload: dict | None = None
+    first_parse_error: str | None = None
+    fallback_path: Path | None = None
+    fallback_payload: dict | None = None
+
+    for candidate in candidate_paths:
+        try:
+            parsed = json.loads(candidate.read_text(encoding="utf-8"))
+        except Exception as e:
+            if first_parse_error is None:
+                first_parse_error = f"{candidate}: {e}"
+            continue
+        if fallback_payload is None:
+            fallback_path = candidate
+            fallback_payload = parsed
+        vocab_max = _vocab_max_id(parsed)
+        if roundtrip_max_token_id is None:
+            tokenizer_json_path = candidate
+            payload = parsed
+            break
+        if isinstance(vocab_max, int) and vocab_max >= roundtrip_max_token_id:
+            tokenizer_json_path = candidate
+            payload = parsed
+            break
+
+    if payload is None and fallback_payload is not None:
+        tokenizer_json_path = fallback_path
+        payload = fallback_payload
+
+    if payload is None or tokenizer_json_path is None:
         return {
             "status": "error",
-            "path": str(tokenizer_json_path),
-            "error": f"failed_to_parse_tokenizer_json: {e}",
+            "path": str(candidate_paths[0]),
+            "error": f"failed_to_parse_tokenizer_json: {first_parse_error or 'unknown_error'}",
         }
 
     model = payload.get("model") if isinstance(payload, dict) else {}
@@ -603,28 +687,36 @@ def _build_tokenizer_preview(
     vocab_raw = model.get("vocab")
     vocab_items: list[tuple[int, str]] = []
     id_to_piece: dict[int, str] = {}
+    piece_to_id: dict[str, int] = {}
     if isinstance(vocab_raw, dict):
         for piece, idx in vocab_raw.items():
             if isinstance(piece, str) and isinstance(idx, int) and idx >= 0:
                 vocab_items.append((int(idx), piece))
                 id_to_piece[int(idx)] = piece
+                piece_to_id[piece] = int(idx)
     vocab_items.sort(key=lambda kv: kv[0])
 
     merges_raw = model.get("merges")
     merge_samples: list[dict] = []
     merge_count = 0
+    merge_piece_map: dict[str, tuple[str, str, int]] = {}
     if isinstance(merges_raw, list):
         merge_count = len(merges_raw)
-        for i, row in enumerate(merges_raw[:48]):
+        for i, row in enumerate(merges_raw):
             left, right = _parse_merge_row(row)
             if not left and not right:
+                continue
+            merged = left + right
+            if merged not in merge_piece_map:
+                merge_piece_map[merged] = (left, right, int(i))
+            if i >= 48:
                 continue
             merge_samples.append(
                 {
                     "rank": int(i),
                     "left": _piece_display(left),
                     "right": _piece_display(right),
-                    "merged_hint": _piece_display(left + right),
+                    "merged_hint": _piece_display(merged),
                 }
             )
 
@@ -659,13 +751,108 @@ def _build_tokenizer_preview(
                     }
                 )
 
+    special_ids = {
+        int(row["id"])
+        for row in special_tokens
+        if isinstance(row.get("id"), int)
+    }
+
+    merge_depth_cache: dict[str, int] = {}
+
+    def _merge_depth(piece: str, stack: set[str] | None = None) -> int:
+        cached = merge_depth_cache.get(piece)
+        if cached is not None:
+            return cached
+        parent = merge_piece_map.get(piece)
+        if parent is None:
+            merge_depth_cache[piece] = 0
+            return 0
+        if stack is None:
+            stack = set()
+        if piece in stack:
+            # Defensive cycle break for malformed merge tables.
+            merge_depth_cache[piece] = 0
+            return 0
+        stack.add(piece)
+        left, right, _ = parent
+        depth = 1 + max(_merge_depth(left, stack), _merge_depth(right, stack))
+        stack.remove(piece)
+        merge_depth_cache[piece] = depth
+        return depth
+
+    source_counts = {"base": 0, "merged": 0, "special": 0}
+    for idx, piece in vocab_items:
+        if idx in special_ids:
+            source_counts["special"] += 1
+        elif piece in merge_piece_map:
+            source_counts["merged"] += 1
+        else:
+            source_counts["base"] += 1
+
+    token_table_rows: list[dict] = []
+    seen_token_ids: set[int] = set()
+
+    def _append_token_row(token_id: int) -> None:
+        if token_id in seen_token_ids:
+            return
+        piece = id_to_piece.get(int(token_id))
+        if not isinstance(piece, str):
+            return
+        seen_token_ids.add(int(token_id))
+        parent = merge_piece_map.get(piece)
+        source = "special" if token_id in special_ids else ("merged" if parent is not None else "base")
+        merge_depth = _merge_depth(piece) if parent is not None else 0
+        token_table_rows.append(
+            {
+                "id": int(token_id),
+                "piece": _piece_display(piece),
+                "bytes_hex": _bytes_hex_preview(piece),
+                "char_class": "ascii" if all(ord(ch) <= 127 for ch in piece) else "non_ascii",
+                "source": source,
+                "merge_depth": int(merge_depth),
+                "merge_rank": int(parent[2]) if parent is not None else None,
+                "merge_left": _piece_display(parent[0]) if parent is not None else None,
+                "merge_right": _piece_display(parent[1]) if parent is not None else None,
+            }
+        )
+
+    # Build a representative, stable table:
+    # - head IDs, then early merges, then special tokens, then tail IDs.
+    for idx, _ in vocab_items[:96]:
+        _append_token_row(int(idx))
+
+    merged_ranked_ids: list[int] = []
+    for merged_piece, (_, _, rank) in sorted(merge_piece_map.items(), key=lambda item: item[1][2]):
+        tok_id = piece_to_id.get(merged_piece)
+        if isinstance(tok_id, int):
+            merged_ranked_ids.append(int(tok_id))
+        if len(merged_ranked_ids) >= 160:
+            break
+    for token_id in merged_ranked_ids[:96]:
+        _append_token_row(token_id)
+
+    for token_id in sorted(special_ids):
+        _append_token_row(token_id)
+
+    for idx, _ in vocab_items[-24:]:
+        _append_token_row(int(idx))
+
+    # Fill a little more coverage using stride sampling if needed.
+    if len(token_table_rows) < 160 and len(vocab_items) > 0:
+        stride = max(1, len(vocab_items) // 64)
+        for pos in range(0, len(vocab_items), stride):
+            _append_token_row(int(vocab_items[pos][0]))
+            if len(token_table_rows) >= 192:
+                break
+
+    token_table_row_limit = 220
+    token_table_rows = token_table_rows[:token_table_row_limit]
+
     pre_tokenizer = payload.get("pre_tokenizer")
     decoder = payload.get("decoder")
     pre_tokenizer_type = pre_tokenizer.get("type") if isinstance(pre_tokenizer, dict) else None
     decoder_type = decoder.get("type") if isinstance(decoder, dict) else None
 
-    roundtrip = files.get("tokenizer_roundtrip") if isinstance(files.get("tokenizer_roundtrip"), dict) else {}
-    sample_rows = roundtrip.get("sample_rows") if isinstance(roundtrip.get("sample_rows"), list) else []
     example = None
     for row in sample_rows:
         if not isinstance(row, dict):
@@ -707,6 +894,14 @@ def _build_tokenizer_preview(
         "vocab_samples": vocab_samples,
         "merge_samples": merge_samples,
         "special_tokens": special_tokens,
+        "token_table_rows": token_table_rows,
+        "token_table_meta": {
+            "total_vocab_size": int(len(vocab_items)),
+            "rows_returned": int(len(token_table_rows)),
+            "row_limit": int(token_table_row_limit),
+            "sample_policy": "head_ids + early_merges + special_tokens + tail_ids + stride_fill",
+            "source_counts": source_counts,
+        },
         "encode_decode_example": example,
     }
 
@@ -837,6 +1032,30 @@ def _derive_profile_alias_roots(run_dir: Path | None, model_root: Path) -> list[
     return roots
 
 
+def _derive_runbook_alias_roots(run_dir: Path | None) -> list[Path]:
+    """Runbook convenience aliases so a single root report can show staged artifacts."""
+    if run_dir is None:
+        return []
+    aliases: list[Path] = []
+    sibling_preview = run_dir.parent / f"{run_dir.name}_tokenize_preview"
+    if sibling_preview.exists() and sibling_preview.is_dir():
+        aliases.append(sibling_preview)
+    nested_preview = run_dir / "tokenize_preview"
+    if nested_preview.exists() and nested_preview.is_dir():
+        aliases.append(nested_preview)
+    for idx in (1, 2):
+        row_dir = run_dir / f"parity_svg_row{idx}"
+        if row_dir.exists() and row_dir.is_dir():
+            aliases.append(row_dir)
+            ck_build = row_dir / "ck_build"
+            dot_ck_build = row_dir / ".ck_build"
+            if ck_build.exists() and ck_build.is_dir():
+                aliases.append(ck_build)
+            if dot_ck_build.exists() and dot_ck_build.is_dir():
+                aliases.append(dot_ck_build)
+    return aliases
+
+
 def _resolve_path_loose(path: Path) -> Path:
     try:
         return path.resolve(strict=False)
@@ -856,6 +1075,178 @@ def _path_under_any_root(path: Path, roots: list[Path]) -> bool:
     return False
 
 
+def _load_json_loose(path: Path):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _extract_loss_series(payload, preferred_keys: list[str]) -> list[float]:
+    if not isinstance(payload, dict):
+        return []
+    curve = payload.get("loss_curve")
+    if not isinstance(curve, list):
+        return []
+    out: list[float] = []
+    for row in curve:
+        if not isinstance(row, dict):
+            continue
+        val = None
+        for k in preferred_keys:
+            v = row.get(k)
+            if isinstance(v, (int, float)):
+                val = float(v)
+                break
+        if val is not None:
+            out.append(val)
+    return out
+
+
+def _find_latest_ascii_bpe_workdir(row_dir: Path) -> Path | None:
+    pipeline_root = row_dir / ".ck_pipeline"
+    if not pipeline_root.exists() or not pipeline_root.is_dir():
+        return None
+    workdirs = sorted(
+        [p for p in pipeline_root.iterdir() if p.is_dir() and p.name.startswith("ascii_bpe_")],
+        key=lambda p: p.name,
+    )
+    if not workdirs:
+        return None
+    return workdirs[-1]
+
+
+def _build_training_canary_summary(run_root: Path | None) -> dict | None:
+    if run_root is None:
+        return None
+    expected = [1, 2]
+    rows: list[dict] = []
+    any_present = False
+    th_max = 1e-4
+    th_mean = 5e-5
+    th_param = 1e-4
+
+    for idx in expected:
+        row_dir = run_root / f"parity_svg_row{idx}"
+        row: dict = {
+            "row": idx,
+            "run_dir": str(row_dir),
+            "status": "missing",
+            "pass": None,
+        }
+        if not row_dir.exists() or not row_dir.is_dir():
+            row["reason"] = "missing_run_dir"
+            rows.append(row)
+            continue
+
+        any_present = True
+        work_dir = _find_latest_ascii_bpe_workdir(row_dir)
+        if work_dir is None:
+            row.update({"status": "missing", "reason": "missing_pipeline_workdir"})
+            rows.append(row)
+            continue
+
+        ck_path = work_dir / "train_ck.json"
+        torch_path = work_dir / "train_torch_ref.json"
+        row["work_dir"] = str(work_dir)
+        row["train_ck_json"] = str(ck_path)
+        row["train_torch_ref_json"] = str(torch_path)
+
+        ck = _load_json_loose(ck_path) if ck_path.exists() else None
+        pt = _load_json_loose(torch_path) if torch_path.exists() else None
+        if not isinstance(ck, dict) or not isinstance(pt, dict):
+            row.update({
+                "status": "missing",
+                "reason": "missing_parity_json",
+                "missing_ck": not isinstance(ck, dict),
+                "missing_torch_ref": not isinstance(pt, dict),
+            })
+            rows.append(row)
+            continue
+
+        ck_losses = _extract_loss_series(ck, ["loss_ck", "loss"])
+        pt_losses = _extract_loss_series(pt, ["loss", "loss_pt", "loss_ck"])
+        n = min(len(ck_losses), len(pt_losses))
+        if n <= 0:
+            row.update({
+                "status": "missing",
+                "reason": "no_overlapping_loss_curve",
+                "ck_steps": len(ck_losses),
+                "torch_steps": len(pt_losses),
+            })
+            rows.append(row)
+            continue
+
+        diffs = [abs(ck_losses[i] - pt_losses[i]) for i in range(n)]
+        max_abs = max(diffs) if diffs else 0.0
+        mean_abs = (sum(diffs) / len(diffs)) if diffs else 0.0
+        final_param = float(ck.get("final_param_max_abs_diff", 0.0) or 0.0)
+
+        passed = bool(max_abs <= th_max and mean_abs <= th_mean and final_param <= th_param)
+        row.update(
+            {
+                "status": "pass" if passed else "fail",
+                "pass": passed,
+                "steps_compared": n,
+                "max_abs_loss_diff": max_abs,
+                "mean_abs_loss_diff": mean_abs,
+                "final_param_max_abs_diff": final_param,
+                "thresholds": {
+                    "max_abs_loss_diff": th_max,
+                    "mean_abs_loss_diff": th_mean,
+                    "final_param_max_abs_diff": th_param,
+                },
+                "loss_ck_first": ck_losses[0],
+                "loss_ck_final": ck_losses[n - 1],
+                "loss_torch_first": pt_losses[0],
+                "loss_torch_final": pt_losses[n - 1],
+            }
+        )
+
+        post_eval = _load_json_loose(row_dir / "post_train_eval.json")
+        if isinstance(post_eval, dict):
+            row["post_train_eval"] = {
+                "status": post_eval.get("status"),
+                "reason": post_eval.get("reason"),
+                "valid_svg_rate": post_eval.get("valid_svg_rate"),
+                "note": post_eval.get("note"),
+            }
+
+        rows.append(row)
+
+    if not rows:
+        return None
+    if not any_present:
+        return None
+
+    compared = [r for r in rows if isinstance(r.get("pass"), bool)]
+    pass_count = sum(1 for r in compared if r.get("pass") is True)
+    fail_count = sum(1 for r in compared if r.get("pass") is False)
+    missing_count = len(rows) - len(compared)
+    if fail_count > 0:
+        status = "fail"
+    elif pass_count == len(expected):
+        status = "pass"
+    elif pass_count > 0 and missing_count > 0:
+        status = "partial"
+    else:
+        status = "missing"
+
+    return {
+        "schema": "ck.training_canary_summary.v1",
+        "run_dir": str(run_root),
+        "expected_rows": len(expected),
+        "rows_present": len([r for r in rows if r.get("reason") != "missing_run_dir"]),
+        "rows_compared": len(compared),
+        "rows_passed": pass_count,
+        "rows_failed": fail_count,
+        "rows_missing": missing_count,
+        "status": status,
+        "rows": rows,
+    }
+
+
 def load_model_data(
     ck_build_path: Path,
     run_dir: Path | None = None,
@@ -870,6 +1261,7 @@ def load_model_data(
         model_name = ck_build_path.parent.name if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path.name
         model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path
     train_runtime_available = has_train_runtime_artifacts(run_dir if run_dir is not None else model_root)
+    inference_runtime_available = has_inference_runtime_artifacts(run_dir if run_dir is not None else model_root)
 
     search_roots: list[Path] = []
     if run_dir is not None:
@@ -892,6 +1284,13 @@ def load_model_data(
     #   profile outputs in .../Qwen3-0.6B-Q8_0
     profile_alias_roots = _derive_profile_alias_roots(run_dir, model_root)
     for root in profile_alias_roots:
+        key = str(root)
+        if key in seen_roots:
+            continue
+        seen_roots.add(key)
+        search_roots.append(root)
+    runbook_alias_roots = _derive_runbook_alias_roots(run_dir)
+    for root in runbook_alias_roots:
         key = str(root)
         if key in seen_roots:
             continue
@@ -926,6 +1325,9 @@ def load_model_data(
         "training_loss_curve",
         "training_grad_norms",
         "training_parity",
+        "training_parity_regimen",
+        "training_parity_xray",
+        "training_canary_summary",
         "training_step_profile",
         "training_checkpoint_policy",
         "training_pipeline",
@@ -936,6 +1338,7 @@ def load_model_data(
         "training_epoch_sweep",
         "analysis_checkpoints",
         "train_e2e",
+        "run_index",
         "run_config",
         "sanity_overfit",
         "parity_report",
@@ -996,6 +1399,9 @@ def load_model_data(
         "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_REPORT_PATH / "training_loss_curve_latest.json", V7_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
         "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_REPORT_PATH / "training_grad_norms_latest.json", V7_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
         "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_REPORT_PATH / "training_parity_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_latest.json"],
+        "training_parity_regimen": model_candidates("training_parity_regimen_latest.json") + model_candidates("training_parity_regimen.json") + [V7_REPORT_PATH / "training_parity_regimen_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_regimen_latest.json"],
+        "training_parity_xray": model_candidates("regimen_backend_xray.json") + model_candidates("training_parity_xray.json") + [V7_REPORT_PATH / "training_parity_xray_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_xray_latest.json"],
+        "training_canary_summary": model_candidates("training_canary_summary.json"),
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
         "training_pipeline": model_candidates("training_pipeline.json") + model_candidates("training_pipeline_latest.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
@@ -1005,6 +1411,7 @@ def load_model_data(
         "post_train_eval": model_candidates("post_train_eval.json"),
         "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
         "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
+        "run_index": model_candidates("run_index.json"),
         "run_config": model_candidates("config.json"),
         "sanity_overfit": model_candidates("sanity_overfit.json"),
         "parity_report": model_candidates("parity_report.json"),
@@ -1079,6 +1486,7 @@ def load_model_data(
             "run_dir": str(run_dir) if run_dir is not None else None,
             "project_root": str(PROJECT_ROOT),
             "has_train_runtime": bool(train_runtime_available),
+            "has_inference_runtime": bool(inference_runtime_available),
             "strict_run_artifacts": strict_run_scope,
             "warnings": [],
         },
@@ -1145,6 +1553,13 @@ def load_model_data(
         loaded.append("analysis_checkpoints")
     else:
         missing_optional.append("analysis_checkpoints")
+
+    if "training_canary_summary" not in data["files"]:
+        canary_summary = _build_training_canary_summary(run_dir if run_dir is not None else model_root)
+        if isinstance(canary_summary, dict):
+            data["files"]["training_canary_summary"] = canary_summary
+            loaded.append("training_canary_summary(derived)")
+            missing_optional = [k for k in missing_optional if k != "training_canary_summary"]
 
     # If only runtime parity reports are present, derive dashboard-friendly
     # training_* aliases so the viewer renders without manual file renaming.
@@ -1314,6 +1729,110 @@ def load_model_data(
             ds_path = data_lab.get("dataset_path")
             if isinstance(ds_path, str) and ds_path:
                 data_lab["dataset_dir"] = str(Path(ds_path).parent)
+
+        # Derive Step 0.55 scale-up provenance from dataset_dir manifests so
+        # the Data tab can explain baseline vs scaled corpus inputs.
+        step_055 = data_lab.get("step_055")
+        if not isinstance(step_055, dict):
+            step_055 = {}
+        existing_sources = step_055.get("sources")
+        if not isinstance(existing_sources, list):
+            existing_sources = []
+        if not existing_sources:
+            ds_dir_raw = data_lab.get("dataset_dir")
+            if isinstance(ds_dir_raw, str) and ds_dir_raw.strip():
+                ds_dir = Path(ds_dir_raw).expanduser()
+                manifest_specs = [
+                    ("repo_assets_ascii", "Repo SVG assets (ASCII)", ds_dir / "svg_assets_docs_ascii_manifest.json"),
+                    ("synthetic_aug", "Synthetic instruction->SVG augmentation", ds_dir / "svg_instruction_aug_manifest.json"),
+                    ("repo_assets_utf8", "Repo SVG assets (UTF-8 baseline)", ds_dir / "svg_assets_docs_utf8_manifest.json"),
+                    ("ascii_all", "Merged ASCII corpus", ds_dir / "svg_assets_ascii_all_manifest.json"),
+                    ("ascii_le4096", "ASCII corpus filtered <=4096 chars", ds_dir / "svg_assets_ascii_le4096_vocab2048_manifest.json"),
+                ]
+                derived_sources: list[dict] = []
+                for source_key, label, manifest_path in manifest_specs:
+                    payload = _load_json_loose(manifest_path)
+                    if not isinstance(payload, dict):
+                        continue
+                    rows = payload.get("output_rows")
+                    if rows is None:
+                        rows = payload.get("num_train")
+                    if rows is None:
+                        rows = payload.get("num_samples")
+                    note_parts: list[str] = []
+                    if source_key == "repo_assets_ascii":
+                        mapped = payload.get("mapped_common_symbols_total")
+                        if isinstance(mapped, int):
+                            note_parts.append(f"mapped_symbols={mapped}")
+                    if source_key == "synthetic_aug":
+                        type_counts = payload.get("type_counts")
+                        if isinstance(type_counts, dict):
+                            note_parts.append(f"type_families={len(type_counts)}")
+                    if source_key == "ascii_le4096":
+                        note_parts.append("long rows trimmed for stable seq windows")
+                    derived_sources.append(
+                        {
+                            "name": source_key,
+                            "label": label,
+                            "rows": rows if isinstance(rows, int) else rows,
+                            "path": str(manifest_path),
+                            "note": ", ".join(note_parts) if note_parts else "",
+                        }
+                    )
+                if derived_sources:
+                    step_055["detected"] = True
+                    step_055["dataset_dir"] = str(ds_dir)
+                    step_055["sources"] = derived_sources
+                    loaded.append("step_055(derived)")
+        if step_055:
+            data_lab["step_055"] = step_055
+
+        # Derive Step 0.56 bridge-pack metadata (optional Stage-A syntax bridge).
+        step_056 = data_lab.get("step_056")
+        if not isinstance(step_056, dict):
+            step_056 = {}
+        if not step_056.get("manifest_path"):
+            ds_dir_raw = data_lab.get("dataset_dir")
+            if isinstance(ds_dir_raw, str) and ds_dir_raw.strip():
+                ds_dir = Path(ds_dir_raw).expanduser()
+                bridge_candidates: list[Path] = [
+                    ds_dir / "svg_stage_a_bridge_small_manifest.json",
+                    ds_dir / "svg_stage_a_bridge_pack_manifest.json",
+                ]
+                bridge_candidates.extend(sorted(ds_dir.glob("svg_stage_a_bridge*_manifest.json")))
+                seen_candidates: set[str] = set()
+                for cand in bridge_candidates:
+                    cand_key = str(cand.resolve()) if cand.exists() else str(cand)
+                    if cand_key in seen_candidates:
+                        continue
+                    seen_candidates.add(cand_key)
+                    payload = _load_json_loose(cand)
+                    if not isinstance(payload, dict):
+                        continue
+                    bridge_rows = payload.get("bridge_rows")
+                    if bridge_rows is None:
+                        bridge_rows = payload.get("num_rows")
+                    missing_before = payload.get("missing_features_from_stage_a")
+                    if not isinstance(missing_before, list):
+                        missing_before = []
+                    missing_after = payload.get("missing_features_after_bridge_only")
+                    if not isinstance(missing_after, list):
+                        missing_after = []
+                    step_056 = {
+                        "detected": True,
+                        "dataset_dir": str(ds_dir),
+                        "manifest_path": str(cand),
+                        "stage_a_path": payload.get("stage_a_path"),
+                        "stage_b_path": payload.get("stage_b_path"),
+                        "out_path": payload.get("out_path"),
+                        "bridge_rows": bridge_rows,
+                        "missing_features_from_stage_a": missing_before,
+                        "missing_features_after_bridge_only": missing_after,
+                    }
+                    loaded.append("step_056(derived)")
+                    break
+        if step_056:
+            data_lab["step_056"] = step_056
         if "tokenizer_json_path" not in data_lab:
             tok = pipeline.get("tokenizer_lineage")
             if isinstance(tok, dict) and isinstance(tok.get("tokenizer_path"), str):

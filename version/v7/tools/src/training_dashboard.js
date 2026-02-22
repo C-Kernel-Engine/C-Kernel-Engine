@@ -138,7 +138,9 @@ export function renderTrainingDashboard(files) {
     const sweepProfile = sweep && typeof sweep === 'object' ? sweep.profile_run : null;
     const finalStep = lossSteps[lossSteps.length - 1] || null;
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
-    const decodeTokS = toNum(profile.decode_tok_s, NaN);
+    const trainTokS = toNum(profile.train_tok_s, NaN);
+    const fallbackTokS = toNum(profile.decode_tok_s, NaN);
+    const throughputTokS = Number.isFinite(trainTokS) ? trainTokS : fallbackTokS;
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
     const trainE2E = files.train_e2e || {};
     const layoutTrain = files.layout_train || {};
@@ -160,9 +162,29 @@ export function renderTrainingDashboard(files) {
     const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object'
         ? dataLab.post_train_eval
         : (files.post_train_eval || {});
+    const postEvalStatus = String(postEval.status || '').toLowerCase();
+    const postEvalSkipped = postEvalStatus === 'skipped';
     const validSvgRate = toNum(postEval.valid_svg_rate, NaN);
     const closureRate = toNum(postEval.closure_success_rate, NaN);
     const loopScore = toNum(postEval.repetition_loop_score, NaN);
+    const finalLoss = finalStep && Number.isFinite(finalStep.loss_ck)
+        ? finalStep.loss_ck
+        : toNum(trainE2E.final_ck_loss, NaN);
+    const maxParamDiff = Number.isFinite(worstParity) && worstParity > 0
+        ? worstParity
+        : toNum(trainE2E.final_param_max_abs_diff, NaN);
+    const trainE2EStatus = (() => {
+        if (trainE2E?.status === 'pass' || trainE2E?.pass === true || trainE2E?.passed === true || trainE2E?.pass_parity === true) {
+            return 'PASS';
+        }
+        if (trainE2E?.status === 'fail' || trainE2E?.pass === false || trainE2E?.passed === false || trainE2E?.pass_parity === false) {
+            return 'FAIL';
+        }
+        return Object.keys(trainE2E).length ? 'CHECK' : '-';
+    })();
+    const validSvgLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-');
+    const closureLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-');
+    const loopLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-');
 
     const reportCmd = runCtx.runDir
         ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
@@ -186,19 +208,19 @@ export function renderTrainingDashboard(files) {
 
     root.innerHTML = `
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value">${finalStep ? fmt(finalStep.loss_ck, 4) : '-'}</div><div class="stat-label">Final CK Loss</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(finalLoss) ? fmt(finalLoss, 4) : '-'}</div><div class="stat-label">Final CK Loss</div></div>
             <div class="stat-card"><div class="stat-value">${finalStep && Number.isFinite(finalStep.grad_norm) ? fmtExp(finalStep.grad_norm, 2) : '-'}</div><div class="stat-label">Grad Norm</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(maxParamDiff) ? fmtExp(maxParamDiff, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(throughputTokS) ? fmt(throughputTokS, 2) : '-'}</div><div class="stat-label">Train tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
-            <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
+            <div class="stat-card"><div class="stat-value">${trainE2EStatus}</div><div class="stat-label">Train E2E Status</div></div>
             <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
             <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-'}</div><div class="stat-label">Valid SVG Rate</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-'}</div><div class="stat-label">Closure Success</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-'}</div><div class="stat-label">Loop Score</div></div>
+            <div class="stat-card"><div class="stat-value">${validSvgLabel}</div><div class="stat-label">Valid SVG Rate</div></div>
+            <div class="stat-card"><div class="stat-value">${closureLabel}</div><div class="stat-label">Closure Success</div></div>
+            <div class="stat-card"><div class="stat-value">${loopLabel}</div><div class="stat-label">Loop Score</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -236,6 +258,18 @@ export function renderTrainingDashboard(files) {
 
     const alertsEl = document.getElementById('trainAlertList');
     const alerts = healthAlerts(lossSteps, parityRows);
+    const svgThreshold = toNum(postEval.min_valid_svg_rate, 0.70);
+    if (postEvalSkipped) {
+        alerts.push({
+            level: 'info',
+            text: `Output quality gate skipped (${postEval.reason || 'disabled_by_flag'}). This does not indicate CK-vs-PyTorch parity failure.`,
+        });
+    } else if (Number.isFinite(validSvgRate) && validSvgRate < svgThreshold) {
+        alerts.push({
+            level: 'warning',
+            text: `Output quality gate is below target (valid_svg_rate=${fmt(validSvgRate, 4)} < ${fmt(svgThreshold, 4)}). This is data/task fit, not a CK-vs-PyTorch parity failure. Improve corpus coverage and add instruction-to-SVG SFT pairs.`,
+        });
+    }
     if (!alertsEl) return;
     if (alerts.length === 0) {
         alertsEl.innerHTML = '<div class="alert-item info">No health alerts. Training telemetry looks stable.</div>';

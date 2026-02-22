@@ -51,6 +51,8 @@ TEXT_WORDS = [
 
 LABELS = ["A", "B", "C", "D", "E", "F", "G"]
 
+CURRENT_FILL_MODE = "mixed"
+
 
 @dataclass
 class Sample:
@@ -84,6 +86,16 @@ def _choice(rng: random.Random, values: list[str]) -> str:
     return values[rng.randrange(len(values))]
 
 
+def _resolve_fill(rng: random.Random, fill_color: str) -> str:
+    mode = str(CURRENT_FILL_MODE).strip().lower()
+    if mode == "filled":
+        return fill_color
+    if mode == "outline":
+        return "none"
+    # mixed
+    return fill_color if rng.random() >= 0.35 else "none"
+
+
 def _line_sample(rng: random.Random) -> Sample:
     w = rng.choice([120, 140, 160, 180, 200])
     h = rng.choice([80, 100, 120, 140])
@@ -109,8 +121,9 @@ def _triangle_sample(rng: random.Random) -> Sample:
     p1 = (rng.randint(10, w // 2), rng.randint(10, h - 10))
     p2 = (rng.randint(w // 2, w - 10), rng.randint(10, h - 10))
     p3 = (rng.randint(10, w - 10), rng.randint(10, h - 10))
-    fill = _choice(rng, PALETTE)
-    stroke = _choice(rng, [c for c in PALETTE if c != fill])
+    fill_color = _choice(rng, PALETTE)
+    stroke = _choice(rng, [c for c in PALETTE if c != fill_color])
+    fill = _resolve_fill(rng, fill_color)
     body = (
         f'<polygon points="{p1[0]},{p1[1]} {p2[0]},{p2[1]} {p3[0]},{p3[1]}" '
         f'fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
@@ -121,9 +134,151 @@ def _triangle_sample(rng: random.Random) -> Sample:
         "make one triangle polygon with vertices {x1},{y1} {x2},{y2} {x3},{y3}",
     ]
     task = _choice(rng, task_templates).format(
-        x1=p1[0], y1=p1[1], x2=p2[0], y2=p2[1], x3=p3[0], y3=p3[1], fill=fill, stroke=stroke
+        x1=p1[0], y1=p1[1], x2=p2[0], y2=p2[1], x3=p3[0], y3=p3[1], fill=fill_color, stroke=stroke
     )
     return Sample("triangle", task, _svg_wrap(w, h, body))
+
+
+def _ellipse_sample(rng: random.Random) -> Sample:
+    w = rng.choice([140, 160, 180, 220])
+    h = rng.choice([90, 110, 130, 150])
+    cx = rng.randint(26, w - 26)
+    cy = rng.randint(24, h - 24)
+    rx = rng.randint(16, max(18, w // 4))
+    ry = rng.randint(10, max(12, h // 4))
+    fill_color = _choice(rng, PALETTE)
+    stroke = _choice(rng, [c for c in PALETTE if c != fill_color])
+    fill = _resolve_fill(rng, fill_color)
+    body = (
+        f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" '
+        f'fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
+    )
+    task_templates = [
+        "draw an ellipse centered at ({cx},{cy}) with radii {rx},{ry}",
+        "create an svg ellipse with stroke {stroke}",
+        "make one ellipse shape with rx={rx} and ry={ry}",
+    ]
+    task = _choice(rng, task_templates).format(cx=cx, cy=cy, rx=rx, ry=ry, stroke=stroke)
+    return Sample("ellipse", task, _svg_wrap(w, h, body))
+
+
+def _polygon_sample(rng: random.Random) -> Sample:
+    w = rng.choice([150, 180, 210, 240])
+    h = rng.choice([100, 120, 140, 160])
+    n = rng.randint(5, 8)
+    pts: list[tuple[int, int]] = []
+    for i in range(n):
+        x = rng.randint(12, w - 12)
+        y = rng.randint(12, h - 12)
+        pts.append((x, y))
+    fill_color = _choice(rng, PALETTE)
+    stroke = _choice(rng, [c for c in PALETTE if c != fill_color])
+    fill = _resolve_fill(rng, fill_color)
+    point_s = " ".join(f"{x},{y}" for x, y in pts)
+    body = f'<polygon points="{point_s}" fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
+    task_templates = [
+        "draw a polygon with {n} points",
+        "create an svg polygon shape with {n} vertices",
+        "make a multi-point polygon outlined in {stroke}",
+    ]
+    task = _choice(rng, task_templates).format(n=n, stroke=stroke)
+    return Sample("polygon", task, _svg_wrap(w, h, body))
+
+
+def _arrow_sample(rng: random.Random) -> Sample:
+    w = rng.choice([160, 180, 200, 220])
+    h = rng.choice([90, 110, 130])
+    x1 = rng.randint(10, 30)
+    y1 = rng.randint(20, h - 20)
+    x2 = rng.randint(w - 50, w - 12)
+    y2 = rng.randint(20, h - 20)
+    stroke = _choice(rng, PALETTE)
+    sw = rng.randint(2, 4)
+    hx = x2
+    hy = y2
+    head = f"{hx},{hy} {hx-12},{hy-7} {hx-12},{hy+7}"
+    body = (
+        f'<line x1="{x1}" y1="{y1}" x2="{x2-10}" y2="{y2}" stroke="{stroke}" stroke-width="{sw}"/>'
+        f'<polygon points="{head}" fill="{stroke}" stroke="{stroke}"/>'
+    )
+    task_templates = [
+        "draw a right-pointing arrow",
+        "create a single directional arrow from left to right",
+        "make an svg arrow line with one arrowhead",
+    ]
+    task = _choice(rng, task_templates)
+    return Sample("arrow", task, _svg_wrap(w, h, body))
+
+
+def _double_arrow_sample(rng: random.Random) -> Sample:
+    w = rng.choice([160, 190, 220])
+    h = rng.choice([90, 110, 130])
+    x1 = rng.randint(18, 30)
+    x2 = rng.randint(w - 30, w - 18)
+    y = rng.randint(20, h - 20)
+    stroke = _choice(rng, PALETTE)
+    sw = rng.randint(2, 4)
+    head_l = f"{x1},{y} {x1+11},{y-7} {x1+11},{y+7}"
+    head_r = f"{x2},{y} {x2-11},{y-7} {x2-11},{y+7}"
+    body = (
+        f'<line x1="{x1+8}" y1="{y}" x2="{x2-8}" y2="{y}" stroke="{stroke}" stroke-width="{sw}"/>'
+        f'<polygon points="{head_l}" fill="{stroke}" stroke="{stroke}"/>'
+        f'<polygon points="{head_r}" fill="{stroke}" stroke="{stroke}"/>'
+    )
+    task_templates = [
+        "draw a double-headed arrow",
+        "create a bidirectional arrow",
+        "make an svg line with arrowheads on both ends",
+    ]
+    task = _choice(rng, task_templates)
+    return Sample("double_arrow", task, _svg_wrap(w, h, body))
+
+
+def _rounded_triangle_sample(rng: random.Random) -> Sample:
+    w = rng.choice([150, 170, 190, 210])
+    h = rng.choice([100, 120, 140])
+    x1, y1 = rng.randint(18, 40), rng.randint(h // 2, h - 14)
+    x2, y2 = rng.randint(w // 2 - 10, w // 2 + 10), rng.randint(12, 28)
+    x3, y3 = rng.randint(w - 40, w - 18), rng.randint(h // 2, h - 14)
+    fill_color = _choice(rng, PALETTE)
+    stroke = _choice(rng, [c for c in PALETTE if c != fill_color])
+    fill = _resolve_fill(rng, fill_color)
+    d = (
+        f"M {x1} {y1} "
+        f"Q {x2} {y2} {x3} {y3} "
+        f"Q {x2} {y2 + 18} {x1} {y1} Z"
+    )
+    body = f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
+    task_templates = [
+        "draw a rounded triangle using a path",
+        "create a soft-corner triangle shape",
+        "make a rounded triangular path with stroke {stroke}",
+    ]
+    task = _choice(rng, task_templates).format(stroke=stroke)
+    return Sample("rounded_triangle", task, _svg_wrap(w, h, body))
+
+
+def _path_sample(rng: random.Random) -> Sample:
+    w = rng.choice([160, 180, 200, 240])
+    h = rng.choice([100, 120, 140])
+    x0 = rng.randint(10, 24)
+    y0 = rng.randint(h // 2, h - 20)
+    cx = rng.randint(w // 3, w // 2)
+    cy = rng.randint(12, h // 2)
+    x1 = rng.randint(w - 30, w - 12)
+    y1 = rng.randint(h // 2, h - 14)
+    stroke = _choice(rng, PALETTE)
+    fill_color = _choice(rng, [c for c in PALETTE if c != stroke])
+    fill = _resolve_fill(rng, fill_color)
+    d = f"M{x0} {y0} Q{cx} {cy} {x1} {y1}"
+    body = f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="3"/>'
+    task_templates = [
+        "draw a curved svg path from left to right",
+        "create a bezier-like curve path",
+        "make one path curve with stroke {stroke}",
+    ]
+    task = _choice(rng, task_templates).format(stroke=stroke)
+    return Sample("path", task, _svg_wrap(w, h, body))
 
 
 def _text_sample(rng: random.Random) -> Sample:
@@ -156,9 +311,11 @@ def _rect_circle_scene_sample(rng: random.Random) -> Sample:
     r = rng.randint(10, min(w, h) // 5)
     rc = _choice(rng, PALETTE)
     cc = _choice(rng, [c for c in PALETTE if c != rc])
+    fill_rc = _resolve_fill(rng, rc)
+    fill_cc = _resolve_fill(rng, cc)
     body = (
-        f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{rc}" stroke="black"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{cc}" stroke="black"/>'
+        f'<rect x="{rx}" y="{ry}" width="{rw}" height="{rh}" fill="{fill_rc}" stroke="black"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill_cc}" stroke="black"/>'
     )
     task_templates = [
         "draw a rectangle and a circle in one svg",
@@ -190,7 +347,8 @@ def _bar_chart_sample(rng: random.Random) -> Sample:
         bh = max(4, int(chart_h * (val / max_v)))
         x = x0 + i * (bar_w + gap)
         y = chart_bottom - bh
-        body_parts.append(f'<rect x="{x}" y="{y}" width="{bar_w}" height="{bh}" fill="{col}" stroke="black"/>')
+        bar_fill = _resolve_fill(rng, col)
+        body_parts.append(f'<rect x="{x}" y="{y}" width="{bar_w}" height="{bh}" fill="{bar_fill}" stroke="black"/>')
         body_parts.append(f'<text x="{x + 8}" y="{chart_bottom + 14}" font-size="10" fill="black">{lab}</text>')
         body_parts.append(f'<text x="{x + 6}" y="{y - 4}" font-size="10" fill="black">{val}</text>')
     task_templates = [
@@ -258,17 +416,28 @@ def _polyline_sample(rng: random.Random) -> Sample:
     return Sample("polyline", task, _svg_wrap(w, h, body))
 
 
-def _pick_generator(rng: random.Random) -> Callable[[random.Random], Sample]:
-    generators: list[Callable[[random.Random], Sample]] = [
-        _line_sample,
-        _triangle_sample,
-        _text_sample,
-        _rect_circle_scene_sample,
-        _bar_chart_sample,
-        _comparison_table_sample,
-        _polyline_sample,
-    ]
-    return generators[rng.randrange(len(generators))]
+def _generator_registry() -> dict[str, Callable[[random.Random], Sample]]:
+    return {
+        "line": _line_sample,
+        "ellipse": _ellipse_sample,
+        "triangle": _triangle_sample,
+        "rounded_triangle": _rounded_triangle_sample,
+        "polygon": _polygon_sample,
+        "path": _path_sample,
+        "arrow": _arrow_sample,
+        "double_arrow": _double_arrow_sample,
+        "text": _text_sample,
+        "rect_circle": _rect_circle_scene_sample,
+        "bar_chart": _bar_chart_sample,
+        "comparison_table": _comparison_table_sample,
+        "polyline": _polyline_sample,
+    }
+
+
+def _pick_generator(rng: random.Random, enabled_types: list[str]) -> Callable[[random.Random], Sample]:
+    registry = _generator_registry()
+    key = enabled_types[rng.randrange(len(enabled_types))]
+    return registry[key]
 
 
 def _write_lines(path: Path, rows: list[str]) -> None:
@@ -290,13 +459,53 @@ def main() -> int:
     ap.add_argument("--num-samples", type=int, default=10000, help="Total samples to generate")
     ap.add_argument("--holdout-ratio", type=float, default=0.10, help="Holdout split ratio [0,1)")
     ap.add_argument("--seed", type=int, default=42, help="Random seed")
+    ap.add_argument(
+        "--types",
+        default="all",
+        help="Comma-separated shape families to generate (default: all). Use --list-types to inspect options.",
+    )
+    ap.add_argument(
+        "--fill-mode",
+        choices=["mixed", "filled", "outline"],
+        default="mixed",
+        help="Fill policy for closed shapes: mixed (default), filled, or outline-only (fill=none).",
+    )
+    ap.add_argument("--list-types", action="store_true", help="Print available generator type names and exit")
     ap.add_argument("--jsonl", action="store_true", help="Also emit JSONL files")
     args = ap.parse_args()
+
+    registry = _generator_registry()
+    available_types = sorted(registry.keys())
+    if args.list_types:
+        print("\n".join(available_types))
+        return 0
+
+    raw_types = str(args.types).strip()
+    if not raw_types or raw_types.lower() == "all":
+        enabled_types = list(available_types)
+    else:
+        enabled_types = []
+        seen: set[str] = set()
+        for part in raw_types.split(","):
+            t = part.strip().lower()
+            if not t:
+                continue
+            if t not in registry:
+                raise SystemExit(f"unknown type '{t}'. Use --list-types.")
+            if t in seen:
+                continue
+            seen.add(t)
+            enabled_types.append(t)
+        if not enabled_types:
+            raise SystemExit("no valid --types selected. Use --list-types.")
 
     if args.num_samples < 1:
         raise SystemExit("--num-samples must be >= 1")
     if not (0.0 <= args.holdout_ratio < 1.0):
         raise SystemExit("--holdout-ratio must be in [0,1)")
+
+    global CURRENT_FILL_MODE
+    CURRENT_FILL_MODE = str(args.fill_mode)
 
     out_dir = Path(args.out_dir).expanduser().resolve()
     rng = random.Random(int(args.seed))
@@ -304,7 +513,7 @@ def main() -> int:
     samples: list[Sample] = []
     type_counts: dict[str, int] = {}
     for _ in range(int(args.num_samples)):
-        gen = _pick_generator(rng)
+        gen = _pick_generator(rng, enabled_types)
         s = gen(rng)
         _assert_ascii(s.task, "task")
         _assert_ascii(s.svg, "svg")
@@ -353,6 +562,8 @@ def main() -> int:
         "num_holdout": int(len(holdout)),
         "holdout_ratio": float(args.holdout_ratio),
         "seed": int(args.seed),
+        "enabled_types": enabled_types,
+        "fill_mode": str(args.fill_mode),
         "type_counts": type_counts,
         "paths": {k: str(v) for k, v in paths.items()},
         "instruction_format": "<task>...</task><svg ...>...</svg><eos>",
@@ -393,4 +604,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
