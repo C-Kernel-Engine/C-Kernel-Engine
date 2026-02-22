@@ -815,8 +815,19 @@ PY</pre>
 <pre>cd "$ROOT"
 PARITY_ROOT="$RUN/parity_canary"
 mkdir -p "$PARITY_ROOT"
-sed -n '1p' "$DATA_TXT" > "$PARITY_ROOT/svg_row1.txt"
-sed -n '2p' "$DATA_TXT" > "$PARITY_ROOT/svg_row2.txt"
+
+# Use a stable canary source for strict CK-vs-PyTorch parity gating.
+# You can override with: export V7_PARITY_CANARY_DATA=/path/to/your_two_row_svg_file.txt
+CANARY_SRC="${V7_PARITY_CANARY_DATA:-$ROOT/version/v7/data/svg_assets_train.txt}"
+if [ ! -s "$CANARY_SRC" ]; then
+  echo "[WARN] Missing default canary source: $CANARY_SRC"
+  echo "[WARN] Falling back to DATA_TXT for canaries: $DATA_TXT"
+  CANARY_SRC="$DATA_TXT"
+fi
+echo "[INFO] parity canary source: $CANARY_SRC"
+
+sed -n '1p' "$CANARY_SRC" > "$PARITY_ROOT/svg_row1.txt"
+sed -n '2p' "$CANARY_SRC" > "$PARITY_ROOT/svg_row2.txt"
 
 if [ ! -s "$PARITY_ROOT/svg_row1.txt" ] || [ ! -s "$PARITY_ROOT/svg_row2.txt" ]; then
   echo "[FAIL] Need at least 2 non-empty rows in DATA_TXT for parity canaries."
@@ -826,6 +837,7 @@ else
   for idx in 1 2; do
     ROW_FILE="$PARITY_ROOT/svg_row${idx}.txt"
     ROW_RUN="$RUN/parity_svg_row${idx}"
+    rm -rf "$ROW_RUN"
     .venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
       --run "$ROW_RUN" \
       --init-if-missing \
@@ -860,6 +872,7 @@ import os
 from pathlib import Path
 from statistics import mean
 
+# TH = threshold
 TH_MAX = 1e-4
 TH_MEAN = 5e-5
 TH_PARAM = 1e-4

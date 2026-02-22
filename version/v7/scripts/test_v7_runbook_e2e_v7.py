@@ -309,10 +309,18 @@ def main() -> int:
     # Step 3.1 parity canaries
     parity_root = run_dir / "parity_canary"
     parity_root.mkdir(parents=True, exist_ok=True)
-    (parity_root / "svg_row1.txt").write_text(qc_lines[0] + "\n", encoding="utf-8")
-    (parity_root / "svg_row2.txt").write_text(qc_lines[1] + "\n", encoding="utf-8")
+    canary_src = DEFAULT_DATA if DEFAULT_DATA.exists() else data_txt
+    canary_lines = [ln for ln in canary_src.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if len(canary_lines) < 2:
+        canary_lines = qc_lines
+    if len(canary_lines) < 2:
+        raise RuntimeError("need at least 2 non-empty rows for parity canaries")
+    (parity_root / "svg_row1.txt").write_text(canary_lines[0] + "\n", encoding="utf-8")
+    (parity_root / "svg_row2.txt").write_text(canary_lines[1] + "\n", encoding="utf-8")
     for idx in (1, 2):
         row_run = run_dir / f"parity_svg_row{idx}"
+        if row_run.exists():
+            shutil.rmtree(row_run)
         row_file = parity_root / f"svg_row{idx}.txt"
         _run(
             [
