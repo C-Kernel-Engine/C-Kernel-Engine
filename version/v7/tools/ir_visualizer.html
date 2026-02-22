@@ -2798,7 +2798,13 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
             <!-- ═══ Numerical Parity Cockpit ═══ -->
             <div class="parity-section">
                 <h3><span class="badge badge-red">Cockpit</span> Numerical Parity Verification Dashboard</h3>
-                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Unified view of all parity tests across the IR graph. Each row maps a specific operation family to its verification status against PyTorch and llama.cpp reference implementations. <strong style="color:var(--orange);">Load parity JSON reports</strong> (drag files or use embedded data) to populate live results.</p>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Unified view of all parity tests across the IR graph. Each row maps a specific operation family to its verification status against PyTorch and llama.cpp reference implementations.</p>
+                <div style="margin:0.4rem 0 0.9rem; padding:0.75rem 1rem; background:rgba(255,180,0,0.08); border:1px solid rgba(255,180,0,0.30); border-radius:8px; font-size:0.72rem; color:var(--text-secondary); line-height:1.6;">
+                    <strong style="color:var(--orange);">Quick Start (Inference Parity)</strong>
+                    <span id="parityQuickStartState" style="margin-left:0.55rem; color:#ffd58a;">status: waiting for parity artifacts</span>
+                    <div style="margin-top:0.4rem;">Note: <code>--generate-visualizer</code> only refreshes <code>ir_report.html</code>. It does <strong>not</strong> generate llama.cpp parity artifacts by itself.</div>
+                    <pre id="parityQuickStartCmd" style="font-size:0.72rem; white-space:pre-wrap; margin-top:0.4rem;">Loading run-scoped command block...</pre>
+                </div>
                 <div id="parityCockpit"></div>
             </div>
 
@@ -3575,6 +3581,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
         let trainContractData = null;
         let trainParity1TokenData = null;
         let trainQkNormParityData = null;
+        let inferenceLlamaParityData = null;
+        let inferenceLlamaParityPrefillData = null;
+        let inferenceLlamaParityDecodeData = null;
+        let inferenceLlamaAutopsyData = null;
+        let inferenceLlamaDumpIndexData = null;
         let trainFdGradData = null;
         let trainParityEpoch3Data = null;
         let trainParityEpoch5Data = null;
@@ -3857,6 +3868,62 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const idx = p.lastIndexOf('/');
             if (idx <= 0) return idx === 0 ? '/' : '';
             return p.slice(0, idx);
+        }
+
+        function deriveRunDirCandidate(raw) {
+            const p = normalizePathString(raw);
+            if (!p || p.startsWith('$')) return '';
+            if (p.endsWith('/ir_report.html')) return p.slice(0, -15);
+            if (p.endsWith('/.ck_build')) return p.slice(0, -10);
+            if (p.endsWith('/ck_build')) return p.slice(0, -9);
+            if (/\.(json|csv|txt|so|c|bump|gguf)$/i.test(p)) return pathDirname(p);
+            return p;
+        }
+
+        function getRunContext() {
+            const embedded = window.EMBEDDED_IR_DATA || {};
+            const meta = (embedded && typeof embedded.meta === 'object' && embedded.meta) ? embedded.meta : (embeddedMeta || {});
+            const loadedPaths = (meta && typeof meta.loaded_paths === 'object') ? meta.loaded_paths : {};
+
+            let runDir = '';
+            if (typeof meta.run_dir === 'string' && meta.run_dir.trim()) {
+                runDir = deriveRunDirCandidate(meta.run_dir);
+            }
+            if (!runDir) {
+                runDir = deriveRunDirCandidate(getReportDirFromCurrentHtml());
+            }
+            if (!runDir && typeof meta.path === 'string' && meta.path.trim()) {
+                runDir = deriveRunDirCandidate(meta.path);
+            }
+            if (!runDir) {
+                const probeKeys = ['ir1_decode', 'layout_decode', 'lowered_decode_call', 'run_config', 'manifest'];
+                for (const k of probeKeys) {
+                    if (loadedPaths[k]) {
+                        runDir = deriveRunDirCandidate(loadedPaths[k]);
+                        if (runDir) break;
+                    }
+                }
+            }
+            if (!runDir) {
+                const best = getBestCommandPaths();
+                runDir = deriveRunDirCandidate(best.modelDir || best.ckBuildDir || '');
+            }
+
+            let modelPath = '';
+            if (typeof meta.path === 'string' && meta.path.trim()) {
+                modelPath = normalizePathString(meta.path);
+            }
+            if (!modelPath && typeof loadedPaths.run_config === 'string' && loadedPaths.run_config.trim()) {
+                modelPath = normalizePathString(loadedPaths.run_config);
+            }
+            if (!modelPath && runDir) {
+                const localGguf = Object.values(loadedFiles || {}).find((x) => x && x.path && String(x.path).toLowerCase().endsWith('.gguf'));
+                if (localGguf && localGguf.path) {
+                    modelPath = normalizePathString(localGguf.path);
+                }
+            }
+
+            return { runDir: runDir || null, modelPath: modelPath || null };
         }
 
         function extractGgufStem(modelInput) {
@@ -4985,6 +5052,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             trainContractData = files.contract_report || trainContractData;
             trainParity1TokenData = files.parity_1token || trainParity1TokenData;
             trainQkNormParityData = files.qk_norm_backward_parity || trainQkNormParityData;
+            inferenceLlamaParityData = files.inference_llama_parity || inferenceLlamaParityData;
+            inferenceLlamaParityPrefillData = files.inference_llama_parity_prefill || inferenceLlamaParityPrefillData;
+            inferenceLlamaParityDecodeData = files.inference_llama_parity_decode || inferenceLlamaParityDecodeData;
+            inferenceLlamaAutopsyData = files.inference_llama_autopsy || inferenceLlamaAutopsyData;
+            inferenceLlamaDumpIndexData = files.inference_llama_dump_index || inferenceLlamaDumpIndexData;
             trainFdGradData = files.fd_gradients || trainFdGradData;
             trainParityEpoch3Data = files.train_parity_epochs_3 || trainParityEpoch3Data;
             trainParityEpoch5Data = files.train_parity_epochs_5 || trainParityEpoch5Data;
@@ -9330,6 +9402,7 @@ function renderTraining() {
             if (name.includes('train_parity') || name.includes('gradient_summary')) return 'training';
             if (name.includes('fd_gradients') || name.includes('replay_determinism') || name.includes('backprop_stitch_runtime')) return 'training';
             if (name.includes('parity_1token') || name.includes('qk_norm_backward_parity')) return 'training';
+            if (name.includes('detailed_parity_analysis') || name.includes('autopsy_report') || name.includes('parity_autopsy') || name.includes('llamacpp_parity')) return 'parity';
             if (name.includes('contract_report')) return 'training';
             if (name.includes('layout')) return 'layout';
             if (name.includes('lowered')) return 'lowered';
@@ -9436,6 +9509,21 @@ function renderTraining() {
                     } else if (name.includes('qk_norm_backward_parity')) {
                         trainQkNormParityData = info.data;
                         console.log('Auto-loaded: qk norm backward parity');
+                    } else if (name.includes('detailed_parity_analysis') && name.includes('prefill')) {
+                        inferenceLlamaParityPrefillData = info.data;
+                        console.log('Auto-loaded: inference llama parity (prefill)');
+                    } else if (name.includes('detailed_parity_analysis') && name.includes('decode')) {
+                        inferenceLlamaParityDecodeData = info.data;
+                        console.log('Auto-loaded: inference llama parity (decode)');
+                    } else if (name.includes('detailed_parity_analysis') || name.includes('llamacpp_parity')) {
+                        inferenceLlamaParityData = info.data;
+                        console.log('Auto-loaded: inference llama parity');
+                    } else if (name.includes('parity_autopsy') || name.includes('autopsy_report')) {
+                        inferenceLlamaAutopsyData = info.data;
+                        console.log('Auto-loaded: inference parity autopsy');
+                    } else if (name.includes('llama_parity_dumps') && name.includes('index')) {
+                        inferenceLlamaDumpIndexData = info.data;
+                        console.log('Auto-loaded: llama parity dump index');
                     } else if (name.includes('fd_gradients')) {
                         trainFdGradData = info.data;
                         console.log('Auto-loaded: fd gradients');
@@ -14300,6 +14388,23 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     'cd unittest && python3 test_q4_k_dequant_match.py',
                     'cd unittest && python3 test_q5_0_dequant_match.py',
                     'cd unittest && python3 test_quantize_batch_parity.py',
+                    'make llamacpp-parity',
+                ],
+            },
+            {
+                family: 'Llama.cpp Inference Parity',
+                opMatch: op => /attn|attention|rope|logits|mlp|ffn|rmsnorm|q_proj|k_proj|v_proj|out_proj/i.test(op),
+                color: '#4cc9f0',
+                tests: [
+                    { name: 'llama dump coverage (index.json)', dataKey: 'inferenceLlamaDumpIndexData', subTest: null, type: 'inference' },
+                    { name: 'Detailed parity (prefill)', dataKey: 'inferenceLlamaParityData', subTest: 'prefill', type: 'inference' },
+                    { name: 'Detailed parity (decode)', dataKey: 'inferenceLlamaParityData', subTest: 'decode', type: 'inference' },
+                    { name: 'Autopsy first-divergence report', dataKey: 'inferenceLlamaAutopsyData', subTest: null, type: 'inference' },
+                ],
+                commands: [
+                    'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"',
+                    'python3 version/v7/tools/open_ir_visualizer.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html',
+                    'make llamacpp-parity-full',
                 ],
             },
             {
@@ -14336,6 +14441,121 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             },
         ];
 
+        function statusCount(summary, key) {
+            if (!summary || typeof summary !== 'object') return 0;
+            const direct = Number(summary[key]);
+            if (Number.isFinite(direct)) return direct;
+            const lower = Number(summary[String(key).toLowerCase()]);
+            return Number.isFinite(lower) ? lower : 0;
+        }
+
+        function extractPhaseSummary(payload, phase) {
+            if (!payload || typeof payload !== 'object') return null;
+            const phasePayload = phase && payload[phase] && typeof payload[phase] === 'object'
+                ? payload[phase]
+                : payload;
+            const parityPayload = phasePayload.parity && typeof phasePayload.parity === 'object'
+                ? phasePayload.parity
+                : null;
+            if (phase && parityPayload && parityPayload[`${phase}_summary`] && typeof parityPayload[`${phase}_summary`] === 'object') {
+                return parityPayload[`${phase}_summary`];
+            }
+            if (parityPayload && parityPayload.summary && typeof parityPayload.summary === 'object') {
+                return parityPayload.summary;
+            }
+            if (phasePayload.summary && typeof phasePayload.summary === 'object') {
+                return phasePayload.summary;
+            }
+            if (phase && phasePayload[`${phase}_summary`] && typeof phasePayload[`${phase}_summary`] === 'object') {
+                return phasePayload[`${phase}_summary`];
+            }
+            return null;
+        }
+
+        function extractPhaseIssue(payload, phase) {
+            if (!payload || typeof payload !== 'object') return null;
+            const phasePayload = phase && payload[phase] && typeof payload[phase] === 'object'
+                ? payload[phase]
+                : payload;
+            const parityPayload = phasePayload.parity && typeof phasePayload.parity === 'object'
+                ? phasePayload.parity
+                : null;
+            if (phase && parityPayload && parityPayload[`${phase}_first_issue`] && typeof parityPayload[`${phase}_first_issue`] === 'object') {
+                return parityPayload[`${phase}_first_issue`];
+            }
+            if (parityPayload && parityPayload.first_issue && typeof parityPayload.first_issue === 'object') {
+                return parityPayload.first_issue;
+            }
+            if (phasePayload.first_issue && typeof phasePayload.first_issue === 'object') {
+                return phasePayload.first_issue;
+            }
+            return null;
+        }
+
+        function maxDiffFromIssue(issue) {
+            if (!issue || typeof issue !== 'object') return null;
+            const candidates = [
+                Number(issue.max_abs_diff),
+                Number(issue.max_diff),
+                Number(issue.abs_diff),
+                Number(issue.diff),
+            ];
+            const hit = candidates.find((x) => Number.isFinite(x));
+            return Number.isFinite(hit) ? hit : null;
+        }
+
+        function parityResultFromSummary(summary, issue, extraFail = false) {
+            const failCount = statusCount(summary, 'FAIL') + statusCount(summary, 'ERROR');
+            const warnCount = statusCount(summary, 'WARN');
+            return {
+                passed: failCount === 0 && warnCount === 0 && !extraFail,
+                maxDiff: maxDiffFromIssue(issue),
+                tolerance: null,
+            };
+        }
+
+        function lookupInferenceLlamaParity(data, phase) {
+            if (!data || typeof data !== 'object') return null;
+            if (Array.isArray(data.rows)) {
+                const rows = data.rows.filter((r) => r && typeof r === 'object');
+                if (rows.length === 0) return null;
+                const failed = rows.some((r) => String(r.overall || '').toUpperCase() !== 'PASS');
+                return { passed: !failed, maxDiff: null, tolerance: null };
+            }
+            const summary = extractPhaseSummary(data, phase);
+            if (!summary) return null;
+            const issue = extractPhaseIssue(data, phase);
+            const coverage = data.ck_coverage && typeof data.ck_coverage === 'object'
+                ? data.ck_coverage
+                : null;
+            const coverageMissing = Number(coverage?.missing_count ?? 0);
+            return parityResultFromSummary(summary, issue, Number.isFinite(coverageMissing) && coverageMissing > 0);
+        }
+
+        function lookupInferenceLlamaAutopsy(data) {
+            if (!data || typeof data !== 'object') return null;
+            const summary = extractPhaseSummary(data, null);
+            if (!summary) return null;
+            const issue = extractPhaseIssue(data, null);
+            return parityResultFromSummary(summary, issue, false);
+        }
+
+        function lookupInferenceDumpIndex(data) {
+            if (Array.isArray(data)) {
+                return { passed: data.length > 0, maxDiff: null, tolerance: null };
+            }
+            if (data && typeof data === 'object') {
+                const count = Number(
+                    data.count ??
+                    (Array.isArray(data.entries) ? data.entries.length : NaN)
+                );
+                if (Number.isFinite(count)) {
+                    return { passed: count > 0, maxDiff: null, tolerance: null };
+                }
+            }
+            return null;
+        }
+
         function lookupParityResult(test) {
             const key = test.dataKey;
             if (!key) return null;
@@ -14343,6 +14563,18 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             const dataMap = {
                 trainParity1TokenData: typeof trainParity1TokenData !== 'undefined' ? trainParity1TokenData : null,
                 trainQkNormParityData: typeof trainQkNormParityData !== 'undefined' ? trainQkNormParityData : null,
+                inferenceLlamaParityData: typeof inferenceLlamaParityData !== 'undefined'
+                    ? (
+                        inferenceLlamaParityData ||
+                        (
+                            (inferenceLlamaParityPrefillData || inferenceLlamaParityDecodeData)
+                                ? { prefill: inferenceLlamaParityPrefillData, decode: inferenceLlamaParityDecodeData, source: 'ui_split_alias' }
+                                : null
+                        )
+                    )
+                    : null,
+                inferenceLlamaAutopsyData: typeof inferenceLlamaAutopsyData !== 'undefined' ? inferenceLlamaAutopsyData : null,
+                inferenceLlamaDumpIndexData: typeof inferenceLlamaDumpIndexData !== 'undefined' ? inferenceLlamaDumpIndexData : null,
                 trainParityEpoch3Data: typeof trainParityEpoch3Data !== 'undefined' ? trainParityEpoch3Data : null,
                 trainParityEpoch5Data: typeof trainParityEpoch5Data !== 'undefined' ? trainParityEpoch5Data : null,
                 trainRuntimeParityRealisticData: typeof trainRuntimeParityRealisticData !== 'undefined' ? trainRuntimeParityRealisticData : null,
@@ -14353,6 +14585,16 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             };
             const data = dataMap[key];
             if (!data) return null;
+
+            if (key === 'inferenceLlamaParityData') {
+                return lookupInferenceLlamaParity(data, test.subTest || null);
+            }
+            if (key === 'inferenceLlamaAutopsyData') {
+                return lookupInferenceLlamaAutopsy(data);
+            }
+            if (key === 'inferenceLlamaDumpIndexData') {
+                return lookupInferenceDumpIndex(data);
+            }
 
             // For parity_1token, find the specific sub-test
             if (test.subTest && data.reports) {
@@ -14394,8 +14636,13 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             // Count loaded ops from the IR
             const ops = loweredData?.operations || callData?.operations || [];
             const opNames = ops.map(o => (o.op || o.name || '').toLowerCase());
-            const runCtx = getRunContext();
+            const runCtx = (typeof getRunContext === 'function')
+                ? getRunContext()
+                : { runDir: null, modelPath: null };
             const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+            const modelPathQ = (runCtx.modelPath && /\.gguf$/i.test(String(runCtx.modelPath || '')))
+                ? quoteShell(runCtx.modelPath)
+                : '';
             const reportCmd = runCtx.runDir
                 ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
                 : 'python3 version/v7/tools/open_ir_visualizer.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
@@ -14410,6 +14657,34 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                 ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runDir} --html-only --no-strict-run-artifacts --output ${runDir}/ir_report.html`
                 : 'python3 version/v7/tools/open_ir_visualizer.py --generate --run <run_dir> --html-only --no-strict-run-artifacts --output <run_dir>/ir_report.html';
             const hasTrainRuntime = Boolean(window?.EMBEDDED_IR_DATA?.meta?.has_train_runtime);
+            const runInferenceParityCmd = runCtx.runDir
+                ? `REPORT_MODEL_DIR=${runDir}
+GGUF_LOCAL="$(find "$REPORT_MODEL_DIR" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"
+if [ -z "$GGUF_LOCAL" ]; then
+  GGUF_LOCAL=${modelPathQ || '"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"'};
+fi
+python3 version/v7/scripts/ck_run_v7.py run "$GGUF_LOCAL" --run "$REPORT_MODEL_DIR" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"`
+                : 'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
+            const inferenceKernelParityCmd = 'make llamacpp-parity-full';
+            const hasInferenceParityData = Boolean(
+                inferenceLlamaParityData ||
+                inferenceLlamaParityPrefillData ||
+                inferenceLlamaParityDecodeData ||
+                inferenceLlamaAutopsyData ||
+                inferenceLlamaDumpIndexData
+            );
+
+            const quickStartCmdEl = document.getElementById('parityQuickStartCmd');
+            if (quickStartCmdEl) {
+                quickStartCmdEl.textContent = `${runInferenceParityCmd}\n${reportCmd}`;
+            }
+            const quickStartStateEl = document.getElementById('parityQuickStartState');
+            if (quickStartStateEl) {
+                quickStartStateEl.textContent = hasInferenceParityData
+                    ? 'status: inference parity artifacts loaded'
+                    : 'status: inference parity artifacts missing';
+                quickStartStateEl.style.color = hasInferenceParityData ? '#47b475' : '#ffd58a';
+            }
 
             let totalTests = 0, passCount = 0, failCount = 0, unknownCount = 0;
             let coveredFamilies = 0;
@@ -14503,11 +14778,15 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             html += '</tbody></table></div>';
 
             // Advice box
-            if (unknownCount > 0) {
+            if (unknownCount > 0 || !hasInferenceParityData) {
                 html += `
                 <div style="margin-top:1rem; padding:0.75rem 1rem; background:rgba(255,180,0,0.08); border:1px solid rgba(255,180,0,0.3); border-radius:8px; font-size:0.72rem; color:var(--text-secondary); line-height:1.6;">
-                    <strong style="color:var(--orange);">Run-scoped parity artifacts are missing.</strong>
-                    <div style="margin-top:0.45rem;">Recommended (writes parity JSONs into this run directory):</div>
+                    <strong style="color:var(--orange);">Run-scoped parity artifacts are incomplete.</strong>
+                    <div style="margin-top:0.45rem;">Inference parity path (llama.cpp + quantized runtime):</div>
+                    <pre style="font-size:0.72rem;white-space:pre-wrap;margin-top:0.35rem;">${runInferenceParityCmd}
+${reportCmd}
+${inferenceKernelParityCmd}</pre>
+                    <div style="margin-top:0.45rem;">Training parity path (PyTorch oracle + train runtime):</div>
                     <pre style="font-size:0.72rem;white-space:pre-wrap;margin-top:0.35rem;">${runParityCmd}
 ${runSweepCmd}
 ${reportCmd}</pre>
@@ -14529,6 +14808,20 @@ ${globalRefreshCmd}</pre>
             // Determine which ops exist in the loaded IR
             const ops = loweredData?.operations || callData?.operations || [];
             const opNamesSet = new Set(ops.map(o => (o.op || o.name || '')));
+            const runCtx = (typeof getRunContext === 'function')
+                ? getRunContext()
+                : { runDir: null, modelPath: null };
+            const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+            const modelPathQ = (runCtx.modelPath && /\.gguf$/i.test(String(runCtx.modelPath || '')))
+                ? quoteShell(runCtx.modelPath)
+                : '';
+            const reportCmd = runCtx.runDir
+                ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
+                : 'python3 version/v7/tools/open_ir_visualizer.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
+            const inferenceParityCmd = runCtx.runDir
+                ? `REPORT_MODEL_DIR=${runDir}; GGUF_LOCAL=\"$(find \"$REPORT_MODEL_DIR\" -maxdepth 1 -type f -name \"*.gguf\" | head -n 1)\"; if [ -z \"$GGUF_LOCAL\" ]; then GGUF_LOCAL=${modelPathQ || '"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"'}; fi; python3 version/v7/scripts/ck_run_v7.py run \"$GGUF_LOCAL\" --run \"$REPORT_MODEL_DIR\" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt \"Hello\"`
+                : 'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
+            const inferenceKernelParityCmd = 'make llamacpp-parity-full';
 
             let html = `
             <p style="color:var(--text-muted); font-size:0.72rem; margin-bottom:1rem;">
@@ -14541,19 +14834,22 @@ ${globalRefreshCmd}</pre>
             PARITY_OP_TESTS.forEach(fam => {
                 const inIR = ops.some(o => fam.opMatch(o.op || o.name || ''));
                 const star = inIR ? ' <span style="color:var(--orange);">★</span>' : '';
+                const commands = fam.family === 'Llama.cpp Inference Parity'
+                    ? [inferenceParityCmd, reportCmd, inferenceKernelParityCmd]
+                    : fam.commands;
 
                 html += `
                 <details style="margin-bottom:0.5rem; background:var(--bg-dark); border:1px solid var(--grey); border-left:3px solid ${fam.color}; border-radius:6px;">
                     <summary style="padding:0.6rem 0.75rem; cursor:pointer; font-size:0.78rem; font-weight:600; color:${fam.color};">
                         ${fam.family}${star}
-                        <span style="font-size:0.65rem; color:var(--text-muted); font-weight:400; margin-left:0.5rem;">${fam.tests.length} tests, ${fam.commands.length} commands</span>
+                        <span style="font-size:0.65rem; color:var(--text-muted); font-weight:400; margin-left:0.5rem;">${fam.tests.length} tests, ${commands.length} commands</span>
                     </summary>
                     <div style="padding:0.5rem 0.75rem 0.75rem;">
                         <div style="font-size:0.72rem; color:var(--text-secondary); margin-bottom:0.5rem;">
                             <strong>What this verifies:</strong> Numerical parity of ${fam.family} ops between C-Kernel-Engine and PyTorch/llama.cpp reference.
                         </div>
                         <div style="font-size:0.68rem; color:var(--text-muted); margin-bottom:0.5rem;">Run these to verify parity at this intersection:</div>
-                        ${fam.commands.map(cmd => `
+                        ${commands.map(cmd => `
                             <div style="display:flex; align-items:center; gap:4px; margin-bottom:4px;">
                                 <code style="flex:1; background:var(--code-bg); padding:4px 8px; border-radius:4px; font-size:0.68rem; overflow-x:auto;">${cmd}</code>
                                 <button onclick="navigator.clipboard.writeText('${cmd.replace(/'/g, "\\'")}')" style="background:none; border:1px solid var(--grey); border-radius:4px; padding:2px 6px; cursor:pointer; color:var(--text-muted); font-size:0.62rem;" title="Copy">📋</button>
@@ -14776,17 +15072,55 @@ function healthAlerts(lossSteps, parityRows) {
     return alerts;
 }
 
-function getRunContext() {
-    const embedded = window.EMBEDDED_IR_DATA || {};
-    const meta = embedded.meta || {};
-    const runDir = typeof meta.run_dir === 'string' && meta.run_dir.trim()
-        ? meta.run_dir
-        : null;
-    const modelPath = typeof meta.path === 'string' && meta.path.trim()
-        ? meta.path
-        : null;
-    return { runDir, modelPath };
-}
+        function deriveRunDirCandidate(raw) {
+            const p = normalizePathString(raw);
+            if (!p) return '';
+            if (p.endsWith('/ir_report.html')) return p.slice(0, -15);
+            if (p.endsWith('/.ck_build')) return p.slice(0, -10);
+            if (p.endsWith('/ck_build')) return p.slice(0, -9);
+            if (/\.(json|csv|txt|so|c|bump|gguf)$/i.test(p)) return pathDirname(p);
+            return p;
+        }
+
+        function getRunContext() {
+            const embedded = window.EMBEDDED_IR_DATA || {};
+            const meta = embedded.meta || {};
+            const loadedPaths = (meta && typeof meta.loaded_paths === 'object') ? meta.loaded_paths : {};
+
+            let runDir = '';
+            if (typeof meta.run_dir === 'string' && meta.run_dir.trim()) {
+                runDir = deriveRunDirCandidate(meta.run_dir);
+            }
+            if (!runDir) {
+                runDir = deriveRunDirCandidate(getReportDirFromCurrentHtml());
+            }
+            if (!runDir && typeof meta.path === 'string' && meta.path.trim()) {
+                runDir = deriveRunDirCandidate(meta.path);
+            }
+            if (!runDir) {
+                const probeKeys = ['ir1_decode', 'layout_decode', 'lowered_decode_call', 'run_config', 'manifest'];
+                for (const k of probeKeys) {
+                    if (loadedPaths[k]) {
+                        runDir = deriveRunDirCandidate(loadedPaths[k]);
+                        if (runDir) break;
+                    }
+                }
+            }
+            if (!runDir) {
+                const best = getBestCommandPaths();
+                runDir = deriveRunDirCandidate(best.modelDir || best.ckBuildDir || '');
+            }
+
+            let modelPath = '';
+            if (typeof meta.path === 'string' && meta.path.trim()) {
+                modelPath = normalizePathString(meta.path);
+            }
+            if (!modelPath && typeof loadedPaths.run_config === 'string' && loadedPaths.run_config.trim()) {
+                modelPath = normalizePathString(loadedPaths.run_config);
+            }
+
+            return { runDir: runDir || null, modelPath: modelPath || null };
+        }
 
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
@@ -14961,10 +15295,41 @@ function quoteShell(value) {
 function getRunContext() {
     const embedded = window.EMBEDDED_IR_DATA || {};
     const meta = embedded.meta || {};
-    const runDir = typeof meta.run_dir === 'string' && meta.run_dir.trim()
-        ? meta.run_dir
-        : null;
-    return { runDir };
+    const loadedPaths = (meta && typeof meta.loaded_paths === 'object') ? meta.loaded_paths : {};
+
+    let runDir = '';
+    if (typeof meta.run_dir === 'string' && meta.run_dir.trim()) {
+        runDir = deriveRunDirCandidate(meta.run_dir);
+    }
+    if (!runDir) {
+        runDir = deriveRunDirCandidate(getReportDirFromCurrentHtml());
+    }
+    if (!runDir && typeof meta.path === 'string' && meta.path.trim()) {
+        runDir = deriveRunDirCandidate(meta.path);
+    }
+    if (!runDir) {
+        const probeKeys = ['ir1_decode', 'layout_decode', 'lowered_decode_call', 'run_config', 'manifest'];
+        for (const k of probeKeys) {
+            if (loadedPaths[k]) {
+                runDir = deriveRunDirCandidate(loadedPaths[k]);
+                if (runDir) break;
+            }
+        }
+    }
+    if (!runDir) {
+        const best = getBestCommandPaths();
+        runDir = deriveRunDirCandidate(best.modelDir || best.ckBuildDir || '');
+    }
+
+    let modelPath = '';
+    if (typeof meta.path === 'string' && meta.path.trim()) {
+        modelPath = normalizePathString(meta.path);
+    }
+    if (!modelPath && typeof loadedPaths.run_config === 'string' && loadedPaths.run_config.trim()) {
+        modelPath = normalizePathString(loadedPaths.run_config);
+    }
+
+    return { runDir: runDir || null, modelPath: modelPath || null };
 }
 
 function renderGradientPanel(files) {

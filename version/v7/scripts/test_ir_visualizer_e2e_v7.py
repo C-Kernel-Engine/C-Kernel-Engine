@@ -75,6 +75,11 @@ SUPPORTED_ARTIFACT_FILES: dict[str, tuple[str, ...]] = {
     "contract_report": ("contract_report_latest.json",),
     "parity_1token": ("parity_1token_latest.json",),
     "qk_norm_backward_parity": ("qk_norm_backward_parity_latest.json",),
+    "inference_llama_parity": ("detailed_parity_analysis_latest.json", "detailed_parity_analysis.json", "llamacpp_parity_latest.json", "llamacpp_parity.json"),
+    "inference_llama_parity_prefill": ("detailed_parity_analysis_prefill_latest.json", "detailed_parity_analysis_prefill.json"),
+    "inference_llama_parity_decode": ("detailed_parity_analysis_decode_latest.json", "detailed_parity_analysis_decode.json"),
+    "inference_llama_autopsy": ("parity_autopsy_latest.json", "autopsy_report_latest.json", "autopsy_report.json"),
+    "inference_llama_dump_index": ("llama_parity_dumps/index.json",),
     "fd_gradients": ("fd_gradients_latest.json",),
     "train_parity_epochs_3": ("train_parity_epochs_3_latest.json",),
     "train_parity_epochs_5": ("train_parity_epochs_5_latest.json",),
@@ -350,6 +355,50 @@ python3 version/v7/tools/open_ir_visualizer.py --generate --run "$REPORT_MODEL_D
     _run(["bash", "-lc", script], cwd=ROOT)
 
 
+def _run_operator_inference_parity_cmd(run_dir: Path, model_input: str, context_len: int, max_tokens: int) -> None:
+    """
+    Replay inference parity command block from ir_visualizer Parity tab.
+    Uses explicit --run to keep artifacts scoped to this report directory.
+    """
+    report_model_dir = shlex.quote(str(run_dir))
+    model_input_q = shlex.quote(model_input)
+    script = f"""
+REPORT_MODEL_DIR={report_model_dir}
+MODEL_INPUT="$REPORT_MODEL_DIR"
+if [ -d "$MODEL_INPUT" ]; then
+  GGUF_LOCAL="$(find "$MODEL_INPUT" -maxdepth 1 -type f -name '*.gguf' | head -n 1)"
+  if [ -n "$GGUF_LOCAL" ]; then
+    MODEL_INPUT="$GGUF_LOCAL"
+  else
+    MODEL_INPUT={model_input_q}
+  fi
+else
+  MODEL_INPUT={model_input_q}
+fi
+echo "inference_parity_model_input=$MODEL_INPUT"
+python3 version/v7/scripts/ck_run_v7.py run "$MODEL_INPUT" --run "$REPORT_MODEL_DIR" --context-len {int(context_len)} --max-tokens {int(max_tokens)} --force-compile --detailed-llamacpp-parity --prompt "Hello" --generate-only --generate-visualizer
+python3 version/v7/tools/open_ir_visualizer.py --generate --run "$REPORT_MODEL_DIR" --html-only --strict-run-artifacts --output "$REPORT_MODEL_DIR/ir_report.html"
+"""
+    _run(["bash", "-lc", script], cwd=ROOT)
+
+
+def _check_inference_parity_loaded(report_data: dict[str, Any], run_dir: Path) -> list[CheckResult]:
+    checks: list[CheckResult] = []
+    loaded_paths = report_data.get("meta", {}).get("loaded_paths", {}) or {}
+    required = ("inference_llama_parity", "inference_llama_autopsy")
+    missing = [k for k in required if not loaded_paths.get(k)]
+    _record(
+        checks,
+        "inference_parity_loaded_paths",
+        not missing,
+        f"missing={missing}",
+    )
+    for name in ("detailed_parity_analysis_latest.json", "parity_autopsy_latest.json"):
+        p = run_dir / name
+        _record(checks, f"inference_parity_file_{name}", p.exists(), str(p))
+    return checks
+
+
 def _ensure_train_runtime(run_dir: Path, python_exec: str) -> None:
     """
     Build/refresh libtrain.so in the same run-dir with a tiny CK-only train pass.
@@ -451,12 +500,15 @@ fi
 def main() -> int:
     ap = argparse.ArgumentParser(description="v7 IR visualizer E2E regression")
     ap.add_argument("--model-input", required=True, help="Model input accepted by ck_run_v7.py run")
+    ap.add_argument("--run-dir", default=None, help="Optional explicit run directory to validate run-path coherence")
     ap.add_argument("--context-len", type=int, default=1024, help="Context length for ck_run_v7.py run")
     ap.add_argument("--prompt", default="hi", help="Smoke prompt")
     ap.add_argument("--max-tokens", type=int, default=1, help="Smoke max tokens")
+    ap.add_argument("--parity-max-tokens", type=int, default=8, help="Max tokens for inference parity command replay")
     ap.add_argument("--force-compile", action="store_true", help="Pass --force-compile to ck_run_v7.py run")
     ap.add_argument("--force-convert", action="store_true", help="Pass --force-convert to ck_run_v7.py run")
     ap.add_argument("--skip-profile", action="store_true", help="Skip decode profile generation check")
+    ap.add_argument("--skip-inference-parity", action="store_true", help="Skip inference parity command replay")
     ap.add_argument(
         "--with-train-runtime",
         action="store_true",
@@ -489,16 +541,28 @@ def main() -> int:
         str(args.max_tokens),
         "--generate-visualizer",
     ]
+    explicit_run_dir = Path(args.run_dir).expanduser().resolve() if args.run_dir else None
+    if explicit_run_dir is not None:
+        run_cmd.extend(["--run", str(explicit_run_dir)])
     if args.force_compile:
         run_cmd.append("--force-compile")
     if args.force_convert:
         run_cmd.append("--force-convert")
     _run(run_cmd)
 
-    resolved_model_dir = Path(
+    resolved_from_model_input = Path(
         _capture([py, str(RESOLVE_MODEL_DIR), "--model-input", args.model_input])
     ).resolve()
-    _record(checks, "resolved_model_dir_exists", resolved_model_dir.exists(), str(resolved_model_dir))
+    _record(checks, "resolved_model_dir_exists", resolved_from_model_input.exists(), str(resolved_from_model_input))
+    resolved_model_dir = explicit_run_dir if explicit_run_dir is not None else resolved_from_model_input
+    _record(checks, "effective_run_dir_exists", resolved_model_dir.exists(), str(resolved_model_dir))
+    if explicit_run_dir is not None:
+        _record(
+            checks,
+            "explicit_run_dir_selected",
+            resolved_model_dir == explicit_run_dir,
+            f"effective={resolved_model_dir} explicit={explicit_run_dir}",
+        )
 
     report_path = resolved_model_dir / "ir_report.html"
     _record(checks, "initial_report_exists", report_path.exists(), str(report_path))
@@ -515,6 +579,23 @@ def main() -> int:
     )
     checks.extend(_check_decode_core_files(initial_data))
     checks.extend(_check_strict_run_scoping(initial_data, resolved_model_dir))
+
+    if not args.skip_inference_parity:
+        _run_operator_inference_parity_cmd(
+            resolved_model_dir,
+            model_input=args.model_input,
+            context_len=args.context_len,
+            max_tokens=args.parity_max_tokens,
+        )
+        _record(
+            checks,
+            "operator_inference_parity_cmd_replay",
+            True,
+            "replayed inference parity command block with explicit REPORT_MODEL_DIR",
+        )
+        parity_refreshed = _extract_embedded_data(report_path)
+        checks.extend(_check_inference_parity_loaded(parity_refreshed, resolved_model_dir))
+        checks.extend(_check_strict_run_scoping(parity_refreshed, resolved_model_dir))
 
     if not args.skip_profile:
         _run_operator_profile_compile_check_cmd(resolved_model_dir)

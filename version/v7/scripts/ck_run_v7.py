@@ -6837,6 +6837,110 @@ def _run_llamacpp_parity(
     return False
 
 
+def _infer_parity_family(model_input: Optional[str], work_dir: Path) -> str:
+    """Best-effort model family inference for parity tooling."""
+    text = " ".join(
+        [
+            str(model_input or ""),
+            str(work_dir.name or ""),
+            str(work_dir.parent.name or ""),
+        ]
+    ).lower()
+    if "qwen3" in text:
+        return "qwen3"
+    if "qwen2" in text:
+        return "qwen2"
+    if "qwen" in text:
+        return "qwen"
+    if "gemma" in text:
+        return "gemma"
+    if "mistral" in text:
+        return "mistral"
+    if "llama" in text:
+        return "llama"
+    return "qwen3"
+
+
+def _run_detailed_inference_parity_reports(
+    work_dir: Path,
+    family: str,
+    *,
+    model_uri: Optional[str],
+    context_len: Optional[int],
+    max_tokens: int,
+    prompt: str,
+) -> None:
+    """
+    Generate JSON artifacts consumed by IR visualizer inference parity cockpit.
+    This runs after parity dumps are present in the same run directory.
+    """
+    parity_model_uri = str(model_uri or work_dir)
+    detail_script = SCRIPTS_DIR / "detailed_parity_analysis.py"
+    if detail_script.exists():
+        cmd = [
+            sys.executable,
+            str(detail_script),
+            "--model-uri",
+            parity_model_uri,
+            "--output-dir",
+            str(work_dir),
+            "--family",
+            family,
+            "--prompt",
+            prompt,
+            "--max-tokens",
+            str(max_tokens),
+            "--skip-ck-run",
+            "--skip-exhaustive-llama",
+            "--report-prefix",
+            "detailed_parity_analysis_latest",
+        ]
+        if context_len and int(context_len) > 0:
+            cmd.extend(["--context-len", str(int(context_len))])
+        proc = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True, check=False)
+        if proc.returncode == 0:
+            log(f"  Detailed parity report: {work_dir / 'detailed_parity_analysis_latest.json'}", C_GREEN)
+        else:
+            log("  Detailed parity analysis failed; continuing", C_ORANGE)
+            if proc.stderr:
+                log(f"    {proc.stderr[-300:]}", C_DIM)
+    else:
+        log("  detailed_parity_analysis.py not found; skipping inference parity summary", C_DIM)
+
+    autopsy_script = SCRIPTS_DIR / "parity" / "parity_autopsy.py"
+    if autopsy_script.exists():
+        cmd = [
+            sys.executable,
+            str(autopsy_script),
+            "--model-uri",
+            parity_model_uri,
+            "--output-dir",
+            str(work_dir),
+            "--family",
+            family,
+            "--pass",
+            "decode",
+            "--skip-run",
+            "--report-prefix",
+            "parity_autopsy_latest",
+        ]
+        if context_len and int(context_len) > 0:
+            cmd.extend(["--context-len", str(int(context_len))])
+        if max_tokens and int(max_tokens) > 0:
+            cmd.extend(["--max-tokens", str(int(max_tokens))])
+        if prompt:
+            cmd.extend(["--prompt", prompt])
+        proc = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True, check=False)
+        if proc.returncode == 0:
+            log(f"  Parity autopsy report: {work_dir / 'parity_autopsy_latest.json'}", C_GREEN)
+        else:
+            log("  Parity autopsy failed; continuing", C_ORANGE)
+            if proc.stderr:
+                log(f"    {proc.stderr[-300:]}", C_DIM)
+    else:
+        log("  parity/parity_autopsy.py not found; skipping autopsy summary", C_DIM)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Profiling Summary
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -6967,6 +7071,13 @@ def run_pipeline(args: argparse.Namespace):
         step_run_train_e2e(args)
         return
 
+    requested_run_dir = None
+    requested_run_dir_raw = getattr(args, "run_dir", None)
+    if requested_run_dir_raw:
+        requested_run_dir = Path(requested_run_dir_raw).expanduser().resolve()
+        requested_run_dir.mkdir(parents=True, exist_ok=True)
+        log(f"  Using explicit run directory: {requested_run_dir}", C_DIM)
+
     # Step 0: Regenerate kernel registry from kernel maps if needed
     step_regenerate_kernel_registry(force=getattr(args, 'force_compile', False))
 
@@ -6979,7 +7090,8 @@ def run_pipeline(args: argparse.Namespace):
     # Determine working directory
     if input_type == 'hf_id':
         model_id = info['model_id']
-        work_dir = CACHE_DIR / model_id.replace('/', '--')
+        default_work_dir = CACHE_DIR / model_id.replace('/', '--')
+        work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
         model_dir = step_download(model_id, CACHE_DIR, force=args.force_download)
 
         # Check if this is a GGUF-only repo (no safetensors)
@@ -7037,7 +7149,8 @@ def run_pipeline(args: argparse.Namespace):
     elif input_type == 'gguf':
         gguf_path = info['path']
         gguf_path_for_tokenizer = gguf_path
-        work_dir = CACHE_DIR / gguf_path.stem
+        default_work_dir = CACHE_DIR / gguf_path.stem
+        work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
         if v7_mode:
             manifest_input_path = step_inspect_weights_v7(
                 input_type, None, gguf_path, work_dir, force=args.force_inspect
@@ -7053,7 +7166,8 @@ def run_pipeline(args: argparse.Namespace):
 
     elif input_type == 'local_dir':
         model_dir = info['path']
-        work_dir = model_dir / ".ck_build"
+        default_work_dir = model_dir / ".ck_build"
+        work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
         config_path = model_dir / "config.json"
 
         # Local CK runtime/train run dir: reuse existing bump+manifest directly.
@@ -7086,7 +7200,8 @@ def run_pipeline(args: argparse.Namespace):
 
     elif input_type == 'local_config':
         config_path = info['path']
-        work_dir = config_path.parent / ".ck_build"
+        default_work_dir = config_path.parent / ".ck_build"
+        work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
         manifest_path = None
         # No weight conversion for config-only (assume weights.bump exists)
         if v7_mode and not args.weight_dtype:
@@ -7100,7 +7215,8 @@ def run_pipeline(args: argparse.Namespace):
         # Download single GGUF file from HuggingFace
         repo_id = info['repo_id']
         filename = info['filename']
-        work_dir = CACHE_DIR / repo_id.replace('/', '--')
+        default_work_dir = CACHE_DIR / repo_id.replace('/', '--')
+        work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
 
         gguf_path = step_download_gguf(repo_id, filename, CACHE_DIR, force=args.force_download)
         gguf_path_for_tokenizer = gguf_path
@@ -7306,6 +7422,43 @@ def run_pipeline(args: argparse.Namespace):
 
     # Determine effective context length for parity tools (prefer explicit CLI override).
     effective_ctx = getattr(args, "context_len", None)
+    parity_artifacts_generated = False
+
+    # Detailed llama.cpp parity can run independently of chat/generate-only mode.
+    if detailed_llama_parity:
+        weights_bump = Path(weights_path) if weights_path else (work_dir / "weights.bump")
+        if not weights_bump.exists():
+            log_error(f"weights.bump not found at {weights_bump}")
+            sys.exit(1)
+        parity_prompt = getattr(args, "prompt", None) or "Hello"
+        parity_max_tokens = int(getattr(args, "max_tokens", 1) or 1)
+        step_run_c_cli_parity_dump(lib_path, weights_bump, parity_prompt, parity_max_tokens, effective_ctx)
+        llama_ok = _run_llamacpp_parity(
+            work_dir,
+            prompt=parity_prompt,
+            max_tokens=parity_max_tokens,
+            ctx_size=effective_ctx,
+            temperature=getattr(args, "temperature", None),
+            llama_filter=getattr(args, "llama_filter", None),
+            llama_layer=getattr(args, "llama_layer", None),
+            llama_stop_after=getattr(args, "llama_stop_after", None),
+            llama_include_global=getattr(args, "llama_include_global", False),
+            llama_timeout=getattr(args, "llama_timeout", None),
+            gguf_path_hint=gguf_path_for_tokenizer,
+        )
+        if not llama_ok:
+            log("  llama.cpp reference dump failed; generating diagnostic parity summaries from available artifacts", C_ORANGE)
+        parity_family = _infer_parity_family(getattr(args, "model", None), work_dir)
+        parity_model_uri = str(gguf_path_for_tokenizer) if gguf_path_for_tokenizer else str(getattr(args, "model", ""))
+        _run_detailed_inference_parity_reports(
+            work_dir,
+            parity_family,
+            model_uri=parity_model_uri,
+            context_len=effective_ctx,
+            max_tokens=parity_max_tokens,
+            prompt=parity_prompt,
+        )
+        parity_artifacts_generated = True
 
     # Run chat (unless generate-only)
     if args.generate_only or args.test_only:
@@ -7323,33 +7476,17 @@ def run_pipeline(args: argparse.Namespace):
             prompt = getattr(args, "c_cli_prompt", None) or "Hello"
             max_tokens = int(getattr(args, "c_cli_max_tokens", 16) or 16)
             step_run_c_cli_smoke(lib_path, weights_bump, prompt, max_tokens)
-        if detailed_llama_parity:
-            weights_bump = Path(weights_path) if weights_path else (work_dir / "weights.bump")
-            if not weights_bump.exists():
-                log_error(f"weights.bump not found at {weights_bump}")
-                sys.exit(1)
-            parity_prompt = getattr(args, "prompt", None) or "Hello"
-            parity_max_tokens = int(getattr(args, "max_tokens", 1) or 1)
-            step_run_c_cli_parity_dump(lib_path, weights_bump, parity_prompt, parity_max_tokens, effective_ctx)
-            _run_llamacpp_parity(
-                work_dir,
-                prompt=parity_prompt,
-                max_tokens=parity_max_tokens,
-                ctx_size=effective_ctx,
-                temperature=getattr(args, "temperature", None),
-                llama_filter=getattr(args, "llama_filter", None),
-                llama_layer=getattr(args, "llama_layer", None),
-                llama_stop_after=getattr(args, "llama_stop_after", None),
-                llama_include_global=getattr(args, "llama_include_global", False),
-                llama_timeout=getattr(args, "llama_timeout", None),
-                gguf_path_hint=gguf_path_for_tokenizer,
-            )
-        else:
+        if not detailed_llama_parity:
             step_run_chat(work_dir, args, gguf_path=gguf_path_for_tokenizer)
 
     # Generate profile summary if profiling was enabled
     if getattr(args, 'profile', False):
         _generate_profile_summary(work_dir)
+
+    # Keep report in sync when parity artifacts were generated after initial report emit.
+    if parity_artifacts_generated and getattr(args, "generate_visualizer", False):
+        log(f"\n{C_ORANGE}[viz]{C_RESET} Refreshing IR visualizer HTML (with parity artifacts)", C_DIM)
+        _generate_visualizer_html(work_dir)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Interactive Model Selector
@@ -7675,7 +7812,7 @@ Examples:
     run_parser.add_argument('--train-e2e', action='store_true',
                            help='Run tiny training parity E2E (CK vs PyTorch) and exit')
     run_parser.add_argument('--run', dest='run_dir', default=None,
-                           help='Optional run directory for train-e2e artifact output')
+                           help='Optional explicit run directory for inference artifacts (also used by --train-e2e)')
     run_parser.add_argument('--train-data', default=None,
                            help='Training text file for --train-e2e (UTF-8)')
     run_parser.add_argument('--train-token-file', default=None,

@@ -341,6 +341,15 @@ def copy_artifacts_if_needed(src_model_dir: Path, dst_model_dir: Path) -> None:
         "parity_1token_latest.json",
         "qk_norm_backward_parity_latest.json",
         "fd_gradients_latest.json",
+        "parity_autopsy_latest.json",
+        "autopsy_report.json",
+        "autopsy_report_latest.json",
+        "detailed_parity_analysis.json",
+        "detailed_parity_analysis_latest.json",
+        "detailed_parity_analysis_prefill.json",
+        "detailed_parity_analysis_prefill_latest.json",
+        "detailed_parity_analysis_decode.json",
+        "detailed_parity_analysis_decode_latest.json",
         "train_parity_epochs_3_latest.json",
         "train_parity_epochs_5_latest.json",
         "replay_determinism_latest.json",
@@ -934,6 +943,11 @@ def load_model_data(
         "contract_report",
         "parity_1token",
         "qk_norm_backward_parity",
+        "inference_llama_parity",
+        "inference_llama_parity_prefill",
+        "inference_llama_parity_decode",
+        "inference_llama_autopsy",
+        "inference_llama_dump_index",
         "fd_gradients",
         "train_parity_epochs_3",
         "train_parity_epochs_5",
@@ -998,6 +1012,30 @@ def load_model_data(
         "contract_report": model_candidates("contract_report_latest.json") + [V7_REPORT_PATH / "contract_report_latest.json", V7_REPORT_PATH_LEGACY / "contract_report_latest.json"],
         "parity_1token": model_candidates("parity_1token_latest.json") + [V7_REPORT_PATH / "parity_1token_latest.json", V7_REPORT_PATH_LEGACY / "parity_1token_latest.json"],
         "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V7_REPORT_PATH / "qk_norm_backward_parity_latest.json", V7_REPORT_PATH_LEGACY / "qk_norm_backward_parity_latest.json"],
+        "inference_llama_parity": (
+            model_candidates("detailed_parity_analysis_latest.json")
+            + model_candidates("detailed_parity_analysis.json")
+            + model_candidates("llamacpp_parity_latest.json")
+            + model_candidates("llamacpp_parity.json")
+            + [V7_REPORT_PATH / "detailed_parity_analysis_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_latest.json"]
+        ),
+        "inference_llama_parity_prefill": (
+            model_candidates("detailed_parity_analysis_prefill_latest.json")
+            + model_candidates("detailed_parity_analysis_prefill.json")
+            + [V7_REPORT_PATH / "detailed_parity_analysis_prefill_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_prefill_latest.json"]
+        ),
+        "inference_llama_parity_decode": (
+            model_candidates("detailed_parity_analysis_decode_latest.json")
+            + model_candidates("detailed_parity_analysis_decode.json")
+            + [V7_REPORT_PATH / "detailed_parity_analysis_decode_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_decode_latest.json"]
+        ),
+        "inference_llama_autopsy": (
+            model_candidates("parity_autopsy_latest.json")
+            + model_candidates("autopsy_report_latest.json")
+            + model_candidates("autopsy_report.json")
+            + [V7_REPORT_PATH / "parity_autopsy_latest.json", V7_REPORT_PATH_LEGACY / "parity_autopsy_latest.json"]
+        ),
+        "inference_llama_dump_index": model_candidates("llama_parity_dumps/index.json"),
         "fd_gradients": model_candidates("fd_gradients_latest.json") + [V7_REPORT_PATH / "fd_gradients_latest.json", V7_REPORT_PATH_LEGACY / "fd_gradients_latest.json"],
         "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_3_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_3_latest.json"],
         "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_5_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_5_latest.json"],
@@ -1181,6 +1219,20 @@ def load_model_data(
                 "sources": {"summary": "runtime_parity", "run_dir": str(run_dir) if run_dir is not None else None},
             }
             loaded.append("training_pipeline(runtime)")
+
+    # Some operators keep decode/prefill parity analyses in split JSON files.
+    # Synthesize a combined payload so the viewer can render both together.
+    files = data["files"]
+    if "inference_llama_parity" not in files:
+        parity_prefill = files.get("inference_llama_parity_prefill")
+        parity_decode = files.get("inference_llama_parity_decode")
+        if isinstance(parity_prefill, dict) or isinstance(parity_decode, dict):
+            files["inference_llama_parity"] = {
+                "prefill": parity_prefill if isinstance(parity_prefill, dict) else None,
+                "decode": parity_decode if isinstance(parity_decode, dict) else None,
+                "source": "split_inference_parity",
+            }
+            loaded.append("inference_llama_parity(split_alias)")
 
     # Training-only run directories often lack decode/prefill filenames.
     # Add decode/prefill aliases so shared viewer tabs (Memory/Kernel/Stats)
