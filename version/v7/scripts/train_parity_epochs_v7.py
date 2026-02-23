@@ -457,30 +457,53 @@ def _seed_all(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def _build_batches(total_tokens: int, seq_len: int, vocab: int, seed: int) -> list[Tuple[torch.Tensor, torch.Tensor]]:
+def _build_batches(total_tokens: int, seq_len: int, vocab: int, seed: int) -> list[Tuple[torch.Tensor, torch.Tensor, int]]:
     rng = np.random.default_rng(seed)
-    stream = rng.integers(0, vocab, size=(total_tokens + 1,), dtype=np.int64)
-    batches: list[Tuple[torch.Tensor, torch.Tensor]] = []
-    for i in range(0, total_tokens - seq_len + 1, seq_len):
-        x = torch.from_numpy(stream[i : i + seq_len]).long().view(1, seq_len)
-        y = torch.from_numpy(stream[i + 1 : i + seq_len + 1]).long().view(1, seq_len)
-        batches.append((x, y))
+    total_tokens_i = max(1, int(total_tokens))
+    seq_len_i = max(1, int(seq_len))
+    windows = max(1, int(math.ceil(float(total_tokens_i) / float(seq_len_i))))
+    needed = max(total_tokens_i + 1, windows * seq_len_i + 1, seq_len_i + 1)
+    stream = rng.integers(0, vocab, size=(needed,), dtype=np.int64)
+    batches: list[Tuple[torch.Tensor, torch.Tensor, int]] = []
+    for w in range(windows):
+        i = w * seq_len_i
+        remaining = total_tokens_i - i
+        valid_tokens = seq_len_i if remaining >= seq_len_i else max(1, remaining)
+        x = torch.from_numpy(stream[i : i + seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[i + 1 : i + seq_len_i + 1]).long().view(1, seq_len_i)
+        if int(x.shape[1]) == seq_len_i and int(y.shape[1]) == seq_len_i:
+            batches.append((x, y, int(valid_tokens)))
+    if not batches:
+        x = torch.from_numpy(stream[:seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[1 : seq_len_i + 1]).long().view(1, seq_len_i)
+        batches.append((x, y, seq_len_i))
     return batches
 
 
-def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: int) -> list[Tuple[torch.Tensor, torch.Tensor]]:
+def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: int) -> list[Tuple[torch.Tensor, torch.Tensor, int]]:
     data = (text or "").encode("utf-8", errors="ignore")
     if len(data) < 2:
         raise ValueError("--train-text must encode to at least 2 bytes")
     ids = [int(b) % int(vocab) for b in data]
-    needed = int(total_tokens) + 1
+    total_tokens_i = max(1, int(total_tokens))
+    seq_len_i = max(1, int(seq_len))
+    windows = max(1, int(math.ceil(float(total_tokens_i) / float(seq_len_i))))
+    needed = max(total_tokens_i + 1, windows * seq_len_i + 1, seq_len_i + 1)
     repeats = (needed + len(ids) - 1) // len(ids)
     stream = np.array((ids * repeats)[:needed], dtype=np.int64)
-    batches: list[Tuple[torch.Tensor, torch.Tensor]] = []
-    for i in range(0, total_tokens - seq_len + 1, seq_len):
-        x = torch.from_numpy(stream[i : i + seq_len]).long().view(1, seq_len)
-        y = torch.from_numpy(stream[i + 1 : i + seq_len + 1]).long().view(1, seq_len)
-        batches.append((x, y))
+    batches: list[Tuple[torch.Tensor, torch.Tensor, int]] = []
+    for w in range(windows):
+        i = w * seq_len_i
+        remaining = total_tokens_i - i
+        valid_tokens = seq_len_i if remaining >= seq_len_i else max(1, remaining)
+        x = torch.from_numpy(stream[i : i + seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[i + 1 : i + seq_len_i + 1]).long().view(1, seq_len_i)
+        if int(x.shape[1]) == seq_len_i and int(y.shape[1]) == seq_len_i:
+            batches.append((x, y, int(valid_tokens)))
+    if not batches:
+        x = torch.from_numpy(stream[:seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[1 : seq_len_i + 1]).long().view(1, seq_len_i)
+        batches.append((x, y, seq_len_i))
     return batches
 
 
@@ -1752,12 +1775,14 @@ def run_training_parity(
 
     for _epoch in range(epochs):
         epoch_step_start = int(step_count)
-        for x, y in batches:
-            targets = y.reshape(-1)
-            window_samples.append((x.detach().clone(), targets.detach().clone()))
+        for x, y, valid_tokens in batches:
+            vt = max(1, min(int(valid_tokens), int(x.shape[1]), int(y.shape[1])))
+            x_valid = x[:, :vt]
+            targets = y[:, :vt].reshape(-1)
+            window_samples.append((x_valid.detach().clone(), targets.detach().clone()))
 
             t_ck_fwd_0 = time.perf_counter()
-            logits_ck = model_ck(x)
+            logits_ck = model_ck(x_valid)
             if _is_c_loss_backend(ck_loss_backend):
                 loss_ck = c_cross_entropy(
                     logits_ck,
@@ -1770,7 +1795,7 @@ def run_training_parity(
             t_ck_fwd_1 = time.perf_counter()
 
             t_t_fwd_0 = time.perf_counter()
-            logits_t = model_torch(x)
+            logits_t = model_torch(x_valid)
             loss_t = F.cross_entropy(logits_t, targets, reduction="mean")
             logit_diff = float((logits_ck.detach() - logits_t.detach()).abs().max().item())
             t_t_fwd_1 = time.perf_counter()
@@ -1787,7 +1812,7 @@ def run_training_parity(
             (loss_t / grad_accum).backward()
             t_t_bwd_1 = time.perf_counter()
 
-            tokens_here = int(x.numel())
+            tokens_here = int(vt)
             processed_tokens += tokens_here
             micro_count += 1
             win_micro += 1

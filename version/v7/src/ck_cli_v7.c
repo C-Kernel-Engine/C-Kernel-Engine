@@ -1809,6 +1809,7 @@ typedef struct {
     void (*ck_train_free)(void);
     int (*ck_train_init)(const float *bump, const int *manifest_sizes, int num_params);
     int (*ck_train_step)(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr);
+    int (*ck_train_step_ex)(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr);
     int (*ck_train_flush_optimizer)(float lr);
     int (*ck_train_memory_diagnostic)(const float *oracle_acts, const float *oracle_grads, float tolerance);
     int (*ck_train_get_accum_steps)(void);
@@ -2025,6 +2026,7 @@ static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
     api->ck_train_free = (void(*)(void))dlsym(api->handle, "ck_train_free");
     api->ck_train_init = (int(*)(const float*, const int*, int))dlsym(api->handle, "ck_train_init");
     api->ck_train_step = (int(*)(const int32_t*, const int32_t*, float*, float))dlsym(api->handle, "ck_train_step");
+    api->ck_train_step_ex = (int(*)(const int32_t*, const int32_t*, int, float*, float))dlsym(api->handle, "ck_train_step_ex");
     api->ck_train_flush_optimizer = (int(*)(float))dlsym(api->handle, "ck_train_flush_optimizer");
     api->ck_train_memory_diagnostic = (int(*)(const float*, const float*, float))dlsym(api->handle, "ck_train_memory_diagnostic");
     api->ck_train_get_accum_steps = (int(*)(void))dlsym(api->handle, "ck_train_get_accum_steps");
@@ -2869,9 +2871,23 @@ static int cmd_train_subcommand(int argc, char **argv) {
     }
     for (int i = 0; i < needed_stream; i++) stream[i] = tokens[i % token_count];
 
+    const int supports_step_ex = (api.ck_train_step_ex != NULL);
     int micro_per_epoch = 0;
-    for (int i = 0; i <= (opt.total_tokens - opt.seq_len); i += opt.seq_len) micro_per_epoch++;
-    if (micro_per_epoch <= 0) micro_per_epoch = 1;
+    if (supports_step_ex) {
+        micro_per_epoch = (opt.total_tokens + opt.seq_len - 1) / opt.seq_len;
+        if (micro_per_epoch <= 0) micro_per_epoch = 1;
+    } else {
+        for (int i = 0; i <= (opt.total_tokens - opt.seq_len); i += opt.seq_len) micro_per_epoch++;
+        if (micro_per_epoch <= 0) micro_per_epoch = 1;
+        if ((opt.total_tokens % opt.seq_len) != 0) {
+            fprintf(
+                stderr,
+                "train: runtime lacks ck_train_step_ex; dropping tail tokens (%d mod %d).\n",
+                opt.total_tokens,
+                opt.seq_len
+            );
+        }
+    }
     int total_steps = opt.epochs * micro_per_epoch;
     float *losses = (float*)calloc((size_t)total_steps, sizeof(float));
     if (!losses) {
@@ -2951,6 +2967,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
     int step_idx = 0;
     float global_min_loss = INFINITY;
     int global_min_step = 0;
+    int done_tokens_total = 0;
     for (int e = 0; e < opt.epochs; e++) {
         double epoch_loss_sum = 0.0;
         int epoch_steps = 0;
@@ -2961,10 +2978,15 @@ static int cmd_train_subcommand(int argc, char **argv) {
             int pos = (micro_per_epoch == 1) ? 0 : (b * opt.seq_len);
             const int32_t *x = &stream[pos];
             const int32_t *y = &stream[pos + 1];
+            int remaining = opt.total_tokens - pos;
+            int valid_tokens = remaining > opt.seq_len ? opt.seq_len : remaining;
+            if (valid_tokens < 1) valid_tokens = 1;
             float loss = 0.0f;
             int this_step = step_idx;
             double step_t0 = monotonic_ms();
-            int src = api.ck_train_step(x, y, &loss, opt.lr);
+            int src = supports_step_ex
+                ? api.ck_train_step_ex(x, y, valid_tokens, &loss, opt.lr)
+                : api.ck_train_step(x, y, &loss, opt.lr);
             double step_t1 = monotonic_ms();
             if (src < 0) {
                 fprintf(stderr, "ck_train_step failed at step %d: %d\n", step_idx + 1, src);
@@ -3015,9 +3037,10 @@ static int cmd_train_subcommand(int argc, char **argv) {
                 global_min_step = this_step + 1;
             }
             int done_steps = this_step + 1;
+            done_tokens_total += valid_tokens;
             if (opt.verbose || (done_steps % step_log_every == 0) || done_steps == total_steps) {
                 double elapsed_ms = monotonic_ms() - t0;
-                int done_tokens = done_steps * opt.seq_len;
+                int done_tokens = done_tokens_total;
                 double tok_s = (elapsed_ms > 0.0) ? ((double)done_tokens / (elapsed_ms / 1000.0)) : 0.0;
                 double ppl = exp(fmin((double)loss, 20.0));
                 double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
@@ -3067,7 +3090,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
     double t1 = monotonic_ms();
     double elapsed_ms = t1 - t0;
 
-    int processed_tokens = total_steps * opt.seq_len;
+    int processed_tokens = done_tokens_total;
     double sum_step_ms = 0.0;
     double sum_fwd_ms = 0.0;
     double sum_bwd_ms = 0.0;
