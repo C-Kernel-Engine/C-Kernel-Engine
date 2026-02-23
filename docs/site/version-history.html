@@ -961,6 +961,8 @@
       min-width: 80px;
       text-align: center;
     }
+    .version-badge.v16 { background: #16a085; color: white; }
+    .version-badge.v15 { background: #34495e; color: white; }
     .version-badge.v14 { background: #9b59b6; color: white; }
     .version-badge.v13 { background: #e74c3c; color: white; }
     .version-badge.v12 { background: #3498db; color: white; }
@@ -1124,6 +1126,18 @@
       <div class="arch-node-label">Audio Train</div>
       <div class="arch-node-dot"></div>
     </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v15">v15</div>
+      <div class="arch-node-label">Embedded Compat</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v16">v16</div>
+      <div class="arch-node-label">LLM+Vision Ctrl</div>
+      <div class="arch-node-dot"></div>
+    </div>
   </div>
 
   <style>
@@ -1173,6 +1187,8 @@
     .arch-node-badge.arch-v11 { background: #1abc9c; color: white; }
     .arch-node-badge.arch-v13 { background: #e74c3c; color: white; }
     .arch-node-badge.arch-v14 { background: #9b59b6; color: white; }
+    .arch-node-badge.arch-v15 { background: #34495e; color: white; }
+    .arch-node-badge.arch-v16 { background: #16a085; color: white; }
     .arch-node-label {
       font-size: 0.75rem;
       color: var(--text-muted);
@@ -1727,6 +1743,20 @@
         <td>v13.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
+      <tr>
+        <td><strong>v15.0</strong></td>
+        <td>Embedded AI Inference</td>
+        <td>Bring LLM/AI inference to constrained flight-control and robotics hardware with deterministic runtime contracts and portable HAL integration</td>
+        <td>v1-v14</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v16.0</strong></td>
+        <td>LLM + Vision Policy Integration</td>
+        <td>Integrate embedded LLM + vision policy outputs into real-time control loops and validate end-to-end autonomy behavior on robotics-class systems</td>
+        <td>v15.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
     </tbody>
   </table>
 
@@ -1772,6 +1802,79 @@
       </div>
     </div>
   </div>
+
+  <h2>Embedded Roadmap Arc (v15 -> v16)</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+    v1-v14 expands model/training architecture options first; v15 then lands embedded deployment targets with hard realtime constraints, and v16 scales policy-level autonomy integration.
+  </p>
+
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>v15 Component</th>
+        <th>Target</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Memory footprint</strong></td>
+        <td><code>&lt;= 512KB</code> runtime core</td>
+        <td>Sub-512KB inference/runtime core for MCU-class deployment (model weights budget tracked separately).</td>
+      </tr>
+      <tr>
+        <td><strong>Latency targets</strong></td>
+        <td><code>&lt; 10ms</code> control-inference step</td>
+        <td>Cortex-M baseline loop target for control inference; higher-throughput token targets tracked for Cortex-A/NPU tiers.</td>
+      </tr>
+      <tr>
+        <td><strong>Determinism</strong></td>
+        <td>WCET + jitter budgets</td>
+        <td>Worst-case execution-time guarantees and bounded jitter suitable for real-time control loops.</td>
+      </tr>
+      <tr>
+        <td><strong>HAL abstraction</strong></td>
+        <td>Portable I/O interfaces</td>
+        <td>Unified hooks for IMUs, motor control (PWM), and sensor buses (I2C/SPI/UART/CAN).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>v15.0 Timeline (Q2-Q4 2026)</h3>
+  <ul class="milestone-list">
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>Phase 1:</strong> Core runtime with deterministic memory and loop contracts.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>Phase 2:</strong> ARM Cortex-M4/M7 baseline (STM32 and NXP target track).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>Phase 3:</strong> Sensor/actuator HAL hooks (IMU, motor PWM, serial buses).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>Phase 4:</strong> Benchmarks for memory, latency, and control quality vs cloud/offboard baselines.</span>
+    </li>
+  </ul>
+
+  <h3>v16 Timeline (2027+)</h3>
+  <ul class="milestone-list">
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Embedded LLM + vision multimodal policy execution.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Policy adapters tied into real-time control loops.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Field validation for drones and broader robotics deployments.</span>
+    </li>
+  </ul>
 
   <h2>v7 PR Progress (As of 2026-02-15)</h2>
   <p style="color: var(--text-secondary); margin-bottom: 1rem;">
@@ -1950,6 +2053,10 @@
       </li>
       <li class="milestone">
         <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Capability-first sequencing: v1-v14 expands architecture/training options before v15 embedded hardening</span>
+      </li>
+      <li class="milestone">
+        <span class="milestone-icon done">✓</span>
         <span class="milestone-text">Graph-based = easy optimization passes, validation, debugging</span>
       </li>
     </ul>
@@ -1963,6 +2070,10 @@
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
         <span class="milestone-text"><strong>Kernel Fusion:</strong> Every version expands fusion patterns</span>
+      </li>
+      <li class="milestone">
+        <span class="milestone-icon planned">○</span>
+        <span class="milestone-text"><strong>No Premature Optimization:</strong> Explore fast-moving architectures first, then harden for embedded constraints</span>
       </li>
       <li class="milestone">
         <span class="milestone-icon planned">○</span>
@@ -1987,6 +2098,8 @@
     <li><strong>v10.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
     <li><strong>v11.x:</strong> Vision encoding (ViT)</li>
     <li><strong>v13.x:</strong> Audio encoding (Whisper/Conformer)</li>
+    <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
+    <li><strong>v16.x:</strong> LLM + vision policy integration for realtime autonomy loops</li>
   </ul>
 
   <div class="alert alert-info" style="margin-top: 1rem;">
@@ -2027,7 +2140,9 @@ const versionData = {
     { major: 11, minor: 0, phase: "Vision Encoder", planned: true },
     { major: 12, minor: 0, phase: "Vision Training", planned: true },
     { major: 13, minor: 0, phase: "Audio Encoder", planned: true },
-    { major: 14, minor: 0, phase: "Audio Training", planned: true }
+    { major: 14, minor: 0, phase: "Audio Training", planned: true },
+    { major: 15, minor: 0, phase: "Embedded AI Inference", planned: true },
+    { major: 16, minor: 0, phase: "LLM + Vision Policy Integration", planned: true }
   ]
 };
 
