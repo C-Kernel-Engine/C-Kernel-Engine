@@ -1371,6 +1371,20 @@ else
 fi</pre>
     </div>
     <p class="mini-note">Important: use <code>$HOME/.cache/...</code>, not <code>/.cache/...</code>. These vars are exported for later Python steps; if you open a new terminal, re-run Step 0 first. The repo includes a bundled demo file at <code>version/v7/data/svg_assets_train.txt</code>.</p>
+    <p style="margin: 0.65rem 0 0.35rem;"><strong>Open Run Hub (all runs in one place):</strong></p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Generate + open consolidated run dashboard for ~/.cache/ck-engine-v7/models
+python3 version/v7/tools/open_ir_hub.py --open
+
+# Optional explicit paths
+# python3 version/v7/tools/open_ir_hub.py \
+#   --models-root "$HOME/.cache/ck-engine-v7/models" \
+#   --output "$HOME/.cache/ck-engine-v7/models/ir_hub.html" \
+#   --index-out "$HOME/.cache/ck-engine-v7/models/runs_hub_index.json" \
+#   --open</pre>
+    </div>
+    <p class="mini-note">Use Run Hub as the parent operator view, then drill into each run's <code>ir_report.html</code>.</p>
 </div>
 
 <h2 id="step-0-clean-start">Step 0.1: Clean Start (Optional)</h2>
@@ -2442,32 +2456,53 @@ xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 ||
 </div>
 
 <div class="card card-green">
-    <h3 style="margin-top: 0;">Phase 2: Make It Better (Quality Tuning)</h3>
-    <p style="margin-bottom: 0.4rem;">For small SVG corpora, increase tokenizer capacity and sequence window before adding complex tricks.</p>
+    <h3 style="margin-top: 0;">Phase 2: Expand Data + Continue From Latest Checkpoint (same RUN)</h3>
+    <p style="margin-bottom: 0.4rem;">If Phase 1 converges but outputs are still brittle, expand corpus coverage and continue training from your latest checkpoint in the same run directory.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>RUN2=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_phase2
-mkdir -p "$RUN2"
+<pre># 1) Expand dataset (Stage A data + richer docs SVG corpus), keep ASCII + one-row-per-svg.
+STAGE_B_SOURCE="$DATA_DIR/svg_assets_docs_ascii.txt"
+RESUME_DATA="$RUN/svg_resume_stageb_mix.txt"
 
+if [ ! -s "$STAGE_B_SOURCE" ]; then
+  echo "[ERROR] Missing $STAGE_B_SOURCE"
+  echo "Run Step 0.55 first to build the larger docs corpus."
+else
+  { cat "$DATA_TXT"; cat "$STAGE_B_SOURCE"; } \
+    | sed '/^[[:space:]]*$/d' \
+    | awk 'length($0) <= 4096' \
+    | sort -u > "$RESUME_DATA"
+
+  python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+    --input "$RESUME_DATA" \
+    --output "$RESUME_DATA" \
+    --input-format text \
+    --ascii-map-common \
+    --ascii-mode xml_escape \
+    --svg-only
+
+  DATA_TXT="$RESUME_DATA"
+fi
+
+# 2) Continue from latest checkpoint in SAME run (no re-init).
 .venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
-  --run "$RUN2" \
-  --init-if-missing \
-  --init xavier_uniform \
+  --run "$RUN" \
+  --resume-latest-checkpoint \
   --template qwen3 \
   --curriculum-stage stage_b \
   --tokenizer ascii_bpe \
   --require-svg-rows \
   --strict-data-gates \
-  --roundtrip-max-lines 1024 --roundtrip-sample-limit 16 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
   --data "$DATA_TXT" \
-  --vocab-size 640 --bpe-vocab-size 640 \
+  --vocab-size 320 --bpe-vocab-size 320 \
   --layers 24 --embed-dim 64 --hidden-dim 128 \
-  --epochs 4 --seq-len 96 --total-tokens 1200000 \
+  --epochs 1 --seq-len 128 --total-tokens 1200000 \
   --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
-  --train-driver ck_cli --ck-cli-log-every 400 \
-  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_phase2_latest.json</pre>
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_assets_bpe_pipeline_l24_resume_stageb_latest.json</pre>
     </div>
-    <p class="mini-note">Typical improvement from Phase 1 -> Phase 2: fewer malformed tails and better tag closure consistency.</p>
+    <p class="mini-note">Keep vocab/dims aligned with the existing run when resuming. If you want a larger vocab (for example 640 instead of 320), start a fresh run directory and re-init.</p>
 </div>
 
 <div class="card card-blue">
@@ -2895,7 +2930,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-22</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-23</p>
             </div>
         </div>
     </footer>
