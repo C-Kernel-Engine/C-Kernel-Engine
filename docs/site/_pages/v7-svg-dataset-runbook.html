@@ -1,0 +1,431 @@
+<!-- TITLE: v7 SVG Dataset Runbook -->
+<!-- NAV: quickstart -->
+
+<style>
+.dataset-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+}
+.dataset-hero-card {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(145deg, rgba(255,180,0,0.1), rgba(7,173,248,0.08));
+}
+.dataset-hero-card h2 {
+    margin-top: 0;
+}
+.dataset-hero-card h2::before {
+    display: none;
+}
+.dataset-hero-svg {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.5rem;
+    background: var(--dark-card);
+}
+
+.cmd-block {
+    position: relative;
+}
+.cmd-block pre {
+    margin-top: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+.copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-45%);
+    border: 1px solid var(--grey-light);
+    background: var(--dark-lighter);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    color: var(--white);
+    border-color: var(--orange);
+}
+
+.mini-note {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 920px) {
+    .dataset-hero {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<h1>v7 SVG Dataset Generation Runbook</h1>
+
+<p>Operator-focused runbook to build clean SVG training corpora from this repo, split progression into pretrain and midtrain data, and hand off directly into v7 training.</p>
+
+<div class="dataset-hero">
+    <div class="dataset-hero-card">
+        <h2>What this page covers</h2>
+        <p><strong>Stage A (pretrain):</strong> syntax + closure stability on strict ASCII SVG rows.</p>
+        <p><strong>Stage B (midtrain):</strong> richer composition from docs assets and continuation training from Stage A checkpoint.</p>
+        <p><strong>Source of truth:</strong> <code>docs/site/assets/*.svg</code> + generated synthetic rows in <code>version/v7/data</code>.</p>
+    </div>
+    <div class="dataset-hero-svg">
+        <svg viewBox="0 0 760 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SVG dataset runbook flow" font-family="Inter,system-ui,sans-serif">
+            <defs>
+                <marker id="a1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#ffb400"/>
+                </marker>
+                <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#47b475"/>
+                </marker>
+            </defs>
+            <rect width="760" height="240" rx="10" fill="#181e28"/>
+            <text x="380" y="22" fill="#ffb400" text-anchor="middle" font-size="12" font-weight="700">Dataset Pipeline: Stage A -> Stage B</text>
+
+            <rect x="26" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#07adf866"/>
+            <text x="104" y="71" fill="#8cb4ff" text-anchor="middle" font-size="10">docs/site/assets/*.svg</text>
+            <line x1="184" y1="67" x2="204" y2="67" stroke="#ffb400" stroke-width="1.5" marker-end="url(#a1)"/>
+
+            <rect x="206" y="50" width="166" height="34" rx="7" fill="#1e2738" stroke="#ffb40066"/>
+            <text x="289" y="71" fill="#ffd58a" text-anchor="middle" font-size="10">ASCII cleanup + svg-only gate</text>
+            <line x1="374" y1="67" x2="394" y2="67" stroke="#ffb400" stroke-width="1.5" marker-end="url(#a1)"/>
+
+            <rect x="396" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#47b47566"/>
+            <text x="474" y="71" fill="#9ae8bc" text-anchor="middle" font-size="10">Stage A dataset</text>
+            <line x1="554" y1="67" x2="574" y2="67" stroke="#47b475" stroke-width="1.5" marker-end="url(#a2)"/>
+
+            <rect x="576" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#47b47566"/>
+            <text x="654" y="71" fill="#9ae8bc" text-anchor="middle" font-size="10">train_data_pipeline_v7.py</text>
+
+            <rect x="26" y="120" width="220" height="90" rx="8" fill="#1a2818" stroke="#47b47544"/>
+            <text x="136" y="143" fill="#47b475" text-anchor="middle" font-size="11" font-weight="700">Stage A (pretrain)</text>
+            <text x="136" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">Simple forms + bridge primitives</text>
+            <text x="136" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">Goal: syntax closure + stability</text>
+            <text x="136" y="196" fill="#667" text-anchor="middle" font-size="8">curriculum-stage stage_a</text>
+
+            <rect x="270" y="120" width="220" height="90" rx="8" fill="#0f2530" stroke="#07adf844"/>
+            <text x="380" y="143" fill="#07adf8" text-anchor="middle" font-size="11" font-weight="700">Stage B (midtrain)</text>
+            <text x="380" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">Richer docs SVG composition</text>
+            <text x="380" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">Resume from latest checkpoint</text>
+            <text x="380" y="196" fill="#667" text-anchor="middle" font-size="8">curriculum-stage stage_b</text>
+
+            <rect x="514" y="120" width="220" height="90" rx="8" fill="#1e2738" stroke="#ffb40044"/>
+            <text x="624" y="143" fill="#ffb400" text-anchor="middle" font-size="11" font-weight="700">Operator validation</text>
+            <text x="624" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">dataset_qc + roundtrip + profile</text>
+            <text x="624" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">training_pipeline + ir_report</text>
+            <text x="624" y="196" fill="#667" text-anchor="middle" font-size="8">Data Lab + Stage Flow tabs</text>
+        </svg>
+    </div>
+</div>
+
+<nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+        <li><a href="#step-0">Step 0: Paths and Environment</a></li>
+        <li><a href="#step-1">Step 1: Baseline ASCII SVG Preparation (0.5)</a></li>
+        <li><a href="#step-2">Step 2: Scale Corpus from Docs Assets (0.55)</a></li>
+        <li><a href="#step-3">Step 3: Stage-A Bridge Pack (0.56)</a></li>
+        <li><a href="#step-4">Step 4: Dataset Validation and Tokenizer Gate</a></li>
+        <li><a href="#step-5">Step 5: Stage A Pretraining Run</a></li>
+        <li><a href="#step-6">Step 6: Stage B Midtraining Resume Run</a></li>
+        <li><a href="#step-7">Step 7: Visualizer and Artifacts</a></li>
+    </ul>
+</nav>
+
+<h2 id="step-0">Step 0: Paths and Environment</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Use one canonical run path and data directory so artifacts and IR visualizer remain aligned.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>export ROOT=/home/antshiv/Workspace/C-Kernel-Engine
+export RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_dataset_run
+export DATA_DIR=$ROOT/version/v7/data
+export DATA_TXT=$DATA_DIR/svg_assets_train.txt
+
+mkdir -p "$RUN" "$DATA_DIR"
+echo "[OK] RUN=$RUN"
+echo "[OK] DATA_DIR=$DATA_DIR"
+echo "[OK] DATA_TXT=$DATA_TXT"</pre>
+    </div>
+</div>
+
+<h2 id="step-1">Step 1: Baseline ASCII SVG Preparation (0.5)</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Fast baseline path: keep one SVG per line, enforce ASCII bytes, and reject non-SVG rows.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Fast path bundled dataset
+if [ ! -s "$DATA_TXT" ]; then
+  echo "[ERROR] Missing bundled dataset: $DATA_TXT"
+  exit 1
+fi
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$DATA_TXT" \
+  --output "$DATA_TXT" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+wc -l -c "$DATA_TXT"
+head -n 3 "$DATA_TXT"</pre>
+    </div>
+    <p class="mini-note">This is the minimum clean dataset gate for Stage A.</p>
+</div>
+
+<h2 id="step-2">Step 2: Scale Corpus from Docs Assets (0.55)</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;">Build larger corpora from <code>docs/site/assets/*.svg</code> and synthetic rows, then promote a strict ASCII merged file for training.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>ASSET_UTF8="$DATA_DIR/svg_assets_docs_utf8.txt"
+ASSET_UTF8_MANIFEST="$DATA_DIR/svg_assets_docs_utf8_manifest.json"
+MAP_TSV="$DATA_DIR/svg_utf8_to_ascii_table.tsv"
+MAP_JSON="$DATA_DIR/svg_utf8_to_ascii_table.json"
+ASSET_ASCII="$DATA_DIR/svg_assets_docs_ascii.txt"
+ASSET_MANIFEST="$DATA_DIR/svg_assets_docs_ascii_manifest.json"
+SYN_PREFIX="svg_instruction_aug"
+SYN_SVG="$DATA_DIR/${SYN_PREFIX}_svg_train.txt"
+DATA_TXT_ASCII="$DATA_DIR/svg_assets_train_scaled_ascii.txt"
+TMP_ASCII="$DATA_DIR/svg_assets_train_scaled_ascii.tmp.txt"
+
+python3 version/v7/scripts/build_svg_corpus_from_assets_v7.py \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --output "$ASSET_UTF8" \
+  --manifest "$ASSET_UTF8_MANIFEST" \
+  --ascii-mode none \
+  --no-dedupe
+
+python3 version/v7/scripts/generate_utf8_ascii_map_report_v7.py \
+  --input "$ASSET_UTF8" \
+  --tsv-out "$MAP_TSV" \
+  --json-out "$MAP_JSON"
+
+python3 version/v7/scripts/build_svg_corpus_from_assets_v7.py \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --output "$ASSET_ASCII" \
+  --manifest "$ASSET_MANIFEST" \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --no-dedupe
+
+python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \
+  --out-dir "$DATA_DIR" \
+  --prefix "$SYN_PREFIX" \
+  --num-samples 20000 \
+  --holdout-ratio 0.10 \
+  --seed 42
+
+{ cat "$ASSET_ASCII"; cat "$SYN_SVG"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | shuf > "$TMP_ASCII"
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$TMP_ASCII" \
+  --output "$DATA_TXT_ASCII" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$DATA_TXT_ASCII"
+echo "[OK] DATA_TXT=$DATA_TXT"
+wc -l -c "$ASSET_UTF8" "$ASSET_ASCII" "$SYN_SVG" "$DATA_TXT"</pre>
+    </div>
+</div>
+
+<h2 id="step-3">Step 3: Stage-A Bridge Pack (0.56)</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Inject a small syntax bridge so Stage A includes core Stage B primitives (<code>g</code>, <code>defs</code>, gradients, markers, transforms, filters).</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>STAGE_B_SOURCE="${ASSET_ASCII:-$DATA_DIR/svg_assets_docs_ascii.txt}"
+BRIDGE_TXT="$DATA_DIR/svg_stage_a_bridge_small.txt"
+BRIDGE_MANIFEST="$DATA_DIR/svg_stage_a_bridge_small_manifest.json"
+STAGE_A_PLUS="$DATA_DIR/svg_stage_a_plus_bridge_small.txt"
+
+python3 version/v7/scripts/build_stage_a_bridge_svg_v7.py \
+  --stage-a "$DATA_TXT" \
+  --stage-b "$STAGE_B_SOURCE" \
+  --out "$BRIDGE_TXT" \
+  --manifest "$BRIDGE_MANIFEST" \
+  --per-feature-cap 4 \
+  --max-total 48 \
+  --seed 42
+
+{ cat "$DATA_TXT"; cat "$BRIDGE_TXT"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | shuf > "$STAGE_A_PLUS"
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$STAGE_A_PLUS" \
+  --output "$STAGE_A_PLUS" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$STAGE_A_PLUS"
+echo "[OK] Stage-A dataset with bridge: $DATA_TXT"
+wc -l "$DATA_TXT"</pre>
+    </div>
+</div>
+
+<h2 id="step-4">Step 4: Dataset Validation and Tokenizer Gate</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.4rem;">Run prepare-only tokenizer build and strict roundtrip gate on the same run path.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --curriculum-stage stage_a \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 2 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 8 --total-tokens 64 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --prepare-only \
+  --json-out "$RUN/train_prepare_stage_a.json"
+
+.venv/bin/python version/v7/scripts/test_ascii_bpe_roundtrip_v7.py \
+  --run "$RUN" \
+  --dataset "$DATA_TXT" \
+  --require-ascii</pre>
+    </div>
+</div>
+
+<h2 id="step-5">Step 5: Stage A Pretraining Run</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Train Stage A from current dataset and write run-scoped telemetry/artifacts.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --template qwen3 \
+  --curriculum-stage stage_a \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 128 --total-tokens 1200000 \
+  --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_stage_a_latest.json</pre>
+    </div>
+</div>
+
+<h2 id="step-6">Step 6: Stage B Midtraining Resume Run</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;">Continue from latest Stage A checkpoint in the same run, using richer docs SVG corpus.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>STAGE_B_SOURCE="$DATA_DIR/svg_assets_docs_ascii.txt"
+RESUME_DATA="$RUN/svg_resume_stageb_mix.txt"
+
+if [ ! -s "$STAGE_B_SOURCE" ]; then
+  echo "[ERROR] Missing $STAGE_B_SOURCE"
+  echo "Run Step 2 first."
+  exit 1
+fi
+
+{ cat "$DATA_TXT"; cat "$STAGE_B_SOURCE"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | awk 'length($0) <= 4096' \
+  | sort -u > "$RESUME_DATA"
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$RESUME_DATA" \
+  --output "$RESUME_DATA" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$RESUME_DATA"
+
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --resume-latest-checkpoint \
+  --template qwen3 \
+  --curriculum-stage stage_b \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 128 --total-tokens 1200000 \
+  --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_stage_b_resume_latest.json</pre>
+    </div>
+    <p class="mini-note">When resuming, keep model dims and vocab aligned to Stage A. Change dims/vocab only in a new run directory.</p>
+</div>
+
+<h2 id="step-7">Step 7: Visualizer and Artifacts</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;">Generate a run-scoped visualizer and inspect data lineage + stage progression.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/tools/open_ir_visualizer.py \
+  --generate \
+  --run "$RUN" \
+  --html-only \
+  --strict-run-artifacts \
+  --output "$RUN/ir_report.html"
+
+echo "[OK] $RUN/ir_report.html"
+xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
+    </div>
+    <p class="mini-note">In the report, open Training -> Data Lab and check Stage Flow, Dataset Catalog, tokenizer roundtrip, and data artifact paths.</p>
+    <p class="mini-note">For full end-to-end train + parity + inference runbook, continue in <a href="v7-runbook.html">v7-runbook.html</a>.</p>
+</div>
+
+<script>
+(function () {
+    var buttons = document.querySelectorAll('.copy-btn');
+    buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pre = btn.parentElement.querySelector('pre');
+            if (!pre) return;
+            var text = pre.innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                var old = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(function () { btn.textContent = old; }, 1200);
+            }).catch(function () {
+                btn.textContent = 'Copy failed';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+            });
+        });
+    });
+})();
+</script>

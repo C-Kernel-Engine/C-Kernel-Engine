@@ -901,6 +901,7 @@
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -961,6 +962,7 @@
       min-width: 80px;
       text-align: center;
     }
+    .version-badge.v17 { background: #7f8c8d; color: white; }
     .version-badge.v16 { background: #16a085; color: white; }
     .version-badge.v15 { background: #34495e; color: white; }
     .version-badge.v14 { background: #9b59b6; color: white; }
@@ -1135,6 +1137,12 @@
     <div class="arch-arrow-right">→</div>
     <div class="arch-node">
       <div class="arch-node-badge arch-v16">v16</div>
+      <div class="arch-node-label">Mech Interp</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
+      <div class="arch-node-badge arch-v17">v17</div>
       <div class="arch-node-label">LLM+Vision Ctrl</div>
       <div class="arch-node-dot"></div>
     </div>
@@ -1189,6 +1197,7 @@
     .arch-node-badge.arch-v14 { background: #9b59b6; color: white; }
     .arch-node-badge.arch-v15 { background: #34495e; color: white; }
     .arch-node-badge.arch-v16 { background: #16a085; color: white; }
+    .arch-node-badge.arch-v17 { background: #7f8c8d; color: white; }
     .arch-node-label {
       font-size: 0.75rem;
       color: var(--text-muted);
@@ -1752,9 +1761,16 @@
       </tr>
       <tr>
         <td><strong>v16.0</strong></td>
+        <td>Mechanistic Interpretability</td>
+        <td>Train sparse autoencoders on traced activations, stitch features back to IR ops/kernels, and add causal intervention tooling for explainable model behavior</td>
+        <td>v15.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v17.0</strong></td>
         <td>LLM + Vision Policy Integration</td>
         <td>Integrate embedded LLM + vision policy outputs into real-time control loops and validate end-to-end autonomy behavior on robotics-class systems</td>
-        <td>v15.0</td>
+        <td>v16.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
     </tbody>
@@ -1803,9 +1819,9 @@
     </div>
   </div>
 
-  <h2>Embedded Roadmap Arc (v15 -> v16)</h2>
+  <h2>Embedded + Interpretability Arc (v15 -> v17)</h2>
   <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-    v1-v14 expands model/training architecture options first; v15 then lands embedded deployment targets with hard realtime constraints, and v16 scales policy-level autonomy integration.
+    v1-v14 expands model/training architecture options first; v15 lands embedded deployment targets with hard realtime constraints; v16 adds mechanistic interpretability to de-risk policy behavior before v17 autonomy integration.
   </p>
 
   <table class="roadmap-table">
@@ -1860,7 +1876,31 @@
     </li>
   </ul>
 
-  <h3>v16 Timeline (2027+)</h3>
+  <h3>v16.0 Timeline (2027): Mechanistic Interpretability</h3>
+  <ul class="milestone-list">
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>PR16.1:</strong> Activation tap points in lowered IR (decode/prefill) with stable op/layer IDs and deterministic dump contracts.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>PR16.2:</strong> Sparse autoencoder (SAE) training pipeline on traced activations with feature dictionary/version artifacts.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>PR16.3:</strong> IR-to-feature stitching layer to map SAE features to kernel paths, sections, and memory ranges.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>PR16.4:</strong> Causal intervention harness (feature ablate/patch) with impact reports on logits and control-relevant metrics.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text"><strong>PR16.5:</strong> Interpretability artifacts integrated into ir_visualizer and operator reports.</span>
+    </li>
+  </ul>
+
+  <h3>v17 Timeline (2027+)</h3>
   <ul class="milestone-list">
     <li class="milestone">
       <span class="milestone-icon planned">○</span>
@@ -2099,7 +2139,8 @@
     <li><strong>v11.x:</strong> Vision encoding (ViT)</li>
     <li><strong>v13.x:</strong> Audio encoding (Whisper/Conformer)</li>
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
-    <li><strong>v16.x:</strong> LLM + vision policy integration for realtime autonomy loops</li>
+    <li><strong>v16.x:</strong> Mechanistic interpretability (SAE feature learning, IR feature mapping, causal intervention tooling)</li>
+    <li><strong>v17.x:</strong> LLM + vision policy integration for realtime autonomy loops</li>
   </ul>
 
   <div class="alert alert-info" style="margin-top: 1rem;">
@@ -2142,7 +2183,8 @@ const versionData = {
     { major: 13, minor: 0, phase: "Audio Encoder", planned: true },
     { major: 14, minor: 0, phase: "Audio Training", planned: true },
     { major: 15, minor: 0, phase: "Embedded AI Inference", planned: true },
-    { major: 16, minor: 0, phase: "LLM + Vision Policy Integration", planned: true }
+    { major: 16, minor: 0, phase: "Mechanistic Interpretability", planned: true },
+    { major: 17, minor: 0, phase: "LLM + Vision Policy Integration", planned: true }
   ]
 };
 

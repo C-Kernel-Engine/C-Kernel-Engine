@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v7BackpropIR | C-Kernel-Engine</title>
+    <title>v7SVGDatasetRunbook | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -934,843 +934,433 @@
     <main>
 
 <style>
-.v7-test-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  margin: 1rem 0 1.5rem;
-  border: 1px solid var(--grey);
-  border-radius: 10px;
-  overflow: hidden;
-  font-size: 0.83rem;
+.dataset-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
 }
-.v7-test-table th {
-  background: linear-gradient(90deg, rgba(255,180,0,0.18), rgba(7,173,248,0.12));
-  color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-  font-size: 0.7rem;
-  padding: 0.72rem 0.82rem;
-  text-align: left;
-  border-bottom: 1px solid var(--grey);
+.dataset-hero-card {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(145deg, rgba(255,180,0,0.1), rgba(7,173,248,0.08));
 }
-.v7-test-table td {
-  padding: 0.7rem 0.82rem;
-  vertical-align: top;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  color: var(--text-secondary);
-  line-height: 1.45;
+.dataset-hero-card h2 {
+    margin-top: 0;
 }
-.v7-test-table tr:last-child td {
-  border-bottom: none;
+.dataset-hero-card h2::before {
+    display: none;
 }
-.v7-test-table code {
-  font-size: 0.74rem;
+.dataset-hero-svg {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.5rem;
+    background: var(--dark-card);
 }
-.v7-badge {
-  display: inline-block;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.64rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.55px;
-  border: 1px solid transparent;
-  margin-right: 0.35rem;
-  margin-bottom: 0.25rem;
+
+.cmd-block {
+    position: relative;
 }
-.v7-badge.kernel { color: #8ce6b5; border-color: rgba(140,230,181,0.35); background: rgba(140,230,181,0.1); }
-.v7-badge.runtime { color: #8ecfff; border-color: rgba(142,207,255,0.35); background: rgba(142,207,255,0.1); }
-.v7-badge.audit { color: #ffcd7f; border-color: rgba(255,205,127,0.35); background: rgba(255,205,127,0.1); }
-.v7-badge.drift { color: #ff9fa4; border-color: rgba(255,159,164,0.35); background: rgba(255,159,164,0.1); }
-.v7-badge.bundle { color: #d8b8ff; border-color: rgba(216,184,255,0.35); background: rgba(216,184,255,0.12); }
+.cmd-block pre {
+    margin-top: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+.copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-45%);
+    border: 1px solid var(--grey-light);
+    background: var(--dark-lighter);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    color: var(--white);
+    border-color: var(--orange);
+}
+
+.mini-note {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 920px) {
+    .dataset-hero {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
-<h1>v7 Backprop IR Pipeline (Operator Guide)</h1>
+<h1>v7 SVG Dataset Generation Runbook</h1>
 
-<p>This page explains how v7 training works end to end, with a focus on what is generated from IR, what is layout/codegen output, where logic lives, and how to debug correctness quickly.</p>
+<p>Operator-focused runbook to build clean SVG training corpora from this repo, split progression into pretrain and midtrain data, and hand off directly into v7 training.</p>
 
-<div class="alert alert-info">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-  </div>
-  <div>
-    <strong>One important clarification</strong><br>
-    There is no <code>ck_run_v7.c</code>. The operator entrypoint is <code>version/v7/scripts/ck_run_v7.py</code> (and wrapper <code>version/v7/scripts/cks-v7-run</code>). It orchestrates generation and execution of generated C runtimes.
-  </div>
+<div class="dataset-hero">
+    <div class="dataset-hero-card">
+        <h2>What this page covers</h2>
+        <p><strong>Stage A (pretrain):</strong> syntax + closure stability on strict ASCII SVG rows.</p>
+        <p><strong>Stage B (midtrain):</strong> richer composition from docs assets and continuation training from Stage A checkpoint.</p>
+        <p><strong>Source of truth:</strong> <code>docs/site/assets/*.svg</code> + generated synthetic rows in <code>version/v7/data</code>.</p>
+    </div>
+    <div class="dataset-hero-svg">
+        <svg viewBox="0 0 760 240" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SVG dataset runbook flow" font-family="Inter,system-ui,sans-serif">
+            <defs>
+                <marker id="a1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#ffb400"/>
+                </marker>
+                <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                    <path d="M0,0 L8,4 L0,8 Z" fill="#47b475"/>
+                </marker>
+            </defs>
+            <rect width="760" height="240" rx="10" fill="#181e28"/>
+            <text x="380" y="22" fill="#ffb400" text-anchor="middle" font-size="12" font-weight="700">Dataset Pipeline: Stage A -> Stage B</text>
+
+            <rect x="26" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#07adf866"/>
+            <text x="104" y="71" fill="#8cb4ff" text-anchor="middle" font-size="10">docs/site/assets/*.svg</text>
+            <line x1="184" y1="67" x2="204" y2="67" stroke="#ffb400" stroke-width="1.5" marker-end="url(#a1)"/>
+
+            <rect x="206" y="50" width="166" height="34" rx="7" fill="#1e2738" stroke="#ffb40066"/>
+            <text x="289" y="71" fill="#ffd58a" text-anchor="middle" font-size="10">ASCII cleanup + svg-only gate</text>
+            <line x1="374" y1="67" x2="394" y2="67" stroke="#ffb400" stroke-width="1.5" marker-end="url(#a1)"/>
+
+            <rect x="396" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#47b47566"/>
+            <text x="474" y="71" fill="#9ae8bc" text-anchor="middle" font-size="10">Stage A dataset</text>
+            <line x1="554" y1="67" x2="574" y2="67" stroke="#47b475" stroke-width="1.5" marker-end="url(#a2)"/>
+
+            <rect x="576" y="50" width="156" height="34" rx="7" fill="#1e2738" stroke="#47b47566"/>
+            <text x="654" y="71" fill="#9ae8bc" text-anchor="middle" font-size="10">train_data_pipeline_v7.py</text>
+
+            <rect x="26" y="120" width="220" height="90" rx="8" fill="#1a2818" stroke="#47b47544"/>
+            <text x="136" y="143" fill="#47b475" text-anchor="middle" font-size="11" font-weight="700">Stage A (pretrain)</text>
+            <text x="136" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">Simple forms + bridge primitives</text>
+            <text x="136" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">Goal: syntax closure + stability</text>
+            <text x="136" y="196" fill="#667" text-anchor="middle" font-size="8">curriculum-stage stage_a</text>
+
+            <rect x="270" y="120" width="220" height="90" rx="8" fill="#0f2530" stroke="#07adf844"/>
+            <text x="380" y="143" fill="#07adf8" text-anchor="middle" font-size="11" font-weight="700">Stage B (midtrain)</text>
+            <text x="380" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">Richer docs SVG composition</text>
+            <text x="380" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">Resume from latest checkpoint</text>
+            <text x="380" y="196" fill="#667" text-anchor="middle" font-size="8">curriculum-stage stage_b</text>
+
+            <rect x="514" y="120" width="220" height="90" rx="8" fill="#1e2738" stroke="#ffb40044"/>
+            <text x="624" y="143" fill="#ffb400" text-anchor="middle" font-size="11" font-weight="700">Operator validation</text>
+            <text x="624" y="162" fill="#b0b0b0" text-anchor="middle" font-size="9">dataset_qc + roundtrip + profile</text>
+            <text x="624" y="178" fill="#b0b0b0" text-anchor="middle" font-size="9">training_pipeline + ir_report</text>
+            <text x="624" y="196" fill="#667" text-anchor="middle" font-size="8">Data Lab + Stage Flow tabs</text>
+        </svg>
+    </div>
 </div>
 
-<div class="img-container svg-viewer" data-title="v7 IR Backprop Stack">
-  <img src="assets/v7-backprop-ir-stack.svg" alt="v7 training flow from init to IR1 to IR2 to layout and codegen">
-</div>
-
-<h2>What Runs in C vs Python</h2>
-
-<table>
-  <tr>
-    <th>Layer</th>
-    <th>Primary Runtime</th>
-    <th>Why It Exists</th>
-    <th>Current Operator Command</th>
-  </tr>
-  <tr>
-    <td>Orchestration and run management</td>
-    <td><strong>Python</strong></td>
-    <td>Build artifacts, launch gates, collect reports, drive strict checks</td>
-    <td><code>cks-v7-run init|train|sanity|parity|profile</code></td>
-  </tr>
-  <tr>
-    <td>Forward and backward kernel math</td>
-    <td><strong>C kernels</strong></td>
-    <td>Deterministic numeric core, SIMD paths, parity-tested primitives</td>
-    <td><code>make test</code>, <code>make v7-gate-train</code></td>
-  </tr>
-  <tr>
-    <td>Generated training runtime</td>
-    <td><strong>C (generated)</strong></td>
-    <td>Dumb emitter executes IR-lowered plan and memory offsets</td>
-    <td><code>generated_train_runtime_v7.c</code>, <code>libtrain.so</code></td>
-  </tr>
-  <tr>
-    <td>Oracle parity and drift localization</td>
-    <td><strong>Python + PyTorch</strong></td>
-    <td>Reference implementation for step-level and slot-level checks</td>
-    <td><code>--backend both</code>, <code>--parity-on</code></td>
-  </tr>
-  <tr>
-    <td>IR report rendering</td>
-    <td><strong>Python + HTML/JS</strong></td>
-    <td>Load run artifacts and present explainable diagnostics</td>
-    <td><code>open_ir_visualizer.py --generate --run ...</code></td>
-  </tr>
-</table>
-
-<h2>Mental Model: What Is Smart and What Is Dumb</h2>
-
-<div class="grid grid-2">
-  <div class="card card-accent">
-    <h3 style="margin-top: 0;">Smart Stages</h3>
+<nav class="toc">
+    <h3>Contents</h3>
     <ul>
-      <li><strong>Template selection</strong>: architecture op sequence and flags</li>
-      <li><strong>IR1</strong>: forward op graph with typed tensors and kernel IDs</li>
-      <li><strong>IR2</strong>: backward synthesis, fanout accumulation, grad edges</li>
-      <li><strong>Layout generation</strong>: contiguous offsets, sections, canary map</li>
-      <li><strong>Validation</strong>: invariants, memory audit, parity, drift checks</li>
+        <li><a href="#step-0">Step 0: Paths and Environment</a></li>
+        <li><a href="#step-1">Step 1: Baseline ASCII SVG Preparation (0.5)</a></li>
+        <li><a href="#step-2">Step 2: Scale Corpus from Docs Assets (0.55)</a></li>
+        <li><a href="#step-3">Step 3: Stage-A Bridge Pack (0.56)</a></li>
+        <li><a href="#step-4">Step 4: Dataset Validation and Tokenizer Gate</a></li>
+        <li><a href="#step-5">Step 5: Stage A Pretraining Run</a></li>
+        <li><a href="#step-6">Step 6: Stage B Midtraining Resume Run</a></li>
+        <li><a href="#step-7">Step 7: Visualizer and Artifacts</a></li>
     </ul>
-  </div>
-  <div class="card">
-    <h3 style="margin-top: 0;">Dumb Stage</h3>
-    <ul>
-      <li><strong>Codegen</strong> only emits what lowered IR and layout already decided</li>
-      <li>No architecture guessing in emitter</li>
-      <li>No hidden model-family conditionals in runtime glue</li>
-      <li>If behavior is wrong, root cause is usually upstream in IR/lowering/layout</li>
-    </ul>
-  </div>
-</div>
+</nav>
 
-<h2>From Init to Train</h2>
-
-<ol>
-  <li><strong>Initialize run</strong>: choose init policy, dimensions, dtype policy, and template.</li>
-  <li><strong>Emit weights</strong>: write <code>weights.bump</code> and <code>weights_manifest.json</code>.</li>
-  <li><strong>Build IR1</strong>: forward graph and typed tensor registry.</li>
-  <li><strong>Lower IR2</strong>: backward graph from IR1 + grad rules, with explicit accumulations.</li>
-  <li><strong>Generate layout</strong>: contiguous memory map with sections and canary ranges.</li>
-  <li><strong>Codegen runtime</strong>: emit train runtime C and compile to <code>libtrain.so</code>.</li>
-  <li><strong>Execute train</strong>: run CK path, optional PyTorch oracle checks, write reports.</li>
-</ol>
-
-<h2>Drift Timeline: Early Schedule Bug to CE Numeric Tightening</h2>
-
-<p>Yes, execution order changed in an important way. The generated train runtime now enforces accumulation-window semantics so optimizer updates only happen at the true boundary of <code>CK_GRAD_ACCUM_STEPS</code> micro-steps.</p>
-
-<div class="img-container svg-viewer" data-title="Grad-Accum Window Schedule">
-  <img src="assets/v7-grad-accum-window.svg" alt="Before and after schedule for gradient accumulation and optimizer boundary">
-</div>
-
-<ul>
-  <li><strong>Before</strong>: optimizer timing could drift relative to the intended accumulation window.</li>
-  <li><strong>Now</strong>: each window does <code>zero_grad</code> once, accumulates grads over micro-steps, then applies one optimizer step at boundary.</li>
-  <li><strong>Impact</strong>: early drift signal (~step 65 in stress) was removed; remaining drift moved to much later horizons and required CE semantic/numeric tightening.</li>
-</ul>
+<h2 id="step-0">Step 0: Paths and Environment</h2>
 
 <div class="card">
-  <h3 style="margin-top: 0;">Current Numeric Status</h3>
-  <ul style="margin-bottom: 0;">
-    <li>Historical baseline showed late drift in full-C stress; CE parity fixes now remove that trigger in the 850-step repro.</li>
-    <li>All three loss backends (<code>c</code>, <code>c_ptref</code>, <code>torch</code>) pass the same deterministic 850-step parity run.</li>
-    <li>Training-side production gates (drift smoke, realistic long-horizon, optimizer parity, FD-grad, replay) are now passing in this validation pass.</li>
-    <li>Interpretation rule: treat generated-runtime parity artifacts (<code>train_runtime_parity_*_latest.json</code>) as release truth; older step-65/step-800 harness failures are historical diagnostics.</li>
-  </ul>
+    <p style="margin-bottom: 0.4rem;">Use one canonical run path and data directory so artifacts and IR visualizer remain aligned.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>export ROOT=/home/antshiv/Workspace/C-Kernel-Engine
+export RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_dataset_run
+export DATA_DIR=$ROOT/version/v7/data
+export DATA_TXT=$DATA_DIR/svg_assets_train.txt
+
+mkdir -p "$RUN" "$DATA_DIR"
+echo "[OK] RUN=$RUN"
+echo "[OK] DATA_DIR=$DATA_DIR"
+echo "[OK] DATA_TXT=$DATA_TXT"</pre>
+    </div>
 </div>
+
+<h2 id="step-1">Step 1: Baseline ASCII SVG Preparation (0.5)</h2>
 
 <div class="card card-accent">
-  <h3 style="margin-top: 0;">Schedule Pseudocode (Expected)</h3>
-  <pre>if g_accum_step == 0: zero_grad()
-forward()
-backward()
-g_accum_step += 1
-if g_accum_step >= CK_GRAD_ACCUM_STEPS:
-    scale_grads(1 / g_accum_step)  # avg over accumulation window
-    optimizer_step()
-    g_accum_step = 0</pre>
+    <p style="margin-bottom: 0.4rem;">Fast baseline path: keep one SVG per line, enforce ASCII bytes, and reject non-SVG rows.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Fast path bundled dataset
+if [ ! -s "$DATA_TXT" ]; then
+  echo "[ERROR] Missing bundled dataset: $DATA_TXT"
+  exit 1
+fi
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$DATA_TXT" \
+  --output "$DATA_TXT" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+wc -l -c "$DATA_TXT"
+head -n 3 "$DATA_TXT"</pre>
+    </div>
+    <p class="mini-note">This is the minimum clean dataset gate for Stage A.</p>
 </div>
+
+<h2 id="step-2">Step 2: Scale Corpus from Docs Assets (0.55)</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;">Build larger corpora from <code>docs/site/assets/*.svg</code> and synthetic rows, then promote a strict ASCII merged file for training.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>ASSET_UTF8="$DATA_DIR/svg_assets_docs_utf8.txt"
+ASSET_UTF8_MANIFEST="$DATA_DIR/svg_assets_docs_utf8_manifest.json"
+MAP_TSV="$DATA_DIR/svg_utf8_to_ascii_table.tsv"
+MAP_JSON="$DATA_DIR/svg_utf8_to_ascii_table.json"
+ASSET_ASCII="$DATA_DIR/svg_assets_docs_ascii.txt"
+ASSET_MANIFEST="$DATA_DIR/svg_assets_docs_ascii_manifest.json"
+SYN_PREFIX="svg_instruction_aug"
+SYN_SVG="$DATA_DIR/${SYN_PREFIX}_svg_train.txt"
+DATA_TXT_ASCII="$DATA_DIR/svg_assets_train_scaled_ascii.txt"
+TMP_ASCII="$DATA_DIR/svg_assets_train_scaled_ascii.tmp.txt"
+
+python3 version/v7/scripts/build_svg_corpus_from_assets_v7.py \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --output "$ASSET_UTF8" \
+  --manifest "$ASSET_UTF8_MANIFEST" \
+  --ascii-mode none \
+  --no-dedupe
+
+python3 version/v7/scripts/generate_utf8_ascii_map_report_v7.py \
+  --input "$ASSET_UTF8" \
+  --tsv-out "$MAP_TSV" \
+  --json-out "$MAP_JSON"
+
+python3 version/v7/scripts/build_svg_corpus_from_assets_v7.py \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --output "$ASSET_ASCII" \
+  --manifest "$ASSET_MANIFEST" \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --no-dedupe
+
+python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \
+  --out-dir "$DATA_DIR" \
+  --prefix "$SYN_PREFIX" \
+  --num-samples 20000 \
+  --holdout-ratio 0.10 \
+  --seed 42
+
+{ cat "$ASSET_ASCII"; cat "$SYN_SVG"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | shuf > "$TMP_ASCII"
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$TMP_ASCII" \
+  --output "$DATA_TXT_ASCII" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$DATA_TXT_ASCII"
+echo "[OK] DATA_TXT=$DATA_TXT"
+wc -l -c "$ASSET_UTF8" "$ASSET_ASCII" "$SYN_SVG" "$DATA_TXT"</pre>
+    </div>
+</div>
+
+<h2 id="step-3">Step 3: Stage-A Bridge Pack (0.56)</h2>
 
 <div class="card">
-  <h3 style="margin-top: 0;">Grad-Accum Math (N vs K)</h3>
-  <p style="margin: 0;">For an exact explanation of CE token normalization (<code>/N</code>) versus accumulation-window normalization (<code>/K</code>), plus CPU effective-batch examples and variable-length caveats, see <a href="v7-grad-accum-windows.html"><code>v7-grad-accum-windows.html</code></a>.</p>
+    <p style="margin-bottom: 0.4rem;">Inject a small syntax bridge so Stage A includes core Stage B primitives (<code>g</code>, <code>defs</code>, gradients, markers, transforms, filters).</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>STAGE_B_SOURCE="${ASSET_ASCII:-$DATA_DIR/svg_assets_docs_ascii.txt}"
+BRIDGE_TXT="$DATA_DIR/svg_stage_a_bridge_small.txt"
+BRIDGE_MANIFEST="$DATA_DIR/svg_stage_a_bridge_small_manifest.json"
+STAGE_A_PLUS="$DATA_DIR/svg_stage_a_plus_bridge_small.txt"
+
+python3 version/v7/scripts/build_stage_a_bridge_svg_v7.py \
+  --stage-a "$DATA_TXT" \
+  --stage-b "$STAGE_B_SOURCE" \
+  --out "$BRIDGE_TXT" \
+  --manifest "$BRIDGE_MANIFEST" \
+  --per-feature-cap 4 \
+  --max-total 48 \
+  --seed 42
+
+{ cat "$DATA_TXT"; cat "$BRIDGE_TXT"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | shuf > "$STAGE_A_PLUS"
+
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$STAGE_A_PLUS" \
+  --output "$STAGE_A_PLUS" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$STAGE_A_PLUS"
+echo "[OK] Stage-A dataset with bridge: $DATA_TXT"
+wc -l "$DATA_TXT"</pre>
+    </div>
 </div>
 
-<div class="card">
-  <h3 style="margin-top: 0;">Cross-Entropy Semantics</h3>
-  <p style="margin: 0;">C cross-entropy uses stable log-sum-exp loss math and PyTorch-aligned index-target mean reduction semantics. For the full CE derivation (<code>p - one_hot</code>), ignore-index denominator details, and long-horizon repro data, read <a href="v7-cross-entropy-parity.html"><code>v7-cross-entropy-parity.html</code></a>.</p>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">Production Readiness Guidance</h3>
-  <p style="margin: 0;">For v7 training backprop, keep production safety enabled (<code>--max-grad-norm</code>, enforced LR guardrails) and retain long-horizon parity gates as blockers. This now gives a production-grade path for the validated v7 harness profile while preserving reproducibility checks.</p>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">Template Flexibility</h3>
-  <p style="margin-top: 0;">You can use built-ins (<code>qwen3</code>, <code>qwen2</code>, <code>gemma3</code>) or a custom template file. If a template op has kernel coverage and bindings, it can be stitched automatically.</p>
-  <pre># Built-in
-version/v7/scripts/cks-v7-run init \
-  --run /tmp/v7_exp1 \
-  --template qwen3 \
-  --init xavier_uniform \
-  --generate-ir --generate-runtime --strict
-
-# Custom template
-version/v7/scripts/cks-v7-run init \
-  --run /tmp/v7_exp_custom \
-  --template my_arch \
-  --template-file /absolute/path/to/my_template.json \
-  --init xavier_uniform \
-  --generate-ir --generate-runtime --strict</pre>
-</div>
-
-<h2>IR1, IR2, Layout, Codegen Responsibilities</h2>
-
-<table>
-  <tr>
-    <th>Stage</th>
-    <th>Input</th>
-    <th>Output</th>
-    <th>Core Responsibility</th>
-  </tr>
-  <tr>
-    <td><strong>IR1 (train-forward)</strong></td>
-    <td>template + manifest + kernel registry + grad rules</td>
-    <td><code>ir1_train_forward.json</code></td>
-    <td>Build forward graph, classify weight vs activation tensors, attach save-for-backward contract</td>
-  </tr>
-  <tr>
-    <td><strong>IR2 (backward)</strong></td>
-    <td>IR1 + grad rules + bindings</td>
-    <td><code>ir2_train_backward.json</code></td>
-    <td>Synthesize backward ops, add gradient fanout accumulation, preserve producer-consumer chain</td>
-  </tr>
-  <tr>
-    <td><strong>Layout + Audit (memory-lowered)</strong></td>
-    <td>IR2 + manifest</td>
-    <td><code>layout_train.json</code>, <code>layout_train_audit.json</code></td>
-    <td>Finalize contiguous offsets, section ownership, canary layout, bounds/overlap validation</td>
-  </tr>
-  <tr>
-    <td><strong>Codegen</strong></td>
-    <td>IR2 + layout</td>
-    <td><code>generated_train_runtime_v7.c</code>, <code>generated_train_runtime_summary_v7.json</code></td>
-    <td>Emit deterministic C calls and memory references only</td>
-  </tr>
-</table>
-
-<h2>Why Train Builder Is Separate From Inference Builder (For Now)</h2>
-
-<ul>
-  <li>Inference IR is decode/prefill-oriented and optimized around quantized runtime contracts.</li>
-  <li>Training IR adds backward-only semantics: grad fanout merges, loss seed ops, optimizer state, clip/update boundaries.</li>
-  <li>Training layout needs persistent regions inference does not own (<code>grad.weight.*</code>, <code>optimizer.m.*</code>, <code>optimizer.v.*</code>).</li>
-  <li>Current policy: keep inference pipeline stable, iterate training pipeline quickly, then unify once parity + diagnostics are robust.</li>
-</ul>
-
-<p>So today: inference uses <code>build_ir_v7.py</code>; training uses <code>build_ir_train_v7.py</code> + <code>lower_ir2_backward_v7.py</code>. Both share IR types and kernel registry contracts.</p>
-
-<h2>How Residual, GQA, and Splits Stitch Backward</h2>
-
-<p>The forward graph can branch. IR2 makes the reverse merge explicit by emitting accumulation ops where gradients meet.</p>
-
-<div class="img-container svg-viewer" data-title="Residual and GQA Backward Routing">
-  <img src="assets/v7-residual-gqa-backward.svg" alt="Forward residual and GQA split with backward gradient accumulation routing">
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">Key Rule</h3>
-  <p style="margin: 0;">If one forward tensor feeds multiple consumers, IR2 inserts explicit gradient accumulation in backward. This is where residual and attention branch merges stay correct.</p>
-</div>
-
-<h2>Memory Layout and Canary Diagnostics</h2>
-
-<p>Training layout is contiguous and sectioned. Canary guards and runtime checks detect out-of-bounds writes and readonly violations.</p>
-
-<div class="img-container svg-viewer" data-title="Training Memory and Canary Map">
-  <img src="assets/v7-train-memory-canary.svg" alt="Contiguous train memory layout with canary guards and diagnostics phases">
-</div>
-
-<table>
-  <tr>
-    <th>Section</th>
-    <th>Examples</th>
-    <th>Written In</th>
-  </tr>
-  <tr>
-    <td>weights</td>
-    <td><code>weight.layer.*</code></td>
-    <td>optimizer step (not forward)</td>
-  </tr>
-  <tr>
-    <td>activations + saved</td>
-    <td><code>act.*</code>, <code>saved.*</code></td>
-    <td>forward</td>
-  </tr>
-  <tr>
-    <td>grad_activations</td>
-    <td><code>grad.act.*</code></td>
-    <td>backward</td>
-  </tr>
-  <tr>
-    <td>grad_weights</td>
-    <td><code>grad.weight.*</code>, <code>tmp.grad.weight.*</code></td>
-    <td>backward</td>
-  </tr>
-  <tr>
-    <td>optimizer state</td>
-    <td>AdamW <code>m</code>, <code>v</code></td>
-    <td>optimizer step</td>
-  </tr>
-  <tr>
-    <td>temporaries + aux</td>
-    <td>scratch, loss buffers, diagnostics</td>
-    <td>multi-phase</td>
-  </tr>
-</table>
-
-<h2>Runbook: End-to-End Commands</h2>
-
-<div class="card card-accent">
-  <h3 style="margin-top: 0;">1) Initialize and generate IR/runtime</h3>
-  <pre>version/v7/scripts/cks-v7-run init \
-  --run /tmp/v7_exp1 \
-  --template qwen3 \
-  --init xavier_uniform \
-  --layers 2 --embed-dim 128 --hidden-dim 256 \
-  --num-heads 8 --num-kv-heads 4 \
-  --generate-ir --generate-runtime --strict</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">2) CK-only training (generated C runtime path)</h3>
-  <pre>version/v7/scripts/cks-v7-run train \
-  --run /tmp/v7_exp1 \
-  --backend ck \
-  --prompt "hello" \
-  --train-epochs 3 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
-  --train-strict</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">3) CK + PyTorch oracle parity</h3>
-  <pre>version/v7/scripts/cks-v7-run train \
-  --run /tmp/v7_exp1 \
-  --backend both \
-  --prompt "hello" \
-  --train-epochs 1 --train-seq-len 16 --train-total-tokens 1024 --train-grad-accum 8 \
-  --parity-on --parity-profile balanced --dump-on-drift --drift-topk 8</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">4) Generate visual report from run directory</h3>
-  <pre>python3 version/v7/tools/open_ir_visualizer.py \
-  --generate --run /tmp/v7_exp1 --html-only</pre>
-  <p style="margin: 0;">Open <code>/tmp/v7_exp1/ir_report.html</code>.</p>
-</div>
-
-<h2 id="v7-train-data-pipeline">New: One-Command Data -> Tokenizer -> Train Pipeline</h2>
-
-<p>For operator workflows, use the pipeline wrapper to avoid manual wiring errors such as missing data files or token/vocab mismatches.</p>
-
-<div class="card card-accent">
-  <h3 style="margin-top: 0;">Byte tokenizer pipeline (with torch reference)</h3>
-  <pre>make v7-train-data-pipeline \
-  RUN=/tmp/v7_pipeline_byte \
-  V7_PIPELINE_TOKENIZER=byte \
-  V7_PIPELINE_WITH_TORCH=1</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">BPE pipeline</h3>
-  <pre>make v7-train-data-pipeline \
-  RUN=/tmp/v7_pipeline_bpe \
-  V7_PIPELINE_TOKENIZER=bpe \
-  V7_PIPELINE_WITH_TORCH=0</pre>
-</div>
-
-<table>
-  <tr>
-    <th>Knob</th>
-    <th>Purpose</th>
-    <th>Typical values</th>
-  </tr>
-  <tr>
-    <td><code>V7_PIPELINE_TOKENIZER</code></td>
-    <td>Select tokenization path</td>
-    <td><code>byte</code>, <code>bpe</code></td>
-  </tr>
-  <tr>
-    <td><code>V7_PIPELINE_EPOCHS</code>, <code>V7_PIPELINE_SEQ_LEN</code>, <code>V7_PIPELINE_TOTAL_TOKENS</code></td>
-    <td>Train budget</td>
-    <td><code>10</code>, <code>32</code>, <code>1024</code></td>
-  </tr>
-  <tr>
-    <td><code>V7_PIPELINE_GRAD_ACCUM</code>, <code>V7_PIPELINE_LR</code></td>
-    <td>Update scale</td>
-    <td><code>1..8</code>, <code>5e-4</code></td>
-  </tr>
-  <tr>
-    <td><code>V7_PIPELINE_OPEN_VIS</code></td>
-    <td>Generate visualizer report automatically</td>
-    <td><code>0</code>, <code>1</code></td>
-  </tr>
-</table>
-
-<div class="alert alert-info">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-  </div>
-  <div>
-    <strong>Safety guard now built in</strong><br>
-    Token-file training now fails fast if token IDs exceed run-dir vocab size. This prevents NaN runs from silent token/vocab mismatch.
-  </div>
-</div>
-
-<h2 id="v7-runtime-stitch-graph">New: Runtime Stitch Graph in IR Visualizer</h2>
-
-<p>The Training tab now includes a function-level runtime graph fed by <code>train_exec_plan.json</code> with explicit stages:</p>
-<ul>
-  <li>forward ops</li>
-  <li>backward ops</li>
-  <li>gradient accumulation ops</li>
-  <li>optimizer/update transition</li>
-</ul>
-
-<div class="card">
-  <h3 style="margin-top: 0;">How to inspect stitching</h3>
-  <ol style="margin-bottom: 0;">
-    <li>Generate report from run-dir: <code>python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_pipeline_byte --html-only</code></li>
-    <li>Open <code>/tmp/v7_pipeline_byte/ir_report.html</code></li>
-    <li>Go to <strong>Training</strong> tab</li>
-    <li>Use <strong>Runtime Stitch</strong> section filters:
-      <code>Stage=forward|backward|accum|optimizer</code> and <code>Layer=all|Lx</code></li>
-    <li>Click a node to inspect dispatch/reduction metadata and phase stitching details</li>
-  </ol>
-</div>
-
-<p>Use this graph when first loss is correct but later updates diverge. It makes boundary mistakes visible at function level without opening generated C manually.</p>
-
-
-<h2>Verification Matrix: Epoch 1 to 10 + Checkpoints + Oracle</h2>
-
-<div class="alert alert-info">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-  </div>
-  <div>
-    <strong>Use <code>.venv/bin/python</code> for strict PyTorch snapshot oracle</strong><br>
-    If you use system <code>python3</code> without torch, training falls back to tiny reference telemetry instead of strict slot-level snapshot checks.
-  </div>
-</div>
-
-<pre># 0) init
-.venv/bin/python version/v7/scripts/ck_run_v7.py init \
-  --run /tmp/v7_oracle_10ep \
-  --init xavier_uniform \
-  --layers 2 --vocab-size 256 --embed-dim 128 --hidden-dim 256 \
-  --num-heads 8 --num-kv-heads 4 --context-len 128 \
-  --generate-ir --generate-runtime --strict
-
-# 1) epoch-1 strict oracle (every step) + replay + periodic checkpoints
-.venv/bin/python version/v7/scripts/ck_run_v7.py train \
-  --run /tmp/v7_oracle_10ep \
-  --backend ck \
-  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
-  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
-  --parity-on --oracle pytorch --parity-profile debug --parity-every 1 \
-  --parity-replay-on-check --train-save-every 4
-
-# 2) epoch-10 sweep strict oracle + replay + checkpoint cadence
-.venv/bin/python version/v7/scripts/ck_run_v7.py train \
-  --run /tmp/v7_oracle_10ep \
-  --backend ck \
-  --train-epochs 10 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
-  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
-  --parity-on --oracle pytorch --parity-profile balanced --parity-every 1 \
-  --parity-replay-on-check --train-save-every 20
-
-# 3) memory verification suite (canary toggle + fault injection + ASan agreement)
-.venv/bin/python version/v7/scripts/ck_run_v7.py train \
-  --run /tmp/v7_oracle_10ep \
-  --backend ck \
-  --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 2 \
-  --train-vocab 256 --train-d-model 64 --train-hidden 128 \
-  --train-verify-memory --train-verify-steps 4</pre>
-
-<table>
-  <tr>
-    <th>Artifact</th>
-    <th>Expected</th>
-    <th>Location</th>
-  </tr>
-  <tr>
-    <td>train summary</td>
-    <td><code>pass_parity: true</code>, strict oracle source + replay checks</td>
-    <td><code>/tmp/v7_oracle_10ep/train_e2e_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>checkpoints</td>
-    <td><code>weights_step_*.bump</code> + per-step manifest</td>
-    <td><code>/tmp/v7_oracle_10ep/checkpoints/</code></td>
-  </tr>
-  <tr>
-    <td>memory verification</td>
-    <td><code>ok: true</code> (toggle diff, intentional +1 catch, ASan agreement, bounds)</td>
-    <td><code>/tmp/v7_oracle_10ep/memory_verification_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>viewer report</td>
-    <td>training tabs populated from run-dir artifacts</td>
-    <td><code>/tmp/v7_oracle_10ep/ir_report.html</code></td>
-  </tr>
-</table>
-
-<h2 id="v7-backprop-parity-suite">Backprop + PyTorch Parity Test Suite</h2>
-
-<p>This is the concrete v7 inventory used to keep backprop parity green. By default, artifacts write to <code>version/v7/.cache/reports/</code> (override with <code>V7_REPORT_DIR</code>).</p>
+<h2 id="step-4">Step 4: Dataset Validation and Tokenizer Gate</h2>
 
 <div class="card card-blue">
-  <h3 style="margin-top: 0;">Canonical Regression Ledger</h3>
-  <p style="margin: 0 0 0.5rem 0;">
-    Use this as the single source of truth for historical failures and fixes so new model architectures do not repeat old bugs:
-  </p>
-  <ul style="margin-bottom: 0;">
-    <li><code>version/v7/reports/REGRESSION_LEDGER.md</code> (human-readable)</li>
-    <li><code>version/v7/reports/REGRESSION_LEDGER.json</code> (IR visualizer/operator-readable)</li>
-  </ul>
+    <p style="margin-bottom: 0.4rem;">Run prepare-only tokenizer build and strict roundtrip gate on the same run path.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --curriculum-stage stage_a \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 2 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 8 --total-tokens 64 \
+  --grad-accum 1 --lr 5e-4 --max-grad-norm 1.0 --seed 42 \
+  --prepare-only \
+  --json-out "$RUN/train_prepare_stage_a.json"
+
+.venv/bin/python version/v7/scripts/test_ascii_bpe_roundtrip_v7.py \
+  --run "$RUN" \
+  --dataset "$DATA_TXT" \
+  --require-ascii</pre>
+    </div>
 </div>
 
-<table class="v7-test-table">
-  <tr>
-    <th>Script</th>
-    <th>Primary Entry</th>
-    <th>What It Verifies</th>
-    <th>Main Artifact</th>
-  </tr>
-  <tr>
-    <td><code>run_parity_1token_v7.py</code></td>
-    <td><span class="v7-badge kernel">kernel</span><code>make v7-parity-1tok</code></td>
-    <td>T=1 parity for RMSNorm (fwd/bwd), SwiGLU (fwd/bwd), CE (loss + dlogits), and QK-norm backward hook.</td>
-    <td><code>parity_1token_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_qk_norm_backward_parity_v7.py</code></td>
-    <td><span class="v7-badge kernel">kernel</span><code>make v7-qk-norm-backward-parity*</code></td>
-    <td>QK-norm backward parity, ISA matrix sweep (scalar/avx/avx2/avx_vnni), and strict no-fallback mode.</td>
-    <td><code>qk_norm_backward_parity*_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_rms_swiglu_backward_parity_v7.py</code></td>
-    <td><span class="v7-badge kernel">kernel</span><code>make v7-rms-swiglu-backward-parity</code></td>
-    <td>RMSNorm backward default+strict paths, SwiGLU exact path, and optional fast-path gate.</td>
-    <td><code>rms_swiglu_backward_parity_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_gemm_backward_parity_v7.py</code></td>
-    <td><span class="v7-badge kernel">kernel</span><code>make v7-kernel-parity-train</code></td>
-    <td>GEMM backward shape-sweep parity for v7 training kernel bindings.</td>
-    <td><code>gemm_backward_shape_sweep_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_optimizer_parity_v7.py</code></td>
-    <td><span class="v7-badge kernel">kernel</span><code>make v7-kernel-parity-train</code></td>
-    <td>Optimizer kernels: <code>adamw_update_f32</code>, <code>gradient_clip_norm_f32</code>, <code>adamw_clip_update_multi_f32</code>, <code>gradient_accumulate_f32</code>.</td>
-    <td><code>optimizer_parity_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_fd_gradients_v7.py</code></td>
-    <td><span class="v7-badge audit">audit</span><code>make v7-grad-fd</code></td>
-    <td>Finite-difference sanity against analytical gradients in the tiny training stack.</td>
-    <td><code>fd_gradients_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_replay_determinism_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make v7-replay</code></td>
-    <td>Deterministic replay across identical training runs (same losses + parameter deltas).</td>
-    <td><code>replay_determinism_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_runtime_replay_accum_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make v7-replay-accum</code></td>
-    <td>Replay-on-check correctness with <code>grad_accum &gt; 1</code>, including accumulation snapshot restoration.</td>
-    <td><code>replay_accum_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>train_parity_epochs_v7.py</code></td>
-    <td><span class="v7-badge drift">drift</span><code>make v7-train-parity-3/5</code> and long-horizon targets</td>
-    <td>Epoch parity, drift smoke, drift localization, and long-horizon CK-vs-PyTorch trajectory checks.</td>
-    <td><code>train_parity_*_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_backprop_plumbing_v7.py</code></td>
-    <td><span class="v7-badge audit">audit</span><code>make v7-backprop-plumbing</code></td>
-    <td>Static IR2/layout/manifest audit: grad coverage, writer coverage, per-layer flow, saved-tensor + layout integrity.</td>
-    <td><code>backprop_plumbing_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>check_backprop_stitch_runtime_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make v7-backprop-stitch-runtime*</code></td>
-    <td>Runtime stitch smoke: manifest-dim wiring, first checked parity step cleanliness, and all checked-step consistency.</td>
-    <td><code>backprop_stitch_runtime*_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>test_bpe_train_parity_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make test-v7-bpe-train-parity</code></td>
-    <td>BPE trainer parity: HF tokenizer JSON vs CK binary tokenizer artifacts on deterministic text probes.</td>
-    <td><code>v7_bpe_train_parity_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>test_svg_overfit_regression_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make test-v7-svg-overfit-regression</code></td>
-    <td>CK runtime vs PyTorch reference overfit regression on deterministic SVG-derived dataset.</td>
-    <td><code>svg_overfit_regression_latest.json</code></td>
-  </tr>
-  <tr>
-    <td><code>ck_run_v7.py</code></td>
-    <td><span class="v7-badge runtime">runtime</span><code>make v7-train-runtime-parity-*</code></td>
-    <td>Generated runtime long-horizon parity checks (stress + realistic) with <code>--parity-on</code>.</td>
-    <td><code>train_runtime_parity_*_latest.json</code></td>
-  </tr>
-</table>
+<h2 id="step-5">Step 5: Stage A Pretraining Run</h2>
 
-<h3>Exhaustive Test-Case Matrix (Backprop + Parity)</h3>
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Train Stage A from current dataset and write run-scoped telemetry/artifacts.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --template qwen3 \
+  --curriculum-stage stage_a \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates --min-valid-svg-rate 0.70 \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 128 --total-tokens 1200000 \
+  --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_stage_a_latest.json</pre>
+    </div>
+</div>
 
-<table class="v7-test-table">
-  <tr>
-    <th>Case Family</th>
-    <th>Exact Command(s)</th>
-    <th>Pass Condition</th>
-    <th>Artifact(s)</th>
-  </tr>
-  <tr>
-    <td>Single-token parity baseline</td>
-    <td><code>make v7-parity-1tok</code></td>
-    <td>All T=1 kernel checks pass under strict tolerances.</td>
-    <td><code>parity_1token_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>QK-norm backward (default + ISA + strict ISA)</td>
-    <td><code>make v7-qk-norm-backward-parity</code><br><code>make v7-qk-norm-backward-parity-isa</code><br><code>make v7-qk-norm-backward-parity-isa-strict</code></td>
-    <td>Parity holds across ISA modes; strict mode fails any fallback mismatch.</td>
-    <td><code>qk_norm_backward_parity_latest.json</code><br><code>qk_norm_backward_parity_isa_latest.json</code><br><code>qk_norm_backward_parity_isa_strict_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>RMSNorm/SwiGLU backward parity</td>
-    <td><code>make v7-rms-swiglu-backward-parity</code></td>
-    <td>RMSNorm default+strict and SwiGLU exact/fast checks all stay within tolerance.</td>
-    <td><code>rms_swiglu_backward_parity_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Kernel parity bundle</td>
-    <td><code>make v7-kernel-parity-train</code></td>
-    <td>Optimizer + QK-norm ISA + RMS/SwiGLU + GEMM-backward sweeps all pass.</td>
-    <td><code>optimizer_parity_latest.json</code><br><code>qk_norm_backward_parity_isa*_latest.json</code><br><code>rms_swiglu_backward_parity_latest.json</code><br><code>gemm_backward_shape_sweep_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Finite-difference gradients</td>
-    <td><code>make v7-grad-fd</code></td>
-    <td>Central-difference numerical grads agree with analytical grads.</td>
-    <td><code>fd_gradients_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Deterministic replay</td>
-    <td><code>make v7-replay</code></td>
-    <td>Two identical runs produce identical replay outputs.</td>
-    <td><code>replay_determinism_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Replay with grad-accum snapshots</td>
-    <td><code>make v7-replay-accum</code></td>
-    <td>Replay-on-check is enabled and accumulation state restores within tolerance.</td>
-    <td><code>replay_accum_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Backprop plumbing static audit</td>
-    <td><code>make v7-backprop-plumbing</code></td>
-    <td>IR2 graph/dataflow, grad writers, saved tensors, layout, and manifest wiring all pass audit checks.</td>
-    <td><code>backprop_plumbing_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Runtime stitch smoke (step-1)</td>
-    <td><code>make v7-backprop-stitch-runtime</code><br><code>make v7-backprop-stitch-runtime-accum</code></td>
-    <td>Manifest dims override conflicting requests; first checked parity step is clean; checked steps stay clean.</td>
-    <td><code>backprop_stitch_runtime_latest.json</code><br><code>backprop_stitch_runtime_accum_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Epoch parity sweeps</td>
-    <td><code>make v7-train-parity-3</code><br><code>make v7-train-parity-5</code></td>
-    <td>Multi-epoch CK-vs-PyTorch parity stays within configured tolerances.</td>
-    <td><code>train_parity_epochs_3_latest.json</code><br><code>train_parity_epochs_5_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Drift smoke and localization</td>
-    <td><code>make v7-train-parity-drift-smoke</code><br><code>make v7-train-parity-drift-localize</code></td>
-    <td>Smoke run reports bounded drift; localization emits same-state stage diagnostics near target step.</td>
-    <td><code>train_parity_drift_smoke_latest.json</code><br><code>train_parity_drift_localize_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Long-horizon parity (stress + realistic)</td>
-    <td><code>make v7-train-parity-long-horizon</code><br><code>make v7-train-parity-long-horizon-realistic</code></td>
-    <td>Long-run loss and parameter parity stay within blocker thresholds.</td>
-    <td><code>train_parity_long_horizon_latest.json</code><br><code>train_parity_realistic_long_horizon_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Generated-runtime long-horizon parity</td>
-    <td><code>make v7-train-runtime-parity-stress</code><br><code>make v7-train-runtime-parity-realistic</code><br><code>make v7-train-runtime-parity-long-horizon</code></td>
-    <td>Generated C runtime with <code>--parity-on</code> stays aligned with oracle over stress and realistic prompts.</td>
-    <td><code>train_runtime_parity_stress_latest.json</code><br><code>train_runtime_parity_realistic_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>BPE train parity gate</td>
-    <td><code>make test-v7-bpe-train-parity</code></td>
-    <td>Tokenizer IDs match between HF tokenizer JSON and CK true-BPE binary path.</td>
-    <td><code>v7_bpe_train_parity_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>SVG overfit regression gate</td>
-    <td><code>make test-v7-svg-overfit-regression</code></td>
-    <td>CK and PyTorch overfit curves satisfy configured first/min/final loss thresholds.</td>
-    <td><code>svg_overfit_regression_latest.json</code></td>
-  </tr>
-  <tr>
-    <td>Full train gate bundle</td>
-    <td><code>make v7-gate-train</code></td>
-    <td>Contract checks, IR/layout/codegen smoke, parity kernels, FD, replay, and enabled optional gates all pass.</td>
-    <td><code>contract_report_latest.json</code> + parity/runtime gate artifacts above</td>
-  </tr>
-  <tr>
-    <td>Production-ready nightly bundle</td>
-    <td><code>make v7-backprop-production-ready</code></td>
-    <td><code>v7-gate-train</code> passes with production safety, then realistic long-horizon blocker + stress monitor run.</td>
-    <td><code>train_parity_realistic_long_horizon_latest.json</code> + gate artifacts</td>
-  </tr>
-</table>
+<h2 id="step-6">Step 6: Stage B Midtraining Resume Run</h2>
 
-<h2>PR4.5 Throughput Track</h2>
+<div class="card card-green">
+    <p style="margin-bottom: 0.4rem;">Continue from latest Stage A checkpoint in the same run, using richer docs SVG corpus.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>STAGE_B_SOURCE="$DATA_DIR/svg_assets_docs_ascii.txt"
+RESUME_DATA="$RUN/svg_resume_stageb_mix.txt"
 
-<ul>
-  <li>Add explicit threaded GEMM dispatch for v7 training runtime (not serial-only blocked calls).</li>
-  <li>Compile runtime with consistent parallel flags and deterministic thread control.</li>
-  <li>Prepack/plan GEMM weight access to reduce cache misses.</li>
-  <li>Reduce backward buffer traffic hotspots (<code>grad_accumulate</code>, <code>memset</code>, <code>memmove</code>).</li>
-  <li>Keep strict parity tolerances unchanged while optimizing.</li>
-</ul>
+if [ ! -s "$STAGE_B_SOURCE" ]; then
+  echo "[ERROR] Missing $STAGE_B_SOURCE"
+  echo "Run Step 2 first."
+  exit 1
+fi
 
-<h2>Performance Workflow (After Parity Is Green)</h2>
+{ cat "$DATA_TXT"; cat "$STAGE_B_SOURCE"; } \
+  | sed '/^[[:space:]]*$/d' \
+  | awk 'length($0) <= 4096' \
+  | sort -u > "$RESUME_DATA"
 
-<ol>
-  <li>Run CK baseline without oracle: <code>--backend ck --parity-on=false</code>.</li>
-  <li>Run reference harness timing: <code>--backend both</code> (captures CK vs torch step metrics).</li>
-  <li>Use <code>make profile-v7-full</code> or <code>make v7-perf-gate</code> for perf + flamegraph artifacts (see <a href="v7-profiling.html"><code>v7-profiling.html</code></a>).</li>
-  <li>Use VTune for microarchitecture + memory bottlenecks (<code>hotspots</code>, <code>uarch-exploration</code>, <code>memory-access</code>), and Advisor for roofline analysis.</li>
-  <li>Use ASan for bounds/UB; use Valgrind when you need slower but deeper leak/use-after-free analysis.</li>
-</ol>
+python3 version/v7/scripts/prepare_ascii_dataset_v7.py \
+  --input "$RESUME_DATA" \
+  --output "$RESUME_DATA" \
+  --input-format text \
+  --ascii-map-common \
+  --ascii-mode xml_escape \
+  --svg-only
+
+export DATA_TXT="$RESUME_DATA"
+
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --resume-latest-checkpoint \
+  --template qwen3 \
+  --curriculum-stage stage_b \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates \
+  --roundtrip-max-lines 2048 --roundtrip-sample-limit 16 \
+  --data "$DATA_TXT" \
+  --vocab-size 320 --bpe-vocab-size 320 \
+  --layers 24 --embed-dim 64 --hidden-dim 128 \
+  --epochs 1 --seq-len 128 --total-tokens 1200000 \
+  --grad-accum 4 --lr 2e-4 --max-grad-norm 1.0 --seed 42 \
+  --train-driver ck_cli --ck-cli-log-every 200 \
+  --json-out version/v7/reports/v7_svg_stage_b_resume_latest.json</pre>
+    </div>
+    <p class="mini-note">When resuming, keep model dims and vocab aligned to Stage A. Change dims/vocab only in a new run directory.</p>
+</div>
+
+<h2 id="step-7">Step 7: Visualizer and Artifacts</h2>
 
 <div class="card">
-  <h3 style="margin-top: 0;">Threading Sanity</h3>
-  <p style="margin-top: 0;">Before optimization work, confirm CK runtime is saturating cores and not running in an accidental single-thread path. Use train step timing plus profiler traces to validate threadpool/OpenMP utilization, then optimize kernel hotspots (usually GEMM backward and attention backward first).</p>
+    <p style="margin-bottom: 0.4rem;">Generate a run-scoped visualizer and inspect data lineage + stage progression.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v7/tools/open_ir_visualizer.py \
+  --generate \
+  --run "$RUN" \
+  --html-only \
+  --strict-run-artifacts \
+  --output "$RUN/ir_report.html"
+
+echo "[OK] $RUN/ir_report.html"
+xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
+    </div>
+    <p class="mini-note">In the report, open Training -> Data Lab and check Stage Flow, Dataset Catalog, tokenizer roundtrip, and data artifact paths.</p>
+    <p class="mini-note">For full end-to-end train + parity + inference runbook, continue in <a href="v7-runbook.html">v7-runbook.html</a>.</p>
 </div>
 
-<h2>How You Know It Is Actually Training</h2>
-
-<ul>
-  <li><code>train_e2e_latest.json</code> shows loss curve with decreasing trend</li>
-  <li><code>training_loss_curve.json</code> and <code>training_grad_norms.json</code> are populated</li>
-  <li><code>training_parity.json</code> reports PASS for oracle checkpoints (when enabled)</li>
-  <li><code>layout_train_audit.json</code> and memory diagnostics show no bounds/overlap/canary failures</li>
-  <li>Generated runtime summary includes expected forward/backward/optimizer kernel calls</li>
-</ul>
-
-<h2>Debug Fast: First-Divergence and Memory Safety</h2>
-
-<table>
-  <tr>
-    <th>Symptom</th>
-    <th>First Artifact</th>
-    <th>Likely Root</th>
-  </tr>
-  <tr>
-    <td>Parity drift appears after a few steps</td>
-    <td><code>drift_report.json</code></td>
-    <td>Specific op mismatch, accumulation edge, or dimension binding issue</td>
-  </tr>
-  <tr>
-    <td>Crash or invalid pointer in CK backend</td>
-    <td><code>memory_diagnostic_latest.json</code></td>
-    <td>Out-of-bounds write, incorrect slot size/offset, or bad kernel args</td>
-  </tr>
-  <tr>
-    <td>Layout audit fails</td>
-    <td><code>layout_train_audit.json</code></td>
-    <td>Overlap, section bounds error, alignment or ownership mismatch</td>
-  </tr>
-  <tr>
-    <td>Generated runtime compiles but output is unstable</td>
-    <td><code>generated_train_runtime_summary_v7.json</code></td>
-    <td>Wrong kernel binding or call-order mismatch from upstream IR</td>
-  </tr>
-</table>
-
-<h2>What Changes for Backprop vs Inference</h2>
-
-<div class="card">
-  <ul>
-    <li>Inference complexity is dominated by quantized weight paths and decode-time KV behavior.</li>
-    <li>Backprop complexity is dominated by memory pressure and graph bookkeeping: saved activations, gradient routing, accumulation, optimizer state.</li>
-    <li>Training usually runs float paths (fp32/bf16 policy) rather than quantized weight formats.</li>
-    <li>Keeping training pipeline partially separated while contracts stabilize is a pragmatic step, not architectural drift.</li>
-  </ul>
-</div>
-
-<h2>Artifact Checklist in a Healthy Run Directory</h2>
-
-<pre>/tmp/v7_exp1/
-  weights.bump
-  weights_manifest.json
-  ir1_train_forward.json
-  ir2_train_backward.json
-  ir_train_invariants.json
-  layout_train.json
-  layout_train_audit.json
-  generated_train_runtime_v7.c
-  generated_train_runtime_summary_v7.json
-  libtrain.so
-  train_e2e_latest.json
-  training_loss_curve.json
-  training_grad_norms.json
-  training_parity.json
-  memory_diagnostic_latest.json
-  ir_report.html</pre>
-
-<p>Use this page as the operator baseline: if these artifacts line up and the gates pass, your v7 backprop pipeline is stitched correctly.</p>
+<script>
+(function () {
+    var buttons = document.querySelectorAll('.copy-btn');
+    buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pre = btn.parentElement.querySelector('pre');
+            if (!pre) return;
+            var text = pre.innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                var old = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(function () { btn.textContent = old; }, 1200);
+            }).catch(function () {
+                btn.textContent = 'Copy failed';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+            });
+        });
+    });
+})();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
