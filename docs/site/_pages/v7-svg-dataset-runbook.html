@@ -69,6 +69,7 @@
 <h1>v7 SVG Dataset Generation Runbook</h1>
 
 <p>Operator-focused runbook to build clean SVG training corpora from this repo, split progression into pretrain and midtrain data, and hand off directly into v7 training.</p>
+<p class="mini-note">Demo goal: start from repo SVG assets and reach coherent, closed SVG/infographic outputs that are visibly useful, then iterate with Stage A -> Stage B and parity checks.</p>
 
 <div class="dataset-hero">
     <div class="dataset-hero-card">
@@ -137,6 +138,7 @@
         <li><a href="#step-5">Step 5: Stage A Pretraining Run</a></li>
         <li><a href="#step-6">Step 6: Stage B Midtraining Resume Run</a></li>
         <li><a href="#step-7">Step 7: Visualizer and Artifacts</a></li>
+        <li><a href="#step-8">Step 8: Optional Autopilot Loop (overnight)</a></li>
     </ul>
 </nav>
 
@@ -407,6 +409,27 @@ xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">In the report, open Training -> Data Lab and check Stage Flow, Dataset Catalog, tokenizer roundtrip, and data artifact paths.</p>
     <p class="mini-note">For full end-to-end train + parity + inference runbook, continue in <a href="v7-runbook.html">v7-runbook.html</a>.</p>
+</div>
+
+<h2 id="step-8">Step 8: Optional Autopilot Loop (overnight)</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.4rem;">Use the autopilot script to continuously expand synthetic SVG data, resume from latest checkpoint, and emit per-iteration metrics for morning review.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>export RUN="$HOME/.cache/ck-engine-v7/models/train/v7_svg_autopilot_seq128"
+export HOURS=8
+export SEQ_LEN=128
+export TOTAL_TOKENS=1200000
+export GRAD_ACCUM=8
+
+bash version/v7/scripts/svg_autopilot_train_loop_v7.sh
+
+# Inspect results
+tail -n 80 "$RUN/autopilot/autopilot.log"
+tail -n 20 "$RUN/autopilot/summary.jsonl"</pre>
+    </div>
+    <p class="mini-note">Autopilot is optimization workflow, not parity replacement. Keep periodic CK-vs-PyTorch parity gates in your main runbook path.</p>
 </div>
 
 <script>
