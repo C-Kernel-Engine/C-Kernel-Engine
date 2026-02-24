@@ -349,6 +349,12 @@ MAKE_TARGETS = {
         "target": "visualizer-full",
         "timeout_sec": 5400,
     },
+    "v7_core_stabilization_nightly": {
+        "name": "v7 Core Stabilization Matrix",
+        "category": "training",
+        "target": "v7-stabilization-nightly",
+        "timeout_sec": 7200,
+    },
 }
 
 # Benchmark targets with perf extraction
