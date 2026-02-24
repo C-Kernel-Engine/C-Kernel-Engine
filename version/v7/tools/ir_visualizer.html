@@ -11142,13 +11142,23 @@ function renderProfileHowTo() {
     ].join('\n');
     const flamegraphCmd = [
         explicitModelDirCmd,
-        `make profile-v7-flamegraph V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+    ].join('\n');
+    const flamegraphPrefillCmd = [
+        explicitModelDirCmd,
+        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+    ].join('\n');
+    const flamegraphBothCmd = [
+        explicitModelDirCmd,
+        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const flamegraphRecoverCmd = [
         explicitModelDirCmd,
         '# If perf is blocked, enable perf sampling permissions first:',
         'sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0',
-        `make profile-v7-flamegraph V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         'python3 version/v7/tools/open_ir_visualizer.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
     const cachegrindCmd = [
@@ -11163,7 +11173,7 @@ function renderProfileHowTo() {
         explicitModelDirCmd,
         `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         `make profile-v7-perf-stat V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-flamegraph V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         `make profile-v7-cachegrind V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         'make v7-perf-gate-evaluate V7_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
@@ -11250,7 +11260,7 @@ function renderProfileHowTo() {
             cmd: perfStatCmd,
         },
         'flamegraph_manifest.json': {
-            why: 'Flamegraph index linking folded stacks and SVG hotspot view. Includes a perf sysctl fallback if perf record is permission-blocked.',
+            why: 'Flamegraph index linking folded stacks and SVG hotspot view for decode and prefill (when captured). Includes a perf sysctl fallback if perf record is permission-blocked.',
             cmd: flamegraphRecoverCmd,
         },
         'cachegrind_summary.json': {
@@ -11407,8 +11417,9 @@ function renderProfileHowTo() {
                     </p>
                     <p class="profile-phase-desc" style="margin-top:-0.25rem;">
                         <strong>Scope:</strong> <code>profile-v7-prefill</code> gives prefill timing coverage. Current
-                        <code>profile-v7-perf-stat</code>, <code>profile-v7-flamegraph</code>, <code>profile-v7-vtune</code>,
-                        and <code>profile-v7-advisor</code> targets are decode-path captures.
+                        <code>profile-v7-perf-stat</code>, <code>profile-v7-vtune</code>, and <code>profile-v7-advisor</code>
+                        targets are decode-path captures, while flamegraph has explicit
+                        <code>profile-v7-flamegraph-decode</code> and <code>profile-v7-flamegraph-prefill</code> modes.
                     </p>
                     <div class="profile-howto-grid">
                         ${renderHowToBlock(
@@ -11440,6 +11451,16 @@ function renderProfileHowTo() {
                             'FlameGraph — Stack Hotspots (Decode)',
                             flamegraphCmd,
                             'Records perf call stacks, collapses them with stackcollapse-perf.pl, and generates an interactive SVG flamegraph. Great for seeing which functions dominate wall-clock time.'
+                        )}
+                        ${renderHowToBlock(
+                            'FlameGraph — Stack Hotspots (Prefill)',
+                            flamegraphPrefillCmd,
+                            'Records prefill call stacks with perf and generates a separate prefill SVG flamegraph. Use this when prompt-ingest kernels dominate your tuning pass.'
+                        )}
+                        ${renderHowToBlock(
+                            'FlameGraph — Capture Both Modes',
+                            flamegraphBothCmd,
+                            'Runs decode and prefill flamegraph captures back-to-back and stores both in flamegraph_manifest.json under by_mode.'
                         )}
                         ${renderHowToBlock(
                             'Cachegrind — Cache Miss Attribution (Decode)',
@@ -12467,17 +12488,41 @@ function renderProfileHowTo() {
                 </div>
             `;
 
-            const flameSvgInline = flamegraphManifestData?.svg_inline;
-            const flameSvgPath = flamegraphManifestData?.svg_resolved_path || flamegraphManifestData?.svg_path;
-            const flameFoldedPath = flamegraphManifestData?.folded_path;
-            const flamePerfDataPath = flamegraphManifestData?.perf_data_path;
+            const flameByMode = (flamegraphManifestData && typeof flamegraphManifestData.by_mode === 'object')
+                ? flamegraphManifestData.by_mode
+                : null;
+            const flameModes = flameByMode
+                ? Object.keys(flameByMode).filter((mode) => flameByMode[mode] && typeof flameByMode[mode] === 'object')
+                : [];
+            let activeFlameMode = null;
+            let activeFlame = flamegraphManifestData;
+            if (flameModes.length > 0) {
+                if (currentMode === 'prefill' && flameByMode.prefill && typeof flameByMode.prefill === 'object') {
+                    activeFlameMode = 'prefill';
+                } else if (currentMode === 'decode' && flameByMode.decode && typeof flameByMode.decode === 'object') {
+                    activeFlameMode = 'decode';
+                } else if (flameByMode.decode && typeof flameByMode.decode === 'object') {
+                    activeFlameMode = 'decode';
+                } else {
+                    activeFlameMode = flameModes[0];
+                }
+                activeFlame = flameByMode[activeFlameMode] || flamegraphManifestData;
+            }
+
+            const flameSvgInline = activeFlame?.svg_inline;
+            const flameSvgPath = activeFlame?.svg_resolved_path || activeFlame?.svg_path;
+            const flameFoldedPath = activeFlame?.folded_path;
+            const flamePerfDataPath = activeFlame?.perf_data_path;
             const flamegraphError =
                 typeof flameSvgInline === 'string' &&
                 /ERROR:\s*No valid input provided to flamegraph\.pl/i.test(flameSvgInline);
             if (flameSvgPath) {
                 links.push(`<a href="${escapeHtml(flameSvgPath)}" target="_blank" style="color:var(--blue);font-family:'JetBrains Mono',monospace;">Open flamegraph SVG</a>`);
             }
-            const top = flamegraphManifestData?.top_symbols || [];
+            if (flameModes.length > 0) {
+                links.push(`Flamegraph modes: ${flameModes.join(', ')} (active: ${escapeHtml(activeFlameMode || flameModes[0])})`);
+            }
+            const top = activeFlame?.top_symbols || [];
             if (Array.isArray(top) && top.length > 0) {
                 links.push(`Top symbols: ${top.slice(0, 6).map(x => `${escapeHtml(x.symbol)} (${x.samples})`).join(', ')}`);
             }
@@ -12486,10 +12531,12 @@ function renderProfileHowTo() {
             }
 
             if (flameSvgInline || flameSvgPath) {
+                const flameModeLabel = activeFlameMode || (flameModes.length > 0 ? flameModes[0] : 'decode');
                 let frame = flameSvgInline
                     ? `<iframe title="Flamegraph Viewer" style="width:100%;height:420px;border:0;background:#0a0a0a;" srcdoc="${escapeHtml(flameSvgInline)}"></iframe>`
                     : `<object type="image/svg+xml" data="${escapeHtml(flameSvgPath)}" style="width:100%;height:420px;"></object>`;
                 if (flamegraphError) {
+                    const retryTarget = flameModeLabel === 'prefill' ? 'profile-v7-flamegraph-prefill' : 'profile-v7-flamegraph-decode';
                     frame = `
                         <div style="border:1px solid #7a5f1a;border-radius:8px;padding:0.7rem;background:rgba(243,156,18,0.10);color:#f6d48f;font-size:0.84rem;line-height:1.45;">
                             Flamegraph generation failed: <code>flamegraph.pl</code> did not receive valid folded stack input.
@@ -12499,14 +12546,15 @@ function renderProfileHowTo() {
                                 ${flamePerfDataPath ? `, <code>${escapeHtml(String(flamePerfDataPath))}</code>` : ''}
                             </div>
                             <div style="margin-top:0.35rem;color:var(--text-muted);">
-                                Re-run: <code>make profile-v7-flamegraph V7_MODEL="&lt;model_dir&gt;" V7_PERF_RUNTIME=cli</code>
+                                Re-run: <code>make ${escapeHtml(retryTarget)} V7_MODEL="&lt;model_dir&gt;" V7_PERF_RUNTIME=cli</code>
                             </div>
                         </div>
                     `;
                 }
                 flameEl.innerHTML = `
                     <div class="profile-artifact-panel">
-                        <h3><span class="badge badge-orange">Flamegraph</span> Interactive Call Stack</h3>
+                        <h3><span class="badge badge-orange">Flamegraph (${escapeHtml(flameModeLabel)})</span> Interactive Call Stack</h3>
+                        ${flameModes.length > 1 ? `<div style="margin-bottom:0.45rem;color:var(--text-muted);font-size:0.76rem;">Use the Profile mode selector (decode/prefill) to switch the active flamegraph view.</div>` : ''}
                         <div class="profile-flame-wrap">${frame}</div>
                     </div>
                 `;

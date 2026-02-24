@@ -4,6 +4,7 @@ const SHARED_TABS = ['memory', 'kernels', 'profile'];
 const INFERENCE_ONLY = ['interpretability', 'quantization', 'parity', 'dataflow', 'tests', 'stats'];
 const TRAINING_TABS = [
     'train-dashboard',
+    'train-logbook',
     'train-data-lab',
     'training',
     'train-gradient',
@@ -167,6 +168,7 @@ function appendTrainingTabs() {
     const insertBefore = tabsRoot.querySelector('.tab[data-tab="profile"]');
     const specs = [
         { id: 'train-dashboard', label: 'Train Dashboard' },
+        { id: 'train-logbook', label: 'Training Logbook' },
         { id: 'train-data-lab', label: 'Data Lab' },
         { id: 'train-gradient', label: 'Gradient Health' },
         { id: 'train-parity', label: 'Parity Tracker' },
@@ -201,6 +203,11 @@ function ensureTrainingPanels() {
         'train-dashboard',
         'Training Dashboard',
         'Loss, gradients, LR and parity health from training telemetry.'
+    );
+    ensurePanel(
+        'train-logbook',
+        'Training Logbook',
+        'Operator timeline: where we are, what failed, why it failed, and what to run next.'
     );
     ensurePanel(
         'train-data-lab',
@@ -244,6 +251,7 @@ function ensureTrainingPanels() {
     );
 
     ensurePanelRoot('train-dashboard', 'trainDashboardRoot');
+    ensurePanelRoot('train-logbook', 'trainLogbookRoot');
     ensurePanelRoot('train-data-lab', 'trainDataLabRoot');
     ensurePanelRoot('train-gradient', 'trainGradientRoot');
     ensurePanelRoot('train-parity', 'trainParityRoot');
