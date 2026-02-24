@@ -752,15 +752,15 @@
       </tr>
       <tr>
         <td><strong>v7.0</strong></td>
-        <td>Training IR Foundation</td>
-        <td>IR1 train-forward + IR2 backward synthesis, training kernel-map parity, v7 init/train/parity CLI flow</td>
+        <td>Training IR + Data Pipeline Foundation</td>
+        <td>IR1 train-forward + IR2 backward synthesis, Stage A/Stage B dataset preparation (ASCII cleanup + tokenizer roundtrip gates), v7 init/train/parity CLI flow</td>
         <td>v6.6</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
       <tr>
         <td><strong>v7.1</strong></td>
         <td>Runtime Safety + Diagnostics</td>
-        <td>Contiguous train memory layout, canary diagnostics, layout audit, first-divergence tracing against oracle</td>
+        <td>Contiguous train memory layout, canary diagnostics, CK-vs-PyTorch parity regimen (epoch + grad-accum sweeps), deterministic replay + drift triage artifacts, IR visualizer training-dashboard hardening (artifact ingestion + bug-fix cadence)</td>
         <td>v7.0</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -856,7 +856,7 @@
           <span class="version-status status-building">Building</span>
           <span class="version-date">Current sprint track</span>
         </div>
-        <p class="version-tagline">"Training IR Runtime" - From parity-first training to fully lowered train execution</p>
+        <p class="version-tagline">"Training IR Runtime + Operator Cockpit" - From data preparation and parity-first training to fully lowered train execution</p>
         <ul class="milestone-list">
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
@@ -872,7 +872,7 @@
           </li>
           <li class="milestone current">
             <span class="milestone-icon building">▶</span>
-            <span class="milestone-text"><strong>PR4 (current):</strong> Oracle cadence + drift triage artifacts + deterministic replay hardening</span>
+            <span class="milestone-text"><strong>PR4 (current):</strong> Oracle cadence + drift triage artifacts + deterministic replay hardening + training telemetry ingestion for IR visualizer</span>
           </li>
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
@@ -881,6 +881,29 @@
           <li class="milestone">
             <span class="milestone-icon planned">○</span>
             <span class="milestone-text"><strong>PR6:</strong> Run-dir artifact unification + one-command v7 train gate</span>
+          </li>
+          <li class="milestone current">
+            <span class="milestone-icon building">▶</span>
+            <span class="milestone-text"><strong>IR Visualizer (ongoing):</strong> training tabs, parity cockpit, data/tokenizer transparency, and robustness bug fixes (path loading, mode wiring, runtime JS errors).</span>
+          </li>
+        </ul>
+        <p style="margin:0.85rem 0 0.4rem 0; color:var(--text-muted); font-size:0.85rem;">Operator history highlights (training stack):</p>
+        <ul class="milestone-list">
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>Data preparation:</strong> Stage 0.5/0.55 corpus path (docs SVG assets -> UTF-8/ASCII cleanup -> manifests + tokenizer map).</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>Stage A / Stage B flow:</strong> pretrain/midtrain dataset tracks with checkpoint promotion and run-scoped reports.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>PyTorch parity analysis:</strong> first-divergence localizer, 10-epoch cadence, grad-accum sweeps, replay determinism checks.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>IR visualizer training cockpit:</strong> training dashboard, parity tracker, data/tokenizer transparency, and operator runbook command blocks.</span>
           </li>
         </ul>
       </div>
