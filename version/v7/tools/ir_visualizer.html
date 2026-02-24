@@ -2332,14 +2332,6 @@
                         <div class="brief-value" id="summaryModelName">-</div>
                     </div>
                     <div class="brief-card">
-                        <div class="brief-label">Run Dir</div>
-                        <div class="brief-value" id="summaryRunDir">-</div>
-                    </div>
-                    <div class="brief-card">
-                        <div class="brief-label">Report Dir</div>
-                        <div class="brief-value" id="summaryReportDir">-</div>
-                    </div>
-                    <div class="brief-card">
                         <div class="brief-label">Generated</div>
                         <div class="brief-value" id="summaryGeneratedAt">-</div>
                     </div>
@@ -3429,21 +3421,14 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <span style="color: var(--orange);">Click any stage</span> to navigate.
             </p>
 
+            <!-- ── Full-Stack Control Spectrum (Data + Computation) ── -->
+            <div id="dpControlSpectrum" style="margin-bottom:1.2rem;"></div>
+
             <!-- ── Mini Spectrum ── -->
             <div id="dpSpectrum" style="display:flex; align-items:stretch; gap:0; padding:14px 0 8px; overflow-x:auto;"></div>
             <div id="dpSpectrumLoop" style="text-align:center; color:var(--text-muted); font-size:0.72rem; margin-bottom:1.5rem;">
                 ← refine data → retrain → evaluate → the loop keeps tightening →
             </div>
-
-            <!-- ── Stage + Data Context ── -->
-            <div id="dpStageFlow" style="margin-bottom:1rem;"></div>
-            <div id="dpCurriculumPanel" style="margin-bottom:1rem;"></div>
-            <div id="dpScalePackPanel" style="margin-bottom:1rem;"></div>
-            <div id="dpDataSourcePanel" style="margin-bottom:1.2rem;"></div>
-            <div id="dpDatasetViewer" style="margin-bottom:1.2rem;"></div>
-            <div id="dpGeneratorWorkbench" style="margin-bottom:1.2rem;"></div>
-            <div id="dpWhySvgPanel" style="margin-bottom:1.2rem;"></div>
-            <div id="dpSvgSampleViewer" style="margin-bottom:1.5rem;"></div>
 
             <!-- ── ASCII Reference ── -->
             <div id="dpAsciiSection" style="margin-bottom:2rem;">
@@ -3557,25 +3542,9 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     The BPE demo above uses a <strong style="color:var(--orange);">hard-coded example merge table</strong> for visualization.
                     Your actual model uses a HuggingFace-compatible <code>tokenizer.json</code> loaded by <code>ck_tokenizer.c</code>,
                     which may be <strong>bytelevel BPE</strong> (GPT-2 style, 131K–152K vocab) or <strong>ascii_bpe</strong> (v7 trainer, default 1024 vocab).
-                    The table below is sampled from that active <code>tokenizer.json</code>.
                 </p>
                 <div id="tokenizerLineageInfo" style="font-size:0.75rem;"></div>
             </div>
-
-            <!-- ═══ Current Tokenizer JSON Table ═══ -->
-            <div style="margin-top:1.25rem;">
-                <h3 style="margin-bottom:0.45rem;">
-                    <span style="color:#ffb400;">🧾</span> Current Tokenizer JSON Table
-                </h3>
-                <p style="color:var(--text-muted); font-size:0.78rem; margin-bottom:0.65rem;">
-                    Direct sample from the active run's <code>tokenizer.json</code> (ID, piece, bytes, source, and merge depth).
-                    ASCII/UTF visuals above remain unchanged.
-                </p>
-                <div id="dpTokenizerJsonTable"></div>
-            </div>
-
-            <!-- ── Full-Stack Control Spectrum (Data + Computation) ── -->
-            <div id="dpControlSpectrum" style="margin-top:1.5rem;"></div>
         </div>
     </main>
 
@@ -3624,9 +3593,6 @@ python3 test_gemv_q8_0_q8_0.py</pre>
         let trainRuntimeParityStressData = null;
         let trainReplayData = null;
         let trainBackpropStitchData = null;
-        let trainParityRegimenData = null;
-        let trainParityXrayData = null;
-        let trainCanarySummaryData = null;
         let trainPipelineData = null;
         let trainExecPlanData = null;
         let regressionLedgerData = null;
@@ -3882,20 +3848,13 @@ python3 test_gemv_q8_0_q8_0.py</pre>
         }
 
         function hasEmbeddedTrainRuntimeContext() {
-            if (embeddedMeta && Object.prototype.hasOwnProperty.call(embeddedMeta, 'has_train_runtime') && embeddedMeta.has_train_runtime === true) {
-                return true;
+            if (embeddedMeta && Object.prototype.hasOwnProperty.call(embeddedMeta, 'has_train_runtime')) {
+                return embeddedMeta.has_train_runtime === true;
             }
             const embeddedFiles = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
                 ? window.EMBEDDED_IR_DATA.files
                 : {};
             return Boolean(
-                embeddedFiles.training_pipeline ||
-                embeddedFiles.training_parity_regimen ||
-                embeddedFiles.training_parity_xray ||
-                embeddedFiles.training_canary_summary ||
-                embeddedFiles.dataset_qc ||
-                embeddedFiles.dataset_profile ||
-                embeddedFiles.tokenizer_roundtrip ||
                 embeddedFiles.generated_train_runtime_summary ||
                 embeddedFiles.memory_diagnostic ||
                 embeddedFiles.memory_verification ||
@@ -4291,73 +4250,31 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const ops = (opsData && (opsData.operations || opsData.ops)) || [];
             const cfg = (layoutData && layoutData.config) || (opsData && opsData.config) || (manifestData && manifestData.config) || {};
             const hasTrainRuntimeContext = hasEmbeddedTrainRuntimeContext();
-            const embeddedFiles = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const hasRealDecodeArtifacts = Boolean(
-                embeddedFiles.ir1_decode ||
-                embeddedFiles.layout_decode ||
-                embeddedFiles.lowered_decode ||
-                embeddedFiles.lowered_decode_call
-            );
-            const hasDecodeTriplet = Boolean(modeSnapshot.ir1 || modeSnapshot.layout || modeSnapshot.call || modeSnapshot.lowered);
-            const hasTrainingTriplet = Boolean(
-                ir1TrainData ||
-                ir2TrainData ||
-                trainExecPlanData ||
-                embeddedFiles.ir1_train ||
-                embeddedFiles.ir2_train ||
-                embeddedFiles.layout_train
-            );
-            const reportMode = String(window.__ckReportMode || '').toLowerCase();
-            const preferTrainingSummary = Boolean(
-                (reportMode === 'training' && hasTrainingTriplet) ||
-                (!hasRealDecodeArtifacts && hasTrainingTriplet)
-            );
 
-            const required = preferTrainingSummary
-                ? [
-                    { key: 'ir1_train', label: 'ir1_train_forward.json', ready: Boolean(ir1TrainData || embeddedFiles.ir1_train) },
-                    { key: 'layout_train', label: 'layout_train.json', ready: Boolean(embeddedFiles.layout_train) },
-                    { key: 'backward', label: 'ir2_train_backward.json|train_exec_plan.json', ready: Boolean(ir2TrainData || trainExecPlanData || embeddedFiles.ir2_train || embeddedFiles.train_exec_plan) },
-                ]
-                : [
-                    { key: 'ir1', label: `ir1_${currentMode}.json`, ready: Boolean(modeSnapshot.ir1) },
-                    { key: 'layout', label: `layout_${currentMode}.json`, ready: Boolean(modeSnapshot.layout) },
-                    {
-                        key: 'lowered',
-                        label: `lowered_${currentMode}.json|lowered_${currentMode}_call.json`,
-                        ready: Boolean(modeSnapshot.call || modeSnapshot.lowered),
-                    },
-                ];
-            const optional = preferTrainingSummary
-                ? [
-                    { key: 'manifest', label: 'weights_manifest.json', ready: Boolean(manifestData) },
-                    { key: 'training_pipeline', label: 'training_pipeline_latest.json', ready: Boolean(trainPipelineData || embeddedFiles.training_pipeline) },
-                    { key: 'dataset_qc', label: 'dataset_qc.json', ready: Boolean(embeddedFiles.dataset_qc) },
-                    { key: 'dataset_profile', label: 'dataset_profile.json', ready: Boolean(embeddedFiles.dataset_profile) },
-                    { key: 'tokenizer_roundtrip', label: 'tokenizer_roundtrip.json', ready: Boolean(embeddedFiles.tokenizer_roundtrip) },
-                    { key: 'parity_regimen', label: 'training_parity_regimen_latest.json', ready: Boolean(trainParityRegimenData || embeddedFiles.training_parity_regimen) },
-                    { key: 'parity_xray', label: 'regimen_backend_xray.json', ready: Boolean(trainParityXrayData || embeddedFiles.training_parity_xray) },
-                    { key: 'canary_summary', label: 'training_canary_summary.json', ready: Boolean(trainCanarySummaryData || embeddedFiles.training_canary_summary) },
-                    { key: 'replay_determinism', label: 'replay_determinism_latest.json', ready: Boolean(trainReplayData || embeddedFiles.replay_determinism) },
-                    { key: 'backprop_stitch', label: 'backprop_stitch_runtime_latest.json', ready: Boolean(trainBackpropStitchData || embeddedFiles.backprop_stitch_runtime) },
-                ]
-                : [
-                    { key: 'manifest', label: 'weights_manifest.json', ready: Boolean(manifestData) },
-                    { key: 'profile', label: 'profile_summary.json', ready: hasRenderableProfileData(profileData) },
-                    { key: 'perf_stat', label: 'perf_stat_summary.json', ready: Boolean(perfStatData) },
-                    { key: 'flamegraph_manifest', label: 'flamegraph_manifest.json', ready: Boolean(flamegraphManifestData) },
-                    { key: 'cachegrind_summary', label: 'cachegrind_summary.json', ready: Boolean(cachegrindSummaryData) },
-                    { key: 'vtune_summary', label: 'vtune_summary.json', ready: Boolean(vtuneSummaryData) },
-                    { key: 'advisor_summary', label: 'advisor_summary.json', ready: Boolean(advisorSummaryData) },
-                    { key: 'memory_signoff', label: 'memory_signoff.json', ready: Boolean(memorySignoffData) },
-                    { key: 'perf_gate_report', label: 'perf_gate_report.json', ready: Boolean(perfGateData) },
-                    { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
-                    ...(hasTrainRuntimeContext || Boolean(asanSummaryData)
-                        ? [{ key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) }]
-                        : []),
-                ];
+            const required = [
+                { key: 'ir1', label: `ir1_${currentMode}.json`, ready: Boolean(modeSnapshot.ir1) },
+                { key: 'layout', label: `layout_${currentMode}.json`, ready: Boolean(modeSnapshot.layout) },
+                {
+                    key: 'lowered',
+                    label: `lowered_${currentMode}.json|lowered_${currentMode}_call.json`,
+                    ready: Boolean(modeSnapshot.call || modeSnapshot.lowered),
+                },
+            ];
+            const optional = [
+                { key: 'manifest', label: 'weights_manifest.json', ready: Boolean(manifestData) },
+                { key: 'profile', label: 'profile_summary.json', ready: hasRenderableProfileData(profileData) },
+                { key: 'perf_stat', label: 'perf_stat_summary.json', ready: Boolean(perfStatData) },
+                { key: 'flamegraph_manifest', label: 'flamegraph_manifest.json', ready: Boolean(flamegraphManifestData) },
+                { key: 'cachegrind_summary', label: 'cachegrind_summary.json', ready: Boolean(cachegrindSummaryData) },
+                { key: 'vtune_summary', label: 'vtune_summary.json', ready: Boolean(vtuneSummaryData) },
+                { key: 'advisor_summary', label: 'advisor_summary.json', ready: Boolean(advisorSummaryData) },
+                { key: 'memory_signoff', label: 'memory_signoff.json', ready: Boolean(memorySignoffData) },
+                { key: 'perf_gate_report', label: 'perf_gate_report.json', ready: Boolean(perfGateData) },
+                { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
+            ];
+            if (hasTrainRuntimeContext || Boolean(asanSummaryData)) {
+                optional.push({ key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) });
+            }
 
             const requiredPresent = required.filter(x => x.ready).length;
             const optionalPresent = optional.filter(x => x.ready).length;
@@ -4365,7 +4282,6 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const totalPresent = requiredPresent + optionalPresent;
             const coveragePct = totalFiles > 0 ? Math.round((totalPresent / totalFiles) * 100) : 0;
             const statusText = requiredPresent === required.length ? 'ready' : 'partial';
-            const summaryModeName = preferTrainingSummary ? 'training' : currentMode;
 
             const modelName = (embeddedMeta && embeddedMeta.model) ||
                 (manifestData && manifestData.model_name) ||
@@ -4379,8 +4295,6 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const summaryTestChip = document.getElementById('summaryTestChip');
             const summaryParityChip = document.getElementById('summaryParityChip');
             const summaryModelName = document.getElementById('summaryModelName');
-            const summaryRunDir = document.getElementById('summaryRunDir');
-            const summaryReportDir = document.getElementById('summaryReportDir');
             const summaryGeneratedAt = document.getElementById('summaryGeneratedAt');
             const summaryOpCount = document.getElementById('summaryOpCount');
             const summaryLayerCount = document.getElementById('summaryLayerCount');
@@ -4403,16 +4317,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 else el.classList.add('status-chip-muted');
             };
 
-            if (summaryModeChip) summaryModeChip.textContent = `mode: ${summaryModeName}`;
+            if (summaryModeChip) summaryModeChip.textContent = `mode: ${currentMode}`;
             if (summaryStatusChip) {
                 setChipState(summaryStatusChip, `status: ${statusText}`, statusText === 'ready' ? 'good' : 'warn');
             }
             if (summaryModelName) summaryModelName.textContent = modelName;
-            const runCtx = (typeof getRunContext === 'function') ? getRunContext() : { runDir: null, modelPath: null };
-            const runDirText = runCtx && runCtx.runDir ? String(runCtx.runDir) : '-';
-            const reportDirText = normalizePathString(getReportDirFromCurrentHtml()) || '-';
-            if (summaryRunDir) summaryRunDir.textContent = runDirText;
-            if (summaryReportDir) summaryReportDir.textContent = reportDirText;
             if (summaryGeneratedAt) summaryGeneratedAt.textContent = generatedAt;
             if (summaryOpCount) summaryOpCount.textContent = ops.length || '-';
             if (summaryLayerCount) summaryLayerCount.textContent = layerCount;
@@ -4420,11 +4329,9 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             if (summaryOptional) summaryOptional.textContent = `${optionalPresent}/${optional.length}`;
             updateTestCommandSnippets();
 
-            const requiredByKey = {};
-            required.forEach((row) => { requiredByKey[row.key] = Boolean(row.ready); });
-            setPipelineNodeState('pipelineNodeIr1', Boolean(requiredByKey.ir1 || requiredByKey.ir1_train));
-            setPipelineNodeState('pipelineNodeLayout', Boolean(requiredByKey.layout || requiredByKey.layout_train));
-            setPipelineNodeState('pipelineNodeLowered', Boolean(requiredByKey.lowered || requiredByKey.backward));
+            setPipelineNodeState('pipelineNodeIr1', Boolean(modeSnapshot.ir1));
+            setPipelineNodeState('pipelineNodeLayout', Boolean(modeSnapshot.layout));
+            setPipelineNodeState('pipelineNodeLowered', Boolean(modeSnapshot.call || modeSnapshot.lowered));
             setPipelineNodeState('pipelineNodeManifest', Boolean(manifestData));
 
             if (pipelineLegend) {
@@ -4540,12 +4447,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const warnings = [];
             const missingRequired = required.filter(x => !x.ready).map(x => x.label);
             if (missingRequired.length > 0) {
-                warnings.push(`Missing required (${summaryModeName}): ${missingRequired.join(', ')}`);
-            }
-            const runDirNorm = normalizePathString(runDirText);
-            const reportDirNorm = normalizePathString(reportDirText);
-            if (runDirNorm && reportDirNorm && runDirNorm !== reportDirNorm) {
-                warnings.push(`Path mismatch: report opened from ${reportDirNorm}, but embedded run_dir is ${runDirNorm}. Open ${runDirNorm}/ir_report.html to stay in sync.`);
+                warnings.push(`Missing required (${currentMode}): ${missingRequired.join(', ')}`);
             }
 
             const usedKernelNames = new Set();
@@ -4665,18 +4567,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
 
         function showTab(tabId) {
             const trainingDisabled = window.__ckTrainingModeAvailable === false;
-            const inferenceDisabled = window.__ckInferenceModeAvailable === false;
             const trainingOnlyTabs = Array.isArray(window.__ckTrainingOnlyTabs) && window.__ckTrainingOnlyTabs.length > 0
                 ? window.__ckTrainingOnlyTabs
                 : ['training', 'train-dashboard', 'train-data-lab', 'train-gradient', 'train-parity', 'train-grad-flow', 'train-weights', 'train-attention', 'train-compare', 'train-memory-canary'];
-            const inferenceOnlyTabs = Array.isArray(window.__ckInferenceOnlyTabs) && window.__ckInferenceOnlyTabs.length > 0
-                ? window.__ckInferenceOnlyTabs
-                : ['interpretability', 'quantization', 'parity', 'dataflow', 'tests', 'stats'];
             if (trainingDisabled && trainingOnlyTabs.includes(tabId)) {
                 tabId = 'memory';
-            }
-            if (inferenceDisabled && inferenceOnlyTabs.includes(tabId)) {
-                tabId = window.__ckTrainingModeAvailable === true ? 'train-dashboard' : 'memory';
             }
 
             const tabs = Array.from(document.querySelectorAll('.tab'));
@@ -5169,9 +5064,6 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             trainRuntimeParityStressData = files.train_runtime_parity_stress || trainRuntimeParityStressData;
             trainReplayData = files.replay_determinism || trainReplayData;
             trainBackpropStitchData = files.backprop_stitch_runtime || trainBackpropStitchData;
-            trainParityRegimenData = files.training_parity_regimen || trainParityRegimenData;
-            trainParityXrayData = files.training_parity_xray || trainParityXrayData;
-            trainCanarySummaryData = files.training_canary_summary || trainCanarySummaryData;
             trainPipelineData = files.training_pipeline || trainPipelineData;
             trainExecPlanData = files.train_exec_plan || trainExecPlanData;
             regressionLedgerData = files.regression_ledger || regressionLedgerData;
@@ -7724,21 +7616,6 @@ function renderTrainingPipelinePanel(panel) {
     const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object'
         ? dataLab.post_train_eval
         : {};
-    const postEvalDiag = Array.isArray(postEval.quality_diagnosis)
-        ? postEval.quality_diagnosis.map((x) => String(x)).filter((x) => x.trim() !== '').join(', ')
-        : '';
-    const postEvalRecs = Array.isArray(postEval.quality_recommendations)
-        ? postEval.quality_recommendations.map((x) => String(x)).filter((x) => x.trim() !== '')
-        : [];
-    const postEvalAdvice = (postEvalDiag || postEvalRecs.length > 0)
-        ? `
-            <div style="border:1px solid #a46a0844;background:#2a230f;border-radius:8px;padding:0.6rem;">
-                <div style="font-weight:700;color:#ffd58a;margin-bottom:0.25rem;">Post-train quality note</div>
-                ${postEvalDiag ? `<div style="margin-bottom:0.35rem;"><strong>diagnosis:</strong> <code>${escapeHtml(postEvalDiag)}</code></div>` : ''}
-                ${postEvalRecs.length > 0 ? `<div style="color:var(--text-secondary);">${postEvalRecs.map((x) => `- ${escapeHtml(x)}`).join('<br>')}</div>` : ''}
-            </div>
-        `
-        : '';
     const roundtripSamples = Array.isArray(roundtripLab.sample_rows)
         ? roundtripLab.sample_rows
         : [];
@@ -7823,7 +7700,6 @@ function renderTrainingPipelinePanel(panel) {
                         <div><strong>Closure rate:</strong> ${escapeHtml(String(postEval.closure_success_rate ?? '-'))}</div>
                         <div><strong>Loop score:</strong> ${escapeHtml(String(postEval.repetition_loop_score ?? '-'))}</div>
                     </div>
-                    ${postEvalAdvice}
                     <div>
                         <strong>Sample Browser (Row → Token IDs → Decoded)</strong>
                         <div style="margin-top:0.35rem;overflow:auto;">${roundtripSampleTable}</div>
@@ -7874,9 +7750,6 @@ function renderTraining() {
         trainRuntimeParityStressData ||
         trainReplayData ||
         trainBackpropStitchData ||
-        trainParityRegimenData ||
-        trainParityXrayData ||
-        trainCanarySummaryData ||
         trainPipelineData
     ));
 
@@ -7923,9 +7796,6 @@ function renderTraining() {
     const invColor = inv ? (invPass ? 'var(--green)' : '#e74c3c') : 'var(--text-primary)';
 
     const gateStatuses = [
-        { label: 'Parity Regimen', pass: trainParityRegimenData?.summary?.passed === true },
-        { label: 'Backend Xray', pass: trainParityXrayData?.summary?.status === 'ok' },
-        { label: 'Canary Rows', pass: trainCanarySummaryData?.status === 'pass' },
         { label: 'Contracts', pass: trainContractData?.summary?.fail === 0 && trainContractData?.summary?.pass > 0 },
         { label: 'Runtime Stitch Smoke', pass: trainBackpropStitchData?.passed === true },
         { label: '1-token Parity', pass: trainParity1TokenData?.overall_pass === true },
@@ -7948,8 +7818,6 @@ function renderTraining() {
         <div class="stat-card"><div class="stat-value" style="color:${invColor}">${invStatus}</div><div class="stat-label">Invariant Gate</div></div>
         <div class="stat-card"><div class="stat-value">${gatePassCount}/${gateSeenCount || gateStatuses.length}</div><div class="stat-label">Gate Checks Passing</div></div>
         <div class="stat-card"><div class="stat-value">${trainParityEpoch3Data?.steps ?? '-'}</div><div class="stat-label">Optimizer Steps (E3)</div></div>
-        <div class="stat-card"><div class="stat-value">${trainParityRegimenData?.summary?.passed === true ? 'PASS' : (trainParityRegimenData ? 'FAIL' : '-')}</div><div class="stat-label">Parity Regimen</div></div>
-        <div class="stat-card"><div class="stat-value">${trainCanarySummaryData ? `${Number(trainCanarySummaryData.rows_passed || 0)}/${Number(trainCanarySummaryData.expected_rows || 2)}` : '-'}</div><div class="stat-label">Canary Rows Passed</div></div>
         <div class="stat-card"><div class="stat-value">${trainRuntimeParityRealisticData?.pass_parity === true ? 'PASS' : (trainRuntimeParityRealisticData ? 'FAIL' : '-')}</div><div class="stat-label">Runtime Parity (Realistic)</div></div>
         <div class="stat-card"><div class="stat-value">${trainRuntimeParityStressData?.pass_parity === true ? 'PASS' : (trainRuntimeParityStressData ? 'FAIL' : '-')}</div><div class="stat-label">Runtime Parity (Stress)</div></div>
     `;
@@ -8067,20 +7935,6 @@ function renderTraining() {
             `<div><strong>Runtime stitch smoke:</strong> pass=${trainBackpropStitchData.passed === true ? 'yes' : 'no'}, first_step=${Number.isFinite(Number(first.step)) ? Number(first.step) : '-'}, logits_diff=${Number.isFinite(Number(first.logits_max_abs_diff)) ? Number(first.logits_max_abs_diff).toExponential(3) : '-'}</div>`
         );
     }
-    if (trainParityXrayData && typeof trainParityXrayData === 'object') {
-        const xsum = trainParityXrayData.summary || {};
-        const ximp = trainParityXrayData.improvement || {};
-        const xbase = (trainParityXrayData.backend_reports || []).find(r => r?.key === 'baseline_c') || {};
-        const xall = (trainParityXrayData.backend_reports || []).find(r => r?.key === 'all_torch') || {};
-        gradientDetails.push(
-            `<div><strong>Backend xray:</strong> source=${escapeHtml(String(xsum.suspected_source || 'unknown'))}, baseline-first-loss=${Number(xbase?.metrics?.first_loss_diff || 0).toExponential(3)}, baseline-first-param=${Number(xbase?.metrics?.first_param_max_abs_diff || 0).toExponential(3)}, all-torch-first-loss=${Number(xall?.metrics?.first_loss_diff || 0).toExponential(3)}, all-torch-first-param=${Number(xall?.metrics?.first_param_max_abs_diff || 0).toExponential(3)}, rmsnorm-loss-reduction=${Number(ximp.loss_diff_reduction_when_rmsnorm_torch || 0).toExponential(3)}</div>`
-        );
-    }
-    if (trainCanarySummaryData && typeof trainCanarySummaryData === 'object') {
-        gradientDetails.push(
-            `<div><strong>Canary rows:</strong> status=${escapeHtml(String(trainCanarySummaryData.status || '-'))}, compared=${Number(trainCanarySummaryData.rows_compared || 0)}, passed=${Number(trainCanarySummaryData.rows_passed || 0)}, failed=${Number(trainCanarySummaryData.rows_failed || 0)}, missing=${Number(trainCanarySummaryData.rows_missing || 0)}</div>`
-        );
-    }
     const invWarnings = Array.isArray(inv?.warnings) ? inv.warnings : [];
     if (invWarnings.length > 0) {
         gradientDetails.push(`<div style="color:#ffc66d;"><strong>Warnings:</strong> ${escapeHtml(invWarnings.slice(0, 5).join(' | '))}</div>`);
@@ -8149,98 +8003,10 @@ function renderTraining() {
             </div>
         `;
 
-    const xrayRoot = (trainParityXrayData && typeof trainParityXrayData === 'object') ? trainParityXrayData : null;
-    const xrayReports = Array.isArray(xrayRoot?.backend_reports) ? xrayRoot.backend_reports : [];
-    const xraySummary = (xrayRoot && typeof xrayRoot.summary === 'object') ? xrayRoot.summary : {};
-    const xrayImprovement = (xrayRoot && typeof xrayRoot.improvement === 'object') ? xrayRoot.improvement : {};
-    const xrayFormulas = (xrayRoot && typeof xrayRoot.formulas === 'object') ? xrayRoot.formulas : {};
-    const xrayRows = xrayReports.map((row) => {
-        const backend = (row && typeof row.backend === 'object') ? row.backend : {};
-        const metrics = (row && typeof row.metrics === 'object') ? row.metrics : {};
-        return `
-            <tr>
-                <td><code>${escapeHtml(String(row?.key || '-'))}</code></td>
-                <td><code>${escapeHtml(String(backend.rmsnorm || '-'))}</code></td>
-                <td><code>${escapeHtml(String(backend.swiglu || '-'))}</code></td>
-                <td><code>${escapeHtml(String(backend.loss || '-'))}</code></td>
-                <td>${Number(metrics.first_loss_diff || 0).toExponential(3)}</td>
-                <td>${Number(metrics.first_logit_max_abs_diff || 0).toExponential(3)}</td>
-                <td>${Number(metrics.first_grad_max_abs_diff || 0).toExponential(3)}</td>
-                <td>${Number(metrics.first_param_max_abs_diff || 0).toExponential(3)}</td>
-                <td><code>${escapeHtml(String(metrics.first_worst_grad_param || '-'))}</code></td>
-            </tr>
-        `;
-    }).join('');
-    const xraySection = xrayRoot
-        ? `
-            <div class="parity-section" style="margin-top:0.8rem;">
-                <h3><span class="badge badge-blue">Xray</span> Backend Divergence Attribution</h3>
-                <div style="color:var(--text-muted);margin-bottom:0.5rem;">
-                    suspected_source=<code>${escapeHtml(String(xraySummary.suspected_source || 'unknown'))}</code>
-                    | rationale=${escapeHtml(String(xraySummary.rationale || '-'))}
-                </div>
-                <div style="overflow:auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Probe</th><th>RMSNorm</th><th>SwiGLU</th><th>Loss</th>
-                                <th>first_loss_diff</th><th>first_logit_diff</th><th>first_grad_diff</th><th>first_param_diff</th><th>worst_grad_param</th>
-                            </tr>
-                        </thead>
-                        <tbody>${xrayRows || '<tr><td colspan="9">No backend probe rows.</td></tr>'}</tbody>
-                    </table>
-                </div>
-                <div style="margin-top:0.5rem;color:var(--text-muted);">
-                    reductions: rmsnorm=${Number(xrayImprovement.loss_diff_reduction_when_rmsnorm_torch || 0).toExponential(3)},
-                    swiglu=${Number(xrayImprovement.loss_diff_reduction_when_swiglu_torch || 0).toExponential(3)},
-                    loss=${Number(xrayImprovement.loss_diff_reduction_when_loss_torch || 0).toExponential(3)},
-                    all_torch=${Number(xrayImprovement.loss_diff_reduction_when_all_torch || 0).toExponential(3)}
-                </div>
-                <details style="margin-top:0.5rem;">
-                    <summary style="cursor:pointer;color:var(--orange);">Show reference formulas</summary>
-                    <table style="margin-top:0.5rem;">
-                        <thead><tr><th>Component</th><th>Formula</th></tr></thead>
-                        <tbody>
-                            <tr><td>RMSNorm forward</td><td><code>${escapeHtml(String(xrayFormulas.rmsnorm_forward || '-'))}</code></td></tr>
-                            <tr><td>RMSNorm backward</td><td><code>${escapeHtml(String(xrayFormulas.rmsnorm_backward || '-'))}</code></td></tr>
-                            <tr><td>SwiGLU forward</td><td><code>${escapeHtml(String(xrayFormulas.swiglu_forward || '-'))}</code></td></tr>
-                            <tr><td>SwiGLU backward</td><td><code>${escapeHtml(String(xrayFormulas.swiglu_backward || '-'))}</code></td></tr>
-                            <tr><td>Cross-entropy grad</td><td><code>${escapeHtml(String(xrayFormulas.cross_entropy_grad || '-'))}</code></td></tr>
-                            <tr><td>AdamW update</td><td><code>${escapeHtml(String(xrayFormulas.adamw_update || '-'))}</code></td></tr>
-                        </tbody>
-                    </table>
-                </details>
-            </div>
-        `
-        : `
-            <div class="parity-section" style="margin-top:0.8rem;">
-                <h3><span class="badge badge-orange">Xray</span> Backend Divergence Attribution</h3>
-                <div style="color:var(--text-muted);">No <code>regimen_backend_xray.json</code> loaded yet.</div>
-            </div>
-        `;
-
     runGatePanel.innerHTML = `
         <table>
             <thead><tr><th>Gate</th><th>Status</th><th>Key Metric</th></tr></thead>
             <tbody>
-                <tr>
-                    <td>Parity regimen</td>
-                    <td>${statusBadge(trainParityRegimenData ? (trainParityRegimenData?.summary?.passed === true) : undefined)}</td>
-                    <td>${
-                        trainParityRegimenData
-                            ? `stages=${Number(trainParityRegimenData?.summary?.passed_stages || 0)}/${Number(trainParityRegimenData?.summary?.total_stages || 0)}, failed=${Array.isArray(trainParityRegimenData?.summary?.failed_stage_ids) ? trainParityRegimenData.summary.failed_stage_ids.join(',') || 'none' : '-'}`
-                            : '-'
-                    }</td>
-                </tr>
-                <tr>
-                    <td>Canary rows (row1/row2)</td>
-                    <td>${statusBadge(trainCanarySummaryData ? (trainCanarySummaryData?.status === 'pass') : undefined)}</td>
-                    <td>${
-                        trainCanarySummaryData
-                            ? `status=${escapeHtml(String(trainCanarySummaryData?.status || '-'))}, compared=${Number(trainCanarySummaryData?.rows_compared || 0)}, passed=${Number(trainCanarySummaryData?.rows_passed || 0)}, failed=${Number(trainCanarySummaryData?.rows_failed || 0)}, missing=${Number(trainCanarySummaryData?.rows_missing || 0)}`
-                            : '-'
-                    }</td>
-                </tr>
                 <tr>
                     <td>Contracts</td>
                     <td>${statusBadge(trainContractData ? (trainContractData.summary?.fail === 0) : undefined)}</td>
@@ -8264,15 +8030,6 @@ function renderTraining() {
                     <td>Epoch-3 parity</td>
                     <td>${statusBadge(trainParityEpoch3Data ? (trainParityEpoch3Data.pass_parity === true) : undefined)}</td>
                     <td>${trainParityEpoch3Data ? `max_loss_diff=${Number(trainParityEpoch3Data.max_loss_abs_diff || 0).toExponential(3)}` : '-'}</td>
-                </tr>
-                <tr>
-                    <td>Backend xray</td>
-                    <td>${statusBadge(trainParityXrayData ? (trainParityXrayData?.summary?.status === 'ok') : undefined)}</td>
-                    <td>${
-                        trainParityXrayData
-                            ? `suspected_source=${escapeHtml(String(trainParityXrayData?.summary?.suspected_source || 'unknown'))}, baseline_first_loss=${Number((trainParityXrayData?.backend_reports || []).find(r => r?.key === 'baseline_c')?.metrics?.first_loss_diff || 0).toExponential(3)}, baseline_first_param=${Number((trainParityXrayData?.backend_reports || []).find(r => r?.key === 'baseline_c')?.metrics?.first_param_max_abs_diff || 0).toExponential(3)}`
-                            : '-'
-                    }</td>
                 </tr>
                 <tr>
                     <td>Replay determinism</td>
@@ -8299,7 +8056,6 @@ function renderTraining() {
                 </tr>
             </tbody>
         </table>
-        ${xraySection}
         ${ledgerSection}
     `;
 
@@ -9795,12 +9551,6 @@ function renderTraining() {
                     } else if (name.includes('training_pipeline')) {
                         trainPipelineData = info.data;
                         console.log('Auto-loaded: training pipeline');
-                    } else if (name.includes('backend_xray') || name.includes('training_parity_xray')) {
-                        trainParityXrayData = info.data;
-                        console.log('Auto-loaded: training parity backend xray');
-                    } else if (name.includes('training_canary_summary')) {
-                        trainCanarySummaryData = info.data;
-                        console.log('Auto-loaded: training canary summary');
                     } else if (name.includes('regression_ledger')) {
                         regressionLedgerData = info.data;
                         console.log('Auto-loaded: regression ledger');
@@ -11377,6 +11127,15 @@ function renderProfileHowTo() {
         explicitModelDirCmd,
         `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
+    const profilePrefillCmd = [
+        explicitModelDirCmd,
+        `make profile-v7-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+    ].join('\n');
+    const profileTimingSweepCmd = [
+        explicitModelDirCmd,
+        `make profile-v7-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+    ].join('\n');
     const perfStatCmd = [
         explicitModelDirCmd,
         `make profile-v7-perf-stat V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
@@ -11384,6 +11143,13 @@ function renderProfileHowTo() {
     const flamegraphCmd = [
         explicitModelDirCmd,
         `make profile-v7-flamegraph V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+    ].join('\n');
+    const flamegraphRecoverCmd = [
+        explicitModelDirCmd,
+        '# If perf is blocked, enable perf sampling permissions first:',
+        'sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0',
+        `make profile-v7-flamegraph V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        'python3 version/v7/tools/open_ir_visualizer.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
     const cachegrindCmd = [
         explicitModelDirCmd,
@@ -11476,7 +11242,7 @@ function renderProfileHowTo() {
 
     const artifactHelp = {
         'profile_summary.json': {
-            why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown). If model_v7.c has zero CK_PROFILE sections, regenerate decode with CK_PROFILE enabled first.',
+            why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown). If model_v7.c has zero CK_PROFILE sections, regenerate decode or prefill with CK_PROFILE enabled first.',
             cmd: profileCompileCheckCmd,
         },
         'perf_stat_summary.json': {
@@ -11484,8 +11250,8 @@ function renderProfileHowTo() {
             cmd: perfStatCmd,
         },
         'flamegraph_manifest.json': {
-            why: 'Flamegraph index linking folded stacks and SVG hotspot view.',
-            cmd: flamegraphCmd,
+            why: 'Flamegraph index linking folded stacks and SVG hotspot view. Includes a perf sysctl fallback if perf record is permission-blocked.',
+            cmd: flamegraphRecoverCmd,
         },
         'cachegrind_summary.json': {
             why: 'Cachegrind summary for instruction/data/cache-miss attribution by function.',
@@ -11634,34 +11400,49 @@ function renderProfileHowTo() {
                 </summary>
                 <div class="profile-phase-body">
                     <p class="profile-phase-desc">
-                        This is the heart of the profiling workflow. First, capture per-kernel decode timing
-                        (profile_summary.json). Then layer on <strong>perf stat</strong> for IPC / cache / branch
+                        This is the heart of the profiling workflow. First, capture per-kernel timing
+                        (decode and prefill are both supported). Then layer on <strong>perf stat</strong> for IPC / cache / branch
                         counters, <strong>FlameGraph</strong> for visual stack hotspots, and
-                        <strong>Cachegrind</strong> for precise cache-miss attribution. The one-liner below runs all four.
+                        <strong>Cachegrind</strong> for precise cache-miss attribution. The one-liner below runs the decode-focused full stack.
+                    </p>
+                    <p class="profile-phase-desc" style="margin-top:-0.25rem;">
+                        <strong>Scope:</strong> <code>profile-v7-prefill</code> gives prefill timing coverage. Current
+                        <code>profile-v7-perf-stat</code>, <code>profile-v7-flamegraph</code>, <code>profile-v7-vtune</code>,
+                        and <code>profile-v7-advisor</code> targets are decode-path captures.
                     </p>
                     <div class="profile-howto-grid">
                         ${renderHowToBlock(
-                            'All Core Artifacts (recommended)',
+                            'All Core Artifacts (Decode, recommended)',
                             fullPerfCmd,
                             'Runs decode profile + perf stat + flamegraph + cachegrind + perf gate in sequence. This single command populates the main Profile charts, CPU counters, flamegraph viewer, and cache analysis panels.'
                         )}
                         ${renderHowToBlock(
-                            'Decode Timing Only',
+                            'Decode + Prefill Timing Sweep',
+                            profileTimingSweepCmd,
+                            'Runs a prefill-focused timing pass first, then restores the decode-focused timing pass. Use this when you want explicit prefill coverage without losing the default decode summary.'
+                        )}
+                        ${renderHowToBlock(
+                            'Decode Timing Only (profile_summary)',
                             profileDecodeCmd,
                             'Runs the model through a decode pass with CK_PROFILE instrumentation. Produces profile_decode.csv → profile_summary.json with per-kernel microsecond timings.'
                         )}
                         ${renderHowToBlock(
-                            'perf stat — Hardware Counters',
+                            'Prefill Timing Only (profile_summary)',
+                            profilePrefillCmd,
+                            'Runs a prompt-ingest (prefill) focused timing pass. Note: this rewrites profile_decode.csv/profile_summary.json, so re-run decode timing afterwards if you want decode-focused charts.'
+                        )}
+                        ${renderHowToBlock(
+                            'perf stat — Hardware Counters (Decode)',
                             perfStatCmd,
                             'Uses Linux perf to capture IPC (instructions per cycle), cache miss rates, and branch misprediction rates. Shows whether the workload is compute-bound or memory-bound.'
                         )}
                         ${renderHowToBlock(
-                            'FlameGraph — Stack Hotspots',
+                            'FlameGraph — Stack Hotspots (Decode)',
                             flamegraphCmd,
                             'Records perf call stacks, collapses them with stackcollapse-perf.pl, and generates an interactive SVG flamegraph. Great for seeing which functions dominate wall-clock time.'
                         )}
                         ${renderHowToBlock(
-                            'Cachegrind — Cache Miss Attribution',
+                            'Cachegrind — Cache Miss Attribution (Decode)',
                             cachegrindNativeCmd,
                             'Runs the binary under Valgrind\'s cachegrind tool to simulate CPU cache behaviour. Gives exact L1/LL miss counts per function — the definitive cache locality diagnostic.'
                         )}
@@ -13585,36 +13366,6 @@ function renderProfileHowTo() {
             { id:'inference',  num:8, icon:'✨', label:'Inference',     sub:'Prompt → output',     color:'#ffd700', tab:'profile' },
         ];
 
-        function resolveDpDataLab(files) {
-            const srcFiles = files && typeof files === 'object' ? files : {};
-            const pipeline = srcFiles.training_pipeline && typeof srcFiles.training_pipeline === 'object'
-                ? srcFiles.training_pipeline
-                : {};
-            const dataLab = pipeline.data_lab && typeof pipeline.data_lab === 'object'
-                ? pipeline.data_lab
-                : {};
-            const provenance = Array.isArray(pipeline.data_provenance)
-                ? pipeline.data_provenance.filter((row) => row && typeof row === 'object')
-                : [];
-            const firstProv = provenance.length > 0 ? provenance[0] : {};
-            const tokLineage = pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object'
-                ? pipeline.tokenizer_lineage
-                : {};
-            if (!dataLab.dataset_path && typeof firstProv.source_path === 'string') dataLab.dataset_path = firstProv.source_path;
-            if (!dataLab.dataset_dir && typeof dataLab.dataset_path === 'string' && dataLab.dataset_path.includes('/')) {
-                dataLab.dataset_dir = dataLab.dataset_path.slice(0, dataLab.dataset_path.lastIndexOf('/'));
-            }
-            if (!dataLab.tokenizer_json_path && typeof tokLineage.tokenizer_path === 'string') dataLab.tokenizer_json_path = tokLineage.tokenizer_path;
-            if (!dataLab.dataset_qc && srcFiles.dataset_qc) dataLab.dataset_qc = srcFiles.dataset_qc;
-            if (!dataLab.dataset_profile && srcFiles.dataset_profile) dataLab.dataset_profile = srcFiles.dataset_profile;
-            if (!dataLab.tokenizer_roundtrip && srcFiles.tokenizer_roundtrip) dataLab.tokenizer_roundtrip = srcFiles.tokenizer_roundtrip;
-            if (!dataLab.post_train_eval && srcFiles.post_train_eval) dataLab.post_train_eval = srcFiles.post_train_eval;
-            if (!dataLab.tokenizer_preview && srcFiles.tokenizer_preview) dataLab.tokenizer_preview = srcFiles.tokenizer_preview;
-            if (!dataLab.step_055 && srcFiles.step_055) dataLab.step_055 = srcFiles.step_055;
-            if (!dataLab.step_056 && srcFiles.step_056) dataLab.step_056 = srcFiles.step_056;
-            return dataLab;
-        }
-
         function renderDpFullStackSpectrum() {
             const root = document.getElementById('dpControlSpectrum');
             if (!root) return;
@@ -13622,7 +13373,7 @@ function renderProfileHowTo() {
                 ? window.EMBEDDED_IR_DATA.files
                 : {};
             const hasTrainRuntime = hasEmbeddedTrainRuntimeContext();
-            const dataLab = resolveDpDataLab(files);
+            const dataLab = resolveDataLab(files);
 
             const stageBadge = (state) => {
                 if (state === 'ready') return '<span style="padding:0.1rem 0.45rem;border-radius:999px;border:1px solid #3a8f63;color:#a5f0c7;font-size:0.66rem;">ready</span>';
@@ -13717,686 +13468,11 @@ function renderProfileHowTo() {
                 <div class="parity-section" style="margin-bottom:0;">
                     <h3><span class="badge badge-blue">Full Stack</span> Control Spectrum (Computation + Data)</h3>
                     <p style="margin:0.35rem 0 0.7rem;color:var(--text-secondary);font-size:0.78rem;">
-                        Operator view of end-to-end control. Data lane shows corpus/tokenizer/fidelity/quality leverage first; computation lane tracks kernels/runtime/profiling leverage.
+                        Operator view of end-to-end control. Computation lane tracks kernel/runtime/profiling leverage; data lane tracks corpus/tokenizer/fidelity/quality leverage.
                     </p>
                     <div style="display:grid;grid-template-columns:1fr;gap:0.7rem;">
-                        ${laneHtml('Data Spectrum', 'Corpus → tokenizer → fidelity → telemetry → output quality', '#ff8c00', dataStages)}
                         ${laneHtml('Computation Spectrum', 'IR → kernels → runtime → microarchitecture → gates', '#07adf8', computationStages)}
-                    </div>
-                </div>
-            `;
-        }
-
-        const DP_MODEL_FLOW = [
-            { key: 'pretrain', label: 'Pretraining', hint: 'Raw corpus + next-token objective' },
-            { key: 'midtrain', label: 'Midtraining', hint: 'Domain refresh / capability rebalance' },
-            { key: 'long_context', label: 'Long Context', hint: 'Sequence extension and stability' },
-            { key: 'sft', label: 'SFT', hint: 'Instruction alignment' },
-            { key: 'dpo', label: 'DPO', hint: 'Preference shaping' },
-            { key: 'rl', label: 'RL', hint: 'Policy optimization' },
-        ];
-
-        function normalizeDpStage(rawStage) {
-            const s = String(rawStage || '').toLowerCase().trim();
-            if (!s) return 'pretrain';
-            if (s.includes('pretrain') || s === 'base') return 'pretrain';
-            if (s.includes('midtrain')) return 'midtrain';
-            if (s.includes('long')) return 'long_context';
-            if (s.includes('sft')) return 'sft';
-            if (s.includes('dpo')) return 'dpo';
-            if (s.includes('rl') || s.includes('grpo')) return 'rl';
-            return 'pretrain';
-        }
-
-        function resolveDpPipeline() {
-            if (trainPipelineData && typeof trainPipelineData === 'object') return trainPipelineData;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            if (files.training_pipeline && typeof files.training_pipeline === 'object') return files.training_pipeline;
-            return {};
-        }
-
-        function renderDpStageFlow() {
-            const root = document.getElementById('dpStageFlow');
-            if (!root) return;
-            const pipeline = resolveDpPipeline();
-            const activeStage = normalizeDpStage(pipeline.active_stage || pipeline.mode || 'pretrain');
-            const activeIdx = Math.max(0, DP_MODEL_FLOW.findIndex((s) => s.key === activeStage));
-
-            const stagePills = DP_MODEL_FLOW.map((stage, idx) => {
-                const isActive = idx === activeIdx;
-                const isDone = idx < activeIdx;
-                const stateText = isActive ? 'active' : (isDone ? 'done' : 'pending');
-                const border = isActive ? '#ffb400' : (isDone ? '#3a8f63' : 'var(--grey)');
-                const fg = isActive ? '#ffd58a' : (isDone ? '#a5f0c7' : 'var(--text-secondary)');
-                const bg = isActive ? 'rgba(255,180,0,0.10)' : (isDone ? 'rgba(71,180,117,0.10)' : 'var(--bg-dark)');
-                return `
-                    <div style="min-width:170px;background:${bg};border:1px solid ${border};border-radius:999px;padding:0.45rem 0.75rem;">
-                        <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:center;">
-                            <strong style="font-size:0.74rem;color:${fg};">${stage.label}</strong>
-                            <span style="font-size:0.64rem;color:${fg};text-transform:uppercase;">${stateText}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('<span style="align-self:center;color:var(--grey-light);">→</span>');
-
-            const activeCard = DP_MODEL_FLOW[activeIdx] || DP_MODEL_FLOW[0];
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-orange">Stage</span> Training Program Flow</h3>
-                    <p style="margin:0.35rem 0 0.65rem;color:var(--text-secondary);font-size:0.78rem;">
-                        Tracks where this run is in the training lifecycle (inspired by staged model-flow views).
-                    </p>
-                    <div style="display:flex;gap:0.45rem;overflow-x:auto;padding-bottom:0.2rem;margin-bottom:0.75rem;">
-                        ${stagePills}
-                    </div>
-                    <div style="padding:0.7rem 0.8rem;background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;">
-                        <div style="font-size:0.74rem;color:var(--text-primary);">
-                            <strong style="color:#ffb400;">Current stage:</strong> ${activeCard.label}
-                        </div>
-                        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">
-                            ${activeCard.hint}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderDpCurriculumPanel() {
-            const root = document.getElementById('dpCurriculumPanel');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const pipeline = resolveDpPipeline();
-            const dataLab = resolveDpDataLab(files);
-            const qc = dataLab.dataset_qc && typeof dataLab.dataset_qc === 'object' ? dataLab.dataset_qc : {};
-            const qcChecks = qc.checks && typeof qc.checks === 'object' ? qc.checks : (qc.checks || {});
-            const rowCount = Number(qc.non_empty_lines || 0);
-            const dsPath = String(dataLab.dataset_path || '').toLowerCase();
-            const provenance = Array.isArray(pipeline.data_provenance) ? pipeline.data_provenance : [];
-            const activeStage = normalizeDpStage(pipeline.active_stage || pipeline.mode || 'pretrain');
-            const curriculumRaw = String(
-                pipeline.curriculum_stage ||
-                (pipeline.execution && pipeline.execution.curriculum_stage) ||
-                ''
-            ).toLowerCase();
-            const step056 = dataLab.step_056 && typeof dataLab.step_056 === 'object' ? dataLab.step_056 : {};
-
-            const step05Ready = Boolean(
-                qc.status === 'pass' ||
-                (qcChecks.ascii_gate === true && (qcChecks.svg_row_gate === true || qc.require_svg_rows === false))
-            );
-            const step055Ready = Boolean(
-                /(scaled|assets_docs|docs_ascii|instruction_aug|svg_assets_docs|_ascii_all)/.test(dsPath) ||
-                provenance.length > 1 ||
-                rowCount >= 1000
-            );
-            const step056Ready = Boolean(
-                step056.detected === true ||
-                /(stage_a_plus_bridge|stage-a-plus-bridge|bridge_small|bridge_pack)/.test(dsPath)
-            );
-            const stageBActive = Boolean(curriculumRaw.includes('stage_b') || curriculumRaw.includes('midtrain') || activeStage === 'midtrain');
-            const stageAActive = !stageBActive && Boolean(curriculumRaw.includes('stage_a') || activeStage === 'pretrain');
-
-            const statusPill = (label, status, detail) => {
-                const map = {
-                    active: { border: '#ffb400', fg: '#ffd58a', bg: 'rgba(255,180,0,0.10)' },
-                    done: { border: '#3a8f63', fg: '#a5f0c7', bg: 'rgba(71,180,117,0.10)' },
-                    pending: { border: 'var(--grey)', fg: 'var(--text-secondary)', bg: 'var(--bg-dark)' },
-                };
-                const c = map[status] || map.pending;
-                return `
-                    <div style="background:${c.bg};border:1px solid ${c.border};border-radius:8px;padding:0.55rem 0.62rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;">
-                            <strong style="font-size:0.72rem;color:${c.fg};">${label}</strong>
-                            <span style="font-size:0.64rem;color:${c.fg};text-transform:uppercase;">${status}</span>
-                        </div>
-                        <div style="font-size:0.67rem;color:var(--text-muted);margin-top:0.25rem;line-height:1.4;">${detail}</div>
-                    </div>
-                `;
-            };
-
-            const s05 = step05Ready ? 'done' : 'pending';
-            const s055 = step055Ready ? 'done' : 'pending';
-            const s056 = step056Ready ? 'done' : 'pending';
-            const sA = stageBActive ? 'done' : (stageAActive ? 'active' : 'pending');
-            const sB = stageBActive ? 'active' : 'pending';
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-orange">Curriculum</span> 0.5 -> 0.55 -> 0.56 -> Stage A -> Stage B</h3>
-                    <p style="margin:0.35rem 0 0.6rem;color:var(--text-secondary);font-size:0.75rem;">
-                        Data-prep steps (0.5/0.55/0.56) are preparation phases; Stage A/B are training phases.
-                    </p>
-                    <div style="display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:0.5rem;">
-                        ${statusPill('Step 0.5', s05, 'Baseline cleanup + QC gates on current dataset.')}
-                        ${statusPill('Step 0.55', s055, 'Scale-up corpus from repo SVG assets + synthetic rows.')}
-                        ${statusPill('Step 0.56', s056, 'Stage-A bridge: inject core Stage-B syntax primitives.')}
-                        ${statusPill('Stage A', sA, 'Pretraining: simple forms, closure and syntax stability.')}
-                        ${statusPill('Stage B', sB, 'Midtraining: charts/infographics and richer composition.')}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderDpScalePackPanel() {
-            const root = document.getElementById('dpScalePackPanel');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const dataLab = resolveDpDataLab(files);
-            const step055 = dataLab.step_055 && typeof dataLab.step_055 === 'object' ? dataLab.step_055 : {};
-            const step056 = dataLab.step_056 && typeof dataLab.step_056 === 'object' ? dataLab.step_056 : {};
-            const sources = Array.isArray(step055.sources) ? step055.sources : [];
-            const datasetDir = String(step055.dataset_dir || dataLab.dataset_dir || '-');
-            const bridgeMissingBefore = Array.isArray(step056.missing_features_from_stage_a) ? step056.missing_features_from_stage_a : [];
-            const bridgeMissingAfter = Array.isArray(step056.missing_features_after_bridge_only) ? step056.missing_features_after_bridge_only : [];
-            const bridgeSummary = step056 && Object.keys(step056).length > 0
-                ? `
-                    <div style="margin-top:0.65rem;padding:0.55rem;border:1px solid var(--grey);border-radius:8px;background:var(--bg-dark);font-size:0.7rem;">
-                        <div style="margin-bottom:0.2rem;"><strong>Step 0.56 Bridge Pack</strong></div>
-                        <div><code>manifest:</code> <code>${escapeHtml(String(step056.manifest_path || '-'))}</code></div>
-                        <div><code>bridge_rows:</code> ${escapeHtml(String(step056.bridge_rows ?? '-'))}</div>
-                        <div><code>missing_from_stage_a:</code> ${escapeHtml(bridgeMissingBefore.length ? bridgeMissingBefore.join(',') : '-')}</div>
-                        <div><code>missing_after_bridge:</code> ${escapeHtml(bridgeMissingAfter.length ? bridgeMissingAfter.join(',') : '-')}</div>
-                    </div>
-                `
-                : '';
-
-            if (sources.length === 0) {
-                root.innerHTML = `
-                    <div class="parity-section" style="margin-bottom:0;">
-                        <h3><span class="badge badge-green">Step 0.55</span> Scaled Corpus Sources</h3>
-                        <p style="margin:0.35rem 0 0.55rem;color:var(--text-secondary);font-size:0.74rem;">
-                            No Step 0.55 source manifests detected for this run. If you used scaled corpus prep, regenerate report with the same <code>DATA_DIR</code>.
-                        </p>
-                        <div style="font-size:0.7rem;color:var(--text-muted);"><code>dataset_dir:</code> <code>${escapeHtml(datasetDir)}</code></div>
-                        ${bridgeSummary}
-                    </div>
-                `;
-                return;
-            }
-
-            const rows = sources.map((s, idx) => {
-                const label = String(s.label || s.name || `source_${idx + 1}`);
-                const rowCount = (s.rows !== undefined && s.rows !== null) ? s.rows : ((s.samples !== undefined && s.samples !== null) ? s.samples : '-');
-                const path = String(s.path || '-');
-                const note = String(s.note || '-');
-                return `
-                    <tr style="border-bottom:1px solid var(--grey);">
-                        <td style="padding:0.42rem;">${escapeHtml(label)}</td>
-                        <td style="padding:0.42rem;">${escapeHtml(String(rowCount))}</td>
-                        <td style="padding:0.42rem;max-width:420px;overflow-wrap:anywhere;"><code>${escapeHtml(path)}</code></td>
-                        <td style="padding:0.42rem;color:var(--text-muted);">${escapeHtml(note)}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-green">Step 0.55</span> Scaled Corpus Sources</h3>
-                    <p style="margin:0.35rem 0 0.55rem;color:var(--text-secondary);font-size:0.74rem;">
-                        Stage-B ready data provenance detected from manifest files.
-                    </p>
-                    <div style="overflow:auto;border:1px solid var(--grey);border-radius:8px;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
-                            <thead>
-                                <tr style="background:var(--dark-card);border-bottom:1px solid var(--grey);">
-                                    <th style="text-align:left;padding:0.42rem;">source</th>
-                                    <th style="text-align:left;padding:0.42rem;">rows/samples</th>
-                                    <th style="text-align:left;padding:0.42rem;">manifest path</th>
-                                    <th style="text-align:left;padding:0.42rem;">note</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                    <div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.4rem;"><code>dataset_dir:</code> <code>${escapeHtml(datasetDir)}</code></div>
-                    ${bridgeSummary}
-                </div>
-            `;
-        }
-
-        var dpDatasetViewerRows = [];
-
-        function dpRenderDatasetViewerRows(filterText) {
-            const body = document.getElementById('dpDatasetRowsBody');
-            if (!body) return;
-            const needle = String(filterText || '').toLowerCase().trim();
-            const rows = needle
-                ? dpDatasetViewerRows.filter((r) => String(r.preview || '').toLowerCase().includes(needle) || String(r.source || '').toLowerCase().includes(needle))
-                : dpDatasetViewerRows;
-            body.innerHTML = rows.map((r) => `
-                <tr style="border-bottom:1px solid var(--grey);">
-                    <td style="padding:0.4rem;">${escapeHtml(String(r.source || '-'))}</td>
-                    <td style="padding:0.4rem;">${escapeHtml(String(r.row || '-'))}</td>
-                    <td style="padding:0.4rem;">${escapeHtml(String(r.chars || '-'))}</td>
-                    <td style="padding:0.4rem;">${escapeHtml(String(r.tokens || '-'))}</td>
-                    <td style="padding:0.4rem;max-width:560px;overflow-wrap:anywhere;"><code>${escapeHtml(String(r.preview || '-'))}</code></td>
-                </tr>
-            `).join('') || '<tr><td colspan="5" style="padding:0.5rem;color:var(--text-muted);">No matching rows.</td></tr>';
-        }
-
-        function dpFilterDatasetViewer() {
-            const input = document.getElementById('dpDatasetSearch');
-            dpRenderDatasetViewerRows(input ? input.value : '');
-        }
-
-        function renderDpDatasetViewer() {
-            const root = document.getElementById('dpDatasetViewer');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const dataLab = resolveDpDataLab(files);
-            const roundtrip = dataLab.tokenizer_roundtrip && typeof dataLab.tokenizer_roundtrip === 'object' ? dataLab.tokenizer_roundtrip : {};
-            const profile = dataLab.dataset_profile && typeof dataLab.dataset_profile === 'object' ? dataLab.dataset_profile : {};
-            const roundtripRows = Array.isArray(roundtrip.sample_rows) ? roundtrip.sample_rows : [];
-            const topRows = profile.duplicates && Array.isArray(profile.duplicates.top_rows) ? profile.duplicates.top_rows : [];
-
-            const rows = [];
-            roundtripRows.forEach((row) => {
-                if (!row || typeof row !== 'object') return;
-                const preview = String(row.decoded || '').trim();
-                rows.push({
-                    source: 'roundtrip',
-                    row: row.line_no ?? '-',
-                    chars: preview.length || '-',
-                    tokens: row.token_count ?? '-',
-                    preview: preview.slice(0, 280),
-                });
-            });
-            topRows.forEach((row, idx) => {
-                if (!row || typeof row !== 'object') return;
-                const preview = String(row.line || '').trim();
-                rows.push({
-                    source: 'profile_top',
-                    row: idx + 1,
-                    chars: row.chars ?? preview.length ?? '-',
-                    tokens: '-',
-                    preview: preview.slice(0, 280),
-                });
-            });
-
-            const dedup = [];
-            const seen = new Set();
-            for (const row of rows) {
-                const key = `${row.source}::${row.preview}`;
-                if (seen.has(key)) continue;
-                seen.add(key);
-                dedup.push(row);
-                if (dedup.length >= 120) break;
-            }
-            dpDatasetViewerRows = dedup;
-
-            if (dpDatasetViewerRows.length === 0) {
-                root.innerHTML = `
-                    <div class="parity-section" style="margin-bottom:0;">
-                        <h3><span class="badge badge-blue">Dataset</span> Dataset Viewer (sample)</h3>
-                        <p style="color:var(--text-muted);font-size:0.74rem;">No row samples available yet from tokenizer_roundtrip/dataset_profile.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-blue">Dataset</span> Dataset Viewer (sample)</h3>
-                    <p style="margin:0.35rem 0 0.55rem;color:var(--text-secondary);font-size:0.74rem;">
-                        HuggingFace-style quick viewer for run-local data samples (preview rows, not full corpus).
-                    </p>
-                    <div style="margin-bottom:0.5rem;">
-                        <input id="dpDatasetSearch" type="text" oninput="dpFilterDatasetViewer()"
-                            placeholder="Search sample rows..."
-                            style="width:100%;padding:0.45rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;font-size:0.75rem;">
-                    </div>
-                    <div style="overflow:auto;max-height:320px;border:1px solid var(--grey);border-radius:8px;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
-                            <thead>
-                                <tr style="position:sticky;top:0;background:var(--dark-card);z-index:1;border-bottom:1px solid var(--grey);">
-                                    <th style="text-align:left;padding:0.4rem;">source</th>
-                                    <th style="text-align:left;padding:0.4rem;">row</th>
-                                    <th style="text-align:left;padding:0.4rem;">chars</th>
-                                    <th style="text-align:left;padding:0.4rem;">tokens</th>
-                                    <th style="text-align:left;padding:0.4rem;">preview</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dpDatasetRowsBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            dpRenderDatasetViewerRows('');
-        }
-
-        const DP_GENERATOR_TYPES = [
-            "line",
-            "ellipse",
-            "triangle",
-            "rounded_triangle",
-            "polygon",
-            "path",
-            "arrow",
-            "double_arrow",
-            "rect_circle",
-            "bar_chart",
-            "comparison_table",
-            "polyline",
-            "text",
-        ];
-
-        function dpCollectGeneratorTypes() {
-            const out = [];
-            DP_GENERATOR_TYPES.forEach((t) => {
-                const el = document.getElementById(`dpGenType_${t}`);
-                if (el && el.checked) out.push(t);
-            });
-            return out;
-        }
-
-        function dpSetGeneratorPreset(preset) {
-            const setChecked = (name, on) => {
-                const el = document.getElementById(`dpGenType_${name}`);
-                if (el) el.checked = !!on;
-            };
-            if (preset === 'all') {
-                DP_GENERATOR_TYPES.forEach((t) => setChecked(t, true));
-            } else if (preset === 'shapes') {
-                DP_GENERATOR_TYPES.forEach((t) => setChecked(t, ["line","ellipse","triangle","rounded_triangle","polygon","path","arrow","double_arrow"].includes(t)));
-            } else if (preset === 'charts') {
-                DP_GENERATOR_TYPES.forEach((t) => setChecked(t, ["bar_chart","comparison_table","polyline","text","rect_circle"].includes(t)));
-            }
-            dpUpdateGeneratorCommand();
-        }
-
-        function dpUpdateGeneratorCommand() {
-            const preview = document.getElementById('dpGenCommandPreview');
-            if (!preview) return;
-            const outDir = document.getElementById('dpGenOutDir') ? document.getElementById('dpGenOutDir').value.trim() : "version/v7/data";
-            const prefix = document.getElementById('dpGenPrefix') ? document.getElementById('dpGenPrefix').value.trim() : "svg_instruction_ui";
-            const samples = document.getElementById('dpGenSamples') ? document.getElementById('dpGenSamples').value.trim() : "1000";
-            const holdout = document.getElementById('dpGenHoldout') ? document.getElementById('dpGenHoldout').value.trim() : "0.10";
-            const seed = document.getElementById('dpGenSeed') ? document.getElementById('dpGenSeed').value.trim() : "42";
-            const fillMode = document.getElementById('dpGenFillMode') ? document.getElementById('dpGenFillMode').value : "mixed";
-            const types = dpCollectGeneratorTypes();
-            const typesArg = types.length === 0 || types.length === DP_GENERATOR_TYPES.length
-                ? "all"
-                : types.join(",");
-
-            const cmd = [
-                "python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py",
-                `  --out-dir "${outDir || 'version/v7/data'}"`,
-                `  --prefix "${prefix || 'svg_instruction_ui'}"`,
-                `  --num-samples ${samples || '1000'}`,
-                `  --holdout-ratio ${holdout || '0.10'}`,
-                `  --seed ${seed || '42'}`,
-                `  --fill-mode ${fillMode || 'mixed'}`,
-                `  --types "${typesArg}"`,
-                "  --jsonl",
-            ].join(" \\\n");
-            preview.textContent = cmd;
-        }
-
-        function dpCopyGeneratorCommand() {
-            const preview = document.getElementById('dpGenCommandPreview');
-            if (!preview) return;
-            const txt = preview.textContent || '';
-            navigator.clipboard.writeText(txt).then(() => {
-                const status = document.getElementById('dpGenCopyStatus');
-                if (status) status.textContent = 'copied';
-            }).catch(() => {
-                const status = document.getElementById('dpGenCopyStatus');
-                if (status) status.textContent = 'copy failed';
-            });
-        }
-
-        function renderDpGeneratorWorkbench() {
-            const root = document.getElementById('dpGeneratorWorkbench');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const dataLab = resolveDpDataLab(files);
-            const outDir = String(dataLab.dataset_dir || "version/v7/data");
-            const typeChips = DP_GENERATOR_TYPES.map((t) => `
-                <label style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.45rem;border:1px solid var(--grey);border-radius:999px;font-size:0.7rem;">
-                    <input type="checkbox" id="dpGenType_${t}" checked onchange="dpUpdateGeneratorCommand()">
-                    <span>${escapeHtml(t)}</span>
-                </label>
-            `).join('');
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-blue">Generator</span> SVG Dataset Generator UI</h3>
-                    <p style="margin:0.35rem 0 0.55rem;color:var(--text-secondary);font-size:0.74rem;">
-                        Configure shape families and build an exact command for <code>generate_svg_instruction_dataset_v7.py</code>.
-                    </p>
-                    <div style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
-                        <label style="font-size:0.7rem;color:var(--text-muted);">out_dir
-                            <input id="dpGenOutDir" value="${escapeHtml(outDir)}" oninput="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                        </label>
-                        <label style="font-size:0.7rem;color:var(--text-muted);">prefix
-                            <input id="dpGenPrefix" value="svg_instruction_ui" oninput="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                        </label>
-                        <label style="font-size:0.7rem;color:var(--text-muted);">num_samples
-                            <input id="dpGenSamples" type="number" min="1" value="1000" oninput="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                        </label>
-                        <label style="font-size:0.7rem;color:var(--text-muted);">holdout_ratio
-                            <input id="dpGenHoldout" type="number" step="0.01" min="0" max="0.99" value="0.10" oninput="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                        </label>
-                        <label style="font-size:0.7rem;color:var(--text-muted);">seed
-                            <input id="dpGenSeed" type="number" value="42" oninput="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                        </label>
-                        <label style="font-size:0.7rem;color:var(--text-muted);">fill_mode
-                            <select id="dpGenFillMode" onchange="dpUpdateGeneratorCommand()"
-                                style="width:100%;margin-top:0.2rem;padding:0.38rem;background:var(--dark-card);color:var(--text-primary);border:1px solid var(--grey);border-radius:6px;">
-                                <option value="mixed">mixed</option>
-                                <option value="filled">filled</option>
-                                <option value="outline">outline</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.45rem;">
-                        <button onclick="dpSetGeneratorPreset('all')" style="padding:0.3rem 0.55rem;background:#263247;color:#d9e4ff;border:1px solid #385277;border-radius:6px;font-size:0.7rem;cursor:pointer;">All</button>
-                        <button onclick="dpSetGeneratorPreset('shapes')" style="padding:0.3rem 0.55rem;background:#2a2f3d;color:#ffd58a;border:1px solid #8a6a1f;border-radius:6px;font-size:0.7rem;cursor:pointer;">Shapes</button>
-                        <button onclick="dpSetGeneratorPreset('charts')" style="padding:0.3rem 0.55rem;background:#203628;color:#9ae8bc;border:1px solid #2f7a51;border-radius:6px;font-size:0.7rem;cursor:pointer;">Charts</button>
-                    </div>
-                    <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.55rem;">${typeChips}</div>
-                    <pre id="dpGenCommandPreview" style="font-size:0.72rem;white-space:pre-wrap;background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:0.65rem;margin-bottom:0.4rem;"></pre>
-                    <div style="display:flex;gap:0.45rem;align-items:center;">
-                        <button onclick="dpCopyGeneratorCommand()" style="padding:0.32rem 0.62rem;background:#ffb400;color:#121212;border:none;border-radius:6px;font-size:0.72rem;cursor:pointer;">Copy Command</button>
-                        <span id="dpGenCopyStatus" style="font-size:0.68rem;color:var(--text-muted);"></span>
-                    </div>
-                </div>
-            `;
-            dpUpdateGeneratorCommand();
-        }
-
-        function renderDpDataSourcePanel(tokInfo) {
-            const root = document.getElementById('dpDataSourcePanel');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const pipeline = resolveDpPipeline();
-            const dataLab = resolveDpDataLab(files);
-            const qc = dataLab.dataset_qc && typeof dataLab.dataset_qc === 'object' ? dataLab.dataset_qc : {};
-            const profile = dataLab.dataset_profile && typeof dataLab.dataset_profile === 'object' ? dataLab.dataset_profile : {};
-            const roundtrip = dataLab.tokenizer_roundtrip && typeof dataLab.tokenizer_roundtrip === 'object' ? dataLab.tokenizer_roundtrip : {};
-            const roundtripLineEval = roundtrip.line_eval && typeof roundtrip.line_eval === 'object' ? roundtrip.line_eval : {};
-            const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object' ? dataLab.post_train_eval : {};
-            const execution = pipeline.execution && typeof pipeline.execution === 'object' ? pipeline.execution : {};
-            const modelCfg = pipeline.model && typeof pipeline.model === 'object' ? pipeline.model : {};
-
-            const runCtx = (typeof getRunContext === 'function') ? getRunContext() : { runDir: null, modelPath: null };
-            const runDir = runCtx && runCtx.runDir ? String(runCtx.runDir) : '-';
-            const datasetPath = String(dataLab.dataset_path || qc.path || '-');
-            const tokenizerPath = String(dataLab.tokenizer_json_path || (tokInfo && tokInfo.tokPath) || '-');
-            const vocabSize = Number(tokInfo && tokInfo.vocabSize || modelCfg.vocab_size || 0);
-            const seqLen = Number(execution.seq_len || modelCfg.context_len || 0);
-            const lineLen = profile.line_length && typeof profile.line_length === 'object' ? profile.line_length : {};
-            const lineMax = Number(lineLen.max || 0);
-            const dupUnique = Number(profile.duplicates && profile.duplicates.duplicate_unique_rows || 0);
-            const nonEmpty = Number(qc.non_empty_lines || 0);
-
-            const suggestions = [];
-            if (nonEmpty > 0 && dupUnique > 0 && (dupUnique / nonEmpty) > 0.35) suggestions.push('High duplicate ratio: add more unique SVG samples or enable stronger dedup.');
-            if (seqLen > 0 && lineMax > 0 && lineMax > seqLen * 0.9) suggestions.push('Max line length is close to seq_len: increase seq_len or trim long rows.');
-            if (vocabSize > 0 && vocabSize < 512) suggestions.push('Vocab is small for SVG attribute diversity: consider vocab_size 640-2048.');
-            const exactRate = Number(roundtripLineEval.exact_match_rate || 0);
-            if (exactRate > 0 && exactRate < 0.99) suggestions.push('Tokenizer roundtrip is below 99% exact: inspect tokenizer merges and special tokens.');
-            const validSvgRate = Number(postEval.valid_svg_rate || 0);
-            if (validSvgRate > 0 && validSvgRate < 0.7) suggestions.push('Output quality is below gate (valid SVG rate < 0.70): expand corpus and add instruction→SVG pairs.');
-            if (suggestions.length === 0) suggestions.push('Current pretraining setup looks consistent; next leverage is dataset scale and task variety.');
-
-            const metricChip = (label, value, color = '#07adf8') => `
-                <span style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.18rem 0.45rem;border-radius:999px;border:1px solid ${color}66;color:${color};font-size:0.67rem;">
-                    <strong>${label}</strong> ${escapeHtml(String(value))}
-                </span>
-            `;
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-green">Data</span> Run Data Context</h3>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin:0.25rem 0 0.55rem;">
-                        What data this run is using, and what to tune next.
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
-                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;padding:0.65rem;">
-                            <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:0.2rem;">run_dir</div>
-                            <div style="font-size:0.72rem;overflow-wrap:anywhere;"><code>${escapeHtml(runDir)}</code></div>
-                            <div style="font-size:0.68rem;color:var(--text-muted);margin:0.5rem 0 0.2rem;">dataset_path</div>
-                            <div style="font-size:0.72rem;overflow-wrap:anywhere;"><code>${escapeHtml(datasetPath)}</code></div>
-                            <div style="font-size:0.68rem;color:var(--text-muted);margin:0.5rem 0 0.2rem;">tokenizer_path</div>
-                            <div style="font-size:0.72rem;overflow-wrap:anywhere;"><code>${escapeHtml(tokenizerPath)}</code></div>
-                        </div>
-                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;padding:0.65rem;">
-                            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.45rem;">
-                                ${metricChip('rows', nonEmpty || '-')}
-                                ${metricChip('vocab', vocabSize || '-', '#ffb400')}
-                                ${metricChip('seq_len', seqLen || '-', '#bc8cff')}
-                                ${metricChip('max_line', lineMax || '-', '#47b475')}
-                                ${metricChip('roundtrip', roundtripLineEval.exact_match_rate !== undefined ? Number(roundtripLineEval.exact_match_rate).toFixed(3) : '-', '#07adf8')}
-                                ${metricChip('valid_svg', postEval.valid_svg_rate !== undefined ? Number(postEval.valid_svg_rate).toFixed(3) : '-', '#ff6b9d')}
-                            </div>
-                            <div style="font-size:0.71rem;color:var(--text-secondary);line-height:1.45;">
-                                <strong style="color:#ffb400;">Expected next improvements:</strong>
-                                <ul style="margin:0.35rem 0 0 1rem;padding:0;">
-                                    ${suggestions.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderDpWhySvgPanel() {
-            const root = document.getElementById('dpWhySvgPanel');
-            if (!root) return;
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-orange">Why SVG</span> Why this domain is powerful for training</h3>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
-                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;padding:0.65rem;">
-                            <ul style="margin:0.1rem 0 0 1rem;padding:0;font-size:0.72rem;color:var(--text-secondary);line-height:1.45;">
-                                <li>Deterministic syntax with strict parse/render checks.</li>
-                                <li>Code-like structure (tags/attributes/hierarchy) + visual output.</li>
-                                <li>Fast operator feedback: quality is visible immediately.</li>
-                                <li>Easy staged progression: pretrain -> SFT -> preference -> RL.</li>
-                                <li>Repo-local bootstrap data from <code>docs/site/assets/*.svg</code>.</li>
-                            </ul>
-                        </div>
-                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;padding:0.65rem;">
-                            <div style="font-size:0.72rem;color:var(--text-primary);margin-bottom:0.25rem;"><strong>What to measure (SVG scorecard)</strong></div>
-                            <ul style="margin:0.1rem 0 0 1rem;padding:0;font-size:0.71rem;color:var(--text-secondary);line-height:1.45;">
-                                <li>Data quality: uniqueness, length vs seq_len, token efficiency.</li>
-                                <li>Syntax validity: parse pass, closure pass, malformed rate.</li>
-                                <li>Render validity: raster success, blank-canvas rate.</li>
-                                <li>Task fidelity: prompt-constraint pass (shape/color/layout).</li>
-                                <li>Training health: loss/ppl, grad norms, parity drift.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderDpSvgSampleViewer() {
-            const root = document.getElementById('dpSvgSampleViewer');
-            if (!root) return;
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const dataLab = resolveDpDataLab(files);
-            const roundtrip = dataLab.tokenizer_roundtrip && typeof dataLab.tokenizer_roundtrip === 'object' ? dataLab.tokenizer_roundtrip : {};
-            const profile = dataLab.dataset_profile && typeof dataLab.dataset_profile === 'object' ? dataLab.dataset_profile : {};
-            const roundtripRows = Array.isArray(roundtrip.sample_rows) ? roundtrip.sample_rows : [];
-            const topRows = profile.duplicates && Array.isArray(profile.duplicates.top_rows)
-                ? profile.duplicates.top_rows
-                : [];
-
-            const candidates = [];
-            roundtripRows.forEach((row) => {
-                if (!row || typeof row !== 'object') return;
-                const decoded = String(row.decoded || '').trim();
-                if (decoded.toLowerCase().includes('<svg')) candidates.push(decoded);
-            });
-            topRows.forEach((row) => {
-                if (!row || typeof row !== 'object') return;
-                const line = String(row.line || '').trim();
-                if (line.toLowerCase().includes('<svg')) candidates.push(line);
-            });
-            const uniq = [];
-            const seen = new Set();
-            for (const row of candidates) {
-                if (!row || seen.has(row)) continue;
-                seen.add(row);
-                uniq.push(row);
-                if (uniq.length >= 6) break;
-            }
-
-            if (uniq.length === 0) {
-                root.innerHTML = `
-                    <div class="parity-section" style="margin-bottom:0;">
-                        <h3><span class="badge badge-blue">Samples</span> SVG Data Preview</h3>
-                        <p style="color:var(--text-muted);font-size:0.74rem;">No SVG sample rows available from tokenizer_roundtrip/dataset_profile yet.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const cards = uniq.map((svg, idx) => {
-                const safeCode = escapeHtml(svg);
-                const src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-                return `
-                    <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;padding:0.55rem;">
-                        <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:0.32rem;">sample ${idx + 1}</div>
-                        <div style="height:92px;background:var(--dark-card);border:1px solid var(--grey);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:0.38rem;">
-                            <img src="${src}" alt="svg sample ${idx + 1}" style="max-width:100%;max-height:88px;object-fit:contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                            <div style="display:none;font-size:0.68rem;color:var(--text-muted);">render failed</div>
-                        </div>
-                        <pre style="margin:0;max-height:84px;overflow:auto;background:var(--dark-card);border:1px solid var(--grey);border-radius:6px;padding:0.35rem;font-size:0.64rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;">${safeCode}</pre>
-                    </div>
-                `;
-            }).join('');
-
-            root.innerHTML = `
-                <div class="parity-section" style="margin-bottom:0;">
-                    <h3><span class="badge badge-blue">Samples</span> SVG Data Preview</h3>
-                    <p style="margin:0.35rem 0 0.6rem;color:var(--text-secondary);font-size:0.74rem;">
-                        Quick visual check of dataset rows used in pretraining diagnostics.
-                    </p>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.55rem;">
-                        ${cards}
+                        ${laneHtml('Data Spectrum', 'Corpus → tokenizer → fidelity → telemetry → output quality', '#ff8c00', dataStages)}
                     </div>
                 </div>
             `;
@@ -14724,15 +13800,8 @@ function renderProfileHowTo() {
             };
 
             runPart('banner', () => renderDpModelBanner(tokInfo));
+            runPart('control-spectrum', () => renderDpFullStackSpectrum());
             runPart('mini-spectrum', () => renderDpSpectrum());
-            runPart('stage-flow', () => renderDpStageFlow());
-            runPart('curriculum-panel', () => renderDpCurriculumPanel());
-            runPart('scale-pack', () => renderDpScalePackPanel());
-            runPart('data-source-panel', () => renderDpDataSourcePanel(tokInfo));
-            runPart('dataset-viewer', () => renderDpDatasetViewer());
-            runPart('generator-workbench', () => renderDpGeneratorWorkbench());
-            runPart('why-svg-panel', () => renderDpWhySvgPanel());
-            runPart('svg-sample-viewer', () => renderDpSvgSampleViewer());
 
             const showByteLevel = shouldRenderByteLevelSection(tokInfo);
             if (showByteLevel) {
@@ -14748,8 +13817,6 @@ function renderProfileHowTo() {
             runPart('diagnostics', () => renderDpDiagnosticTable());
             runPart('embedding-explorer', () => renderEmbeddingExplorer());
             runPart('tokenizer-lineage', () => renderTokenizerLineage());
-            runPart('tokenizer-json-table', () => renderDpTokenizerJsonTable());
-            runPart('control-spectrum', () => renderDpFullStackSpectrum());
         }
 
         /* ── Model-Aware Banner ── */
@@ -15188,183 +14255,6 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                 row.reduce((s, v, i) => s + v * pc1[i], 0),
                 row.reduce((s, v, i) => s + v * pc2[i], 0),
             ]);
-        }
-
-        function getEmbeddedTokenizerPreview() {
-            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
-                ? window.EMBEDDED_IR_DATA.files
-                : {};
-            const pipeline = (files.training_pipeline && typeof files.training_pipeline === 'object')
-                ? files.training_pipeline
-                : {};
-            const dataLab = (pipeline.data_lab && typeof pipeline.data_lab === 'object')
-                ? pipeline.data_lab
-                : {};
-            // Prefer run-scoped derived preview first; pipeline data_lab can point to sub-runs.
-            if (files.tokenizer_preview && typeof files.tokenizer_preview === 'object') {
-                return files.tokenizer_preview;
-            }
-            if (dataLab.tokenizer_preview && typeof dataLab.tokenizer_preview === 'object') {
-                return dataLab.tokenizer_preview;
-            }
-            return null;
-        }
-
-        function renderDpTokenizerJsonTable() {
-            const root = document.getElementById('dpTokenizerJsonTable');
-            if (!root) return;
-
-            const preview = getEmbeddedTokenizerPreview();
-            if (!preview || Object.keys(preview).length === 0) {
-                root.innerHTML = `
-                    <div style="padding:0.75rem 0.9rem;background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;color:var(--text-muted);font-size:0.76rem;">
-                        Tokenizer preview not available yet. Regenerate the report from a run that includes <code>tokenizer.json</code>.
-                    </div>
-                `;
-                return;
-            }
-
-            if (preview.status === 'error') {
-                root.innerHTML = `
-                    <div style="padding:0.75rem 0.9rem;background:#3a2020;border:1px solid #e74c3c66;border-radius:8px;color:#ffb3a7;font-size:0.76rem;">
-                        Failed to parse tokenizer JSON: <code>${escapeHtml(preview.error || '-')}</code>
-                    </div>
-                `;
-                return;
-            }
-
-            const rows = Array.isArray(preview.token_table_rows)
-                ? preview.token_table_rows
-                : [];
-            const fallbackRows = Array.isArray(preview.vocab_samples)
-                ? preview.vocab_samples.map((v) => ({
-                    id: v.id,
-                    piece: v.piece,
-                    bytes_hex: v.bytes_hex,
-                    char_class: (typeof v.piece === 'string' && /^[\x00-\x7F]*$/.test(v.piece)) ? 'ascii' : 'non_ascii',
-                    source: '-',
-                    merge_depth: '-',
-                    merge_rank: '-',
-                    merge_left: null,
-                    merge_right: null,
-                }))
-                : [];
-            const tableRows = rows.length > 0 ? rows : fallbackRows;
-            const meta = (preview.token_table_meta && typeof preview.token_table_meta === 'object')
-                ? preview.token_table_meta
-                : {};
-            const sourceCounts = (meta.source_counts && typeof meta.source_counts === 'object')
-                ? meta.source_counts
-                : {};
-            const flow = (preview.encode_decode_example && Array.isArray(preview.encode_decode_example.token_flow))
-                ? preview.encode_decode_example.token_flow
-                : [];
-
-            if (tableRows.length === 0) {
-                root.innerHTML = `
-                    <div style="padding:0.75rem 0.9rem;background:var(--bg-dark);border:1px solid var(--grey);border-radius:8px;color:var(--text-muted);font-size:0.76rem;">
-                        No tokenizer rows available in preview payload.
-                    </div>
-                `;
-                return;
-            }
-
-            const sourceBadge = (label, color) => (
-                `<span style="display:inline-flex;align-items:center;padding:0.12rem 0.45rem;border-radius:999px;border:1px solid ${color}66;color:${color};font-size:0.66rem;">${label}</span>`
-            );
-            const byDepth = (depth) => tableRows
-                .filter((row) => Number(row.merge_depth) === depth && row.merge_left && row.merge_right)
-                .slice(0, 10);
-            const depth1 = byDepth(1);
-            const depth2 = byDepth(2);
-            const depth3 = byDepth(3);
-            const renderDepthCol = (title, rows) => `
-                <div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:0.55rem;">
-                    <div style="font-size:0.72rem;color:var(--orange);margin-bottom:0.35rem;">${title}</div>
-                    ${rows.length === 0
-                        ? '<div style="font-size:0.7rem;color:var(--text-muted);">No sampled rows.</div>'
-                        : rows.map((row) => `
-                            <div style="font-size:0.69rem;line-height:1.35;margin-bottom:0.22rem;">
-                                <code>${escapeHtml(row.id)}</code> <code>${escapeHtml(row.piece)}</code>
-                                <span style="color:var(--text-muted);">=</span>
-                                <code>${escapeHtml(row.merge_left)}</code> + <code>${escapeHtml(row.merge_right)}</code>
-                            </div>
-                        `).join('')
-                    }
-                </div>
-            `;
-            const flowStrip = flow.slice(0, 20).map((t) => (
-                `<span style="display:inline-block;border:1px solid var(--grey);border-radius:999px;padding:0.15rem 0.45rem;margin:0 0.25rem 0.25rem 0;font-size:0.66rem;">
-                    <code>${escapeHtml(t.id)}</code>:<code>${escapeHtml(t.piece)}</code>
-                </span>`
-            )).join('');
-
-            root.innerHTML = `
-                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">
-                    ${sourceBadge(`model=${escapeHtml(preview.model_type || 'unknown')}`, '#07adf8')}
-                    ${sourceBadge(`vocab=${Number(preview.vocab_size || 0).toLocaleString()}`, '#ffb400')}
-                    ${sourceBadge(`rows=${Number(meta.rows_returned || tableRows.length).toLocaleString()}`, '#47b475')}
-                    ${sourceBadge(`base=${Number(sourceCounts.base || 0).toLocaleString()}`, '#9aa5b1')}
-                    ${sourceBadge(`merged=${Number(sourceCounts.merged || 0).toLocaleString()}`, '#ff8c00')}
-                    ${sourceBadge(`special=${Number(sourceCounts.special || 0).toLocaleString()}`, '#bc8cff')}
-                </div>
-                <div style="color:var(--text-muted);font-size:0.7rem;margin-bottom:0.45rem;">
-                    sample_policy: <code>${escapeHtml(meta.sample_policy || 'vocab_samples_fallback')}</code>
-                </div>
-                <div style="margin-bottom:0.55rem;font-size:0.72rem;color:var(--text-muted);">
-                    Logits map directly to token IDs below. These are sampled from the active <code>tokenizer.json</code>.
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.45rem;margin-bottom:0.55rem;">
-                    ${renderDepthCol('1-pair merges (depth=1)', depth1)}
-                    ${renderDepthCol('2-pair merges (depth=2)', depth2)}
-                    ${renderDepthCol('3-pair merges (depth=3)', depth3)}
-                </div>
-                ${flowStrip ? `
-                    <div style="margin-bottom:0.6rem;padding:0.5rem 0.6rem;background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;">
-                        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.3rem;">
-                            Example token-id flow (first 20 IDs from encode/decode sample):
-                        </div>
-                        <div>${flowStrip}</div>
-                    </div>
-                ` : ''}
-                <div style="overflow:auto;max-height:460px;border:1px solid var(--grey);border-radius:8px;">
-                    <table style="width:100%;border-collapse:collapse;font-size:0.73rem;">
-                        <thead>
-                            <tr style="position:sticky;top:0;background:var(--dark-card);z-index:1;">
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">id</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">piece</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">bytes</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">class</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">source</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">depth</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">merge rank</th>
-                                <th style="text-align:left;padding:0.45rem;border-bottom:1px solid var(--grey);">merge parents</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${tableRows.map((row) => {
-                                const left = row.merge_left;
-                                const right = row.merge_right;
-                                const parents = (left || right)
-                                    ? `<code>${escapeHtml(left || '-')}</code> + <code>${escapeHtml(right || '-')}</code>`
-                                    : '-';
-                                return `
-                                    <tr style="border-bottom:1px solid var(--grey);">
-                                        <td style="padding:0.38rem;"><code>${escapeHtml(row.id ?? '-')}</code></td>
-                                        <td style="padding:0.38rem;max-width:280px;overflow-wrap:anywhere;"><code>${escapeHtml(row.piece ?? '-')}</code></td>
-                                        <td style="padding:0.38rem;max-width:220px;overflow-wrap:anywhere;"><code>${escapeHtml(row.bytes_hex ?? '-')}</code></td>
-                                        <td style="padding:0.38rem;">${escapeHtml(row.char_class ?? '-')}</td>
-                                        <td style="padding:0.38rem;">${escapeHtml(row.source ?? '-')}</td>
-                                        <td style="padding:0.38rem;">${escapeHtml(row.merge_depth ?? '-')}</td>
-                                        <td style="padding:0.38rem;">${escapeHtml(row.merge_rank ?? '-')}</td>
-                                        <td style="padding:0.38rem;max-width:320px;overflow-wrap:anywhere;">${parents}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
         }
 
         // Tokenizer lineage info panel
@@ -16278,9 +15168,7 @@ function renderTrainingDashboard(files) {
     const sweepProfile = sweep && typeof sweep === 'object' ? sweep.profile_run : null;
     const finalStep = lossSteps[lossSteps.length - 1] || null;
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
-    const trainTokS = toNum(profile.train_tok_s, NaN);
-    const fallbackTokS = toNum(profile.decode_tok_s, NaN);
-    const throughputTokS = Number.isFinite(trainTokS) ? trainTokS : fallbackTokS;
+    const decodeTokS = toNum(profile.decode_tok_s, NaN);
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
     const trainE2E = files.train_e2e || {};
     const layoutTrain = files.layout_train || {};
@@ -16302,29 +15190,9 @@ function renderTrainingDashboard(files) {
     const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object'
         ? dataLab.post_train_eval
         : (files.post_train_eval || {});
-    const postEvalStatus = String(postEval.status || '').toLowerCase();
-    const postEvalSkipped = postEvalStatus === 'skipped';
     const validSvgRate = toNum(postEval.valid_svg_rate, NaN);
     const closureRate = toNum(postEval.closure_success_rate, NaN);
     const loopScore = toNum(postEval.repetition_loop_score, NaN);
-    const finalLoss = finalStep && Number.isFinite(finalStep.loss_ck)
-        ? finalStep.loss_ck
-        : toNum(trainE2E.final_ck_loss, NaN);
-    const maxParamDiff = Number.isFinite(worstParity) && worstParity > 0
-        ? worstParity
-        : toNum(trainE2E.final_param_max_abs_diff, NaN);
-    const trainE2EStatus = (() => {
-        if (trainE2E?.status === 'pass' || trainE2E?.pass === true || trainE2E?.passed === true || trainE2E?.pass_parity === true) {
-            return 'PASS';
-        }
-        if (trainE2E?.status === 'fail' || trainE2E?.pass === false || trainE2E?.passed === false || trainE2E?.pass_parity === false) {
-            return 'FAIL';
-        }
-        return Object.keys(trainE2E).length ? 'CHECK' : '-';
-    })();
-    const validSvgLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-');
-    const closureLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-');
-    const loopLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-');
 
     const reportCmd = runCtx.runDir
         ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
@@ -16348,19 +15216,19 @@ function renderTrainingDashboard(files) {
 
     root.innerHTML = `
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(finalLoss) ? fmt(finalLoss, 4) : '-'}</div><div class="stat-label">Final CK Loss</div></div>
+            <div class="stat-card"><div class="stat-value">${finalStep ? fmt(finalStep.loss_ck, 4) : '-'}</div><div class="stat-label">Final CK Loss</div></div>
             <div class="stat-card"><div class="stat-value">${finalStep && Number.isFinite(finalStep.grad_norm) ? fmtExp(finalStep.grad_norm, 2) : '-'}</div><div class="stat-label">Grad Norm</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(maxParamDiff) ? fmtExp(maxParamDiff, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
-            <div class="stat-card"><div class="stat-value">${Number.isFinite(throughputTokS) ? fmt(throughputTokS, 2) : '-'}</div><div class="stat-label">Train tok/s</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(decodeTokS) ? fmt(decodeTokS, 2) : '-'}</div><div class="stat-label">Decode tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
-            <div class="stat-card"><div class="stat-value">${trainE2EStatus}</div><div class="stat-label">Train E2E Status</div></div>
+            <div class="stat-card"><div class="stat-value">${toNum(trainE2E?.passed, 0) === 1 || trainE2E?.pass === true ? 'PASS' : (Object.keys(trainE2E).length ? 'CHECK' : '-')}</div><div class="stat-label">Train E2E Status</div></div>
             <div class="stat-card"><div class="stat-value">${memoryDiagState}</div><div class="stat-label">Memory Diagnostic</div></div>
             <div class="stat-card"><div class="stat-value">${layoutAuditState}</div><div class="stat-label">Layout Audit</div></div>
-            <div class="stat-card"><div class="stat-value">${validSvgLabel}</div><div class="stat-label">Valid SVG Rate</div></div>
-            <div class="stat-card"><div class="stat-value">${closureLabel}</div><div class="stat-label">Closure Success</div></div>
-            <div class="stat-card"><div class="stat-value">${loopLabel}</div><div class="stat-label">Loop Score</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-'}</div><div class="stat-label">Valid SVG Rate</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-'}</div><div class="stat-label">Closure Success</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-'}</div><div class="stat-label">Loop Score</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
@@ -16398,18 +15266,6 @@ function renderTrainingDashboard(files) {
 
     const alertsEl = document.getElementById('trainAlertList');
     const alerts = healthAlerts(lossSteps, parityRows);
-    const svgThreshold = toNum(postEval.min_valid_svg_rate, 0.70);
-    if (postEvalSkipped) {
-        alerts.push({
-            level: 'info',
-            text: `Output quality gate skipped (${postEval.reason || 'disabled_by_flag'}). This does not indicate CK-vs-PyTorch parity failure.`,
-        });
-    } else if (Number.isFinite(validSvgRate) && validSvgRate < svgThreshold) {
-        alerts.push({
-            level: 'warning',
-            text: `Output quality gate is below target (valid_svg_rate=${fmt(validSvgRate, 4)} < ${fmt(svgThreshold, 4)}). This is data/task fit, not a CK-vs-PyTorch parity failure. Improve corpus coverage and add instruction-to-SVG SFT pairs.`,
-        });
-    }
     if (!alertsEl) return;
     if (alerts.length === 0) {
         alertsEl.innerHTML = '<div class="alert-item info">No health alerts. Training telemetry looks stable.</div>';
@@ -16553,47 +15409,6 @@ function renderParityPanel(files) {
     if (!root) return;
     clear(root);
 
-    const canary = files.training_canary_summary && typeof files.training_canary_summary === 'object'
-        ? files.training_canary_summary
-        : null;
-    let canarySection = '';
-    if (canary) {
-        const rows = Array.isArray(canary.rows) ? canary.rows : [];
-        const statusBadgeClass = canary.status === 'pass'
-            ? 'badge badge-green'
-            : (canary.status === 'fail' ? 'badge badge-red' : 'badge badge-orange');
-        const canaryRows = rows.map((r) => {
-            const rowStatus = String(r?.status || '-');
-            const rowBadge = rowStatus === 'pass'
-                ? '<span class="badge badge-green">PASS</span>'
-                : (rowStatus === 'fail' ? '<span class="badge badge-red">FAIL</span>' : '<span class="badge badge-orange">N/A</span>');
-            const metric = (typeof r?.max_abs_loss_diff === 'number')
-                ? `max_loss_diff=${Number(r.max_abs_loss_diff).toExponential(3)}, final_param_diff=${Number(r.final_param_max_abs_diff || 0).toExponential(3)}`
-                : (r?.reason ? `reason=${htmlEscape(String(r.reason))}` : '-');
-            return `
-                <tr>
-                    <td>${htmlEscape(String(r?.row ?? '-'))}</td>
-                    <td>${rowBadge}</td>
-                    <td style="max-width:420px;overflow-wrap:anywhere;">${metric}</td>
-                    <td style="max-width:360px;overflow-wrap:anywhere;"><code>${htmlEscape(String(r?.run_dir || '-'))}</code></td>
-                </tr>
-            `;
-        }).join('');
-        canarySection = `
-            <div class="parity-section" style="margin-bottom:0.8rem;">
-                <h3><span class="badge badge-blue">Canary</span> Row1/Row2 Parity Gate</h3>
-                <div style="margin-bottom:0.55rem;color:var(--text-secondary);">
-                    <span class="${statusBadgeClass}">${htmlEscape(String(canary.status || '-')).toUpperCase()}</span>
-                    <span style="margin-left:0.5rem;">compared=${Number(canary.rows_compared || 0)}, passed=${Number(canary.rows_passed || 0)}, failed=${Number(canary.rows_failed || 0)}, missing=${Number(canary.rows_missing || 0)}</span>
-                </div>
-                <table>
-                    <thead><tr><th>Row</th><th>Status</th><th>Metric / Reason</th><th>Run Dir</th></tr></thead>
-                    <tbody>${canaryRows || '<tr><td colspan="4">No canary rows found.</td></tr>'}</tbody>
-                </table>
-            </div>
-        `;
-    }
-
     const rows = parseParityRows(files.training_parity);
     if (rows.length === 0) {
         const runCtx = getRunContext();
@@ -16605,7 +15420,6 @@ function renderParityPanel(files) {
             ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
             : 'python3 version/v7/tools/open_ir_visualizer.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
         root.innerHTML = `
-            ${canarySection}
             <div class="parity-section">
                 <h3><span class="badge badge-orange">No Parity Data</span> Missing training_parity.json</h3>
                 <p style="color:var(--text-muted);margin-bottom:0.6rem;">Generate parity telemetry in the same run directory, then regenerate this report.</p>
@@ -16633,7 +15447,6 @@ ${reportCmd}</pre>
         : (maxDiff > 1e-5 ? `Parity drift elevated: ${fmtExp(maxDiff, 2)}` : `Parity stable: ${fmtExp(maxDiff, 2)}`);
 
     root.innerHTML = `
-        ${canarySection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Parity Tracker</span> CK vs PyTorch</h3>
             <div class="alert-item ${status}" style="margin-bottom:0.8rem;">${msg}</div>
@@ -18190,19 +17003,11 @@ const TRAINING_SIGNAL_KEYS = [
     'training_parity',
     'training_step_profile',
     'training_pipeline',
-    'training_canary_summary',
     'train_e2e',
     'memory_diagnostic',
     'memory_verification',
     'backprop_stitch_runtime',
 ];
-
-function _hasPayload(payload) {
-    if (payload == null) return false;
-    if (Array.isArray(payload)) return payload.length > 0;
-    if (typeof payload === 'object') return Object.keys(payload).length > 0;
-    return true;
-}
 
 function detectTrainingModeAvailable() {
     const embedded = window.EMBEDDED_IR_DATA && typeof window.EMBEDDED_IR_DATA === 'object'
@@ -18218,76 +17023,6 @@ function detectTrainingModeAvailable() {
         if (typeof payload === 'object') return Object.keys(payload).length > 0;
         return true;
     });
-}
-
-function detectInferenceModeAvailable() {
-    const embedded = window.EMBEDDED_IR_DATA && typeof window.EMBEDDED_IR_DATA === 'object'
-        ? window.EMBEDDED_IR_DATA
-        : {};
-    const meta = embedded.meta && typeof embedded.meta === 'object' ? embedded.meta : {};
-    const files = getEmbeddedFiles();
-    const decodeReady = _hasPayload(files.ir1_decode) && _hasPayload(files.layout_decode)
-        && (_hasPayload(files.lowered_decode_call) || _hasPayload(files.lowered_decode));
-    const prefillReady = _hasPayload(files.ir1_prefill) && _hasPayload(files.layout_prefill)
-        && (_hasPayload(files.lowered_prefill_call) || _hasPayload(files.lowered_prefill));
-    if (decodeReady || prefillReady) return true;
-
-    const decodeSnapshot = modeData && modeData.decode ? modeData.decode : {};
-    const prefillSnapshot = modeData && modeData.prefill ? modeData.prefill : {};
-    const decodeLoaded = Boolean(decodeSnapshot.ir1 && decodeSnapshot.layout && (decodeSnapshot.call || decodeSnapshot.lowered));
-    const prefillLoaded = Boolean(prefillSnapshot.ir1 && prefillSnapshot.layout && (prefillSnapshot.call || prefillSnapshot.lowered));
-    if (decodeLoaded || prefillLoaded) return true;
-
-    // Stage-aware fallback: keep inference available when a runtime is ready
-    // (weights + libmodel present), even if decode artifacts are not embedded yet.
-    return meta.has_inference_runtime === true;
-}
-
-function renderModeAvailabilityHint() {
-    const controls = document.querySelector('.controls');
-    if (!controls) return;
-    let hint = document.getElementById('ckModeAvailabilityHint');
-    if (!hint) {
-        hint = document.createElement('div');
-        hint.id = 'ckModeAvailabilityHint';
-        hint.className = 'mode-hint mode-hint-info';
-        controls.appendChild(hint);
-    }
-
-    const files = getEmbeddedFiles();
-    const hasTraining = window.__ckTrainingModeAvailable === true;
-    const hasInference = window.__ckInferenceModeAvailable !== false;
-    const hasInferenceArtifacts = _hasPayload(files.ir1_decode) || _hasPayload(files.ir1_prefill);
-    const runIndex = files.run_index && typeof files.run_index === 'object' ? files.run_index : {};
-    const runIndexFiles = runIndex.files && typeof runIndex.files === 'object' ? runIndex.files : {};
-    const hasTrainingCurve = _hasPayload(files.training_loss_curve)
-        || Boolean(runIndexFiles['training_loss_curve_latest.json'] && runIndexFiles['training_loss_curve_latest.json'].exists === true);
-    const hasTrainCompletion = _hasPayload(files.train_e2e) || _hasPayload(files.post_train_eval)
-        || Boolean(runIndexFiles['train_e2e_latest.json'] && runIndexFiles['train_e2e_latest.json'].exists === true)
-        || Boolean(runIndexFiles['post_train_eval.json'] && runIndexFiles['post_train_eval.json'].exists === true);
-
-    if (hasTraining && !hasInference) {
-        hint.className = 'mode-hint mode-hint-warn';
-        hint.textContent = 'Training-focused report: inference IR/profile artifacts are not loaded; inference mode is disabled.';
-        hint.style.display = '';
-        return;
-    }
-
-    if (hasTraining && hasInference && !hasInferenceArtifacts) {
-        hint.className = 'mode-hint mode-hint-info';
-        hint.textContent = 'Inference runtime is ready, but decode/prefill artifacts are sparse. Regenerate ir_report.html after inference profiling for full visibility.';
-        hint.style.display = '';
-        return;
-    }
-
-    if (hasTraining && hasTrainingCurve && !hasTrainCompletion) {
-        hint.className = 'mode-hint mode-hint-info';
-        hint.textContent = 'Training telemetry is loaded. If training is still running, regenerate ir_report.html to refresh artifacts.';
-        hint.style.display = '';
-        return;
-    }
-
-    hint.style.display = 'none';
 }
 
 function injectStyles() {
@@ -18320,25 +17055,6 @@ function injectStyles() {
             cursor: not-allowed;
             background: var(--dark-card);
             color: var(--text-muted);
-        }
-        .mode-hint {
-            margin-left: 10px;
-            padding: 0.35rem 0.55rem;
-            border-radius: 6px;
-            border: 1px solid;
-            font-size: 0.74rem;
-            line-height: 1.2;
-            max-width: 520px;
-        }
-        .mode-hint-info {
-            color: #9bd1ff;
-            border-color: #2f79b844;
-            background: #122130;
-        }
-        .mode-hint-warn {
-            color: #ffd58a;
-            border-color: #a46a0844;
-            background: #2a230f;
         }
         .alert-item {
             border-left: 3px solid;
@@ -18529,18 +17245,12 @@ function installModeToggle() {
         <button type="button" data-mode="inference" class="active">Inference</button>
         <button type="button" data-mode="training">Training</button>
     `;
-    const inferenceBtn = host.querySelector('button[data-mode="inference"]');
     const trainingBtn = host.querySelector('button[data-mode="training"]');
-    if (inferenceBtn && window.__ckInferenceModeAvailable === false) {
-        inferenceBtn.disabled = true;
-        inferenceBtn.title = 'Inference mode unavailable: this report does not include decode/prefill artifacts.';
-    }
     if (trainingBtn && window.__ckTrainingModeAvailable === false) {
         trainingBtn.disabled = true;
         trainingBtn.title = 'Training mode unavailable: this report was generated from inference-only artifacts.';
     }
     controls.appendChild(host);
-    renderModeAvailabilityHint();
 }
 
 function visibleTabElements() {
@@ -18554,11 +17264,8 @@ function firstVisibleTabId() {
 
 function applyReportMode(mode) {
     let normalized = mode === 'training' ? 'training' : 'inference';
-    if (normalized === 'inference' && window.__ckInferenceModeAvailable === false) {
-        normalized = window.__ckTrainingModeAvailable === true ? 'training' : 'inference';
-    }
     if (normalized === 'training' && window.__ckTrainingModeAvailable === false) {
-        normalized = window.__ckInferenceModeAvailable === false ? 'training' : 'inference';
+        normalized = 'inference';
     }
     window.__ckReportMode = normalized;
 
@@ -18581,15 +17288,10 @@ function applyReportMode(mode) {
     } else if (normalized === 'training' && INFERENCE_ONLY.includes(activeTabId)) {
         window.showTab('train-dashboard');
     }
-    if (typeof updateOperatorSummary === 'function') {
-        updateOperatorSummary();
-    }
 }
 
 function initModeUI() {
-    window.__ckInferenceOnlyTabs = [...INFERENCE_ONLY];
     window.__ckTrainingOnlyTabs = [...TRAINING_ONLY_TABS];
-    window.__ckInferenceModeAvailable = detectInferenceModeAvailable();
     window.__ckTrainingModeAvailable = detectTrainingModeAvailable();
     injectStyles();
     ensureTabDataAttrs();
@@ -18607,18 +17309,7 @@ function initModeUI() {
         btn.addEventListener('click', () => applyReportMode(btn.dataset.mode || 'inference'));
     });
 
-    const runDirHint = String((window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.meta && window.EMBEDDED_IR_DATA.meta.run_dir) || '').toLowerCase();
-    const preferTrainingInitial = window.__ckTrainingModeAvailable === true && (
-        runDirHint.includes('/models/train/') ||
-        runDirHint.endsWith('/train') ||
-        runDirHint.includes('/train/')
-    );
-    const initialMode = preferTrainingInitial
-        ? 'training'
-        : (window.__ckInferenceModeAvailable === false && window.__ckTrainingModeAvailable === true
-            ? 'training'
-            : 'inference');
-    applyReportMode(initialMode);
+    applyReportMode('inference');
 }
 
 function trainingTabIds() {
@@ -19181,6 +17872,22 @@ function meBuildProfilerHints(alignment, seqLocality) {
         'Collect baseline IPC/cache/branch metrics before deep profiling.',
         'recommended'
     );
+
+    if (currentMode === 'prefill') {
+        addHint(
+            'Prefill timing',
+            'make profile-v7-prefill',
+            'Refresh prefill-focused timing so token_id=0 kernels drive the active view.',
+            'recommended'
+        );
+    } else {
+        addHint(
+            'Prefill timing',
+            'make profile-v7-prefill',
+            'Capture prompt-ingest timing explicitly when tuning long-context prefill behavior.',
+            'info'
+        );
+    }
 
     if (alignment && alignment.misaligned > 0) {
         addHint(
