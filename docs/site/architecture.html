@@ -901,6 +901,7 @@
                         <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
                         <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
                         <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
                         <a href="testing.html">Testing<small>Numerical parity verification</small></a>
                         <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
                     </div>
@@ -969,6 +970,39 @@
 
 <div class="img-container">
     <img src="assets/architecture-overview.svg" alt="Architecture Overview">
+</div>
+
+<h2>Operator Spectrum Map</h2>
+
+<p>This view connects the data path (pretrain to RLHF/GRPO) with the compute path (math to inference/backprop) so operators can reason about the full stack in one place.</p>
+
+<div class="card" style="overflow-x: auto; border: 1px solid var(--grey); border-radius: 12px; padding: 0.95rem; background: radial-gradient(circle at 12% 0%, rgba(255, 180, 0, 0.16), transparent 40%), radial-gradient(circle at 90% 15%, rgba(7, 173, 248, 0.12), transparent 42%), var(--dark-card);">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:0.55rem;">
+        <span style="font-size:0.8rem; color:var(--grey-light);">Click the map to open in the dark in-site SVG viewer.</span>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <a href="assets/operator-spectrum-map.svg" download style="font-size:0.8rem;">Download SVG</a>
+        </div>
+    </div>
+    <div class="img-container svg-viewer" data-title="Operator Spectrum Map" style="margin:0;">
+        <img src="assets/operator-spectrum-map.svg" alt="Operator Spectrum Map" style="display:block; width:100%; min-width:900px; height:auto; border-radius:10px; border:1px solid rgba(148,163,184,0.35);">
+    </div>
+</div>
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Data Runbook Links</h3>
+        <ul>
+            <li><a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook</a> (Stage A and Stage B corpus generation)</li>
+            <li><a href="v7-runbook.html">v7 Train + Inference Runbook</a> (parity gates and train execution)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Computation Runbook Links</h3>
+        <ul>
+            <li><a href="ir-pipeline.html">IR Pipeline</a> (IR1/IR2/lowering and memory mapping)</li>
+            <li><a href="v7-profiling.html">v7 Profiling</a> (perf, flamegraph, cache, VTune/Advisor)</li>
+            <li><a href="v7-backprop-ir.html">v7 Backprop IR</a> (gradient path and training runtime checks)</li>
+        </ul>
+    </div>
 </div>
 
 <h2>Stage 1: Model Configuration</h2>
@@ -1176,7 +1210,7 @@ make ck-emit CONFIG=config.json OUT=build/model.c</pre>
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-02-23 09:12</span>
+        <span class="folder-updated">Updated: 2026-02-23 20:24</span>
     </div>
     <pre class="tree-output">
 src/kernels
@@ -1202,6 +1236,7 @@ version/v6.6
 version/v7
 |-- contracts
 |-- data
+|   `-- generated
 |-- include
 |-- kernel_maps
 |-- reports
@@ -1215,7 +1250,7 @@ version/v7
 `-- tools
     `-- src
 
-35 directories
+36 directories
 </pre>
 </div>
 
