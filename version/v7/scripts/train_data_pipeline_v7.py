@@ -79,44 +79,67 @@ def _run_capture(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     return result
 
 
-def _promote_latest_checkpoint_for_eval(
+def _promote_checkpoint(
     run_dir: Path,
     *,
     strict: bool,
+    step: int | None = None,
+    purpose: str = "eval",
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "status": "skipped",
-        "reason": "checkpoint_promotion_not_attempted",
+        "reason": f"checkpoint_promotion_not_attempted:{purpose}",
     }
     if not PROMOTE_CKPT.exists():
         payload = {"status": "skipped", "reason": f"missing_script:{PROMOTE_CKPT}"}
         if strict:
             raise SystemExit(
-                "ERROR: strict data gate requires checkpoint promotion before eval.\n"
+                "ERROR: strict mode requires checkpoint promotion.\n"
                 f"  missing: {PROMOTE_CKPT}"
             )
         return payload
     try:
+        cmd = [
+            _python_exec(),
+            str(PROMOTE_CKPT),
+            "--run",
+            str(run_dir),
+        ]
+        if step is not None:
+            cmd.extend(["--step", str(int(step))])
         _run(
-            [
-                _python_exec(),
-                str(PROMOTE_CKPT),
-                "--run",
-                str(run_dir),
-            ],
+            cmd,
             cwd=ROOT,
         )
-        return {"status": "ok", "strategy": "latest_checkpoint"}
+        return {
+            "status": "ok",
+            "strategy": "exact_step" if step is not None else "latest_checkpoint",
+            "step": int(step) if step is not None else None,
+            "purpose": str(purpose),
+        }
     except Exception as exc:
         payload = {"status": "error", "reason": str(exc)}
         if strict:
             raise SystemExit(
-                "ERROR: strict data gate failed (checkpoint promotion).\n"
+                "ERROR: strict mode failed (checkpoint promotion).\n"
                 f"  run_dir: {run_dir}\n"
                 f"  reason:  {exc}"
             )
         print(f"[WARN] checkpoint promotion skipped: {exc}")
         return payload
+
+
+def _promote_latest_checkpoint_for_eval(
+    run_dir: Path,
+    *,
+    strict: bool,
+) -> dict[str, Any]:
+    return _promote_checkpoint(
+        run_dir,
+        strict=bool(strict),
+        step=None,
+        purpose="eval",
+    )
 
 
 def _ensure_binary(path: Path, make_target: str) -> None:
@@ -318,13 +341,50 @@ class _TrueBPEHandle:
         raise RuntimeError("ck_true_bpe_decode exceeded buffer growth limit")
 
 
+def _encode_segment_with_bpe_fallback(handle: _TrueBPEHandle, seg: str, chunk_chars: int = 8192) -> list[int]:
+    """Encode one segment with split fallback when runtime returns 0 ids."""
+    if not seg:
+        return []
+    ids = handle.encode(seg)
+    if len(ids) > 0:
+        return ids
+    if len(seg) <= 1:
+        raise RuntimeError("BPE encoding produced 0 ids for non-empty 1-char segment.")
+
+    # Split and retry to avoid dropping content on long/complex lines.
+    step = max(1, min(int(chunk_chars), len(seg) // 2))
+    out: list[int] = []
+    for i in range(0, len(seg), step):
+        chunk = seg[i : i + step]
+        if not chunk:
+            continue
+        chunk_ids = handle.encode(chunk)
+        if len(chunk_ids) > 0:
+            out.extend(chunk_ids)
+            continue
+        if len(chunk) <= 1:
+            raise RuntimeError("BPE encoding produced 0 ids for fallback chunk.")
+        half = max(1, len(chunk) // 2)
+        for j in range(0, len(chunk), half):
+            piece = chunk[j : j + half]
+            if not piece:
+                continue
+            piece_ids = handle.encode(piece)
+            if len(piece_ids) == 0:
+                raise RuntimeError(
+                    f"BPE encoding produced 0 ids for fallback piece (len={len(piece)})."
+                )
+            out.extend(piece_ids)
+    return out
+
+
 def _encode_large_text_with_bpe_handle(handle: _TrueBPEHandle, text: str, chunk_chars: int = 8192) -> list[int]:
     """
-    Encode long corpora robustly.
+    Encode long corpora robustly without silently dropping segments.
 
-    Some tokenizer runtimes can return 0 ids for very large single-buffer input.
-    We preserve exact text bytes by encoding splitlines(keepends=True) and, for
-    pathological long lines, sub-chunking by characters.
+    Some tokenizer runtimes can return 0 ids for large single-buffer input.
+    We preserve text content by splitlines(keepends=True) and retrying with
+    progressively smaller chunks when needed.
     """
     if not text:
         return []
@@ -335,18 +395,7 @@ def _encode_large_text_with_bpe_handle(handle: _TrueBPEHandle, text: str, chunk_
     for seg in segments:
         if not seg:
             continue
-        ids = handle.encode(seg)
-        if len(ids) > 0:
-            out.extend(ids)
-            continue
-        # Fallback for very long segments.
-        if len(seg) <= chunk_chars:
-            continue
-        for i in range(0, len(seg), chunk_chars):
-            chunk = seg[i : i + chunk_chars]
-            if not chunk:
-                continue
-            out.extend(handle.encode(chunk))
+        out.extend(_encode_segment_with_bpe_fallback(handle, seg, chunk_chars=chunk_chars))
     return out
 
 
@@ -1032,6 +1081,224 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _manifest_rows(payload: dict[str, Any]) -> int | None:
+    for key in ("output_rows", "num_rows", "num_train", "num_samples", "rows", "train_rows"):
+        val = payload.get(key)
+        if isinstance(val, int):
+            return int(val)
+        if isinstance(val, float) and math.isfinite(val):
+            return int(val)
+    return None
+
+
+def _infer_dataset_stage(name: str, active_stage: str) -> str:
+    probe = str(name or "").lower()
+    if any(tok in probe for tok in ("dpo",)):
+        return "dpo"
+    if any(tok in probe for tok in ("grpo",)):
+        return "grpo"
+    if any(tok in probe for tok in ("ppo", "rl")):
+        return "ppo"
+    if any(tok in probe for tok in ("stage_b", "midtrain", "instruction", "sft")):
+        return "midtrain"
+    if any(tok in probe for tok in ("stage_a", "bridge", "assets", "ascii", "svg")):
+        return "pretrain"
+    return active_stage
+
+
+def _collect_dataset_catalog(
+    dataset_path: Path,
+    run_dir: Path,
+    active_stage: str,
+    dataset_qc: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+
+    def _add_entry(
+        *,
+        stage: str,
+        kind: str,
+        name: str,
+        path: str,
+        rows: int | None = None,
+        note: str = "",
+        status: str = "ready",
+        source: str = "local",
+        sha256: str | None = None,
+    ) -> None:
+        key = str(path)
+        if key in seen_paths:
+            return
+        seen_paths.add(key)
+        entries.append(
+            {
+                "stage": str(stage),
+                "kind": str(kind),
+                "name": str(name),
+                "path": key,
+                "rows": int(rows) if isinstance(rows, int) else None,
+                "note": str(note or ""),
+                "status": str(status),
+                "source": str(source),
+                "sha256": str(sha256) if isinstance(sha256, str) and sha256 else None,
+            }
+        )
+
+    active_rows = None
+    if isinstance(dataset_qc, dict):
+        val = dataset_qc.get("non_empty_lines")
+        if isinstance(val, int):
+            active_rows = int(val)
+    active_hash = _sha256_file(dataset_path) if dataset_path.exists() else None
+    _add_entry(
+        stage=active_stage,
+        kind="active_dataset",
+        name=dataset_path.name,
+        path=str(dataset_path),
+        rows=active_rows,
+        note="dataset used for this run stage",
+        sha256=active_hash,
+    )
+
+    manifest_paths: list[Path] = []
+    if dataset_path.parent.exists():
+        manifest_paths.extend(sorted(dataset_path.parent.glob("*manifest.json")))
+    repo_data_dir = ROOT / "version" / "v7" / "data"
+    if repo_data_dir.exists():
+        manifest_paths.extend(sorted(repo_data_dir.glob("svg*_manifest.json")))
+    autopilot_dir = run_dir / "autopilot"
+    if autopilot_dir.exists():
+        manifest_paths.extend(sorted(autopilot_dir.glob("iter_*/*manifest*.json")))
+        manifest_paths.extend(sorted(autopilot_dir.glob("iter_*/**/*manifest*.json")))
+
+    seen_manifest: set[str] = set()
+    for manifest_path in manifest_paths:
+        key = str(manifest_path)
+        if key in seen_manifest:
+            continue
+        seen_manifest.add(key)
+        payload: dict[str, Any] | None = None
+        try:
+            payload = _load_json(manifest_path)
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            continue
+
+        rows = _manifest_rows(payload)
+        out_path = payload.get("out_path")
+        ds_name = payload.get("dataset_name")
+        if not isinstance(ds_name, str) or not ds_name.strip():
+            if isinstance(out_path, str) and out_path.strip():
+                ds_name = Path(out_path).name
+            else:
+                ds_name = manifest_path.stem
+        stage = _infer_dataset_stage(manifest_path.name, active_stage)
+        note_parts: list[str] = []
+        mapped = payload.get("mapped_common_symbols_total")
+        if isinstance(mapped, int):
+            note_parts.append(f"mapped_symbols={mapped}")
+        tc = payload.get("type_counts")
+        if isinstance(tc, dict):
+            note_parts.append(f"type_families={len(tc)}")
+        if isinstance(payload.get("source_files"), int):
+            note_parts.append(f"source_files={payload.get('source_files')}")
+
+        _add_entry(
+            stage=stage,
+            kind="manifest",
+            name=ds_name,
+            path=str(manifest_path),
+            rows=rows,
+            note=", ".join(note_parts),
+            source="manifest",
+        )
+        if isinstance(out_path, str) and out_path.strip():
+            _add_entry(
+                stage=stage,
+                kind="generated_dataset",
+                name=Path(out_path).name,
+                path=out_path,
+                rows=rows,
+                note=f"derived from {manifest_path.name}",
+                source="manifest_output",
+            )
+
+    return entries
+
+
+def _build_stage_artifacts(
+    *,
+    stage_timeline: list[dict[str, Any]],
+    active_stage: str,
+    data_provenance: list[dict[str, Any]],
+    data_lab: dict[str, Any],
+    bpe_artifacts: dict[str, Any],
+    run_dir: Path,
+) -> list[dict[str, Any]]:
+    prov_by_stage: dict[str, dict[str, Any]] = {}
+    for row in data_provenance:
+        if isinstance(row, dict):
+            stage = row.get("stage")
+            if isinstance(stage, str) and stage not in prov_by_stage:
+                prov_by_stage[stage] = row
+
+    artifacts_map = data_lab.get("artifacts") if isinstance(data_lab.get("artifacts"), dict) else {}
+    active_artifacts: list[dict[str, Any]] = []
+
+    def _push(label: str, path: str | None, required: bool = False) -> None:
+        if not isinstance(path, str) or not path.strip():
+            return
+        active_artifacts.append(
+            {
+                "label": str(label),
+                "path": str(path),
+                "required": bool(required),
+                "exists": bool(Path(path).expanduser().exists()),
+            }
+        )
+
+    _push("dataset_path", data_lab.get("dataset_path"), required=True)
+    _push("tokenizer_json", data_lab.get("tokenizer_json_path"), required=True)
+    _push("dataset_qc_json", artifacts_map.get("dataset_qc_json"), required=True)
+    _push("dataset_profile_json", artifacts_map.get("dataset_profile_json"), required=True)
+    _push("tokenizer_roundtrip_json", artifacts_map.get("tokenizer_roundtrip_json"), required=True)
+    _push("post_train_eval_json", artifacts_map.get("post_train_eval_json"), required=False)
+    _push("token_file", bpe_artifacts.get("token_file"), required=False)
+    _push("tokenizer_binary_dir", bpe_artifacts.get("run_binary_dir") or bpe_artifacts.get("binary_dir"), required=False)
+    for label, rel in (
+        ("training_loss_curve", "training_loss_curve_latest.json"),
+        ("training_pipeline", "training_pipeline_latest.json"),
+        ("ir1_train", "ir1_train_forward.json"),
+        ("ir2_train", "ir2_train_backward.json"),
+        ("layout_train", "layout_train.json"),
+        ("train_exec_plan", "train_exec_plan.json"),
+    ):
+        p = run_dir / rel
+        if p.exists():
+            _push(label, str(p), required=False)
+
+    stage_rows: list[dict[str, Any]] = []
+    for row in stage_timeline:
+        stage = str(row.get("stage") or "")
+        if not stage:
+            continue
+        prov = prov_by_stage.get(stage, {})
+        stage_rows.append(
+            {
+                "stage": stage,
+                "status": str(row.get("status") or ("active" if stage == active_stage else "planned")),
+                "active": bool(row.get("active") is True or stage == active_stage),
+                "dataset_name": prov.get("dataset_name"),
+                "token_count": prov.get("token_count"),
+                "source_path": prov.get("source_path"),
+                "artifacts": list(active_artifacts) if stage == active_stage else [],
+            }
+        )
+    return stage_rows
+
+
 def _build_training_pipeline_payload(
     args: argparse.Namespace,
     run_dir: Path,
@@ -1043,6 +1310,7 @@ def _build_training_pipeline_payload(
     tokenizer_roundtrip: dict[str, Any] | None = None,
     data_lab_artifacts: dict[str, str] | None = None,
     post_train_eval: dict[str, Any] | None = None,
+    resume_checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build ``training_pipeline_latest.json`` in the schema the visualizer expects.
 
@@ -1131,6 +1399,21 @@ def _build_training_pipeline_payload(
     if isinstance(post_train_eval, dict) and post_train_eval:
         data_lab["post_train_eval"] = dict(post_train_eval)
 
+    dataset_catalog = _collect_dataset_catalog(
+        dataset_path=dataset_path,
+        run_dir=run_dir,
+        active_stage=active_stage,
+        dataset_qc=dataset_qc,
+    )
+    stage_artifacts = _build_stage_artifacts(
+        stage_timeline=stage_timeline,
+        active_stage=active_stage,
+        data_provenance=data_provenance,
+        data_lab=data_lab,
+        bpe_artifacts=bpe_artifacts,
+        run_dir=run_dir,
+    )
+
     # ── execution ───────────────────────────────────────────────
     steps = ck_loss.get("steps", 0) if isinstance(ck_loss, dict) else 0
     tokens_per_update = int(args.seq_len) * int(args.grad_accum)
@@ -1157,6 +1440,7 @@ def _build_training_pipeline_payload(
         "active_stage": active_stage,
         "curriculum_stage": curriculum_stage,
         "stage_timeline": stage_timeline,
+        "stage_artifacts": stage_artifacts,
         "backend": "ck",
         "optimizer": {
             "name": "adamw",
@@ -1180,11 +1464,13 @@ def _build_training_pipeline_payload(
         },
         "train_dims": train_dims,
         "data_provenance": data_provenance,
+        "dataset_catalog": dataset_catalog,
         "tokenizer_lineage": tokenizer_lineage,
         "data_lab": data_lab,
         "sources": {
             "summary": "train_data_pipeline_v7",
             "run_dir": str(run_dir),
+            "resume_checkpoint": dict(resume_checkpoint or {}),
         },
     }
 
@@ -1392,6 +1678,17 @@ def main() -> int:
     ap.add_argument("--max-grad-norm", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--enforce-production-safety", action="store_true")
+    ap.add_argument(
+        "--resume-latest-checkpoint",
+        action="store_true",
+        help="Before training, promote latest checkpoint into run_dir weights (resume-in-place).",
+    )
+    ap.add_argument(
+        "--resume-step",
+        type=int,
+        default=None,
+        help="Optional exact checkpoint step to resume from (implies --resume-latest-checkpoint).",
+    )
     ap.add_argument("--with-torch-ref", action="store_true", help="Run torch ref too (byte/bpe/ascii_bpe via token-file)")
     ap.set_defaults(open_visualizer=True)
     ap.add_argument("--open-visualizer", dest="open_visualizer", action="store_true",
@@ -1530,6 +1827,8 @@ def main() -> int:
         _errors.append(f"--eval-sample-limit must be >= 1, got {args.eval_sample_limit}")
     if args.eval_temperature < 0.0:
         _errors.append(f"--eval-temperature must be >= 0, got {args.eval_temperature}")
+    if args.resume_step is not None and int(args.resume_step) < 0:
+        _errors.append(f"--resume-step must be >= 0, got {args.resume_step}")
     if _errors:
         raise SystemExit("ERROR: invalid arguments:\\n  " + "\\n  ".join(_errors))
 
@@ -1562,6 +1861,20 @@ def main() -> int:
         if run_dir.exists() and (not manifest.exists() or not weights_bump.exists()):
             print(f"[init] run-dir exists but missing manifest/weights, bootstrapping: {run_dir}")
         _run_v7_init(args, run_dir)
+
+    if args.resume_step is not None:
+        args.resume_latest_checkpoint = True
+    resume_checkpoint: dict[str, Any] = {
+        "status": "skipped",
+        "reason": "resume_not_requested",
+    }
+    if bool(getattr(args, "resume_latest_checkpoint", False)):
+        resume_checkpoint = _promote_checkpoint(
+            run_dir,
+            strict=True,
+            step=(int(args.resume_step) if args.resume_step is not None else None),
+            purpose="resume_before_train",
+        )
 
     if args.work_dir:
         work_dir = Path(args.work_dir).expanduser().resolve()
@@ -1648,7 +1961,9 @@ def main() -> int:
         token_ids_all = [int(v) for v in ids]
         tokenizer_json_for_roundtrip = str(run_dir / "tokenizer.json")
         decoded_text = bpe_handle.decode(token_ids_all)
-        encode_line_fn = bpe_handle.encode
+        encode_line_fn = lambda row: _encode_segment_with_bpe_fallback(
+            bpe_handle, row, chunk_chars=2048
+        )
         decode_ids_fn = bpe_handle.decode
         bpe_artifacts = {
             "tokenizer_json": str(tokenizer_json),
@@ -1751,6 +2066,7 @@ def main() -> int:
             tokenizer_roundtrip=tokenizer_roundtrip,
             data_lab_artifacts=data_lab_artifacts,
             post_train_eval={"status": "skipped", "reason": "prepare_only"},
+            resume_checkpoint=resume_checkpoint,
         )
         _atomic_write_text(run_dir / "training_pipeline_latest.json", json.dumps(prepare_pipeline, indent=2))
         print("v7 train pipeline prepared")
@@ -1848,6 +2164,7 @@ def main() -> int:
         "tokenizer_roundtrip": tokenizer_roundtrip,
         "post_train_eval": post_train_eval,
         "checkpoint_promotion": checkpoint_promotion,
+        "resume_checkpoint": resume_checkpoint,
         "ck_loss": {},
         "torch_loss": {},
     }
@@ -1878,6 +2195,7 @@ def main() -> int:
             **({"post_train_eval_json": post_train_eval_path} if post_train_eval_path else {}),
         },
         post_train_eval=post_train_eval,
+        resume_checkpoint=resume_checkpoint,
     )
     pipeline_json_path = run_dir / "training_pipeline_latest.json"
     _atomic_write_text(pipeline_json_path, json.dumps(training_pipeline, indent=2))
@@ -1887,6 +2205,15 @@ def main() -> int:
     print(f"  dataset:   {dataset_path}")
     print(f"  tokenizer: {args.tokenizer}")
     print(f"  driver:    {args.train_driver}")
+    if isinstance(resume_checkpoint, dict):
+        r_status = str(resume_checkpoint.get("status", "unknown"))
+        r_strategy = str(resume_checkpoint.get("strategy", "-"))
+        r_step = resume_checkpoint.get("step")
+        if r_status == "ok":
+            if r_step is None:
+                print(f"  resume:    {r_status} ({r_strategy})")
+            else:
+                print(f"  resume:    {r_status} ({r_strategy}, step={r_step})")
     print(f"  report:    {out_path}")
     print(
         "  roundtrip:"

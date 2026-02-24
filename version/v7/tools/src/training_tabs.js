@@ -145,11 +145,22 @@ function htmlEscape(value) {
         .replace(/>/g, '&gt;');
 }
 
+function stageTone(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'active') return 'green';
+    if (s === 'completed' || s === 'pass') return 'blue';
+    if (s === 'missing' || s === 'fail') return 'red';
+    return 'blue';
+}
+
 function renderDataLabPanel(files) {
     const root = document.getElementById('trainDataLabRoot');
     if (!root) return;
     clear(root);
 
+    const pipeline = files.training_pipeline && typeof files.training_pipeline === 'object'
+        ? files.training_pipeline
+        : {};
     const dataLab = resolveDataLab(files);
     const qc = dataLab.dataset_qc && typeof dataLab.dataset_qc === 'object' ? dataLab.dataset_qc : {};
     const profile = dataLab.dataset_profile && typeof dataLab.dataset_profile === 'object' ? dataLab.dataset_profile : {};
@@ -160,6 +171,130 @@ function renderDataLabPanel(files) {
     const tokenizerPreview = dataLab.tokenizer_preview && typeof dataLab.tokenizer_preview === 'object'
         ? dataLab.tokenizer_preview
         : (files.tokenizer_preview || {});
+    const activeStage = typeof pipeline.active_stage === 'string' && pipeline.active_stage.trim()
+        ? pipeline.active_stage
+        : 'pretrain';
+    const timeline = Array.isArray(pipeline.stage_timeline)
+        ? pipeline.stage_timeline.filter((row) => row && typeof row === 'object')
+        : [];
+    const stageArtifacts = Array.isArray(pipeline.stage_artifacts)
+        ? pipeline.stage_artifacts.filter((row) => row && typeof row === 'object')
+        : [];
+    const artifactByStage = {};
+    for (const row of stageArtifacts) {
+        if (typeof row.stage === 'string' && row.stage.trim()) artifactByStage[row.stage] = row;
+    }
+    const timelineByStage = {};
+    for (const row of timeline) {
+        if (typeof row.stage === 'string' && row.stage.trim()) timelineByStage[row.stage] = row;
+    }
+    const defaultStageOrder = ['pretrain', 'midtrain', 'sft', 'dpo', 'grpo', 'ppo'];
+    const orderedStages = [];
+    for (const s of defaultStageOrder) {
+        if (timelineByStage[s] || s === activeStage) orderedStages.push(s);
+    }
+    for (const row of timeline) {
+        const s = String(row.stage || '');
+        if (s && !orderedStages.includes(s)) orderedStages.push(s);
+    }
+    if (!orderedStages.includes(activeStage)) orderedStages.push(activeStage);
+
+    const flowCards = orderedStages.map((stage) => {
+        const t = timelineByStage[stage] || {};
+        const status = String(t.status || (stage === activeStage ? 'active' : 'planned'));
+        const isActive = Boolean(t.active === true || stage === activeStage);
+        const tone = stageTone(status);
+        const chip = statusPill(status, tone);
+        const border = isActive ? '1px solid rgba(71,180,117,0.55)' : '1px solid rgba(255,255,255,0.10)';
+        const bg = isActive ? 'rgba(71,180,117,0.12)' : 'rgba(255,255,255,0.03)';
+        const data = artifactByStage[stage] && typeof artifactByStage[stage] === 'object' ? artifactByStage[stage] : {};
+        const artifactsForStage = Array.isArray(data.artifacts) ? data.artifacts : [];
+        const artifactCount = artifactsForStage.length;
+        return `
+            <div style="min-width:130px;padding:0.45rem 0.55rem;border-radius:10px;${`border:${border};background:${bg};`}">
+                <div style="font-weight:700;">${htmlEscape(stage)}</div>
+                <div style="margin-top:0.2rem;">${chip}</div>
+                <div style="margin-top:0.2rem;color:var(--text-muted);font-size:0.78rem;">artifacts: ${artifactCount}</div>
+            </div>
+        `;
+    }).join('<div style="align-self:center;color:var(--text-muted);">-></div>');
+
+    const activeStageMeta = artifactByStage[activeStage] && typeof artifactByStage[activeStage] === 'object'
+        ? artifactByStage[activeStage]
+        : {};
+    const activeStageArtifacts = Array.isArray(activeStageMeta.artifacts) ? activeStageMeta.artifacts : [];
+    const activeArtifactTable = activeStageArtifacts.length > 0
+        ? `
+            <table>
+                <thead><tr><th>Label</th><th>Path</th><th>Required</th><th>Exists</th></tr></thead>
+                <tbody>
+                    ${activeStageArtifacts.map((a) => `
+                        <tr>
+                            <td>${htmlEscape(a.label ?? '-')}</td>
+                            <td style="max-width:620px;overflow-wrap:anywhere;"><code>${htmlEscape(a.path ?? '-')}</code></td>
+                            <td>${a.required ? statusPill('yes', 'blue') : statusPill('no', 'blue')}</td>
+                            <td>${a.exists ? statusPill('yes', 'green') : statusPill('no', 'red')}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `
+        : '<div style="color:var(--text-muted);">No active-stage artifact map found. Regenerate training_pipeline_latest.json.</div>';
+
+    const trainDims = pipeline.train_dims && typeof pipeline.train_dims === 'object' ? pipeline.train_dims : {};
+    const dimsSummary = [
+        `layers=${trainDims.num_layers ?? '-'}`,
+        `embed_dim=${trainDims.embed_dim ?? '-'}`,
+        `hidden_dim=${trainDims.hidden_dim ?? '-'}`,
+        `vocab=${trainDims.vocab_size ?? '-'}`,
+        `heads=${trainDims.num_heads ?? '-'}`,
+        `ctx=${trainDims.context_length ?? '-'}`,
+    ].join(' | ');
+    const stageFlowSection = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Stage Flow</span> Pretrain -> Midtrain -> SFT/DPO/RL Readiness</h3>
+            <div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">${flowCards}</div>
+            <div style="margin-top:0.6rem;color:var(--text-muted);font-size:0.85rem;">
+                active_stage=${htmlEscape(activeStage)} | model_dims: <code>${htmlEscape(dimsSummary)}</code>
+            </div>
+            <div style="margin-top:0.6rem;">
+                <strong>Active Stage Evidence</strong>
+                <div style="margin-top:0.35rem;overflow:auto;">${activeArtifactTable}</div>
+            </div>
+        </div>
+    `;
+
+    const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
+        ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
+        : [];
+    const datasetCatalogSection = `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Dataset Catalog</span> Generated Data + Manifests</h3>
+            ${datasetCatalog.length > 0
+                ? `
+                    <div style="margin-bottom:0.4rem;color:var(--text-muted);">
+                        ${datasetCatalog.length} entries discovered for this run scope.
+                    </div>
+                    <table>
+                        <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th>Rows</th><th>Path</th><th>Note</th></tr></thead>
+                        <tbody>
+                            ${datasetCatalog.slice(0, 200).map((row) => `
+                                <tr>
+                                    <td>${htmlEscape(row.stage ?? '-')}</td>
+                                    <td>${htmlEscape(row.kind ?? '-')}</td>
+                                    <td>${htmlEscape(row.name ?? '-')}</td>
+                                    <td>${htmlEscape(row.rows ?? '-')}</td>
+                                    <td style="max-width:500px;overflow-wrap:anywhere;"><code>${htmlEscape(row.path ?? '-')}</code></td>
+                                    <td style="max-width:300px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `
+                : '<div style="color:var(--text-muted);">No dataset_catalog embedded yet. Regenerate report to derive from manifests.</div>'
+            }
+        </div>
+    `;
 
     const pathRows = [
         ['dataset_dir', dataLab.dataset_dir || qc.dataset_dir || profile.dataset_dir || '-'],
@@ -311,10 +446,12 @@ function renderDataLabPanel(files) {
         `;
 
     root.innerHTML = `
+        ${stageFlowSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
             ${pathTable}
         </div>
+        ${datasetCatalogSection}
         <div class="stats-grid" style="margin-top:0.8rem;">
             <div class="stat-card"><div class="stat-value">${qc.status || '-'}</div><div class="stat-label">QC Status</div></div>
             <div class="stat-card"><div class="stat-value">${qc.non_empty_lines ?? profile.non_empty_lines ?? '-'}</div><div class="stat-label">Non-empty Rows</div></div>
@@ -341,9 +478,320 @@ function renderDataLabPanel(files) {
     `;
 }
 
+function statusPill(label, tone) {
+    const klass = tone === 'green'
+        ? 'badge badge-green'
+        : (tone === 'red' ? 'badge badge-orange' : 'badge badge-blue');
+    return `<span class="${klass}">${htmlEscape(label)}</span>`;
+}
+
+function extractPostEval(files) {
+    const pipeline = files.training_pipeline && typeof files.training_pipeline === 'object'
+        ? files.training_pipeline
+        : {};
+    const dataLab = pipeline.data_lab && typeof pipeline.data_lab === 'object'
+        ? pipeline.data_lab
+        : {};
+    const postEval = dataLab.post_train_eval && typeof dataLab.post_train_eval === 'object'
+        ? dataLab.post_train_eval
+        : (files.post_train_eval || {});
+    return postEval && typeof postEval === 'object' ? postEval : {};
+}
+
+function extractRoundtrip(files) {
+    const pipeline = files.training_pipeline && typeof files.training_pipeline === 'object'
+        ? files.training_pipeline
+        : {};
+    const dataLab = pipeline.data_lab && typeof pipeline.data_lab === 'object'
+        ? pipeline.data_lab
+        : {};
+    const roundtrip = dataLab.tokenizer_roundtrip && typeof dataLab.tokenizer_roundtrip === 'object'
+        ? dataLab.tokenizer_roundtrip
+        : (files.tokenizer_roundtrip || {});
+    return roundtrip && typeof roundtrip === 'object' ? roundtrip : {};
+}
+
+function trainE2EState(trainE2E) {
+    if (!trainE2E || typeof trainE2E !== 'object' || Object.keys(trainE2E).length === 0) {
+        return { label: 'missing', pass: null };
+    }
+    if (trainE2E.status === 'pass' || trainE2E.pass === true || trainE2E.passed === true || trainE2E.pass_parity === true) {
+        return { label: 'pass', pass: true };
+    }
+    if (trainE2E.status === 'fail' || trainE2E.pass === false || trainE2E.passed === false || trainE2E.pass_parity === false) {
+        return { label: 'fail', pass: false };
+    }
+    return { label: 'check', pass: null };
+}
+
+function latestLoss(files) {
+    const curve = files.training_loss_curve && Array.isArray(files.training_loss_curve.steps)
+        ? files.training_loss_curve.steps
+        : [];
+    if (curve.length > 0) {
+        const last = curve[curve.length - 1];
+        const n = toNum(last && last.loss_ck, NaN);
+        if (Number.isFinite(n)) return n;
+    }
+    const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
+    const fallback = toNum(trainE2E.final_ck_loss, NaN);
+    return Number.isFinite(fallback) ? fallback : NaN;
+}
+
+function renderTrainingLogbookPanel(files) {
+    const root = document.getElementById('trainLogbookRoot');
+    if (!root) return;
+    clear(root);
+
+    const pipeline = files.training_pipeline && typeof files.training_pipeline === 'object'
+        ? files.training_pipeline
+        : {};
+    const dataLab = resolveDataLab(files);
+    const qc = dataLab.dataset_qc && typeof dataLab.dataset_qc === 'object' ? dataLab.dataset_qc : {};
+    const profile = dataLab.dataset_profile && typeof dataLab.dataset_profile === 'object' ? dataLab.dataset_profile : {};
+    const tokenizerPreview = dataLab.tokenizer_preview && typeof dataLab.tokenizer_preview === 'object'
+        ? dataLab.tokenizer_preview
+        : (files.tokenizer_preview || {});
+    const activeStage = typeof pipeline.active_stage === 'string' && pipeline.active_stage.trim()
+        ? pipeline.active_stage
+        : 'pretrain';
+    const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
+    const e2e = trainE2EState(trainE2E);
+    const parityRows = parseParityRows(files.training_parity);
+    const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
+    const postEval = extractPostEval(files);
+    const roundtrip = extractRoundtrip(files);
+    const roundtripEval = roundtrip.line_eval && typeof roundtrip.line_eval === 'object' ? roundtrip.line_eval : {};
+    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
+        ? files.training_parity_regimen
+        : {};
+    const logbook = files.training_logbook && typeof files.training_logbook === 'object'
+        ? files.training_logbook
+        : {};
+    const runCtx = getRunContext();
+    const latest = latestLoss(files);
+    const lossCurve = files.training_loss_curve && Array.isArray(files.training_loss_curve.steps)
+        ? files.training_loss_curve.steps
+        : [];
+    const firstLoss = lossCurve.length > 0 ? toNum(lossCurve[0]?.loss_ck, NaN) : NaN;
+    const reducedLoss = Number.isFinite(firstLoss) && Number.isFinite(latest) ? (latest < firstLoss) : false;
+
+    const failures = [];
+    const nextSteps = [];
+
+    const lineRate = toNum(roundtripEval.exact_match_rate, NaN);
+    const roundtripExact = roundtrip.exact_match === true;
+    if (roundtrip.exact_match === false || (Number.isFinite(lineRate) && lineRate < 1.0)) {
+        failures.push({
+            title: 'Tokenizer roundtrip mismatch',
+            why: `exact_match=${roundtrip.exact_match === true ? 'true' : 'false'}, line_rate=${Number.isFinite(lineRate) ? lineRate.toFixed(4) : '-'}`,
+            severity: 'warning',
+        });
+        nextSteps.push('Fix tokenizer encode/decode fidelity first (line_rate should be 1.0000 before long runs).');
+    }
+
+    if (e2e.pass === false) {
+        failures.push({
+            title: 'Train E2E parity failed',
+            why: `status=${e2e.label}`,
+            severity: 'error',
+        });
+        nextSteps.push('Run parity canary rows and inspect first divergence before scaling training.');
+    }
+
+    if (Number.isFinite(worstParity) && worstParity > 1e-3) {
+        failures.push({
+            title: 'High CK vs PyTorch drift',
+            why: `worst max_param_diff=${fmtExp(worstParity, 2)} (>1e-3)`,
+            severity: 'error',
+        });
+        nextSteps.push('Use training parity regimen + xray to isolate the first mismatching layer/op.');
+    } else if (Number.isFinite(worstParity) && worstParity > 1e-5) {
+        failures.push({
+            title: 'Elevated parity drift',
+            why: `worst max_param_diff=${fmtExp(worstParity, 2)} (>1e-5)`,
+            severity: 'warning',
+        });
+        nextSteps.push('Track drift trend; rerun parity regimen if this grows across commits.');
+    }
+
+    const regimenStatus = String(regimen.status || '').toLowerCase();
+    if (regimenStatus === 'fail') {
+        failures.push({
+            title: 'Parity regimen failed',
+            why: 'training_parity_regimen_latest.json status=fail',
+            severity: 'error',
+        });
+        nextSteps.push('Open training_parity_regimen_latest.md and fix failing gate before full retrain.');
+    }
+
+    const postStatus = String(postEval.status || '').toLowerCase();
+    const validSvgRate = toNum(postEval.valid_svg_rate, NaN);
+    const minValidSvgRate = toNum(postEval.min_valid_svg_rate, 0.70);
+    if (postStatus === 'fail' || (Number.isFinite(validSvgRate) && validSvgRate < minValidSvgRate)) {
+        failures.push({
+            title: 'Output quality/data-fit gate below target',
+            why: `valid_svg_rate=${Number.isFinite(validSvgRate) ? validSvgRate.toFixed(4) : '-'} threshold=${minValidSvgRate.toFixed(4)}`,
+            severity: 'warning',
+        });
+        nextSteps.push('Improve corpus coverage/SFT pairs; this is usually data-fit, not a numeric parity bug.');
+    }
+
+    if (failures.length === 0) {
+        nextSteps.push('Continue with the next curriculum stage and keep parity gates enabled on regenerated code.');
+    }
+
+    const datasetRows = qc.non_empty_lines ?? profile.non_empty_lines ?? '-';
+    const tokenizerVocab = tokenizerPreview.vocab_size ?? '-';
+    const tokenCount = roundtrip.token_count ?? tokenizerPreview.encode_decode_example?.token_count ?? '-';
+    const lineRateLabel = Number.isFinite(lineRate) ? lineRate.toFixed(4) : '-';
+    const dataPass = String(qc.status || '').toLowerCase() === 'pass';
+    const tokenizePass = tokenizerPreview && typeof tokenizerPreview === 'object' && (
+        String(tokenizerPreview.status || '').toLowerCase() === 'ok'
+        || Number.isFinite(Number(tokenizerPreview.vocab_size))
+    );
+    const roundtripPass = roundtripExact && (!Number.isFinite(lineRate) || lineRate >= 0.9999);
+    const trainingPass = Number.isFinite(firstLoss) && Number.isFinite(latest) && reducedLoss;
+    const stageRows = [
+        {
+            stage: '1) Data Intake (SVG)',
+            status: dataPass ? 'pass' : 'check',
+            evidence: `dataset_rows=${datasetRows}, qc_status=${qc.status || '-'}, dataset_path=${dataLab.dataset_path || qc.path || '-'}`,
+        },
+        {
+            stage: '2) Tokenize (ASCII BPE)',
+            status: tokenizePass ? 'pass' : 'check',
+            evidence: `tokenizer=${tokenizerPreview.model_type || 'bpe'} vocab=${tokenizerVocab} token_count=${tokenCount}`,
+        },
+        {
+            stage: '3) Encode -> Decode Fidelity',
+            status: roundtripPass ? 'pass' : 'fail',
+            evidence: `exact_match=${roundtrip.exact_match === true ? 'true' : 'false'} line_rate=${lineRateLabel} evaluated_lines=${roundtripEval.evaluated_lines ?? '-'}`,
+        },
+        {
+            stage: '4) Train (1+ epochs)',
+            status: trainingPass ? 'pass' : 'check',
+            evidence: `loss_first=${Number.isFinite(firstLoss) ? firstLoss.toFixed(6) : '-'} loss_final=${Number.isFinite(latest) ? latest.toFixed(6) : '-'} reduced=${trainingPass ? 'yes' : 'no'}`,
+        },
+    ];
+
+    const sampleRows = Array.isArray(roundtrip.sample_rows) ? roundtrip.sample_rows.slice(0, 10) : [];
+    const sampleTable = sampleRows.length > 0
+        ? `
+            <table>
+                <thead><tr><th>row</th><th>tokens</th><th>exact</th><th>decoded/sample</th></tr></thead>
+                <tbody>
+                    ${sampleRows.map((row) => {
+                        const decoded = String(row.decoded || row.source || '-');
+                        const shortDecoded = decoded.length > 220 ? `${decoded.slice(0, 220)}...` : decoded;
+                        return `
+                            <tr>
+                                <td>${htmlEscape(row.line_no ?? '-')}</td>
+                                <td>${htmlEscape(row.token_count ?? '-')}</td>
+                                <td>${row.exact_match ? '<span class="badge badge-green">yes</span>' : '<span class="badge badge-orange">no</span>'}</td>
+                                <td style="max-width:560px;overflow-wrap:anywhere;"><code>${htmlEscape(shortDecoded)}</code></td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `
+        : '<div style="color:var(--text-muted);">No sample rows embedded. Regenerate with tokenizer roundtrip artifacts.</div>';
+
+    const currentStateRows = [
+        ['run_dir', runCtx.runDir || '-'],
+        ['stage', activeStage],
+        ['train_e2e', e2e.label],
+        ['latest_ck_loss', Number.isFinite(latest) ? latest.toFixed(6) : '-'],
+        ['parity_worst_max_param_diff', Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'],
+        ['valid_svg_rate', Number.isFinite(validSvgRate) ? validSvgRate.toFixed(4) : '-'],
+    ];
+
+    const logMarkdown = typeof logbook.markdown === 'string' ? logbook.markdown.trim() : '';
+    const logPath = typeof logbook.path === 'string' && logbook.path.trim() ? logbook.path : '-';
+    const logSource = typeof logbook.source === 'string' && logbook.source.trim() ? logbook.source : '-';
+
+    root.innerHTML = `
+        <div class="parity-section">
+            <h3><span class="badge badge-blue">State</span> Where We Are</h3>
+            <table>
+                <thead><tr><th>Signal</th><th>Value</th></tr></thead>
+                <tbody>
+                    ${currentStateRows.map((r) => `
+                        <tr>
+                            <td>${htmlEscape(r[0])}</td>
+                            <td style="max-width:620px;overflow-wrap:anywhere;"><code>${htmlEscape(r[1])}</code></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                ${statusPill(`train_e2e: ${e2e.label}`, e2e.pass === false ? 'red' : (e2e.pass === true ? 'green' : 'blue'))}
+                ${statusPill(`stage: ${activeStage}`, 'blue')}
+                ${statusPill(`failures: ${failures.length}`, failures.length > 0 ? 'red' : 'green')}
+            </div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-orange">Failures</span> What Failed + Why</h3>
+            ${failures.length === 0
+                ? '<div style="color:var(--text-muted);">No active failure signals in loaded artifacts.</div>'
+                : failures.map((f) => `
+                    <div class="alert-item ${f.severity === 'error' ? 'critical' : 'warning'}" style="margin-bottom:0.6rem;">
+                        <div><strong>${htmlEscape(f.title)}</strong></div>
+                        <div style="margin-top:0.2rem;color:var(--text-muted);">${htmlEscape(f.why)}</div>
+                    </div>
+                `).join('')}
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Next</span> Suggested Next Steps</h3>
+            <ul style="margin:0.2rem 0 0 1.1rem;padding:0;">
+                ${nextSteps.map((s) => `<li style="margin:0.28rem 0;">${htmlEscape(s)}</li>`).join('')}
+            </ul>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Pipeline</span> Data -> Tokens -> Fidelity -> Training</h3>
+            <table>
+                <thead><tr><th>Stage</th><th>Status</th><th>Evidence</th></tr></thead>
+                <tbody>
+                    ${stageRows.map((s) => `
+                        <tr>
+                            <td>${htmlEscape(s.stage)}</td>
+                            <td>${statusPill(String(s.status).toUpperCase(), s.status === 'pass' ? 'green' : (s.status === 'fail' ? 'red' : 'blue'))}</td>
+                            <td style="max-width:640px;overflow-wrap:anywhere;"><code>${htmlEscape(s.evidence)}</code></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Data Viewer</span> SVG Rows (HF-style sample)</h3>
+            <div style="overflow:auto;">${sampleTable}</div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Logbook</span> Operator Notes</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.5rem;margin-bottom:0.6rem;">
+                <div><strong>source:</strong> <code>${htmlEscape(logSource)}</code></div>
+                <div><strong>path:</strong> <code style="overflow-wrap:anywhere;">${htmlEscape(logPath)}</code></div>
+            </div>
+            ${logMarkdown
+                ? `<pre style="font-size:0.8rem;white-space:pre-wrap;max-height:460px;overflow:auto;">${htmlEscape(logMarkdown)}</pre>`
+                : '<div style="color:var(--text-muted);">No embedded training logbook markdown found for this run yet.</div>'}
+        </div>
+    `;
+}
+
+if (typeof window !== 'undefined') {
+    // Global bridges for legacy (non-module) sections in ir_visualizer.html.
+    window.getRunContext = getRunContext;
+    window.resolveDataLab = resolveDataLab;
+    window.htmlEscape = htmlEscape;
+}
+
 export function renderTrainingExtensionTab(tabId, files) {
     if (tabId === 'train-gradient') {
         renderGradientPanel(files);
+    } else if (tabId === 'train-logbook') {
+        renderTrainingLogbookPanel(files);
     } else if (tabId === 'train-data-lab') {
         renderDataLabPanel(files);
     } else if (tabId === 'train-parity') {

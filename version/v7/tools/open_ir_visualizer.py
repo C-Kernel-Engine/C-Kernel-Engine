@@ -970,6 +970,67 @@ def collect_analysis_checkpoints(search_roots: list[Path]) -> dict | None:
     }
 
 
+def collect_training_logbook(
+    search_roots: list[Path],
+    *,
+    run_dir: Path | None = None,
+    strict_run_scope: bool = False,
+) -> dict | None:
+    """Load an operator-facing training logbook markdown file."""
+    repo_logbook = V7_ROOT / "reports" / "TRAINING_LOGBOOK.md"
+    names = [
+        "training_logbook.md",
+        "TRAINING_LOGBOOK.md",
+        "training_logbook_latest.md",
+    ]
+    candidates: list[Path] = []
+    seen: set[str] = set()
+
+    def push(path: Path) -> None:
+        key = str(path)
+        if key in seen:
+            return
+        seen.add(key)
+        candidates.append(path)
+
+    for root in search_roots:
+        for name in names:
+            push(root / name)
+    # Keep repo logbook as a final fallback even in strict run scope:
+    # it is operator guidance, not mutable model telemetry.
+    push(repo_logbook)
+
+    for path in candidates:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as e:
+            print(f"  ! training logbook {path}: {e}")
+            continue
+        if not text.strip():
+            continue
+
+        source = "run_local"
+        if path == repo_logbook:
+            source = "repo_default"
+        elif run_dir is not None:
+            try:
+                path.relative_to(run_dir)
+                source = "run_local"
+            except Exception:
+                source = "external"
+
+        return {
+            "path": str(path),
+            "source": source,
+            "line_count": len(text.splitlines()),
+            "markdown": text,
+        }
+
+    return None
+
+
 def _has_renderable_profile_payload(payload) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -1081,6 +1142,216 @@ def _load_json_loose(path: Path):
             return json.load(f)
     except Exception:
         return None
+
+
+def _manifest_rows_from_payload(payload: dict) -> int | None:
+    for key in ("output_rows", "num_rows", "num_train", "num_samples", "rows", "train_rows"):
+        value = payload.get(key)
+        if isinstance(value, int):
+            return int(value)
+        if isinstance(value, float) and value == value and value not in (float("inf"), float("-inf")):
+            return int(value)
+    return None
+
+
+def _infer_dataset_stage_from_name(name: str, default_stage: str) -> str:
+    probe = str(name or "").lower()
+    if "dpo" in probe:
+        return "dpo"
+    if "grpo" in probe:
+        return "grpo"
+    if "ppo" in probe or "rl" in probe:
+        return "ppo"
+    if any(tok in probe for tok in ("stage_b", "midtrain", "instruction", "sft")):
+        return "midtrain"
+    if any(tok in probe for tok in ("stage_a", "bridge", "assets", "ascii", "svg")):
+        return "pretrain"
+    return default_stage
+
+
+def _derive_dataset_catalog(pipeline: dict, run_dir: Path | None) -> list[dict]:
+    data_lab = pipeline.get("data_lab") if isinstance(pipeline.get("data_lab"), dict) else {}
+    active_stage = str(pipeline.get("active_stage") or "pretrain")
+    qc = data_lab.get("dataset_qc") if isinstance(data_lab.get("dataset_qc"), dict) else {}
+
+    entries: list[dict] = []
+    seen_paths: set[str] = set()
+
+    def _add_entry(
+        *,
+        stage: str,
+        kind: str,
+        name: str,
+        path: str,
+        rows: int | None = None,
+        note: str = "",
+        source: str = "local",
+    ) -> None:
+        key = str(path)
+        if not key or key in seen_paths:
+            return
+        seen_paths.add(key)
+        entries.append(
+            {
+                "stage": str(stage),
+                "kind": str(kind),
+                "name": str(name),
+                "path": key,
+                "rows": int(rows) if isinstance(rows, int) else None,
+                "note": str(note or ""),
+                "source": str(source),
+            }
+        )
+
+    dataset_path = data_lab.get("dataset_path")
+    if isinstance(dataset_path, str) and dataset_path.strip():
+        active_rows = qc.get("non_empty_lines")
+        _add_entry(
+            stage=active_stage,
+            kind="active_dataset",
+            name=Path(dataset_path).name,
+            path=dataset_path,
+            rows=int(active_rows) if isinstance(active_rows, int) else None,
+            note="dataset used for this report",
+        )
+
+    manifest_candidates: list[Path] = []
+    ds_dir_raw = data_lab.get("dataset_dir")
+    if isinstance(ds_dir_raw, str) and ds_dir_raw.strip():
+        ds_dir = Path(ds_dir_raw).expanduser()
+        if ds_dir.exists():
+            manifest_candidates.extend(sorted(ds_dir.glob("*manifest.json")))
+    repo_data_dir = V7_ROOT / "data"
+    if repo_data_dir.exists():
+        manifest_candidates.extend(sorted(repo_data_dir.glob("svg*_manifest.json")))
+    if run_dir is not None:
+        ap_dir = run_dir / "autopilot"
+        if ap_dir.exists():
+            manifest_candidates.extend(sorted(ap_dir.glob("iter_*/*manifest*.json")))
+            manifest_candidates.extend(sorted(ap_dir.glob("iter_*/**/*manifest*.json")))
+
+    seen_manifest: set[str] = set()
+    for manifest_path in manifest_candidates:
+        key = str(_resolve_path_loose(manifest_path))
+        if key in seen_manifest:
+            continue
+        seen_manifest.add(key)
+        payload = _load_json_loose(manifest_path)
+        if not isinstance(payload, dict):
+            continue
+        rows = _manifest_rows_from_payload(payload)
+        out_path = payload.get("out_path")
+        dataset_name = payload.get("dataset_name")
+        if not isinstance(dataset_name, str) or not dataset_name.strip():
+            if isinstance(out_path, str) and out_path.strip():
+                dataset_name = Path(out_path).name
+            else:
+                dataset_name = manifest_path.stem
+        stage = _infer_dataset_stage_from_name(manifest_path.name, active_stage)
+        note_parts: list[str] = []
+        if isinstance(payload.get("source_files"), int):
+            note_parts.append(f"source_files={payload.get('source_files')}")
+        mapped = payload.get("mapped_common_symbols_total")
+        if isinstance(mapped, int):
+            note_parts.append(f"mapped_symbols={mapped}")
+        tcounts = payload.get("type_counts")
+        if isinstance(tcounts, dict):
+            note_parts.append(f"type_families={len(tcounts)}")
+        _add_entry(
+            stage=stage,
+            kind="manifest",
+            name=dataset_name,
+            path=str(manifest_path),
+            rows=rows,
+            note=", ".join(note_parts),
+            source="manifest",
+        )
+        if isinstance(out_path, str) and out_path.strip():
+            _add_entry(
+                stage=stage,
+                kind="generated_dataset",
+                name=Path(out_path).name,
+                path=out_path,
+                rows=rows,
+                note=f"derived from {manifest_path.name}",
+                source="manifest_output",
+            )
+
+    return entries
+
+
+def _derive_stage_artifacts(pipeline: dict, loaded_paths: dict[str, str], run_dir: Path | None) -> list[dict]:
+    timeline = pipeline.get("stage_timeline")
+    if not isinstance(timeline, list) or not timeline:
+        timeline = [{"stage": str(pipeline.get("active_stage") or "pretrain"), "status": "active", "active": True}]
+    active_stage = str(pipeline.get("active_stage") or "pretrain")
+    data_provenance = pipeline.get("data_provenance")
+    if not isinstance(data_provenance, list):
+        data_provenance = []
+    prov_by_stage: dict[str, dict] = {}
+    for row in data_provenance:
+        if isinstance(row, dict):
+            stage = row.get("stage")
+            if isinstance(stage, str) and stage not in prov_by_stage:
+                prov_by_stage[stage] = row
+
+    data_lab = pipeline.get("data_lab") if isinstance(pipeline.get("data_lab"), dict) else {}
+    artifacts = data_lab.get("artifacts") if isinstance(data_lab.get("artifacts"), dict) else {}
+    active_artifacts: list[dict] = []
+
+    def _push(label: str, path: str | None, required: bool = False) -> None:
+        if not isinstance(path, str) or not path.strip():
+            return
+        active_artifacts.append(
+            {
+                "label": str(label),
+                "path": str(path),
+                "required": bool(required),
+                "exists": bool(Path(path).expanduser().exists()),
+            }
+        )
+
+    _push("dataset_path", data_lab.get("dataset_path"), required=True)
+    _push("tokenizer_json_path", data_lab.get("tokenizer_json_path"), required=True)
+    _push("dataset_qc_json", artifacts.get("dataset_qc_json"), required=True)
+    _push("dataset_profile_json", artifacts.get("dataset_profile_json"), required=True)
+    _push("tokenizer_roundtrip_json", artifacts.get("tokenizer_roundtrip_json"), required=True)
+    _push("post_train_eval_json", artifacts.get("post_train_eval_json"), required=False)
+    _push("training_pipeline_json", loaded_paths.get("training_pipeline"), required=True)
+
+    if run_dir is not None:
+        for label, rel in (
+            ("training_loss_curve", "training_loss_curve_latest.json"),
+            ("training_parity", "training_parity_latest.json"),
+            ("ir1_train", "ir1_train_forward.json"),
+            ("ir2_train", "ir2_train_backward.json"),
+            ("layout_train", "layout_train.json"),
+            ("train_exec_plan", "train_exec_plan.json"),
+        ):
+            p = run_dir / rel
+            if p.exists():
+                _push(label, str(p), required=False)
+
+    rows: list[dict] = []
+    for row in timeline:
+        if not isinstance(row, dict):
+            continue
+        stage = str(row.get("stage") or "")
+        if not stage:
+            continue
+        prov = prov_by_stage.get(stage, {})
+        rows.append(
+            {
+                "stage": stage,
+                "status": str(row.get("status") or ("active" if stage == active_stage else "planned")),
+                "active": bool(row.get("active") is True or stage == active_stage),
+                "dataset_name": prov.get("dataset_name"),
+                "token_count": prov.get("token_count"),
+                "source_path": prov.get("source_path"),
+                "artifacts": list(active_artifacts) if stage == active_stage else [],
+            }
+        )
+    return rows
 
 
 def _extract_loss_series(payload, preferred_keys: list[str]) -> list[float]:
@@ -1331,6 +1602,7 @@ def load_model_data(
         "training_step_profile",
         "training_checkpoint_policy",
         "training_pipeline",
+        "training_logbook",
         "dataset_qc",
         "dataset_profile",
         "tokenizer_roundtrip",
@@ -1553,6 +1825,17 @@ def load_model_data(
         loaded.append("analysis_checkpoints")
     else:
         missing_optional.append("analysis_checkpoints")
+
+    training_logbook_payload = collect_training_logbook(
+        search_roots,
+        run_dir=run_dir,
+        strict_run_scope=strict_run_scope,
+    )
+    if training_logbook_payload is not None:
+        data["files"]["training_logbook"] = training_logbook_payload
+        loaded.append("training_logbook")
+    else:
+        missing_optional.append("training_logbook")
 
     if "training_canary_summary" not in data["files"]:
         canary_summary = _build_training_canary_summary(run_dir if run_dir is not None else model_root)
@@ -1833,6 +2116,21 @@ def load_model_data(
                     break
         if step_056:
             data_lab["step_056"] = step_056
+
+        dataset_catalog = pipeline.get("dataset_catalog")
+        if not isinstance(dataset_catalog, list) or not dataset_catalog:
+            derived_catalog = _derive_dataset_catalog(pipeline, run_dir)
+            if derived_catalog:
+                pipeline["dataset_catalog"] = derived_catalog
+                loaded.append("dataset_catalog(derived)")
+
+        stage_artifacts = pipeline.get("stage_artifacts")
+        if not isinstance(stage_artifacts, list) or not stage_artifacts:
+            derived_stage_artifacts = _derive_stage_artifacts(pipeline, loaded_paths, run_dir)
+            if derived_stage_artifacts:
+                pipeline["stage_artifacts"] = derived_stage_artifacts
+                loaded.append("stage_artifacts(derived)")
+
         if "tokenizer_json_path" not in data_lab:
             tok = pipeline.get("tokenizer_lineage")
             if isinstance(tok, dict) and isinstance(tok.get("tokenizer_path"), str):
