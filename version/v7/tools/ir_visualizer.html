@@ -13110,10 +13110,11 @@ function renderProfileHowTo() {
                 : rowScope === 'header_footer'
                     ? 'Header + Footer rows'
                     : 'Layer rows (L0..LN)';
+            const activeProfileMode = normalizeMode(document.getElementById('profileMode')?.value || currentMode || 'decode');
 
             let html = `<h3 style="margin-bottom:0.4rem;">${title}</h3>`;
             html += `<div style="color:var(--text-muted);font-size:0.78rem;margin-bottom:0.75rem;">
-                Columns=${sortedCols.length}, Rows=${sortedRows.length}, Scope=${escapeHtml(rowScopeLabel)}. Amber intensity indicates higher time concentration.
+                Columns=${sortedCols.length}, Rows=${sortedRows.length}, Scope=${escapeHtml(rowScopeLabel)} [Mode=${escapeHtml(activeProfileMode)}]. Amber intensity indicates higher time concentration.
             </div>`;
             html += '<div style="overflow-x:auto;"><table style="font-size:0.75rem;border-collapse:collapse;">';
             html += '<thead><tr><th style="padding:4px 8px;">Row</th>' + sortedCols.map(col => {

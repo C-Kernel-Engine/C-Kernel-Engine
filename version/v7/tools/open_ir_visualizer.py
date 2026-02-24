@@ -2143,15 +2143,29 @@ def load_model_data(
     # Enrich artifacts for standalone report portability.
     flame = data["files"].get("flamegraph_manifest")
     if isinstance(flame, dict):
-        svg_path = flame.get("svg_path")
-        if isinstance(svg_path, str):
+        def _enrich_flame_entry(entry: dict) -> None:
+            svg_path = entry.get("svg_path")
+            if not isinstance(svg_path, str):
+                return
             resolved = _resolve_asset_path(svg_path, ck_build_path, model_root)
             if resolved and resolved.suffix.lower() == ".svg":
                 try:
-                    flame["svg_inline"] = resolved.read_text(errors="ignore")
-                    flame["svg_resolved_path"] = str(resolved)
+                    entry["svg_inline"] = resolved.read_text(errors="ignore")
+                    entry["svg_resolved_path"] = str(resolved)
                 except Exception as e:
                     data["meta"]["warnings"].append(f"Failed to inline flamegraph SVG: {e}")
+
+        _enrich_flame_entry(flame)
+        by_mode = flame.get("by_mode")
+        if isinstance(by_mode, dict):
+            mode_keys: list[str] = []
+            for mode_name, payload in by_mode.items():
+                if not isinstance(mode_name, str) or not isinstance(payload, dict):
+                    continue
+                mode_keys.append(mode_name)
+                _enrich_flame_entry(payload)
+            if mode_keys:
+                flame["available_modes"] = sorted(set(mode_keys))
 
     vtune = data["files"].get("vtune_summary")
     if isinstance(vtune, dict):

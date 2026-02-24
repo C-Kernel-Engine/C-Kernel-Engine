@@ -230,6 +230,16 @@ def write_json(path: Path, payload: Dict[str, object]) -> None:
         json.dump(payload, f, indent=2)
 
 
+def read_json_dict(path: Path) -> Dict[str, object]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(errors="ignore"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate v7 perf artifact JSON files")
     parser.add_argument("--model-dir", type=Path, help="Model output directory")
@@ -239,6 +249,7 @@ def main() -> int:
     parser.add_argument("--perf-data", type=Path, help="perf.data file used for flamegraph")
     parser.add_argument("--folded", type=Path, help="Folded stack file from stackcollapse-perf.pl")
     parser.add_argument("--flamegraph-svg", type=Path, help="Generated flamegraph SVG")
+    parser.add_argument("--mode", choices=["decode", "prefill"], help="Flamegraph capture mode")
     parser.add_argument("--vtune-summary", type=Path, help="Optional VTune summary JSON/text")
     args = parser.parse_args()
 
@@ -261,14 +272,42 @@ def main() -> int:
 
     if args.flamegraph_svg and args.flamegraph_svg.exists():
         top_symbols = parse_folded_top_symbols(args.folded) if args.folded else []
-        manifest = {
+        mode_key = args.mode or "decode"
+        entry = {
             "generated_at": utc_now_iso(),
+            "mode": mode_key,
             "svg_path": str(args.flamegraph_svg),
             "perf_data_path": str(args.perf_data) if args.perf_data else None,
             "folded_path": str(args.folded) if args.folded else None,
             "top_symbols": top_symbols,
         }
-        write_json(out_dir / "flamegraph_manifest.json", manifest)
+        manifest_path = out_dir / "flamegraph_manifest.json"
+        prev = read_json_dict(manifest_path)
+        prev_by_mode = prev.get("by_mode")
+        by_mode: Dict[str, Dict[str, object]] = {}
+        if isinstance(prev_by_mode, dict):
+            for k, v in prev_by_mode.items():
+                if isinstance(k, str) and isinstance(v, dict):
+                    by_mode[k] = dict(v)
+        by_mode[mode_key] = entry
+
+        preferred_mode = "decode" if "decode" in by_mode else ("prefill" if "prefill" in by_mode else mode_key)
+        preferred = by_mode.get(preferred_mode, entry)
+
+        manifest = {
+            "generated_at": utc_now_iso(),
+            "mode": preferred_mode,
+            "available_modes": sorted(by_mode.keys()),
+            "svg_path": preferred.get("svg_path"),
+            "perf_data_path": preferred.get("perf_data_path"),
+            "folded_path": preferred.get("folded_path"),
+            "top_symbols": preferred.get("top_symbols", []),
+            "by_mode": by_mode,
+        }
+        manifest_source = prev.get("source")
+        if isinstance(manifest_source, str) and manifest_source:
+            manifest["source"] = manifest_source
+        write_json(manifest_path, manifest)
         print(f"Wrote {out_dir / 'flamegraph_manifest.json'}")
         wrote_any = True
 
