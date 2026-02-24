@@ -219,6 +219,7 @@
         <li><a href="#step-2-training-setup">Step 2: Training Setup (true_bpe)</a></li>
         <li><a href="#step-3-5-parity-gate">Step 3.1: Mandatory CK vs PyTorch Parity Gate (10 epochs)</a></li>
         <li><a href="#step-3-6-parity-regimen">Step 3.2: Automated Training Parity Regimen</a></li>
+        <li><a href="#step-3-6-nightly-core-stabilization">Step 3.3: Nightly Core Stabilization Matrix</a></li>
         <li><a href="#step-3-train">Step 3.7: Run Full Training Pipeline</a></li>
         <li><a href="#step-4-artifacts">Step 4: Artifact Locations + Data Format</a></li>
         <li><a href="#step-5-promote">Step 5: Promote Latest Checkpoint to Inference Weights</a></li>
@@ -966,6 +967,27 @@ python3 version/v7/scripts/ck_run_v7.py train --run "$RUN" --parity-regimen run
 python3 version/v7/scripts/ck_run_v7.py train --run "$RUN" --parity-regimen require</pre>
     </div>
     <p class="mini-note">Use <code>--parity-regimen off</code> only for deliberate fast-debug loops.</p>
+</div>
+
+<h2 id="step-3-6-nightly-core-stabilization">Step 3.3: Nightly Core Stabilization Matrix (1-4 Layers)</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Run one nightly matrix that combines strict tokenizer gates and parity gates:</p>
+    <ul style="margin-top: 0.2rem;">
+        <li>Tokenizer gates: <code>ascii_bpe</code> and <code>bpe</code> with strict encode/decode roundtrip exactness.</li>
+        <li>Parity matrix: layers <code>1,2,3,4</code>, variable token budgets, grad-accum sweep <code>2,4,8</code>.</li>
+        <li>Replay/runtime checks: determinism + accum snapshot checks included by default.</li>
+    </ul>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+make v7-stabilization-nightly \
+  V7_STABILIZATION_RUN_ROOT="$RUN/nightly_stabilization" \
+  V7_STABILIZATION_DATA="$DATA_TXT"</pre>
+    </div>
+    <p class="mini-note">Optional main-run validation: add <code>V7_STABILIZATION_MAIN_RUN_DIR="$RUN"</code> to include your current run-dir weights as an extra parity case.</p>
+    <p class="mini-note">Outputs: <code>training_stabilization_scorecard_latest.json</code>, <code>training_stabilization_scorecard_latest.md</code>, and append-only <code>training_stabilization_history.jsonl</code>.</p>
+    <p class="mini-note">Tune matrix size with: <code>V7_STABILIZATION_LAYERS</code>, <code>V7_STABILIZATION_TOKEN_BUDGETS</code>, <code>V7_STABILIZATION_GRAD_ACCUM_SWEEP</code>.</p>
 </div>
 
 <h2 id="step-3-train">Step 3.7: Run Full Training Pipeline (After Parity Gates)</h2>
