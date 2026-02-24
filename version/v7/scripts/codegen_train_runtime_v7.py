@@ -430,13 +430,13 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
         if "num_kv_heads" in name:
             return str(int(cfg.get("num_kv_heads", cfg.get("num_heads", 1))))
         if name in ("t", "tokens", "num_tokens", "token_count"):
-            return "CK_NUM_TOKENS"
+            return "g_active_tokens"
         if "vocab" in name:
             return str(int(cfg.get("vocab_size", 256)))
         if "aligned_context_window" in name or "context_window" in name:
             # Training runtime currently executes 1-token micro-steps.
             # Use runtime token count to avoid kernels assuming full-context buffers.
-            return "CK_NUM_TOKENS"
+            return "g_active_tokens"
         if "head_dim" in name:
             return str(int(cfg.get("head_dim", 64)))
         if "aligned_embed_dim" in name or "embed_dim" in name or "d_model" in name:
@@ -446,7 +446,7 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
         if "aligned_out" in name:
             return str(int(cfg.get("hidden_size", cfg.get("embed_dim", 128))))
         if "kv_stride_tokens" in name:
-            return "CK_NUM_TOKENS"
+            return "g_active_tokens"
         if "rotary_dim" in name:
             hd = int(cfg.get("head_dim", 64))
             return str(int(cfg.get("rotary_dim", hd)))
@@ -1328,7 +1328,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("static float *g_memory = NULL;")
     ap("static size_t g_memory_floats = 0;")
     ap("static float g_dummy_f32[1];")
-    ap("static int32_t g_dummy_i32[1];")
+    ap("static int32_t g_dummy_i32[(CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1)];")
     ap("static float g_loss_scalar[1];")
     ap("static float g_rope_cos_cache[((CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1) * ((CK_ROPE_ROTARY_DIM / 2) > 0 ? (CK_ROPE_ROTARY_DIM / 2) : 1))];")
     ap("static float g_rope_sin_cache[((CK_NUM_TOKENS > 0 ? CK_NUM_TOKENS : 1) * ((CK_ROPE_ROTARY_DIM / 2) > 0 ? (CK_ROPE_ROTARY_DIM / 2) : 1))];")
@@ -1353,6 +1353,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 seen_v.add(vvar)
     ap("static int g_opt_step = 0;")
     ap("static int g_accum_step = 0;")
+    ap("static int g_active_tokens = CK_NUM_TOKENS;")
     ap("static int g_profile_steps = 0;")
     ap("static int g_profile_optimizer_steps = 0;")
     ap("static double g_last_step_ms = 0.0;")
@@ -1442,6 +1443,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("int ck_train_get_accum_snapshot_numel(void);")
     ap("int ck_train_export_accum_snapshot(float *dst, int dst_numel);")
     ap("int ck_train_import_accum_snapshot(const float *src, int src_numel);")
+    ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens);")
+    ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr);")
     ap("")
 
     ap("static inline float ck_canary_value_f32(void) {")
@@ -1694,6 +1697,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("    (void)oracle_grads;")
     ap("    (void)tolerance;")
     ap("    if (g_memory == NULL) return -1;")
+    ap("    g_active_tokens = CK_NUM_TOKENS;")
     ap("    g_diag_failed_op_id = -1;")
     ap("    g_diag_failed_canary_idx = -1;")
     ap("    int first = -1;")
@@ -1747,6 +1751,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     if opt_pairs:
         ap("    g_opt_step = 0;")
     ap("    g_accum_step = 0;")
+    ap("    g_active_tokens = CK_NUM_TOKENS;")
     ap("    ck_train_reset_profile();")
     ap("    g_loss_scalar[0] = 0.0f;")
     ap("}")
@@ -1786,7 +1791,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         # Missing/NULL caches can silently skew intermediate activations while
         # keeping final logits deceptively close for tiny-token runs.
         ap("    if (CK_ROPE_ROTARY_DIM > 0) {")
-        ap("        rope_precompute_cache_split(g_rope_cos_cache, g_rope_sin_cache, CK_NUM_TOKENS, CK_ROPE_ROTARY_DIM, CK_ROPE_THETA);")
+        ap("        rope_precompute_cache_split(g_rope_cos_cache, g_rope_sin_cache, g_active_tokens, CK_ROPE_ROTARY_DIM, CK_ROPE_THETA);")
         ap("    }")
     ap("    return CK_INIT_WEIGHT_COUNT;")
     ap("}")
@@ -1920,20 +1925,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
-                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
+                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
                         q_scratch, k_scratch, q_gamma_var, k_gamma_var
                     ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
                 else:
                     ap("    /* missing tmp.* scratch for qk_norm bridge; fallback direct call */")
                     if q_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
                         q_out_var, k_out_var, q_gamma_var, k_gamma_var
                     ))
                 ap("    call_count++;")
@@ -1972,20 +1977,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
-                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
+                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
                         q_scratch, k_scratch
                     ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
                 else:
                     ap("    /* missing tmp.* scratch for RoPE bridge; fallback direct call */")
                     if q_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
                         q_out_var, k_out_var
                     ))
                 ap("    call_count++;")
@@ -2041,19 +2046,19 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_scratch, int(y_numel), op_id))
                     if needs_attn_saved:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (attn_saved_var, int(attn_saved_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
                     if needs_attn_saved:
                         # Flash forward does not materialize softmax weights; backward expects saved attn weights.
-                        ap("    attention_forward_causal_head_major_gqa_exact(%s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                        ap("    attention_forward_causal_head_major_gqa_exact(%s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
                             q_scratch, k_scratch, v_scratch, attn_saved_var, y_scratch
                         ))
                     else:
-                        ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                        ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
                             q_scratch, k_scratch, v_scratch, y_scratch
                         ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (y_scratch, y_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (y_scratch, y_var))
                     ap("    call_count++;")
                     continue
                 else:
@@ -2136,18 +2141,18 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_var, int(dv_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_scratch, int(dv_numel), op_id))
 
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dy_var, dy_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dy_var, dy_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
 
-                    ap("    %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, CK_NUM_TOKENS);" % (
+                    ap("    %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
                         fn, dy_scratch, q_scratch, k_scratch, v_scratch, attn_var, dq_scratch, dk_scratch, dv_scratch, ds_var
                     ))
 
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dv_scratch, dv_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dv_scratch, dv_var))
                     ap("#if CK_ABLATE_ATTENTION_BACKWARD")
                     ap("    /* Ablation fallback: bypass attention backward outputs with passthrough/zeros. */")
                     if dq_numel > 0:
@@ -2212,13 +2217,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
 
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
-                    ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
+                    ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
                         dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
                     ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
                     ap("#if CK_ABLATE_ROPE_BACKWARD_QK")
                     ap("    /* Ablation fallback: treat RoPE backward as identity for dq/dk. */")
                     if dq_numel > 0:
@@ -2311,18 +2316,18 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
 
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_in_var, q_in_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_in_var, k_in_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_in_var, q_in_scratch))
+                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_in_var, k_in_scratch))
 
-                    ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, CK_NUM_TOKENS, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+                    ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
                         dq_out_scratch, dk_out_scratch, q_in_scratch, k_in_scratch, q_gamma_var, k_gamma_var,
                         dq_scratch, dk_scratch, dq_gamma_var, dk_gamma_var
                     ))
 
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, CK_NUM_TOKENS, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
+                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
                     ap("#if CK_ABLATE_QK_NORM_BACKWARD")
                     ap("    /* Ablation fallback: treat qk_norm backward as identity for dq/dk and zero gamma grads. */")
                     if dq_numel > 0:
@@ -2807,28 +2812,44 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("}")
     ap("")
 
-    ap("int ck_train_set_batch(const int32_t *token_ids, const int32_t *targets) {")
+    ap("static inline int ck_clamp_active_tokens(int valid_tokens) {")
+    ap("    if (valid_tokens < 1) return 1;")
+    ap("    if (valid_tokens > CK_NUM_TOKENS) return CK_NUM_TOKENS;")
+    ap("    return valid_tokens;")
+    ap("}")
+    ap("")
+    ap("int ck_train_set_batch_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens) {")
+    ap("    const int active = ck_clamp_active_tokens(valid_tokens);")
     ap("    if (token_ids != NULL) {")
     if token_input_i32_vars:
         for var in sorted(set(token_input_i32_vars)):
-            ap("        memcpy(%s, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);" % var)
+            ap("        memcpy(%s, token_ids, sizeof(int32_t) * (size_t)active);" % var)
+            ap("        if (active < CK_NUM_TOKENS) memset(%s + active, 0, sizeof(int32_t) * (size_t)(CK_NUM_TOKENS - active));" % var)
     else:
-        ap("        memcpy(g_dummy_i32, token_ids, sizeof(int32_t) * CK_NUM_TOKENS);")
+        ap("        memcpy(g_dummy_i32, token_ids, sizeof(int32_t) * (size_t)active);")
+        ap("        if (active < CK_NUM_TOKENS) memset(g_dummy_i32 + active, 0, sizeof(int32_t) * (size_t)(CK_NUM_TOKENS - active));")
     ap("    }")
     ap("    if (targets != NULL) {")
     if target_input_i32_vars:
         for var in sorted(set(target_input_i32_vars)):
-            ap("        memcpy(%s, targets, sizeof(int32_t) * CK_NUM_TOKENS);" % var)
+            ap("        memcpy(%s, targets, sizeof(int32_t) * (size_t)active);" % var)
+            ap("        if (active < CK_NUM_TOKENS) memset(%s + active, 0, sizeof(int32_t) * (size_t)(CK_NUM_TOKENS - active));" % var)
     else:
-        ap("        memcpy(g_dummy_i32, targets, sizeof(int32_t) * CK_NUM_TOKENS);")
+        ap("        memcpy(g_dummy_i32, targets, sizeof(int32_t) * (size_t)active);")
+        ap("        if (active < CK_NUM_TOKENS) memset(g_dummy_i32 + active, 0, sizeof(int32_t) * (size_t)(CK_NUM_TOKENS - active));")
     ap("    }")
-    ap("    return 0;")
+    ap("    g_active_tokens = active;")
+    ap("    return active;")
+    ap("}")
+    ap("")
+    ap("int ck_train_set_batch(const int32_t *token_ids, const int32_t *targets) {")
+    ap("    return ck_train_set_batch_ex(token_ids, targets, CK_NUM_TOKENS);")
     ap("}")
     ap("")
 
-    ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
+    ap("int ck_train_step_ex(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr) {")
     ap("    double t_step0 = ck_now_ms();")
-    ap("    ck_train_set_batch(token_ids, targets);")
+    ap("    ck_train_set_batch_ex(token_ids, targets, valid_tokens);")
     ap("    /*")
     ap("     * Grad-accum window contract (must match PyTorch):")
     ap("     * - zero grads once at window start")
@@ -2886,6 +2907,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     ap("        *loss_out = g_loss_scalar[0];")
     ap("    }")
     ap("    return fwd + bwd + opt;")
+    ap("}")
+    ap("")
+    ap("int ck_train_step(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr) {")
+    ap("    return ck_train_step_ex(token_ids, targets, CK_NUM_TOKENS, loss_out, lr);")
     ap("}")
     ap("")
 

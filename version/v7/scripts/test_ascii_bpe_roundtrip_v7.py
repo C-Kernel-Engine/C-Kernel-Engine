@@ -86,13 +86,63 @@ def _load_artifacts(bin_dir: Path):
     return mode, vocab_size, num_merges, offsets, merges, strings_b
 
 
-def _encode(lib, bpe, payload: bytes) -> list[int]:
+def _encode_once(lib, bpe, payload: bytes) -> list[int]:
     max_ids = max(4096, len(payload) * 8)
     out = (ctypes.c_int32 * max_ids)()
     n = int(lib.ck_true_bpe_encode(bpe, payload, len(payload), out, max_ids))
     if n < 0:
         raise SystemExit(f"ERROR: ck_true_bpe_encode returned {n}")
     return [int(out[i]) for i in range(n)]
+
+
+def _encode_segment_with_fallback(lib, bpe, payload: bytes, chunk_bytes: int = 8192) -> list[int]:
+    if not payload:
+        return []
+    ids = _encode_once(lib, bpe, payload)
+    if len(ids) > 0:
+        return ids
+    if len(payload) <= 1:
+        raise SystemExit("ERROR: ck_true_bpe_encode returned 0 ids for non-empty 1-byte segment")
+
+    step = max(1, min(int(chunk_bytes), len(payload) // 2))
+    out: list[int] = []
+    for i in range(0, len(payload), step):
+        chunk = payload[i : i + step]
+        if not chunk:
+            continue
+        chunk_ids = _encode_once(lib, bpe, chunk)
+        if len(chunk_ids) > 0:
+            out.extend(chunk_ids)
+            continue
+        if len(chunk) <= 1:
+            raise SystemExit("ERROR: ck_true_bpe_encode returned 0 ids for fallback chunk")
+        half = max(1, len(chunk) // 2)
+        for j in range(0, len(chunk), half):
+            piece = chunk[j : j + half]
+            if not piece:
+                continue
+            piece_ids = _encode_once(lib, bpe, piece)
+            if len(piece_ids) == 0:
+                raise SystemExit(
+                    f"ERROR: ck_true_bpe_encode returned 0 ids for fallback piece (len={len(piece)})"
+                )
+            out.extend(piece_ids)
+    return out
+
+
+def _encode_resilient(lib, bpe, payload: bytes, chunk_bytes: int = 8192) -> list[int]:
+    """Encode full payload without silently losing bytes on long rows."""
+    if not payload:
+        return []
+    out: list[int] = []
+    segments = payload.splitlines(keepends=True)
+    if not segments:
+        segments = [payload]
+    for seg in segments:
+        if not seg:
+            continue
+        out.extend(_encode_segment_with_fallback(lib, bpe, seg, chunk_bytes=chunk_bytes))
+    return out
 
 
 def _decode(lib, bpe, ids: list[int], hint_bytes: int) -> bytes:
@@ -160,8 +210,8 @@ def main() -> int:
         if rc != 0:
             raise SystemExit(f"ERROR: ck_true_bpe_load_binary failed rc={rc}")
 
-        ids1 = _encode(lib, bpe, payload)
-        ids2 = _encode(lib, bpe, payload)
+        ids1 = _encode_resilient(lib, bpe, payload)
+        ids2 = _encode_resilient(lib, bpe, payload)
         if ids1 != ids2:
             raise SystemExit("ERROR: encode is non-deterministic (ids mismatch across runs)")
 

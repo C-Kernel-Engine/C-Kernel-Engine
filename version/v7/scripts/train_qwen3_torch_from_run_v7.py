@@ -51,34 +51,56 @@ def _load_token_file(path: Path) -> List[int]:
     return ids
 
 
-def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+def _build_batches_from_text(text: str, total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor, int]]:
     data = (text or "").encode("utf-8", errors="ignore")
     if len(data) < 2:
         raise ValueError("Training text must encode to at least 2 bytes")
     ids = [int(b) % int(vocab) for b in data]
-    needed = int(total_tokens) + 1
+    total_tokens_i = max(1, int(total_tokens))
+    seq_len_i = max(1, int(seq_len))
+    windows = max(1, int(math.ceil(float(total_tokens_i) / float(seq_len_i))))
+    needed = max(total_tokens_i + 1, windows * seq_len_i + 1, seq_len_i + 1)
     repeats = (needed + len(ids) - 1) // len(ids)
     stream = np.array((ids * repeats)[:needed], dtype=np.int64)
-    batches: List[Tuple[torch.Tensor, torch.Tensor]] = []
-    for i in range(0, total_tokens - seq_len + 1, seq_len):
-        x = torch.from_numpy(stream[i : i + seq_len]).long().view(1, seq_len)
-        y = torch.from_numpy(stream[i + 1 : i + seq_len + 1]).long().view(1, seq_len)
-        batches.append((x, y))
+    batches: List[Tuple[torch.Tensor, torch.Tensor, int]] = []
+    for w in range(windows):
+        i = w * seq_len_i
+        remaining = total_tokens_i - i
+        valid_tokens = seq_len_i if remaining >= seq_len_i else max(1, remaining)
+        x = torch.from_numpy(stream[i : i + seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[i + 1 : i + seq_len_i + 1]).long().view(1, seq_len_i)
+        if int(x.shape[1]) == seq_len_i and int(y.shape[1]) == seq_len_i:
+            batches.append((x, y, int(valid_tokens)))
+    if not batches:
+        x = torch.from_numpy(stream[:seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[1 : seq_len_i + 1]).long().view(1, seq_len_i)
+        batches.append((x, y, seq_len_i))
     return batches
 
 
-def _build_batches_from_ids(token_ids: Sequence[int], total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+def _build_batches_from_ids(token_ids: Sequence[int], total_tokens: int, seq_len: int, vocab: int) -> List[Tuple[torch.Tensor, torch.Tensor, int]]:
     ids = [int(x) % int(vocab) for x in token_ids]
     if len(ids) < 2:
         raise ValueError("Need at least 2 token ids")
-    needed = int(total_tokens) + 1
+    total_tokens_i = max(1, int(total_tokens))
+    seq_len_i = max(1, int(seq_len))
+    windows = max(1, int(math.ceil(float(total_tokens_i) / float(seq_len_i))))
+    needed = max(total_tokens_i + 1, windows * seq_len_i + 1, seq_len_i + 1)
     repeats = (needed + len(ids) - 1) // len(ids)
     stream = np.array((ids * repeats)[:needed], dtype=np.int64)
-    batches: List[Tuple[torch.Tensor, torch.Tensor]] = []
-    for i in range(0, total_tokens - seq_len + 1, seq_len):
-        x = torch.from_numpy(stream[i : i + seq_len]).long().view(1, seq_len)
-        y = torch.from_numpy(stream[i + 1 : i + seq_len + 1]).long().view(1, seq_len)
-        batches.append((x, y))
+    batches: List[Tuple[torch.Tensor, torch.Tensor, int]] = []
+    for w in range(windows):
+        i = w * seq_len_i
+        remaining = total_tokens_i - i
+        valid_tokens = seq_len_i if remaining >= seq_len_i else max(1, remaining)
+        x = torch.from_numpy(stream[i : i + seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[i + 1 : i + seq_len_i + 1]).long().view(1, seq_len_i)
+        if int(x.shape[1]) == seq_len_i and int(y.shape[1]) == seq_len_i:
+            batches.append((x, y, int(valid_tokens)))
+    if not batches:
+        x = torch.from_numpy(stream[:seq_len_i]).long().view(1, seq_len_i)
+        y = torch.from_numpy(stream[1 : seq_len_i + 1]).long().view(1, seq_len_i)
+        batches.append((x, y, seq_len_i))
     return batches
 
 
@@ -352,10 +374,13 @@ def train_qwen_from_run(
     steps = 0
     loss_curve: List[dict] = []
     for epoch_idx in range(int(epochs)):
-        for x, y in batches:
+        for x, y, valid_tokens in batches:
             optimizer.zero_grad(set_to_none=True)
             logits = model(x)
-            loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), y.reshape(-1), reduction="mean")
+            vt = max(1, min(int(valid_tokens), int(logits.shape[1]), int(y.shape[1])))
+            logits_v = logits[:, :vt, :]
+            y_v = y[:, :vt]
+            loss = F.cross_entropy(logits_v.reshape(-1, logits_v.shape[-1]), y_v.reshape(-1), reduction="mean")
             loss.backward()
             if max_grad_norm > 0.0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)

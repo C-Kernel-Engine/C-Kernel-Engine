@@ -2265,11 +2265,14 @@ def _build_train_token_batches(
     vocab: int,
     seed: int,
     token_stream: Optional[list[int]] = None,
-) -> list[tuple[list[int], list[int]]]:
+) -> list[tuple[list[int], list[int], int]]:
     """Build deterministic token/target batches for CK runtime train stepping."""
     if seq_len < 1:
         return []
-    needed = max(int(total_tokens) + 1, int(seq_len) + 1)
+    total_tokens_i = max(1, int(total_tokens))
+    seq_len_i = max(1, int(seq_len))
+    windows = max(1, int(math.ceil(float(total_tokens_i) / float(seq_len_i))))
+    needed = max(total_tokens_i + 1, windows * seq_len_i + 1, seq_len_i + 1)
     if token_stream:
         base = [int(v) for v in token_stream]
         bad = next((v for v in base if v < 0 or v >= int(vocab)), None)
@@ -2290,15 +2293,38 @@ def _build_train_token_batches(
         rng = random.Random(int(seed))
         stream = [rng.randrange(int(vocab)) for _ in range(needed)]
 
-    batches: list[tuple[list[int], list[int]]] = []
-    for i in range(0, max(1, int(total_tokens) - int(seq_len) + 1), int(seq_len)):
-        x = stream[i:i + int(seq_len)]
-        y = stream[i + 1:i + int(seq_len) + 1]
-        if len(x) == int(seq_len) and len(y) == int(seq_len):
-            batches.append((x, y))
+    batches: list[tuple[list[int], list[int], int]] = []
+    for w in range(windows):
+        i = w * seq_len_i
+        remaining = total_tokens_i - i
+        valid_tokens = seq_len_i if remaining >= seq_len_i else max(1, remaining)
+        x = stream[i:i + seq_len_i]
+        y = stream[i + 1:i + seq_len_i + 1]
+        if len(x) == seq_len_i and len(y) == seq_len_i:
+            batches.append((x, y, int(valid_tokens)))
     if not batches:
-        batches.append((stream[:int(seq_len)], stream[1:int(seq_len) + 1]))
+        batches.append((stream[:seq_len_i], stream[1:seq_len_i + 1], seq_len_i))
     return batches
+
+
+def _unpack_train_batch(batch: tuple) -> tuple[list[int], list[int], int]:
+    if isinstance(batch, tuple) and len(batch) >= 3:
+        x_vals = list(batch[0])
+        y_vals = list(batch[1])
+        valid_tokens = int(batch[2])
+    elif isinstance(batch, tuple) and len(batch) == 2:
+        x_vals = list(batch[0])
+        y_vals = list(batch[1])
+        valid_tokens = min(len(x_vals), len(y_vals))
+    else:
+        raise ValueError(f"Invalid batch shape: {type(batch)}")
+    if valid_tokens < 1:
+        valid_tokens = 1
+    if valid_tokens > len(x_vals):
+        valid_tokens = len(x_vals)
+    if valid_tokens > len(y_vals):
+        valid_tokens = len(y_vals)
+    return x_vals, y_vals, int(valid_tokens)
 
 
 
@@ -3166,11 +3192,21 @@ def _probe_ck_runtime_loss_curve(lib_path: Path, init_payload: dict, batches: li
     lib = ctypes.CDLL(str(lib_path))
     if not hasattr(lib, "ck_train_step") or not hasattr(lib, "ck_train_init"):
         raise RuntimeError(f"Missing training symbols in {lib_path}")
+    has_step_ex = bool(hasattr(lib, "ck_train_step_ex"))
 
     lib.ck_train_init.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.c_int]
     lib.ck_train_init.restype = ctypes.c_int
     lib.ck_train_step.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
     lib.ck_train_step.restype = ctypes.c_int
+    if has_step_ex:
+        lib.ck_train_step_ex.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_float,
+        ]
+        lib.ck_train_step_ex.restype = ctypes.c_int
 
     float_ptr = ctypes.cast(init_payload["float_buffer"], ctypes.POINTER(ctypes.c_float))
     size_ptr = ctypes.cast(init_payload["sizes_buffer"], ctypes.POINTER(ctypes.c_int))
@@ -3181,11 +3217,14 @@ def _probe_ck_runtime_loss_curve(lib_path: Path, init_payload: dict, batches: li
 
     limit = max(1, min(int(steps), len(batches)))
     for i in range(limit):
-        x_vals, y_vals = batches[i]
+        x_vals, y_vals, valid_tokens = _unpack_train_batch(batches[i])
         x_buf = (ctypes.c_int32 * len(x_vals))(*x_vals)
         y_buf = (ctypes.c_int32 * len(y_vals))(*y_vals)
         loss_out = ctypes.c_float(0.0)
-        rc = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
+        if has_step_ex:
+            rc = int(lib.ck_train_step_ex(x_buf, y_buf, ctypes.c_int(int(valid_tokens)), ctypes.byref(loss_out), ctypes.c_float(lr)))
+        else:
+            rc = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
         out["step_rcs"].append(int(rc))
         out["losses"].append(float(loss_out.value))
         if rc < 0:
@@ -3837,6 +3876,7 @@ def _run_ck_train_runtime_body(
         raise RuntimeError(f"Missing ck_train_step symbol in {libtrain_so}")
     if not hasattr(lib, "ck_train_init"):
         raise RuntimeError(f"Missing ck_train_init symbol in {libtrain_so}")
+    has_step_ex = bool(hasattr(lib, "ck_train_step_ex"))
 
     def _set_runtime_strict_parity(lib_handle, enabled: bool) -> bool:
         """Best-effort strict kernel parity toggle for generated runtime."""
@@ -3864,6 +3904,15 @@ def _run_ck_train_runtime_body(
         ctypes.c_float,
     ]
     lib.ck_train_step.restype = ctypes.c_int
+    if has_step_ex:
+        lib.ck_train_step_ex.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_float,
+        ]
+        lib.ck_train_step_ex.restype = ctypes.c_int
 
     diag_info = {
         "available": bool(hasattr(lib, "ck_train_memory_diagnostic")),
@@ -4278,6 +4327,7 @@ def _run_ck_train_runtime_body(
 
     replay_lib = None
     replay_runtime_error = None
+    replay_has_step_ex = False
     replay_has_forward_api = False
     replay_has_set_batch_api = False
     replay_has_act_snapshot_api = False
@@ -4303,6 +4353,16 @@ def _run_ck_train_runtime_body(
             replay_lib.ck_train_init.restype = ctypes.c_int
             replay_lib.ck_train_step.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
             replay_lib.ck_train_step.restype = ctypes.c_int
+            replay_has_step_ex = bool(hasattr(replay_lib, "ck_train_step_ex"))
+            if replay_has_step_ex:
+                replay_lib.ck_train_step_ex.argtypes = [
+                    ctypes.POINTER(ctypes.c_int32),
+                    ctypes.POINTER(ctypes.c_int32),
+                    ctypes.c_int,
+                    ctypes.POINTER(ctypes.c_float),
+                    ctypes.c_float,
+                ]
+                replay_lib.ck_train_step_ex.restype = ctypes.c_int
             replay_lib.ck_train_import_weight_snapshot.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_int]
             replay_lib.ck_train_import_weight_snapshot.restype = ctypes.c_int
 
@@ -4370,6 +4430,7 @@ def _run_ck_train_runtime_body(
         except Exception as e:
             replay_runtime_error = str(e)
             replay_lib = None
+            replay_has_step_ex = False
             replay_has_forward_api = False
             replay_has_set_batch_api = False
             replay_has_act_snapshot_api = False
@@ -4403,7 +4464,8 @@ def _run_ck_train_runtime_body(
     last_oracle_loss = None
 
     for _ in range(epochs):
-        for x_vals, y_vals in batches:
+        for batch in batches:
+            x_vals, y_vals, valid_tokens = _unpack_train_batch(batch)
             step += 1
             micro_steps += 1
             x_buf = (ctypes.c_int32 * len(x_vals))(*x_vals)
@@ -4442,7 +4504,10 @@ def _run_ck_train_runtime_body(
                     pre_accum_snapshot, pre_accum_snapshot_numel = accum_snap
 
             t0 = time.perf_counter()
-            calls = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
+            if has_step_ex:
+                calls = int(lib.ck_train_step_ex(x_buf, y_buf, ctypes.c_int(int(valid_tokens)), ctypes.byref(loss_out), ctypes.c_float(lr)))
+            else:
+                calls = int(lib.ck_train_step(x_buf, y_buf, ctypes.byref(loss_out), ctypes.c_float(lr)))
             t1 = time.perf_counter()
             if calls < 0:
                 raise RuntimeError(f"ck_train_step failed at step {step} (calls={calls})")
@@ -4458,7 +4523,7 @@ def _run_ck_train_runtime_body(
 
             step_ms = (t1 - t0) * 1000.0
             total_ck_ms += step_ms
-            processed_tokens += min(len(x_vals), int(runtime_num_tokens))
+            processed_tokens += min(int(valid_tokens), int(runtime_num_tokens))
             loss_val = float(loss_out.value)
 
             post_snapshot = None
@@ -4722,7 +4787,18 @@ def _run_ck_train_runtime_body(
                                 else:
                                     replay_pre_accum_import_error = "pre_accum_export_unavailable"
                         replay_loss_out = ctypes.c_float(0.0)
-                        replay_calls = int(replay_lib.ck_train_step(x_buf, y_buf, ctypes.byref(replay_loss_out), ctypes.c_float(lr)))
+                        if replay_has_step_ex:
+                            replay_calls = int(
+                                replay_lib.ck_train_step_ex(
+                                    x_buf,
+                                    y_buf,
+                                    ctypes.c_int(int(valid_tokens)),
+                                    ctypes.byref(replay_loss_out),
+                                    ctypes.c_float(lr),
+                                )
+                            )
+                        else:
+                            replay_calls = int(replay_lib.ck_train_step(x_buf, y_buf, ctypes.byref(replay_loss_out), ctypes.c_float(lr)))
                         if replay_calls < 0:
                             raise RuntimeError(f"ck_train_step replay failed at step {step} (calls={replay_calls})")
                         replay_loss = float(replay_loss_out.value)
