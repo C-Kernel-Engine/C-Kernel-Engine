@@ -505,6 +505,19 @@ def _guard_bump_offsets(layout: Dict, ir_list: List[Dict]) -> None:
         print(f"Warning: Unresolved bump macros in IR: {sorted(unknown)[:5]}")
 
 
+def _collect_lower3_issues(ir: Dict) -> tuple[int, int, int]:
+    """Return (top_level_errors, ops_with_errors, ops_missing_args)."""
+    ops = ir.get("operations")
+    if not isinstance(ops, list):
+        ops = ir.get("ops", [])
+    if not isinstance(ops, list):
+        ops = []
+    ir_errors = ir.get("errors") if isinstance(ir.get("errors"), list) else []
+    op_errors = [op for op in ops if isinstance(op, dict) and op.get("errors")]
+    missing_args = [op for op in ops if isinstance(op, dict) and "args" not in op]
+    return len(ir_errors), len(op_errors), len(missing_args)
+
+
 def _infer_logits_layout(config: Dict, layout: Dict) -> str:
     """Infer logits layout ('last' or 'full') from config/layout."""
     layout_cfg = str(config.get("logits_layout", "auto")).lower()
@@ -1270,13 +1283,11 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
     rope_cache_layout = "head_dim/2" if rope_init_kernel == "rope_precompute_cache_split" else "rotary_dim/2"
 
     # Fail fast if IR Lower 3 has errors or missing args
-    ir_errors = ir.get("errors", [])
-    op_errors = [op for op in ops if op.get("errors")]
-    missing_args = [op for op in ops if "args" not in op]
-    if ir_errors or op_errors or missing_args:
+    ir_error_count, op_error_count, missing_args_count = _collect_lower3_issues(ir)
+    if ir_error_count or op_error_count or missing_args_count:
         raise RuntimeError(
-            f"IR Lower 3 invalid: {len(ir_errors)} issues, "
-            f"{len(op_errors)} ops with errors, {len(missing_args)} ops missing args"
+            f"IR Lower 3 invalid: {ir_error_count} issues, "
+            f"{op_error_count} ops with errors, {missing_args_count} ops missing args"
         )
 
     # Get token offset from layout
@@ -1517,6 +1528,12 @@ def main():
             if prefill_ir.exists():
                 with open(prefill_ir) as f:
                     prefill_obj = json.load(f)
+                pe_ir_err, pe_op_err, pe_missing = _collect_lower3_issues(prefill_obj)
+                if pe_ir_err or pe_op_err or pe_missing:
+                    raise RuntimeError(
+                        f"Prefill IR Lower 3 invalid: {pe_ir_err} issues, "
+                        f"{pe_op_err} ops with errors, {pe_missing} ops missing args"
+                    )
         with open(layout_decode) as f:
             layout_obj = json.load(f)
         ir_list = [decode_obj] + ([prefill_obj] if prefill_obj else [])

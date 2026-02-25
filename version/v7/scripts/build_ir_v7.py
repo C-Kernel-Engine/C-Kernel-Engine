@@ -3230,6 +3230,13 @@ def generate_ir_lower_1(
                         "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
                     },
                     "scratch": [],
+                    "params": {
+                        "num_kv_heads": int(config.get("num_kv_heads", 1)),
+                        "head_dim": int(config.get("head_dim", 1)),
+                        # Prefill copies a token batch into KV cache; use configured max context
+                        # as the conservative compile-time dimension for call-IR binding.
+                        "seq_len": int(config.get("context_length", config.get("context_len", 1))),
+                    },
                     "_auto_inserted": True,
                 }
                 final_ops.append(kv_batch_copy_op)
@@ -3268,9 +3275,18 @@ def generate_ir_lower_1(
         copy_last_logits_inserted = True
         print(f"  Inserted copy_last_logits op for prefill mode")
 
-    # Renumber ops
+    # Renumber ops and normalize derived params for auto-inserted kernels.
     for i, op in enumerate(final_ops):
         op["idx"] = i
+        if op.get("op") == "kv_cache_batch_copy":
+            params = op.setdefault("params", {})
+            num_kv_heads = int(params.get("num_kv_heads", config.get("num_kv_heads", 1)))
+            head_dim = int(params.get("head_dim", config.get("head_dim", 1)))
+            seq_len = int(params.get("seq_len", config.get("context_length", config.get("context_len", 1))))
+            params["num_kv_heads"] = num_kv_heads
+            params["head_dim"] = head_dim
+            params["seq_len"] = seq_len
+            params["_kv_copy_bytes"] = num_kv_heads * head_dim * seq_len * 4  # FP32 bytes
 
     lowered_ops = final_ops
     print(f"  Inserted {kv_store_count} kv_cache_store operations")
@@ -5960,6 +5976,18 @@ def main(args: List[str]) -> int:
         with open(init_call_path, 'w') as f:
             json.dump(init_call, f, indent=2)
         print(f"✓ Wrote init call IR to: {init_call_path}")
+
+    if lowered_call is not None:
+        ir_errors = lowered_call.get("errors") if isinstance(lowered_call.get("errors"), list) else []
+        call_ops = lowered_call.get("operations") if isinstance(lowered_call.get("operations"), list) else []
+        op_errors = [op for op in call_ops if isinstance(op, dict) and isinstance(op.get("errors"), list) and op.get("errors")]
+        missing_args = [op for op in call_ops if isinstance(op, dict) and "args" not in op]
+        if ir_errors or op_errors or missing_args:
+            print(
+                f"ERROR: IR Lower 3 invalid: {len(ir_errors)} issues, "
+                f"{len(op_errors)} ops with errors, {len(missing_args)} ops missing args"
+            )
+            return 2
 
     if not parsed_args.output and not parsed_args.layout_output and not parsed_args.lowered_output:
         print(f"\nIR1 (first 10 ops):")
