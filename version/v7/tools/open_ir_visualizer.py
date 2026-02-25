@@ -2236,6 +2236,72 @@ def load_model_data(
                 except Exception as e:
                     data["meta"]["warnings"].append(f"Failed to inline flamegraph SVG: {e}")
 
+        # Legacy compatibility: old manifests only had decode-level fields at top-level.
+        # Synthesize mode-aware entries so Profile dropdown can switch decode/prefill.
+        by_mode = flame.get("by_mode")
+        if not isinstance(by_mode, dict) or len(by_mode) == 0:
+            decode_entry: dict[str, Any] = {}
+            for key in ("svg_path", "perf_data_path", "folded_path", "top_symbols", "generated_at"):
+                if key in flame:
+                    decode_entry[key] = flame.get(key)
+
+            synthesized: dict[str, dict[str, Any]] = {}
+            if decode_entry:
+                synthesized["decode"] = dict(decode_entry)
+
+            decode_svg = decode_entry.get("svg_path")
+            decode_perf = decode_entry.get("perf_data_path")
+            decode_folded = decode_entry.get("folded_path")
+
+            def _replace_suffix(raw: Any, old: str, new: str) -> str | None:
+                if not isinstance(raw, str):
+                    return None
+                return raw.replace(old, new)
+
+            prefill_entry: dict[str, Any] = {}
+            prefill_svg_path = (
+                flame.get("prefill_svg_path")
+                if isinstance(flame.get("prefill_svg_path"), str)
+                else _replace_suffix(decode_svg, "flamegraph_v7.svg", "flamegraph_v7_prefill.svg")
+            )
+            prefill_perf_path = (
+                flame.get("prefill_perf_data_path")
+                if isinstance(flame.get("prefill_perf_data_path"), str)
+                else _replace_suffix(decode_perf, "ck_v7_perf.data", "ck_v7_perf_prefill.data")
+            )
+            prefill_folded_path = (
+                flame.get("prefill_folded_path")
+                if isinstance(flame.get("prefill_folded_path"), str)
+                else _replace_suffix(decode_folded, "ck_v7_perf.folded", "ck_v7_perf_prefill.folded")
+            )
+            prefill_top_symbols = flame.get("prefill_top_symbols")
+
+            if isinstance(prefill_svg_path, str) and prefill_svg_path:
+                prefill_entry["svg_path"] = prefill_svg_path
+            if isinstance(prefill_perf_path, str) and prefill_perf_path:
+                prefill_entry["perf_data_path"] = prefill_perf_path
+            if isinstance(prefill_folded_path, str) and prefill_folded_path:
+                prefill_entry["folded_path"] = prefill_folded_path
+            if isinstance(prefill_top_symbols, list):
+                prefill_entry["top_symbols"] = prefill_top_symbols
+
+            if prefill_entry.get("svg_path"):
+                resolved_prefill = _resolve_asset_path(str(prefill_entry["svg_path"]), ck_build_path, model_root)
+                if resolved_prefill:
+                    synthesized["prefill"] = prefill_entry
+
+            if synthesized:
+                for payload in synthesized.values():
+                    _enrich_flame_entry(payload)
+                flame["by_mode"] = synthesized
+                flame["available_modes"] = sorted(synthesized.keys())
+                preferred_mode = "decode" if "decode" in synthesized else next(iter(synthesized.keys()))
+                preferred_entry = synthesized.get(preferred_mode, {})
+                if isinstance(preferred_entry, dict):
+                    for key in ("svg_path", "perf_data_path", "folded_path", "top_symbols", "svg_inline", "svg_resolved_path"):
+                        if key in preferred_entry:
+                            flame[key] = preferred_entry[key]
+
         _enrich_flame_entry(flame)
         by_mode = flame.get("by_mode")
         if isinstance(by_mode, dict):
