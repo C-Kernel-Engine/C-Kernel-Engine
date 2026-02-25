@@ -438,62 +438,108 @@ class CKModel:
         else:
             if force_python_tokenizer:
                 print(f"Forcing Python tokenizer (--python-tokenizer flag)")
-            # Fall back to Python tokenizer
             self.use_c_tokenizer = False
-            # Tokenizer files may live either in model root or .ck_build output dir.
-            model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
-            tokenizer_candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
-            vocab_candidates = [self.model_dir / "vocab.json", model_root / "vocab.json"]
-
-            tokenizer_json = next((p for p in tokenizer_candidates if p.exists()), tokenizer_candidates[0])
-            vocab_json = next((p for p in vocab_candidates if p.exists()), vocab_candidates[0])
-
-            true_bpe_bin = _find_true_bpe_bin_dir(self.model_dir)
-            true_bpe_lib = _find_true_bpe_lib(self.model_dir)
-            if true_bpe_bin and true_bpe_lib:
-                try:
-                    self.tokenizer = CKTrueBPETokenizer(true_bpe_lib, true_bpe_bin)
-                    print(f"Loaded CK true_bpe tokenizer from {true_bpe_bin}")
-                except Exception as e:
-                    print(f"Warning: failed to load CK true_bpe tokenizer ({e})")
-                    self.tokenizer = None
-
-            if self.tokenizer is not None:
-                pass
-            elif tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
-                # Use HuggingFace tokenizer if available
-                self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
-                print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
-            elif vocab_json.exists():
-                # Use GGUF-compatible wrapper (now supports plain vocab maps too)
-                self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
-                print(f"Loaded GGUF tokenizer from {vocab_json}")
-            elif tokenizer_json.exists():
-                # Fallback: parse tokenizer.json via GGUF wrapper if tokenizers package is missing.
-                self.tokenizer = GGUFTokenizerWrapper.from_file(str(tokenizer_json))
-                print(f"Loaded tokenizer via GGUF wrapper from {tokenizer_json}")
-            elif gguf_path and Path(gguf_path).exists():
-                # Extract directly from GGUF
-                print(f"Extracting tokenizer from GGUF: {gguf_path}")
-                self.tokenizer = GGUFTokenizerWrapper(GGUFTokenizer.from_gguf(gguf_path))
-                # Save for next time
-                self.tokenizer._tokenizer.save(str(vocab_json))
-                print(f"Saved vocab to {vocab_json}")
-            else:
-                print(f"Error: No tokenizer found. Tried:")
-                print(f"  - C tokenizer (not available)")
-                print(f"  - {tokenizer_json}")
-                print(f"  - {vocab_json}")
-                if gguf_path:
-                    print(f"  - {gguf_path}")
+            if not self._load_python_tokenizer(gguf_path=gguf_path):
                 return False
 
-        # Detect EOS tokens from tokenizer
-        self._detect_eos_tokens()
-
-        # Configure chat template usage
+        # Configure chat template usage first (needed for marker support checks).
         self._configure_chat_template(chat_template)
 
+        # If template markers are not tokenizable via C path, auto-switch to Python tokenizer.
+        if self.use_c_tokenizer and self.use_chat_template and not self._chat_template_markers_supported():
+            print(
+                "Warning: C tokenizer cannot represent chat template markers reliably; "
+                "switching to Python tokenizer for template fidelity."
+            )
+            self.use_c_tokenizer = False
+            if not self._load_python_tokenizer(gguf_path=gguf_path):
+                return False
+
+        # Detect EOS/stop tokens from active tokenizer + template mode.
+        self._detect_eos_tokens()
+
+        return True
+
+    def _load_python_tokenizer(self, gguf_path: Optional[str] = None) -> bool:
+        """Load Python tokenizer stack (true_bpe / HF / GGUF wrapper)."""
+        # Tokenizer files may live either in model root or .ck_build output dir.
+        model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
+        tokenizer_candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
+        vocab_candidates = [self.model_dir / "vocab.json", model_root / "vocab.json"]
+
+        tokenizer_json = next((p for p in tokenizer_candidates if p.exists()), tokenizer_candidates[0])
+        vocab_json = next((p for p in vocab_candidates if p.exists()), vocab_candidates[0])
+
+        true_bpe_bin = _find_true_bpe_bin_dir(self.model_dir)
+        true_bpe_lib = _find_true_bpe_lib(self.model_dir)
+        if true_bpe_bin and true_bpe_lib:
+            try:
+                self.tokenizer = CKTrueBPETokenizer(true_bpe_lib, true_bpe_bin)
+                print(f"Loaded CK true_bpe tokenizer from {true_bpe_bin}")
+            except Exception as e:
+                print(f"Warning: failed to load CK true_bpe tokenizer ({e})")
+                self.tokenizer = None
+
+        if self.tokenizer is not None:
+            return True
+        if tokenizer_json.exists() and HF_TOKENIZER_AVAILABLE:
+            # Use HuggingFace tokenizer if available
+            self.tokenizer = Tokenizer.from_file(str(tokenizer_json))
+            print(f"Loaded HuggingFace tokenizer from {tokenizer_json}")
+            return True
+        if vocab_json.exists():
+            # Use GGUF-compatible wrapper (now supports plain vocab maps too)
+            self.tokenizer = GGUFTokenizerWrapper.from_file(str(vocab_json))
+            print(f"Loaded GGUF tokenizer from {vocab_json}")
+            return True
+        if tokenizer_json.exists():
+            # Fallback: parse tokenizer.json via GGUF wrapper if tokenizers package is missing.
+            self.tokenizer = GGUFTokenizerWrapper.from_file(str(tokenizer_json))
+            print(f"Loaded tokenizer via GGUF wrapper from {tokenizer_json}")
+            return True
+        if gguf_path and Path(gguf_path).exists():
+            # Extract directly from GGUF
+            print(f"Extracting tokenizer from GGUF: {gguf_path}")
+            self.tokenizer = GGUFTokenizerWrapper(GGUFTokenizer.from_gguf(gguf_path))
+            # Save for next time
+            self.tokenizer._tokenizer.save(str(vocab_json))
+            print(f"Saved vocab to {vocab_json}")
+            return True
+
+        print(f"Error: No tokenizer found. Tried:")
+        print(f"  - {tokenizer_json}")
+        print(f"  - {vocab_json}")
+        if gguf_path:
+            print(f"  - {gguf_path}")
+        return False
+
+    def _chat_template_markers_supported(self) -> bool:
+        """Return True if active C tokenizer can faithfully roundtrip template markers."""
+        if not self.use_c_tokenizer or not self.use_chat_template:
+            return True
+
+        markers: List[str] = []
+        if self.chat_template_mode == "gemma":
+            markers = ["<start_of_turn>", "<end_of_turn>"]
+        elif self.chat_template_mode == "qwen":
+            markers = ["<|im_start|>", "<|im_end|>"]
+
+        for marker in markers:
+            try:
+                token_id = int(self.lib.ck_model_lookup_token(marker.encode("utf-8")))
+            except Exception:
+                token_id = -1
+            if token_id < 0:
+                return False
+            try:
+                token_ids = self.encode(marker)
+                if len(token_ids) != 1:
+                    return False
+                decoded = self.decode(token_ids)
+                if marker not in decoded:
+                    return False
+            except Exception:
+                return False
         return True
 
     def _load_model_meta(self) -> dict:
@@ -620,6 +666,9 @@ class CKModel:
                 if eos_id >= 0:
                     self.eos_tokens.add(eos_id)
 
+                # Chat templates may require turn-end markers as generation stops.
+                self._add_chat_template_stop_tokens()
+
                 # If we got stop tokens from the model, we're done
                 if self.eos_tokens:
                     return
@@ -678,10 +727,66 @@ class CKModel:
         elif self.vocab_size > 127000:  # Llama 3 family (128256 vocab)
             self.eos_tokens.update(LLAMA_EOS_TOKENS)
 
+        # Chat template specific turn-end stops (fallback path).
+        self._add_chat_template_stop_tokens()
+
         # IMPORTANT: Only use low token IDs as fallback if we found NOTHING
         # Different tokenizers assign different meanings to low IDs!
         if not self.eos_tokens:
             self.eos_tokens.update([0, 1, 2])
+
+    def _lookup_single_token_id(self, text: str) -> int:
+        """Best-effort lookup for a token string that should map to one ID."""
+        if not text:
+            return -1
+
+        # Direct C tokenizer lookup when available.
+        if self.use_c_tokenizer:
+            try:
+                token_id = int(self.lib.ck_model_lookup_token(text.encode("utf-8")))
+                if token_id >= 0:
+                    return token_id
+            except Exception:
+                pass
+
+        # Python tokenizer vocab lookup.
+        vocab = None
+        try:
+            if hasattr(self.tokenizer, "get_vocab"):
+                vocab = self.tokenizer.get_vocab()
+            elif hasattr(self.tokenizer, "_tokenizer") and hasattr(self.tokenizer._tokenizer, "vocab"):
+                vocab = self.tokenizer._tokenizer.vocab
+        except Exception:
+            vocab = None
+        if isinstance(vocab, dict) and text in vocab:
+            try:
+                return int(vocab[text])
+            except Exception:
+                pass
+
+        # Final fallback: only accept if the string encodes to exactly one token.
+        try:
+            token_ids = self.encode(text)
+            if len(token_ids) == 1:
+                return int(token_ids[0])
+        except Exception:
+            pass
+
+        return -1
+
+    def _add_chat_template_stop_tokens(self):
+        """Add template-specific turn delimiters to stop token set."""
+        mode = getattr(self, "chat_template_mode", "none")
+        if mode == "gemma":
+            for marker in ("<end_of_turn>",):
+                token_id = self._lookup_single_token_id(marker)
+                if token_id >= 0:
+                    self.eos_tokens.add(token_id)
+        elif mode == "qwen":
+            for marker in ("<|im_end|>",):
+                token_id = self._lookup_single_token_id(marker)
+                if token_id >= 0:
+                    self.eos_tokens.add(token_id)
 
     def is_eos_token(self, token_id: int) -> bool:
         """Check if token is an EOS token."""
@@ -884,24 +989,63 @@ class CKModel:
             self.lib.ck_model_free()
 
 
-def sample_top_k(logits: np.ndarray, k: int = 40, temperature: float = 0.7) -> int:
-    """Sample from top-k logits with temperature."""
+def sample_top_k(
+    logits: np.ndarray,
+    k: int = 40,
+    temperature: float = 0.7,
+    recent_tokens: Optional[List[int]] = None,
+    repeat_penalty: float = 1.0,
+    repeat_last_n: int = 64,
+    top_p: float = 1.0,
+    min_p: float = 0.0,
+) -> int:
+    """Sample with top-k plus optional repeat-penalty, top-p, and min-p filters."""
+    scores = logits.astype(np.float64).copy()
+
+    if repeat_penalty > 1.0 and recent_tokens:
+        recent = recent_tokens[-max(1, int(repeat_last_n)):]
+        for token_id in set(recent):
+            if token_id < 0 or token_id >= scores.shape[0]:
+                continue
+            if scores[token_id] > 0:
+                scores[token_id] /= repeat_penalty
+            else:
+                scores[token_id] *= repeat_penalty
+
     if temperature <= 0:
-        return int(np.argmax(logits))
+        return int(np.argmax(scores))
 
-    # Apply temperature
-    logits = logits / temperature
+    scores /= temperature
+    k = max(1, min(int(k), scores.shape[0]))
 
-    # Top-k filtering
-    top_k_indices = np.argpartition(logits, -k)[-k:]
-    top_k_logits = logits[top_k_indices]
+    top_k_indices = np.argpartition(scores, -k)[-k:]
+    top_k_scores = scores[top_k_indices]
+    top_k_scores = top_k_scores - np.max(top_k_scores)
+    probs = np.exp(top_k_scores)
+    probs_sum = probs.sum()
+    if probs_sum <= 0 or not np.isfinite(probs_sum):
+        return int(top_k_indices[np.argmax(top_k_scores)])
+    probs /= probs_sum
 
-    # Softmax
-    max_logit = np.max(top_k_logits)
-    exp_logits = np.exp(top_k_logits - max_logit)
-    probs = exp_logits / np.sum(exp_logits)
+    if min_p > 0.0:
+        max_prob = float(np.max(probs))
+        keep = probs >= (max_prob * float(min_p))
+        if np.any(keep):
+            top_k_indices = top_k_indices[keep]
+            probs = probs[keep]
+            probs /= probs.sum()
 
-    # Sample
+    if top_p < 1.0:
+        order = np.argsort(probs)[::-1]
+        sorted_probs = probs[order]
+        cdf = np.cumsum(sorted_probs)
+        cutoff = int(np.searchsorted(cdf, float(top_p), side="right")) + 1
+        cutoff = max(1, min(cutoff, sorted_probs.shape[0]))
+        keep_order = order[:cutoff]
+        top_k_indices = top_k_indices[keep_order]
+        probs = probs[keep_order]
+        probs /= probs.sum()
+
     idx = np.random.choice(len(top_k_indices), p=probs)
     return int(top_k_indices[idx])
 
@@ -980,7 +1124,12 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              ascii_display: bool = False,
              escape_newlines: bool = False,
              show_token_ids: bool = False,
-             show_token_pieces: bool = False) -> str:
+             show_token_pieces: bool = False,
+             top_k: int = 40,
+             top_p: float = 1.0,
+             min_p: float = 0.0,
+             repeat_penalty: float = 1.0,
+             repeat_last_n: int = 64) -> str:
     """Generate text from prompt.
 
     Args:
@@ -1025,7 +1174,16 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
         for i in range(max_tokens):
             # Sample
             t_sample = time.time()
-            next_token = sample_top_k(logits, k=40, temperature=temperature)
+            next_token = sample_top_k(
+                logits,
+                k=top_k,
+                temperature=temperature,
+                recent_tokens=token_ids,
+                repeat_penalty=repeat_penalty,
+                repeat_last_n=repeat_last_n,
+                top_p=top_p,
+                min_p=min_p,
+            )
             sample_times.append(time.time() - t_sample)
 
             if model.is_eos_token(next_token):
@@ -1082,7 +1240,16 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
             # Sample next token
             t_sample = time.time()
-            next_token = sample_top_k(logits, k=40, temperature=temperature)
+            next_token = sample_top_k(
+                logits,
+                k=top_k,
+                temperature=temperature,
+                recent_tokens=token_ids,
+                repeat_penalty=repeat_penalty,
+                repeat_last_n=repeat_last_n,
+                top_p=top_p,
+                min_p=min_p,
+            )
             sample_times.append(time.time() - t_sample)
 
             # Check for EOS token
@@ -1187,7 +1354,12 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               no_prefill: bool = False, safe_display: bool = True,
               ascii_display: bool = False, escape_newlines: bool = False,
               show_token_ids: bool = False,
-              show_token_pieces: bool = False):
+              show_token_pieces: bool = False,
+              top_k: int = 40,
+              top_p: float = 1.0,
+              min_p: float = 0.0,
+              repeat_penalty: float = 1.0,
+              repeat_last_n: int = 64):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
@@ -1246,7 +1418,12 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
                           ascii_display=ascii_display,
                           escape_newlines=escape_newlines,
                           show_token_ids=show_token_ids,
-                          show_token_pieces=show_token_pieces)
+                          show_token_pieces=show_token_pieces,
+                          top_k=top_k,
+                          top_p=top_p,
+                          min_p=min_p,
+                          repeat_penalty=repeat_penalty,
+                          repeat_last_n=repeat_last_n)
         print()
 
 
@@ -1257,6 +1434,11 @@ def main():
     parser.add_argument("--prompt", help="Single prompt (non-interactive mode)")
     parser.add_argument("--max-tokens", type=int, default=100, help="Max tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature")
+    parser.add_argument("--top-k", type=int, default=40, help="Top-k sampling size (default: 40)")
+    parser.add_argument("--top-p", type=float, default=1.0, help="Top-p nucleus sampling (default: 1.0)")
+    parser.add_argument("--min-p", type=float, default=0.0, help="Min-p filter as fraction of max prob (default: 0.0)")
+    parser.add_argument("--repeat-penalty", type=float, default=1.0, help="Repeat penalty >1.0 reduces looping (default: 1.0)")
+    parser.add_argument("--repeat-last-n", type=int, default=64, help="Window size for repeat penalty (default: 64)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--stats", action="store_true", default=True,
                        help="Show performance stats (default: on)")
@@ -1331,7 +1513,16 @@ def main():
             # Single prompt mode
             print(f"\nPrompt: {args.prompt}")
             print("Response: ", end='', flush=True)
-            generate(model, args.prompt, max_tokens=args.max_tokens,
+
+            # Apply chat template in single-prompt mode when enabled.
+            formatted_prompt = model.format_chat_prompt(args.prompt)
+            if args.verbose and formatted_prompt != args.prompt:
+                print(
+                    f"\n[chat-template] applied mode={model.chat_template_mode}",
+                    file=sys.stderr,
+                )
+
+            generate(model, formatted_prompt, max_tokens=args.max_tokens,
                     temperature=args.temperature, verbose=args.verbose,
                     show_stats=args.stats, validator=validator,
                     check_every_n=args.check_every,
@@ -1340,7 +1531,12 @@ def main():
                     ascii_display=args.ascii_display,
                     escape_newlines=args.escape_newlines,
                     show_token_ids=args.show_token_ids,
-                    show_token_pieces=args.show_token_pieces)
+                    show_token_pieces=args.show_token_pieces,
+                    top_k=args.top_k,
+                    top_p=args.top_p,
+                    min_p=args.min_p,
+                    repeat_penalty=args.repeat_penalty,
+                    repeat_last_n=args.repeat_last_n)
             print()
         else:
             # Interactive chat mode
@@ -1351,7 +1547,12 @@ def main():
                      ascii_display=args.ascii_display,
                      escape_newlines=args.escape_newlines,
                      show_token_ids=args.show_token_ids,
-                     show_token_pieces=args.show_token_pieces)
+                     show_token_pieces=args.show_token_pieces,
+                     top_k=args.top_k,
+                     top_p=args.top_p,
+                     min_p=args.min_p,
+                     repeat_penalty=args.repeat_penalty,
+                     repeat_last_n=args.repeat_last_n)
     finally:
         model.free()
 
