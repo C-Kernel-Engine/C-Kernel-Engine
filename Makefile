@@ -4638,6 +4638,10 @@ profile-v7-perf-stat:
 		echo "SKIP: perf not installed"; \
 	else \
 		mkdir -p build; \
+		perf_events="cycles,instructions,cache-references,cache-misses,LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend,dTLB-loads,dTLB-load-misses,dTLB-stores,dTLB-store-misses,iTLB-load-misses,minor-faults,major-faults"; \
+		if perf list 2>/dev/null | grep -q "dtlb_load_misses.walk_completed"; then \
+			perf_events="$$perf_events,cpu_core/dtlb_load_misses.walk_completed/,cpu_core/dtlb_store_misses.walk_completed/,cpu_core/itlb_misses.walk_completed/,cpu_core/dtlb_load_misses.stlb_hit/,cpu_core/itlb_misses.stlb_hit/"; \
+		fi; \
 		if [ "$(V7_PERF_RUNTIME)" = "cli" ]; then \
 			model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
 		runtime_dir="$$model_dir"; \
@@ -4674,18 +4678,14 @@ profile-v7-perf-stat:
 			fi; \
 			fi; \
 			$(MAKE) --no-print-directory ck-cli-v7 CFLAGS="$(CFLAGS) $(PROFILE_V7_DEBUG_CFLAGS)"; \
-			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
-LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
-branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+			perf stat --all-user -e "$$perf_events" \
 				./build/ck-cli-v7 "$$runtime_dir/libmodel.so" "$$runtime_dir/weights.bump" \
 				--prompt "The quick brown fox" --max-tokens 32 --timing --quiet-output \
 				$(V7_CLI_TEMPLATE_ARGS) $(V7_CLI_ARGS) > /dev/null \
 				2> $(PROFILE_V7_PERF_STAT_TXT); \
 		else \
 			CK_V7_COMPILER="$(PROFILE_V7_COMPILER)" \
-			perf stat --all-user -e cycles,instructions,cache-references,cache-misses,\
-LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses,\
-branches,branch-misses,stalled-cycles-frontend,stalled-cycles-backend \
+			perf stat --all-user -e "$$perf_events" \
 			$(PYTHON) $(PROFILE_V7_SCRIPT) run \
 				"$(V7_MODEL)" \
 				--context-len 1024 --prompt "The quick brown fox" --max-tokens 32 \

@@ -1139,6 +1139,12 @@
             margin: 0.25rem 0;
         }
 
+        .summary-error-item {
+            margin: 0.25rem 0;
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
         .quant-layer-chip-row {
             margin: 0 0 0.75rem;
             justify-content: flex-start;
@@ -4534,7 +4540,16 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             if (summaryWarnings) {
                 summaryWarnings.innerHTML = warnings.length === 0
                     ? ''
-                    : warnings.map(w => `<div class="summary-warning-item">Warning: ${w}</div>`).join('');
+                    : warnings.map(w => {
+                        const text = String(w || '');
+                        const isError = /^ERROR:/i.test(text);
+                        const clean = text
+                            .replace(/^ERROR:\s*/i, '')
+                            .replace(/^WARN(?:ING)?:\s*/i, '');
+                        const cls = isError ? 'summary-error-item' : 'summary-warning-item';
+                        const label = isError ? 'Error' : 'Warning';
+                        return `<div class="${cls}">${label}: ${escapeHtml(clean)}</div>`;
+                    }).join('');
             }
 
             if (summaryRunbook) {
@@ -11411,7 +11426,7 @@ function renderProfileHowTo() {
                 <div class="profile-phase-body">
                     <p class="profile-phase-desc">
                         This is the heart of the profiling workflow. First, capture per-kernel timing
-                        (decode and prefill are both supported). Then layer on <strong>perf stat</strong> for IPC / cache / branch
+                        (decode and prefill are both supported). Then layer on <strong>perf stat</strong> for IPC / cache / branch / TLB
                         counters, <strong>FlameGraph</strong> for visual stack hotspots, and
                         <strong>Cachegrind</strong> for precise cache-miss attribution. The one-liner below runs the decode-focused full stack.
                     </p>
@@ -11974,6 +11989,30 @@ function renderProfileHowTo() {
                 who: 'Collected by "perf stat -e branches,branch-misses". Parsed into perf_stat_summary.json.',
                 why: 'Usually low (<1%) for ML workloads (loops are predictable). High values indicate complex control flow.'
             },
+            'dTLB Miss Rate': {
+                what: 'Combined data-TLB miss rate for load + store accesses.',
+                how: '(dTLB-load-misses + dTLB-store-misses) / (dTLB-loads + dTLB-stores).',
+                who: 'Collected by perf stat dTLB events and normalized by perf_artifacts_v7.py.',
+                why: 'High values indicate address-translation pressure and poor locality across pages.'
+            },
+            'iTLB Misses / kInst': {
+                what: 'Instruction-TLB misses per 1,000 retired instructions.',
+                how: 'iTLB-load-misses * 1000 / instructions.',
+                who: 'Collected by perf stat and normalized in perf_stat_summary.json derived metrics.',
+                why: 'Helps detect instruction footprint pressure and code-fetch translation overhead.'
+            },
+            'Page Walks / kInst': {
+                what: 'Completed hardware page walks per 1,000 retired instructions.',
+                how: '(dtlb_load_misses.walk_completed + dtlb_store_misses.walk_completed + itlb_misses.walk_completed) * 1000 / instructions.',
+                who: 'Collected from PMU page-walk counters when available and parsed into perf_stat_summary.json.',
+                why: 'Direct indicator of costly page-table walks; lower is better for latency and stability.'
+            },
+            'STLB Hits / kInst': {
+                what: 'Second-level TLB (STLB) hits per 1,000 retired instructions.',
+                how: '(dtlb_load_misses.stlb_hit + itlb_misses.stlb_hit) * 1000 / instructions.',
+                who: 'Collected from PMU STLB hit counters when available.',
+                why: 'Rising STLB pressure can precede expensive page walks and hints at growing translation stress.'
+            },
             'CPU Counters': {
                 what: 'Raw hardware performance counter values: total cycles consumed and instructions retired.',
                 how: 'cycles = CPU clock cycles elapsed. instructions = total instructions retired (committed). Read from perf stat.',
@@ -12126,6 +12165,12 @@ function renderProfileHowTo() {
             const ipc = perfStatData?.derived?.ipc;
             const cmr = perfStatData?.derived?.cache_miss_rate;
             const bmr = perfStatData?.derived?.branch_miss_rate;
+            const dtlbMissRate = perfStatData?.derived?.dtlb_miss_rate;
+            const itlbMissesPerKInst = perfStatData?.derived?.itlb_misses_per_kinst;
+            const pageWalksPerKInst = perfStatData?.derived?.page_walks_per_kinst;
+            const stlbHitsPerKInst = perfStatData?.derived?.stlb_hits_per_kinst;
+            const minorFaults = getPerfCounterByMatcher(['minor-faults', /minor-faults/i]);
+            const majorFaults = getPerfCounterByMatcher(['major-faults', /major-faults/i]);
             cards.push(`
                 <div class="stat-card">
                     <div class="stat-value">${ipc !== undefined ? Number(ipc).toFixed(3) : '-'}</div>
@@ -12140,7 +12185,23 @@ function renderProfileHowTo() {
                     ${statLabel('Branch Miss Rate')}
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="font-size:1rem;">cycles ${formatMetricValue(cyc)}<br/>instr ${formatMetricValue(ins)}</div>
+                    <div class="stat-value">${dtlbMissRate !== undefined ? `${(Number(dtlbMissRate) * 100).toFixed(2)}%` : '-'}</div>
+                    ${statLabel('dTLB Miss Rate')}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${itlbMissesPerKInst !== undefined ? Number(itlbMissesPerKInst).toFixed(3) : '-'}</div>
+                    ${statLabel('iTLB Misses / kInst')}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${pageWalksPerKInst !== undefined ? Number(pageWalksPerKInst).toFixed(3) : '-'}</div>
+                    ${statLabel('Page Walks / kInst')}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stlbHitsPerKInst !== undefined ? Number(stlbHitsPerKInst).toFixed(3) : '-'}</div>
+                    ${statLabel('STLB Hits / kInst')}
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="font-size:1rem;">cycles ${formatMetricValue(cyc)}<br/>instr ${formatMetricValue(ins)}<br/>minflt ${formatMetricValue(minorFaults)} | majflt ${formatMetricValue(majorFaults)}</div>
                     ${statLabel('CPU Counters')}
                 </div>
             `);

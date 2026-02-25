@@ -28,6 +28,7 @@ import webbrowser
 import argparse
 import subprocess
 from pathlib import Path
+from typing import Any
 
 # Path construction:
 # Script is at: version/v7/tools/open_ir_visualizer.py
@@ -545,6 +546,86 @@ def _trim_memory_signoff_payload(payload: dict, max_items: int = 120) -> dict:
     out["error_count"] = total_errors
     out["warning_count"] = total_warnings
     return out
+
+
+def _summarize_call_ir_payload(payload: dict[str, Any], max_samples: int = 6) -> dict[str, Any]:
+    """Summarize call-IR errors/warnings so operator snapshot can show hard failures."""
+    top_errors = payload.get("errors")
+    top_warnings = payload.get("warnings")
+    ops = payload.get("operations")
+
+    top_error_count = len(top_errors) if isinstance(top_errors, list) else 0
+    top_warning_count = len(top_warnings) if isinstance(top_warnings, list) else 0
+    op_error_count = 0
+    op_warning_count = 0
+    sample_errors: list[dict[str, Any]] = []
+    sample_warnings: list[dict[str, Any]] = []
+
+    if isinstance(ops, list):
+        for i, op in enumerate(ops):
+            if not isinstance(op, dict):
+                continue
+            idx = op.get("idx", i)
+            op_name = op.get("op") or op.get("type") or ""
+            fn_name = op.get("function") or op.get("kernel") or ""
+            errs = op.get("errors")
+            warns = op.get("warnings")
+            if isinstance(errs, list) and errs:
+                op_error_count += len(errs)
+                if len(sample_errors) < max_samples:
+                    sample_errors.append(
+                        {
+                            "idx": idx,
+                            "op": str(op_name),
+                            "function": str(fn_name),
+                            "message": str(errs[0]),
+                        }
+                    )
+            if isinstance(warns, list) and warns:
+                op_warning_count += len(warns)
+                if len(sample_warnings) < max_samples:
+                    sample_warnings.append(
+                        {
+                            "idx": idx,
+                            "op": str(op_name),
+                            "function": str(fn_name),
+                            "message": str(warns[0]),
+                        }
+                    )
+
+    return {
+        "top_error_count": top_error_count,
+        "top_warning_count": top_warning_count,
+        "op_error_count": op_error_count,
+        "op_warning_count": op_warning_count,
+        "error_count": top_error_count + op_error_count,
+        "warning_count": top_warning_count + op_warning_count,
+        "sample_errors": sample_errors,
+        "sample_warnings": sample_warnings,
+    }
+
+
+def _collect_call_ir_health(files: dict[str, Any]) -> dict[str, Any] | None:
+    modes: dict[str, Any] = {}
+    for mode, key in (("decode", "lowered_decode_call"), ("prefill", "lowered_prefill_call")):
+        payload = files.get(key)
+        if not isinstance(payload, dict):
+            continue
+        modes[mode] = _summarize_call_ir_payload(payload)
+
+    if not modes:
+        return None
+
+    totals = {"error_count": 0, "warning_count": 0}
+    for summary in modes.values():
+        totals["error_count"] += int(summary.get("error_count") or 0)
+        totals["warning_count"] += int(summary.get("warning_count") or 0)
+
+    return {
+        "schema": "ck.call_ir_health.v1",
+        "modes": modes,
+        "totals": totals,
+    }
 
 
 def _piece_display(piece: str, limit: int = 64) -> str:
@@ -2285,6 +2366,33 @@ def load_model_data(
     mem = data["files"].get("memory_signoff")
     if isinstance(mem, dict):
         data["files"]["memory_signoff"] = _trim_memory_signoff_payload(mem)
+
+    call_ir_health = _collect_call_ir_health(data["files"])
+    if isinstance(call_ir_health, dict):
+        data["files"]["call_ir_health"] = call_ir_health
+        loaded.append("call_ir_health(derived)")
+        totals = call_ir_health.get("totals", {})
+        total_err = int(totals.get("error_count") or 0)
+        total_warn = int(totals.get("warning_count") or 0)
+        if total_err > 0 or total_warn > 0:
+            decode = call_ir_health.get("modes", {}).get("decode", {})
+            prefill = call_ir_health.get("modes", {}).get("prefill", {})
+            de = int(decode.get("error_count") or 0)
+            dw = int(decode.get("warning_count") or 0)
+            pe = int(prefill.get("error_count") or 0)
+            pw = int(prefill.get("warning_count") or 0)
+            data["meta"]["warnings"].append(
+                f"ERROR: Call-IR issues detected. decode(e={de}, w={dw}) prefill(e={pe}, w={pw})."
+            )
+            for mode_name, mode_payload in (("decode", decode), ("prefill", prefill)):
+                sample_errs = mode_payload.get("sample_errors")
+                if isinstance(sample_errs, list) and sample_errs:
+                    s0 = sample_errs[0]
+                    data["meta"]["warnings"].append(
+                        "ERROR: "
+                        f"{mode_name} op[{s0.get('idx')}:{s0.get('op')}] "
+                        f"{s0.get('message')}"
+                    )
 
     # Report missing files
     if missing_required:

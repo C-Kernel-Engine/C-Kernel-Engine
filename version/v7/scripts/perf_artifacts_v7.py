@@ -129,6 +129,18 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
     cache_miss = counters.get("cache-misses")
     branches = counters.get("branches")
     branch_miss = counters.get("branch-misses")
+    dtlb_loads = counters.get("dTLB-loads")
+    dtlb_load_miss = counters.get("dTLB-load-misses")
+    dtlb_stores = counters.get("dTLB-stores")
+    dtlb_store_miss = counters.get("dTLB-store-misses")
+    itlb_load_miss = counters.get("iTLB-load-misses")
+    dtlb_load_walk_completed = counters.get("dtlb_load_misses.walk_completed")
+    dtlb_store_walk_completed = counters.get("dtlb_store_misses.walk_completed")
+    itlb_walk_completed = counters.get("itlb_misses.walk_completed")
+    dtlb_load_stlb_hit = counters.get("dtlb_load_misses.stlb_hit")
+    itlb_stlb_hit = counters.get("itlb_misses.stlb_hit")
+    minor_faults = counters.get("minor-faults")
+    major_faults = counters.get("major-faults")
 
     if inst is None:
         inst = _sum_matching([r"(^|/)instructions/?$", r"\binstructions\b"])
@@ -142,6 +154,30 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
         branches = _sum_matching([r"(^|/)branches/?$", r"\bbranches\b"])
     if branch_miss is None:
         branch_miss = _sum_matching([r"branch-misses"])
+    if dtlb_loads is None:
+        dtlb_loads = _sum_matching([r"dtlb-loads"])
+    if dtlb_load_miss is None:
+        dtlb_load_miss = _sum_matching([r"dtlb-load-misses"])
+    if dtlb_stores is None:
+        dtlb_stores = _sum_matching([r"dtlb-stores"])
+    if dtlb_store_miss is None:
+        dtlb_store_miss = _sum_matching([r"dtlb-store-misses"])
+    if itlb_load_miss is None:
+        itlb_load_miss = _sum_matching([r"itlb-load-misses"])
+    if dtlb_load_walk_completed is None:
+        dtlb_load_walk_completed = _sum_matching([r"dtlb_load_misses\.walk_completed"])
+    if dtlb_store_walk_completed is None:
+        dtlb_store_walk_completed = _sum_matching([r"dtlb_store_misses\.walk_completed"])
+    if itlb_walk_completed is None:
+        itlb_walk_completed = _sum_matching([r"itlb_misses\.walk_completed"])
+    if dtlb_load_stlb_hit is None:
+        dtlb_load_stlb_hit = _sum_matching([r"dtlb_load_misses\.stlb_hit"])
+    if itlb_stlb_hit is None:
+        itlb_stlb_hit = _sum_matching([r"itlb_misses\.stlb_hit"])
+    if minor_faults is None:
+        minor_faults = _sum_matching([r"minor-faults"])
+    if major_faults is None:
+        major_faults = _sum_matching([r"major-faults"])
 
     if inst is not None:
         counters["instructions"] = float(inst)
@@ -155,6 +191,30 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
         counters["branches"] = float(branches)
     if branch_miss is not None:
         counters["branch-misses"] = float(branch_miss)
+    if dtlb_loads is not None:
+        counters["dTLB-loads"] = float(dtlb_loads)
+    if dtlb_load_miss is not None:
+        counters["dTLB-load-misses"] = float(dtlb_load_miss)
+    if dtlb_stores is not None:
+        counters["dTLB-stores"] = float(dtlb_stores)
+    if dtlb_store_miss is not None:
+        counters["dTLB-store-misses"] = float(dtlb_store_miss)
+    if itlb_load_miss is not None:
+        counters["iTLB-load-misses"] = float(itlb_load_miss)
+    if dtlb_load_walk_completed is not None:
+        counters["dtlb_load_misses.walk_completed"] = float(dtlb_load_walk_completed)
+    if dtlb_store_walk_completed is not None:
+        counters["dtlb_store_misses.walk_completed"] = float(dtlb_store_walk_completed)
+    if itlb_walk_completed is not None:
+        counters["itlb_misses.walk_completed"] = float(itlb_walk_completed)
+    if dtlb_load_stlb_hit is not None:
+        counters["dtlb_load_misses.stlb_hit"] = float(dtlb_load_stlb_hit)
+    if itlb_stlb_hit is not None:
+        counters["itlb_misses.stlb_hit"] = float(itlb_stlb_hit)
+    if minor_faults is not None:
+        counters["minor-faults"] = float(minor_faults)
+    if major_faults is not None:
+        counters["major-faults"] = float(major_faults)
 
     derived: Dict[str, float] = {}
 
@@ -164,6 +224,48 @@ def parse_perf_stat_text(text: str) -> Dict[str, object]:
         derived["cache_miss_rate"] = cache_miss / cache_ref
     if branches and branches > 0 and branch_miss is not None:
         derived["branch_miss_rate"] = branch_miss / branches
+    if dtlb_loads and dtlb_loads > 0 and dtlb_load_miss is not None:
+        derived["dtlb_load_miss_rate"] = dtlb_load_miss / dtlb_loads
+    if dtlb_stores and dtlb_stores > 0 and dtlb_store_miss is not None:
+        derived["dtlb_store_miss_rate"] = dtlb_store_miss / dtlb_stores
+    dtlb_accesses = 0.0
+    dtlb_misses = 0.0
+    if dtlb_loads is not None:
+        dtlb_accesses += float(dtlb_loads)
+    if dtlb_stores is not None:
+        dtlb_accesses += float(dtlb_stores)
+    if dtlb_load_miss is not None:
+        dtlb_misses += float(dtlb_load_miss)
+    if dtlb_store_miss is not None:
+        dtlb_misses += float(dtlb_store_miss)
+    if dtlb_accesses > 0:
+        derived["dtlb_miss_rate"] = dtlb_misses / dtlb_accesses
+    if itlb_load_miss is not None and inst and inst > 0:
+        derived["itlb_misses_per_kinst"] = (float(itlb_load_miss) * 1000.0) / float(inst)
+    page_walks = 0.0
+    has_page_walks = False
+    for val in (dtlb_load_walk_completed, dtlb_store_walk_completed, itlb_walk_completed):
+        if val is not None:
+            page_walks += float(val)
+            has_page_walks = True
+    if has_page_walks:
+        derived["page_walks"] = page_walks
+        if inst and inst > 0:
+            derived["page_walks_per_kinst"] = (page_walks * 1000.0) / float(inst)
+    stlb_hits = 0.0
+    has_stlb_hits = False
+    for val in (dtlb_load_stlb_hit, itlb_stlb_hit):
+        if val is not None:
+            stlb_hits += float(val)
+            has_stlb_hits = True
+    if has_stlb_hits:
+        derived["stlb_hits"] = stlb_hits
+        if inst and inst > 0:
+            derived["stlb_hits_per_kinst"] = (stlb_hits * 1000.0) / float(inst)
+    if minor_faults is not None and inst and inst > 0:
+        derived["minor_faults_per_kinst"] = (float(minor_faults) * 1000.0) / float(inst)
+    if major_faults is not None and inst and inst > 0:
+        derived["major_faults_per_kinst"] = (float(major_faults) * 1000.0) / float(inst)
 
     return {
         "generated_at": utc_now_iso(),
