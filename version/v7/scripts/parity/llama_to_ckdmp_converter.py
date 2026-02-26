@@ -18,6 +18,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import struct
 import sys
 from pathlib import Path
@@ -28,7 +29,7 @@ import numpy as np
 # CKDMP Format Definition (must match ck_parity_dump.h)
 # =============================================================================
 
-CKDMP_MAGIC = b"CKDMP\x00\x00"
+CKDMP_MAGIC = b"CKDMP\x00\x00\x00"
 CKDMP_VERSION = 1
 CKDMP_HEADER_SIZE = 128
 
@@ -43,7 +44,7 @@ HEADER_SPEC = struct.Struct(
     "I"       # elem_count (4)
     "i"       # token_id (4)
     "I"       # dump_type (4)
-    "20x"     # reserved (20)
+    "28x"     # reserved (28)
 )
 
 # =============================================================================
@@ -224,6 +225,34 @@ def infer_dtype_from_name(filename: str) -> int:
         return 0  # default fp32
 
 
+TOKEN_SUFFIX_PATTERNS = (
+    re.compile(r"^(?P<base>.+?)-token-(?P<tok>\d+)$"),
+    re.compile(r"^(?P<base>.+?)_token_(?P<tok>\d+)$"),
+    re.compile(r"^(?P<base>.+?)-tok-(?P<tok>\d+)$"),
+    re.compile(r"^(?P<base>.+?)_tok_(?P<tok>\d+)$"),
+)
+
+
+def split_token_suffix(op_name: str) -> Tuple[str, Optional[int]]:
+    """Split optional token suffix from raw op name.
+
+    Examples:
+      Qcur-0-token-000012 -> (Qcur-0, 12)
+      attn_out-0_tok_42   -> (attn_out-0, 42)
+    """
+    for pat in TOKEN_SUFFIX_PATTERNS:
+        m = pat.match(op_name)
+        if not m:
+            continue
+        base = str(m.group("base"))
+        try:
+            tok = int(m.group("tok"))
+        except Exception:
+            tok = None
+        return base, tok
+    return op_name, None
+
+
 def infer_shape_from_data(data: np.ndarray) -> Tuple[int, List[int]]:
     """Infer proper shape from numpy array."""
     shape = list(data.shape)
@@ -326,6 +355,7 @@ def convert_raw_to_ckdmp(
 
         for bin_file in bin_files:
             op_name = bin_file.stem
+            base_op_name, token_from_name = split_token_suffix(op_name)
 
             try:
                 # Read raw data
@@ -338,6 +368,8 @@ def convert_raw_to_ckdmp(
 
                 # Get metadata from index.json if available (preferred source)
                 metadata = index_metadata.get(op_name, {})
+                if not metadata:
+                    metadata = index_metadata.get(base_op_name, {})
 
                 # Determine dtype
                 if dtype_hint is not None:
@@ -348,12 +380,12 @@ def convert_raw_to_ckdmp(
                     dtype = infer_dtype_from_name(bin_file.name)
 
                 # Get layer ID
-                layer_id = extract_layer_id(op_name)
+                layer_id = extract_layer_id(base_op_name)
                 if 'layer_id' in metadata:
                     layer_id = int(metadata['layer_id'])
 
                 # Get token ID
-                token_id = 0
+                token_id = token_from_name if token_from_name is not None else 0
                 if 'token_id' in metadata:
                     token_id = int(metadata['token_id'])
                 else:
@@ -379,16 +411,19 @@ def convert_raw_to_ckdmp(
                     elem_count = int(metadata['elem_count'])
 
                 # Map llama name to CK name
-                ck_name = name_map.get(op_name, op_name)
+                ck_name = name_map.get(base_op_name, base_op_name)
 
                 # Determine dump type from context
                 dump_type = 0  # prefill
-                if 'decode' in op_name.lower() or 'second' in op_name.lower():
+                if token_id > 0:
+                    dump_type = 1
+                elif 'decode' in base_op_name.lower() or 'second' in base_op_name.lower():
                     dump_type = 1  # decode
 
                 # Build header
                 header = bytearray(CKDMP_HEADER_SIZE)
-                header[:8] = CKDMP_MAGIC
+                # Keep magic assignment length-exact to avoid shrinking bytearray.
+                header[0:8] = CKDMP_MAGIC
                 struct.pack_into("<I", header, 8, CKDMP_VERSION)
                 struct.pack_into("<i", header, 12, layer_id)
                 name_bytes = ck_name.encode('utf-8')[:31]
@@ -411,7 +446,8 @@ def convert_raw_to_ckdmp(
                 if generate_index:
                     index_entries.append({
                         "name": ck_name,
-                        "llama_name": op_name,
+                        "llama_name": base_op_name,
+                        "llama_raw_name": op_name,
                         "original_file": bin_file.name,
                         "dtype": dtype,
                         "rank": rank,
@@ -423,7 +459,10 @@ def convert_raw_to_ckdmp(
                         "offset": out_f.tell() - CKDMP_HEADER_SIZE - elem_count * 4,
                     })
 
-                print(f"  [OK] {op_name} -> {ck_name} (layer={layer_id}, dtype={dtype}, shape={shape})")
+                print(
+                    f"  [OK] {op_name} -> {ck_name} "
+                    f"(layer={layer_id}, token={token_id}, dtype={dtype}, shape={shape})"
+                )
                 converted += 1
 
             except Exception as e:

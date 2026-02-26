@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-Check layer-0 ffn_norm contract:
-  - capture input right before ffn_norm (after first residual_add)
-  - capture ffn_norm output
+Check layer-N MLP pre-norm contract:
+  - capture input right before MLP pre-norm (after first residual_add)
+  - capture pre-norm output
   - compute local RMSNorm reference with bound ln2_gamma + eps
   - compare runtime vs reference
 
-TODO(model-contracts):
-  - Run this per model family/template, not just Gemma defaults.
-  - Read norm-contract keys from template/config (norm type, eps key, any
-    model-specific scaling) so new families do not silently reuse wrong math.
+Supports both older IR naming (ffn_norm) and current naming (rmsnorm
+occurrence #1 in the decoder block).
 """
 
 from __future__ import annotations
@@ -71,6 +69,27 @@ def rmsnorm_ref(x: np.ndarray, gamma: np.ndarray, eps: float) -> np.ndarray:
     return x * rstd * gamma
 
 
+def _resolve_mlp_prenorm_op(
+    ops: list[dict[str, Any]],
+    call_ops: list[dict[str, Any]],
+    layer: int,
+) -> tuple[int, dict[str, Any], int, str]:
+    """Find MLP pre-norm op across IR naming variants."""
+    # Older naming.
+    op_idx, op = find_op(ops, layer, "ffn_norm", 0)
+    stop_idx, _ = find_op(call_ops, layer, "ffn_norm", 0)
+    if op is not None and stop_idx is not None:
+        return op_idx, op, stop_idx, "ffn_norm"
+
+    # Current naming: second rmsnorm in the block.
+    op_idx, op = find_op(ops, layer, "rmsnorm", 1)
+    stop_idx, _ = find_op(call_ops, layer, "rmsnorm", 1)
+    if op is not None and stop_idx is not None:
+        return op_idx, op, stop_idx, "rmsnorm(occ=1)"
+
+    raise RuntimeError("MLP pre-norm op not found (expected ffn_norm or rmsnorm occurrence 1)")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Check ffn_norm runtime vs local reference")
     ap.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
@@ -89,25 +108,32 @@ def main() -> int:
     embed_dim = int(cfg.get("embed_dim", 640))
     eps = float(cfg.get("rms_eps", 1e-6))
 
-    ffn_idx, ffn_op = find_op(ops, args.layer, "ffn_norm", 0)
-    if ffn_op is None:
-        raise RuntimeError("ffn_norm op not found")
+    ffn_idx, ffn_op, ffn_stop_idx, ffn_label = _resolve_mlp_prenorm_op(ops, call_ops, args.layer)
     res_idx, res_op = find_op(ops, args.layer, "residual_add", 0)
     if res_op is None:
         raise RuntimeError("residual_add op#0 not found")
-    ffn_stop_idx, _ = find_op(call_ops, args.layer, "ffn_norm", 0)
     res_stop_idx, _ = find_op(call_ops, args.layer, "residual_add", 0)
-    if None in (ffn_stop_idx, res_stop_idx):
-        raise RuntimeError("ffn_norm/residual_add stop op not found in lowered_decode_call")
+    if res_stop_idx is None:
+        raise RuntimeError("residual_add stop op not found in lowered_decode_call")
 
-    ffn_out_rel = int(ffn_op.get("outputs", {}).get("output", {}).get("activation_offset", 0))
+    out_binding = (
+        ffn_op.get("outputs", {}).get("output")
+        or ffn_op.get("outputs", {}).get("out")
+        or ffn_op.get("outputs", {}).get("y")
+        or {}
+    )
+    ffn_out_rel = int(out_binding.get("activation_offset", 0))
     ffn_out_abs = resolve_abs_offset(lowered, ffn_out_rel)
     res_out_rel = int(res_op.get("outputs", {}).get("out", {}).get("activation_offset", 0))
     res_out_abs = resolve_abs_offset(lowered, res_out_rel)
 
-    ln2 = ffn_op.get("weights", {}).get("ln2_gamma")
+    ln2 = (
+        ffn_op.get("weights", {}).get("ln2_gamma")
+        or ffn_op.get("weights", {}).get("gamma")
+        or ffn_op.get("weights", {}).get("weight")
+    )
     if not isinstance(ln2, dict):
-        raise RuntimeError("ffn_norm ln2_gamma binding missing")
+        raise RuntimeError("MLP pre-norm gamma binding missing")
     ln2_name = str(ln2.get("name"))
     entry_by_name = {e.get("name"): e for e in manifest.get("entries", []) if isinstance(e, dict)}
     ent = entry_by_name.get(ln2_name)
@@ -171,12 +197,13 @@ def main() -> int:
     worst = int(np.argmax(diff))
 
     print("=" * 88)
-    print("FFN_NORM CONTRACT CHECK")
+    print("MLP PRE-NORM CONTRACT CHECK")
     print("=" * 88)
     print(f"model_dir      : {model_dir}")
     print(f"layer/token    : {args.layer}/{args.token}")
+    print(f"norm op        : {ffn_label}")
     print(f"residual_add idx: stop={res_stop_idx}, lowered={res_idx}")
-    print(f"ffn_norm idx   : stop={ffn_stop_idx}, lowered={ffn_idx}")
+    print(f"prenorm idx    : stop={ffn_stop_idx}, lowered={ffn_idx}")
     print(f"embed_dim/eps  : {embed_dim}/{eps}")
     print(f"ln2_gamma      : {ln2_name} (file_offset={ln2_file_off}, size={ln2_size})")
     print("")

@@ -518,8 +518,36 @@ def _collect_lower3_issues(ir: Dict) -> tuple[int, int, int]:
     return len(ir_errors), len(op_errors), len(missing_args)
 
 
+CODEGEN_REQUIRED_CONTRACT_FIELDS: dict[str, tuple[str, ...]] = {
+    "tokenizer_contract": ("tokenizer_type", "special_tokens"),
+    "attention_contract": ("rope_type", "kv_layout"),
+    "block_contract": ("norm_type", "mlp_formula", "activation"),
+    "logits_contract": ("final_norm", "lm_head"),
+    "quant_contract": ("kernel_select",),
+    "runtime_invariants": ("required_call_args",),
+}
+
+
+def _validate_codegen_contract(config: Dict) -> list[str]:
+    issues: list[str] = []
+    contract = config.get("contract")
+    if not isinstance(contract, dict):
+        return ["missing config.contract object in lowered IR"]
+    for section, fields in CODEGEN_REQUIRED_CONTRACT_FIELDS.items():
+        sec = contract.get(section)
+        if not isinstance(sec, dict):
+            issues.append(f"missing contract section: {section}")
+            continue
+        for field in fields:
+            if sec.get(field) is None:
+                issues.append(f"missing contract field: {section}.{field}")
+    return issues
+
+
 def _infer_logits_layout(config: Dict, layout: Dict) -> str:
     """Infer logits layout ('last' or 'full') from config/layout."""
+    # TODO(contract): stop inferring in strict contract mode.
+    # Logits layout should come from an explicit logits_contract in lowered call-IR.
     layout_cfg = str(config.get("logits_layout", "auto")).lower()
     if layout_cfg in {"last", "full"}:
         return layout_cfg
@@ -1216,7 +1244,15 @@ CK_EXPORT uintptr_t ck_model_get_base_ptr(void) {{ return (uintptr_t)(g_model ? 
 # MAIN
 # =============================================================================
 
-def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: Dict = None, profile: bool = False, dump: bool = False) -> str:
+def generate(
+    ir_path: Path,
+    layout_path: Path,
+    debug: bool = False,
+    init_call: Dict = None,
+    profile: bool = False,
+    dump: bool = False,
+    strict_contracts: bool = False,
+) -> str:
     """Generate complete C code.
 
     Args:
@@ -1283,12 +1319,19 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
     rope_cache_layout = "head_dim/2" if rope_init_kernel == "rope_precompute_cache_split" else "rotary_dim/2"
 
     # Fail fast if IR Lower 3 has errors or missing args
+    # TODO(contract): add semantic contract enforcement here (unknown rope/norm/mlp/
+    # tokenizer semantics should fail before C emission; no best-guess fallbacks).
     ir_error_count, op_error_count, missing_args_count = _collect_lower3_issues(ir)
     if ir_error_count or op_error_count or missing_args_count:
         raise RuntimeError(
             f"IR Lower 3 invalid: {ir_error_count} issues, "
             f"{op_error_count} ops with errors, {missing_args_count} ops missing args"
         )
+    if strict_contracts:
+        contract_issues = _validate_codegen_contract(config)
+        if contract_issues:
+            joined = "; ".join(contract_issues)
+            raise RuntimeError(f"Strict contract check failed: {joined}")
 
     # Get token offset from layout
     token_offset = 16
@@ -1307,7 +1350,9 @@ def generate(ir_path: Path, layout_path: Path, debug: bool = False, init_call: D
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     # Extract tokenizer include from init_call (if present)
-    # Codegen is DUMB - we read the include from IR, not hardcode it
+    # Codegen is DUMB - we read the include from IR, not hardcode it.
+    # TODO(contract): require explicit tokenizer_contract in lowered IR and reject
+    # unknown tokenizer class / special-token policy in strict mode.
     tokenizer_include = ""
     if init_call:
         for op in init_call.get("operations", []):
@@ -1485,6 +1530,11 @@ def main():
     # Parity Dump
     parser.add_argument("--parity-dump", action="store_true",
                        help="Emit parity dump calls for llama.cpp comparison")
+    parser.add_argument(
+        "--strict-contracts",
+        action="store_true",
+        help="Require full semantic contract in lowered IR config before C emission",
+    )
     args = parser.parse_args()
 
     # Handle legacy API (--decode/--prefill)
@@ -1540,7 +1590,15 @@ def main():
         _guard_bump_offsets(layout_obj, ir_list)
 
         # Generate decode code
-        code = generate(decode_ir, layout_decode, debug=args.debug, init_call=init_call_obj, profile=args.profile, dump=args.parity_dump)
+        code = generate(
+            decode_ir,
+            layout_decode,
+            debug=args.debug,
+            init_call=init_call_obj,
+            profile=args.profile,
+            dump=args.parity_dump,
+            strict_contracts=args.strict_contracts,
+        )
 
         # Generate prefill code if provided
         prefill_code = ""
@@ -1554,6 +1612,10 @@ def main():
                 except ImportError as e:
                     print(f"Warning: Could not import prefill codegen: {e}")
                 except Exception as e:
+                    if args.strict_contracts:
+                        raise
+                    # TODO(contract): in strict mode, do not continue after prefill
+                    # codegen failures. Bubble hard error to avoid partial runtimes.
                     print(f"Warning: Prefill codegen failed: {e}")
 
         # Combine decode + prefill
@@ -1589,7 +1651,15 @@ def main():
             with open(init_call_path) as f:
                 init_call_obj = json.load(f)
 
-        code = generate(Path(args.ir), Path(args.layout), debug=args.debug, init_call=init_call_obj, profile=args.profile, dump=args.parity_dump)
+        code = generate(
+            Path(args.ir),
+            Path(args.layout),
+            debug=args.debug,
+            init_call=init_call_obj,
+            profile=args.profile,
+            dump=args.parity_dump,
+            strict_contracts=args.strict_contracts,
+        )
         with open(args.output, 'w') as f:
             f.write(code)
         print(f"Generated: {args.output}")

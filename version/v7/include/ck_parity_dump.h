@@ -27,11 +27,11 @@
 extern "C" {
 #endif
 
-#define CKDUMP_MAGIC "CKDMP\0\0"
+#define CKDUMP_MAGIC "CKDMP\0\0\0"
 #define CKDUMP_VERSION 1
 
 typedef struct {
-    char magic[8];         /* "CKDMP\0\0" */
+    char magic[8];         /* "CKDMP\0\0\0" */
     uint32_t version;      /* = 1 */
     int32_t layer_id;      /* -1 for global ops, 0-27 for layers */
     char op_name[32];      /* e.g., "q_proj", "attn_out", "logits" */
@@ -42,6 +42,10 @@ typedef struct {
     int32_t token_id;      /* current token being decoded */
     uint8_t reserved[32];  /* padding (header = 128 bytes) */
 } __attribute__((packed)) CKDumpFileHeader;
+
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+_Static_assert(sizeof(CKDumpFileHeader) == 128, "CKDumpFileHeader must be 128 bytes");
+#endif
 
 static FILE *g_ck_dump_file = NULL;
 static int g_ck_dump_token = 0;

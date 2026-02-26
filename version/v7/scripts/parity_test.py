@@ -24,7 +24,7 @@ import re
 import struct
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
 
 # =============================================================================
@@ -33,12 +33,43 @@ import numpy as np
 
 CKDUMP_MAGIC = b"CKDMP\x00\x00\x00"
 
-# CKDMP format has drifted across branches; support the known variants.
-# Keep the parser permissive and infer the record layout from the header bytes.
+# CKDMP format has drifted across branches; support known variants.
+# Canonical writer: 128-byte header.
+# Legacy converter bug: 127-byte header (magic slice shrink).
 HEADER_FORMATS = [
     {
-        "name": "rank_120",
-        "spec": struct.Struct("<8sIi32sII4qIi24x"),  # 120 bytes
+        "name": "canonical_128_no_dump_type",
+        "spec": struct.Struct("<8sIi32sII4qIi32x"),  # 128 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": u[5],
+            "shape": [u[6], u[7], u[8], u[9]],
+            "elem_count": u[10],
+            "token_id": u[11],
+        },
+    },
+    {
+        "name": "canonical_128_with_dump_type",
+        "spec": struct.Struct("<8sIi32sII4qIiI28x"),  # 128 bytes
+        "decoder": lambda u: {
+            "magic": u[0],
+            "version": u[1],
+            "layer_id": u[2],
+            "op_name_bytes": u[3],
+            "dtype": u[4],
+            "rank": u[5],
+            "shape": [u[6], u[7], u[8], u[9]],
+            "elem_count": u[10],
+            "token_id": u[11],
+        },
+    },
+    {
+        "name": "legacy_converter_127_with_dump_type",
+        "spec": struct.Struct("<8sIi32sII4qIiI27x"),  # 127 bytes
         "decoder": lambda u: {
             "magic": u[0],
             "version": u[1],
@@ -67,8 +98,8 @@ HEADER_FORMATS = [
         },
     },
     {
-        "name": "rank_dump_type_128",
-        "spec": struct.Struct("<8sIi32sII4qIiI28x"),  # 128 bytes
+        "name": "rank_120",
+        "spec": struct.Struct("<8sIi32sII4qIi24x"),  # 120 bytes
         "decoder": lambda u: {
             "magic": u[0],
             "version": u[1],
@@ -137,9 +168,9 @@ def _is_plausible_header(h: Dict) -> bool:
     return True
 
 
-def _decode_header(header_bytes: bytes) -> Optional[Tuple[Dict, int]]:
-    # Prefer larger formats first so we can parse newer writers when possible.
-    for fmt in sorted(HEADER_FORMATS, key=lambda x: x["spec"].size, reverse=True):
+def _decode_header_candidates(header_bytes: bytes) -> List[Tuple[Dict, int]]:
+    out: List[Tuple[Dict, int]] = []
+    for fmt in HEADER_FORMATS:
         size = fmt["spec"].size
         if len(header_bytes) < size:
             continue
@@ -149,8 +180,16 @@ def _decode_header(header_bytes: bytes) -> Optional[Tuple[Dict, int]]:
             continue
         header = fmt["decoder"](unpacked)
         if _is_plausible_header(header):
-            return header, size
-    return None
+            out.append((header, size))
+    return out
+
+
+def _decode_header(header_bytes: bytes) -> Optional[Tuple[Dict, int]]:
+    candidates = _decode_header_candidates(header_bytes)
+    if not candidates:
+        return None
+    # Fallback decoder: choose largest plausible header size.
+    return max(candidates, key=lambda x: x[1])
 
 
 def _normalize_layer_and_op(layer_id: int, op_name: str) -> Tuple[int, str]:
@@ -197,6 +236,56 @@ def _dtype_to_elem_size(dtype: int) -> int:
     return 4
 
 
+def _decode_header_at(blob: bytes, rec_start: int) -> Optional[Tuple[Dict, int]]:
+    """
+    Decode the header at `rec_start` and choose the best header-size variant by
+    looking at next-record alignment.
+    """
+    candidates = _decode_header_candidates(blob[rec_start:rec_start + MAX_HEADER_SIZE])
+    if not candidates:
+        return None
+
+    best: Optional[Tuple[float, Dict, int]] = None
+    for header, header_size in candidates:
+        elem_count = int(header["elem_count"])
+        preferred = _dtype_to_elem_size(int(header["dtype"]))
+        elem_sizes: List[int] = []
+        for s in (preferred, 4, 2, 1):
+            if s not in elem_sizes:
+                elem_sizes.append(s)
+
+        candidate_best = -1.0
+        for rank, elem_size in enumerate(elem_sizes):
+            next_off = rec_start + header_size + elem_count * elem_size
+            if next_off > len(blob):
+                continue
+
+            score = 0.0
+            if elem_size == preferred:
+                score += 2.0
+            if next_off == len(blob):
+                score += 6.0
+            elif blob[next_off:next_off + len(CKDUMP_MAGIC)] == CKDUMP_MAGIC:
+                score += 8.0
+            elif next_off + MIN_HEADER_SIZE <= len(blob):
+                if _decode_header(blob[next_off:next_off + MAX_HEADER_SIZE]) is not None:
+                    score += 5.0
+
+            # Prefer earlier elem-size candidates (dtype-consistent first).
+            score -= rank * 0.05
+            if score > candidate_best:
+                candidate_best = score
+
+        if best is None or candidate_best > best[0] or (
+            candidate_best == best[0] and header_size > best[2]
+        ):
+            best = (candidate_best, header, header_size)
+
+    if best is None:
+        return _decode_header(blob[rec_start:rec_start + MAX_HEADER_SIZE])
+    return best[1], best[2]
+
+
 def _choose_elem_size(blob: bytes, rec_start: int, header_size: int, elem_count: int, dtype: int) -> int:
     preferred = _dtype_to_elem_size(dtype)
     candidates = [preferred, 4, 2, 1]
@@ -238,7 +327,7 @@ def read_dump_file(path: Path) -> List[ParityDump]:
 
     while offset + MIN_HEADER_SIZE <= len(blob):
         rec_start = offset
-        decoded = _decode_header(blob[offset:offset + MAX_HEADER_SIZE])
+        decoded = _decode_header_at(blob, offset)
         if decoded is None:
             nxt = blob.find(CKDUMP_MAGIC, offset + 1)
             if nxt < 0:
@@ -364,8 +453,8 @@ def compare_dumps(
             "has_inf": False,
             "ref_range": (0, 0),
             "test_range": (0, 0),
-            "ref_shape": ref_dump.data.shape,
-            "test_shape": test_dump.data.shape,
+            "ref_shape": [int(x) for x in ref_dump.data.shape],
+            "test_shape": [int(x) for x in test_dump.data.shape],
             "size_mismatch": True,
         }
 
@@ -389,8 +478,8 @@ def compare_dumps(
             diverge_idx = int(diverge_indices[0])
 
     # Check for NaN/Inf
-    has_nan = np.any(np.isnan(test_data)) or np.any(np.isnan(ref_data))
-    has_inf = np.any(np.isinf(test_data)) or np.any(np.isinf(ref_data))
+    has_nan = bool(np.any(np.isnan(test_data)) or np.any(np.isnan(ref_data)))
+    has_inf = bool(np.any(np.isinf(test_data)) or np.any(np.isinf(ref_data)))
 
     # Determine status
     if has_nan or has_inf:
@@ -411,10 +500,18 @@ def compare_dumps(
         "has_inf": has_inf,
         "ref_range": (float(np.min(ref_data)), float(np.max(ref_data))),
         "test_range": (float(np.min(test_data)), float(np.max(test_data))),
-        "ref_shape": ref_dump.data.shape,
-        "test_shape": test_dump.data.shape,
+        "ref_shape": [int(x) for x in ref_dump.data.shape],
+        "test_shape": [int(x) for x in test_dump.data.shape],
         "size_mismatch": False,
     }
+
+
+def _json_default(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 # =============================================================================
@@ -441,6 +538,59 @@ def _filter_by_pass(dumps: List[ParityDump], pass_filter: str | None) -> List[Pa
     if pass_filter == "prefill":
         return [d for d in dumps if d.token_id != last_token]
     return dumps
+
+
+def _pick_best_alignment(
+    ck_candidates: List[ParityDump],
+    ref_candidates: List[ParityDump],
+    atol: float,
+    rtol: float,
+) -> tuple[Optional[ParityDump], Optional[ParityDump], Optional[Dict[str, Any]], bool]:
+    """Pick the best-aligned CK/ref candidate pair for one (layer, op).
+
+    Alignment preference:
+    1) same token_id
+    2) smaller max_abs_diff
+    3) smaller mean_abs_diff
+
+    Returns:
+        (ck_dump, ref_dump, comp_dict_or_none, alignment_ambiguous)
+    """
+    if not ck_candidates:
+        return None, None, None, False
+    if not ref_candidates:
+        # No reference side; use first CK candidate deterministically.
+        ambiguous = len(ck_candidates) > 1
+        return ck_candidates[0], None, None, ambiguous
+
+    best: Optional[tuple[tuple[float, ...], ParityDump, ParityDump, Dict[str, Any]]] = None
+    for ck_idx, ck_dump in enumerate(ck_candidates):
+        for ref_idx, ref_dump in enumerate(ref_candidates):
+            comp = compare_dumps(ref_dump, ck_dump, atol, rtol)
+            token_match = 1.0 if ck_dump.token_id == ref_dump.token_id else 0.0
+            # Lower tuple is better.
+            score = (
+                0.0 if token_match > 0.0 else 1.0,
+                float(comp.get("max_abs_diff", float("inf"))),
+                float(comp.get("mean_abs_diff", float("inf"))),
+                abs(float(ck_dump.token_id) - float(ref_dump.token_id)),
+                float(ref_idx),
+                float(ck_idx),
+            )
+            if best is None or score < best[0]:
+                best = (score, ck_dump, ref_dump, comp)
+
+    if best is None:
+        ambiguous = len(ck_candidates) > 1 or len(ref_candidates) > 1
+        return ck_candidates[0], ref_candidates[0], None, ambiguous
+
+    _, ck_sel, ref_sel, comp_sel = best
+    ambiguous = (
+        len(ck_candidates) > 1
+        or len(ref_candidates) > 1
+        or ck_sel.token_id != ref_sel.token_id
+    )
+    return ck_sel, ref_sel, comp_sel, ambiguous
 
 def run_parity_test(
     ck_dump_path: Path,
@@ -499,11 +649,12 @@ def run_parity_test(
         print("=" * 80)
 
     # Organize CKE dumps
-    ck_by_layer_op: Dict[Tuple[int, str], ParityDump] = {}
+    ck_by_layer_op: Dict[Tuple[int, str], List[ParityDump]] = {}
     for d in ck_dumps:
         key = (d.layer_id, d.op_name)
         if key not in ck_by_layer_op:
-            ck_by_layer_op[key] = d
+            ck_by_layer_op[key] = []
+        ck_by_layer_op[key].append(d)
 
     # Get all keys
     all_keys = sorted(set(ck_by_layer_op.keys()) | set(reference.by_layer_op.keys()))
@@ -515,8 +666,14 @@ def run_parity_test(
         print("-" * 130)
 
     for layer_id, op_name in all_keys:
-        ck_dump = ck_by_layer_op.get((layer_id, op_name))
-        ref_dump = reference.get(layer_id, op_name)
+        ck_candidates = ck_by_layer_op.get((layer_id, op_name), [])
+        ref_candidates = reference.by_layer_op.get((layer_id, op_name), [])
+        ck_dump, ref_dump, precomputed_comp, alignment_ambiguous = _pick_best_alignment(
+            ck_candidates,
+            ref_candidates,
+            atol,
+            rtol,
+        )
 
         if not ck_dump:
             status = "MISSING"
@@ -528,6 +685,9 @@ def run_parity_test(
                 "status": status,
                 "max_abs_diff": float('inf'),
                 "ck_missing": True,
+                "ck_candidates": 0,
+                "ref_candidates": len(ref_candidates),
+                "alignment_ambiguous": False,
             }
         else:
             # Check for NaN/Inf first (even without reference)
@@ -548,6 +708,12 @@ def run_parity_test(
                     "has_nan": has_nan,
                     "has_inf": has_inf,
                     "ck_range": test_range,
+                    "token": int(ck_dump.token_id),
+                    "ck_token": int(ck_dump.token_id),
+                    "ref_token": int(ref_dump.token_id) if ref_dump is not None else None,
+                    "ck_candidates": len(ck_candidates),
+                    "ref_candidates": len(ref_candidates),
+                    "alignment_ambiguous": bool(alignment_ambiguous),
                 }
             elif ref_dump is None:
                 status = "WARN"
@@ -560,9 +726,15 @@ def run_parity_test(
                     "status": status,
                     "max_abs_diff": 0,
                     "ref_missing": True,
+                    "token": int(ck_dump.token_id),
+                    "ck_token": int(ck_dump.token_id),
+                    "ref_token": None,
+                    "ck_candidates": len(ck_candidates),
+                    "ref_candidates": len(ref_candidates),
+                    "alignment_ambiguous": bool(alignment_ambiguous),
                 }
             else:
-                comp = compare_dumps(ref_dump, ck_dump, atol, rtol)
+                comp = precomputed_comp if precomputed_comp is not None else compare_dumps(ref_dump, ck_dump, atol, rtol)
                 status = comp["status"]
                 max_diff = f"{comp['max_abs_diff']:.2e}"
                 mean_diff = f"{comp['mean_abs_diff']:.2e}"
@@ -572,6 +744,12 @@ def run_parity_test(
                     "layer": layer_id,
                     "op": op_name,
                     **comp,
+                    "token": int(ck_dump.token_id),
+                    "ck_token": int(ck_dump.token_id),
+                    "ref_token": int(ref_dump.token_id),
+                    "ck_candidates": len(ck_candidates),
+                    "ref_candidates": len(ref_candidates),
+                    "alignment_ambiguous": bool(alignment_ambiguous),
                 }
 
         results.append(result)
@@ -707,7 +885,7 @@ Examples:
 
     if args.json:
         import json
-        print(json.dumps(results, indent=2))
+        print(json.dumps(results, indent=2, default=_json_default))
 
     return exit_code
 

@@ -137,24 +137,20 @@ void ck_test_gemv_q6_k(const void *weight_q6k,
                        float *output,
                        int cols)
 {
-    /* Q6_K GEMV is not yet implemented in CK - provide reference impl */
-    /* For now, dequantize and compute in FP32 */
-    float *weight_f32 = (float *)malloc(cols * sizeof(float));
-    if (!weight_f32) {
+    /* Match runtime decode path:
+     * 1) quantize FP32 activation to Q8_K
+     * 2) run Q6_K x Q8_K GEMV kernel with M=1
+     */
+    int n_blocks = cols / CK_QK_K;
+    block_q8_K *q8_data = (block_q8_K *)malloc(n_blocks * sizeof(block_q8_K));
+    if (!q8_data) {
         *output = 0.0f;
         return;
     }
 
-    dequant_q6_k_row(weight_q6k, weight_f32, cols);
-
-    /* Dot product in FP32 */
-    double sum = 0.0;
-    for (int i = 0; i < cols; i++) {
-        sum += (double)weight_f32[i] * (double)input_f32[i];
-    }
-    *output = (float)sum;
-
-    free(weight_f32);
+    quantize_row_q8_k(input_f32, q8_data, cols);
+    gemv_q6_k_q8_k(output, weight_q6k, q8_data, 1, cols);
+    free(q8_data);
 }
 
 void ck_test_gemv_q5_0(const void *weight_q5_0,

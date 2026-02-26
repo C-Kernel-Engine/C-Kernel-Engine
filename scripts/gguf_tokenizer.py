@@ -179,6 +179,7 @@ class GGUFTokenizer:
         self.tokens: List[str] = []
         self.scores: List[float] = []
         self.token_to_id: Dict[str, int] = {}
+        self.special_ids: set[int] = set()
         self.bos_id: int = 1
         self.eos_id: int = 2
         self.unk_id: int = 0
@@ -206,6 +207,12 @@ class GGUFTokenizer:
         self.pad_id = data.get("tokenizer.ggml.padding_token_id", 0)
         self.add_bos = data.get("tokenizer.ggml.add_bos_token", True)
         self.add_eos = data.get("tokenizer.ggml.add_eos_token", False)
+        extra_special = data.get("tokenizer.ggml.special_token_ids", [])
+        if isinstance(extra_special, list):
+            self.special_ids = {int(x) for x in extra_special if isinstance(x, int)}
+        else:
+            self.special_ids = set()
+        self.special_ids.update({self.bos_id, self.eos_id, self.pad_id, self.unk_id})
 
     @classmethod
     def from_gguf(cls, gguf_path: str) -> "GGUFTokenizer":
@@ -244,6 +251,7 @@ class GGUFTokenizer:
         model_type = "unknown"
         bos_id, eos_id, unk_id, pad_id = 1, 2, 0, 0
         add_bos, add_eos = True, False
+        special_ids: set[int] = set()
 
         # 2) HuggingFace tokenizer.json (tokenizers format)
         if isinstance(data, dict) and isinstance(data.get("model"), dict):
@@ -275,6 +283,8 @@ class GGUFTokenizer:
                         unk_id = tid
                     elif "pad" in c:
                         pad_id = tid
+                    if bool(item.get("special")):
+                        special_ids.add(tid)
 
         # 3) Plain vocab map file (token -> id)
         if vocab_map is None and isinstance(data, dict):
@@ -285,11 +295,27 @@ class GGUFTokenizer:
                 model_type = "bpe"
 
         if isinstance(vocab_map, dict):
+            added_tokens_map: Dict[int, str] = {}
+            added = data.get("added_tokens")
+            if isinstance(added, list):
+                for item in added:
+                    if not isinstance(item, dict):
+                        continue
+                    content = item.get("content")
+                    tid = item.get("id")
+                    if isinstance(content, str) and isinstance(tid, int) and tid >= 0:
+                        added_tokens_map[int(tid)] = content
+
             if vocab_map:
-                max_id = max(int(v) for v in vocab_map.values())
+                max_vocab_id = max(int(v) for v in vocab_map.values())
+                max_added_id = max(added_tokens_map.keys()) if added_tokens_map else -1
+                max_id = max(max_vocab_id, max_added_id)
                 tokens = [f"<|ck_missing_{i}|>" for i in range(max_id + 1)]
                 for tok, tid in vocab_map.items():
                     if isinstance(tok, str) and isinstance(tid, int) and 0 <= tid <= max_id:
+                        tokens[tid] = tok
+                for tid, tok in added_tokens_map.items():
+                    if 0 <= tid <= max_id:
                         tokens[tid] = tok
             else:
                 tokens = []
@@ -304,6 +330,7 @@ class GGUFTokenizer:
                 "tokenizer.ggml.padding_token_id": pad_id,
                 "tokenizer.ggml.add_bos_token": add_bos,
                 "tokenizer.ggml.add_eos_token": add_eos,
+                "tokenizer.ggml.special_token_ids": sorted(special_ids),
             }
             return cls(vocab_data)
 
@@ -424,7 +451,7 @@ class GGUFTokenizer:
         Returns:
             Decoded text string
         """
-        special_ids = {self.bos_id, self.eos_id, self.pad_id}
+        special_ids = set(self.special_ids)
         pieces = []
 
         for token_id in ids:
@@ -516,6 +543,17 @@ class Tokenizer:
     def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
         """Decode token IDs to text."""
         return self._tokenizer.decode(ids, skip_special=skip_special_tokens)
+
+    def get_vocab(self) -> Dict[str, int]:
+        """HuggingFace-compatible vocab map."""
+        return dict(self._tokenizer.token_to_id)
+
+    def id_to_token(self, token_id: int) -> Optional[str]:
+        """HuggingFace-compatible token lookup."""
+        tid = int(token_id)
+        if 0 <= tid < len(self._tokenizer.tokens):
+            return self._tokenizer.tokens[tid]
+        return None
 
     @property
     def vocab_size(self) -> int:

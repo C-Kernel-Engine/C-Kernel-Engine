@@ -15,6 +15,49 @@
     "post_attention_norm": true,
     "post_ffn_norm": true
   },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "sentencepiece",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "attention_contract": {
+      "rope_type": "rope",
+      "qk_norm": true,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "sliding_window"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> geglu -> down",
+      "activation": "geglu",
+      "qkv_bias": "from_weights"
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "weight_tying",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "kv_cache_batch_copy": [
+          "activation:k_src",
+          "activation:v_src",
+          "output:k_dst",
+          "output:v_dst",
+          "dim:_kv_copy_bytes"
+        ]
+      }
+    }
+  },
   "kernels": {
     "rope_qk": "rope_forward_qk_split",
     "rope_init": "rope_precompute_cache_split"

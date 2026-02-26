@@ -103,15 +103,64 @@ def find_gguf(model_dir: Path, model_uri: str) -> Path | None:
         return parent_found
     return None
 
+def infer_run_dir_from_output_dir(output_dir: Path | None) -> Path | None:
+    """Map a provided output dir to ck_run_v7 --run dir.
+
+    detailed_parity_analysis accepts ck_build paths, while ck_run_v7 expects run dirs.
+    """
+    if output_dir is None:
+        return None
+    p = output_dir.expanduser().resolve()
+    if p.name in {"ck_build", ".ck_build"}:
+        return p.parent
+    return p
+
 
 def find_llama_binary() -> Path | None:
     p = ROOT / "build" / "llama-parity"
     if p.exists():
         return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "llama-completion"
+    if p.exists():
+        return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "llama-cli"
+    if p.exists():
+        return p
     p = ROOT / "llama.cpp" / "main"
     if p.exists():
         return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "main"
+    if p.exists():
+        return p
     return None
+
+
+def token_audit_from_index(index_path: Path) -> tuple[bool, str]:
+    if not index_path.exists():
+        return False, "missing index.json"
+    try:
+        obj = json.loads(index_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return False, f"index parse error: {e}"
+    if not isinstance(obj, list):
+        return False, "index is not a list"
+    token_ids: list[int] = []
+    for row in obj:
+        if not isinstance(row, dict):
+            continue
+        if "token_id" not in row:
+            continue
+        try:
+            token_ids.append(int(row.get("token_id", 0)))
+        except Exception:
+            continue
+    if not token_ids:
+        return False, "index has no token_id entries"
+    unique = sorted(set(token_ids))
+    collapsed_zero = len(token_ids) >= 8 and len(unique) == 1 and unique[0] == 0
+    if collapsed_zero:
+        return False, f"collapsed token ids (all zero across {len(token_ids)} dumps)"
+    return True, f"entries={len(token_ids)} unique_tokens={unique[:16]}"
 
 
 def load_parity_module():
@@ -315,8 +364,18 @@ def check_weights(model_dir: Path, family: str) -> dict[str, Any]:
 def llama_mapping_gaps(parity_mod: Any, ref_dumps: list[Any], family: str) -> dict[str, Any]:
     unknown = Counter()
     mapped = Counter()
+    mapper = getattr(parity_mod, "map_llama_to_ck_name", None)
+    normalizer = getattr(parity_mod, "_normalize_layer_and_op", None)
     for d in ref_dumps:
-        mapped_name = parity_mod.map_llama_to_ck_name(d.op_name, family)
+        if callable(mapper):
+            mapped_name = mapper(d.op_name, family)
+        elif callable(normalizer):
+            try:
+                _layer, mapped_name = normalizer(int(getattr(d, "layer_id", -1)), str(d.op_name))
+            except Exception:
+                mapped_name = str(d.op_name)
+        else:
+            mapped_name = str(d.op_name)
         base = d.op_name.split(" (", 1)[0]
         if mapped_name == d.op_name:
             unknown[base] += 1
@@ -405,6 +464,17 @@ def main() -> int:
     ap.add_argument("--llama-filter", default=None, help="Optional explicit CKDMP_FILTER for exhaustive pass")
     ap.add_argument("--llama-layer", type=int, default=None, help="Optional CKDMP_LAYER for exhaustive pass")
     ap.add_argument("--llama-stop-after", type=int, default=None, help="Optional CKDMP_STOP_AFTER for exhaustive pass")
+    ap.add_argument(
+        "--llama-require-token-aware-dumps",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require token-aware llama CKDMP index (reject collapsed token_id=0 dumps)",
+    )
+    ap.add_argument(
+        "--llama-allow-raw-fallback",
+        action="store_true",
+        help="Allow LLAMA_DUMP_LAYER0 raw fallback conversion when CKDMP dump is missing/invalid",
+    )
     ap.add_argument("--ck-run-arg", action="append", default=[], help="Extra arg to pass through to ck_run (repeatable)")
     ap.add_argument("--report-prefix", default="detailed_parity_analysis")
     # Unknown args are forwarded to ck_run, which makes this wrapper easy to use:
@@ -440,10 +510,15 @@ def main() -> int:
             "--context-len",
             str(args.context_len),
         ]
+        if args.llama_require_token_aware_dumps:
+            ck_cmd.append("--llama-require-token-aware-dumps")
+        if not args.llama_allow_raw_fallback:
+            ck_cmd.append("--llama-no-raw-fallback")
         if args.force_compile:
             ck_cmd.append("--force-compile")
-        if args.output_dir is not None:
-            ck_cmd.extend(["--run", str(args.output_dir)])
+        run_dir = infer_run_dir_from_output_dir(args.output_dir)
+        if run_dir is not None:
+            ck_cmd.extend(["--run", str(run_dir)])
         for x in args.ck_run_arg:
             ck_cmd.append(x)
         for x in passthrough_args:
@@ -501,13 +576,23 @@ def main() -> int:
                 str(gguf),
                 "-p",
                 args.prompt,
-                "-no-cnv",
-                "--no-warmup",
-                "--temp",
-                "0",
-                "-n",
-                str(args.max_tokens),
             ]
+            exe_name = llama_bin.name.lower()
+            if "llama-cli" in exe_name:
+                llama_cmd.extend(["-no-cnv", "--single-turn", "--simple-io"])
+            elif ("llama-completion" in exe_name) or (exe_name == "main") or ("llama-parity" in exe_name):
+                llama_cmd.extend(["-no-cnv", "--simple-io"])
+            else:
+                llama_cmd.extend(["--simple-io"])
+            llama_cmd.extend(
+                [
+                    "--no-warmup",
+                    "--temp",
+                    "0",
+                    "-n",
+                    str(args.max_tokens),
+                ]
+            )
             if args.context_len > 0:
                 llama_cmd.extend(["--ctx-size", str(args.context_len)])
             timeout = None if args.llama_timeout <= 0 else args.llama_timeout
@@ -516,7 +601,69 @@ def main() -> int:
             report["commands"]["llama_exhaustive_rc"] = llama_proc.returncode
             report["commands"]["llama_exhaustive_stdout_tail"] = llama_proc.stdout[-3000:]
             report["commands"]["llama_exhaustive_stderr_tail"] = llama_proc.stderr[-5000:]
-            if llama_proc.returncode != 0:
+            ref_dump = ref_dir / "dump.bin"
+            ref_index = ref_dir / "index.json"
+            has_ckdmp_dump = ref_dump.exists() and ref_dump.stat().st_size > 0
+            token_aware_ok = False
+            token_audit_msg = "no CKDMP dump"
+            if has_ckdmp_dump:
+                token_aware_ok, token_audit_msg = token_audit_from_index(ref_index)
+            report["llama_token_audit"] = {
+                "require_token_aware_dumps": bool(args.llama_require_token_aware_dumps),
+                "ok": bool(token_aware_ok),
+                "message": token_audit_msg,
+            }
+
+            needs_fallback = (not has_ckdmp_dump) or (
+                bool(args.llama_require_token_aware_dumps) and not token_aware_ok
+            )
+            if needs_fallback and not args.llama_allow_raw_fallback:
+                report["notes"].append(
+                    "Token-aware llama CKDMP dump required and raw fallback disabled."
+                )
+            elif needs_fallback and args.llama_allow_raw_fallback:
+                # Optional fallback for local llama.cpp builds with LLAMA_DUMP_LAYER0 raw dumps.
+                raw_dir = model_dir / "llama_dump"
+                for stale in raw_dir.glob("*.bin"):
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass
+                env_raw = os.environ.copy()
+                env_raw["LLAMA_DUMP_LAYER0"] = "1"
+                llama_raw_proc = run_cmd(llama_cmd, cwd=model_dir, env=env_raw, timeout=timeout)
+                report["commands"]["llama_raw_rc"] = llama_raw_proc.returncode
+                report["commands"]["llama_raw_stdout_tail"] = llama_raw_proc.stdout[-3000:]
+                report["commands"]["llama_raw_stderr_tail"] = llama_raw_proc.stderr[-5000:]
+
+                raw_bins = sorted(raw_dir.glob("*.bin"))
+                converter = SCRIPT_DIR / "parity" / "llama_to_ckdmp_converter.py"
+                if raw_bins and converter.exists():
+                    conv_cmd = [
+                        sys.executable,
+                        str(converter),
+                        "-i",
+                        str(raw_dir),
+                        "-o",
+                        str(ref_dir / "dump.bin"),
+                        "--model",
+                        parity_family,
+                        "--index",
+                    ]
+                    conv_proc = run_cmd(conv_cmd, cwd=ROOT)
+                    report["commands"]["llama_raw_convert_cmd"] = conv_cmd
+                    report["commands"]["llama_raw_convert_rc"] = conv_proc.returncode
+                    report["commands"]["llama_raw_convert_stdout_tail"] = conv_proc.stdout[-2000:]
+                    report["commands"]["llama_raw_convert_stderr_tail"] = conv_proc.stderr[-2000:]
+                    if (ref_dir / "dump.bin").exists() and (ref_dir / "dump.bin").stat().st_size > 0:
+                        ok2, msg2 = token_audit_from_index(ref_index)
+                        report["llama_token_audit_after_fallback"] = {
+                            "ok": bool(ok2),
+                            "message": msg2,
+                        }
+
+            ref_dump = ref_dir / "dump.bin"
+            if llama_proc.returncode != 0 and not (ref_dump.exists() and ref_dump.stat().st_size > 0):
                 report["notes"].append("Exhaustive llama pass failed.")
     else:
         report["commands"]["llama_exhaustive_rc"] = None

@@ -953,7 +953,7 @@ def print_conversion_report(
         if gguf_name == "output_norm.weight":
             return "final_ln_weight"
         if gguf_name == "output.weight":
-            return None  # Tied with token_emb, not separately stored
+            return "output.weight"
 
         # Layer tensors
         if gguf_name.startswith("blk."):
@@ -986,6 +986,8 @@ def print_conversion_report(
         """Map bump entry name back to GGUF tensor name."""
         if bump_name == "token_emb":
             return "token_embd.weight"
+        if bump_name == "output.weight":
+            return "output.weight"
         if bump_name == "final_ln_weight":
             return "output_norm.weight"
         if bump_name == "final_ln_bias":
@@ -1412,6 +1414,7 @@ Workflow Examples:
 Tensor Mapping (GGUF → C-Kernel-Engine):
   token_embd.weight      → token_emb
   output_norm.weight     → final_ln_weight
+  output.weight          → output.weight (optional untied LM head)
   blk.X.attn_norm.weight → layer.X.ln1_gamma
   blk.X.ffn_norm.weight  → layer.X.ln2_gamma
   blk.X.attn_q.weight    → layer.X.wq
@@ -1541,6 +1544,23 @@ def main() -> None:
         "tokenizer.ggml.add_eos_token",
         "tokenizer.ggml.add_space_prefix",
         "tokenizer.chat_template",
+        # Optional embedding tie metadata (fallback is tensor-presence inference)
+        "llama.tie_word_embeddings",
+        "qwen2.tie_word_embeddings",
+        "qwen3.tie_word_embeddings",
+        "gemma3.tie_word_embeddings",
+        "mistral.tie_word_embeddings",
+        "mistral3.tie_word_embeddings",
+        "deepseek2.tie_word_embeddings",
+        "general.tie_word_embeddings",
+        "model.tie_word_embeddings",
+        "llama.embedding_weight_tying",
+        "qwen2.embedding_weight_tying",
+        "qwen3.embedding_weight_tying",
+        "gemma3.embedding_weight_tying",
+        "mistral.embedding_weight_tying",
+        "mistral3.embedding_weight_tying",
+        "deepseek2.embedding_weight_tying",
     }
 
     if args.extract_vocab:
@@ -1786,6 +1806,24 @@ def main() -> None:
                             return v.decode("utf-8")
                         except Exception:
                             return None
+            return None
+
+        def meta_bool(*keys: str) -> Optional[bool]:
+            """Get boolean-like metadata value, trying multiple keys in order."""
+            for key in keys:
+                if key not in meta:
+                    continue
+                v = meta.get(key)
+                if isinstance(v, bool):
+                    return bool(v)
+                if isinstance(v, (int, np.integer)):
+                    return bool(int(v))
+                if isinstance(v, str):
+                    s = v.strip().lower()
+                    if s in {"1", "true", "yes", "y", "on"}:
+                        return True
+                    if s in {"0", "false", "no", "n", "off"}:
+                        return False
             return None
 
         def weight_dtype(info: TensorInfo, label: str) -> int:
@@ -2118,11 +2156,56 @@ def main() -> None:
             if name not in tensors:
                 raise GGUFError(f"Missing required tensor: {name}")
 
+        # Keep output.weight when present. This avoids silently tying logits to token_emb
+        # for untied-LM-head models (e.g., Nanbeige), which causes gibberish generation.
+        out_weight = tensors.get("output.weight")
+        tie_word_embeddings_meta = meta_bool(
+            "llama.tie_word_embeddings",
+            "qwen2.tie_word_embeddings",
+            "qwen3.tie_word_embeddings",
+            "gemma3.tie_word_embeddings",
+            "mistral.tie_word_embeddings",
+            "mistral3.tie_word_embeddings",
+            "deepseek2.tie_word_embeddings",
+            "general.tie_word_embeddings",
+            "model.tie_word_embeddings",
+            "llama.embedding_weight_tying",
+            "qwen2.embedding_weight_tying",
+            "qwen3.embedding_weight_tying",
+            "gemma3.embedding_weight_tying",
+            "mistral.embedding_weight_tying",
+            "mistral3.embedding_weight_tying",
+            "deepseek2.embedding_weight_tying",
+        )
+        tie_word_embeddings = False if out_weight is not None else True
+        if tie_word_embeddings_meta is not None and out_weight is None:
+            tie_word_embeddings = bool(tie_word_embeddings_meta)
+        if tie_word_embeddings_meta is False and out_weight is None:
+            raise GGUFError(
+                "Metadata reports tie_word_embeddings=false but output.weight is missing"
+            )
+
+        if out_weight is not None:
+            if len(out_weight.dims) != 2:
+                raise GGUFError(f"{out_weight.name}: expected 2D, got dims={out_weight.dims}")
+            if out_weight.ne0 != embed_dim:
+                raise GGUFError(
+                    f"{out_weight.name}: ne0 mismatch: expected {embed_dim}, got {out_weight.ne0}"
+                )
+            if out_weight.ne1 != vocab_size:
+                raise GGUFError(
+                    f"{out_weight.name}: ne1 mismatch: expected {vocab_size}, got {out_weight.ne1}"
+                )
+
         token_dtype = weight_dtype(tok, "token_emb")
-        needs_k_quant = token_dtype in (CK_DT_Q4_K, CK_DT_Q6_K)
+        output_dtype = weight_dtype(out_weight, "output.weight") if out_weight is not None else token_dtype
+        needs_k_quant = token_dtype in (CK_DT_Q4_K, CK_DT_Q6_K) or output_dtype in (CK_DT_Q4_K, CK_DT_Q6_K)
 
         layer_infos = []
-        dtype_table = [token_dtype, CK_DT_FP32]
+        dtype_table = [token_dtype]
+        if out_weight is not None:
+            dtype_table.append(output_dtype)
+        dtype_table.append(CK_DT_FP32)
         for layer in range(num_layers):
             attn_norm = tensors.get(f"blk.{layer}.attn_norm.weight")
             ffn_norm = tensors.get(f"blk.{layer}.ffn_norm.weight")
@@ -2274,6 +2357,10 @@ def main() -> None:
             dt = layer_info.get("down_dt")
             if dt in (CK_DT_Q4_K, CK_DT_Q6_K) and intermediate % 256 != 0:
                 raise GGUFError(f"K-quant requires intermediate_size multiple of 256 (got {intermediate})")
+        if out_weight is not None and output_dtype in (CK_DT_Q4_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
+            raise GGUFError(
+                f"K-quant requires embed_dim multiple of 256 (got {embed_dim}) for output.weight"
+            )
 
         # Create output directory.
         os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
@@ -2316,6 +2403,12 @@ def main() -> None:
                 tok_size = ggml_tensor_bytes(tok)
                 record_entry("token_emb", get_quant_type_name(tok.ggml_type), tok_size)
                 copy_bytes_stream(f, data_start + tok.offset, tok_size, w)
+
+            # 1a) output projection (optional untied LM head)
+            if out_weight is not None:
+                out_size = ggml_tensor_bytes(out_weight)
+                record_entry("output.weight", get_quant_type_name(out_weight.ggml_type), out_size)
+                copy_bytes_stream(f, data_start + out_weight.offset, out_size, w)
 
             # 1b) tokenizer data (optional)
             if vocab_offsets is not None and vocab_strings is not None:
@@ -2517,6 +2610,7 @@ def main() -> None:
                     "rope_attn_factor": float(rope_attn_factor),
                     "vocab_size": int(vocab_size),
                     "rms_eps": float(rms_eps) if rms_eps else 1e-5,
+                    "tie_word_embeddings": bool(tie_word_embeddings),
                 }
                 chat_template = meta.get("tokenizer.chat_template")
                 if isinstance(chat_template, str) and chat_template.strip():
@@ -2528,11 +2622,16 @@ def main() -> None:
                 if isinstance(model_name, str) and model_name.strip():
                     config["model_name"] = model_name
 
-                # Build quantization summary from layer_infos
-                # Header/footer ops (embedding/logits) use token_emb quant.
+                # Build quantization summary from layer_infos.
+                # For untied models, logits use output.weight; for tied models,
+                # logits share token_emb quantization.
                 quant_summary = {
                     "token_emb": get_quant_type_name(tok.ggml_type),
                 }
+                if out_weight is not None:
+                    quant_summary["lm_head"] = get_quant_type_name(out_weight.ggml_type)
+                else:
+                    quant_summary["lm_head"] = get_quant_type_name(tok.ggml_type)
                 for i, info in enumerate(layer_infos):
                     quant_summary[f"layer.{i}"] = {
                         "wq": get_quant_type_name(info["wq"].ggml_type),
@@ -2691,6 +2790,7 @@ def main() -> None:
             rms_norm_eps=rms_eps,
         )
         cfg["attn_out_dim"] = int(attn_out_dim)
+        cfg["tie_word_embeddings"] = bool(tie_word_embeddings)
         cfg["num_merges"] = num_merges
         cfg["total_vocab_bytes"] = total_vocab_bytes
         if sliding_window and sliding_window > 0:

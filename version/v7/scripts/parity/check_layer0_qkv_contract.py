@@ -15,6 +15,7 @@ import argparse
 import ctypes
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,11 @@ from typing import Any
 import numpy as np
 
 
+QK_K = 256
 QK8_0 = 32
+BLOCK_Q4_K_SIZE = 144
+BLOCK_Q6_K_SIZE = 210
+BLOCK_Q5_0_SIZE = 22
 BLOCK_Q8_0_SIZE = 34
 
 DEFAULT_MODEL_DIR = Path.home() / ".cache/ck-engine-v7/models/unsloth--gemma-3-270m-it-GGUF/ck_build"
@@ -52,6 +57,44 @@ class OpBinding:
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _assert_runtime_artifact_freshness(model_dir: Path) -> None:
+    libmodel = model_dir / "libmodel.so"
+    if not libmodel.exists():
+        return
+    # The checker reads lowered_* and model_v7.c metadata but executes libmodel.so.
+    # If libmodel is older, stop-op probes can read stale layouts/op schedules.
+    dependencies = [
+        model_dir / "model_v7.c",
+        model_dir / "lowered_decode_call.json",
+        model_dir / "lowered_prefill_call.json",
+    ]
+    try:
+        lib_mtime = libmodel.stat().st_mtime
+    except OSError:
+        return
+    newer = [p for p in dependencies if p.exists() and p.stat().st_mtime > lib_mtime]
+    if newer:
+        newer_list = ", ".join(p.name for p in newer)
+        raise RuntimeError(
+            "stale runtime artifacts detected: "
+            f"{libmodel.name} is older than [{newer_list}]. "
+            "Rebuild with `python3 version/v7/scripts/ck_run_v7.py run <model-dir> --force-compile`."
+        )
+
+
+def _load_model_macro_offsets(model_dir: Path) -> dict[str, int]:
+    model_c = model_dir / "model_v7.c"
+    if not model_c.exists():
+        return {}
+    out: dict[str, int] = {}
+    for line in model_c.read_text(encoding="utf-8", errors="ignore").splitlines():
+        m = re.match(r"^\s*#define\s+([A-Z0-9_]+)\s+([0-9]+)\s*$", line)
+        if not m:
+            continue
+        out[m.group(1)] = int(m.group(2))
+    return out
 
 
 def _find_project_root() -> Path:
@@ -116,6 +159,52 @@ def _resolve_abs_offset(lowered: dict[str, Any], rel_off: int) -> int:
     if str(arena.get("mode", "")) == "region":
         return int(arena.get("activations_base", 0)) + int(rel_off)
     return int(rel_off)
+
+
+def _expr_bump_abs_offset(expr: str | None, macro_offsets: dict[str, int]) -> int | None:
+    if not expr:
+        return None
+    m_int = re.search(r"model->bump\s*\+\s*([0-9]+)", expr)
+    if m_int:
+        return int(m_int.group(1))
+    m_macro = re.search(r"model->bump\s*\+\s*([A-Z0-9_]+)", expr)
+    if m_macro:
+        return macro_offsets.get(m_macro.group(1))
+    return None
+
+
+def _find_arg_expr(
+    call_op: dict[str, Any] | None,
+    preferred_names: tuple[str, ...],
+    source_prefixes: tuple[str, ...],
+) -> str | None:
+    if not isinstance(call_op, dict):
+        return None
+    args = call_op.get("args", [])
+    if not isinstance(args, list):
+        return None
+    by_name = {}
+    for a in args:
+        if not isinstance(a, dict):
+            continue
+        name = str(a.get("name", ""))
+        expr = a.get("expr")
+        if isinstance(expr, str):
+            by_name[name] = expr
+    for n in preferred_names:
+        if n in by_name:
+            return by_name[n]
+    for a in args:
+        if not isinstance(a, dict):
+            continue
+        source = str(a.get("source", ""))
+        expr = a.get("expr")
+        if not isinstance(expr, str):
+            continue
+        for p in source_prefixes:
+            if source.startswith(p):
+                return expr
+    return None
 
 
 def _read_f32(base_ptr: int, abs_off: int, count: int) -> np.ndarray:
@@ -196,6 +285,14 @@ def _weights_and_bias(
 
 
 def _load_parity_libs(root: Path) -> tuple[ctypes.CDLL, ctypes.CDLL]:
+    # libck_parity.so references symbols exported by libckernel_engine.so.
+    for dep in (
+        root / "build" / "libckernel_engine.so",
+        root / "build" / "libckernel_tokenizer.so",
+    ):
+        if dep.exists():
+            ctypes.CDLL(str(dep), mode=ctypes.RTLD_GLOBAL)
+
     ck_candidates = [
         root / "build" / "libck_parity.so",
         root / "libck_parity.so",
@@ -227,14 +324,22 @@ def _load_parity_libs(root: Path) -> tuple[ctypes.CDLL, ctypes.CDLL]:
         ggml_lib.test_init()
 
     required_ck = [
-        "ck_test_gemv_q5_1",
-        "ck_test_gemm_q5_1",
+        "ck_test_gemv_q4_k",
+        "ck_test_gemm_q4_k",
+        "ck_test_gemv_q6_k",
+        "ck_test_gemm_q6_k",
+        "ck_test_gemv_q5_0",
+        "ck_test_gemm_q5_0",
         "ck_test_gemv_q8_0",
         "ck_test_gemm_q8_0",
     ]
     required_ggml = [
-        "test_gemv_q5_1",
-        "test_gemm_q5_1",
+        "test_gemv_q4_k",
+        "test_gemm_q4_k",
+        "test_gemv_q6_k",
+        "test_gemm_q6_k",
+        "test_gemv_q5_0",
+        "test_gemm_q5_0",
         "test_gemv_q8_0",
         "test_gemm_q8_0",
     ]
@@ -245,16 +350,32 @@ def _load_parity_libs(root: Path) -> tuple[ctypes.CDLL, ctypes.CDLL]:
         if not hasattr(ggml_lib, sym):
             raise RuntimeError(f"missing llama parity symbol: {sym}")
 
-    ck_lib.ck_test_gemv_q5_1.argtypes = [
-        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int
+    ck_lib.ck_test_gemv_q4_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
     ]
-    ck_lib.ck_test_gemv_q5_1.restype = None
-    ck_lib.ck_test_gemm_q5_1.argtypes = [
+    ck_lib.ck_test_gemv_q4_k.restype = None
+    ck_lib.ck_test_gemm_q4_k.argtypes = [
         ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
     ]
-    ck_lib.ck_test_gemm_q5_1.restype = None
+    ck_lib.ck_test_gemm_q4_k.restype = None
+    ck_lib.ck_test_gemv_q6_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
+    ]
+    ck_lib.ck_test_gemv_q6_k.restype = None
+    ck_lib.ck_test_gemm_q6_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
+    ]
+    ck_lib.ck_test_gemm_q6_k.restype = None
+    ck_lib.ck_test_gemv_q5_0.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
+    ]
+    ck_lib.ck_test_gemv_q5_0.restype = None
+    ck_lib.ck_test_gemm_q5_0.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
+    ]
+    ck_lib.ck_test_gemm_q5_0.restype = None
     ck_lib.ck_test_gemv_q8_0.argtypes = [
-        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
     ]
     ck_lib.ck_test_gemv_q8_0.restype = None
     ck_lib.ck_test_gemm_q8_0.argtypes = [
@@ -262,14 +383,30 @@ def _load_parity_libs(root: Path) -> tuple[ctypes.CDLL, ctypes.CDLL]:
     ]
     ck_lib.ck_test_gemm_q8_0.restype = None
 
-    ggml_lib.test_gemv_q5_1.argtypes = [
-        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int
+    ggml_lib.test_gemv_q4_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
     ]
-    ggml_lib.test_gemv_q5_1.restype = None
-    ggml_lib.test_gemm_q5_1.argtypes = [
+    ggml_lib.test_gemv_q4_k.restype = None
+    ggml_lib.test_gemm_q4_k.argtypes = [
         ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
     ]
-    ggml_lib.test_gemm_q5_1.restype = None
+    ggml_lib.test_gemm_q4_k.restype = None
+    ggml_lib.test_gemv_q6_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
+    ]
+    ggml_lib.test_gemv_q6_k.restype = None
+    ggml_lib.test_gemm_q6_k.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
+    ]
+    ggml_lib.test_gemm_q6_k.restype = None
+    ggml_lib.test_gemv_q5_0.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
+    ]
+    ggml_lib.test_gemv_q5_0.restype = None
+    ggml_lib.test_gemm_q5_0.argtypes = [
+        ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int, ctypes.c_int, ctypes.c_int
+    ]
+    ggml_lib.test_gemm_q5_0.restype = None
     ggml_lib.test_gemv_q8_0.argtypes = [
         ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int
     ]
@@ -280,6 +417,28 @@ def _load_parity_libs(root: Path) -> tuple[ctypes.CDLL, ctypes.CDLL]:
     ggml_lib.test_gemm_q8_0.restype = None
 
     return ck_lib, ggml_lib
+
+
+def _row_bytes_for_dtype(dtype: str, cols: int) -> int:
+    if cols <= 0:
+        raise RuntimeError(f"invalid projection cols={cols}")
+    if dtype == "q4_k":
+        if cols % QK_K != 0:
+            raise RuntimeError(f"q4_k expects cols multiple of {QK_K}, got {cols}")
+        return (cols // QK_K) * BLOCK_Q4_K_SIZE
+    if dtype == "q6_k":
+        if cols % QK_K != 0:
+            raise RuntimeError(f"q6_k expects cols multiple of {QK_K}, got {cols}")
+        return (cols // QK_K) * BLOCK_Q6_K_SIZE
+    if dtype == "q5_0":
+        if cols % QK8_0 != 0:
+            raise RuntimeError(f"q5_0 expects cols multiple of {QK8_0}, got {cols}")
+        return (cols // QK8_0) * BLOCK_Q5_0_SIZE
+    if dtype == "q8_0":
+        if cols % QK8_0 != 0:
+            raise RuntimeError(f"q8_0 expects cols multiple of {QK8_0}, got {cols}")
+        return (cols // QK8_0) * BLOCK_Q8_0_SIZE
+    raise RuntimeError(f"unsupported dtype for row bytes: {dtype}")
 
 
 def _load_model_lib(model_dir: Path) -> ctypes.CDLL:
@@ -354,24 +513,23 @@ def _run_ck_projection(
 
     if x.ndim == 1:
         out = np.zeros((rows,), dtype=np.float32)
-        if dtype == "q5_1":
-            ck_lib.ck_test_gemv_q5_1(
-                w_ptr,
-                x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                rows,
+        x_ptr = x.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+        row_bytes = _row_bytes_for_dtype(dtype, cols)
+        gemv_name = f"ck_test_gemv_{dtype}"
+        if not hasattr(ck_lib, gemv_name):
+            raise RuntimeError(f"missing CK parity symbol: {gemv_name}")
+        gemv_fn = getattr(ck_lib, gemv_name)
+        for r in range(rows):
+            off = r * row_bytes
+            row_view = (ctypes.c_uint8 * row_bytes).from_buffer_copy(w_bytes[off:off + row_bytes])
+            y_tmp = np.zeros((1,), dtype=np.float32)
+            gemv_fn(
+                ctypes.cast(row_view, ctypes.c_void_p),
+                x_ptr,
+                y_tmp.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                 cols,
             )
-        elif dtype == "q8_0":
-            ck_lib.ck_test_gemv_q8_0(
-                w_ptr,
-                x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                rows,
-                cols,
-            )
-        else:
-            raise RuntimeError(f"unsupported dtype for CK projection: {dtype}")
+            out[r] = float(y_tmp[0])
         return out
 
     if x.ndim != 2:
@@ -379,17 +537,12 @@ def _run_ck_projection(
 
     n_tokens = int(x.shape[0])
     out2 = np.zeros((n_tokens, rows), dtype=np.float32)
-    if dtype == "q5_1":
-        ck_lib.ck_test_gemm_q5_1(
-            w_ptr,
-            x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            out2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            rows,
-            cols,
-            n_tokens,
-        )
-    elif dtype == "q8_0":
-        ck_lib.ck_test_gemm_q8_0(
+    gemm_name = f"ck_test_gemm_{dtype}"
+    if not hasattr(ck_lib, gemm_name):
+        raise RuntimeError(f"missing CK parity symbol: {gemm_name}")
+    gemm_fn = getattr(ck_lib, gemm_name)
+    if dtype in ("q4_k", "q6_k", "q5_0", "q8_0"):
+        gemm_fn(
             w_ptr,
             x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             out2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -416,48 +569,36 @@ def _run_llama_projection(
 
     if x.ndim == 1:
         out = np.zeros((rows,), dtype=np.float32)
-        if dtype == "q5_1":
-            ggml_lib.test_gemv_q5_1(
-                w_ptr,
-                x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                rows,
+        x_ptr = x.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+        row_bytes = _row_bytes_for_dtype(dtype, cols)
+        gemv_name = f"test_gemv_{dtype}"
+        if not hasattr(ggml_lib, gemv_name):
+            raise RuntimeError(f"missing llama parity symbol: {gemv_name}")
+        gemv_fn = getattr(ggml_lib, gemv_name)
+        for r in range(rows):
+            off = r * row_bytes
+            row_view = (ctypes.c_uint8 * row_bytes).from_buffer_copy(w_bytes[off:off + row_bytes])
+            y_tmp = np.zeros((1,), dtype=np.float32)
+            gemv_fn(
+                ctypes.cast(row_view, ctypes.c_void_p),
+                x_ptr,
+                y_tmp.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                 cols,
             )
-            return out
-        if dtype == "q8_0":
-            row_bytes = (cols // QK8_0) * BLOCK_Q8_0_SIZE
-            for r in range(rows):
-                off = r * row_bytes
-                row_view = (ctypes.c_uint8 * row_bytes).from_buffer_copy(w_bytes[off:off + row_bytes])
-                y_tmp = np.zeros((1,), dtype=np.float32)
-                ggml_lib.test_gemv_q8_0(
-                    ctypes.cast(row_view, ctypes.c_void_p),
-                    x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                    y_tmp.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                    cols,
-                )
-                out[r] = y_tmp[0]
-            return out
-        raise RuntimeError(f"unsupported dtype for llama projection: {dtype}")
+            out[r] = float(y_tmp[0])
+        return out
 
     if x.ndim != 2:
         raise RuntimeError(f"invalid x rank for llama projection: {x.ndim}")
     n_tokens = int(x.shape[0])
     out2 = np.zeros((n_tokens, rows), dtype=np.float32)
 
-    if dtype == "q5_1":
-        ggml_lib.test_gemm_q5_1(
-            w_ptr,
-            x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            out2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            n_tokens,
-            rows,
-            cols,
-        )
-        return out2
-    if dtype == "q8_0":
-        ggml_lib.test_gemm_q8_0(
+    gemm_name = f"test_gemm_{dtype}"
+    if not hasattr(ggml_lib, gemm_name):
+        raise RuntimeError(f"missing llama parity symbol: {gemm_name}")
+    gemm_fn = getattr(ggml_lib, gemm_name)
+    if dtype in ("q4_k", "q6_k", "q5_0", "q8_0"):
+        gemm_fn(
             w_ptr,
             x.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             out2.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -505,7 +646,10 @@ def _parse_bindings(
     lowered_call: dict[str, Any],
     manifest: dict[str, Any],
     layer: int,
+    macro_offsets: dict[str, int] | None = None,
 ) -> tuple[int, int, dict[str, OpBinding]]:
+    if macro_offsets is None:
+        macro_offsets = {}
     ops = lowered.get("operations", [])
     call_ops = lowered_call.get("operations", [])
     arena = lowered.get("memory", {}).get("arena", {})
@@ -518,10 +662,17 @@ def _parse_bindings(
     }
 
     attn_idx, attn_op = _find_layer_op_any(ops, layer, ("attn_norm", "rmsnorm"))
+    attn_cidx, attn_cop = _find_layer_op_any(call_ops, layer, ("attn_norm", "rmsnorm"))
     if attn_idx is None or attn_op is None:
         raise RuntimeError(f"attn_norm/rmsnorm not found for layer={layer}")
+    if attn_cidx is None or attn_cop is None:
+        raise RuntimeError(f"attn_norm/rmsnorm call op not found for layer={layer}")
     attn_out_rel = _first_activation_offset(attn_op.get("outputs"))
     attn_out_abs = _resolve_abs_offset(lowered, attn_out_rel)
+    attn_out_expr = _find_arg_expr(attn_cop, ("output", "out", "y"), ("output:",))
+    attn_out_abs_call = _expr_bump_abs_offset(attn_out_expr, macro_offsets)
+    if attn_out_abs_call is not None:
+        attn_out_abs = attn_out_abs_call
 
     weight_map = {
         "q_proj": ("wq", "bq"),
@@ -547,7 +698,7 @@ def _parse_bindings(
             raise RuntimeError(f"{op_name}: missing {b_key} binding")
 
         dtype = str(w_ref.get("dtype"))
-        if dtype not in ("q5_1", "q8_0"):
+        if dtype not in ("q4_k", "q6_k", "q5_0", "q8_0"):
             raise RuntimeError(f"{op_name}: unsupported dtype {dtype}")
 
         args = {a.get("name"): a.get("expr") for a in cop.get("args", [])}
@@ -570,6 +721,14 @@ def _parse_bindings(
         y_rel = _first_activation_offset(op.get("outputs"))
         x_abs = _resolve_abs_offset(lowered, x_rel)
         y_abs = _resolve_abs_offset(lowered, y_rel)
+        x_expr = _find_arg_expr(cop, ("A", "x_q8", "x", "input"), ("activation:",))
+        y_expr = _find_arg_expr(cop, ("C", "y", "output", "out"), ("output:",))
+        x_abs_call = _expr_bump_abs_offset(x_expr, macro_offsets)
+        y_abs_call = _expr_bump_abs_offset(y_expr, macro_offsets)
+        if x_abs_call is not None:
+            x_abs = x_abs_call
+        if y_abs_call is not None:
+            y_abs = y_abs_call
 
         w_name = str(w_ref.get("name"))
         b_name = str(b_ref.get("name"))
@@ -624,6 +783,11 @@ def main() -> int:
     ap.add_argument("--skip-decode", action="store_true", help="skip decode-path checks")
     ap.add_argument("--skip-prefill", action="store_true", help="skip prefill-path checks")
     ap.add_argument("--no-fail-fast", action="store_true", help="report all mismatches before exiting")
+    ap.add_argument(
+        "--call-free",
+        action="store_true",
+        help="call ck_model_free() before exit (off by default for crash-isolation in parity probes)",
+    )
     args = ap.parse_args()
 
     model_dir = args.model_dir.expanduser().resolve()
@@ -646,16 +810,22 @@ def main() -> int:
         if not p.exists():
             raise FileNotFoundError(f"required file missing: {p}")
 
+    _assert_runtime_artifact_freshness(model_dir)
+
     manifest = _load_json(model_dir / "weights_manifest.json")
     lower_decode = _load_json(model_dir / "lowered_decode.json")
     call_decode = _load_json(model_dir / "lowered_decode_call.json")
     lower_prefill = _load_json(model_dir / "lowered_prefill.json")
     call_prefill = _load_json(model_dir / "lowered_prefill_call.json")
+    macro_offsets = _load_model_macro_offsets(model_dir)
 
-    decode_attn_idx, decode_attn_abs, decode_bindings = _parse_bindings(lower_decode, call_decode, manifest, args.layer)
-    prefill_attn_idx, prefill_attn_abs, prefill_bindings = _parse_bindings(lower_prefill, call_prefill, manifest, args.layer)
+    decode_attn_idx, decode_attn_abs, decode_bindings = _parse_bindings(
+        lower_decode, call_decode, manifest, args.layer, macro_offsets
+    )
+    prefill_attn_idx, prefill_attn_abs, prefill_bindings = _parse_bindings(
+        lower_prefill, call_prefill, manifest, args.layer, macro_offsets
+    )
 
-    ck_lib, ggml_lib = _load_parity_libs(root)
     model_lib = _load_model_lib(model_dir)
 
     weights_path = model_dir / "weights.bump"
@@ -666,6 +836,9 @@ def main() -> int:
     base_ptr = int(model_lib.ck_model_get_base_ptr())
     if not base_ptr:
         raise RuntimeError("ck_model_get_base_ptr returned null")
+    # Load parity helper libraries after model init so their symbols do not
+    # perturb runtime initialization in mixed ctypes sessions.
+    ck_lib, ggml_lib = _load_parity_libs(root)
 
     failures: list[str] = []
     try:
@@ -807,7 +980,10 @@ def main() -> int:
         return 0
     finally:
         os.environ.pop("CK_STOP_OP", None)
-        if hasattr(model_lib, "ck_model_free"):
+        # NOTE:
+        # Some parity probe runs intentionally skip ck_model_free to avoid masking
+        # first-divergence diagnostics with teardown-time native crashes.
+        if args.call_free and hasattr(model_lib, "ck_model_free"):
             model_lib.ck_model_free()
 
 

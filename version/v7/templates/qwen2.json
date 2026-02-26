@@ -8,6 +8,49 @@
     "rope": "rope",
     "tokenizer": "bpe"
   },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "bpe",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "attention_contract": {
+      "rope_type": "rope",
+      "qk_norm": false,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "dense"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> silu_mul -> down",
+      "activation": "swiglu",
+      "qkv_bias": "from_weights"
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "weight_tying",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "kv_cache_batch_copy": [
+          "activation:k_src",
+          "activation:v_src",
+          "output:k_dst",
+          "output:v_dst",
+          "dim:_kv_copy_bytes"
+        ]
+      }
+    }
+  },
   "sequence": ["decoder"],
   "block_types": {
     "decoder": {

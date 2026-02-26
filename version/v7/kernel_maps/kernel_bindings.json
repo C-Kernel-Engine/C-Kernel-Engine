@@ -63,6 +63,144 @@
         }
       ]
     },
+    "embedding_forward_fp32": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
+    "embedding_forward_q4_k": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
+    "embedding_forward_q6_k": {
+      "params": [
+        {
+          "name": "token_ids",
+          "source": "activation:tokens",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "token_count",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "vocab_size",
+          "source": "dim:vocab_size"
+        },
+        {
+          "name": "token_embeddings",
+          "source": "weight:token_emb"
+        },
+        {
+          "name": "pos_embeddings",
+          "source": "null"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "context_window",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "add_pos",
+          "source": "const:0"
+        }
+      ]
+    },
     "embedding_forward_q8_0": {
       "params": [
         {
@@ -761,6 +899,55 @@
     },
     "attention_forward_decode_head_major_gqa_flash": {
       "note": "Decode: single query token attends to KV cache (positions 0..pos)",
+      "params": [
+        {
+          "name": "q_token",
+          "source": "scratch:q_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_cache",
+          "source": "runtime:kv_cache_k_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "v_cache",
+          "source": "runtime:kv_cache_v_layer",
+          "cast": "const float*"
+        },
+        {
+          "name": "out_token",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "kv_tokens",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        }
+      ]
+    },
+    "attention_forward_decode_head_major_gqa_regular": {
+      "note": "Decode: single query token attends to KV cache (regular O(n) path)",
       "params": [
         {
           "name": "q_token",

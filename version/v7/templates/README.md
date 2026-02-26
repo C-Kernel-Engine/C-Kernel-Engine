@@ -40,6 +40,13 @@ These files describe compute graphs.
 - One JSON per model family. Examples: `qwen2.json`, `llama.json`, `mistral.json`.
 - Keep names lowercase and stable; they are referenced by IR tooling.
 
+## Bring-up Notes
+
+- Use `llama_nanbeige_contract.md` as the working checklist for Llama-family
+  model onboarding when output quality is gibberish despite successful compile.
+- It captures tokenizer/chat-stop semantics and strict gate ordering needed
+  before interactive generation is considered valid.
+
 ## Schema Evolution
 
 ### Version 1 (Legacy - Text-only Models)

@@ -386,6 +386,9 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             wk = tensors.get(f"blk.{layer}.attn_k.weight")
             wv = tensors.get(f"blk.{layer}.attn_v.weight")
             wo = tensors.get(f"blk.{layer}.attn_output.weight")
+            bq = tensors.get(f"blk.{layer}.attn_q.bias")
+            bk = tensors.get(f"blk.{layer}.attn_k.bias")
+            bv = tensors.get(f"blk.{layer}.attn_v.bias")
             gate = tensors.get(f"blk.{layer}.ffn_gate.weight")
             up = tensors.get(f"blk.{layer}.ffn_up.weight")
             down = tensors.get(f"blk.{layer}.ffn_down.weight")
@@ -430,6 +433,15 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             if k_norm:
                 layer_entries.append({"name": f"layer.{layer}.k_norm", "dtype": "fp32",
                                       "shape": [k_norm.ne0]})
+            if bq:
+                layer_entries.append({"name": f"layer.{layer}.bq", "dtype": "fp32",
+                                      "shape": [bq.ne0], "source_dtype": gguf.ggml_type_name(bq.ggml_type)})
+            if bk:
+                layer_entries.append({"name": f"layer.{layer}.bk", "dtype": "fp32",
+                                      "shape": [bk.ne0], "source_dtype": gguf.ggml_type_name(bk.ggml_type)})
+            if bv:
+                layer_entries.append({"name": f"layer.{layer}.bv", "dtype": "fp32",
+                                      "shape": [bv.ne0], "source_dtype": gguf.ggml_type_name(bv.ggml_type)})
 
             layer_entries.extend([
                 {"name": f"layer.{layer}.ln2_gamma", "dtype": "fp32", "shape": [embed_dim]},
