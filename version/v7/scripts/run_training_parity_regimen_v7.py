@@ -2,11 +2,33 @@
 """
 run_training_parity_regimen_v7.py
 
-Operator-facing CK-vs-PyTorch training parity regimen:
-1) forward/backward/optimizer drift gate (10 passes on same tiny sample path)
-2) grad-accum sweeps (2/4/8)
-3) multi-epoch stability sweeps
-4) replay/stitch runtime checks
+Operator-facing CK-vs-PyTorch training parity regimen.
+
+This regimen has two distinct signoff planes:
+
+Plane K (kernel-isolation harness):
+  - A1: short-horizon forward/backward/optimizer drift gate on the parity harness
+  - A2: first-divergence localizer (only when A1 fails)
+  - A3: backend xray (swap one kernel path at a time: rmsnorm/swiglu/loss)
+  - B*: grad-accum sweeps
+  - C*: stability sweeps
+
+Plane R (generated runtime correctness):
+  - D1: runtime stitch check (generated runtime via ck_run_v7.py --backend ck)
+  - E1: replay determinism check
+  - F1: replay + grad-accum snapshot check
+
+Important interpretation:
+  - A1 is intentionally a kernel-level isolation gate, not a full generated-runtime
+    production signoff by itself.
+  - A1 failures usually indicate math/path drift in isolated C-kernel parity
+    execution (often approximation/order effects), and should be investigated
+    before trusting downstream runtime behavior.
+  - D1/E1/F1 are the generated-runtime stitch/replay checks that validate the
+    integrated runtime path.
+  - A1/A2 default to short-horizon optimizer settings so this gate captures
+    kernel-path parity drift, not AdamW first-step sign sensitivity on tiny
+    gradient deltas.
 
 Outputs:
   - training_parity_regimen_latest.json
@@ -379,6 +401,9 @@ def _build_backend_xray_payload(
             "seed": int(args.seed),
             "seq_len": int(args.seq_len),
             "lr": float(args.lr),
+            "a1_optimizer": str(args.a1_optimizer),
+            "a1_lr": float(args.a1_lr) if args.a1_lr is not None else float(args.lr),
+            "a1_max_steps": int(args.a1_max_steps),
             "ck_loss_backend": str(args.ck_loss_backend),
             "weights_from_run_dir": bool(run_dir is not None),
         },
@@ -503,6 +528,36 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--hidden", type=int, default=128)
     ap.add_argument("--num-layers", type=int, default=1)
     ap.add_argument("--lr", type=float, default=1e-3)
+    # A1/A2 fix:
+    # AdamW can amplify tiny CK-vs-Torch gradient deltas into large first-step
+    # parameter divergence (sign-sensitive denominator/update path), which can
+    # hide the actual kernel-parity signal. Keep A1/A2 short-horizon and
+    # optimizer-stable by default (SGD + capped steps), and reserve AdamW
+    # stress behavior for later B/C sweeps.
+    ap.add_argument(
+        "--a1-optimizer",
+        choices=["adamw", "sgd"],
+        default="sgd",
+        help="Optimizer for A1/A2/A3 short-horizon kernel isolation checks (default: sgd).",
+    )
+    ap.add_argument(
+        "--a1-lr",
+        type=float,
+        default=None,
+        help="Optional LR override for A1/A2/A3 (default: use --lr).",
+    )
+    ap.add_argument(
+        "--a1-max-steps",
+        type=int,
+        default=2,
+        help="Max optimizer steps for A1 short-horizon gate (default: 2).",
+    )
+    ap.add_argument(
+        "--a2-max-steps",
+        type=int,
+        default=2,
+        help="Max optimizer steps for A2 localizer (default: 2).",
+    )
     ap.add_argument("--loss-tol", type=float, default=2e-5)
     ap.add_argument("--param-tol", type=float, default=3e-5)
     ap.add_argument("--ck-loss-backend", choices=["c", "c_ptref", "torch"], default="c_ptref")
@@ -527,6 +582,16 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    if int(args.a1_max_steps) < 1:
+        print("ERROR: --a1-max-steps must be >= 1", file=sys.stderr)
+        return 2
+    if int(args.a2_max_steps) < 1:
+        print("ERROR: --a2-max-steps must be >= 1", file=sys.stderr)
+        return 2
+    if args.a1_lr is not None and float(args.a1_lr) <= 0.0:
+        print("ERROR: --a1-lr must be > 0 when set", file=sys.stderr)
+        return 2
+    a1_lr = float(args.a1_lr) if args.a1_lr is not None else float(args.lr)
 
     run_dir = args.run_dir.resolve() if args.run_dir is not None else None
     run_bump = (run_dir / "weights.bump") if run_dir is not None else None
@@ -590,7 +655,11 @@ def main() -> int:
         if stage.status != "PASS" and args.stop_on_fail:
             stop_due_to_failure = True
 
-    # Stage A: forward/backward/optimizer canary, 10 passes, same text.
+    # Stage A: kernel-isolation canary on parity harness.
+    # This stage is expected to catch C-kernel numeric drift early (before
+    # generated-runtime stitch/replay checks).
+    # Use short-horizon settings to avoid AdamW sign-flip amplification on
+    # near-zero gradients masking kernel-path parity signals.
     stage_a_json = base_out_dir / "regimen_forward_backward_10x.json"
     stage_a_cmd = [
         python_exec,
@@ -612,9 +681,11 @@ def main() -> int:
         "--grad-accum",
         "1",
         "--optimizer",
-        "adamw",
+        str(args.a1_optimizer),
         "--lr",
-        str(args.lr),
+        str(a1_lr),
+        "--max-steps",
+        str(args.a1_max_steps),
         "--seed",
         str(args.seed),
         "--ck-loss-backend",
@@ -634,7 +705,10 @@ def main() -> int:
     ]
     _append_run_weights(stage_a_cmd)
 
-    rc, dt, log_path = _run_stage_command("A1", "Forward/Backward/Optimizer 10x", stage_a_cmd, stage_a_json, logs_dir)
+    stage_a_name = (
+        f"Forward/Backward/Optimizer ({args.a1_optimizer}, max_steps={int(args.a1_max_steps)})"
+    )
+    rc, dt, log_path = _run_stage_command("A1", stage_a_name, stage_a_cmd, stage_a_json, logs_dir)
     stage_a_notes: List[str] = []
     stage_a_metrics: Dict[str, Any] = {}
     if stage_a_json.exists():
@@ -647,6 +721,9 @@ def main() -> int:
         max_param_first_n = max((_float(r.get("max_param_diff"), 0.0) for r in first_n if isinstance(r, dict)), default=math.inf)
         stage_a_metrics["max_loss_abs_diff_first_n"] = float(max_loss_first_n)
         stage_a_metrics["max_param_abs_diff_first_n"] = float(max_param_first_n)
+        stage_a_metrics["a1_optimizer"] = str(args.a1_optimizer)
+        stage_a_metrics["a1_lr"] = float(a1_lr)
+        stage_a_metrics["a1_max_steps"] = int(args.a1_max_steps)
         passed = bool(stage_a_metrics.get("pass_parity", False))
         passed = passed and len(rows) >= 2
         passed = passed and max_loss_first_n <= float(args.loss_tol)
@@ -656,7 +733,7 @@ def main() -> int:
         _add_stage(
             StageResult(
                 id="A1",
-                name="Forward/Backward/Optimizer 10x",
+                name=stage_a_name,
                 status="PASS" if passed else "FAIL",
                 duration_s=dt,
                 command=stage_a_cmd,
@@ -671,7 +748,7 @@ def main() -> int:
         _add_stage(
             StageResult(
                 id="A1",
-                name="Forward/Backward/Optimizer 10x",
+                name=stage_a_name,
                 status="FAIL",
                 duration_s=dt,
                 command=stage_a_cmd,
@@ -708,9 +785,11 @@ def main() -> int:
             "--grad-accum",
             "1",
             "--optimizer",
-            "adamw",
+            str(args.a1_optimizer),
             "--lr",
-            str(args.lr),
+            str(a1_lr),
+            "--max-steps",
+            str(args.a2_max_steps),
             "--seed",
             str(args.seed),
             "--ck-loss-backend",
@@ -807,9 +886,9 @@ def main() -> int:
                 "--grad-accum",
                 "1",
                 "--optimizer",
-                "adamw",
+                str(args.a1_optimizer),
                 "--lr",
-                str(args.lr),
+                str(a1_lr),
                 "--seed",
                 str(args.seed),
                 "--ck-rmsnorm-backend",
@@ -1111,7 +1190,9 @@ def main() -> int:
             if stop_due_to_failure:
                 break
 
-    # Stage D/E/F: runtime-oriented checks.
+    # Stage D/E/F: generated-runtime stitch/replay signoff checks.
+    # These exercise ck_run_v7.py --backend ck and validate integrated runtime
+    # correctness independent of harness-only kernel isolation signals.
     if (not stop_due_to_failure) and bool(args.runtime_checks):
         runtime_specs = [
             (
