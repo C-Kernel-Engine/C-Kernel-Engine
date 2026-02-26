@@ -747,6 +747,16 @@ def main() -> int:
         "[analysis] Prefill first issue: "
         f"{report['parity']['prefill_first_issue'] if report['parity']['prefill_first_issue'] else 'none'}"
     )
+    # Exit non-zero when either dump is absent: parity cannot be computed and
+    # a zero exit would silently mask the missing reference.
+    if not ref_dump.exists() or not ck_dump.exists():
+        missing = []
+        if not ref_dump.exists():
+            missing.append(f"llama ref dump ({ref_dump})")
+        if not ck_dump.exists():
+            missing.append(f"CK dump ({ck_dump})")
+        print(f"[analysis] INCOMPLETE: missing {', '.join(missing)}", flush=True)
+        return 2
     return 0
 
 

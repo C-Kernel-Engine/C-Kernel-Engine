@@ -326,6 +326,181 @@ def detect_model_dir_from_input(model_input: str) -> Optional[Path]:
     return None
 
 
+def collect_cpu_topology() -> Dict[str, object]:
+    """Collect CPU topology, cache sizes, ISA flags, and compute peak estimates.
+
+    Uses /proc/cpuinfo and /sys/devices/system/cpu/ as primary sources.
+    Every step is wrapped in try/except so partial failures never break the caller.
+    """
+    result: Dict[str, object] = {"source": "sysfs+cpuinfo"}
+
+    # ── 1. Parse /proc/cpuinfo ──────────────────────────────────────
+    try:
+        cpuinfo_text = Path("/proc/cpuinfo").read_text(errors="ignore")
+        processors: List[Dict[str, str]] = []
+        current: Dict[str, str] = {}
+        for line in cpuinfo_text.splitlines():
+            line = line.strip()
+            if not line:
+                if current:
+                    processors.append(current)
+                    current = {}
+            elif ":" in line:
+                k, _, v = line.partition(":")
+                current[k.strip()] = v.strip()
+        if current:
+            processors.append(current)
+
+        model_names: set = set()
+        mhz_values: List[float] = []
+        all_flags: set = set()
+        physical_ids: set = set()
+        core_ids_per_socket: Dict[str, set] = {}
+
+        for proc in processors:
+            pkeys = {k.lower(): v for k, v in proc.items()}
+            if "model name" in pkeys:
+                model_names.add(pkeys["model name"])
+            if "cpu mhz" in pkeys:
+                try:
+                    mhz_values.append(float(pkeys["cpu mhz"]))
+                except ValueError:
+                    pass
+            if "flags" in pkeys:
+                all_flags.update(pkeys["flags"].split())
+            phys_id = pkeys.get("physical id", "0")
+            core_id = pkeys.get("core id", "0")
+            physical_ids.add(phys_id)
+            core_ids_per_socket.setdefault(phys_id, set()).add(core_id)
+
+        if model_names:
+            result["model_name"] = next(iter(model_names))
+        result["num_sockets"]    = len(physical_ids) if physical_ids else 1
+        result["physical_cores"] = sum(len(v) for v in core_ids_per_socket.values()) or len(processors)
+        result["logical_cpus"]   = len(processors)
+        result["has_avx"]        = "avx"          in all_flags
+        result["has_avx2"]       = "avx2"         in all_flags
+        result["has_avx512f"]    = "avx512f"      in all_flags
+        result["has_fma"]        = "fma"          in all_flags
+        result["has_avx512vnni"] = ("avx512_vnni" in all_flags) or ("avx512vnni" in all_flags)
+        result["has_amx_bf16"]   = "amx_bf16"     in all_flags
+        if mhz_values:
+            result["current_mhz_avg"] = round(sum(mhz_values) / len(mhz_values), 1)
+    except Exception:
+        pass
+
+    # ── 2. Max boost frequency from cpufreq ─────────────────────────
+    try:
+        max_freq_path = Path("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
+        if max_freq_path.exists():
+            result["max_freq_mhz"] = round(float(max_freq_path.read_text().strip()) / 1000.0, 1)
+    except Exception:
+        pass
+
+    # ── 3. Cache sizes from sysfs ────────────────────────────────────
+    try:
+        cache_path = Path("/sys/devices/system/cpu/cpu0/cache")
+        caches: Dict[str, object] = {}
+        if cache_path.exists():
+            for idx_dir in sorted(cache_path.iterdir()):
+                level_f = idx_dir / "level"
+                type_f  = idx_dir / "type"
+                size_f  = idx_dir / "size"
+                if not (level_f.exists() and type_f.exists() and size_f.exists()):
+                    continue
+                level    = level_f.read_text().strip()
+                ctype    = type_f.read_text().strip().lower()   # "data", "instruction", "unified"
+                size_raw = size_f.read_text().strip()
+                m = re.match(r"(\d+)([KMG]?)", size_raw)
+                if not m:
+                    continue
+                val  = int(m.group(1))
+                unit = m.group(2)
+                if unit == "K": val *= 1024
+                elif unit == "M": val *= 1024 * 1024
+                elif unit == "G": val *= 1024 * 1024 * 1024
+                key = f"L{level}_{ctype}"
+                if key not in caches:
+                    caches[key] = {"size_bytes": val, "size_human": size_raw}
+        if caches:
+            result["caches"] = caches
+    except Exception:
+        pass
+
+    # ── 4. P-core / E-core detection (Intel hybrid, Linux ≥5.15) ────
+    try:
+        cpu_base = Path("/sys/devices/system/cpu")
+        p_core_count = e_core_count = 0
+        seen_keys: set = set()
+        for cpu_dir in sorted(cpu_base.glob("cpu[0-9]*")):
+            ct_f = cpu_dir / "topology" / "core_type"
+            ci_f = cpu_dir / "topology" / "core_id"
+            if not ct_f.exists():
+                continue
+            ctype   = int(ct_f.read_text().strip())
+            core_id = ci_f.read_text().strip() if ci_f.exists() else cpu_dir.name
+            key = (ctype, core_id)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            if ctype == 0:
+                p_core_count += 1
+            else:
+                e_core_count += 1
+        if seen_keys:
+            result["hybrid_cpu"]   = e_core_count > 0
+            result["p_core_count"] = p_core_count
+            result["e_core_count"] = e_core_count
+    except Exception:
+        pass
+
+    # ── 5. Compute theoretical FP32/FP64 peak GFLOP/s ───────────────
+    try:
+        phys     = int(result.get("physical_cores", 1))
+        # E-cores don't run AVX2/FMA; use P-core count for peak
+        if result.get("hybrid_cpu"):
+            phys = int(result.get("p_core_count", phys))
+        freq_mhz = float(result.get("max_freq_mhz") or result.get("current_mhz_avg", 3000.0))
+        freq_ghz = freq_mhz / 1000.0
+        has_fma  = bool(result.get("has_fma"))
+        if result.get("has_avx512f") and has_fma:
+            fp32_lanes, fp64_lanes = 16, 8
+        elif (result.get("has_avx2") or result.get("has_avx")) and has_fma:
+            fp32_lanes, fp64_lanes = 8, 4
+        elif result.get("has_avx") or result.get("has_avx2"):
+            fp32_lanes, fp64_lanes = 8, 4   # no FMA → 1 FLOP per lane per cycle
+        else:
+            fp32_lanes, fp64_lanes = 1, 1
+        fma_mult = 2.0 if has_fma else 1.0
+        result["peak_fp32_gflops"] = round(phys * freq_ghz * fp32_lanes * fma_mult, 1)
+        result["peak_fp64_gflops"] = round(phys * freq_ghz * fp64_lanes * fma_mult, 1)
+    except Exception:
+        pass
+
+    # ── 6. Transparent HugePages status ─────────────────────────────
+    try:
+        thp_path = Path("/sys/kernel/mm/transparent_hugepage/enabled")
+        if thp_path.exists():
+            content = thp_path.read_text().strip()
+            m = re.search(r"\[(\w+)\]", content)
+            result["thp_status"] = m.group(1) if m else "unknown"
+    except Exception:
+        pass
+
+    # ── 7. Hugepage size from /proc/meminfo ──────────────────────────
+    try:
+        for line in Path("/proc/meminfo").read_text(errors="ignore").splitlines():
+            if line.startswith("Hugepagesize:"):
+                m = re.match(r"Hugepagesize:\s+(\d+)\s*kB", line)
+                if m:
+                    result["hugepage_size_kb"] = int(m.group(1))
+                break
+    except Exception:
+        pass
+
+    return result
+
+
 def write_json(path: Path, payload: Dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -368,6 +543,7 @@ def main() -> int:
     if args.perf_stat and args.perf_stat.exists():
         perf_summary = parse_perf_stat_text(args.perf_stat.read_text(errors="ignore"))
         perf_summary["source"] = str(args.perf_stat)
+        perf_summary["cpu_topology"] = collect_cpu_topology()
         write_json(out_dir / "perf_stat_summary.json", perf_summary)
         print(f"Wrote {out_dir / 'perf_stat_summary.json'}")
         wrote_any = True

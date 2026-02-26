@@ -2,9 +2,15 @@
 """
 check_backprop_stitch_runtime_v7.py
 
-Runtime stitch smoke for v7 backprop:
-- verifies manifest-dim wiring wins over conflicting CLI train dims
-- verifies first parity check (step 1) has no slot/tensor drift
+Why this script exists (D1 in regimen):
+- Generated-runtime stitch smoke test for backprop integration.
+- Verifies runtime wiring/shape mapping is correct when using
+  ck_run_v7.py train --backend ck.
+
+Checks:
+- Manifest dims override conflicting CLI train dims (wiring sanity).
+- First checked parity step has no bad tensor/op drift.
+- Check-dump artifacts exist so operators can inspect failures quickly.
 """
 
 from __future__ import annotations

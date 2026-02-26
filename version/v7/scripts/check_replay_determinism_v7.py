@@ -2,8 +2,14 @@
 """
 check_replay_determinism_v7.py
 
-Run the tiny v7 train parity harness twice with identical configuration
-and verify deterministic replay (same final losses and parameter deltas).
+Why this script exists (E1 in regimen):
+- Determinism guardrail for the parity harness path.
+- Runs identical harness config twice and asserts reproducible outputs
+  (loss/param drift metrics) across repeats.
+
+This catches:
+- Seed/control-flow nondeterminism.
+- Unintended order/state drift that can hide real kernel issues.
 """
 
 import argparse

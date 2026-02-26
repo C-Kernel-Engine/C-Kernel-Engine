@@ -3374,6 +3374,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <h3><span class="badge badge-orange">Gradient Checks</span> FD and Kernel-Level Parity</h3>
                 <div id="trainingGradChecksPanel" style="color: var(--text-muted);">No gradient checks loaded.</div>
             </div>
+
+            <div class="parity-section" style="margin-top: 1rem;">
+                <h3><span class="badge badge-blue">Dataset Corpus</span> Generated Corpus Catalog</h3>
+                <div id="trainingCorpusCatalog" style="color: var(--text-muted);">No corpus catalog loaded.</div>
+            </div>
         </div>
 
         <div id="profile" class="panel">
@@ -8128,7 +8133,218 @@ function renderTraining() {
     renderTrainingBackwardGraph();
     refreshTrainingSelectionUI(backwardList);
     renderTrainingRuntimeGraph();
+    renderTrainingCorpusCatalog();
 }
+
+        function renderTrainingCorpusCatalog() {
+            const panel = document.getElementById('trainingCorpusCatalog');
+            if (!panel) return;
+
+            // Pull data from trainPipelineData (training_pipeline.json) and files globals
+            const pipeline = (trainPipelineData && typeof trainPipelineData === 'object') ? trainPipelineData : {};
+            const dataLab = (pipeline.data_lab && typeof pipeline.data_lab === 'object') ? pipeline.data_lab : {};
+            const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
+                ? pipeline.dataset_catalog.filter(row => row && typeof row === 'object')
+                : [];
+            const provenance = Array.isArray(pipeline.data_provenance)
+                ? pipeline.data_provenance.filter(row => row && typeof row === 'object')
+                : [];
+
+            // Also check the files globals (loaded from folder drag-drop or embedded)
+            const qcData   = dataLab.dataset_qc   || (typeof files !== 'undefined' && files.dataset_qc)   || null;
+            const profData = dataLab.dataset_profile || (typeof files !== 'undefined' && files.dataset_profile) || null;
+            const rtData   = dataLab.tokenizer_roundtrip || (typeof files !== 'undefined' && files.tokenizer_roundtrip) || null;
+
+            const hasCatalog   = datasetCatalog.length > 0;
+            const hasProvenance = provenance.length > 0;
+            const hasQC        = qcData && typeof qcData === 'object';
+            const hasProfile   = profData && typeof profData === 'object';
+            const hasRoundtrip = rtData && typeof rtData === 'object';
+
+            if (!hasCatalog && !hasProvenance && !hasQC && !hasProfile) {
+                panel.textContent = 'No corpus catalog data available. Generate a training run to populate.';
+                return;
+            }
+
+            const parts = [];
+
+            // ── QC / Profile summary strip ──────────────────────────────────────────────
+            const qcStatus   = hasQC ? (qcData.status || 'unknown') : null;
+            const qcRows     = hasQC ? (qcData.non_empty_lines || qcData.total_rows || null) : null;
+            const qcPath     = hasQC ? (qcData.path || dataLab.dataset_path || null) : (dataLab.dataset_path || null);
+            const rtStatus   = hasRoundtrip ? (rtData.status || 'unknown') : null;
+            const rtExact    = hasRoundtrip ? rtData.exact_match : null;
+            const profileRows = hasProfile ? (profData.total_rows || profData.non_empty_lines || null) : null;
+
+            const qcColor  = qcStatus === 'pass' ? '#47b475' : qcStatus === 'fail' ? '#e74c3c' : '#f39c12';
+            const rtColor  = rtExact === true ? '#47b475' : rtExact === false ? '#e74c3c' : '#888';
+
+            const summaryItems = [];
+            if (qcRows != null)    summaryItems.push(`<span style="color:#d7deea;font-weight:600;">${Number(qcRows).toLocaleString()}</span> rows`);
+            if (qcPath)            summaryItems.push(`<code style="font-size:0.72rem;color:#8fa8c8;word-break:break-all;">${qcPath.split('/').slice(-2).join('/')}</code>`);
+            if (qcStatus)          summaryItems.push(`QC <span style="color:${qcColor};font-weight:600;">${qcStatus.toUpperCase()}</span>`);
+            if (rtExact != null)   summaryItems.push(`Roundtrip <span style="color:${rtColor};font-weight:600;">${rtExact ? 'EXACT' : 'MISMATCH'}</span>`);
+
+            if (summaryItems.length) {
+                parts.push(`<div style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center;padding:0.65rem 0.9rem;background:rgba(71,180,117,0.07);border:1px solid rgba(71,180,117,0.22);border-radius:8px;margin-bottom:0.85rem;font-size:0.79rem;">
+                    <span style="color:#47b475;font-weight:700;margin-right:0.25rem;">Active Dataset</span>
+                    ${summaryItems.join('<span style="color:#444;margin:0 0.1rem;">·</span>')}
+                </div>`);
+            }
+
+            // ── QC checks detail ────────────────────────────────────────────────────────
+            if (hasQC && qcData.checks && typeof qcData.checks === 'object') {
+                const checks = qcData.checks;
+                const checkRows = Object.entries(checks).map(([k, v]) => {
+                    const pass   = v === true || v === 'pass' || v === 'ok';
+                    const fail   = v === false || v === 'fail';
+                    const col    = pass ? '#47b475' : fail ? '#e74c3c' : '#f39c12';
+                    const label  = pass ? '✓' : fail ? '✗' : '~';
+                    const valStr = typeof v === 'boolean' ? (v ? 'pass' : 'fail') : String(v);
+                    return `<tr>
+                        <td style="padding:0.3rem 0.5rem;color:#8fa8c8;font-family:monospace;font-size:0.74rem;">${k}</td>
+                        <td style="padding:0.3rem 0.5rem;color:${col};font-weight:600;font-size:0.74rem;">${label} ${valStr}</td>
+                    </tr>`;
+                }).join('');
+                if (checkRows) {
+                    parts.push(`<div style="margin-bottom:0.85rem;">
+                        <div style="font-size:0.78rem;color:#7e91ad;font-weight:600;margin-bottom:0.4rem;">Dataset QC Checks</div>
+                        <table style="width:100%;border-collapse:collapse;background:var(--dark-card);border-radius:6px;overflow:hidden;border:1px solid var(--grey);">
+                            <tbody>${checkRows}</tbody>
+                        </table>
+                    </div>`);
+                }
+            }
+
+            // ── Dataset catalog table (from pipeline.dataset_catalog) ─────────────────
+            if (hasCatalog) {
+                const stageColors = { stage_a: '#47b475', stage_b: '#07adf8', bridge: '#f39c12', base: '#a070ff', holdout: '#888' };
+                const rows = datasetCatalog.map(row => {
+                    const stage = String(row.stage || row.kind || '-');
+                    const name  = String(row.name || row.label || '-');
+                    const count = row.rows != null ? Number(row.rows).toLocaleString() : (row.num_samples != null ? Number(row.num_samples).toLocaleString() : '-');
+                    const note  = String(row.note || row.description || '');
+                    const sCol  = stageColors[stage] || '#9ba8b8';
+                    const pathShort = row.path ? row.path.split('/').slice(-1)[0] : '';
+                    return `<tr style="border-bottom:1px solid var(--grey);">
+                        <td style="padding:0.35rem 0.5rem;"><span style="color:${sCol};font-weight:600;font-size:0.74rem;">${stage}</span></td>
+                        <td style="padding:0.35rem 0.5rem;color:#d7deea;font-size:0.74rem;">${name}</td>
+                        <td style="padding:0.35rem 0.5rem;color:#d7deea;font-size:0.74rem;text-align:right;font-family:monospace;">${count}</td>
+                        <td style="padding:0.35rem 0.5rem;color:#8fa8c8;font-family:monospace;font-size:0.7rem;">${pathShort}</td>
+                        <td style="padding:0.35rem 0.5rem;color:#555;font-size:0.72rem;">${note}</td>
+                    </tr>`;
+                }).join('');
+                parts.push(`<div style="margin-bottom:0.85rem;">
+                    <div style="font-size:0.78rem;color:#7e91ad;font-weight:600;margin-bottom:0.4rem;">Corpus Catalog <span style="font-weight:400;color:#555;">(${datasetCatalog.length} entries)</span></div>
+                    <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;background:var(--dark-card);border-radius:6px;overflow:hidden;border:1px solid var(--grey);font-size:0.75rem;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--grey);">
+                                <th style="padding:0.35rem 0.5rem;text-align:left;color:#7e91ad;">Stage</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:left;color:#7e91ad;">Name</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;color:#7e91ad;">Rows</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:left;color:#7e91ad;">File</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:left;color:#7e91ad;">Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table></div>
+                </div>`);
+            }
+
+            // ── Data provenance trace ────────────────────────────────────────────────
+            if (hasProvenance && !hasCatalog) {
+                const rows = provenance.slice(0, 8).map(p => {
+                    const stage = String(p.stage || p.curriculum_stage || '-');
+                    const src   = p.source_path ? p.source_path.split('/').slice(-1)[0] : '-';
+                    const rows  = p.rows != null ? Number(p.rows).toLocaleString() : '-';
+                    return `<tr style="border-bottom:1px solid var(--grey);">
+                        <td style="padding:0.3rem 0.5rem;color:#47b475;font-size:0.74rem;">${stage}</td>
+                        <td style="padding:0.3rem 0.5rem;color:#8fa8c8;font-family:monospace;font-size:0.7rem;">${src}</td>
+                        <td style="padding:0.3rem 0.5rem;color:#d7deea;font-family:monospace;font-size:0.74rem;text-align:right;">${rows}</td>
+                    </tr>`;
+                }).join('');
+                parts.push(`<div style="margin-bottom:0.85rem;">
+                    <div style="font-size:0.78rem;color:#7e91ad;font-weight:600;margin-bottom:0.4rem;">Data Provenance</div>
+                    <table style="width:100%;border-collapse:collapse;background:var(--dark-card);border-radius:6px;border:1px solid var(--grey);">
+                        <thead><tr style="border-bottom:2px solid var(--grey);">
+                            <th style="padding:0.3rem 0.5rem;text-align:left;color:#7e91ad;font-size:0.74rem;">Stage</th>
+                            <th style="padding:0.3rem 0.5rem;text-align:left;color:#7e91ad;font-size:0.74rem;">Source</th>
+                            <th style="padding:0.3rem 0.5rem;text-align:right;color:#7e91ad;font-size:0.74rem;">Rows</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`);
+            }
+
+            // ── Profile: length histogram & top chars ───────────────────────────────
+            if (hasProfile) {
+                const hist = profData.line_length_histogram || profData.length_histogram || null;
+                const topChars = Array.isArray(profData.top_chars) ? profData.top_chars.slice(0, 12) : null;
+                const dups = profData.duplicate_rows != null ? profData.duplicate_rows : profData.duplicates;
+
+                const statItems = [];
+                if (profData.total_rows != null)     statItems.push(['Rows', Number(profData.total_rows).toLocaleString()]);
+                if (profData.total_bytes != null)    statItems.push(['Bytes', Number(profData.total_bytes).toLocaleString()]);
+                if (profData.mean_row_len != null)   statItems.push(['Avg row len', Number(profData.mean_row_len).toFixed(0)]);
+                if (profData.median_row_len != null) statItems.push(['Median row len', Number(profData.median_row_len).toFixed(0)]);
+                if (dups != null)                    statItems.push(['Duplicate rows', Number(dups).toLocaleString()]);
+
+                const statsHtml = statItems.map(([k,v]) =>
+                    `<div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:6px;padding:0.45rem 0.65rem;display:flex;flex-direction:column;gap:2px;">
+                        <span style="font-size:0.68rem;color:#7e91ad;">${k}</span>
+                        <span style="font-size:0.9rem;color:#d7deea;font-weight:600;font-family:monospace;">${v}</span>
+                    </div>`
+                ).join('');
+
+                const charsHtml = topChars ? topChars.map(c => {
+                    const ch = typeof c === 'string' ? c : (c[0] || String.fromCharCode(Number(c.codepoint || 0)));
+                    const cnt = typeof c === 'object' ? (c.count || c[1] || '') : '';
+                    return `<span style="display:inline-flex;flex-direction:column;align-items:center;background:var(--dark-card);border:1px solid var(--grey);border-radius:4px;padding:3px 6px;min-width:28px;gap:1px;">
+                        <span style="font-family:monospace;font-size:0.82rem;color:#d7deea;">${ch === ' ' ? '·' : ch}</span>
+                        ${cnt ? `<span style="font-size:0.6rem;color:#555;">${typeof cnt === 'number' ? cnt.toLocaleString() : cnt}</span>` : ''}
+                    </span>`;
+                }).join('') : '';
+
+                let profileHtml = '';
+                if (statsHtml) profileHtml += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.4rem;margin-bottom:0.6rem;">${statsHtml}</div>`;
+                if (charsHtml) profileHtml += `<div style="font-size:0.72rem;color:#7e91ad;margin-bottom:0.3rem;">Top chars</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${charsHtml}</div>`;
+
+                if (profileHtml) {
+                    parts.push(`<div style="margin-bottom:0.85rem;">
+                        <div style="font-size:0.78rem;color:#7e91ad;font-weight:600;margin-bottom:0.4rem;">Dataset Profile</div>
+                        ${profileHtml}
+                    </div>`);
+                }
+            }
+
+            // ── Roundtrip sample rows ───────────────────────────────────────────────
+            if (hasRoundtrip && Array.isArray(rtData.sample_rows) && rtData.sample_rows.length > 0) {
+                const samples = rtData.sample_rows.slice(0, 4);
+                const sampleRows = samples.map((s, i) => {
+                    const orig    = typeof s === 'object' ? (s.original || s.text || '') : String(s);
+                    const decoded = typeof s === 'object' ? (s.decoded || s.roundtrip || '') : '';
+                    const match   = typeof s === 'object' ? s.exact_match : null;
+                    const col     = match === true ? '#47b475' : match === false ? '#e74c3c' : '#888';
+                    const label   = match === true ? '✓' : match === false ? '✗' : '?';
+                    const preview = orig.length > 80 ? orig.slice(0, 80) + '…' : orig;
+                    return `<div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:6px;padding:0.45rem 0.65rem;margin-bottom:4px;font-size:0.73rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                            <span style="color:#7e91ad;">row ${i}</span>
+                            <span style="color:${col};font-weight:700;">${label}</span>
+                        </div>
+                        <div style="font-family:monospace;color:#9fb3cc;word-break:break-all;">${preview}</div>
+                        ${decoded && decoded !== orig ? `<div style="font-family:monospace;color:#555;word-break:break-all;margin-top:2px;">${decoded.length > 80 ? decoded.slice(0,80)+'…' : decoded}</div>` : ''}
+                    </div>`;
+                }).join('');
+                parts.push(`<div>
+                    <div style="font-size:0.78rem;color:#7e91ad;font-weight:600;margin-bottom:0.4rem;">Tokenizer Roundtrip Samples</div>
+                    ${sampleRows}
+                </div>`);
+            }
+
+            panel.innerHTML = parts.length ? parts.join('') : '<span style="color:#555;">Corpus data available but empty.</span>';
+        }
 
         function filterKernels(query) {
             const nodes = document.querySelectorAll('.kernel-node');

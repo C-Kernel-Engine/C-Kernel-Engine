@@ -2,10 +2,15 @@
 """
 check_rms_swiglu_backward_parity_v7.py
 
-Parity sweep for v7 training-critical backward kernels:
-- rmsnorm_backward (strict and default paths)
+Why this script exists:
+- Focused kernel-level parity sweep for training-critical backward math.
+- Provides fast, isolated proof that RMSNorm/SwiGLU backward kernels align with
+  PyTorch references before debugging full harness/runtime behavior.
+
+Covers:
+- rmsnorm_backward (default and strict scalar parity paths)
 - swiglu_backward_exact (strict reference path)
-- swiglu_backward (fast path, optional gate)
+- swiglu_backward (fast approximation path with looser tolerance)
 """
 
 from __future__ import annotations
@@ -339,4 +344,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

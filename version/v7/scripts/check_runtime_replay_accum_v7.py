@@ -2,8 +2,14 @@
 """
 check_runtime_replay_accum_v7.py
 
-Run generated CK runtime parity with grad_accum>1 and enforce replay-on-check.
-Verifies replay restores full train state, including accumulation buffers.
+Why this script exists (F1 in regimen):
+- Generated-runtime replay correctness under grad_accum>1.
+- Verifies replay restores full train state, including accumulation snapshots,
+  not just scalar loss.
+
+This catches:
+- Replay restore gaps in optimizer/accum state.
+- Hidden state divergence that only appears with accumulation windows.
 """
 
 from __future__ import annotations

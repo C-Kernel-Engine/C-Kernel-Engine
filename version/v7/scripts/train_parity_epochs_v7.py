@@ -2,15 +2,22 @@
 """
 v7 tiny training parity (C-kernel autograd wrappers vs pure PyTorch).
 
-Purpose:
-- Validate gradient accumulation semantics
-- Validate multi-epoch optimizer behavior
-- Compare parameter trajectories against PyTorch baseline
+Why this script exists:
+- Kernel-isolation parity harness for training math.
+- Used by regimen stages A1/A2/A3/B/C to detect and localize numeric drift
+  between CK C kernels and PyTorch reference equations.
+- Runs C kernels through custom autograd wrappers, so kernel math can be
+  bisected without depending on full generated-runtime stitching.
+
+What this script is not:
+- Not the generated runtime itself.
+- Not a standalone production signoff for integrated runtime stitching/replay.
+  That role is handled by D1/E1/F1 runtime-oriented scripts.
 
 Scope:
-- CPU, fp32, deterministic seed
-- Tiny language-model-like stack:
-  Embedding -> RMSNorm -> Linear(2H) -> SwiGLU -> Linear(V) -> CE
+- CPU, fp32, deterministic seed.
+- Tiny/stacked language-model-like training path:
+  Embedding -> RMSNorm -> Linear(2H) -> SwiGLU -> Linear(V) -> CE.
 """
 
 from __future__ import annotations

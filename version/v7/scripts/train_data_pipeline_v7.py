@@ -1623,7 +1623,11 @@ def _run_v7_init(args: argparse.Namespace, run_dir: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="High-level v7 dataset/tokenizer/train pipeline")
-    ap.add_argument("--run", required=True, help="Existing v7 run-dir (created by ck_run_v7.py init)")
+    ap.add_argument(
+        "--run",
+        required=True,
+        help="Existing v7 run-dir (created by ck_run_v7.py init). Recommended: ~/.cache/ck-engine-v7/models/train/<run-name> for ir_hub discovery.",
+    )
     ap.add_argument(
         "--init-if-missing",
         action="store_true",
@@ -1836,6 +1840,17 @@ def main() -> int:
         args.require_ascii_data = args.tokenizer == "ascii_bpe"
 
     run_dir = Path(args.run).expanduser().resolve()
+    cache_train_root = (Path.home() / ".cache" / "ck-engine-v7" / "models" / "train").resolve()
+    try:
+        in_cache_train_root = run_dir.is_relative_to(cache_train_root)
+    except AttributeError:
+        in_cache_train_root = str(run_dir).startswith(str(cache_train_root))
+    if not in_cache_train_root:
+        print(
+            "[WARN] --run is outside ~/.cache/ck-engine-v7/models/train.\n"
+            f"       run_dir={run_dir}\n"
+            "       open_ir_hub.py may not auto-discover this run unless you move it later."
+        )
     manifest = run_dir / "weights_manifest.json"
     weights_bump = run_dir / "weights.bump"
     needs_init = (not run_dir.exists()) or (not manifest.exists()) or (not weights_bump.exists())

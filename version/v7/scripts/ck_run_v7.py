@@ -6721,7 +6721,9 @@ def step_run_train_init(args: argparse.Namespace) -> None:
 
     run_name = str(getattr(args, "run_name", "tiny_init") or "tiny_init").strip()
     out_dir_arg = getattr(args, "output_dir", None)
-    out_dir = Path(out_dir_arg) if out_dir_arg else (V7_ROOT / "runs" / run_name)
+    # Keep default run dirs under cache so open_ir_hub.py can discover them automatically.
+    default_train_root = Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
+    out_dir = Path(out_dir_arg) if out_dir_arg else (default_train_root / run_name)
 
     cmd = [
         python_exec,
@@ -9426,10 +9428,10 @@ Examples:
   ./ck-v7 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
   # Training run-dir flow
-  ./ck-v7 init --run ./version/v7/runs/exp1 --init xavier_uniform
-  ./ck-v7 train --run ./version/v7/runs/exp1 --data ./train.txt --train-epochs 3
-  ./ck-v7 sanity --run ./version/v7/runs/exp1 --data ./train.txt --train-epochs 1
-  ./ck-v7 parity --run ./version/v7/runs/exp1 --data ./train.txt --with-fd --with-replay
+  ./ck-v7 init --run ~/.cache/ck-engine-v7/models/train/exp1 --init xavier_uniform
+  ./ck-v7 train --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --train-epochs 3
+  ./ck-v7 sanity --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --train-epochs 1
+  ./ck-v7 parity --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --with-fd --with-replay
 """
     )
 
@@ -9804,7 +9806,7 @@ Examples:
     # Init command (tiny training run bootstrap)
     init_parser = subparsers.add_parser('init', help='Initialize tiny v7 training run directory')
     init_parser.add_argument('--run', dest='output_dir', default=None,
-                             help='Output run directory (default: version/v7/runs/tiny_init)')
+                             help='Output run directory (default: ~/.cache/ck-engine-v7/models/train/<run-name>)')
     init_parser.add_argument('--run-name', default='tiny_init',
                              help='Run name used when --run is not set')
     init_parser.add_argument('--init', choices=['normal_0p02', 'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'zeros'],
