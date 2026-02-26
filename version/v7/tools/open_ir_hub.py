@@ -482,6 +482,20 @@ def render_html(index_payload: dict[str, Any]) -> str:
     tr:last-child td {{ border-bottom: none; }}
     tr:hover td {{ background: #2e2e2e; }}
 
+    /* ── ROW KIND HIGHLIGHTS ── */
+    tr.row-train td {{ background: rgba(7,173,248,0.04); }}
+    tr.row-train td:first-child {{ box-shadow: inset 3px 0 0 rgba(7,173,248,0.55); }}
+    tr.row-train:hover td {{ background: rgba(7,173,248,0.09); }}
+    tr.row-inference td:first-child {{ box-shadow: inset 3px 0 0 rgba(255,180,0,0.30); }}
+    tr.row-inference:hover td {{ background: #2e2e2e; }}
+
+    /* ── LEGEND ── */
+    .legend {{ display: flex; gap: 16px; margin-bottom: 0.75rem; font-size: 0.72rem; color: var(--muted); align-items: center; }}
+    .leg-item {{ display: flex; align-items: center; gap: 5px; }}
+    .leg-dot {{ width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }}
+    .leg-train {{ background: rgba(7,173,248,0.25); border: 1px solid var(--blue); }}
+    .leg-infer {{ background: rgba(255,180,0,0.12); border: 1px solid rgba(255,180,0,0.40); }}
+
     /* ── MISC ── */
     .mono  {{ font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; }}
     .small {{ font-size: 0.72rem; line-height: 1.35; }}
@@ -551,6 +565,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
         <option value="train">Train</option>
         <option value="inference">Inference</option>
       </select>
+    </div>
+    <div class="legend">
+      <span class="leg-item"><span class="leg-dot leg-train"></span>Train run</span>
+      <span class="leg-item"><span class="leg-dot leg-infer"></span>Inference run</span>
     </div>
     <div class="rules">
       <span class="rules-label">Reuse Rules</span>
@@ -654,7 +672,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
           <div class=\"small\"><span class=\"badge b-warn\">ctx MAYBE</span></div>
           <div class=\"small\"><span class=\"badge b-bad\">dim NO</span></div>
         `;
-        return `<tr>
+        return `<tr class="row-${{r.kind}}">
           <td><div><span class=\"badge b-muted kind\">${{esc(r.kind)}}</span><strong>${{esc(r.name)}}</strong></div><div class=\"mono muted\">${{esc(r.rel_path)}}</div></td>
           <td class=\"mono\">${{esc(dim)}}</td>
           <td>${{statusCell}}</td>
