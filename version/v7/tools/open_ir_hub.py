@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -82,6 +83,15 @@ def _infer_kind(run_dir: Path, models_root: Path) -> str:
     if parts and parts[0] == "train":
         return "train"
     return "inference"
+
+
+def _build_generate_report_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    out_q = shlex.quote(str(run_dir / "ir_report.html"))
+    return (
+        "python3 version/v7/tools/open_ir_visualizer.py "
+        f"--generate --run {run_q} --html-only --strict-run-artifacts --output {out_q}"
+    )
 
 
 def _find_report_path(run_dir: Path) -> Path | None:
@@ -227,6 +237,7 @@ class RunRecord:
     weights_step: int | None
     weights_reason: str | None
     shape_signature: str | None
+    generate_report_cmd: str
     updated_epoch: float
     updated_iso: str | None
 
@@ -252,6 +263,7 @@ class RunRecord:
             "weights_step": self.weights_step,
             "weights_reason": self.weights_reason,
             "shape_signature": self.shape_signature,
+            "generate_report_cmd": self.generate_report_cmd,
             "updated_epoch": self.updated_epoch,
             "updated_iso": self.updated_iso,
         }
@@ -316,6 +328,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         weights_step=weights_step,
         weights_reason=weights_reason,
         shape_signature=_shape_signature(dims),
+        generate_report_cmd=_build_generate_report_cmd(run_dir),
         updated_epoch=updated_epoch,
         updated_iso=updated_iso,
     )
@@ -387,6 +400,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
     a {{ color: #8fc2ff; text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
     .actions a {{ margin-right: 6px; white-space: nowrap; }}
+    .copy-btn {{ margin-top: 6px; font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background:#121722; color:var(--text); cursor:pointer; }}
+    .copy-btn:hover {{ border-color:#3b4b62; }}
+    .cmdline {{ margin-top: 6px; background:#121722; border:1px solid var(--line); border-radius:6px; padding:6px; }}
     .small {{ font-size: 11px; line-height: 1.35; }}
     .rules {{ margin-bottom: 12px; }}
     .status {{ display:flex; flex-direction:column; gap:3px; }}
@@ -450,6 +466,18 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     const esc = (v) => String(v ?? '').replace(/[&<>\"']/g, m => ({{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}}[m]));
     const fmt = (v, n=4) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(n) : '-';
+    const copyCmd = async (btn) => {{
+      const cmd = btn?.dataset?.cmd || '';
+      if (!cmd) return;
+      try {{
+        await navigator.clipboard.writeText(cmd);
+        const prev = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => {{ btn.textContent = prev; }}, 1000);
+      }} catch (_) {{
+        // no-op
+      }}
+    }};
     const parityBadge = (status) => {{
       if (status === 'PASS') return '<span class=\"badge b-good\">PASS</span>';
       if (status === 'PASS_REUSED') return '<span class=\"badge b-good\">PASS(reused)</span>';
@@ -474,6 +502,15 @@ def render_html(index_payload: dict[str, Any]) -> str:
         const actions = [];
         if (r.report_uri) actions.push(`<a href=\"${{esc(r.report_uri)}}\" target=\"_blank\" rel=\"noopener\">Open report</a>`);
         if (r.run_uri) actions.push(`<a href=\"${{esc(r.run_uri)}}\" target=\"_blank\" rel=\"noopener\">Open dir</a>`);
+        if (!r.report_uri && r.generate_report_cmd) {{
+          actions.push(`
+            <details class=\"small\" style=\"margin-top:6px;\">
+              <summary>Generate report</summary>
+              <div class=\"cmdline mono\">${{esc(r.generate_report_cmd)}}</div>
+              <button class=\"copy-btn\" data-cmd=\"${{esc(r.generate_report_cmd)}}\" onclick=\"copyCmd(this)\">Copy</button>
+            </details>
+          `);
+        }}
         const weightsCell = `
           <div class=\"mono small tight\">step=${{esc(r.weights_step ?? '-')}} · reason=${{esc(r.weights_reason ?? '-')}}</div>
           <div class=\"mono small tight\">ckpt=${{esc(r.checkpoint_count ?? 0)}} · latest=${{esc(r.latest_checkpoint_step ?? '-')}}</div>
