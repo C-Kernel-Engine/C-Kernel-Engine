@@ -7519,6 +7519,56 @@ def _run_llamacpp_parity(
             return False, f"collapsed token ids (all zero across {len(token_ids)} dumps)"
         return True, f"entries={len(token_ids)} unique_tokens={unique[:16]}"
 
+    def _looks_like_flag_error(stderr_text: str) -> bool:
+        s = (stderr_text or "").lower()
+        needles = (
+            "unknown argument",
+            "unrecognized option",
+            "invalid option",
+            "unknown option",
+            "did you mean",
+        )
+        return any(tok in s for tok in needles)
+
+    def _short_tail(text: str, limit: int = 500) -> str:
+        if not text:
+            return ""
+        return text[-limit:]
+
+    def _run_once(
+        run_cmd: list[str],
+        *,
+        run_env: dict[str, str],
+        run_cwd: Path,
+        timeout_sec: Optional[int],
+    ) -> tuple[Optional[subprocess.CompletedProcess[str]], Optional[str]]:
+        try:
+            proc = subprocess.run(
+                run_cmd,
+                cwd=run_cwd,
+                env=run_env,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+            )
+            return proc, None
+        except subprocess.TimeoutExpired:
+            return None, "timeout"
+        except Exception as e:
+            return None, str(e)
+
+    def _is_fresh_nonempty(path: Path, started_at: float, *, slack_sec: float = 1.5) -> bool:
+        try:
+            if not path.exists():
+                return False
+            st = path.stat()
+            if st.st_size <= 0:
+                return False
+            return st.st_mtime >= (started_at - slack_sec)
+        except Exception:
+            return False
+
     env = os.environ.copy()
     env["CKDMP_DIR"] = str(ref_dump_dir)
     if llama_layer is None:
@@ -7533,6 +7583,20 @@ def _run_llamacpp_parity(
         env["CKDMP_INCLUDE_GLOBAL"] = "1"
 
     temp = 0.0 if temperature is None else float(temperature)
+    ctx_arg = int(ctx_size) if (ctx_size is not None and int(ctx_size) > 0) else 0
+    if ctx_arg <= 0:
+        raw_default_ctx = str(os.environ.get("CK_LLAMA_PARITY_DEFAULT_CTX", "1024")).strip()
+        try:
+            ctx_arg = int(raw_default_ctx)
+        except Exception:
+            ctx_arg = 1024
+        if ctx_arg > 0:
+            log(
+                f"  llama parity ctx-size not set; using -c {ctx_arg} "
+                f"(override with --context-len or CK_LLAMA_PARITY_DEFAULT_CTX)",
+                C_DIM,
+            )
+
     exe_name = llm_path.name.lower()
     cmd = [
         str(llm_path),
@@ -7557,31 +7621,88 @@ def _run_llamacpp_parity(
             str(max_tokens),
         ]
     )
-    if ctx_size and ctx_size > 0:
-        cmd.extend(["--ctx-size", str(ctx_size)])
+    if ctx_arg > 0:
+        cmd.extend(["-c", str(ctx_arg)])
 
-    try:
-        timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
-        if timeout_sec <= 0:
-            timeout_sec = None
-        result = subprocess.run(
-            cmd,
-            cwd=work_dir,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-        )
-    except subprocess.TimeoutExpired:
-        log_error("llama.cpp parity run timed out")
-        return False
-    except Exception as e:
-        log_error(f"llama.cpp parity run error: {e}")
-        return False
+    timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
+    if timeout_sec <= 0:
+        timeout_sec = None
 
-    has_dump = ref_dump.exists() and ref_dump.stat().st_size > 0
-    has_index = ref_index.exists() and ref_index.stat().st_size > 0
+    attempt_diag: list[dict[str, Any]] = []
+    _purge_ref_dump()
+    ckdmp_started = time.time()
+    result, run_err = _run_once(cmd, run_env=env, run_cwd=work_dir, timeout_sec=timeout_sec)
+    if run_err is not None:
+        log_error(f"llama.cpp parity run failed: {run_err}")
+        return False
+    if result is None:
+        log_error("llama.cpp parity run failed (no process result)")
+        return False
+    attempt_diag.append(
+        {
+            "phase": "ckdmp",
+            "cwd": str(work_dir),
+            "cmd": " ".join(shlex.quote(x) for x in cmd),
+            "rc": int(result.returncode),
+            "stderr_tail": _short_tail(result.stderr, 360),
+        }
+    )
+
+    # Retry with compatibility flags only when the binary explicitly rejects args.
+    if result.returncode != 0 and _looks_like_flag_error(result.stderr):
+        flag_variants: list[list[str]] = []
+        if "--simple-io" in cmd:
+            flag_variants.append([x for x in cmd if x != "--simple-io"])
+        if "--no-warmup" in cmd:
+            flag_variants.append([x for x in cmd if x != "--no-warmup"])
+        if "-no-cnv" in cmd:
+            flag_variants.append([x for x in cmd if x != "-no-cnv"])
+        if "--single-turn" in cmd:
+            flag_variants.append([x for x in cmd if x != "--single-turn"])
+        # Last resort: minimal prompt-only invocation.
+        minimal = [str(llm_path), "-m", str(gguf_path), "-p", prompt, "--temp", f"{temp}", "-n", str(max_tokens)]
+        if ctx_arg > 0:
+            minimal.extend(["-c", str(ctx_arg)])
+        flag_variants.append(minimal)
+
+        seen_variants: set[tuple[str, ...]] = set()
+        for alt_cmd in flag_variants:
+            key = tuple(alt_cmd)
+            if key in seen_variants:
+                continue
+            seen_variants.add(key)
+            _purge_ref_dump()
+            ckdmp_started = time.time()
+            alt_res, alt_err = _run_once(alt_cmd, run_env=env, run_cwd=work_dir, timeout_sec=timeout_sec)
+            if alt_err is not None or alt_res is None:
+                attempt_diag.append(
+                    {
+                        "phase": "ckdmp-retry",
+                        "cwd": str(work_dir),
+                        "cmd": " ".join(shlex.quote(x) for x in alt_cmd),
+                        "rc": None,
+                        "stderr_tail": f"runner error: {alt_err}",
+                    }
+                )
+                continue
+            result = alt_res
+            attempt_diag.append(
+                {
+                    "phase": "ckdmp-retry",
+                    "cwd": str(work_dir),
+                    "cmd": " ".join(shlex.quote(x) for x in alt_cmd),
+                    "rc": int(result.returncode),
+                    "stderr_tail": _short_tail(result.stderr, 280),
+                }
+            )
+            has_dump_alt = _is_fresh_nonempty(ref_dump, ckdmp_started)
+            if has_dump_alt:
+                break
+            if not _looks_like_flag_error(result.stderr):
+                break
+
+    has_dump = _is_fresh_nonempty(ref_dump, ckdmp_started)
+    has_index = _is_fresh_nonempty(ref_index, ckdmp_started)
 
     if result.returncode == 0 and has_dump:
         ok_tokens, token_msg = _token_audit(ref_index)
@@ -7613,21 +7734,8 @@ def _run_llamacpp_parity(
 
     # Fallback for local llama.cpp builds that expose LLAMA_DUMP_LAYER0 raw dumps
     # but are not instrumented with CKDMP output.
-    raw_dump_dir = work_dir / "llama_dump"
     raw_converter = SCRIPTS_DIR / "parity" / "llama_to_ckdmp_converter.py"
     if allow_raw_fallback and raw_converter.exists():
-        for stale in raw_dump_dir.glob("*.bin"):
-            try:
-                stale.unlink()
-            except OSError:
-                pass
-        raw_index = raw_dump_dir / "index.json"
-        try:
-            if raw_index.exists():
-                raw_index.unlink()
-        except OSError:
-            pass
-
         env_raw = os.environ.copy()
         env_raw["LLAMA_DUMP_LAYER0"] = "1"
         for key in (
@@ -7639,25 +7747,89 @@ def _run_llamacpp_parity(
             "CKDMP_INCLUDE_GLOBAL",
         ):
             env_raw.pop(key, None)
+        raw_parent_candidates: list[Path] = []
+        for parent in (
+            work_dir,
+            work_dir / ".ck_build",
+            gguf_path.parent,
+            gguf_path.parent / ".ck_build",
+            work_dir.parent,
+            work_dir.parent / ".ck_build",
+        ):
+            if parent not in raw_parent_candidates:
+                raw_parent_candidates.append(parent)
 
-        try:
-            timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
-            if timeout_sec <= 0:
-                timeout_sec = None
-            raw_res = subprocess.run(
-                cmd,
-                cwd=work_dir,
-                env=env_raw,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
+        for raw_parent in raw_parent_candidates:
+            raw_dump_dir = raw_parent / "llama_dump"
+            try:
+                raw_dump_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                attempt_diag.append(
+                    {
+                        "phase": "raw",
+                        "cwd": str(raw_parent),
+                        "cmd": "<mkdir llama_dump>",
+                        "rc": None,
+                        "stderr_tail": f"skip: cannot create raw dump dir ({e})",
+                    }
+                )
+                continue
+            if not os.access(raw_parent, os.W_OK | os.X_OK) or not os.access(raw_dump_dir, os.W_OK | os.X_OK):
+                attempt_diag.append(
+                    {
+                        "phase": "raw",
+                        "cwd": str(raw_parent),
+                        "cmd": "<raw fallback>",
+                        "rc": None,
+                        "stderr_tail": "skip: raw dump dir not writable",
+                    }
+                )
+                continue
+
+            for stale in raw_dump_dir.glob("*.bin"):
+                try:
+                    stale.unlink()
+                except OSError:
+                    pass
+            raw_index = raw_dump_dir / "index.json"
+            try:
+                if raw_index.exists():
+                    raw_index.unlink()
+            except OSError:
+                pass
+
+            raw_started = time.time()
+            raw_res, raw_err = _run_once(cmd, run_env=env_raw, run_cwd=raw_parent, timeout_sec=timeout_sec)
+            if raw_err is not None:
+                attempt_diag.append(
+                    {
+                        "phase": "raw",
+                        "cwd": str(raw_parent),
+                        "cmd": " ".join(shlex.quote(x) for x in cmd),
+                        "rc": None,
+                        "stderr_tail": f"runner error: {raw_err}",
+                    }
+                )
+                continue
+            if raw_res is None:
+                continue
+            raw_bins = sorted(
+                p for p in raw_dump_dir.glob("*.bin")
+                if _is_fresh_nonempty(p, raw_started)
             )
-        except Exception:
-            raw_res = None
+            attempt_diag.append(
+                {
+                    "phase": "raw",
+                    "cwd": str(raw_parent),
+                    "cmd": " ".join(shlex.quote(x) for x in cmd),
+                    "rc": int(raw_res.returncode),
+                    "stderr_tail": _short_tail(raw_res.stderr, 260),
+                    "raw_bins": int(len(raw_bins)),
+                }
+            )
+            if not raw_bins:
+                continue
 
-        raw_bins = sorted(raw_dump_dir.glob("*.bin"))
-        if raw_bins:
             conv_cmd = [
                 sys.executable,
                 str(raw_converter),
@@ -7678,9 +7850,12 @@ def _run_llamacpp_parity(
                 check=False,
             )
             if conv_res.returncode == 0 and ref_dump.exists() and ref_dump.stat().st_size > 0:
-                if raw_res is not None and raw_res.returncode != 0:
-                    log(f"  llama.cpp raw dump run exited with {raw_res.returncode}; converted raw dumps anyway", C_ORANGE)
-                log(f"  Converted raw llama_dump -> {ref_dump}", C_GREEN)
+                if raw_res.returncode != 0:
+                    log(
+                        f"  llama.cpp raw dump run exited with {raw_res.returncode}; converted raw dumps anyway",
+                        C_ORANGE,
+                    )
+                log(f"  Converted raw llama_dump ({raw_dump_dir}) -> {ref_dump}", C_GREEN)
                 return True
 
     if require_token_aware_dumps and not allow_raw_fallback:
@@ -7689,8 +7864,27 @@ def _run_llamacpp_parity(
         return False
 
     log_error("llama.cpp parity dump failed")
-    if result.stderr:
-        log(f"  {result.stderr[:300]}", C_DIM)
+    log(f"  binary: {llm_path}", C_DIM)
+    log(f"  gguf:   {gguf_path}", C_DIM)
+    log(f"  run:    {work_dir}", C_DIM)
+    if result is not None:
+        log(
+            f"  ckdmp rc={result.returncode} dump={has_dump} index={has_index}",
+            C_DIM,
+        )
+        if result.returncode == -9:
+            log("  hint: process killed (rc=-9). Try --context-len 1024 or lower.", C_ORANGE)
+        if result.stderr:
+            log(f"  ckdmp stderr tail:\n{_short_tail(result.stderr, 420)}", C_DIM)
+    for d in attempt_diag[-6:]:
+        rc_txt = "n/a" if d.get("rc") is None else str(d.get("rc"))
+        log(
+            f"  attempt[{d.get('phase')}] cwd={d.get('cwd')} rc={rc_txt} "
+            f"cmd={d.get('cmd')}",
+            C_DIM,
+        )
+        if d.get("stderr_tail"):
+            log(f"    {d.get('stderr_tail')}", C_DIM)
     return False
 
 
@@ -9018,7 +9212,8 @@ def run_pipeline(args: argparse.Namespace):
             allow_raw_fallback=not bool(getattr(args, "llama_no_raw_fallback", False)),
         )
         if not llama_ok:
-            log("  llama.cpp reference dump failed; generating diagnostic parity summaries from available artifacts", C_ORANGE)
+            log_error("llama.cpp reference dump failed; cannot complete --detailed-llamacpp-parity")
+            sys.exit(1)
         parity_model_uri = str(gguf_path_for_tokenizer) if gguf_path_for_tokenizer else str(getattr(args, "model", ""))
         _run_detailed_inference_parity_reports(
             work_dir,
