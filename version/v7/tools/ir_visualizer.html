@@ -11579,12 +11579,21 @@ function renderProfileHowTo() {
          *  @param {object} p – { ai, gflops, dramBw, peakDp, peakSp, kernels[] }
          *  @returns {string} SVG markup */
         function buildRooflineSvg(p) {
-            const ai       = (p && Number.isFinite(Number(p.ai)))     ? Number(p.ai)     : null;
-            const gflops   = (p && Number.isFinite(Number(p.gflops))) ? Number(p.gflops) : null;
-            const dramBw   = (p && Number.isFinite(Number(p.dramBw))) ? Number(p.dramBw) : 29.0;
-            const peakDp   = (p && Number.isFinite(Number(p.peakDp))) ? Number(p.peakDp) : 288.1;
-            const peakSp   = (p && Number.isFinite(Number(p.peakSp))) ? Number(p.peakSp) : 580.6;
-            const kernels  = (p && Array.isArray(p.kernels)) ? p.kernels : [];
+            const ai        = (p && Number.isFinite(Number(p.ai)))       ? Number(p.ai)       : null;
+            const gflops    = (p && Number.isFinite(Number(p.gflops)))   ? Number(p.gflops)   : null;
+            const dramBw    = (p && Number.isFinite(Number(p.dramBw)))   ? Number(p.dramBw)   : 29.0;
+            // FP32 = primary ceiling (LLM inference uses FP32 activations).
+            // Accept either new peakFp32/peakFp64 keys (from cpu_topology) or
+            // legacy peakSp/peakDp (from Intel Advisor), with sane fallbacks.
+            const peakFp32  = (p && Number.isFinite(Number(p.peakFp32))) ? Number(p.peakFp32)
+                            : (p && Number.isFinite(Number(p.peakSp)))   ? Number(p.peakSp)   : 576.0;
+            const peakFp64  = (p && Number.isFinite(Number(p.peakFp64))) ? Number(p.peakFp64)
+                            : (p && Number.isFinite(Number(p.peakDp)))   ? Number(p.peakDp)   : 288.0;
+            const kernels   = (p && Array.isArray(p.kernels)) ? p.kernels : [];
+            const inferMode = (p && p.inferMode) ? String(p.inferMode) : 'unknown';
+            const cpuModel  = (p && p.cpuModel)  ? String(p.cpuModel)  : null;
+            // Ridge point is where DRAM BW ceiling meets FP32 compute ceiling
+            const fp32RidgeAI = peakFp32 / dramBw;
 
             const W = 680, H = 390;
             const PL = 68, PR = 648, PT = 32, PB = 310;
@@ -11596,8 +11605,16 @@ function renderProfileHowTo() {
 
             let s = `<svg class="profile-inline-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Roofline Model" data-ck-svg-expand="Roofline Model">`;
             s += `<rect width="${W}" height="${H}" rx="10" fill="#0a0e17"/>`;
+            const modeLabel = inferMode === 'decode'  ? 'Decode — GEMV, 1 token, deeply memory-bound'
+                            : inferMode === 'prefill' ? 'Prefill — GEMM, prompt tokens'
+                            : '';
+            const cpuStr = cpuModel ? cpuModel.replace(/\s+CPU\s*@.*$/i,'').replace(/\(TM\)|\(R\)/g,'').trim() : '';
             s += `<text x="${PL}" y="16" fill="#d7deea" font-size="10" font-weight="700" font-family="Inter,sans-serif">Roofline Model — Arithmetic Intensity vs. Performance</text>`;
-            s += `<text x="${PL}" y="27" fill="#7e91ad" font-size="7.4" font-family="Inter,sans-serif">Peak lines = theoretical max (memory BW × AI or compute ceiling). Dots = op families. Left of ridge = memory-bound; right = compute-bound. Hover for details.</text>`;
+            s += `<text x="${PL}" y="27" fill="#7e91ad" font-size="7.4" font-family="Inter,sans-serif">Peak lines = theoretical ceilings (memory BW × AI or compute max). Left of ridge = memory-bound; right = compute-bound. Op dots are <tspan fill="#e74c3c">estimated</tspan> from timing.</text>`;
+            if (cpuStr || modeLabel) {
+                const infoStr = [cpuStr, modeLabel].filter(Boolean).join('  ·  ');
+                s += `<text x="${PR}" y="16" text-anchor="end" fill="#2e3d52" font-size="7" font-family="Inter,sans-serif">${infoStr}</text>`;
+            }
 
             /* plot area */
             s += `<rect x="${PL}" y="${PT}" width="${PW}" height="${PH}" fill="#0d1220" rx="3"/>`;
@@ -11620,14 +11637,14 @@ function renderProfileHowTo() {
             s += `<text x="${PL+PW/2}" y="${H-8}" text-anchor="middle" fill="#91a4bf" font-size="9.2" font-family="Inter,sans-serif">Arithmetic Intensity (FLOPs / byte) — log scale</text>`;
             s += `<text x="11" y="${PT+PH/2}" text-anchor="middle" fill="#91a4bf" font-size="9.2" font-family="Inter,sans-serif" transform="rotate(-90,11,${(PT+PH/2).toFixed(0)})">Performance (GFLOP/s) — log scale</text>`;
 
-            /* bandwidth roof helper — each roof line gets a fat invisible hover target + <title> tooltip */
+            /* bandwidth roof helper — uses FP32 peak as the ceiling for each BW roof */
             const drawRoof = (bw, color, dash, label, tooltipDesc, labelDx = 5, labelDy = -5) => {
-                const ridgeAI = peakDp / bw;
+                const ridgeAI = peakFp32 / bw;          // ridge relative to FP32 ceiling
                 const xStart  = Math.pow(10, xLogMin);
                 const yStart  = bw * xStart;
-                const x1 = toX(xStart), y1 = toY(Math.min(yStart, peakDp));
+                const x1 = toX(xStart), y1 = toY(Math.min(yStart, peakFp32));
                 const x2 = toX(Math.min(ridgeAI, Math.pow(10, xLogMax)));
-                const y2 = toY(Math.min(bw * Math.min(ridgeAI, Math.pow(10, xLogMax)), peakDp));
+                const y2 = toY(Math.min(bw * Math.min(ridgeAI, Math.pow(10, xLogMax)), peakFp32));
                 if (x2 > PL) {
                     const lx1 = Math.max(x1,PL).toFixed(1), ly1 = Math.min(y1,PB).toFixed(1);
                     const lx2 = Math.min(x2,PR).toFixed(1), ly2 = Math.max(y2,PT).toFixed(1);
@@ -11643,37 +11660,38 @@ function renderProfileHowTo() {
             };
             // label offsets reduce overlap around low-AI kernel dots
             drawRoof(dramBw, '#f39c12', 'none', `DRAM ${dramBw.toFixed(0)} GB/s`,
-                `DRAM Bandwidth: ${dramBw.toFixed(0)} GB/s\nSlope = ${dramBw.toFixed(0)} GFLOP/s per FLOPs/byte.\nRidge point: ${(peakDp/dramBw).toFixed(1)} FLOPs/byte.\nBelow this line = memory-bound. Reduce bytes moved to climb toward the ceiling.`,
+                `DRAM Bandwidth: ${dramBw.toFixed(0)} GB/s\nSlope = ${dramBw.toFixed(0)} GFLOP/s per FLOPs/byte.\nFP32 ridge point: ${fp32RidgeAI.toFixed(1)} FLOPs/byte.\nBelow this line = memory-bound (streaming weights/KV-cache dominates).\nTo climb: reduce bytes moved — quantize weights, fuse ops, use KV-cache eviction.`,
                 -18, 10);
             drawRoof(200, '#3498db', '6,3', 'L2 ~200 GB/s',
-                `L2 Cache Bandwidth: ~200 GB/s (estimated)\nIf working-set fits in L2, effective bandwidth is ~7x DRAM.\nRidge point: ~${(peakDp/200).toFixed(1)} FLOPs/byte.\nCache-blocked GEMM can reach this ceiling.`,
+                `L2 Cache Bandwidth: ~200 GB/s (estimated)\nIf working-set fits in L2, effective BW is ~${(200/dramBw).toFixed(0)}× DRAM.\nRidge point: ~${(peakFp32/200).toFixed(1)} FLOPs/byte.\nCache-blocked GEMM with small tiles can approach this ceiling.`,
                 4, -10);
             drawRoof(800, '#9b59b6', '3,4', 'L1 ~800 GB/s',
-                `L1 Cache Bandwidth: ~800 GB/s (estimated)\nSmall hot loops operating fully from L1 approach this ceiling.\nRidge point: ~${(peakDp/800).toFixed(1)} FLOPs/byte.\nAchievable for tiny inner-product kernels with perfect register reuse.`,
+                `L1 Cache Bandwidth: ~800 GB/s (estimated)\nSmall hot loops operating fully from L1 approach this ceiling.\nRidge point: ~${(peakFp32/800).toFixed(1)} FLOPs/byte.\nAchievable for tiny inner-product kernels with perfect register reuse.`,
                 8, -18);
 
-            /* peak compute roofs */
-            const yDp = toY(peakDp);
-            const xDpRidge = toX(peakDp / dramBw);
-            if (yDp >= PT && yDp <= PB) {
-                s += `<g style="cursor:help"><title>FP64·FMA Peak: ${peakDp.toFixed(0)} GFLOP/s\nFP64 = Double Precision (64-bit float). FMA = Fused Multiply-Add: a·b+c = 2 FLOPs in a single instruction.\nWith AVX2: 8 doubles/lane × 2 FLOPs × ~3.6 GHz ≈ ${peakDp.toFixed(0)} GFLOP/s theoretical peak per socket.\nMost ML workloads reach 5–30% of this. Blocked GEMM with AVX2 can reach 50–80%.\nTo maximize: packed SIMD, no load stalls, loop unrolling, high register reuse.</title>`;
-                s += `<line x1="${Math.min(xDpRidge,PR).toFixed(1)}" y1="${yDp.toFixed(1)}" x2="${PR}" y2="${yDp.toFixed(1)}" stroke="#47b475" stroke-width="1.5" opacity="0.9"/>`;
-                s += `<line x1="${Math.min(xDpRidge,PR).toFixed(1)}" y1="${yDp.toFixed(1)}" x2="${PR}" y2="${yDp.toFixed(1)}" stroke="transparent" stroke-width="12"/>`;
-                s += `<text x="${PR-4}" y="${(yDp-5).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="8" font-family="Inter,sans-serif">FP64·FMA ${peakDp.toFixed(0)} GF/s</text></g>`;
+            /* peak compute roofs — FP32 is primary (LLM inference), FP64 is reference */
+            const yFp32 = toY(peakFp32);
+            const xFp32Ridge = toX(fp32RidgeAI);
+            if (yFp32 >= PT && yFp32 <= PB) {
+                s += `<g style="cursor:help"><title>FP32·FMA Peak: ${peakFp32.toFixed(0)} GFLOP/s  ← PRIMARY ceiling for LLM inference\nFP32 = Single Precision (32-bit float) — this is what LLM activations and accumulations use.\nFMA = Fused Multiply-Add: a·b+c = 2 FLOPs per instruction.\nWith AVX2+FMA: 8 FP32 lanes × 2 FLOPs × freq × cores = ${peakFp32.toFixed(0)} GF/s theoretical peak.\nMost inference reaches 2–15% of this (memory-bound). Quantized GEMM with tiling can reach 30–60%.</title>`;
+                s += `<line x1="${Math.min(xFp32Ridge,PR).toFixed(1)}" y1="${yFp32.toFixed(1)}" x2="${PR}" y2="${yFp32.toFixed(1)}" stroke="#47b475" stroke-width="1.8" opacity="0.95"/>`;
+                s += `<line x1="${Math.min(xFp32Ridge,PR).toFixed(1)}" y1="${yFp32.toFixed(1)}" x2="${PR}" y2="${yFp32.toFixed(1)}" stroke="transparent" stroke-width="12"/>`;
+                s += `<text x="${PR-4}" y="${(yFp32-5).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="8" font-family="Inter,sans-serif">FP32·FMA ${peakFp32.toFixed(0)} GF/s</text></g>`;
             }
-            const ySpRidge = toX(peakSp / dramBw);
-            const ySp = toY(peakSp);
-            if (ySp >= PT && ySp <= PB) {
-                s += `<g style="cursor:help"><title>FP32·FMA Peak: ${peakSp.toFixed(0)} GFLOP/s\nFP32 = Single Precision (32-bit float) — twice the SIMD lanes of FP64, so double the peak.\nRelevant for FP32 activations in LLM inference and mixed-precision training.\nAMX tiles on Sapphire Rapids / Granite Rapids can exceed this for BF16/INT8 matrix ops.</title>`;
-                s += `<line x1="${Math.min(ySpRidge,PR).toFixed(1)}" y1="${ySp.toFixed(1)}" x2="${PR}" y2="${ySp.toFixed(1)}" stroke="#47b475" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>`;
-                s += `<text x="${PR-4}" y="${(ySp-5).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="7.5" font-family="Inter,sans-serif" opacity="0.55">FP32·FMA ${peakSp.toFixed(0)} GF/s</text></g>`;
+            const yFp64 = toY(peakFp64);
+            const xFp64Ridge = toX(peakFp64 / dramBw);
+            if (yFp64 >= PT && yFp64 <= PB && Math.abs(yFp64 - yFp32) > 8) {
+                s += `<g style="cursor:help"><title>FP64·FMA Peak: ${peakFp64.toFixed(0)} GFLOP/s  (reference only — LLM inference uses FP32)\nFP64 = Double Precision (64-bit float) — twice the bytes per value, half the SIMD lanes of FP32.\nShown for reference. Most LLM inference does not run FP64 kernels.\nIf your workload uses FP64 (e.g. scientific computing), this is the relevant ceiling.</title>`;
+                s += `<line x1="${Math.min(xFp64Ridge,PR).toFixed(1)}" y1="${yFp64.toFixed(1)}" x2="${PR}" y2="${yFp64.toFixed(1)}" stroke="#47b475" stroke-width="1" stroke-dasharray="5,4" opacity="0.4"/>`;
+                s += `<line x1="${Math.min(xFp64Ridge,PR).toFixed(1)}" y1="${yFp64.toFixed(1)}" x2="${PR}" y2="${yFp64.toFixed(1)}" stroke="transparent" stroke-width="12"/>`;
+                s += `<text x="${PR-4}" y="${(yFp64-4).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="7" font-family="Inter,sans-serif" opacity="0.45">FP64·FMA ${peakFp64.toFixed(0)} GF/s</text></g>`;
             }
 
-            /* DRAM ridge point marker */
-            const dramRidgeAI = peakDp / dramBw;
-            const xRidge = toX(dramRidgeAI), yRidge = toY(peakDp);
+            /* DRAM ridge point marker — based on FP32 ceiling */
+            const dramRidgeAI = fp32RidgeAI;
+            const xRidge = toX(dramRidgeAI), yRidge = toY(peakFp32);
             if (xRidge >= PL && xRidge <= PR && yRidge >= PT && yRidge <= PB) {
-                s += `<g style="cursor:help"><title>DRAM Ridge Point: ${dramRidgeAI.toFixed(1)} FLOPs/byte\nThis is where the DRAM bandwidth ceiling meets the compute ceiling.\nLeft of ridge = memory-bound. Right of ridge = compute-bound.\nFor decode (batch=1) LLM inference, the workload is almost always left of this.</title>`;
+                s += `<g style="cursor:help"><title>FP32 DRAM Ridge Point: ${dramRidgeAI.toFixed(1)} FLOPs/byte\nWhere the DRAM bandwidth ceiling meets the FP32 compute ceiling.\nLeft of ridge = memory-bound (more bytes than FLOPs). Right = compute-bound.\nDecode (batch=1) LLM inference is almost always far left — weights stream once per token.\nTo move right: increase batch size (more reuse per weight row → GEMM instead of GEMV).</title>`;
                 s += `<line x1="${xRidge.toFixed(1)}" y1="${yRidge.toFixed(1)}" x2="${xRidge.toFixed(1)}" y2="${PB}" stroke="#f39c12" stroke-width="0.8" stroke-dasharray="2,4" opacity="0.5"/>`;
                 s += `<circle cx="${xRidge.toFixed(1)}" cy="${yRidge.toFixed(1)}" r="4" fill="none" stroke="#f39c12" stroke-width="1.5"/>`;
                 s += `</g>`;
@@ -11691,7 +11709,7 @@ function renderProfileHowTo() {
                 const compactLabel = kLabel.length > 12 ? `${kLabel.slice(0, 12)}…` : kLabel;
                 const labelOffset = 10 + ((i % 2) * 8);
                 s += `<g style="cursor:pointer">`;
-                s += `<title>${k.label}\nEstimated AI: ${k.ai.toFixed(2)} FLOPs/byte\nEstimated: ${k.gflops.toFixed(2)} GFLOP/s\nRegime: ${constraint}\nNote: AI is estimated from timing model. Run Intel Advisor for precise values.</title>`;
+                s += `<title>${k.label} (estimated position)\nEstimated AI: ${k.ai.toFixed(2)} FLOPs/byte — derived from op type + infer mode, NOT hardware measured\nEstimated throughput: ${k.gflops.toFixed(2)} GFLOP/s — proportional share of total timed GFLOPs\nRegime: ${constraint}\nInference mode: ${inferMode} — ${inferMode==='decode'?'GEMV: each weight row streamed once (low AI)':'GEMM: weight rows reused across tokens (higher AI)'}\nFor precise AI: run Intel Advisor roofline or perf mem events.</title>`;
                 s += `<circle cx="${kx.toFixed(1)}" cy="${ky.toFixed(1)}" r="14" fill="transparent"/>`;
                 s += `<circle cx="${kx.toFixed(1)}" cy="${ky.toFixed(1)}" r="7" fill="${k.color||'#aaa'}" opacity="0.75" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
                 s += `<text x="${kx.toFixed(1)}" y="${(ky-labelOffset).toFixed(1)}" text-anchor="middle" fill="${k.color||'#aaa'}" font-size="7.4" font-family="Inter,sans-serif" opacity="0.95">${compactLabel}</text>`;
@@ -11702,13 +11720,13 @@ function renderProfileHowTo() {
             if (ai !== null && gflops !== null && ai > 0 && gflops > 0) {
                 const wx = toX(ai), wy = toY(gflops);
                 if (wx >= PL && wx <= PR && wy >= PT && wy <= PB) {
-                    const wConstraint = ai < dramRidgeAI ? `MEMORY-BOUND — below DRAM ridge (${dramRidgeAI.toFixed(1)} F/B)` : `COMPUTE-BOUND — above DRAM ridge`;
+                    const wConstraint = ai < dramRidgeAI ? `MEMORY-BOUND — below FP32 ridge (${dramRidgeAI.toFixed(1)} F/B)` : `COMPUTE-BOUND — above FP32 ridge`;
                     const wDramPct = (gflops / (dramBw * ai) * 100).toFixed(0);
-                    const wPeakPct = (gflops / peakDp * 100).toFixed(0);
+                    const wPeakPct = (gflops / peakFp32 * 100).toFixed(0);  // vs FP32, the relevant ceiling
                     s += `<line x1="${PL}" y1="${wy.toFixed(1)}" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}" stroke="#fff" stroke-width="0.6" stroke-dasharray="2,3" opacity="0.2"/>`;
                     s += `<line x1="${wx.toFixed(1)}" y1="${PB}" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}" stroke="#fff" stroke-width="0.6" stroke-dasharray="2,3" opacity="0.2"/>`;
                     s += `<g style="cursor:pointer">`;
-                    s += `<title>Measured Workload\nArithmetic Intensity: ${ai.toFixed(3)} FLOPs/byte\nThroughput: ${gflops.toFixed(2)} GFLOP/s\nDRAM BW utilization: ~${wDramPct}% of local ceiling\nCompute utilization: ~${wPeakPct}% of DP FMA peak\nRegime: ${wConstraint}</title>`;
+                    s += `<title>Measured Workload\nArithmetic Intensity: ${ai.toFixed(3)} FLOPs/byte (estimated from timing)\nThroughput: ${gflops.toFixed(2)} GFLOP/s (from profile timings)\nDRAM BW utilization: ~${wDramPct}% of local DRAM ceiling\nFP32·FMA utilization: ~${wPeakPct}% of peak (${peakFp32.toFixed(0)} GF/s)\nRegime: ${wConstraint}\nNote: AI is estimated from timing model. Run Intel Advisor for hardware-measured AI.</title>`;
                     s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="16" fill="transparent"/>`;
                     s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="10" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>`;
                     s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="5" fill="#ffffff" stroke="rgba(0,0,0,0.6)" stroke-width="1.5"/>`;
@@ -11724,10 +11742,10 @@ function renderProfileHowTo() {
             const lx = PL+8, ly = PT+10;
             s += `<rect x="${lx}" y="${ly}" width="168" height="58" rx="5" fill="rgba(10,14,23,0.88)" stroke="#2a3348" stroke-width="0.8"/>`;
             const legItems = [
-                {color:'#f39c12', label:`DRAM BW ${dramBw.toFixed(0)} GB/s`,  dash:'none'},
-                {color:'#3498db', label:'L2 ~200 GB/s',    dash:'5,2'},
-                {color:'#9b59b6', label:'L1 ~800 GB/s',    dash:'3,3'},
-                {color:'#47b475', label:'FP64·FMA peak',   dash:'none'},
+                {color:'#47b475', label:`FP32·FMA ${peakFp32.toFixed(0)} GF/s`,  dash:'none'},
+                {color:'#f39c12', label:`DRAM BW ${dramBw.toFixed(0)} GB/s`,      dash:'none'},
+                {color:'#3498db', label:'L2 ~200 GB/s',                            dash:'5,2'},
+                {color:'#9b59b6', label:'L1 ~800 GB/s',                            dash:'3,3'},
             ];
             legItems.forEach((item, i) => {
                 const ly2 = ly+11+i*12;
@@ -11753,6 +11771,11 @@ function renderProfileHowTo() {
             };
             const fmtPct = v => Number.isFinite(Number(v)) ? (Number(v)*100).toFixed(2)+'%' : '-';
             const stateColor = p.tlbState === 'HIGH' ? '#e74c3c' : (p.tlbState === 'WATCH' ? '#f39c12' : '#47b475');
+            // CPU topology for hugepage size and THP status
+            const tlbCt    = (p && p.cpuTopo) ? p.cpuTopo : {};
+            const tlbHpKB  = Number.isFinite(Number(tlbCt.hugepage_size_kb)) ? Number(tlbCt.hugepage_size_kb) : 2048;
+            const tlbThp   = tlbCt.thp_status || null;
+            const tlbHpMB  = tlbHpKB >= 1024 ? `${tlbHpKB/1024} MB` : `${tlbHpKB} KB`;
 
             const W = 680, H = 305;
             let s = `<svg class="profile-inline-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="TLB Hierarchy" data-ck-svg-expand="TLB Translation Pipeline">`;
@@ -11813,16 +11836,23 @@ function renderProfileHowTo() {
             /* ── Hugepage / TLB coverage section ── */
             const hpY = fy + 24;
             s += `<line x1="16" y1="${hpY}" x2="${W-16}" y2="${hpY}" stroke="#161e2c" stroke-width="0.7"/>`;
-            s += `<text x="16" y="${hpY+11}" fill="#8aa0bf" font-size="8.1" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage — 64-entry L1 TLB × page size = virtual address range covered before next miss</text>`;
+            s += `<text x="16" y="${hpY+11}" fill="#8aa0bf" font-size="8" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage — 64-entry L1 TLB × page size = VA range before next miss</text>`;
+            // THP status badge (real data from cpu_topology)
+            if (tlbThp) {
+                const tCol = tlbThp === 'always' ? '#47b475' : (tlbThp === 'madvise' ? '#f39c12' : '#e74c3c');
+                s += `<rect x="${W-72}" y="${hpY+1}" width="56" height="12" rx="5" fill="${tCol}22" stroke="${tCol}" stroke-width="0.8"/>`;
+                s += `<text x="${W-44}" y="${hpY+10}" text-anchor="middle" fill="${tCol}" font-size="7" font-weight="700" font-family="Inter,sans-serif">THP: ${tlbThp}</text>`;
+            }
 
+            const hpCovMB = ((64 * tlbHpKB) / 1024).toFixed(0);
             const hpRows = [
-                {label:'4 KB (default)',  cov:'64 × 4 KB = 256 KB', impact:'KV/weight footprints exceed 256 KB → frequent misses', col:'#e74c3c'},
-                {label:'2 MB (THP/huge)', cov:'64 × 2 MB = 128 MB', impact:'covers most tensors → fewer page walks', col:'#47b475'},
+                {label:'4 KB (default)',       cov:'64 × 4 KB = 256 KB',        impact:'KV/weight footprints exceed 256 KB → frequent misses', col:'#e74c3c'},
+                {label:`${tlbHpMB} (hugepage)`, cov:`64 × ${tlbHpMB} = ${hpCovMB} MB`, impact:'covers most tensors → fewer page walks', col:'#47b475'},
             ];
             hpRows.forEach((row, i) => {
                 const rx = 16 + i*(W/2 - 4), ry = hpY + 20;
                 s += `<text x="${rx}" y="${ry}" fill="${row.col}" font-size="7.6" font-weight="600" font-family="'JetBrains Mono',monospace">${row.label}</text>`;
-                s += `<text x="${rx}" y="${ry+11}" fill="#9aacc3" font-size="7.1" font-family="Inter,sans-serif">covers: ${row.cov}</text>`;
+                s += `<text x="${rx}" y="${ry+11}" fill="#9aacc3" font-size="7" font-family="Inter,sans-serif">covers: ${row.cov}</text>`;
                 s += `<text x="${rx}" y="${ry+22}" fill="#7388a6" font-size="6.8" font-family="Inter,sans-serif" font-style="italic">${row.impact}</text>`;
             });
             s += `<text x="${W-14}" y="${hpY+52}" text-anchor="end" fill="#7288a8" font-size="6.8" font-family="Inter,sans-serif">check THP: cat /sys/kernel/mm/transparent_hugepage/enabled</text>`;
@@ -11845,6 +11875,19 @@ function renderProfileHowTo() {
             const l1Rate  = p.d1MissRate !== null && p.d1MissRate !== undefined ? p.d1MissRate : p.l1MissRate;
             const l1Col   = colFor(l1Rate, 10, 2);
             const llCol   = colFor(p.llMissRate, 5, 1);
+            // CPU topology — used for real cache sizes and hybrid core detection
+            const ct = (p && p.cpuTopo) ? p.cpuTopo : {};
+            const caches = ct.caches || {};
+            const isHybrid   = ct.hybrid_cpu === true;
+            const pCores     = ct.p_core_count;
+            const eCores     = ct.e_core_count;
+            const thpStatus  = ct.thp_status || null;
+            const hpKB       = Number.isFinite(Number(ct.hugepage_size_kb)) ? Number(ct.hugepage_size_kb) : 2048;
+            // Helper: format cache size from sysfs object
+            const cacheSize = (key) => caches[key]?.size_human || null;
+            const l1dSize  = cacheSize('L1_data')    || cacheSize('L1d_data') || '32–64 KB';
+            const l2Size   = cacheSize('L2_unified') || '256 KB–1 MB';
+            const llcSize  = cacheSize('L3_unified') || '6–32 MB';
 
             const W = 680, H = 350;
             const cx = W/2;
@@ -11856,10 +11899,10 @@ function renderProfileHowTo() {
             s += `<text x="${W-14}" y="15" text-anchor="end" fill="#7e95b4" font-size="7.6" font-family="Inter,sans-serif">op stressor</text>`;
 
             const levels = [
-                {label:'L1d Cache', cap:'32–64 KB · ~4 cyc',  w:130, col:l1Col,    miss:fmtPct(l1Rate),       src: p.d1MissRate != null ? 'cachegrind D1' : 'perf L1', lat:'4',    ops:'RoPE + norm (elem-wise)'},
-                {label:'L2 Cache',  cap:'256 KB–1 MB · ~12 cyc', w:230, col:'#3a4560', miss:null,              src:'not measured',  lat:'12',   ops:'attention score tiles'},
-                {label:'LLC / L3',  cap:'6–32 MB · ~40 cyc',  w:350, col:llCol,    miss:fmtPct(p.llMissRate), src:'cachegrind LL', lat:'40',   ops:'GEMM activations/logits'},
-                {label:'DRAM',      cap:'DDR4/DDR5 · ~100 ns', w:450, col:'#2a6cb4', miss:fmtBw(p.memBwGBs),  src:'est. BW',       lat:'200+', ops:'KV cache + weights'},
+                {label:'L1d Cache', cap:`${l1dSize} · ~4 cyc`,  w:130, col:l1Col,    miss:fmtPct(l1Rate),       src: p.d1MissRate != null ? 'cachegrind D1' : 'perf L1', lat:'4',    ops:'RoPE + norm (elem-wise)'},
+                {label:'L2 Cache',  cap:`${l2Size} · ~12 cyc`,  w:230, col:'#3a4560', miss:null,                src:'not measured',  lat:'12',   ops:'attention score tiles'},
+                {label:'LLC / L3',  cap:`${llcSize} · ~40 cyc`, w:350, col:llCol,    miss:fmtPct(p.llMissRate), src:'cachegrind LL', lat:'40',   ops:'GEMM activations/logits'},
+                {label:'DRAM',      cap:'DDR4/DDR5 · ~100 ns',  w:450, col:'#2a6cb4', miss:fmtBw(p.memBwGBs),  src:'est. BW',       lat:'200+', ops:'KV cache + weights'},
             ];
 
             const boxH = 26, gap = 8, startY = 24;
@@ -11886,46 +11929,65 @@ function renderProfileHowTo() {
                 }
             });
 
-            /* ── Bottom section: P-core / E-core topology + Hugepage coverage ── */
+            /* ── Bottom section: core topology + hugepage coverage ── */
             const secY = startY + levels.length*(boxH+gap) + 10;
-
-            /* divider */
             s += `<line x1="16" y1="${secY}" x2="${W-16}" y2="${secY}" stroke="#161e2c" stroke-width="1"/>`;
 
-            /* P-core / E-core side by side */
-            const colW = (W-32)/2 - 4;
-            /* P-core box */
+            const colW    = (W-32)/2 - 4;
             const coreBoxH = 74;
-            s += `<rect x="16" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1a2e" stroke="#1a2d4a" stroke-width="1"/>`;
-            s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#a8c4e0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">P-core (Performance)</text>`;
-            s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#8ea5c1" font-size="7" font-family="Inter,sans-serif">Alder Lake / Raptor Lake</text>`;
-            const pcLines = ['L1d: 48 KB (dedicated)','L2: 1.25 MB (dedicated)','Runs: AVX2/FMA · FP32/FP64','Contention: own cache, no sharing'];
-            pcLines.forEach((ln, i) => s += `<text x="${(26).toFixed(0)}" y="${secY+38+i*10}" fill="#9eb6d3" font-size="7.1" font-family="Inter,sans-serif">${ln}</text>`);
 
-            /* E-core box */
-            const ex = 16 + colW + 8;
-            s += `<rect x="${ex.toFixed(0)}" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1e18" stroke="#1a3a28" stroke-width="1"/>`;
-            s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#80c4a0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">E-core (Efficiency)</text>`;
-            s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#86b9a0" font-size="7" font-family="Inter,sans-serif">cluster of 4 E-cores</text>`;
-            const ecLines = ['L1d: 32 KB (dedicated)','L2: 2 MB (shared × 4)','Runs: OS / background tasks','Contention: shared L2 → LLC thrash'];
-            ecLines.forEach((ln, i) => s += `<text x="${(ex+10).toFixed(0)}" y="${secY+38+i*10}" fill="#9ad0b3" font-size="7.1" font-family="Inter,sans-serif">${ln}</text>`);
+            if (isHybrid) {
+                /* ── Hybrid CPU: P-core vs E-core side by side ── */
+                const pLabel = pCores ? `P-core × ${pCores}` : 'P-core (Performance)';
+                const eLabel = eCores ? `E-core × ${eCores}` : 'E-core (Efficiency)';
+                s += `<rect x="16" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1a2e" stroke="#1a2d4a" stroke-width="1"/>`;
+                s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#a8c4e0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">${pLabel}</text>`;
+                s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#8ea5c1" font-size="7" font-family="Inter,sans-serif">dedicated L1d/L2 · runs AVX2/FMA</text>`;
+                const pcLines = [`L1d: ${l1dSize} (dedicated)`,`L2: ${l2Size} (dedicated)`,'Runs: AVX2·FMA, FP32/FP64 kernels','Contention: own cache, no sharing'];
+                pcLines.forEach((ln, i) => s += `<text x="26" y="${secY+38+i*9}" fill="#9eb6d3" font-size="7" font-family="Inter,sans-serif">${ln}</text>`);
+                const ex = 16 + colW + 8;
+                s += `<rect x="${ex.toFixed(0)}" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1e18" stroke="#1a3a28" stroke-width="1"/>`;
+                s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#80c4a0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">${eLabel}</text>`;
+                s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#86b9a0" font-size="7" font-family="Inter,sans-serif">shared L2 per cluster · no AVX512</text>`;
+                const ecLines = ['L1d: 32 KB (dedicated)','L2: shared per cluster of 4','Runs: OS / background threads','Contention: shared L2 → LLC pressure'];
+                ecLines.forEach((ln, i) => s += `<text x="${(ex+10).toFixed(0)}" y="${secY+38+i*9}" fill="#9ad0b3" font-size="7" font-family="Inter,sans-serif">${ln}</text>`);
+            } else {
+                /* ── Uniform CPU: single core type ── */
+                const physCores = ct.physical_cores ? `${ct.physical_cores} physical cores` : 'uniform topology';
+                s += `<rect x="16" y="${secY+5}" width="${(W-32).toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1520" stroke="#1a2d3a" stroke-width="1"/>`;
+                s += `<text x="${(W/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#a8c4e0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">CPU Core Topology — ${physCores}</text>`;
+                const cpuHas = [
+                    ct.has_avx2   && 'AVX2', ct.has_fma   && 'FMA', ct.has_avx512f && 'AVX-512',
+                    ct.has_avx512vnni && 'VNNI', ct.has_amx_bf16 && 'AMX-BF16',
+                ].filter(Boolean).join(' · ') || 'standard ISA';
+                const uLines = [`L1d: ${l1dSize} per core`,`L2: ${l2Size} per core`,`LLC: ${llcSize} shared`,`ISA: ${cpuHas}`];
+                uLines.forEach((ln, i) => s += `<text x="${(W/2).toFixed(0)}" y="${secY+32+i*10}" text-anchor="middle" fill="#9eb6d3" font-size="7.5" font-family="Inter,sans-serif">${ln}</text>`);
+            }
 
             /* ── Hugepage / TLB coverage row ── */
             const hpY = secY + coreBoxH + 14;
             s += `<line x1="16" y1="${hpY}" x2="${W-16}" y2="${hpY}" stroke="#161e2c" stroke-width="0.7"/>`;
-            s += `<text x="16" y="${hpY+12}" fill="#8aa0bf" font-size="8.1" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage (64-entry L1 TLB)</text>`;
 
+            // THP status badge
+            const thpCol  = thpStatus === 'always' ? '#47b475' : (thpStatus === 'madvise' ? '#f39c12' : (thpStatus === 'never' ? '#e74c3c' : '#3a4560'));
+            const thpText = thpStatus ? `THP: ${thpStatus}` : 'THP: unknown';
+            s += `<text x="16" y="${hpY+12}" fill="#8aa0bf" font-size="8" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage (64-entry L1 TLB)</text>`;
+            s += `<rect x="${W-78}" y="${hpY+2}" width="62" height="13" rx="6" fill="${thpCol}22" stroke="${thpCol}" stroke-width="0.8"/>`;
+            s += `<text x="${W-47}" y="${hpY+12}" text-anchor="middle" fill="${thpCol}" font-size="7" font-weight="700" font-family="Inter,sans-serif">${thpText}</text>`;
+
+            const hpSize = hpKB >= 1024 ? `${hpKB/1024} MB` : `${hpKB} KB`;
+            const hpCov  = `64 × ${hpSize} = ${((64 * hpKB) / 1024).toFixed(0)} MB`;
             const pgCols = [
-                {size:'4 KB (default)',  coverage:'64 × 4 KB = 256 KB',  note:'large weights → frequent misses', col:'#e74c3c'},
-                {size:'2 MB (THP)',      coverage:'64 × 2 MB = 128 MB',  note:'covers most tensors → fewer walks', col:'#47b475'},
+                {size:'4 KB (default)',     cov:'64 × 4 KB = 256 KB',  note:'large tensors >> 256 KB → frequent walks', col:'#e74c3c'},
+                {size:`${hpSize} (THP)`,    cov:hpCov,                 note:'covers most tensors → 10–50× fewer walks', col:'#47b475'},
             ];
             pgCols.forEach((pg, i) => {
                 const px = 16 + i * (W/2 - 8), py = hpY+22;
-                s += `<text x="${px}" y="${py}" fill="${pg.col}" font-size="7.6" font-weight="600" font-family="'JetBrains Mono',monospace">${pg.size}</text>`;
-                s += `<text x="${px}" y="${py+11}" fill="#9aacc3" font-size="7.1" font-family="Inter,sans-serif">coverage: ${pg.coverage}</text>`;
+                s += `<text x="${px}" y="${py}" fill="${pg.col}" font-size="7.5" font-weight="600" font-family="'JetBrains Mono',monospace">${pg.size}</text>`;
+                s += `<text x="${px}" y="${py+11}" fill="#9aacc3" font-size="7" font-family="Inter,sans-serif">covers: ${pg.cov}</text>`;
                 s += `<text x="${px}" y="${py+22}" fill="#7388a6" font-size="6.8" font-family="Inter,sans-serif" font-style="italic">${pg.note}</text>`;
             });
-            s += `<text x="${W-14}" y="${hpY+52}" text-anchor="end" fill="#7288a8" font-size="6.9" font-family="Inter,sans-serif">check: cat /sys/kernel/mm/transparent_hugepage/enabled</text>`;
+            s += `<text x="${W-14}" y="${hpY+52}" text-anchor="end" fill="#7288a8" font-size="6.8" font-family="Inter,sans-serif">cat /sys/kernel/mm/transparent_hugepage/enabled</text>`;
 
             s += '</svg>';
             return s;
@@ -12204,23 +12266,41 @@ function renderProfileHowTo() {
             }).join('');
 
             // ── Build kernel family dots for the roofline chart ──
+            // Detect CPU topology and inference mode for correct AI estimates
+            const cpuTopo     = perfStatData?.cpu_topology || {};
+            const inferMode   = flamegraphManifestData?.mode || 'unknown';
+            const isDecode    = inferMode === 'decode';
+            // Compute actual FP32/FP64 peaks from CPU topology; fall back to Intel Raptor Lake estimates
+            const peakFp32cpu = Number.isFinite(Number(cpuTopo.peak_fp32_gflops)) ? Number(cpuTopo.peak_fp32_gflops) : 576.0;
+            const peakFp64cpu = Number.isFinite(Number(cpuTopo.peak_fp64_gflops)) ? Number(cpuTopo.peak_fp64_gflops) : 288.0;
+            const cpuModel    = cpuTopo.model_name || null;
+
+            // Arithmetic Intensity estimates depend heavily on inference mode:
+            //   Decode  (batch=1, seq=1) = GEMV: one weight row streamed per output → AI ≈ 0.1–0.4
+            //   Prefill (batch=1, seq>1) = GEMM: weight rows reused across T tokens → AI ≈ 1.0–3.0
             const rooflineKernelDots = [];
             sortedStages.forEach((s) => {
-                const label = s.label;
+                const label      = s.label;
                 const classifier = classifyProfileStage(label);
-                const lbl = label.length > 12 ? label.slice(0,12) + '…' : label;
-                // Estimated arithmetic intensity for each kernel family
+                const lbl        = label.length > 12 ? label.slice(0,12) + '…' : label;
                 let estAI = null, dotColor = '#888';
-                if (['attention', 'mlp'].includes(classifier) || label.toLowerCase().includes('gemm') || label.toLowerCase().includes('gemv') || label.toLowerCase().includes('proj') || label.toLowerCase().includes('lm_head')) {
-                    estAI = 1.2;  dotColor = '#e74c3c';
+                const ll = label.toLowerCase();
+                if (['attention', 'mlp'].includes(classifier) || ll.includes('gemm') || ll.includes('gemv') || ll.includes('proj') || ll.includes('lm_head')) {
+                    // GEMV (decode): weight_row bytes >> FLOPs per output  → very memory-bound
+                    // GEMM (prefill): rows reused across T tokens          → higher AI
+                    estAI = isDecode ? 0.2 : 1.5;  dotColor = '#e74c3c';
                 } else if (['norm', 'quant'].includes(classifier)) {
-                    estAI = 0.5;  dotColor = '#f39c12';
+                    // Element-wise over hidden_dim: slightly higher AI than GEMV since no weight matrix
+                    estAI = isDecode ? 0.4 : 0.5;  dotColor = '#f39c12';
                 } else if (['embedding'].includes(classifier)) {
-                    estAI = 0.7;  dotColor = '#3498db';
-                } else if (label.toLowerCase().includes('softmax')) {
-                    estAI = 3.5;  dotColor = '#9b59b6';
-                } else if (label.toLowerCase().includes('rope')) {
-                    estAI = 2.5;  dotColor = '#47b475';
+                    // Scatter/gather table lookup — lowest AI
+                    estAI = isDecode ? 0.1 : 0.3;  dotColor = '#3498db';
+                } else if (ll.includes('softmax')) {
+                    // Softmax over head_dim: some reuse of exp values
+                    estAI = isDecode ? 1.0 : 3.5;  dotColor = '#9b59b6';
+                } else if (ll.includes('rope')) {
+                    // RoPE: 2 sin/cos ops per element, reads pos cache once
+                    estAI = isDecode ? 0.5 : 2.5;  dotColor = '#47b475';
                 }
                 if (estAI !== null && physics.gflops !== null && physics.totalUs > 0 && s.us > 0) {
                     const stageGflops = (s.us / physics.totalUs) * physics.gflops;
@@ -12228,12 +12308,14 @@ function renderProfileHowTo() {
                 }
             });
             const rooflineSvg = buildRooflineSvg({
-                ai: ai,
-                gflops: physics.gflops,
-                dramBw: physics.memoryBwGBs || 29.0,
-                peakDp: 288.1,
-                peakSp: 580.6,
-                kernels: rooflineKernelDots,
+                ai:        ai,
+                gflops:    physics.gflops,
+                dramBw:    physics.memoryBwGBs || 29.0,
+                peakFp32:  peakFp32cpu,
+                peakFp64:  peakFp64cpu,
+                inferMode: inferMode,
+                cpuModel:  cpuModel,
+                kernels:   rooflineKernelDots,
             });
 
             // ── Advisor roofline enrichment ──
@@ -12747,6 +12829,7 @@ function renderProfileHowTo() {
                     stlbHits, stlbHitsPerKInst, pageWalks, pageWalksPerKInst,
                     dtlbMissRate, dtlbLoadMissRate, dtlbStoreMissRate,
                     itlbMissesPerKInst, majorFaults, minorFaults, tlbState,
+                    cpuTopo: perfStatData?.cpu_topology || {},
                 });
 
                 tlbPanelHtml = `
@@ -13077,7 +13160,8 @@ function renderProfileHowTo() {
                     l1MissRate: cmr !== undefined ? Number(cmr) : null,
                     d1MissRate: d1Rate !== undefined ? Number(d1Rate) : null,
                     llMissRate: llRate !== undefined ? Number(llRate) : null,
-                    memBwGBs: physics.memoryBwGBs,
+                    memBwGBs:   physics.memoryBwGBs,
+                    cpuTopo:    perfStatData?.cpu_topology || {},
                 });
                 cachePanelHtml = `
                     <div class="parity-section" style="margin-top:0.8rem;">
