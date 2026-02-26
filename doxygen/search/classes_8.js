@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['recommendation_2530',['Recommendation',['../structRecommendation.html',1,'']]],
-  ['recommendationlist_2531',['RecommendationList',['../structRecommendationList.html',1,'']]]
+  ['recommendation_0',['Recommendation',['../structRecommendation.html',1,'']]],
+  ['recommendationlist_1',['RecommendationList',['../structRecommendationList.html',1,'']]]
 ];
