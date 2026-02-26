@@ -16856,11 +16856,24 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
 function healthAlerts(lossSteps, parityRows) {
     const alerts = [];
     const last = lossSteps[lossSteps.length - 1];
-    if (last && Number.isFinite(last.grad_norm)) {
-        if (last.grad_norm < 1e-5) {
-            alerts.push({ level: 'warning', text: `Gradient norm low (${fmtExp(last.grad_norm, 2)}): possible vanishing trend.` });
-        } else if (last.grad_norm > 0.1) {
-            alerts.push({ level: 'critical', text: `Gradient norm high (${fmtExp(last.grad_norm, 2)}): possible explosion risk.` });
+    const gradSeries = Array.isArray(lossSteps)
+        ? lossSteps
+            .map((s) => toNum(s.grad_norm, NaN))
+            .filter((v) => Number.isFinite(v))
+        : [];
+    if (gradSeries.length > 0) {
+        const allZero = gradSeries.every((v) => Math.abs(v) <= 1e-12);
+        if (allZero) {
+            alerts.push({
+                level: 'warning',
+                text: 'Grad norm is 0.00e+0 at every logged step. This can indicate missing grad telemetry in the current runtime path; treat as "unknown" unless loss and parity also degrade.',
+            });
+        } else if (last && Number.isFinite(last.grad_norm)) {
+            if (last.grad_norm < 1e-5) {
+                alerts.push({ level: 'warning', text: `Gradient norm low (${fmtExp(last.grad_norm, 2)}): possible vanishing trend.` });
+            } else if (last.grad_norm > 0.1) {
+                alerts.push({ level: 'critical', text: `Gradient norm high (${fmtExp(last.grad_norm, 2)}): possible explosion risk.` });
+            }
         }
     }
     const worstParity = parityRows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
@@ -17007,6 +17020,9 @@ function renderTrainingDashboard(files) {
         </div>
         <div style="color:var(--text-muted);font-size:0.76rem;margin-top:0.15rem;">
             LR chart shows base AdamW learning rate schedule; Adam's per-parameter adaptive scaling is internal and not plotted directly.
+        </div>
+        <div style="color:var(--text-muted);font-size:0.76rem;margin-top:0.15rem;">
+            Grad norm = global L2 norm of parameter gradients before optimizer update. If this line is flat at 0.00e+0 for all steps, gradients may be truly collapsed or grad telemetry may be missing in this runtime path; confirm using loss trend and parity/replay gates.
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
