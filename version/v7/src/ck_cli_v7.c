@@ -1825,6 +1825,7 @@ typedef struct {
         int *opt_calls,
         int *opt_applied
     );
+    int (*ck_train_get_last_step_grad_norm)(float *grad_norm);
     int (*ck_train_get_cumulative_profile)(
         double *total_ms,
         double *fwd_ms,
@@ -2034,6 +2035,8 @@ static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
     api->ck_train_reset_profile = (void(*)(void))dlsym(api->handle, "ck_train_reset_profile");
     api->ck_train_get_last_step_profile =
         (int(*)(double*, double*, double*, double*, int*, int*, int*, int*))dlsym(api->handle, "ck_train_get_last_step_profile");
+    api->ck_train_get_last_step_grad_norm =
+        (int(*)(float*))dlsym(api->handle, "ck_train_get_last_step_grad_norm");
     api->ck_train_get_cumulative_profile =
         (int(*)(double*, double*, double*, double*, int*, int*))dlsym(api->handle, "ck_train_get_cumulative_profile");
     api->ck_train_get_weight_snapshot_numel =
@@ -2179,6 +2182,7 @@ typedef struct {
     const double *fwd_ms;
     const double *bwd_ms;
     const double *opt_ms;
+    const double *grad_norm;
     const int *opt_applied;
     const int *fwd_calls;
     const int *bwd_calls;
@@ -2548,10 +2552,11 @@ static int write_train_summary_and_telemetry(
     fprintf(f, "  \"loss_curve\": [\n");
     for (int i = 0; i < total_steps; i++) {
         double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+        double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
         fprintf(
             f,
-            "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0, \"step_ms\": %.6f}%s\n",
-            i + 1, losses[i], losses[i], opt->lr, step_ms, (i + 1 < total_steps) ? "," : ""
+            "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": %.9g, \"step_ms\": %.6f}%s\n",
+            i + 1, losses[i], losses[i], opt->lr, grad_norm, step_ms, (i + 1 < total_steps) ? "," : ""
         );
     }
     fprintf(f, "  ],\n");
@@ -2563,7 +2568,10 @@ static int write_train_summary_and_telemetry(
     for (int i = 0; i < total_steps; i++) fprintf(f, "%d%s", i + 1, (i + 1 < total_steps) ? ", " : "");
     fprintf(f, "],\n");
     fprintf(f, "    \"global\": [");
-    for (int i = 0; i < total_steps; i++) fprintf(f, "0.0%s", (i + 1 < total_steps) ? ", " : "");
+    for (int i = 0; i < total_steps; i++) {
+        double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+        fprintf(f, "%.9g%s", grad_norm, (i + 1 < total_steps) ? ", " : "");
+    }
     fprintf(f, "],\n");
     fprintf(f, "    \"params\": {}\n");
     fprintf(f, "  },\n");
@@ -2660,14 +2668,16 @@ static int write_train_summary_and_telemetry(
         fprintf(g, "{\"steps\": [");
         for (int i = 0; i < total_steps; i++) {
             double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+            double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
             fprintf(
                 g,
-                "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": 0.0, \"step_ms\": %.6f}",
+                "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": %.9g, \"step_ms\": %.6f}",
                 (i == 0 ? "" : ","),
                 i + 1,
                 losses[i],
                 losses[i],
                 opt->lr,
+                grad_norm,
                 step_ms
             );
         }
@@ -2686,7 +2696,10 @@ static int write_train_summary_and_telemetry(
         fprintf(g, "{\"steps\": [");
         for (int i = 0; i < total_steps; i++) fprintf(g, "%s%d", (i ? "," : ""), i + 1);
         fprintf(g, "], \"global\": [");
-        for (int i = 0; i < total_steps; i++) fprintf(g, "%s0.0", (i ? "," : ""));
+        for (int i = 0; i < total_steps; i++) {
+            double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+            fprintf(g, "%s%.9g", (i ? "," : ""), grad_norm);
+        }
         fprintf(g, "], \"params\": {}, \"source\": \"ck_cli_v7_native\"}\n");
         fclose(g);
     }
@@ -2902,13 +2915,14 @@ static int cmd_train_subcommand(int argc, char **argv) {
     double *fwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
     double *bwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
     double *opt_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *grad_norm_series = (double*)calloc((size_t)total_steps, sizeof(double));
     int *opt_applied_series = (int*)calloc((size_t)total_steps, sizeof(int));
     int *fwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
     int *bwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
     int *opt_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
-    if (!step_ms_series || !fwd_ms_series || !bwd_ms_series || !opt_ms_series ||
+    if (!step_ms_series || !fwd_ms_series || !bwd_ms_series || !opt_ms_series || !grad_norm_series ||
         !opt_applied_series || !fwd_calls_series || !bwd_calls_series || !opt_calls_series) {
-        free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+        free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
         free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
         free(losses); free(stream); free(tokens);
         if (api.ck_train_free) api.ck_train_free();
@@ -2923,6 +2937,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
     telemetry.fwd_ms = fwd_ms_series;
     telemetry.bwd_ms = bwd_ms_series;
     telemetry.opt_ms = opt_ms_series;
+    telemetry.grad_norm = grad_norm_series;
     telemetry.opt_applied = opt_applied_series;
     telemetry.fwd_calls = fwd_calls_series;
     telemetry.bwd_calls = bwd_calls_series;
@@ -2990,7 +3005,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
             double step_t1 = monotonic_ms();
             if (src < 0) {
                 fprintf(stderr, "ck_train_step failed at step %d: %d\n", step_idx + 1, src);
-                free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+                free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
                 free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
                 free(losses); free(stream); free(tokens);
                 if (api.ck_train_free) api.ck_train_free();
@@ -3006,6 +3021,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
             int bwd_calls = 0;
             int opt_calls = 0;
             int opt_applied = 0;
+            float grad_norm = 0.0f;
             if (api.ck_train_get_last_step_profile &&
                 api.ck_train_get_last_step_profile(&step_ms, &fwd_ms, &bwd_ms, &opt_ms,
                                                    &fwd_calls, &bwd_calls, &opt_calls, &opt_applied) == 0) {
@@ -3015,14 +3031,20 @@ static int cmd_train_subcommand(int argc, char **argv) {
             } else if (effective_grad_accum > 0 && ((this_step + 1) % effective_grad_accum == 0)) {
                 opt_applied = 1;
             }
+            if (api.ck_train_get_last_step_grad_norm &&
+                api.ck_train_get_last_step_grad_norm(&grad_norm) != 0) {
+                grad_norm = 0.0f;
+            }
             if (step_ms < 0.0) step_ms = 0.0;
             if (fwd_ms < 0.0) fwd_ms = 0.0;
             if (bwd_ms < 0.0) bwd_ms = 0.0;
             if (opt_ms < 0.0) opt_ms = 0.0;
+            if (!isfinite((double)grad_norm) || grad_norm < 0.0f) grad_norm = 0.0f;
             step_ms_series[this_step] = step_ms;
             fwd_ms_series[this_step] = fwd_ms;
             bwd_ms_series[this_step] = bwd_ms;
             opt_ms_series[this_step] = opt_ms;
+            grad_norm_series[this_step] = (double)grad_norm;
             opt_applied_series[this_step] = opt_applied;
             fwd_calls_series[this_step] = fwd_calls;
             bwd_calls_series[this_step] = bwd_calls;
@@ -3078,7 +3100,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
         int flush_rc = api.ck_train_flush_optimizer(opt.lr);
         if (flush_rc < 0) {
             fprintf(stderr, "ck_train_flush_optimizer failed: %d\n", flush_rc);
-            free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series);
+            free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
             free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
             free(losses); free(stream); free(tokens);
             if (api.ck_train_free) api.ck_train_free();
@@ -3202,6 +3224,7 @@ static int cmd_train_subcommand(int argc, char **argv) {
     free(fwd_ms_series);
     free(bwd_ms_series);
     free(opt_ms_series);
+    free(grad_norm_series);
     free(opt_applied_series);
     free(fwd_calls_series);
     free(bwd_calls_series);
