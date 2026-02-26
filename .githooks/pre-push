@@ -238,9 +238,9 @@ if [ -n "$RUNNER" ]; then
 
             # Basic perf warning (non-fatal)
             if command -v rg >/dev/null 2>&1; then
-                tok_s=$(echo "$OUTPUT" | rg -o "([0-9]+\\.?[0-9]*)\\s*tok/s" | head -1 | rg -o "[0-9]+\\.?[0-9]*")
+                tok_s=$(echo "$OUTPUT" | rg -o "([0-9]+\\.?[0-9]*)\\s*tok/s" | head -1 | rg -o "[0-9]+\\.?[0-9]*" || true)
             else
-                tok_s=$(echo "$OUTPUT" | grep -oE "([0-9]+\\.?[0-9]*)[[:space:]]*tok/s" | head -1 | grep -oE "[0-9]+\\.?[0-9]*")
+                tok_s=$(echo "$OUTPUT" | grep -oE "([0-9]+\\.?[0-9]*)[[:space:]]*tok/s" | head -1 | grep -oE "[0-9]+\\.?[0-9]*" || true)
             fi
             if [ -n "$tok_s" ]; then
                 warn=$(python3 - <<PY
