@@ -814,6 +814,31 @@ def _build_tokenizer_preview(
         }
         for idx, piece in vocab_items[:48]
     ]
+    token_lookup_row_limit = min(len(vocab_items), 50000)
+    token_lookup_rows = [
+        {
+            "id": int(idx),
+            "piece": _piece_display(piece),
+            "bytes_hex": _bytes_hex_preview(piece),
+        }
+        for idx, piece in vocab_items[:token_lookup_row_limit]
+    ]
+
+    token_index_dir = run_dir if isinstance(run_dir, Path) else tokenizer_json_path.parent
+    token_index_path = token_index_dir / "tokenizer_vocab_index.jsonl"
+    token_index_error: str | None = None
+    try:
+        token_index_dir.mkdir(parents=True, exist_ok=True)
+        with token_index_path.open("w", encoding="utf-8") as fh:
+            for idx, piece in vocab_items:
+                row = {
+                    "id": int(idx),
+                    "piece": _piece_display(piece, limit=512),
+                    "bytes_hex": _bytes_hex_preview(piece, limit=64),
+                }
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception as e:
+        token_index_error = str(e)
 
     added_tokens = payload.get("added_tokens")
     special_tokens: list[dict] = []
@@ -934,6 +959,42 @@ def _build_tokenizer_preview(
     pre_tokenizer_type = pre_tokenizer.get("type") if isinstance(pre_tokenizer, dict) else None
     decoder_type = decoder.get("type") if isinstance(decoder, dict) else None
 
+    tokenizer_config_path: Path | None = None
+    tokenizer_class: str | None = None
+    tokenizer_config_candidates = [
+        tokenizer_json_path.parent / "tokenizer_config.json",
+        ck_build_path / "tokenizer_config.json",
+        model_root / "tokenizer_config.json",
+    ]
+    if run_dir is not None:
+        tokenizer_config_candidates.insert(0, run_dir / "tokenizer_config.json")
+    for candidate in tokenizer_config_candidates:
+        if candidate.exists():
+            tokenizer_config_path = candidate
+            break
+    if tokenizer_config_path is not None:
+        try:
+            tokenizer_config_payload = json.loads(tokenizer_config_path.read_text(encoding="utf-8"))
+            if isinstance(tokenizer_config_payload, dict):
+                raw_class = tokenizer_config_payload.get("tokenizer_class")
+                if isinstance(raw_class, str) and raw_class.strip():
+                    tokenizer_class = raw_class.strip()
+        except Exception:
+            tokenizer_class = None
+
+    sentencepiece_model_path: Path | None = None
+    sentencepiece_candidates = [
+        tokenizer_json_path.parent / "tokenizer.model",
+        ck_build_path / "tokenizer.model",
+        model_root / "tokenizer.model",
+    ]
+    if run_dir is not None:
+        sentencepiece_candidates.insert(0, run_dir / "tokenizer.model")
+    for candidate in sentencepiece_candidates:
+        if candidate.exists():
+            sentencepiece_model_path = candidate
+            break
+
     example = None
     for row in sample_rows:
         if not isinstance(row, dict):
@@ -970,11 +1031,27 @@ def _build_tokenizer_preview(
         "pre_tokenizer_type": pre_tokenizer_type,
         "decoder_type": decoder_type,
         "bytelevel_mode": bool(pre_tokenizer_type == "ByteLevel" or decoder_type == "ByteLevel"),
+        "tokenizer_config_path": str(tokenizer_config_path) if tokenizer_config_path is not None else None,
+        "tokenizer_class": tokenizer_class,
+        "sentencepiece_model_path": str(sentencepiece_model_path) if sentencepiece_model_path is not None else None,
+        "sentencepiece_model_present": bool(sentencepiece_model_path is not None),
         "ascii_piece_count": int(len(vocab_items) - non_ascii_piece_count),
         "non_ascii_piece_count": int(non_ascii_piece_count),
         "vocab_samples": vocab_samples,
         "merge_samples": merge_samples,
         "special_tokens": special_tokens,
+        "token_lookup_rows": token_lookup_rows,
+        "token_lookup_meta": {
+            "rows_returned": int(len(token_lookup_rows)),
+            "row_limit": int(token_lookup_row_limit),
+            "total_vocab_size": int(len(vocab_items)),
+            "truncated": bool(len(vocab_items) > token_lookup_row_limit),
+            "sample_policy": "head_by_token_id_capped",
+        },
+        "token_index_path": str(token_index_path),
+        "token_index_status": "ok" if token_index_error is None else "error",
+        "token_index_error": token_index_error,
+        "token_index_rows": int(len(vocab_items)),
         "token_table_rows": token_table_rows,
         "token_table_meta": {
             "total_vocab_size": int(len(vocab_items)),

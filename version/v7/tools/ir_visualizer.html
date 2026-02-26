@@ -1546,6 +1546,16 @@
             padding: 0.75rem;
         }
 
+        .profile-inline-svg {
+            width: min(100%, 860px);
+            height: auto;
+            display: block;
+            margin: 0.25rem auto;
+            border-radius: 10px;
+            shape-rendering: geometricPrecision;
+            text-rendering: optimizeLegibility;
+        }
+
         .profile-artifact-panel h3 {
             margin: 0 0 0.65rem;
             color: var(--white);
@@ -3455,10 +3465,10 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <div id="dpAsciiDetail" style="margin-top:0.75rem; padding:0.75rem 1rem; background:var(--bg-dark); border:1px solid var(--grey); border-radius:8px; display:none;"></div>
             </div>
 
-            <!-- ── BPE Tokenizer Explainer ── -->
+            <!-- ── Tokenizer Explainer ── -->
             <div style="margin-bottom:2rem;">
-                <h3 style="margin-bottom:0.5rem;">
-                    <span style="color:#ff8c00;">BPE</span> Tokenizer — How Bytes Become Tokens
+                <h3 id="dpTokenizerExplainerTitle" style="margin-bottom:0.5rem;">
+                    <span style="color:#ff8c00;">Tokenizer</span> — How Text Becomes Tokens
                 </h3>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;" id="dpBpeGrid">
                     <!-- Left: encode demo -->
@@ -3475,7 +3485,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     <!-- Right: merge visualization -->
                     <div style="background:var(--bg-dark); border:1px solid var(--grey); border-radius:10px; padding:1rem;">
                         <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">
-                            <strong style="color:#47b475;">BPE Merge Rules</strong> — how pairs get combined
+                            <strong id="dpTokenizerRulesTitle" style="color:#47b475;">Tokenizer Rules</strong> — how pieces get combined
                         </div>
                         <div id="dpBpeMergeVis" style="min-height:120px;"></div>
                     </div>
@@ -3547,7 +3557,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <p style="color:var(--text-muted); font-size:0.78rem; margin-bottom:0.75rem;">
                     The BPE demo above uses a <strong style="color:var(--orange);">hard-coded example merge table</strong> for visualization.
                     Your actual model uses a HuggingFace-compatible <code>tokenizer.json</code> loaded by <code>ck_tokenizer.c</code>,
-                    which may be <strong>bytelevel BPE</strong> (GPT-2 style, 131K–152K vocab) or <strong>ascii_bpe</strong> (v7 trainer, default 1024 vocab).
+                    which may be <strong>bytelevel BPE</strong>, <strong>SentencePiece</strong> (BPE/Unigram), or <strong>ascii_bpe</strong> (v7 trainer, default 1024 vocab).
                 </p>
                 <div id="tokenizerLineageInfo" style="font-size:0.75rem;"></div>
             </div>
@@ -11562,6 +11572,366 @@ function renderProfileHowTo() {
 }
 
         /* ═══════════════════════════════════════════════════════════════════
+           SVG Infographic Builders — Roofline · TLB Hierarchy · Cache Hierarchy
+           ═══════════════════════════════════════════════════════════════════ */
+
+        /** buildRooflineSvg — Intel Advisor-style log-log roofline chart.
+         *  @param {object} p – { ai, gflops, dramBw, peakDp, peakSp, kernels[] }
+         *  @returns {string} SVG markup */
+        function buildRooflineSvg(p) {
+            const ai       = (p && Number.isFinite(Number(p.ai)))     ? Number(p.ai)     : null;
+            const gflops   = (p && Number.isFinite(Number(p.gflops))) ? Number(p.gflops) : null;
+            const dramBw   = (p && Number.isFinite(Number(p.dramBw))) ? Number(p.dramBw) : 29.0;
+            const peakDp   = (p && Number.isFinite(Number(p.peakDp))) ? Number(p.peakDp) : 288.1;
+            const peakSp   = (p && Number.isFinite(Number(p.peakSp))) ? Number(p.peakSp) : 580.6;
+            const kernels  = (p && Array.isArray(p.kernels)) ? p.kernels : [];
+
+            const W = 680, H = 390;
+            const PL = 68, PR = 648, PT = 32, PB = 310;
+            const PW = PR - PL, PH = PB - PT;
+            const xLogMin = Math.log10(0.05),  xLogMax = Math.log10(200);
+            const yLogMin = Math.log10(0.08),  yLogMax = Math.log10(2000);
+            const toX = v => PL + (Math.log10(Math.max(v, 1e-12)) - xLogMin) / (xLogMax - xLogMin) * PW;
+            const toY = v => PB - (Math.log10(Math.max(v, 1e-12)) - yLogMin) / (yLogMax - yLogMin) * PH;
+
+            let s = `<svg class="profile-inline-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Roofline Model" data-ck-svg-expand="Roofline Model">`;
+            s += `<rect width="${W}" height="${H}" rx="10" fill="#0a0e17"/>`;
+            s += `<text x="${PL}" y="16" fill="#d7deea" font-size="10" font-weight="700" font-family="Inter,sans-serif">Roofline Model — Arithmetic Intensity vs. Performance</text>`;
+            s += `<text x="${PL}" y="27" fill="#7e91ad" font-size="7.4" font-family="Inter,sans-serif">Peak lines = theoretical max (memory BW × AI or compute ceiling). Dots = op families. Left of ridge = memory-bound; right = compute-bound. Hover for details.</text>`;
+
+            /* plot area */
+            s += `<rect x="${PL}" y="${PT}" width="${PW}" height="${PH}" fill="#0d1220" rx="3"/>`;
+
+            /* grid */
+            [0.1,0.5,1,2,5,10,20,50,100].forEach(v => {
+                const x = toX(v); if (x < PL || x > PR) return;
+                s += `<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${PB}" stroke="#1f2a40" stroke-width="1" stroke-dasharray="3,4"/>`;
+                s += `<text x="${x.toFixed(1)}" y="${PB+13}" text-anchor="middle" fill="#91a4bf" font-size="7.6" font-family="'JetBrains Mono',monospace">${v<1?v.toFixed(1):v}</text>`;
+            });
+            [0.1,0.5,1,2,5,10,20,50,100,200,500,1000].forEach(v => {
+                const y = toY(v); if (y < PT || y > PB) return;
+                s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${PR}" y2="${y.toFixed(1)}" stroke="#1f2a40" stroke-width="1" stroke-dasharray="3,4"/>`;
+                s += `<text x="${PL-5}" y="${(y+3).toFixed(1)}" text-anchor="end" fill="#91a4bf" font-size="7.6" font-family="'JetBrains Mono',monospace">${v>=100?v.toFixed(0):v}</text>`;
+            });
+
+            /* axes */
+            s += `<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PB}" stroke="#3a4560" stroke-width="1.5"/>`;
+            s += `<line x1="${PL}" y1="${PB}" x2="${PR}" y2="${PB}" stroke="#3a4560" stroke-width="1.5"/>`;
+            s += `<text x="${PL+PW/2}" y="${H-8}" text-anchor="middle" fill="#91a4bf" font-size="9.2" font-family="Inter,sans-serif">Arithmetic Intensity (FLOPs / byte) — log scale</text>`;
+            s += `<text x="11" y="${PT+PH/2}" text-anchor="middle" fill="#91a4bf" font-size="9.2" font-family="Inter,sans-serif" transform="rotate(-90,11,${(PT+PH/2).toFixed(0)})">Performance (GFLOP/s) — log scale</text>`;
+
+            /* bandwidth roof helper — each roof line gets a fat invisible hover target + <title> tooltip */
+            const drawRoof = (bw, color, dash, label, tooltipDesc, labelDx = 5, labelDy = -5) => {
+                const ridgeAI = peakDp / bw;
+                const xStart  = Math.pow(10, xLogMin);
+                const yStart  = bw * xStart;
+                const x1 = toX(xStart), y1 = toY(Math.min(yStart, peakDp));
+                const x2 = toX(Math.min(ridgeAI, Math.pow(10, xLogMax)));
+                const y2 = toY(Math.min(bw * Math.min(ridgeAI, Math.pow(10, xLogMax)), peakDp));
+                if (x2 > PL) {
+                    const lx1 = Math.max(x1,PL).toFixed(1), ly1 = Math.min(y1,PB).toFixed(1);
+                    const lx2 = Math.min(x2,PR).toFixed(1), ly2 = Math.max(y2,PT).toFixed(1);
+                    s += `<g style="cursor:help">`;
+                    s += `<title>${tooltipDesc}</title>`;
+                    s += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="${color}" stroke-width="1.8" stroke-dasharray="${dash}" opacity="0.85"/>`;
+                    s += `<line x1="${lx1}" y1="${ly1}" x2="${lx2}" y2="${ly2}" stroke="transparent" stroke-width="12"/>`;
+                    const mx = (Math.max(x1,PL)+Math.min(x2,PR))/2;
+                    const my = (Math.min(y1,PB)+Math.max(y2,PT))/2;
+                    s += `<text x="${(mx+labelDx).toFixed(1)}" y="${(my+labelDy).toFixed(1)}" fill="${color}" font-size="8.5" font-family="Inter,sans-serif" opacity="0.94">${label}</text>`;
+                    s += `</g>`;
+                }
+            };
+            // label offsets reduce overlap around low-AI kernel dots
+            drawRoof(dramBw, '#f39c12', 'none', `DRAM ${dramBw.toFixed(0)} GB/s`,
+                `DRAM Bandwidth: ${dramBw.toFixed(0)} GB/s\nSlope = ${dramBw.toFixed(0)} GFLOP/s per FLOPs/byte.\nRidge point: ${(peakDp/dramBw).toFixed(1)} FLOPs/byte.\nBelow this line = memory-bound. Reduce bytes moved to climb toward the ceiling.`,
+                -18, 10);
+            drawRoof(200, '#3498db', '6,3', 'L2 ~200 GB/s',
+                `L2 Cache Bandwidth: ~200 GB/s (estimated)\nIf working-set fits in L2, effective bandwidth is ~7x DRAM.\nRidge point: ~${(peakDp/200).toFixed(1)} FLOPs/byte.\nCache-blocked GEMM can reach this ceiling.`,
+                4, -10);
+            drawRoof(800, '#9b59b6', '3,4', 'L1 ~800 GB/s',
+                `L1 Cache Bandwidth: ~800 GB/s (estimated)\nSmall hot loops operating fully from L1 approach this ceiling.\nRidge point: ~${(peakDp/800).toFixed(1)} FLOPs/byte.\nAchievable for tiny inner-product kernels with perfect register reuse.`,
+                8, -18);
+
+            /* peak compute roofs */
+            const yDp = toY(peakDp);
+            const xDpRidge = toX(peakDp / dramBw);
+            if (yDp >= PT && yDp <= PB) {
+                s += `<g style="cursor:help"><title>FP64·FMA Peak: ${peakDp.toFixed(0)} GFLOP/s\nFP64 = Double Precision (64-bit float). FMA = Fused Multiply-Add: a·b+c = 2 FLOPs in a single instruction.\nWith AVX2: 8 doubles/lane × 2 FLOPs × ~3.6 GHz ≈ ${peakDp.toFixed(0)} GFLOP/s theoretical peak per socket.\nMost ML workloads reach 5–30% of this. Blocked GEMM with AVX2 can reach 50–80%.\nTo maximize: packed SIMD, no load stalls, loop unrolling, high register reuse.</title>`;
+                s += `<line x1="${Math.min(xDpRidge,PR).toFixed(1)}" y1="${yDp.toFixed(1)}" x2="${PR}" y2="${yDp.toFixed(1)}" stroke="#47b475" stroke-width="1.5" opacity="0.9"/>`;
+                s += `<line x1="${Math.min(xDpRidge,PR).toFixed(1)}" y1="${yDp.toFixed(1)}" x2="${PR}" y2="${yDp.toFixed(1)}" stroke="transparent" stroke-width="12"/>`;
+                s += `<text x="${PR-4}" y="${(yDp-5).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="8" font-family="Inter,sans-serif">FP64·FMA ${peakDp.toFixed(0)} GF/s</text></g>`;
+            }
+            const ySpRidge = toX(peakSp / dramBw);
+            const ySp = toY(peakSp);
+            if (ySp >= PT && ySp <= PB) {
+                s += `<g style="cursor:help"><title>FP32·FMA Peak: ${peakSp.toFixed(0)} GFLOP/s\nFP32 = Single Precision (32-bit float) — twice the SIMD lanes of FP64, so double the peak.\nRelevant for FP32 activations in LLM inference and mixed-precision training.\nAMX tiles on Sapphire Rapids / Granite Rapids can exceed this for BF16/INT8 matrix ops.</title>`;
+                s += `<line x1="${Math.min(ySpRidge,PR).toFixed(1)}" y1="${ySp.toFixed(1)}" x2="${PR}" y2="${ySp.toFixed(1)}" stroke="#47b475" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>`;
+                s += `<text x="${PR-4}" y="${(ySp-5).toFixed(1)}" text-anchor="end" fill="#47b475" font-size="7.5" font-family="Inter,sans-serif" opacity="0.55">FP32·FMA ${peakSp.toFixed(0)} GF/s</text></g>`;
+            }
+
+            /* DRAM ridge point marker */
+            const dramRidgeAI = peakDp / dramBw;
+            const xRidge = toX(dramRidgeAI), yRidge = toY(peakDp);
+            if (xRidge >= PL && xRidge <= PR && yRidge >= PT && yRidge <= PB) {
+                s += `<g style="cursor:help"><title>DRAM Ridge Point: ${dramRidgeAI.toFixed(1)} FLOPs/byte\nThis is where the DRAM bandwidth ceiling meets the compute ceiling.\nLeft of ridge = memory-bound. Right of ridge = compute-bound.\nFor decode (batch=1) LLM inference, the workload is almost always left of this.</title>`;
+                s += `<line x1="${xRidge.toFixed(1)}" y1="${yRidge.toFixed(1)}" x2="${xRidge.toFixed(1)}" y2="${PB}" stroke="#f39c12" stroke-width="0.8" stroke-dasharray="2,4" opacity="0.5"/>`;
+                s += `<circle cx="${xRidge.toFixed(1)}" cy="${yRidge.toFixed(1)}" r="4" fill="none" stroke="#f39c12" stroke-width="1.5"/>`;
+                s += `</g>`;
+                s += `<text x="${xRidge.toFixed(1)}" y="${PB+22}" text-anchor="middle" fill="#f39c12" font-size="8" font-family="Inter,sans-serif">ridge</text>`;
+                s += `<text x="${xRidge.toFixed(1)}" y="${PB+31}" text-anchor="middle" fill="#f39c12" font-size="8" font-family="'JetBrains Mono',monospace">${dramRidgeAI.toFixed(1)} F/B</text>`;
+            }
+
+            /* kernel family dots — each wrapped in <g> with <title> tooltip */
+            kernels.forEach((k, i) => {
+                if (!Number.isFinite(k.ai) || !Number.isFinite(k.gflops) || k.ai <= 0 || k.gflops <= 0) return;
+                const kx = toX(k.ai), ky = toY(k.gflops);
+                if (kx < PL-8 || kx > PR+8 || ky < PT-8 || ky > PB+8) return;
+                const constraint = k.ai < dramRidgeAI ? 'memory-bound (left of DRAM ridge)' : 'compute-bound (right of DRAM ridge)';
+                const kLabel = String(k.label || '').trim();
+                const compactLabel = kLabel.length > 12 ? `${kLabel.slice(0, 12)}…` : kLabel;
+                const labelOffset = 10 + ((i % 2) * 8);
+                s += `<g style="cursor:pointer">`;
+                s += `<title>${k.label}\nEstimated AI: ${k.ai.toFixed(2)} FLOPs/byte\nEstimated: ${k.gflops.toFixed(2)} GFLOP/s\nRegime: ${constraint}\nNote: AI is estimated from timing model. Run Intel Advisor for precise values.</title>`;
+                s += `<circle cx="${kx.toFixed(1)}" cy="${ky.toFixed(1)}" r="14" fill="transparent"/>`;
+                s += `<circle cx="${kx.toFixed(1)}" cy="${ky.toFixed(1)}" r="7" fill="${k.color||'#aaa'}" opacity="0.75" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>`;
+                s += `<text x="${kx.toFixed(1)}" y="${(ky-labelOffset).toFixed(1)}" text-anchor="middle" fill="${k.color||'#aaa'}" font-size="7.4" font-family="Inter,sans-serif" opacity="0.95">${compactLabel}</text>`;
+                s += `</g>`;
+            });
+
+            /* measured workload dot */
+            if (ai !== null && gflops !== null && ai > 0 && gflops > 0) {
+                const wx = toX(ai), wy = toY(gflops);
+                if (wx >= PL && wx <= PR && wy >= PT && wy <= PB) {
+                    const wConstraint = ai < dramRidgeAI ? `MEMORY-BOUND — below DRAM ridge (${dramRidgeAI.toFixed(1)} F/B)` : `COMPUTE-BOUND — above DRAM ridge`;
+                    const wDramPct = (gflops / (dramBw * ai) * 100).toFixed(0);
+                    const wPeakPct = (gflops / peakDp * 100).toFixed(0);
+                    s += `<line x1="${PL}" y1="${wy.toFixed(1)}" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}" stroke="#fff" stroke-width="0.6" stroke-dasharray="2,3" opacity="0.2"/>`;
+                    s += `<line x1="${wx.toFixed(1)}" y1="${PB}" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}" stroke="#fff" stroke-width="0.6" stroke-dasharray="2,3" opacity="0.2"/>`;
+                    s += `<g style="cursor:pointer">`;
+                    s += `<title>Measured Workload\nArithmetic Intensity: ${ai.toFixed(3)} FLOPs/byte\nThroughput: ${gflops.toFixed(2)} GFLOP/s\nDRAM BW utilization: ~${wDramPct}% of local ceiling\nCompute utilization: ~${wPeakPct}% of DP FMA peak\nRegime: ${wConstraint}</title>`;
+                    s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="16" fill="transparent"/>`;
+                    s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="10" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.3)" stroke-width="0.8"/>`;
+                    s += `<circle cx="${wx.toFixed(1)}" cy="${wy.toFixed(1)}" r="5" fill="#ffffff" stroke="rgba(0,0,0,0.6)" stroke-width="1.5"/>`;
+                    s += `</g>`;
+                    s += `<text x="${(wx+14).toFixed(1)}" y="${(wy-6).toFixed(1)}" fill="#ffffff" font-size="9" font-weight="700" font-family="Inter,sans-serif">Workload</text>`;
+                    s += `<text x="${(wx+14).toFixed(1)}" y="${(wy+5).toFixed(1)}" fill="#aaa" font-size="7.5" font-family="'JetBrains Mono',monospace">AI=${ai.toFixed(2)} · ${gflops.toFixed(1)} GF/s</text>`;
+                }
+            } else {
+                s += `<text x="${(PL+PW/2).toFixed(0)}" y="${(PT+PH/2).toFixed(0)}" text-anchor="middle" fill="#2a3348" font-size="13" font-family="Inter,sans-serif">Load profiling data to plot workload on the roofline</text>`;
+            }
+
+            /* legend */
+            const lx = PL+8, ly = PT+10;
+            s += `<rect x="${lx}" y="${ly}" width="168" height="58" rx="5" fill="rgba(10,14,23,0.88)" stroke="#2a3348" stroke-width="0.8"/>`;
+            const legItems = [
+                {color:'#f39c12', label:`DRAM BW ${dramBw.toFixed(0)} GB/s`,  dash:'none'},
+                {color:'#3498db', label:'L2 ~200 GB/s',    dash:'5,2'},
+                {color:'#9b59b6', label:'L1 ~800 GB/s',    dash:'3,3'},
+                {color:'#47b475', label:'FP64·FMA peak',   dash:'none'},
+            ];
+            legItems.forEach((item, i) => {
+                const ly2 = ly+11+i*12;
+                s += `<line x1="${lx+8}" y1="${ly2}" x2="${lx+22}" y2="${ly2}" stroke="${item.color}" stroke-width="1.5" stroke-dasharray="${item.dash}"/>`;
+                s += `<text x="${lx+27}" y="${(ly2+4)}" fill="#778" font-size="8" font-family="Inter,sans-serif">${item.label}</text>`;
+            });
+
+            s += '</svg>';
+            return s;
+        }
+
+        /** buildTlbHierarchySvg — dTLB → STLB → Page Walker flow with hugepage coverage.
+         *  @param {object} p – TLB metric values
+         *  @returns {string} SVG markup */
+        function buildTlbHierarchySvg(p) {
+            const fmt = (v, d) => {
+                const n = Number(v);
+                if (!Number.isFinite(n)) return '-';
+                if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+                if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+                if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+                return n.toFixed(d !== undefined ? d : 0);
+            };
+            const fmtPct = v => Number.isFinite(Number(v)) ? (Number(v)*100).toFixed(2)+'%' : '-';
+            const stateColor = p.tlbState === 'HIGH' ? '#e74c3c' : (p.tlbState === 'WATCH' ? '#f39c12' : '#47b475');
+
+            const W = 680, H = 305;
+            let s = `<svg class="profile-inline-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="TLB Hierarchy" data-ck-svg-expand="TLB Translation Pipeline">`;
+            s += `<rect width="${W}" height="${H}" rx="10" fill="#0a0e17"/>`;
+
+            /* header */
+            s += `<text x="20" y="14" fill="#c8c8d0" font-size="10" font-weight="700" font-family="Inter,sans-serif">TLB Translation Pipeline — Virtual → Physical Address Flow</text>`;
+            s += `<text x="20" y="24" fill="#7e91ad" font-size="7.4" font-family="Inter,sans-serif">CPU looks up virtual→physical in TLB on every memory access. Miss = walk page table in DRAM (50–500 cycles penalty).</text>`;
+            s += `<rect x="${W-152}" y="3" width="142" height="16" rx="7" fill="${stateColor}22" stroke="${stateColor}" stroke-width="0.8"/>`;
+            s += `<text x="${W-81}" y="14" text-anchor="middle" fill="${stateColor}" font-size="8" font-weight="700" font-family="Inter,sans-serif">TLB PRESSURE: ${p.tlbState||'UNKNOWN'}</text>`;
+
+            /* 3 stage boxes */
+            const stages = [
+                {x:16,  w:180, title:'dTLB (L1 TLB)', sub:'Hardware, 64 entries · ~4 cyc',
+                 color:'#1a3a5c', border:'#2a5a8c',
+                 lines:[`Loads:  ${fmt(p.dtlbLoads)}`,`Stores: ${fmt(p.dtlbStores)}`,`Miss rate: ${fmtPct(p.dtlbMissRate)}`],
+                 warn: Number.isFinite(Number(p.dtlbMissRate)) && Number(p.dtlbMissRate)*100 >= 0.5},
+                {x:248, w:180, title:'STLB (L2 TLB)', sub:'Second-level, 1536 entries · ~15 cyc',
+                 color:'#1a3a2c', border:'#2a8c5c',
+                 lines:[`Hits:    ${fmt(p.stlbHits)}`,`Hits/kI: ${Number.isFinite(Number(p.stlbHitsPerKInst)) ? Number(p.stlbHitsPerKInst).toFixed(3) : '-'}`,`ld miss: ${fmtPct(p.dtlbLoadMissRate)}`],
+                 warn: false},
+                {x:480, w:180, title:'Page Walker (PTW)', sub:'Hardware, 50–500 cyc penalty',
+                 color:'#2a1a3a', border:'#6a3a8c',
+                 lines:[`Walks:   ${fmt(p.pageWalks)}`,`Walk/kI: ${Number.isFinite(Number(p.pageWalksPerKInst)) ? Number(p.pageWalksPerKInst).toFixed(3) : '-'}`,`iTLB/kI: ${Number.isFinite(Number(p.itlbMissesPerKInst)) ? Number(p.itlbMissesPerKInst).toFixed(3) : '-'}`],
+                 warn: Number.isFinite(Number(p.pageWalksPerKInst)) && Number(p.pageWalksPerKInst) >= 0.05},
+            ];
+
+            const boxY = 34, boxH = 88;
+            stages.forEach(st => {
+                const sc = st.warn ? '#e74c3c' : '#47b475';
+                s += `<rect x="${st.x}" y="${boxY}" width="${st.w}" height="${boxH}" rx="7" fill="${st.color}" stroke="${st.border}" stroke-width="1.2"/>`;
+                s += `<text x="${st.x+st.w/2}" y="${boxY+14}" text-anchor="middle" fill="#e0e0e0" font-size="9.5" font-weight="700" font-family="Inter,sans-serif">${st.title}</text>`;
+                s += `<text x="${st.x+st.w/2}" y="${boxY+25}" text-anchor="middle" fill="#7f96b3" font-size="7.2" font-family="Inter,sans-serif">${st.sub}</text>`;
+                st.lines.forEach((line, li) => {
+                    s += `<text x="${st.x+9}" y="${boxY+40+li*14}" fill="${li===2?'#a6b7cd':'#c6d3e3'}" font-size="8.3" font-family="'JetBrains Mono',monospace">${line}</text>`;
+                });
+                s += `<circle cx="${st.x+st.w-10}" cy="${boxY+10}" r="4.5" fill="${sc}" opacity="0.9"/>`;
+            });
+
+            /* arrows */
+            const arrowY = boxY + boxH/2;
+            [[196, 248, '#f39c12', 'miss→STLB'], [428, 480, '#9b59b6', 'miss→PTW']].forEach(([x1,x2,col,lbl]) => {
+                s += `<line x1="${x1}" y1="${arrowY}" x2="${x2-6}" y2="${arrowY}" stroke="${col}" stroke-width="1.3"/>`;
+                s += `<polygon points="${x2-6},${arrowY-4} ${x2},${arrowY} ${x2-6},${arrowY+4}" fill="${col}"/>`;
+                s += `<text x="${(x1+x2)/2}" y="${arrowY-7}" text-anchor="middle" fill="${col}" font-size="7.8" font-family="Inter,sans-serif">${lbl}</text>`;
+            });
+
+            /* page faults row */
+            const fy = boxY + boxH + 10;
+            s += `<line x1="16" y1="${fy-2}" x2="${W-16}" y2="${fy-2}" stroke="#161e2c" stroke-width="0.7"/>`;
+            const majFlt = Number(p.majorFaults);
+            s += `<text x="16" y="${fy+9}" fill="#7f96b3" font-size="7.6" font-weight="600" font-family="Inter,sans-serif">Page Faults →</text>`;
+            s += `<text x="98" y="${fy+9}" fill="#c7d4e5" font-size="7.7" font-family="'JetBrains Mono',monospace">minor: ${fmt(p.minorFaults)}  major: ${fmt(p.majorFaults)}</text>`;
+            if (Number.isFinite(majFlt) && majFlt > 0) {
+                s += `<text x="320" y="${fy+9}" fill="#e74c3c" font-size="7.5" font-weight="700" font-family="Inter,sans-serif">MAJOR FAULTS — check swap/mlock!</text>`;
+            }
+
+            /* ── Hugepage / TLB coverage section ── */
+            const hpY = fy + 24;
+            s += `<line x1="16" y1="${hpY}" x2="${W-16}" y2="${hpY}" stroke="#161e2c" stroke-width="0.7"/>`;
+            s += `<text x="16" y="${hpY+11}" fill="#8aa0bf" font-size="8.1" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage — 64-entry L1 TLB × page size = virtual address range covered before next miss</text>`;
+
+            const hpRows = [
+                {label:'4 KB (default)',  cov:'64 × 4 KB = 256 KB', impact:'KV/weight footprints exceed 256 KB → frequent misses', col:'#e74c3c'},
+                {label:'2 MB (THP/huge)', cov:'64 × 2 MB = 128 MB', impact:'covers most tensors → fewer page walks', col:'#47b475'},
+            ];
+            hpRows.forEach((row, i) => {
+                const rx = 16 + i*(W/2 - 4), ry = hpY + 20;
+                s += `<text x="${rx}" y="${ry}" fill="${row.col}" font-size="7.6" font-weight="600" font-family="'JetBrains Mono',monospace">${row.label}</text>`;
+                s += `<text x="${rx}" y="${ry+11}" fill="#9aacc3" font-size="7.1" font-family="Inter,sans-serif">covers: ${row.cov}</text>`;
+                s += `<text x="${rx}" y="${ry+22}" fill="#7388a6" font-size="6.8" font-family="Inter,sans-serif" font-style="italic">${row.impact}</text>`;
+            });
+            s += `<text x="${W-14}" y="${hpY+52}" text-anchor="end" fill="#7288a8" font-size="6.8" font-family="Inter,sans-serif">check THP: cat /sys/kernel/mm/transparent_hugepage/enabled</text>`;
+
+            s += '</svg>';
+            return s;
+        }
+
+        /** buildCacheHierarchySvg — L1d→L2→LLC→DRAM pyramid with miss rates, P/E-core topology, hugepage context.
+         *  @param {object} p – { l1MissRate, d1MissRate, llMissRate, memBwGBs }
+         *  @returns {string} SVG markup */
+        function buildCacheHierarchySvg(p) {
+            const fmtPct = v => (v !== null && Number.isFinite(Number(v))) ? `${(Number(v)*100).toFixed(2)}%` : null;
+            const fmtBw  = v => (v !== null && Number.isFinite(Number(v))) ? `${Number(v).toFixed(1)} GB/s` : null;
+            const colFor  = (rate, bad, warn) => {
+                if (rate === null || !Number.isFinite(Number(rate))) return '#3a4560';
+                const r = Number(rate)*100;
+                return r >= bad ? '#e74c3c' : (r >= warn ? '#f39c12' : '#47b475');
+            };
+            const l1Rate  = p.d1MissRate !== null && p.d1MissRate !== undefined ? p.d1MissRate : p.l1MissRate;
+            const l1Col   = colFor(l1Rate, 10, 2);
+            const llCol   = colFor(p.llMissRate, 5, 1);
+
+            const W = 680, H = 350;
+            const cx = W/2;
+            let s = `<svg class="profile-inline-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cache Hierarchy" data-ck-svg-expand="Cache Hierarchy">`;
+            s += `<rect width="${W}" height="${H}" rx="10" fill="#0a0e17"/>`;
+            s += `<text x="20" y="15" fill="#d7deea" font-size="10" font-weight="700" font-family="Inter,sans-serif">Cache Hierarchy — Miss Rates &amp; Bandwidth per Level</text>`;
+
+            /* op stressor column header */
+            s += `<text x="${W-14}" y="15" text-anchor="end" fill="#7e95b4" font-size="7.6" font-family="Inter,sans-serif">op stressor</text>`;
+
+            const levels = [
+                {label:'L1d Cache', cap:'32–64 KB · ~4 cyc',  w:130, col:l1Col,    miss:fmtPct(l1Rate),       src: p.d1MissRate != null ? 'cachegrind D1' : 'perf L1', lat:'4',    ops:'RoPE + norm (elem-wise)'},
+                {label:'L2 Cache',  cap:'256 KB–1 MB · ~12 cyc', w:230, col:'#3a4560', miss:null,              src:'not measured',  lat:'12',   ops:'attention score tiles'},
+                {label:'LLC / L3',  cap:'6–32 MB · ~40 cyc',  w:350, col:llCol,    miss:fmtPct(p.llMissRate), src:'cachegrind LL', lat:'40',   ops:'GEMM activations/logits'},
+                {label:'DRAM',      cap:'DDR4/DDR5 · ~100 ns', w:450, col:'#2a6cb4', miss:fmtBw(p.memBwGBs),  src:'est. BW',       lat:'200+', ops:'KV cache + weights'},
+            ];
+
+            const boxH = 26, gap = 8, startY = 24;
+            levels.forEach((lv, i) => {
+                const bx = cx - lv.w/2, by = startY + i*(boxH+gap);
+                const fillOp = lv.col === '#e74c3c' ? 0.20 : (lv.col === '#f39c12' ? 0.14 : 0.08);
+                s += `<rect x="${bx.toFixed(1)}" y="${by}" width="${lv.w}" height="${boxH}" rx="5" fill="${lv.col}" fill-opacity="${fillOp}" stroke="${lv.col}" stroke-width="${lv.col==='#e74c3c'?1.8:1.1}"/>`;
+                s += `<text x="${cx}" y="${by+12}" text-anchor="middle" fill="#dde" font-size="9.5" font-weight="700" font-family="Inter,sans-serif">${lv.label}</text>`;
+                s += `<text x="${cx}" y="${by+22}" text-anchor="middle" fill="#92a5bf" font-size="7.2" font-family="Inter,sans-serif">${lv.cap}</text>`;
+                /* miss / BW left */
+                const missLabel = lv.miss || '—';
+                s += `<text x="${(bx-6).toFixed(1)}" y="${by+15}" text-anchor="end" fill="${lv.miss ? lv.col : '#4f6280'}" font-size="8.4" font-weight="600" font-family="'JetBrains Mono',monospace">${missLabel}</text>`;
+                /* source label */
+                s += `<text x="${(bx+lv.w+6).toFixed(1)}" y="${by+15}" fill="#87a0c0" font-size="7.1" font-family="Inter,sans-serif">${lv.src}</text>`;
+                /* latency far-right */
+                s += `<text x="${W-14}" y="${by+12}" text-anchor="end" fill="#8ba5c7" font-size="7.1" font-family="Inter,sans-serif">&lt;${lv.lat} cyc</text>`;
+                /* op stressor below latency */
+                s += `<text x="${W-14}" y="${by+22}" text-anchor="end" fill="#6f8fb6" font-size="6.8" font-family="Inter,sans-serif" font-style="italic">${lv.ops}</text>`;
+                /* connector arrow */
+                if (i < levels.length-1) {
+                    const ay1 = by+boxH, ay2 = by+boxH+gap;
+                    s += `<line x1="${cx}" y1="${ay1}" x2="${cx}" y2="${ay2-3}" stroke="#1e2838" stroke-width="1.5"/>`;
+                    s += `<polygon points="${cx-4},${ay2-3} ${cx+4},${ay2-3} ${cx},${ay2+2}" fill="#1e2838"/>`;
+                }
+            });
+
+            /* ── Bottom section: P-core / E-core topology + Hugepage coverage ── */
+            const secY = startY + levels.length*(boxH+gap) + 10;
+
+            /* divider */
+            s += `<line x1="16" y1="${secY}" x2="${W-16}" y2="${secY}" stroke="#161e2c" stroke-width="1"/>`;
+
+            /* P-core / E-core side by side */
+            const colW = (W-32)/2 - 4;
+            /* P-core box */
+            const coreBoxH = 74;
+            s += `<rect x="16" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1a2e" stroke="#1a2d4a" stroke-width="1"/>`;
+            s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#a8c4e0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">P-core (Performance)</text>`;
+            s += `<text x="${(16+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#8ea5c1" font-size="7" font-family="Inter,sans-serif">Alder Lake / Raptor Lake</text>`;
+            const pcLines = ['L1d: 48 KB (dedicated)','L2: 1.25 MB (dedicated)','Runs: AVX2/FMA · FP32/FP64','Contention: own cache, no sharing'];
+            pcLines.forEach((ln, i) => s += `<text x="${(26).toFixed(0)}" y="${secY+38+i*10}" fill="#9eb6d3" font-size="7.1" font-family="Inter,sans-serif">${ln}</text>`);
+
+            /* E-core box */
+            const ex = 16 + colW + 8;
+            s += `<rect x="${ex.toFixed(0)}" y="${secY+5}" width="${colW.toFixed(0)}" height="${coreBoxH}" rx="5" fill="#0d1e18" stroke="#1a3a28" stroke-width="1"/>`;
+            s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+17}" text-anchor="middle" fill="#80c4a0" font-size="8.5" font-weight="700" font-family="Inter,sans-serif">E-core (Efficiency)</text>`;
+            s += `<text x="${(ex+colW/2).toFixed(0)}" y="${secY+26}" text-anchor="middle" fill="#86b9a0" font-size="7" font-family="Inter,sans-serif">cluster of 4 E-cores</text>`;
+            const ecLines = ['L1d: 32 KB (dedicated)','L2: 2 MB (shared × 4)','Runs: OS / background tasks','Contention: shared L2 → LLC thrash'];
+            ecLines.forEach((ln, i) => s += `<text x="${(ex+10).toFixed(0)}" y="${secY+38+i*10}" fill="#9ad0b3" font-size="7.1" font-family="Inter,sans-serif">${ln}</text>`);
+
+            /* ── Hugepage / TLB coverage row ── */
+            const hpY = secY + coreBoxH + 14;
+            s += `<line x1="16" y1="${hpY}" x2="${W-16}" y2="${hpY}" stroke="#161e2c" stroke-width="0.7"/>`;
+            s += `<text x="16" y="${hpY+12}" fill="#8aa0bf" font-size="8.1" font-weight="700" font-family="Inter,sans-serif">Page Size &amp; TLB Coverage (64-entry L1 TLB)</text>`;
+
+            const pgCols = [
+                {size:'4 KB (default)',  coverage:'64 × 4 KB = 256 KB',  note:'large weights → frequent misses', col:'#e74c3c'},
+                {size:'2 MB (THP)',      coverage:'64 × 2 MB = 128 MB',  note:'covers most tensors → fewer walks', col:'#47b475'},
+            ];
+            pgCols.forEach((pg, i) => {
+                const px = 16 + i * (W/2 - 8), py = hpY+22;
+                s += `<text x="${px}" y="${py}" fill="${pg.col}" font-size="7.6" font-weight="600" font-family="'JetBrains Mono',monospace">${pg.size}</text>`;
+                s += `<text x="${px}" y="${py+11}" fill="#9aacc3" font-size="7.1" font-family="Inter,sans-serif">coverage: ${pg.coverage}</text>`;
+                s += `<text x="${px}" y="${py+22}" fill="#7388a6" font-size="6.8" font-family="Inter,sans-serif" font-style="italic">${pg.note}</text>`;
+            });
+            s += `<text x="${W-14}" y="${hpY+52}" text-anchor="end" fill="#7288a8" font-size="6.9" font-family="Inter,sans-serif">check: cat /sys/kernel/mm/transparent_hugepage/enabled</text>`;
+
+            s += '</svg>';
+            return s;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
            TOC Bottleneck X-Ray — Theory of Constraints applied to profiling
            ═══════════════════════════════════════════════════════════════════ */
         function renderProfileTOC(profileBasis) {
@@ -11833,6 +12203,39 @@ function renderProfileHowTo() {
                 `;
             }).join('');
 
+            // ── Build kernel family dots for the roofline chart ──
+            const rooflineKernelDots = [];
+            sortedStages.forEach((s) => {
+                const label = s.label;
+                const classifier = classifyProfileStage(label);
+                const lbl = label.length > 12 ? label.slice(0,12) + '…' : label;
+                // Estimated arithmetic intensity for each kernel family
+                let estAI = null, dotColor = '#888';
+                if (['attention', 'mlp'].includes(classifier) || label.toLowerCase().includes('gemm') || label.toLowerCase().includes('gemv') || label.toLowerCase().includes('proj') || label.toLowerCase().includes('lm_head')) {
+                    estAI = 1.2;  dotColor = '#e74c3c';
+                } else if (['norm', 'quant'].includes(classifier)) {
+                    estAI = 0.5;  dotColor = '#f39c12';
+                } else if (['embedding'].includes(classifier)) {
+                    estAI = 0.7;  dotColor = '#3498db';
+                } else if (label.toLowerCase().includes('softmax')) {
+                    estAI = 3.5;  dotColor = '#9b59b6';
+                } else if (label.toLowerCase().includes('rope')) {
+                    estAI = 2.5;  dotColor = '#47b475';
+                }
+                if (estAI !== null && physics.gflops !== null && physics.totalUs > 0 && s.us > 0) {
+                    const stageGflops = (s.us / physics.totalUs) * physics.gflops;
+                    if (stageGflops > 0) rooflineKernelDots.push({ label: lbl, ai: estAI, gflops: stageGflops, color: dotColor });
+                }
+            });
+            const rooflineSvg = buildRooflineSvg({
+                ai: ai,
+                gflops: physics.gflops,
+                dramBw: physics.memoryBwGBs || 29.0,
+                peakDp: 288.1,
+                peakSp: 580.6,
+                kernels: rooflineKernelDots,
+            });
+
             // ── Advisor roofline enrichment ──
             let advisorInsightHtml = '';
             if (hasAdvisor) {
@@ -11898,6 +12301,13 @@ function renderProfileHowTo() {
                     <div style="margin-bottom:1.2rem;">
                         ${chainSvg}
                     </div>
+
+                    <details open style="margin-bottom:1.2rem;">
+                        <summary style="cursor:pointer;color:#07adf8;font-weight:600;font-size:0.92rem;padding:0.3rem 0;">Roofline Analysis — Compute vs. Memory Ceiling</summary>
+                        <p style="color:var(--text-muted);font-size:0.78rem;margin:0.3rem 0 0.5rem;">X = arithmetic intensity (FLOPs/byte, log scale). Y = performance (GFLOP/s, log scale). Sloped lines = memory bandwidth ceilings. Horizontal lines = peak compute ceilings. Workload dot = measured operating point. Hover any element for details. Click chart or ⛶ to open full-screen.</p>
+                        ${rooflineSvg}
+                        <span class="ck-svg-expand-btn" data-title="Roofline Model" style="margin-top:6px;">⛶ Open full-screen / export SVG</span>
+                    </details>
 
                     ${stageXrayRows ? `
                     <details open style="margin-bottom:1rem;">
@@ -12157,6 +12567,8 @@ function renderProfileHowTo() {
             const links = [];
             let gatePanelHtml = '';
             let cliPanelHtml = '';
+            let tlbPanelHtml = '';
+            let cachePanelHtml = '';
             let advisorPanelHtml = '';
             let safetyPanelHtml = '';
 
@@ -12166,9 +12578,23 @@ function renderProfileHowTo() {
             const cmr = perfStatData?.derived?.cache_miss_rate;
             const bmr = perfStatData?.derived?.branch_miss_rate;
             const dtlbMissRate = perfStatData?.derived?.dtlb_miss_rate;
+            const dtlbLoadMissRate = perfStatData?.derived?.dtlb_load_miss_rate;
+            const dtlbStoreMissRate = perfStatData?.derived?.dtlb_store_miss_rate;
             const itlbMissesPerKInst = perfStatData?.derived?.itlb_misses_per_kinst;
+            const pageWalks = perfStatData?.derived?.page_walks;
             const pageWalksPerKInst = perfStatData?.derived?.page_walks_per_kinst;
+            const stlbHits = perfStatData?.derived?.stlb_hits;
             const stlbHitsPerKInst = perfStatData?.derived?.stlb_hits_per_kinst;
+            const dtlbLoads = getPerfCounterByMatcher(['dTLB-loads', /dtlb-loads/i]);
+            const dtlbLoadMisses = getPerfCounterByMatcher(['dTLB-load-misses', /dtlb-load-misses/i]);
+            const dtlbStores = getPerfCounterByMatcher(['dTLB-stores', /dtlb-stores/i]);
+            const dtlbStoreMisses = getPerfCounterByMatcher(['dTLB-store-misses', /dtlb-store-misses/i]);
+            const itlbLoadMisses = getPerfCounterByMatcher(['iTLB-load-misses', /itlb-load-misses/i]);
+            const dtlbLoadWalkCompleted = getPerfCounterByMatcher(['dtlb_load_misses.walk_completed', /dtlb_load_misses\.walk_completed/i]);
+            const dtlbStoreWalkCompleted = getPerfCounterByMatcher(['dtlb_store_misses.walk_completed', /dtlb_store_misses\.walk_completed/i]);
+            const itlbWalkCompleted = getPerfCounterByMatcher(['itlb_misses.walk_completed', /itlb_misses\.walk_completed/i]);
+            const dtlbLoadStlbHit = getPerfCounterByMatcher(['dtlb_load_misses.stlb_hit', /dtlb_load_misses\.stlb_hit/i]);
+            const itlbStlbHit = getPerfCounterByMatcher(['itlb_misses.stlb_hit', /itlb_misses\.stlb_hit/i]);
             const minorFaults = getPerfCounterByMatcher(['minor-faults', /minor-faults/i]);
             const majorFaults = getPerfCounterByMatcher(['major-faults', /major-faults/i]);
             cards.push(`
@@ -12205,6 +12631,160 @@ function renderProfileHowTo() {
                     ${statLabel('CPU Counters')}
                 </div>
             `);
+
+            const hasTlbData = [
+                dtlbMissRate,
+                dtlbLoadMissRate,
+                dtlbStoreMissRate,
+                itlbMissesPerKInst,
+                pageWalks,
+                pageWalksPerKInst,
+                stlbHits,
+                stlbHitsPerKInst,
+                dtlbLoads,
+                dtlbLoadMisses,
+                dtlbStores,
+                dtlbStoreMisses,
+                itlbLoadMisses,
+                dtlbLoadWalkCompleted,
+                dtlbStoreWalkCompleted,
+                itlbWalkCompleted,
+                dtlbLoadStlbHit,
+                itlbStlbHit,
+                minorFaults,
+                majorFaults
+            ].some((v) => v !== null && v !== undefined && Number.isFinite(Number(v)));
+            if (hasTlbData) {
+                const dtlbMissRatePct = Number.isFinite(Number(dtlbMissRate)) ? Number(dtlbMissRate) * 100 : null;
+                const walkToStlbRatio = (Number.isFinite(Number(pageWalks)) && Number.isFinite(Number(stlbHits)) && Number(stlbHits) > 0)
+                    ? Number(pageWalks) / Number(stlbHits)
+                    : null;
+                const alerts = [];
+                if (dtlbMissRatePct !== null && dtlbMissRatePct >= 0.5) alerts.push('dTLB miss rate >= 0.5%');
+                if (Number.isFinite(Number(pageWalks)) && Number(pageWalks) >= 2000000) alerts.push('page_walks >= 2M');
+                if (Number.isFinite(Number(pageWalksPerKInst)) && Number(pageWalksPerKInst) >= 0.05) alerts.push('page_walks_per_kinst >= 0.05');
+                if (Number.isFinite(Number(majorFaults)) && Number(majorFaults) > 0) alerts.push('major-faults > 0');
+
+                let tlbState = 'GOOD';
+                let tlbStateColor = 'var(--green)';
+                if (alerts.length >= 2 || (Number.isFinite(Number(majorFaults)) && Number(majorFaults) > 0)) {
+                    tlbState = 'HIGH';
+                    tlbStateColor = '#e74c3c';
+                } else if (alerts.length === 1) {
+                    tlbState = 'WATCH';
+                    tlbStateColor = '#f39c12';
+                }
+
+                const tlbDiagnosticRows = [
+                    {
+                        metric: 'dTLB miss rate',
+                        value: dtlbMissRatePct !== null ? `${dtlbMissRatePct.toFixed(2)}%` : '-',
+                        target: '< 0.5%',
+                        ok: dtlbMissRatePct !== null ? dtlbMissRatePct < 0.5 : null
+                    },
+                    {
+                        metric: 'Page walks / kInst',
+                        value: Number.isFinite(Number(pageWalksPerKInst)) ? Number(pageWalksPerKInst).toFixed(3) : '-',
+                        target: '< 0.05',
+                        ok: Number.isFinite(Number(pageWalksPerKInst)) ? Number(pageWalksPerKInst) < 0.05 : null
+                    },
+                    {
+                        metric: 'Walk / STLB hit',
+                        value: walkToStlbRatio !== null ? walkToStlbRatio.toFixed(3) : '-',
+                        target: 'as low as possible',
+                        ok: walkToStlbRatio !== null ? walkToStlbRatio < 0.35 : null
+                    },
+                    {
+                        metric: 'Major faults',
+                        value: Number.isFinite(Number(majorFaults)) ? formatMetricValue(majorFaults) : '-',
+                        target: '0',
+                        ok: Number.isFinite(Number(majorFaults)) ? Number(majorFaults) === 0 : null
+                    }
+                ];
+                const tlbRowHtml = tlbDiagnosticRows.map((row) => {
+                    const status = row.ok === null ? 'NA' : (row.ok ? 'OK' : 'WARN');
+                    const color = row.ok === null ? 'var(--text-muted)' : (row.ok ? 'var(--green)' : '#e74c3c');
+                    return `
+                        <tr>
+                            <td>${escapeHtml(row.metric)}</td>
+                            <td>${escapeHtml(row.value)}</td>
+                            <td>${escapeHtml(row.target)}</td>
+                            <td style="color:${color};font-weight:700;">${status}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const rawCounterRows = [
+                    ['dTLB-loads', dtlbLoads],
+                    ['dTLB-load-misses', dtlbLoadMisses],
+                    ['dTLB-stores', dtlbStores],
+                    ['dTLB-store-misses', dtlbStoreMisses],
+                    ['iTLB-load-misses', itlbLoadMisses],
+                    ['dtlb_load_misses.walk_completed', dtlbLoadWalkCompleted],
+                    ['dtlb_store_misses.walk_completed', dtlbStoreWalkCompleted],
+                    ['itlb_misses.walk_completed', itlbWalkCompleted],
+                    ['dtlb_load_misses.stlb_hit', dtlbLoadStlbHit],
+                    ['itlb_misses.stlb_hit', itlbStlbHit],
+                    ['minor-faults', minorFaults],
+                    ['major-faults', majorFaults]
+                ].map(([name, value]) => `
+                    <tr>
+                        <td><code>${escapeHtml(String(name))}</code></td>
+                        <td>${escapeHtml(formatMetricValue(value))}</td>
+                    </tr>
+                `).join('');
+
+                const tlbNotes = [];
+                if (alerts.length > 0) {
+                    tlbNotes.push(`Signals: ${alerts.join(', ')}`);
+                } else {
+                    tlbNotes.push('Signals: no threshold violations detected.');
+                }
+                tlbNotes.push('Interpretation: wide miss rates + rising page walks indicate translation pressure, not compute saturation.');
+
+                const tlbHierarchySvg = buildTlbHierarchySvg({
+                    dtlbLoads, dtlbLoadMisses, dtlbStores, dtlbStoreMisses,
+                    stlbHits, stlbHitsPerKInst, pageWalks, pageWalksPerKInst,
+                    dtlbMissRate, dtlbLoadMissRate, dtlbStoreMissRate,
+                    itlbMissesPerKInst, majorFaults, minorFaults, tlbState,
+                });
+
+                tlbPanelHtml = `
+                    <div class="parity-section" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-orange">TLB</span> Translation Miss Diagnostics</h3>
+                        <p style="margin:0.35rem 0 0.7rem;color:var(--text-secondary);font-size:0.78rem;">
+                            Derived from <code>perf_stat_summary.json</code> and perf PMU counters. This panel isolates virtual-memory translation pressure
+                            (dTLB/iTLB misses, page walks, STLB behavior) separate from cache misses.
+                        </p>
+                        <div style="display:flex;gap:0.55rem;flex-wrap:wrap;margin:0 0 0.75rem;">
+                            <span style="padding:0.2rem 0.55rem;border:1px solid ${tlbStateColor};border-radius:999px;color:${tlbStateColor};font-size:0.74rem;font-weight:700;">TLB ${tlbState}</span>
+                            <span style="padding:0.2rem 0.55rem;border:1px solid var(--grey);border-radius:999px;color:var(--text-secondary);font-size:0.74rem;">dTLB load miss: ${Number.isFinite(Number(dtlbLoadMissRate)) ? `${(Number(dtlbLoadMissRate) * 100).toFixed(2)}%` : '-'}</span>
+                            <span style="padding:0.2rem 0.55rem;border:1px solid var(--grey);border-radius:999px;color:var(--text-secondary);font-size:0.74rem;">dTLB store miss: ${Number.isFinite(Number(dtlbStoreMissRate)) ? `${(Number(dtlbStoreMissRate) * 100).toFixed(2)}%` : '-'}</span>
+                            <span style="padding:0.2rem 0.55rem;border:1px solid var(--grey);border-radius:999px;color:var(--text-secondary);font-size:0.74rem;">Page walks: ${formatMetricValue(pageWalks)}</span>
+                            <span style="padding:0.2rem 0.55rem;border:1px solid var(--grey);border-radius:999px;color:var(--text-secondary);font-size:0.74rem;">STLB hits: ${formatMetricValue(stlbHits)}</span>
+                        </div>
+                        <div style="margin:0 0 0.4rem;">${tlbHierarchySvg}</div>
+                        <span class="ck-svg-expand-btn" data-title="TLB Translation Pipeline" style="margin-bottom:0.7rem;">⛶ Open full-screen / export SVG</span>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.7rem;">
+                            <div style="overflow-x:auto;">
+                                <table class="profile-hotspot-table">
+                                    <thead><tr><th>Diagnostic</th><th>Readout</th><th>Target</th><th>Status</th></tr></thead>
+                                    <tbody>${tlbRowHtml}</tbody>
+                                </table>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table class="profile-hotspot-table">
+                                    <thead><tr><th>Raw perf counter</th><th>Value</th></tr></thead>
+                                    <tbody>${rawCounterRows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div style="margin-top:0.65rem;color:var(--text-muted);font-size:0.76rem;line-height:1.45;">
+                            ${escapeHtml(tlbNotes.join('  '))}
+                        </div>
+                    </div>
+                `;
+            }
 
             const perfGate = perfGateData;
             if (perfGate && Array.isArray(perfGate.checks)) {
@@ -12487,6 +13067,29 @@ function renderProfileHowTo() {
                     ${statLabel('Cycles per Token')}
                 </div>
             `);
+
+            // ── Cache hierarchy infographic ──
+            const cacheHierarchyHasSomeData = (cmr !== undefined) || Boolean(cachegrindSummaryData);
+            if (cacheHierarchyHasSomeData) {
+                const d1Rate = cachegrindSummaryData?.derived?.d1_miss_rate;
+                const llRate = cachegrindSummaryData?.derived?.ll_miss_rate;
+                const cacheHierSvg = buildCacheHierarchySvg({
+                    l1MissRate: cmr !== undefined ? Number(cmr) : null,
+                    d1MissRate: d1Rate !== undefined ? Number(d1Rate) : null,
+                    llMissRate: llRate !== undefined ? Number(llRate) : null,
+                    memBwGBs: physics.memoryBwGBs,
+                });
+                cachePanelHtml = `
+                    <div class="parity-section" style="margin-top:0.8rem;">
+                        <h3><span class="badge badge-blue">Cache</span> Memory Hierarchy Miss Rates</h3>
+                        <p style="margin:0.35rem 0 0.7rem;color:var(--text-secondary);font-size:0.78rem;">
+                            L1d / LLC miss rates from <code>perf stat</code> and <code>cachegrind</code>. Wider miss rates at each level mean more pressure on slower memory. Target: L1d &lt;2%, LLC &lt;1%.
+                        </p>
+                        ${cacheHierSvg}
+                        <span class="ck-svg-expand-btn" data-title="Cache Hierarchy" style="margin-top:6px;">&#x26F6; Open full-screen / export SVG</span>
+                    </div>
+                `;
+            }
 
             const stageBreakdown = getProfileStageBreakdown(profileBasis);
             const stageRows = stageBreakdown.map((s) => `
@@ -12897,7 +13500,7 @@ function renderProfileHowTo() {
             }
 
             summaryEl.innerHTML = cards.length > 0
-                ? `<div class="stats-grid">${cards.join('')}</div>${cliPanelHtml}${gatePanelHtml}`
+                ? `<div class="stats-grid">${cards.join('')}</div>${tlbPanelHtml}${cachePanelHtml}${cliPanelHtml}${gatePanelHtml}`
                 : '<p style="color:var(--text-muted);">No perf/cache/validation artifacts loaded (perf_stat_summary.json, cachegrind_summary.json, asan_summary.json, memory_signoff.json, perf_gate_report.json).</p>';
             artifactsEl.innerHTML = links.length > 0
                 ? `<div class="parity-section"><h3><span class="badge badge-blue">Artifacts</span> External Profiling Artifacts</h3><div style="display:grid;gap:0.45rem;color:var(--text-secondary);">${links.map(x => `<div>${x}</div>`).join('')}</div></div>`
@@ -13303,14 +13906,58 @@ function renderProfileHowTo() {
         function detectTokenizerType() {
             const lineage = (trainPipelineData && trainPipelineData.tokenizer_lineage) || {};
             const config = (loweredData && loweredData.config) || (callData && callData.config) || {};
+            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
+                ? window.EMBEDDED_IR_DATA.files
+                : {};
+            const preview = (files.tokenizer_preview && typeof files.tokenizer_preview === 'object')
+                ? files.tokenizer_preview
+                : {};
             const vocabSize = Number(config.vocab_size || lineage.vocab_size || 0);
             const tokPath = lineage.tokenizer_path || lineage.tokenizer_json_path ||
                             (embeddedMeta && embeddedMeta.tokenizer_path) || '';
-            const explicitMode = lineage.mode || '';
+            const explicitMode = String(lineage.mode || preview.mode || '').trim().toLowerCase();
+            const previewModelType = String(preview.model_type || '').trim().toLowerCase();
+            const previewPreTokenizerType = String(preview.pre_tokenizer_type || '').trim();
+            const previewBytelevel = preview.bytelevel_mode === true;
+            const tokenizerClass = String(preview.tokenizer_class || lineage.tokenizer_class || '').trim();
+            const configModelType = String(config.model_type || '').trim().toLowerCase();
+            const sentencepieceModelPath = String(preview.sentencepiece_model_path || '').trim();
+            const hasSentencePieceModel = Boolean(preview.sentencepiece_model_present) ||
+                /tokenizer\.model$/i.test(sentencepieceModelPath) ||
+                /tokenizer\.model$/i.test(String(tokPath || ''));
+
+            const buildSentencePieceInfo = (variant, nameHint) => ({
+                type: variant === 'unigram' ? 'sentencepiece_unigram' : 'sentencepiece_bpe',
+                name: nameHint || 'SentencePiece',
+                byteBase: 0,
+                mergeCountTypical: preview.merge_count !== undefined && preview.merge_count !== null
+                    ? String(preview.merge_count)
+                    : (variant === 'unigram' ? 'n/a (unigram model)' : '~model-defined'),
+                preTokenizer: previewPreTokenizerType || 'None (SentencePiece handles segmentation)',
+                special: ['<s>', '</s>', '<unk>'],
+                vocabSize,
+                tokPath,
+                detected: true,
+                matchKey: variant === 'unigram' ? 'sentencepiece_unigram' : 'sentencepiece_bpe',
+                tokenizerClass,
+                sentencepieceModelPath: sentencepieceModelPath || '',
+                previewModelType: previewModelType || '',
+            });
 
             // Explicit mode wins
             if (explicitMode === 'ascii_bpe') {
                 return { ...TOKENIZER_FAMILIES.v7ascii, vocabSize, tokPath, detected: true, matchKey: 'v7ascii' };
+            }
+            if (
+                explicitMode === 'sentencepiece' ||
+                explicitMode === 'spm' ||
+                explicitMode === 'sentencepiece_bpe' ||
+                explicitMode === 'sentencepiece_unigram'
+            ) {
+                return buildSentencePieceInfo(
+                    explicitMode.endsWith('unigram') ? 'unigram' : 'bpe',
+                    explicitMode.endsWith('unigram') ? 'SentencePiece Unigram' : 'SentencePiece BPE'
+                );
             }
             if (explicitMode === 'bytelevel_bpe' || explicitMode === 'byte_level') {
                 // Try to match by vocab size for name resolution
@@ -13325,12 +13972,31 @@ function renderProfileHowTo() {
                          special: [], vocabSize, tokPath, detected: true, matchKey: 'bytelevel_generic' };
             }
 
+            // Prefer explicit tokenizer-preview evidence before vocab-size heuristics.
+            if (!previewBytelevel) {
+                if (previewModelType === 'unigram') {
+                    return buildSentencePieceInfo('unigram', 'SentencePiece Unigram');
+                }
+                const llamaFamily = new Set(['llama', 'mistral', 'gemma']);
+                const likelySentencePieceBpe = previewModelType === 'bpe' && (
+                    hasSentencePieceModel ||
+                    /llamatokenizer|sentencepiece/i.test(tokenizerClass) ||
+                    llamaFamily.has(configModelType)
+                );
+                if (likelySentencePieceBpe) {
+                    return buildSentencePieceInfo('bpe', 'SentencePiece BPE');
+                }
+            }
+
             // Infer from vocab size
             if (vocabSize > 0) {
                 for (const [k, fam] of Object.entries(TOKENIZER_FAMILIES)) {
                     if (vocabSize >= fam.minVocab && vocabSize <= fam.maxVocab) {
                         return { ...fam, vocabSize, tokPath, detected: true, matchKey: k };
                     }
+                }
+                if (hasSentencePieceModel && configModelType === 'llama') {
+                    return buildSentencePieceInfo('bpe', `SentencePiece BPE (${vocabSize.toLocaleString()})`);
                 }
                 // Large vocab → bytelevel, small → ascii
                 if (vocabSize > 10000) {
@@ -13363,6 +14029,11 @@ function renderProfileHowTo() {
                 lineage.vocab_size ||
                 0
             );
+            if (
+                tokInfo &&
+                (tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram')
+            ) return false;
+            if (explicitMode === 'sentencepiece' || explicitMode === 'spm' || explicitMode.startsWith('sentencepiece')) return false;
             if (tokInfo && tokInfo.type === 'bytelevel_bpe') return true;
             if (explicitMode === 'bytelevel_bpe' || explicitMode === 'byte_level') return true;
             if (preview.bytelevel_mode === true) return true;
@@ -13676,6 +14347,13 @@ function renderProfileHowTo() {
                         Subset of ${tokInfo.name}'s 256-byte base vocabulary &mdash; see Byte-Level grid above for full 0–255 range
                     </span>
                 `;
+            } else if (header && tokInfo.detected && (tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram')) {
+                header.innerHTML = `
+                    <span style="color:var(--orange);">ASCII</span> — Reference Character Map (0x00–0x7F)
+                    <span style="font-size:0.7rem; color:var(--text-muted); font-weight:400;">
+                        ${tokInfo.name} uses SentencePiece pieces; this grid remains a raw-byte reference, not the tokenizer base vocabulary.
+                    </span>
+                `;
             }
 
             grid.innerHTML = '';
@@ -13753,6 +14431,147 @@ function renderProfileHowTo() {
             '#bc8cff','#ff6b9d','#ffd700','#e74c3c','#ff8c00',
         ];
 
+        let DP_SPM_LOOKUP_CACHE = null;
+
+        function getTokenizerPreviewForDp() {
+            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
+                ? window.EMBEDDED_IR_DATA.files
+                : {};
+            return (files.tokenizer_preview && typeof files.tokenizer_preview === 'object')
+                ? files.tokenizer_preview
+                : {};
+        }
+
+        function getDpSpmLookup() {
+            const preview = getTokenizerPreviewForDp();
+            const previewPath = typeof preview.path === 'string' ? preview.path : '';
+            if (DP_SPM_LOOKUP_CACHE && DP_SPM_LOOKUP_CACHE.previewPath === previewPath) {
+                return DP_SPM_LOOKUP_CACHE;
+            }
+            const rows = Array.isArray(preview.token_lookup_rows) ? preview.token_lookup_rows : [];
+            const special = Array.isArray(preview.special_tokens) ? preview.special_tokens : [];
+            const pieceToId = new Map();
+            rows.forEach((row) => {
+                if (!row || typeof row !== 'object') return;
+                const piece = typeof row.piece === 'string' ? row.piece : null;
+                const id = Number(row.id);
+                if (!piece || !Number.isFinite(id)) return;
+                pieceToId.set(piece, Math.trunc(id));
+            });
+            special.forEach((row) => {
+                if (!row || typeof row !== 'object') return;
+                const piece = typeof row.content === 'string' ? row.content : null;
+                const id = Number(row.id);
+                if (!piece || !Number.isFinite(id) || pieceToId.has(piece)) return;
+                pieceToId.set(piece, Math.trunc(id));
+            });
+            const pieces = Array.from(pieceToId.keys())
+                .filter((p) => p && !/^<\|.*\|>$/.test(p))
+                .sort((a, b) => {
+                    if (b.length !== a.length) return b.length - a.length;
+                    return a.localeCompare(b);
+                });
+            const unkId = pieceToId.has('<unk>') ? pieceToId.get('<unk>') : null;
+            DP_SPM_LOOKUP_CACHE = { pieceToId, pieces, unkId, preview, previewPath };
+            return DP_SPM_LOOKUP_CACHE;
+        }
+
+        function dpSpmPreprocess(text) {
+            const raw = String(text || '');
+            const replaced = raw.replace(/ /g, '▁');
+            const addPrefix = replaced.length > 0 && !replaced.startsWith('▁');
+            return {
+                raw,
+                normalized: addPrefix ? `▁${replaced}` : replaced,
+                addPrefix,
+            };
+        }
+
+        function dpSpmBytePiece(byteVal) {
+            const hx = Number(byteVal).toString(16).toUpperCase().padStart(2, '0');
+            return `<0x${hx}>`;
+        }
+
+        function dpSpmNextChar(text, index) {
+            const cp = text.codePointAt(index);
+            if (!Number.isFinite(cp)) return { char: text[index] || '', next: index + 1 };
+            const ch = String.fromCodePoint(cp);
+            return { char: ch, next: index + ch.length };
+        }
+
+        function dpSpmSegment(text) {
+            const prep = dpSpmPreprocess(text);
+            const lookup = getDpSpmLookup();
+            const tokens = [];
+            const steps = [];
+            let pos = 0;
+
+            while (pos < prep.normalized.length) {
+                let matchedPiece = null;
+                let matchedId = null;
+                for (const piece of lookup.pieces) {
+                    if (piece.length === 0) continue;
+                    if (prep.normalized.startsWith(piece, pos)) {
+                        matchedPiece = piece;
+                        matchedId = lookup.pieceToId.get(piece);
+                        break;
+                    }
+                }
+                if (matchedPiece) {
+                    tokens.push({
+                        piece: matchedPiece,
+                        id: Number.isFinite(Number(matchedId)) ? Math.trunc(Number(matchedId)) : null,
+                        kind: 'piece',
+                    });
+                    steps.push({
+                        type: 'piece',
+                        pos,
+                        piece: matchedPiece,
+                        id: Number.isFinite(Number(matchedId)) ? Math.trunc(Number(matchedId)) : null,
+                    });
+                    pos += matchedPiece.length;
+                    continue;
+                }
+
+                const { char, next } = dpSpmNextChar(prep.normalized, pos);
+                const bytes = Array.from(new TextEncoder().encode(char));
+                const byteTokens = [];
+                for (const byteVal of bytes) {
+                    const bytePiece = dpSpmBytePiece(byteVal);
+                    const byteId = lookup.pieceToId.has(bytePiece) ? lookup.pieceToId.get(bytePiece) : null;
+                    if (byteId !== null && byteId !== undefined) {
+                        const id = Math.trunc(Number(byteId));
+                        tokens.push({ piece: bytePiece, id, kind: 'byte', source: char });
+                        byteTokens.push({ piece: bytePiece, id });
+                    } else if (lookup.unkId !== null && lookup.unkId !== undefined) {
+                        const id = Math.trunc(Number(lookup.unkId));
+                        tokens.push({ piece: '<unk>', id, kind: 'unk', source: char });
+                        byteTokens.push({ piece: '<unk>', id });
+                    } else {
+                        tokens.push({ piece: char, id: null, kind: 'raw', source: char });
+                        byteTokens.push({ piece: char, id: null });
+                    }
+                }
+                steps.push({ type: 'fallback', pos, char, bytes: byteTokens });
+                pos = next;
+            }
+
+            let decoded = prep.normalized.replace(/▁/g, ' ');
+            if (prep.addPrefix && decoded.startsWith(' ')) decoded = decoded.slice(1);
+
+            return {
+                prep,
+                tokens,
+                steps,
+                decoded,
+                exact: decoded === prep.raw,
+                lookupRows: lookup.preview && lookup.preview.token_lookup_meta
+                    ? Number(lookup.preview.token_lookup_meta.rows_returned || 0)
+                    : 0,
+                lookupTotal: lookup.preview ? Number(lookup.preview.vocab_size || 0) : 0,
+            };
+        }
+
         function dpBpeEncode() {
             const input = document.getElementById('dpBpeInput');
             const tokensEl = document.getElementById('dpBpeTokens');
@@ -13761,9 +14580,50 @@ function renderProfileHowTo() {
             const roundDec = document.getElementById('dpRoundtripDecoded');
             const roundStatus = document.getElementById('dpRoundtripStatus');
             if (!input || !tokensEl) return;
+            const tokInfo = detectTokenizerType();
+            const isSentencePiece = tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram';
 
             const text = input.value;
             if (!text) { tokensEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.75rem;">Type something above...</span>'; stepsEl.innerHTML = ''; return; }
+
+            if (isSentencePiece) {
+                const seg = dpSpmSegment(text);
+                tokensEl.innerHTML = seg.tokens.map((tok, i) => {
+                    const c = DP_TOKEN_COLORS[i % DP_TOKEN_COLORS.length];
+                    const kindLabel = tok.kind === 'byte' ? 'byte' : (tok.kind === 'unk' ? 'unk' : 'piece');
+                    return `<span style="display:inline-flex;flex-direction:column;align-items:center;background:${c}18;border:1px solid ${c}44;border-radius:6px;padding:4px 8px;gap:1px;">
+                        <span style="color:${c};font-family:monospace;font-size:0.78rem;font-weight:600;">${htmlEscape(String(tok.piece || '-'))}</span>
+                        <span style="font-size:0.55rem;color:var(--text-muted);">id:${tok.id !== null && tok.id !== undefined ? htmlEscape(String(tok.id)) : '?'}</span>
+                        <span style="font-size:0.52rem;color:var(--text-muted);">${kindLabel}</span>
+                    </span>`;
+                }).join('');
+
+                const stepLines = [];
+                stepLines.push(`<span style="color:var(--text-muted);">Step 0 — raw text:</span> <code>${htmlEscape(seg.prep.raw)}</code>`);
+                stepLines.push(`<span style="color:var(--text-muted);">Step 1 — SPM normalization:</span> <code>${htmlEscape(seg.prep.normalized)}</code>`);
+                const pieceSteps = seg.steps.filter((s) => s.type === 'piece').slice(0, 24);
+                pieceSteps.forEach((s, idx) => {
+                    stepLines.push(`<span style="color:var(--text-muted);">Pick ${idx + 1} @${s.pos}:</span> <code>${htmlEscape(String(s.piece))}</code> → id:<code>${s.id !== null && s.id !== undefined ? htmlEscape(String(s.id)) : '?'}</code>`);
+                });
+                const fallbackSteps = seg.steps.filter((s) => s.type === 'fallback').slice(0, 8);
+                fallbackSteps.forEach((s) => {
+                    const bytesLabel = Array.isArray(s.bytes)
+                        ? s.bytes.map((b) => `${b.piece}:${b.id !== null && b.id !== undefined ? b.id : '?'}`).join(', ')
+                        : '-';
+                    stepLines.push(`<span style="color:#ffb400;">Byte fallback @${s.pos} for '${htmlEscape(String(s.char || ''))}':</span> <code>${htmlEscape(bytesLabel)}</code>`);
+                });
+                stepLines.push(`<span style="color:var(--text-muted);">Coverage note:</span> using ${seg.lookupRows.toLocaleString()} loaded piece rows from tokenizer preview (vocab=${seg.lookupTotal.toLocaleString() || '?'}).`);
+                stepsEl.innerHTML = stepLines.join('<br>');
+
+                if (roundOrig) roundOrig.textContent = seg.prep.raw;
+                if (roundDec) roundDec.textContent = seg.decoded;
+                if (roundStatus) {
+                    roundStatus.innerHTML = seg.exact
+                        ? '<span style="color:#47b475;">✓ SentencePiece-style roundtrip (normalized decode)</span>'
+                        : '<span style="color:#e74c3c;">✗ Mismatch — check piece coverage / fallback</span>';
+                }
+                return;
+            }
 
             // Start with character-level tokens
             let tokens = text.split('');
@@ -13818,10 +14678,35 @@ function renderProfileHowTo() {
             if (!el) return;
             if (!tokInfo) tokInfo = detectTokenizerType();
             const isBytes = tokInfo.type === 'bytelevel_bpe' && tokInfo.detected;
+            const isSentencePiece = tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram';
+            const isSentencePieceUnigram = tokInfo.type === 'sentencepiece_unigram';
+            const titleEl = document.getElementById('dpTokenizerExplainerTitle');
+            const rulesTitleEl = document.getElementById('dpTokenizerRulesTitle');
+            if (titleEl) {
+                if (isSentencePiece) {
+                    titleEl.innerHTML = `<span style="color:#16a085;">${isSentencePieceUnigram ? 'SentencePiece Unigram' : 'SentencePiece BPE'}</span> Tokenizer — How Text Becomes Tokens`;
+                } else if (isBytes) {
+                    titleEl.innerHTML = `<span style="color:#ff8c00;">BPE</span> Tokenizer — How Bytes Become Tokens`;
+                } else {
+                    titleEl.innerHTML = `<span style="color:#ff8c00;">Tokenizer</span> — How Text Becomes Tokens`;
+                }
+            }
+            if (rulesTitleEl) {
+                rulesTitleEl.textContent = isSentencePiece
+                    ? (isSentencePieceUnigram ? 'SentencePiece Unigram Pieces' : 'SentencePiece Merge Rules')
+                    : (isBytes ? 'BPE Merge Rules' : 'Tokenizer Rules');
+            }
             const show = Array.isArray(DP_BPE_EXAMPLE_MERGES) ? DP_BPE_EXAMPLE_MERGES.slice(0, 8) : [];
 
             // Model-aware context note
-            const contextNote = isBytes
+            const contextNote = isSentencePiece
+                ? `<div style="margin-bottom:0.75rem;padding:0.5rem;background:#16a0850a;border:1px solid #16a08544;border-radius:6px;font-size:0.68rem;color:var(--text-secondary);">
+                     <strong style="color:#16a085;">Model: ${tokInfo.name}</strong> &mdash;
+                     This run uses <strong>${isSentencePieceUnigram ? 'SentencePiece Unigram' : 'SentencePiece BPE'}</strong> with a vocab of
+                     <strong>${tokInfo.vocabSize ? tokInfo.vocabSize.toLocaleString() : '?'}</strong> tokens.
+                     ${tokInfo.sentencepieceModelPath ? `Pieces come from <code>${tokInfo.sentencepieceModelPath}</code>.` : 'Pieces come from tokenizer metadata in runtime assets.'}
+                   </div>`
+                : isBytes
                 ? `<div style="margin-bottom:0.75rem;padding:0.5rem;background:#07adf80a;border:1px solid #07adf844;border-radius:6px;font-size:0.68rem;color:var(--text-secondary);">
                      <strong style="color:#07adf8;">Model: ${tokInfo.name}</strong> &mdash;
                      Your model has <strong>${tokInfo.mergeCountTypical}</strong> learned merge rules with a vocab of <strong>${tokInfo.vocabSize ? tokInfo.vocabSize.toLocaleString() : '?'}</strong> tokens.
@@ -13829,10 +14714,73 @@ function renderProfileHowTo() {
                    </div>`
                 : '';
 
+            if (isSentencePiece) {
+                const preview = getTokenizerPreviewForDp();
+                const rows = Array.isArray(preview.token_lookup_rows) ? preview.token_lookup_rows : [];
+                const pieceRows = rows
+                    .filter((row) => row && typeof row === 'object' && typeof row.piece === 'string' && row.piece.startsWith('▁'))
+                    .slice(0, 10);
+                const hasByteFallback = rows.some((row) => row && typeof row.piece === 'string' && /^<0x[0-9A-F]{2}>$/.test(row.piece));
+                const loadedRows = preview.token_lookup_meta && typeof preview.token_lookup_meta === 'object'
+                    ? Number(preview.token_lookup_meta.rows_returned || 0)
+                    : 0;
+                const totalVocab = Number(preview.vocab_size || tokInfo.vocabSize || 0);
+                const detailsHref = 'https://antshiv.github.io/C-Kernel-Engine/sentencepiece.html';
+
+                el.innerHTML = `
+                    ${contextNote}
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.55rem;">
+                        SentencePiece path (real behavior): <strong>text normalization</strong> → <strong>${isSentencePieceUnigram ? 'unigram scoring + best path' : 'subword piece matching'}</strong> → <strong>byte fallback</strong> when no piece matches.
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0.5rem;margin-bottom:0.6rem;">
+                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:7px;padding:0.5rem;">
+                            <div style="font-size:0.64rem;color:#16a085;font-weight:700;">1) Normalize Text</div>
+                            <div style="font-size:0.68rem;color:var(--text-secondary);margin-top:0.2rem;">Spaces map to <code>▁</code>. Optional leading <code>▁</code> prefix is applied depending on config.</div>
+                        </div>
+                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:7px;padding:0.5rem;">
+                            <div style="font-size:0.64rem;color:#16a085;font-weight:700;">2) Choose Pieces</div>
+                            <div style="font-size:0.68rem;color:var(--text-secondary);margin-top:0.2rem;">${isSentencePieceUnigram ? 'Viterbi/DP selects best-scoring piece sequence.' : 'Piece matcher selects subword tokens covering the full string.'}</div>
+                        </div>
+                        <div style="background:var(--bg-dark);border:1px solid var(--grey);border-radius:7px;padding:0.5rem;">
+                            <div style="font-size:0.64rem;color:#16a085;font-weight:700;">3) Fallback Coverage</div>
+                            <div style="font-size:0.68rem;color:var(--text-secondary);margin-top:0.2rem;">
+                                ${hasByteFallback
+                                    ? 'Byte fallback tokens <code>&lt;0xXX&gt;</code> exist; unknown spans can still tokenize.'
+                                    : 'No byte tokens detected in loaded preview rows; unknowns may route through <code>&lt;unk&gt;</code>.'}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin:0.55rem 0 0.45rem; font-size:0.68rem; color:var(--text-muted);">
+                        Loaded piece preview: <code>${loadedRows.toLocaleString()}</code> rows (vocab <code>${totalVocab.toLocaleString() || '?'}</code>).
+                        Full walkthrough: <a href="${detailsHref}" target="_blank" rel="noopener noreferrer" style="color:#07adf8;">sentencepiece.html</a>.
+                    </div>
+                    ${pieceRows.length > 0 ? `
+                        <table style="margin-top:0.35rem;">
+                            <thead><tr><th>token_id</th><th>piece</th><th>bytes</th></tr></thead>
+                            <tbody>
+                                ${pieceRows.map((row) => `
+                                    <tr>
+                                        <td>${htmlEscape(String(row.id ?? '-'))}</td>
+                                        <td><code>${htmlEscape(String(row.piece ?? '-'))}</code></td>
+                                        <td><code>${htmlEscape(String(row.bytes_hex ?? '-'))}</code></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<div style="color:var(--text-muted);font-size:0.7rem;">No ▁-prefixed pieces available in preview rows.</div>'}
+                `;
+                return;
+            }
+
             el.innerHTML = `
                 ${contextNote}
                 <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.5rem;">
-                    ${isBytes ? 'Illustrative merge rules (demo — not from model):' : 'Top merge rules (by frequency):'}
+                    ${isSentencePiece
+                        ? (isSentencePieceUnigram
+                            ? 'Illustrative piece-composition demo (actual model uses SentencePiece unigram scoring):'
+                            : 'Illustrative SentencePiece merge-style demo (actual merges loaded from tokenizer assets):')
+                        : (isBytes ? 'Illustrative merge rules (demo — not from model):' : 'Top merge rules (by frequency):')
+                    }
                 </div>
                 ${show.length > 0 ? show.map((m, i) => {
                     const c = DP_TOKEN_COLORS[i % DP_TOKEN_COLORS.length];
@@ -13851,8 +14799,12 @@ function renderProfileHowTo() {
                     </div>`;
                 }).join('') : '<div style="color:var(--text-muted);font-size:0.72rem;">No merge-demo rows available.</div>'}
                 <div style="margin-top:0.75rem;padding:0.5rem;background:var(--dark-card);border-radius:6px;font-size:0.68rem;color:var(--text-secondary);">
-                    <strong style="color:var(--orange);">How BPE works:</strong>
-                    ${isBytes
+                    <strong style="color:var(--orange);">${isSentencePiece ? 'How SentencePiece works:' : 'How BPE works:'}</strong>
+                    ${isSentencePiece
+                        ? (isSentencePieceUnigram
+                            ? 'SentencePiece Unigram starts from a large candidate piece set and selects the most probable segmentation of text. Piece boundaries are chosen by likelihood, not only greedy pair merges.'
+                            : 'SentencePiece BPE learns subword pieces from raw text (often with ▁ as a word-boundary marker) and applies merges so common substrings become single tokens.')
+                        : isBytes
                         ? 'Start with 256 byte-level base tokens (every possible byte → one token). Count adjacent pairs across the corpus. Merge the most frequent pair into a new token. Repeat ~150K times. Result: common words/subwords become single tokens while rare byte sequences stay split.'
                         : 'Start with individual characters. Count every adjacent pair. Merge the most frequent pair into a single new token. Repeat until you reach the target vocab size. This is a <em>greedy</em> compression — common substrings become single tokens.'
                     }
@@ -13958,8 +14910,13 @@ function renderProfileHowTo() {
             }
 
             const isBytes = tokInfo.type === 'bytelevel_bpe';
-            const bannerColor = isBytes ? '#07adf8' : '#ff8c00';
-            const typeLabel = isBytes ? 'ByteLevel BPE' : 'ASCII BPE';
+            const isSentencePiece = tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram';
+            const bannerColor = isBytes ? '#07adf8' : (isSentencePiece ? '#16a085' : '#ff8c00');
+            const typeLabel = isBytes
+                ? 'ByteLevel BPE'
+                : (isSentencePiece
+                    ? (tokInfo.type === 'sentencepiece_unigram' ? 'SentencePiece Unigram' : 'SentencePiece BPE')
+                    : 'ASCII BPE');
             const vocabStr = tokInfo.vocabSize ? tokInfo.vocabSize.toLocaleString() : '?';
             const familyBadges = (tokInfo.special || []).map(s =>
                 `<span style="background:${bannerColor}18;border:1px solid ${bannerColor}44;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:0.7rem;color:${bannerColor};">${s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`
@@ -13981,8 +14938,13 @@ function renderProfileHowTo() {
                         ? `<strong>Pre-tokenizer:</strong> ${tokInfo.preTokenizer}. Every input byte (0–255) maps to a base token via the GPT-2 byte-to-unicode table.
                            Learned merges: <strong>${tokInfo.mergeCountTypical}</strong> rules build subwords from these 256 base bytes.
                            The ASCII grid below covers bytes 0–127; see the <strong style="color:#bc8cff;">Byte-Level Base (0–255)</strong> grid for full coverage.`
-                        : `<strong>Pre-tokenizer:</strong> ${tokInfo.preTokenizer}. Input is split at character boundaries (ASCII 0–127).
-                           Learned merges: <strong>${tokInfo.mergeCountTypical}</strong> rules build subwords. Vocab size: ${vocabStr}.`
+                        : (isSentencePiece
+                            ? `<strong>Tokenizer family:</strong> ${typeLabel}. Model pieces are learned directly by SentencePiece segmentation.
+                               <strong>Model type:</strong> ${tokInfo.previewModelType || 'unknown'}.
+                               <strong>Pre-tokenizer:</strong> ${tokInfo.preTokenizer || 'none'}.
+                               ${tokInfo.sentencepieceModelPath ? `<br><strong>SP model:</strong> <code style="font-size:0.68rem;">${tokInfo.sentencepieceModelPath}</code>` : ''}`
+                            : `<strong>Pre-tokenizer:</strong> ${tokInfo.preTokenizer}. Input is split at character boundaries (ASCII 0–127).
+                               Learned merges: <strong>${tokInfo.mergeCountTypical}</strong> rules build subwords. Vocab size: ${vocabStr}.`)
                     }
                     ${tokInfo.tokPath ? `<br><strong>Path:</strong> <code style="font-size:0.68rem;">${tokInfo.tokPath}</code>` : ''}
                 </div>
@@ -14376,18 +15338,203 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
             ]);
         }
 
+        const TOKENIZER_LINEAGE_TABLE = {
+            rows: [],
+            filteredIdx: [],
+            page: 1,
+            pageSize: 50,
+            query: '',
+        };
+
+        function tokenizerLineageTableReset(rows) {
+            TOKENIZER_LINEAGE_TABLE.rows = Array.isArray(rows) ? rows : [];
+            TOKENIZER_LINEAGE_TABLE.filteredIdx = TOKENIZER_LINEAGE_TABLE.rows.map((_, idx) => idx);
+            TOKENIZER_LINEAGE_TABLE.page = 1;
+            TOKENIZER_LINEAGE_TABLE.query = '';
+        }
+
+        function tokenizerLineageApplyFilter() {
+            const q = String(TOKENIZER_LINEAGE_TABLE.query || '').trim().toLowerCase();
+            const rows = TOKENIZER_LINEAGE_TABLE.rows;
+            if (!q) {
+                TOKENIZER_LINEAGE_TABLE.filteredIdx = rows.map((_, idx) => idx);
+                TOKENIZER_LINEAGE_TABLE.page = 1;
+                return;
+            }
+            TOKENIZER_LINEAGE_TABLE.filteredIdx = rows
+                .map((row, idx) => ({ row, idx }))
+                .filter(({ row }) => {
+                    if (!row || typeof row !== 'object') return false;
+                    const id = String(row.id ?? '');
+                    const piece = String(row.piece ?? '').toLowerCase();
+                    const bytes = String(row.bytes_hex ?? '').toLowerCase();
+                    return id.includes(q) || piece.includes(q) || bytes.includes(q);
+                })
+                .map(({ idx }) => idx);
+            TOKENIZER_LINEAGE_TABLE.page = 1;
+        }
+
+        function renderTokenizerLineageTablePage() {
+            const tbody = document.getElementById('tokenLineageTableBody');
+            const statusEl = document.getElementById('tokenLineagePageStatus');
+            const prevBtn = document.getElementById('tokenLineagePrev');
+            const nextBtn = document.getElementById('tokenLineageNext');
+            const firstBtn = document.getElementById('tokenLineageFirst');
+            const lastBtn = document.getElementById('tokenLineageLast');
+            if (!tbody) return;
+
+            const pageSize = Math.max(1, Number(TOKENIZER_LINEAGE_TABLE.pageSize) || 50);
+            const filtered = TOKENIZER_LINEAGE_TABLE.filteredIdx;
+            const total = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            TOKENIZER_LINEAGE_TABLE.page = Math.max(1, Math.min(totalPages, Number(TOKENIZER_LINEAGE_TABLE.page) || 1));
+            const page = TOKENIZER_LINEAGE_TABLE.page;
+            const start = (page - 1) * pageSize;
+            const end = Math.min(total, start + pageSize);
+            const slice = filtered.slice(start, end).map((idx) => TOKENIZER_LINEAGE_TABLE.rows[idx]);
+
+            tbody.innerHTML = slice.length > 0
+                ? slice.map((row) => `
+                    <tr style="border-bottom:1px solid var(--grey);">
+                        <td style="padding:4px 6px;">${htmlEscape(String(row.id ?? '-'))}</td>
+                        <td style="padding:4px 6px;"><code>${htmlEscape(String(row.piece ?? '-'))}</code></td>
+                        <td style="padding:4px 6px;"><code>${htmlEscape(String(row.bytes_hex ?? '-'))}</code></td>
+                    </tr>
+                `).join('')
+                : `<tr><td colspan="3" style="padding:8px 6px; color:var(--text-muted);">No rows match current filter.</td></tr>`;
+
+            if (statusEl) {
+                statusEl.textContent = `page ${page}/${totalPages} • rows ${total > 0 ? `${start + 1}-${end}` : '0'} of ${total}`;
+            }
+            const atStart = page <= 1;
+            const atEnd = page >= totalPages;
+            if (prevBtn) prevBtn.disabled = atStart;
+            if (firstBtn) firstBtn.disabled = atStart;
+            if (nextBtn) nextBtn.disabled = atEnd;
+            if (lastBtn) lastBtn.disabled = atEnd;
+        }
+
+        function tokLineageSearch(value) {
+            TOKENIZER_LINEAGE_TABLE.query = String(value || '');
+            tokenizerLineageApplyFilter();
+            renderTokenizerLineageTablePage();
+        }
+
+        function tokLineageSetPageSize(value) {
+            TOKENIZER_LINEAGE_TABLE.pageSize = Math.max(1, Number(value) || 50);
+            TOKENIZER_LINEAGE_TABLE.page = 1;
+            renderTokenizerLineageTablePage();
+        }
+
+        function tokLineagePage(delta) {
+            TOKENIZER_LINEAGE_TABLE.page = Number(TOKENIZER_LINEAGE_TABLE.page || 1) + Number(delta || 0);
+            renderTokenizerLineageTablePage();
+        }
+
+        function tokLineagePageEdge(which) {
+            const total = TOKENIZER_LINEAGE_TABLE.filteredIdx.length;
+            const pageSize = Math.max(1, Number(TOKENIZER_LINEAGE_TABLE.pageSize) || 50);
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            TOKENIZER_LINEAGE_TABLE.page = which === 'first' ? 1 : totalPages;
+            renderTokenizerLineageTablePage();
+        }
+
         // Tokenizer lineage info panel
         function renderTokenizerLineage() {
             const el = document.getElementById('tokenizerLineageInfo');
             if (!el) return;
 
             const tokInfo = detectTokenizerType();
+            const files = (window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files)
+                ? window.EMBEDDED_IR_DATA.files
+                : {};
+            const tokenizerPreview = (files.tokenizer_preview && typeof files.tokenizer_preview === 'object')
+                ? files.tokenizer_preview
+                : {};
             const vocabSize = tokInfo.vocabSize || '?';
             const tokPath = tokInfo.tokPath || '';
             const mode = tokInfo.type || 'unknown';
             const isBytes = tokInfo.type === 'bytelevel_bpe';
+            const isSentencePiece = tokInfo.type === 'sentencepiece_bpe' || tokInfo.type === 'sentencepiece_unigram';
             const modelName = tokInfo.name || 'Unknown';
-            const modeColor = isBytes ? '#07adf8' : '#ff8c00';
+            const modeColor = isBytes ? '#07adf8' : (isSentencePiece ? '#16a085' : '#ff8c00');
+            const vocabDisplay = Number.isFinite(Number(vocabSize)) ? Number(vocabSize).toLocaleString() : '?';
+            const baseVocabText = isBytes
+                ? '256 bytes (0x00–0xFF)'
+                : (isSentencePiece ? 'Learned SentencePiece subword inventory' : '128 ASCII (0x00–0x7F)');
+            const sentencepieceModelPath = tokInfo.sentencepieceModelPath || '';
+            const tokenizerClass = tokInfo.tokenizerClass || '-';
+            const tokenLookupRows = Array.isArray(tokenizerPreview.token_lookup_rows)
+                ? tokenizerPreview.token_lookup_rows
+                : [];
+            const tokenLookupMeta = tokenizerPreview.token_lookup_meta && typeof tokenizerPreview.token_lookup_meta === 'object'
+                ? tokenizerPreview.token_lookup_meta
+                : {};
+            const tokenIndexPath = typeof tokenizerPreview.token_index_path === 'string' ? tokenizerPreview.token_index_path : '';
+            const tokenIndexRows = Number.isFinite(Number(tokenizerPreview.token_index_rows))
+                ? Number(tokenizerPreview.token_index_rows)
+                : (Number.isFinite(Number(tokenLookupMeta.total_vocab_size)) ? Number(tokenLookupMeta.total_vocab_size) : null);
+            const tokenPreviewRows = Number.isFinite(Number(tokenLookupMeta.rows_returned))
+                ? Number(tokenLookupMeta.rows_returned)
+                : tokenLookupRows.length;
+            const tokenPreviewTruncated = Boolean(tokenLookupMeta.truncated) ||
+                (tokenIndexRows !== null && tokenPreviewRows < tokenIndexRows);
+            const tokenLookupBlock = tokenLookupRows.length > 0
+                ? `
+                <div style="margin-top:0.75rem; background:var(--bg-dark); border:1px solid var(--grey); border-radius:8px; padding:0.65rem 0.75rem;">
+                    <div style="display:flex; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; align-items:baseline; margin-bottom:0.45rem;">
+                        <strong style="font-size:0.78rem; color:${modeColor};">Actual Token ID Map (from tokenizer.json)</strong>
+                        <span style="font-size:0.66rem; color:var(--text-muted);">
+                            loaded ${tokenPreviewRows.toLocaleString()}${tokenIndexRows !== null ? ` of ${tokenIndexRows.toLocaleString()}` : ''} rows${tokenPreviewTruncated ? ' (preview cap)' : ''}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:0.45rem;">
+                        <input
+                            id="tokenLineageSearch"
+                            type="text"
+                            placeholder="Search token id / piece / bytes..."
+                            oninput="tokLineageSearch(this.value)"
+                            style="flex:1; min-width:220px; padding:0.38rem 0.55rem; background:var(--dark-card); color:var(--text-primary); border:1px solid var(--grey); border-radius:6px; font-size:0.7rem;"
+                        />
+                        <label style="font-size:0.66rem; color:var(--text-muted); display:flex; align-items:center; gap:0.35rem;">
+                            page size
+                            <select id="tokenLineagePageSize" onchange="tokLineageSetPageSize(this.value)" style="background:var(--dark-card); color:var(--text-primary); border:1px solid var(--grey); border-radius:6px; padding:0.25rem 0.3rem; font-size:0.68rem;">
+                                <option value="25">25</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="250">250</option>
+                                <option value="500">500</option>
+                            </select>
+                        </label>
+                        <button id="tokenLineageFirst" onclick="tokLineagePageEdge('first')" style="padding:0.26rem 0.5rem; background:var(--dark-card); color:var(--text-secondary); border:1px solid var(--grey); border-radius:6px; font-size:0.67rem; cursor:pointer;">« First</button>
+                        <button id="tokenLineagePrev" onclick="tokLineagePage(-1)" style="padding:0.26rem 0.5rem; background:var(--dark-card); color:var(--text-secondary); border:1px solid var(--grey); border-radius:6px; font-size:0.67rem; cursor:pointer;">‹ Prev</button>
+                        <span id="tokenLineagePageStatus" style="font-size:0.66rem; color:var(--text-muted); min-width:150px; text-align:center;">page 1/1</span>
+                        <button id="tokenLineageNext" onclick="tokLineagePage(1)" style="padding:0.26rem 0.5rem; background:var(--dark-card); color:var(--text-secondary); border:1px solid var(--grey); border-radius:6px; font-size:0.67rem; cursor:pointer;">Next ›</button>
+                        <button id="tokenLineageLast" onclick="tokLineagePageEdge('last')" style="padding:0.26rem 0.5rem; background:var(--dark-card); color:var(--text-secondary); border:1px solid var(--grey); border-radius:6px; font-size:0.67rem; cursor:pointer;">Last »</button>
+                    </div>
+                    <div style="overflow:auto; max-height:320px;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.7rem;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--grey);">
+                                    <th style="text-align:left; padding:4px 6px; color:var(--text-muted);">token_id</th>
+                                    <th style="text-align:left; padding:4px 6px; color:var(--text-muted);">piece</th>
+                                    <th style="text-align:left; padding:4px 6px; color:var(--text-muted);">bytes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tokenLineageTableBody"></tbody>
+                        </table>
+                    </div>
+                    ${tokenIndexPath
+                        ? `<div style="margin-top:0.45rem; font-size:0.65rem; color:var(--text-muted);">Full index file: <code>${htmlEscape(tokenIndexPath)}</code></div>`
+                        : ''
+                    }
+                </div>
+                `
+                : `
+                <div style="margin-top:0.75rem; font-size:0.7rem; color:var(--text-muted); background:var(--bg-dark); border:1px solid var(--grey); border-radius:8px; padding:0.55rem 0.75rem;">
+                    Token ID map preview unavailable. Regenerate report to populate tokenizer preview rows.
+                </div>
+                `;
 
             el.innerHTML = `
                 <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.5rem;">
@@ -14397,7 +15544,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
                         <div style="font-size:0.65rem; color:var(--text-muted);">Vocab Size</div>
-                        <div style="font-size:1rem; font-weight:700; color:var(--orange);">${vocabSize ? Number(vocabSize).toLocaleString() : '?'}</div>
+                        <div style="font-size:1rem; font-weight:700; color:var(--orange);">${vocabDisplay}</div>
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
                         <div style="font-size:0.65rem; color:var(--text-muted);">Tokenizer Mode</div>
@@ -14405,7 +15552,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
                         <div style="font-size:0.65rem; color:var(--text-muted);">Base Vocabulary</div>
-                        <div style="font-size:0.85rem; font-weight:700; color:var(--text-secondary);">${isBytes ? '256 bytes (0x00–0xFF)' : '128 ASCII (0x00–0x7F)'}</div>
+                        <div style="font-size:0.85rem; font-weight:700; color:var(--text-secondary);">${baseVocabText}</div>
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
                         <div style="font-size:0.65rem; color:var(--text-muted);">Pre-Tokenizer</div>
@@ -14416,8 +15563,8 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                         <div style="font-size:0.85rem; font-weight:700; color:var(--text-secondary);">${tokInfo.mergeCountTypical || '?'}</div>
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
-                        <div style="font-size:0.65rem; color:var(--text-muted);">Implementation</div>
-                        <div style="font-size:0.78rem; color:var(--text-secondary);">ck_tokenizer.c (784 lines)</div>
+                        <div style="font-size:0.65rem; color:var(--text-muted);">Tokenizer Class</div>
+                        <div style="font-size:0.78rem; color:var(--text-secondary);">${tokenizerClass}</div>
                     </div>
                     <div style="background:var(--dark-card); border:1px solid var(--grey); border-radius:6px; padding:0.5rem 0.75rem;">
                         <div style="font-size:0.65rem; color:var(--text-muted);">Tokenizer Path</div>
@@ -14429,20 +15576,39 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     <span style="font-size:0.68rem; color:var(--text-muted);">Special tokens:</span>
                     ${tokInfo.special.map(s => `<span style="background:${modeColor}18;border:1px solid ${modeColor}44;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:0.7rem;color:${modeColor};">${s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`).join(' ')}
                 </div>` : ''}
+                ${sentencepieceModelPath ? `
+                <div style="margin-top:0.35rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:0.68rem; color:var(--text-muted);">SentencePiece model:</span>
+                    <code style="font-size:0.68rem; color:var(--text-secondary);">${sentencepieceModelPath}</code>
+                </div>` : ''}
+                ${tokenLookupBlock}
                 <div style="margin-top:0.75rem; padding:0.6rem 1rem; background:var(--bg-dark); border:1px solid var(--grey); border-radius:8px; font-size:0.72rem; color:var(--text-secondary); line-height:1.6;">
                     ${tokInfo.detected
                         ? (isBytes
-                            ? `<strong style="color:#07adf8;">Detected: ${modelName}</strong> — This model uses <strong>bytelevel BPE</strong> with ${Number(vocabSize).toLocaleString()} tokens.
+                            ? `<strong style="color:#07adf8;">Detected: ${modelName}</strong> — This model uses <strong>bytelevel BPE</strong> with ${vocabDisplay} tokens.
                                The GPT-2 byte-to-unicode mapping is used as the pre-tokenizer: every byte (0-255) maps to a base token,
                                then ${tokInfo.mergeCountTypical} learned merges build the full vocabulary. Loaded from <code>tokenizer.json</code>.`
-                            : `<strong style="color:#ff8c00;">Detected: ${modelName}</strong> — This model uses <strong>ascii_bpe</strong> with ${Number(vocabSize).toLocaleString()} tokens.
-                               Characters 0-127 form the base vocabulary, with ~${Number(vocabSize) - 128} learned merges.
-                               Trained by <code>ck_bpe_train.c</code>.`)
+                            : (isSentencePiece
+                                ? `<strong style="color:#16a085;">Detected: ${modelName}</strong> — This model uses <strong>${tokInfo.type === 'sentencepiece_unigram' ? 'SentencePiece Unigram' : 'SentencePiece BPE'}</strong> with ${vocabDisplay} tokens.
+                                   Segmentation is driven by SentencePiece model vocabulary (not raw 256-byte bytelevel pre-tokenization).
+                                   ${sentencepieceModelPath ? `Runtime assets include <code>tokenizer.model</code> + <code>tokenizer.json</code>.` : 'Runtime assets are loaded via tokenizer metadata.'}`
+                                : `<strong style="color:#ff8c00;">Detected: ${modelName}</strong> — This model uses <strong>ascii_bpe</strong> with ${vocabDisplay} tokens.
+                                   Characters 0-127 form the base vocabulary, with ~${Number(vocabSize) - 128} learned merges.
+                                   Trained by <code>ck_bpe_train.c</code>.`))
                         : `<strong style="color:var(--orange);">No model loaded.</strong> The BPE demo above uses a hard-coded SVG-focused merge table for illustration.
                            Load an IR snapshot / training report to see your model's actual tokenizer info here.`
                     }
                 </div>
             `;
+
+            if (tokenLookupRows.length > 0) {
+                tokenizerLineageTableReset(tokenLookupRows);
+                const pageSizeSelect = document.getElementById('tokenLineagePageSize');
+                if (pageSizeSelect) {
+                    TOKENIZER_LINEAGE_TABLE.pageSize = Math.max(1, Number(pageSizeSelect.value) || 50);
+                }
+                renderTokenizerLineageTablePage();
+            }
         }
 
         /* ═══════════════════════════════════════════════════════════
@@ -15793,6 +16959,13 @@ function renderDataLabPanel(files) {
     ];
     const mergeRows = Array.isArray(tokenizerPreview.merge_samples) ? tokenizerPreview.merge_samples.slice(0, 24) : [];
     const vocabRows = Array.isArray(tokenizerPreview.vocab_samples) ? tokenizerPreview.vocab_samples.slice(0, 24) : [];
+    const tokenLookupRows = Array.isArray(tokenizerPreview.token_lookup_rows)
+        ? tokenizerPreview.token_lookup_rows.slice(0, 200)
+        : [];
+    const tokenIndexPath = tokenizerPreview.token_index_path || '-';
+    const tokenIndexStatus = tokenizerPreview.token_index_status || '-';
+    const tokenIndexRows = tokenizerPreview.token_index_rows ?? '-';
+    const tokenIndexError = tokenizerPreview.token_index_error || '';
     const flowRows = tokenizerPreview.encode_decode_example && Array.isArray(tokenizerPreview.encode_decode_example.token_flow)
         ? tokenizerPreview.encode_decode_example.token_flow.slice(0, 32)
         : [];
@@ -15847,6 +17020,33 @@ function renderDataLabPanel(files) {
                             </table>
                         ` : '<div style="color:var(--text-muted);">No vocab samples available.</div>'}
                     </div>
+                </div>
+                <div style="margin-top:0.8rem;">
+                    <strong>Actual Token ID Map (from tokenizer.json)</strong>
+                    <div style="margin-top:0.25rem; color:var(--text-secondary); font-size:0.72rem;">
+                        Export status:
+                        <span class="${tokenIndexStatus === 'ok' ? 'badge badge-green' : 'badge badge-orange'}">${htmlEscape(tokenIndexStatus)}</span>
+                        rows: <code>${htmlEscape(tokenIndexRows)}</code>
+                        | file: <code style="overflow-wrap:anywhere;">${htmlEscape(tokenIndexPath)}</code>
+                        ${tokenIndexError ? `<br><span style="color:#f39c12;">export_error: ${htmlEscape(tokenIndexError)}</span>` : ''}
+                    </div>
+                    ${tokenLookupRows.length > 0 ? `
+                        <div style="margin-top:0.35rem; color:var(--text-muted); font-size:0.7rem;">
+                            Showing first ${tokenLookupRows.length} tokens by ID. Full index is written to <code>tokenizer_vocab_index.jsonl</code>.
+                        </div>
+                        <table style="margin-top:0.4rem;">
+                            <thead><tr><th>token_id</th><th>piece</th><th>bytes</th></tr></thead>
+                            <tbody>
+                                ${tokenLookupRows.map((row) => `
+                                    <tr>
+                                        <td>${htmlEscape(row.id ?? '-')}</td>
+                                        <td><code>${htmlEscape(row.piece ?? '-')}</code></td>
+                                        <td><code>${htmlEscape(row.bytes_hex ?? '-')}</code></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<div style="color:var(--text-muted); margin-top:0.35rem;">No token lookup rows loaded from tokenizer preview.</div>'}
                 </div>
                 <div style="margin-top:0.7rem;">
                     <strong>Encode/Decode Walkthrough</strong>
@@ -16083,17 +17283,17 @@ function renderTrainingLogbookPanel(files) {
     );
     const roundtripPass = roundtripExact && (!Number.isFinite(lineRate) || lineRate >= 0.9999);
     const trainingPass = Number.isFinite(firstLoss) && Number.isFinite(latest) && reducedLoss;
-    const stageRows = [
-        {
-            stage: '1) Data Intake (SVG)',
-            status: dataPass ? 'pass' : 'check',
-            evidence: `dataset_rows=${datasetRows}, qc_status=${qc.status || '-'}, dataset_path=${dataLab.dataset_path || qc.path || '-'}`,
-        },
-        {
-            stage: '2) Tokenize (ASCII BPE)',
-            status: tokenizePass ? 'pass' : 'check',
-            evidence: `tokenizer=${tokenizerPreview.model_type || 'bpe'} vocab=${tokenizerVocab} token_count=${tokenCount}`,
-        },
+        const stageRows = [
+            {
+                stage: '1) Data Intake (SVG)',
+                status: dataPass ? 'pass' : 'check',
+                evidence: `dataset_rows=${datasetRows}, qc_status=${qc.status || '-'}, dataset_path=${dataLab.dataset_path || qc.path || '-'}`,
+            },
+            {
+                stage: '2) Tokenize (BPE / SentencePiece)',
+                status: tokenizePass ? 'pass' : 'check',
+                evidence: `tokenizer=${tokenizerPreview.model_type || 'bpe'} vocab=${tokenizerVocab} token_count=${tokenCount}`,
+            },
         {
             stage: '3) Encode -> Decode Fidelity',
             status: roundtripPass ? 'pass' : 'fail',
@@ -19331,5 +20531,179 @@ if (document.readyState === 'loading') {
 })();
 </script>
     <!-- CK_V7_MODULE_BUNDLE_END -->
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         CK SVG Viewer Overlay — fullscreen pan/zoom for profile charts
+         Adapted from docs/site/_partials/footer.html
+         Triggered by clicking any element with data-ck-svg-expand attr
+         ═══════════════════════════════════════════════════════════════ -->
+    <style>
+    #ck-svg-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.96); z-index:999999; }
+    #ck-svg-overlay .ck-sv-toolbar { position:fixed; top:0; left:0; right:0; padding:10px 20px; background:rgba(10,14,23,0.95); display:flex; justify-content:space-between; align-items:center; z-index:1000000; border-bottom:1px solid #2a3a5a; gap:0.6rem; }
+    #ck-svg-overlay .ck-sv-title { color:#c0c8d8; font-size:13px; font-family:Inter,sans-serif; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #ck-svg-overlay .ck-sv-controls { display:flex; gap:6px; align-items:center; flex-shrink:0; }
+    #ck-svg-overlay .ck-sv-controls button { background:#1a2035; color:#07adf8; border:1px solid #2a3a5a; padding:6px 12px; cursor:pointer; border-radius:4px; font-size:13px; font-family:Inter,sans-serif; transition:background 0.15s; }
+    #ck-svg-overlay .ck-sv-controls button:hover { background:#253050; border-color:#07adf8; }
+    #ck-svg-overlay .ck-sv-zoom-display { color:#556; font-size:12px; min-width:42px; text-align:center; font-family:'JetBrains Mono',monospace; }
+    #ck-svg-overlay .ck-sv-close { font-size:18px; padding:4px 10px; color:#e74c3c !important; border-color:#e74c3c !important; }
+    #ck-svg-overlay .ck-sv-sep { color:#2a3a5a; user-select:none; }
+    #ck-svg-overlay .ck-sv-inner { display:flex; justify-content:center; align-items:flex-start; min-height:100vh; padding:58px 20px 20px; overflow:auto; cursor:grab; }
+    #ck-svg-overlay .ck-sv-inner:active { cursor:grabbing; }
+    #ck-svg-overlay .ck-sv-inner svg { transform-origin:top center; flex-shrink:0; border-radius:8px; }
+    #ck-svg-overlay .ck-sv-hint { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); color:#333; font-size:11px; background:rgba(0,0,0,0.8); padding:6px 18px; border-radius:20px; pointer-events:none; font-family:Inter,sans-serif; }
+    /* expand button shown on SVG containers */
+    .ck-svg-expand-btn { display:inline-flex; align-items:center; gap:5px; margin-top:5px; padding:4px 10px; background:rgba(7,173,248,0.1); color:#07adf8; border:1px solid rgba(7,173,248,0.3); border-radius:5px; font-size:11px; font-family:Inter,sans-serif; cursor:pointer; transition:background 0.15s; user-select:none; }
+    .ck-svg-expand-btn:hover { background:rgba(7,173,248,0.2); border-color:#07adf8; }
+    </style>
+
+    <div id="ck-svg-overlay">
+        <div class="ck-sv-toolbar">
+            <span class="ck-sv-title" id="ck-sv-title">Chart</span>
+            <div class="ck-sv-controls">
+                <button onclick="ckSvgViewer.zoomOut()" title="Zoom Out (-)">−</button>
+                <span class="ck-sv-zoom-display" id="ck-sv-zoom">100%</span>
+                <button onclick="ckSvgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="ck-sv-sep">|</span>
+                <button onclick="ckSvgViewer.fitWidth()" title="Fit Width (W)">Fit W</button>
+                <button onclick="ckSvgViewer.reset()" title="Reset (0)">Reset</button>
+                <span class="ck-sv-sep">|</span>
+                <button onclick="ckSvgViewer.exportSvg()" title="Download SVG">↓ SVG</button>
+                <span class="ck-sv-sep">|</span>
+                <button class="ck-sv-close" onclick="ckSvgViewer.close()" title="Close (ESC)">✕</button>
+            </div>
+        </div>
+        <div class="ck-sv-inner" id="ck-sv-inner"></div>
+        <div class="ck-sv-hint">Scroll to zoom · Drag to pan · W = fit width · 0 = reset · ESC = close</div>
+    </div>
+
+    <script>
+    var ckSvgViewer = (function() {
+        var overlay, inner, titleEl, zoomEl;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragX, dragY, panX0, panY0;
+        var currentSvgEl = null, currentTitle = '';
+
+        function init() {
+            overlay = document.getElementById('ck-svg-overlay');
+            inner   = document.getElementById('ck-sv-inner');
+            titleEl = document.getElementById('ck-sv-title');
+            zoomEl  = document.getElementById('ck-sv-zoom');
+            if (!overlay || !inner) return;
+
+            // Wire all expand buttons
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('.ck-svg-expand-btn');
+                if (!btn) return;
+                var svgEl = btn.previousElementSibling;
+                if (svgEl && svgEl.tagName === 'svg') {
+                    open(svgEl, btn.getAttribute('data-title') || svgEl.getAttribute('data-ck-svg-expand') || 'Chart');
+                }
+            });
+
+            // Also wire direct click on svgs with data-ck-svg-expand
+            document.addEventListener('click', function(e) {
+                var svg = e.target.closest('svg[data-ck-svg-expand]');
+                if (!svg || svg.closest('#ck-svg-overlay')) return;
+                open(svg, svg.getAttribute('data-ck-svg-expand') || 'Chart');
+            });
+
+            inner.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.3, Math.min(12, scale + (e.deltaY > 0 ? -0.15 : 0.15)));
+                applyTransform();
+            }, { passive: false });
+
+            inner.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                isDragging = true; dragX = e.clientX; dragY = e.clientY; panX0 = panX; panY0 = panY;
+                inner.style.cursor = 'grabbing';
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                panX = panX0 + (e.clientX - dragX);
+                panY = panY0 + (e.clientY - dragY);
+                applyTransform();
+            });
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                if (inner) inner.style.cursor = 'grab';
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (!overlay || overlay.style.display !== 'flex') return;
+                if (e.key === 'Escape') close();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') reset();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+            });
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay || e.target === inner) close();
+            });
+        }
+
+        function applyTransform() {
+            if (!currentSvgEl) return;
+            currentSvgEl.style.transform = 'translate('+panX+'px,'+panY+'px) scale('+scale+')';
+            if (zoomEl) zoomEl.textContent = Math.round(scale*100)+'%';
+        }
+
+        function open(svgEl, title) {
+            scale = 1; panX = 0; panY = 0;
+            inner.innerHTML = '';
+            // Clone the SVG so we don't disturb the original
+            currentSvgEl = svgEl.cloneNode(true);
+            // Make it sized to the viewport
+            currentSvgEl.style.width = Math.min(window.innerWidth - 60, 1600)+'px';
+            currentSvgEl.style.height = 'auto';
+            currentSvgEl.style.maxWidth = 'none';
+            inner.appendChild(currentSvgEl);
+            currentTitle = title;
+            if (titleEl) titleEl.textContent = title;
+            applyTransform();
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() {
+            overlay.style.display = 'none';
+            document.body.style.overflow = '';
+            inner.innerHTML = '';
+            currentSvgEl = null;
+        }
+
+        function zoomIn()  { scale = Math.min(12, scale+0.25); applyTransform(); }
+        function zoomOut() { scale = Math.max(0.3, scale-0.25); applyTransform(); }
+        function reset()   { scale = 1; panX = 0; panY = 0; applyTransform(); }
+
+        function fitWidth() {
+            if (!currentSvgEl) return;
+            var w = currentSvgEl.getBoundingClientRect().width / scale;
+            scale = Math.max(0.1, Math.min(12, (window.innerWidth - 80) / w));
+            panX = 0; panY = 0; applyTransform();
+        }
+
+        function exportSvg() {
+            if (!currentSvgEl) return;
+            var ser = new XMLSerializer();
+            var src = '<?xml version="1.0" encoding="utf-8"?>\n' + ser.serializeToString(currentSvgEl);
+            var blob = new Blob([src], { type: 'image/svg+xml' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (currentTitle || 'chart').replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.svg';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        return { zoomIn: zoomIn, zoomOut: zoomOut, reset: reset, fitWidth: fitWidth, exportSvg: exportSvg, close: close };
+    })();
+    </script>
+
 </body>
 </html>
