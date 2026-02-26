@@ -92,6 +92,14 @@ C_BLUE = "\033[38;5;75m"
 C_RED = "\033[38;5;203m"
 C_CYAN = "\033[38;5;87m"
 
+TEMPLATE_AUDIT_TOKENIZER_REF_ALLOWLIST = {
+    "vocab_offsets",
+    "vocab_strings",
+    "vocab_scores",
+    "vocab_types",
+    "vocab_merges",
+}
+
 
 def log(msg: str, color: str = ""):
     """Print colored log message."""
@@ -840,6 +848,364 @@ def _prepare_runtime_dir_from_local_ck_artifacts(model_dir: Path, work_dir: Path
     return dst_bump, dst_config, dst_manifest
 
 
+def _find_local_gguf(model_dir: Path) -> Optional[Path]:
+    """Return a deterministic GGUF candidate from a local model directory."""
+    candidates: list[Path] = []
+    for patt in ("*.gguf", "*/*.gguf"):
+        for p in model_dir.glob(patt):
+            if p.is_file():
+                candidates.append(p.resolve())
+    if not candidates:
+        return None
+    candidates = sorted(set(candidates))
+    return candidates[0]
+
+
+def _manifest_lm_head_state(manifest_path: Path) -> tuple[Optional[bool], bool]:
+    """Extract (tie_word_embeddings, has_untied_lm_head_entry) from manifest."""
+    doc = _load_json_dict(manifest_path)
+    cfg = doc.get("config") if isinstance(doc.get("config"), dict) else {}
+    tie_cfg_raw = cfg.get("tie_word_embeddings")
+    tie_cfg: Optional[bool]
+    if isinstance(tie_cfg_raw, bool):
+        tie_cfg = tie_cfg_raw
+    elif isinstance(tie_cfg_raw, (int, float)):
+        tie_cfg = bool(tie_cfg_raw)
+    else:
+        tie_cfg = None
+
+    entries = doc.get("entries") if isinstance(doc.get("entries"), list) else []
+    names = {str(e.get("name", "")) for e in entries if isinstance(e, dict)}
+    has_untied_lm_head = any(
+        n in names for n in ("output.weight", "lm_head.weight", "lm_head_weight", "lm_head")
+    )
+    return tie_cfg, has_untied_lm_head
+
+
+def _inspect_gguf_tie_word_embeddings(gguf_path: Path) -> Optional[bool]:
+    """Best-effort GGUF tie-word-embeddings probe using inspect_weights_v7."""
+    try:
+        from inspect_weights_v7 import inspect_gguf
+        cfg, _ = inspect_gguf(gguf_path, max_layers=1)
+        tie = cfg.get("tie_word_embeddings")
+        if isinstance(tie, bool):
+            return tie
+        if isinstance(tie, (int, float)):
+            return bool(tie)
+    except Exception:
+        return None
+    return None
+
+
+def _gguf_manifest_lm_head_contract_ok(
+    gguf_path: Path,
+    manifest_path: Path,
+    *,
+    verbose: bool = True,
+) -> bool:
+    """
+    Validate untied LM-head contract between source GGUF and converted manifest.
+
+    Contract:
+    - If GGUF is untied (tie_word_embeddings=false), manifest must include output/lm_head weight.
+    - If manifest config declares untied, it must include output/lm_head weight.
+    """
+    if not manifest_path.exists():
+        if verbose:
+            log(f"  Missing manifest for LM-head contract check: {manifest_path}", C_ORANGE)
+        return False
+
+    tie_cfg, has_untied_lm_head = _manifest_lm_head_state(manifest_path)
+    if tie_cfg is False and not has_untied_lm_head:
+        if verbose:
+            log_error(
+                f"Manifest contract failed: tie_word_embeddings=false but output/lm_head weight is missing ({manifest_path})"
+            )
+        return False
+
+    tie_src = _inspect_gguf_tie_word_embeddings(gguf_path)
+    if tie_src is False and not has_untied_lm_head:
+        if verbose:
+            log_error(
+                f"GGUF contract failed: source GGUF is untied but manifest has no output/lm_head weight ({manifest_path})"
+            )
+        return False
+    if tie_src is False and tie_cfg is True:
+        if verbose:
+            log_error(
+                f"GGUF contract failed: source GGUF untied but manifest config says tie_word_embeddings=true ({manifest_path})"
+            )
+        return False
+    return True
+
+
+def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[str, Any]]:
+    """
+    Fail-fast semantic checks between manifest weights/config and template contract.
+
+    This catches silent mismatches that otherwise show up later as gibberish output.
+    """
+    manifest_doc = _load_json_dict(manifest_path) or {}
+    cfg = manifest_doc.get("config") if isinstance(manifest_doc.get("config"), dict) else {}
+    template_doc = manifest_doc.get("template") if isinstance(manifest_doc.get("template"), dict) else {}
+    contract_doc = template_doc.get("contract") if isinstance(template_doc.get("contract"), dict) else {}
+
+    seq = template_doc.get("sequence") if isinstance(template_doc.get("sequence"), list) else []
+    block_types = template_doc.get("block_types") if isinstance(template_doc.get("block_types"), dict) else {}
+    block_name = str(seq[0]) if seq else ""
+    block_doc = block_types.get(block_name) if isinstance(block_types.get(block_name), dict) else {}
+    body_doc = block_doc.get("body")
+    body_ops = body_doc.get("ops") if isinstance(body_doc, dict) else body_doc
+    body_ops = [str(op) for op in (body_ops or []) if isinstance(op, str)]
+    footer_ops = [str(op) for op in (block_doc.get("footer") or []) if isinstance(op, str)]
+    has_template_graph = bool(body_ops or footer_ops)
+
+    entries = manifest_doc.get("entries") if isinstance(manifest_doc.get("entries"), list) else []
+    entry_names = {
+        str(e.get("name", "")).strip()
+        for e in entries
+        if isinstance(e, dict) and str(e.get("name", "")).strip()
+    }
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    tie_cfg = _coerce_bool(cfg.get("tie_word_embeddings"))
+    has_untied_head = any(
+        name in entry_names for name in ("output.weight", "lm_head.weight", "lm_head_weight", "lm_head")
+    )
+    logits_contract = contract_doc.get("logits_contract") if isinstance(contract_doc.get("logits_contract"), dict) else {}
+    template_lm_head_mode = str(logits_contract.get("lm_head", "")).strip().lower()
+    tied_modes = {"weight_tying", "tied", "token_emb"}
+    strict_untied_modes = {"output_weight", "untied"}
+
+    if tie_cfg is False and template_lm_head_mode in tied_modes:
+        errors.append(
+            "Manifest says tie_word_embeddings=false but template logits_contract.lm_head indicates weight tying. "
+            "Use an untied head contract (lm_head/output.weight)."
+        )
+    if tie_cfg is False and not has_untied_head:
+        errors.append(
+            "Manifest says tie_word_embeddings=false but no output/lm_head weight entry was found."
+        )
+    if tie_cfg is True and template_lm_head_mode in strict_untied_modes and not has_untied_head:
+        errors.append(
+            "Template requires untied logits head, but manifest has no untied lm_head/output.weight entry."
+        )
+    if tie_cfg is True and has_untied_head and template_lm_head_mode in tied_modes:
+        warnings.append(
+            "Manifest includes untied lm_head/output.weight while template requests weight tying. "
+            "Verify if this model should be tied or untied."
+        )
+
+    has_qkv_bias = any(name.endswith((".bq", ".bk", ".bv")) for name in entry_names)
+    has_qk_norm = bool(
+        manifest_doc.get("has_qk_norm")
+        or cfg.get("has_qk_norm")
+        or any(name.endswith((".q_norm", ".k_norm")) for name in entry_names)
+    )
+    attention_contract = contract_doc.get("attention_contract") if isinstance(contract_doc.get("attention_contract"), dict) else {}
+    contract_qk_norm = _coerce_bool(attention_contract.get("qk_norm"))
+    template_has_qk_norm_op = "qk_norm" in body_ops
+    if has_template_graph:
+        template_has_qkv_proj = any(op in {"qkv_proj", "q_proj", "k_proj", "v_proj"} for op in body_ops)
+        if has_qkv_bias and not template_has_qkv_proj:
+            errors.append(
+                "Manifest has Q/K/V bias tensors but template body has no qkv projection op to consume them."
+            )
+
+        if has_qk_norm and not template_has_qk_norm_op:
+            errors.append("Manifest has qk_norm tensors but template body is missing qk_norm op.")
+        if has_qk_norm and contract_qk_norm is False:
+            errors.append("Manifest has qk_norm tensors but template contract attention_contract.qk_norm=false.")
+        if (not has_qk_norm) and template_has_qk_norm_op:
+            warnings.append("Template includes qk_norm op but manifest does not expose q_norm/k_norm tensors.")
+    elif has_qkv_bias or has_qk_norm:
+        warnings.append("Template graph ops are unavailable; skipped qkv-bias/qk-norm semantic checks.")
+
+    special_tokens = manifest_doc.get("special_tokens")
+    if not isinstance(special_tokens, dict):
+        special_tokens = cfg.get("special_tokens") if isinstance(cfg.get("special_tokens"), dict) else {}
+    tok_model = str(special_tokens.get("tokenizer_model", "")).strip().lower()
+    manifest_tok_type: Optional[str] = None
+    if tok_model in {"gpt2", "bpe"}:
+        manifest_tok_type = "bpe"
+    elif tok_model in {"llama", "sentencepiece", "spm"}:
+        manifest_tok_type = "sentencepiece"
+    template_tok_type = ""
+    tok_contract = contract_doc.get("tokenizer_contract")
+    if isinstance(tok_contract, dict):
+        template_tok_type = str(tok_contract.get("tokenizer_type", "")).strip().lower()
+    if manifest_tok_type and template_tok_type and manifest_tok_type != template_tok_type:
+        errors.append(
+            f"Tokenizer contract mismatch: manifest tokenizer={manifest_tok_type} but template tokenizer={template_tok_type}."
+        )
+
+    sliding_window = cfg.get("sliding_window", manifest_doc.get("sliding_window"))
+    has_sliding_window = isinstance(sliding_window, (int, float)) and int(sliding_window) > 0
+    template_has_sliding = "attn_sliding" in body_ops
+    if has_template_graph:
+        if has_sliding_window and not template_has_sliding:
+            warnings.append("Manifest advertises sliding_window but template has no attn_sliding op.")
+        if (not has_sliding_window) and template_has_sliding:
+            warnings.append("Template has attn_sliding op but manifest has no sliding_window value.")
+
+    return (
+        len(errors) == 0,
+        {
+            "errors": errors,
+            "warnings": warnings,
+            "tie_word_embeddings": tie_cfg,
+            "template_lm_head_mode": template_lm_head_mode,
+            "has_untied_lm_head_entry": has_untied_head,
+            "has_qk_norm": has_qk_norm,
+            "template_has_qk_norm_op": template_has_qk_norm_op,
+            "manifest_tokenizer_type": manifest_tok_type,
+            "template_tokenizer_type": template_tok_type,
+            "body_ops": body_ops,
+            "footer_ops": footer_ops,
+        },
+    )
+
+
+def _gguf_manifest_weight_category_check(
+    gguf_path: Path,
+    manifest_path: Path,
+    *,
+    verbose: bool = True,
+    report_out: Optional[Path] = None,
+) -> tuple[bool, list[str]]:
+    """
+    Compare GGUF expected converted categories vs manifest categories.
+
+    This catches silent drops where conversion omits required categories.
+    """
+    if not manifest_path.exists():
+        if verbose:
+            log_error(f"Missing manifest for category check: {manifest_path}")
+        return False, ["<manifest_missing>"]
+
+    try:
+        import importlib.util
+        inspect_path = SCRIPTS_DIR / "inspect_weights_v7.py"
+        spec = importlib.util.spec_from_file_location("inspect_weights_v7", inspect_path)
+        if spec is None or spec.loader is None:
+            reason = "inspect loader unavailable"
+            if verbose:
+                log_error(f"GGUF category check unavailable: {reason}")
+            if report_out is not None:
+                report_out.parent.mkdir(parents=True, exist_ok=True)
+                report_out.write_text(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "reason": reason,
+                            "gguf_path": str(gguf_path),
+                            "manifest_path": str(manifest_path),
+                            "missing_categories": ["<category_check_unavailable>"],
+                        },
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+            return False, ["<category_check_unavailable>"]
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        inspect_gguf = getattr(mod, "inspect_gguf", None)
+        if inspect_gguf is None:
+            reason = "inspect_gguf missing in inspect_weights_v7.py"
+            if verbose:
+                log_error(f"GGUF category check unavailable: {reason}")
+            if report_out is not None:
+                report_out.parent.mkdir(parents=True, exist_ok=True)
+                report_out.write_text(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "reason": reason,
+                            "gguf_path": str(gguf_path),
+                            "manifest_path": str(manifest_path),
+                            "missing_categories": ["<category_check_unavailable>"],
+                        },
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+            return False, ["<category_check_unavailable>"]
+        _, expected_entries = inspect_gguf(gguf_path, max_layers=None)
+    except Exception as exc:
+        reason = f"inspect_gguf failed: {exc}"
+        if verbose:
+            log_error(f"GGUF category check failed: {exc}")
+        if report_out is not None:
+            report_out.parent.mkdir(parents=True, exist_ok=True)
+            report_out.write_text(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "reason": reason,
+                        "gguf_path": str(gguf_path),
+                        "manifest_path": str(manifest_path),
+                        "missing_categories": ["<category_check_error>"],
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+        return False, ["<category_check_error>"]
+
+    expected_names = {
+        str(e.get("name", "")) for e in expected_entries if isinstance(e, dict) and e.get("name")
+    }
+    manifest_doc = _load_json_dict(manifest_path)
+    actual_names = {
+        str(e.get("name", ""))
+        for e in (manifest_doc.get("entries") or [])
+        if isinstance(e, dict) and e.get("name")
+    }
+
+    aliases = {
+        "lm_head_weight": ("lm_head_weight", "lm_head.weight", "output.weight", "lm_head"),
+    }
+
+    missing: list[str] = []
+    for name in sorted(expected_names):
+        alts = aliases.get(name, (name,))
+        if not any(alt in actual_names for alt in alts):
+            missing.append(name)
+
+    if verbose:
+        log(
+            f"  GGUF category check: expected={len(expected_names)} manifest_entries={len(actual_names)} missing={len(missing)}",
+            C_DIM,
+        )
+        if missing:
+            preview = ", ".join(missing[:8])
+            if len(missing) > 8:
+                preview += ", ..."
+            log_error(f"Missing converted categories: {preview}")
+
+    if report_out is not None:
+        report_out.parent.mkdir(parents=True, exist_ok=True)
+        report_out.write_text(
+            json.dumps(
+                {
+                    "ok": len(missing) == 0,
+                    "gguf_path": str(gguf_path),
+                    "manifest_path": str(manifest_path),
+                    "expected_category_count": len(expected_names),
+                    "manifest_entry_count": len(actual_names),
+                    "missing_category_count": len(missing),
+                    "missing_categories": missing,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+    return (len(missing) == 0), missing
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Input Detection
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1079,10 +1445,20 @@ def step_convert_gguf(gguf_path: Path,
     weights_path = output_dir / "weights.bump"
     config_path = output_dir / "config.json"
     manifest_path = output_dir / "weights_manifest.json"
+    coverage_report_path = output_dir / "gguf_weight_category_coverage.json"
 
     if weights_path.exists() and config_path.exists() and manifest_path.exists() and not force:
-        log(f"  Using cached weights at {weights_path}", C_DIM)
-        return weights_path, config_path
+        categories_ok, _ = _gguf_manifest_weight_category_check(
+            gguf_path,
+            manifest_path,
+            verbose=False,
+            report_out=coverage_report_path,
+        )
+        if categories_ok:
+            log(f"  Using cached weights at {weights_path}", C_DIM)
+            log(f"  Category coverage report: {coverage_report_path}", C_DIM)
+            return weights_path, config_path
+        log("  Cached GGUF conversion category mismatch; regenerating weights", C_ORANGE)
     if weights_path.exists() and config_path.exists() and not manifest_path.exists() and not force:
         log(f"  Missing manifest; re-running conversion", C_DIM)
 
@@ -1099,6 +1475,18 @@ def step_convert_gguf(gguf_path: Path,
     ]
 
     run_cmd(cmd)
+    categories_ok, missing_categories = _gguf_manifest_weight_category_check(
+        gguf_path,
+        manifest_path,
+        verbose=True,
+        report_out=coverage_report_path,
+    )
+    if not categories_ok:
+        raise RuntimeError(
+            "GGUF conversion category coverage failed; see "
+            f"{coverage_report_path} (missing={len(missing_categories)})"
+        )
+    log(f"  Category coverage report: {coverage_report_path}", C_GREEN)
     log(f"  Created {weights_path}", C_GREEN)
     return weights_path, config_path
 
@@ -1183,6 +1571,81 @@ def _prefill_codegen_is_stub(output_dir: Path) -> bool:
     return "EXPLICIT PER-LAYER PREFILL FUNCTIONS" not in text
 
 
+def _build_ir_contract_signature(
+    manifest_path: Path,
+    *,
+    target_modes: list[str],
+    context_len: Optional[int],
+    logits_layout: Optional[str],
+    layout_mode: str,
+    layer_limit: Optional[int],
+    no_fusion: bool,
+) -> dict[str, Any]:
+    manifest_doc = _load_json_dict(manifest_path) or {}
+    cfg = manifest_doc.get("config") if isinstance(manifest_doc.get("config"), dict) else {}
+    template_doc = manifest_doc.get("template") if isinstance(manifest_doc.get("template"), dict) else {}
+    contract_doc = template_doc.get("contract") if isinstance(template_doc.get("contract"), dict) else {}
+    entries = manifest_doc.get("entries") if isinstance(manifest_doc.get("entries"), list) else []
+    entry_names = [
+        str(e.get("name", "")).strip()
+        for e in entries
+        if isinstance(e, dict) and str(e.get("name", "")).strip()
+    ]
+    entry_name_set = set(entry_names)
+    qkv_bias_count = sum(1 for n in entry_names if n.endswith((".bq", ".bk", ".bv")))
+    qk_norm_count = sum(1 for n in entry_names if n.endswith((".q_norm", ".k_norm")))
+
+    seq = template_doc.get("sequence") if isinstance(template_doc.get("sequence"), list) else []
+    block_types = template_doc.get("block_types") if isinstance(template_doc.get("block_types"), dict) else {}
+    block_name = str(seq[0]) if seq else ""
+    block_doc = block_types.get(block_name) if isinstance(block_types.get(block_name), dict) else {}
+    body_doc = block_doc.get("body")
+    body_ops = body_doc.get("ops") if isinstance(body_doc, dict) else body_doc
+
+    signature = {
+        "schema": "ck.v7.ir_contract.v1",
+        "manifest_sha256": _hash_sha256_file(manifest_path),
+        "model": {
+            "model": cfg.get("model"),
+            "arch": cfg.get("arch"),
+            "tie_word_embeddings": _coerce_bool(cfg.get("tie_word_embeddings")),
+            "vocab_size": cfg.get("vocab_size"),
+            "embed_dim": cfg.get("embed_dim"),
+            "num_layers": cfg.get("num_layers"),
+            "num_heads": cfg.get("num_heads"),
+            "num_kv_heads": cfg.get("num_kv_heads"),
+            "head_dim": cfg.get("head_dim"),
+            "rope_theta": cfg.get("rope_theta"),
+            "rope_scaling": cfg.get("rope_scaling"),
+            "sliding_window": cfg.get("sliding_window"),
+        },
+        "template": {
+            "name": template_doc.get("name"),
+            "sequence": seq,
+            "body_ops": body_ops if isinstance(body_ops, list) else [],
+            "footer_ops": block_doc.get("footer") if isinstance(block_doc.get("footer"), list) else [],
+            "contract": contract_doc,
+        },
+        "entries": {
+            "count": len(entry_names),
+            "has_token_emb": "token_emb" in entry_name_set,
+            "has_output_weight": "output.weight" in entry_name_set,
+            "has_lm_head_weight": "lm_head.weight" in entry_name_set,
+            "qkv_bias_count": qkv_bias_count,
+            "qk_norm_count": qk_norm_count,
+        },
+        "build_args": {
+            "modes": list(target_modes),
+            "context_len": context_len,
+            "logits_layout": logits_layout,
+            "layout_mode": layout_mode,
+            "layer_limit": layer_limit,
+            "no_fusion": bool(no_fusion),
+        },
+    }
+    return signature
+
+
 def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = None,
                   bump_path: Path = None,
                   weight_dtype: str = None, modes: list = None, force: bool = False,
@@ -1233,6 +1696,37 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    semantic_ok, semantic_details = _template_manifest_semantic_check(manifest_path)
+    if not semantic_ok:
+        for msg in semantic_details.get("errors", []):
+            log_error(f"Template/manifest contract mismatch: {msg}")
+        sys.exit(1)
+    for msg in semantic_details.get("warnings", []):
+        log(f"  [contract warning] {msg}", C_ORANGE)
+
+    contract_signature = _build_ir_contract_signature(
+        manifest_path,
+        target_modes=target_modes,
+        context_len=context_len,
+        logits_layout=logits_layout,
+        layout_mode=layout_mode,
+        layer_limit=layer_limit,
+        no_fusion=no_fusion,
+    )
+    contract_hash = _hash_sha256_bytes(_canonical_json_bytes(contract_signature))
+    contract_hash_path = output_dir / "ir_build_contract_hash.json"
+    cached_contract_hash = None
+    cached_contract_doc = _load_json_dict(contract_hash_path)
+    if isinstance(cached_contract_doc, dict):
+        raw_hash = cached_contract_doc.get("hash")
+        if isinstance(raw_hash, str) and raw_hash.strip():
+            cached_contract_hash = raw_hash.strip()
+    contract_hash_mismatch = bool(cached_contract_hash and cached_contract_hash != contract_hash)
+    if not force and cached_contract_hash is None and contract_hash_path.exists():
+        contract_hash_mismatch = True
+    if not force and contract_hash_mismatch:
+        log("  Contract hash changed (tie/head/template semantics), rebuilding IR outputs", C_YELLOW)
+
     ir1_paths = {}
 
     # Generate IR1 for each mode
@@ -1261,6 +1755,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                 outputs_exist = False
             manifest_newer = False
             context_len_mismatch = False
+            contract_mismatch = contract_hash_mismatch
             if outputs_exist:
                 manifest_mtime = manifest_path.stat().st_mtime
                 layout_input_mtime = 0
@@ -1280,7 +1775,6 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                 # Check if context_len or layout_mode/logits_layout matches cached layout
                 if layout_path.exists():
                     try:
-                        import json
                         with open(layout_path, 'r') as f:
                             cached_layout = json.load(f)
                         # Check context_len
@@ -1305,7 +1799,7 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                     except Exception:
                         pass
 
-            if outputs_exist and not manifest_newer and not context_len_mismatch:
+            if outputs_exist and not manifest_newer and not context_len_mismatch and not contract_mismatch:
                 log(f"  Using cached IR outputs for {mode} at {ir1_path}", C_DIM)
                 ir1_paths[mode] = ir1_path
                 continue
@@ -1313,6 +1807,8 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
                 log(f"  Manifest updated, rebuilding IR outputs for {mode}", C_DIM)
             if context_len_mismatch:
                 log(f"  Context length changed, rebuilding IR outputs for {mode}", C_DIM)
+            if contract_mismatch:
+                log(f"  Contract hash changed, rebuilding IR outputs for {mode}", C_DIM)
 
         cmd = [
             sys.executable,
@@ -1385,6 +1881,19 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
         ir1_paths[mode] = ir1_path
 
+    contract_hash_path.write_text(
+        json.dumps(
+            {
+                "schema": "ck.v7.ir_contract_hash.v1",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "hash": contract_hash,
+                "signature": contract_signature,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
     # Return decode IR1 as primary (for compatibility)
     return ir1_paths.get("decode", ir1_paths[target_modes[0]])
 
@@ -1395,6 +1904,7 @@ def step_codegen(
     force: bool = False,
     profile: bool = False,
     dump: bool = False,
+    strict_contracts: bool = False,
 ) -> Path:
     """Generate v7 C code from lowered IR.
 
@@ -1450,6 +1960,8 @@ def step_codegen(
         cmd.append("--profile")
     if dump:
         cmd.append("--parity-dump")
+    if strict_contracts:
+        cmd.append("--strict-contracts")
     # Filter empty args
     cmd = [c for c in cmd if c]
 
@@ -1823,6 +2335,10 @@ def _hash_sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _canonical_json_bytes(payload: Any) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
 def _hash_sha256_file(path: Path) -> Optional[str]:
     if not path.exists() or not path.is_file():
         return None
@@ -1843,6 +2359,20 @@ def _load_json_dict(path: Path) -> Optional[dict]:
     except Exception:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _coerce_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"1", "true", "yes", "on"}:
+            return True
+        if raw in {"0", "false", "no", "off"}:
+            return False
+    return None
 
 
 def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> dict:
@@ -6731,6 +7261,18 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
         cmd.extend(["--temperature", str(args.temperature)])
     if args.max_tokens:
         cmd.extend(["--max-tokens", str(args.max_tokens)])
+    if getattr(args, "top_k", None) is not None:
+        cmd.extend(["--top-k", str(args.top_k)])
+    if getattr(args, "top_p", None) is not None:
+        cmd.extend(["--top-p", str(args.top_p)])
+    if getattr(args, "min_p", None) is not None:
+        cmd.extend(["--min-p", str(args.min_p)])
+    if getattr(args, "repeat_penalty", None) is not None:
+        cmd.extend(["--repeat-penalty", str(args.repeat_penalty)])
+    if getattr(args, "repeat_last_n", None) is not None:
+        cmd.extend(["--repeat-last-n", str(args.repeat_last_n)])
+    # Keep ck_run compatible with baseline ck_chat.py CLI.
+    # Optional anti-markup controls are only available in local experimental ck_chat variants.
     if args.prompt:
         cmd.extend(["--prompt", args.prompt])
     if getattr(args, "no_chat_template", False):
@@ -6825,9 +7367,12 @@ def step_run_c_cli_parity_dump(
     parity_dump_dir.mkdir(parents=True, exist_ok=True)
     env["CK_PARITY_DUMP"] = "1"
     env["CK_PARITY_DIR"] = str(parity_dump_dir)
+    # Debug stop-points from the caller shell can short-circuit decode before dumps.
+    env.pop("CK_STOP_OP", None)
 
-    if max_tokens <= 0:
-        max_tokens = 1
+    # Need at least one decode step after prefill to emit decode-path parity dumps.
+    if max_tokens <= 1:
+        max_tokens = 2
 
     cmd = [
         str(cli_path),
@@ -6838,6 +7383,7 @@ def step_run_c_cli_parity_dump(
         "--max-tokens",
         str(max_tokens),
         "--no-chat-template",
+        "--ignore-eos",
     ]
     if ctx_size and ctx_size > 0:
         cmd.extend(["--context", str(ctx_size)])
@@ -6892,16 +7438,28 @@ def _run_llamacpp_parity(
     llama_include_global: bool = False,
     llama_timeout: Optional[int] = None,
     gguf_path_hint: Optional[Path] = None,
+    parity_family: str = "llama",
+    require_token_aware_dumps: bool = False,
+    allow_raw_fallback: bool = True,
 ) -> bool:
     """Run llama.cpp parity binary to generate reference dumps."""
     log(f"\n{C_ORANGE}[llamacpp-parity]{C_RESET} Running llama.cpp for reference dumps")
 
-    # Prefer patched parity binary; fallback to local llama.cpp main.
-    llm_path = PROJECT_ROOT / "build" / "llama-parity"
-    if not llm_path.exists():
-        llm_path = PROJECT_ROOT / "llama.cpp" / "main"
-    if not llm_path.exists():
-        log_error("llama.cpp parity binary not found (expected build/llama-parity or llama.cpp/main)")
+    # Prefer patched parity binary; then common llama.cpp executable locations.
+    llm_candidates = [
+        PROJECT_ROOT / "build" / "llama-parity",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "llama-completion",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "llama-cli",
+        PROJECT_ROOT / "llama.cpp" / "main",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "main",
+    ]
+    llm_path = next((p for p in llm_candidates if p.exists()), None)
+    if llm_path is None:
+        log_error(
+            "llama.cpp parity binary not found "
+            "(expected build/llama-parity, llama.cpp/build/bin/llama-cli, "
+            "llama.cpp/build/bin/llama-completion, or llama.cpp/main)"
+        )
         return False
 
     gguf_path = gguf_path_hint if gguf_path_hint and gguf_path_hint.exists() else None
@@ -6919,6 +7477,47 @@ def _run_llamacpp_parity(
 
     ref_dump_dir = work_dir / "llama_parity_dumps"
     ref_dump_dir.mkdir(parents=True, exist_ok=True)
+    ref_dump = ref_dump_dir / "dump.bin"
+    ref_index = ref_dump_dir / "index.json"
+
+    def _purge_ref_dump() -> None:
+        for p in (ref_dump, ref_index):
+            try:
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                pass
+
+    # Never reuse stale reference dumps across runs.
+    _purge_ref_dump()
+
+    def _token_audit(index_path: Path) -> tuple[bool, str]:
+        if not index_path.exists():
+            return False, "missing index.json"
+        try:
+            obj = json.loads(index_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            return False, f"index parse error: {e}"
+        if not isinstance(obj, list):
+            return False, "index is not a list"
+        token_ids: list[int] = []
+        for row in obj:
+            if not isinstance(row, dict):
+                continue
+            if "token_id" not in row:
+                continue
+            try:
+                token_ids.append(int(row.get("token_id", 0)))
+            except Exception:
+                continue
+        if not token_ids:
+            return False, "index has no token_id entries"
+        unique = sorted(set(token_ids))
+        # Raw fallback conversions typically collapse everything to token_id=0.
+        collapsed_zero = len(token_ids) >= 8 and len(unique) == 1 and unique[0] == 0
+        if collapsed_zero:
+            return False, f"collapsed token ids (all zero across {len(token_ids)} dumps)"
+        return True, f"entries={len(token_ids)} unique_tokens={unique[:16]}"
 
     env = os.environ.copy()
     env["CKDMP_DIR"] = str(ref_dump_dir)
@@ -6934,20 +7533,30 @@ def _run_llamacpp_parity(
         env["CKDMP_INCLUDE_GLOBAL"] = "1"
 
     temp = 0.0 if temperature is None else float(temperature)
+    exe_name = llm_path.name.lower()
     cmd = [
         str(llm_path),
         "-m",
         str(gguf_path),
         "-p",
         prompt,
-        "-no-cnv",
-        "--simple-io",
-        "--no-warmup",
-        "--temp",
-        f"{temp}",
-        "-n",
-        str(max_tokens),
     ]
+    # Keep llama parity invocations non-interactive across binary variants.
+    if "llama-cli" in exe_name:
+        cmd.extend(["-no-cnv", "--single-turn", "--simple-io"])
+    elif ("llama-completion" in exe_name) or (exe_name == "main") or ("llama-parity" in exe_name):
+        cmd.extend(["-no-cnv", "--simple-io"])
+    else:
+        cmd.extend(["--simple-io"])
+    cmd.extend(
+        [
+            "--no-warmup",
+            "--temp",
+            f"{temp}",
+            "-n",
+            str(max_tokens),
+        ]
+    )
     if ctx_size and ctx_size > 0:
         cmd.extend(["--ctx-size", str(ctx_size)])
 
@@ -6971,20 +7580,113 @@ def _run_llamacpp_parity(
         log_error(f"llama.cpp parity run error: {e}")
         return False
 
-    ref_dump = ref_dump_dir / "dump.bin"
-    ref_index = ref_dump_dir / "index.json"
     has_dump = ref_dump.exists() and ref_dump.stat().st_size > 0
     has_index = ref_index.exists() and ref_index.stat().st_size > 0
 
     if result.returncode == 0 and has_dump:
-        log(f"  Reference dump: {ref_dump}", C_GREEN)
-        return True
+        ok_tokens, token_msg = _token_audit(ref_index)
+        if require_token_aware_dumps and not ok_tokens:
+            log_error(f"llama CKDMP token audit failed: {token_msg}")
+            if not allow_raw_fallback:
+                _purge_ref_dump()
+                return False
+        else:
+            log(f"  Reference dump: {ref_dump}", C_GREEN)
+            if ok_tokens:
+                log(f"  CKDMP token audit: {token_msg}", C_DIM)
+            return True
 
     # CKDMP_STOP_AFTER intentionally exits non-zero after enough dumps.
     if result.returncode != 0 and has_dump and has_index:
-        log(f"  llama.cpp exited with code {result.returncode} after writing dumps", C_ORANGE)
-        log(f"  Reference dump: {ref_dump}", C_GREEN)
-        return True
+        ok_tokens, token_msg = _token_audit(ref_index)
+        if require_token_aware_dumps and not ok_tokens:
+            log_error(f"llama CKDMP token audit failed: {token_msg}")
+            if not allow_raw_fallback:
+                _purge_ref_dump()
+                return False
+        else:
+            log(f"  llama.cpp exited with code {result.returncode} after writing dumps", C_ORANGE)
+            log(f"  Reference dump: {ref_dump}", C_GREEN)
+            if ok_tokens:
+                log(f"  CKDMP token audit: {token_msg}", C_DIM)
+            return True
+
+    # Fallback for local llama.cpp builds that expose LLAMA_DUMP_LAYER0 raw dumps
+    # but are not instrumented with CKDMP output.
+    raw_dump_dir = work_dir / "llama_dump"
+    raw_converter = SCRIPTS_DIR / "parity" / "llama_to_ckdmp_converter.py"
+    if allow_raw_fallback and raw_converter.exists():
+        for stale in raw_dump_dir.glob("*.bin"):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+        raw_index = raw_dump_dir / "index.json"
+        try:
+            if raw_index.exists():
+                raw_index.unlink()
+        except OSError:
+            pass
+
+        env_raw = os.environ.copy()
+        env_raw["LLAMA_DUMP_LAYER0"] = "1"
+        for key in (
+            "CKDMP_DIR",
+            "CKDMP_ALL_LAYERS",
+            "CKDMP_FILTER",
+            "CKDMP_LAYER",
+            "CKDMP_STOP_AFTER",
+            "CKDMP_INCLUDE_GLOBAL",
+        ):
+            env_raw.pop(key, None)
+
+        try:
+            timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
+            if timeout_sec <= 0:
+                timeout_sec = None
+            raw_res = subprocess.run(
+                cmd,
+                cwd=work_dir,
+                env=env_raw,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+            )
+        except Exception:
+            raw_res = None
+
+        raw_bins = sorted(raw_dump_dir.glob("*.bin"))
+        if raw_bins:
+            conv_cmd = [
+                sys.executable,
+                str(raw_converter),
+                "-i",
+                str(raw_dump_dir),
+                "-o",
+                str(ref_dump),
+                "--model",
+                str(parity_family or "llama"),
+                "--index",
+            ]
+            conv_res = subprocess.run(
+                conv_cmd,
+                cwd=PROJECT_ROOT,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if conv_res.returncode == 0 and ref_dump.exists() and ref_dump.stat().st_size > 0:
+                if raw_res is not None and raw_res.returncode != 0:
+                    log(f"  llama.cpp raw dump run exited with {raw_res.returncode}; converted raw dumps anyway", C_ORANGE)
+                log(f"  Converted raw llama_dump -> {ref_dump}", C_GREEN)
+                return True
+
+    if require_token_aware_dumps and not allow_raw_fallback:
+        log_error("token-aware llama CKDMP dump required; raw LLAMA_DUMP_LAYER0 fallback disabled")
+        _purge_ref_dump()
+        return False
 
     log_error("llama.cpp parity dump failed")
     if result.stderr:
@@ -7001,6 +7703,22 @@ def _infer_parity_family(model_input: Optional[str], work_dir: Path) -> str:
             str(work_dir.parent.name or ""),
         ]
     ).lower()
+    config_paths = [
+        work_dir / "config.json",
+        work_dir / ".ck_build" / "config.json",
+    ]
+    for cfg_path in config_paths:
+        try:
+            if not cfg_path.exists():
+                continue
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            model_type = str(cfg.get("model_type") or "").strip().lower()
+            if model_type in ("llama", "gemma", "qwen2", "qwen3", "qwen"):
+                return model_type
+        except Exception:
+            pass
+    if "nanbeige" in text:
+        return "llama"
     if "qwen3" in text:
         return "qwen3"
     if "qwen2" in text:
@@ -7206,6 +7924,674 @@ def _generate_visualizer_html(work_dir: Path) -> Path:
     return report_path
 
 
+def _template_audit_write_report(report: dict[str, Any], out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
+def _template_audit_extract_weight_refs(op: dict[str, Any]) -> set[str]:
+    refs: set[str] = set()
+
+    def _push_ref(value: Any) -> None:
+        if isinstance(value, str):
+            name = value.strip()
+            if name:
+                refs.add(name)
+
+    _push_ref(op.get("weight_ref"))
+    weight_refs = op.get("weight_refs")
+    if isinstance(weight_refs, list):
+        for value in weight_refs:
+            _push_ref(value)
+
+    args = op.get("args")
+    arg_items: list[Any]
+    if isinstance(args, list):
+        arg_items = args
+    elif isinstance(args, dict):
+        arg_items = [args]
+    else:
+        arg_items = []
+
+    for item in arg_items:
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        if isinstance(source, str) and ":" in source:
+            prefix, value = source.split(":", 1)
+            if prefix.strip().lower() in {"weight", "manifest"}:
+                _push_ref(value)
+        _push_ref(item.get("weight_ref"))
+        nested = item.get("weight_refs")
+        if isinstance(nested, list):
+            for value in nested:
+                _push_ref(value)
+
+    return refs
+
+
+TEMPLATE_CONTRACT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "tokenizer_contract": ("tokenizer_type", "special_tokens"),
+    "attention_contract": ("rope_type", "kv_layout"),
+    "block_contract": ("norm_type", "mlp_formula", "activation"),
+    "logits_contract": ("final_norm", "lm_head"),
+    "quant_contract": ("kernel_select",),
+    "runtime_invariants": ("required_call_args",),
+}
+
+
+def _template_audit_validate_contract(contract_doc: Any) -> tuple[bool, dict[str, Any]]:
+    missing_sections: list[str] = []
+    missing_fields: dict[str, list[str]] = {}
+    wrong_types: dict[str, str] = {}
+
+    if not isinstance(contract_doc, dict):
+        return False, {
+            "error": "contract is missing or not an object",
+            "missing_sections": list(TEMPLATE_CONTRACT_REQUIRED_FIELDS.keys()),
+        }
+
+    for section, fields in TEMPLATE_CONTRACT_REQUIRED_FIELDS.items():
+        section_doc = contract_doc.get(section)
+        if not isinstance(section_doc, dict):
+            missing_sections.append(section)
+            continue
+        for field in fields:
+            value = section_doc.get(field)
+            if value is None:
+                missing_fields.setdefault(section, []).append(field)
+            elif field == "required_call_args" and not isinstance(value, dict):
+                wrong_types[f"{section}.{field}"] = type(value).__name__
+            elif field == "special_tokens" and not isinstance(value, dict):
+                wrong_types[f"{section}.{field}"] = type(value).__name__
+
+    ok = not missing_sections and not missing_fields and not wrong_types
+    return ok, {
+        "missing_sections": missing_sections,
+        "missing_fields": missing_fields,
+        "wrong_types": wrong_types,
+    }
+
+
+def _template_audit_ir_stitching_report(work_dir: Path, manifest_path: Path) -> dict[str, Any]:
+    manifest_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_entries = manifest_doc.get("entries") if isinstance(manifest_doc.get("entries"), list) else []
+    manifest_names = {
+        str(entry.get("name", "")).strip()
+        for entry in manifest_entries
+        if isinstance(entry, dict) and str(entry.get("name", "")).strip()
+    }
+
+    mode_stats: dict[str, dict[str, Any]] = {}
+    aggregate_refs: set[str] = set()
+    aggregate_top_errors = 0
+    aggregate_ops_with_errors = 0
+    aggregate_ops = 0
+
+    for mode in ("decode", "prefill"):
+        path = work_dir / f"lowered_{mode}_call.json"
+        if not path.exists():
+            mode_stats[mode] = {"present": False}
+            continue
+
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        operations = doc.get("operations") if isinstance(doc.get("operations"), list) else []
+        top_errors = doc.get("errors") if isinstance(doc.get("errors"), list) else []
+        ops_with_errors = 0
+        mode_refs: set[str] = set()
+
+        for op in operations:
+            if not isinstance(op, dict):
+                continue
+            errs = op.get("errors") if isinstance(op.get("errors"), list) else []
+            if errs:
+                ops_with_errors += 1
+            mode_refs.update(_template_audit_extract_weight_refs(op))
+
+        mode_stats[mode] = {
+            "present": True,
+            "path": str(path),
+            "ops": int(len(operations)),
+            "top_level_errors": int(len(top_errors)),
+            "ops_with_errors": int(ops_with_errors),
+            "unique_weight_refs": int(len(mode_refs)),
+        }
+        aggregate_refs.update(mode_refs)
+        aggregate_top_errors += int(len(top_errors))
+        aggregate_ops_with_errors += int(ops_with_errors)
+        aggregate_ops += int(len(operations))
+
+    unknown_refs = sorted(
+        ref
+        for ref in aggregate_refs
+        if ref
+        and not ref.startswith("_")
+        and ref not in manifest_names
+        and ref not in TEMPLATE_AUDIT_TOKENIZER_REF_ALLOWLIST
+    )
+    tokenizer_refs = sorted(
+        ref for ref in aggregate_refs if ref in TEMPLATE_AUDIT_TOKENIZER_REF_ALLOWLIST
+    )
+
+    passed = bool(
+        aggregate_ops > 0
+        and len(unknown_refs) == 0
+        and aggregate_top_errors == 0
+        and aggregate_ops_with_errors == 0
+    )
+
+    return {
+        "pass": passed,
+        "ops_total": int(aggregate_ops),
+        "top_level_errors_total": int(aggregate_top_errors),
+        "ops_with_errors_total": int(aggregate_ops_with_errors),
+        "unique_weight_refs_total": int(len(aggregate_refs)),
+        "unknown_weight_refs": unknown_refs,
+        "tokenizer_weight_refs": tokenizer_refs,
+        "manifest_entries": int(len(manifest_names)),
+        "mode_stats": mode_stats,
+    }
+
+
+def _template_audit_prepare_artifacts(
+    args: argparse.Namespace,
+    input_type: str,
+    info: dict[str, Any],
+    work_dir: Path,
+) -> dict[str, Any]:
+    gguf_path: Optional[Path] = None
+    model_dir: Optional[Path] = None
+
+    if input_type == "hf_id":
+        model_id = info["model_id"]
+        model_dir = step_download(model_id, CACHE_DIR, force=getattr(args, "force_download", False))
+        has_safetensors = list(model_dir.glob("*.safetensors")) or list(model_dir.glob("model*.safetensors"))
+        gguf_files = list(model_dir.glob("*.gguf"))
+
+        if gguf_files and not has_safetensors:
+            gguf_path = next(iter(sorted(gguf_files)), gguf_files[0])
+            ensure_tokenizer_files(model_id, work_dir)
+            weights_path, config_path = step_convert_gguf(
+                gguf_path,
+                work_dir,
+                force=getattr(args, "force_convert", False),
+                validate=True,
+            )
+            manifest_path = work_dir / "weights_manifest.json"
+        else:
+            tokenizer_json = model_dir / "tokenizer.json"
+            weights_path = step_convert_hf(
+                model_dir,
+                work_dir,
+                weight_dtype=(getattr(args, "weight_dtype", None) or "float32"),
+                force=getattr(args, "force_convert", False),
+                tokenizer_json=tokenizer_json if tokenizer_json.exists() else None,
+            )
+            config_path = model_dir / "config.json"
+            manifest_path = work_dir / "weights_manifest.json"
+
+    elif input_type == "hf_gguf":
+        repo_id = info["repo_id"]
+        gguf_path = step_download_gguf(repo_id, info["filename"], CACHE_DIR, force=getattr(args, "force_download", False))
+        ensure_tokenizer_files(repo_id, work_dir)
+        weights_path, config_path = step_convert_gguf(
+            gguf_path,
+            work_dir,
+            force=getattr(args, "force_convert", False),
+            validate=True,
+        )
+        manifest_path = work_dir / "weights_manifest.json"
+
+    elif input_type == "gguf":
+        gguf_path = info["path"]
+        weights_path, config_path = step_convert_gguf(
+            gguf_path,
+            work_dir,
+            force=getattr(args, "force_convert", False),
+            validate=True,
+        )
+        manifest_path = work_dir / "weights_manifest.json"
+
+    elif input_type == "local_dir":
+        model_dir = info["path"]
+        local_gguf = _find_local_gguf(model_dir)
+        if _is_ck_runtime_dir(model_dir):
+            if getattr(args, "force_convert", False) and local_gguf is not None:
+                gguf_path = local_gguf
+                weights_path, config_path = step_convert_gguf(
+                    local_gguf,
+                    work_dir,
+                    force=True,
+                    validate=True,
+                )
+                manifest_path = work_dir / "weights_manifest.json"
+            else:
+                weights_path, config_path, manifest_path = _prepare_runtime_dir_from_local_ck_artifacts(model_dir, work_dir)
+        else:
+            tokenizer_json = model_dir / "tokenizer.json"
+            weights_path = step_convert_hf(
+                model_dir,
+                work_dir,
+                weight_dtype=(getattr(args, "weight_dtype", None) or "float32"),
+                force=getattr(args, "force_convert", False),
+                tokenizer_json=tokenizer_json if tokenizer_json.exists() else None,
+            )
+            config_path = model_dir / "config.json"
+            manifest_path = work_dir / "weights_manifest.json"
+
+    elif input_type == "local_config":
+        config_path = info["path"]
+        model_dir = config_path.parent
+        local_gguf = _find_local_gguf(model_dir)
+        if _is_ck_runtime_dir(model_dir):
+            if getattr(args, "force_convert", False) and local_gguf is not None:
+                gguf_path = local_gguf
+                weights_path, config_path = step_convert_gguf(
+                    local_gguf,
+                    work_dir,
+                    force=True,
+                    validate=True,
+                )
+                manifest_path = work_dir / "weights_manifest.json"
+            else:
+                weights_path, config_path, manifest_path = _prepare_runtime_dir_from_local_ck_artifacts(model_dir, work_dir)
+        else:
+            raise RuntimeError(
+                f"config-only input requires colocated weights.bump + weights_manifest.json: {config_path.parent}"
+            )
+
+    else:
+        raise RuntimeError(f"Unsupported input type for template audit: {input_type}")
+
+    if not Path(manifest_path).exists():
+        raise RuntimeError(f"Missing manifest after preparation: {manifest_path}")
+    if not Path(config_path).exists():
+        raise RuntimeError(f"Missing config after preparation: {config_path}")
+    if not Path(weights_path).exists():
+        raise RuntimeError(f"Missing weights bump after preparation: {weights_path}")
+
+    return {
+        "work_dir": work_dir,
+        "manifest_path": Path(manifest_path),
+        "config_path": Path(config_path),
+        "weights_path": Path(weights_path),
+        "gguf_path": gguf_path,
+        "model_dir": model_dir,
+    }
+
+
+def _template_audit_run_reverse_validation_on_path(
+    lowered_path: Path,
+    manifest_path: Path,
+    *,
+    verbose: bool = False,
+) -> tuple[bool, str]:
+    try:
+        from ir_reverse_validator import run_validation
+    except ImportError:
+        validator_path = SCRIPTS_DIR / "ir_reverse_validator.py"
+        if not validator_path.exists():
+            raise RuntimeError("ir_reverse_validator.py not found")
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("ir_reverse_validator", validator_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("failed to load ir_reverse_validator.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        run_validation = module.run_validation
+
+    return run_validation(
+        lowered_path=lowered_path,
+        manifest_path=manifest_path if manifest_path.exists() else None,
+        kernel_maps_dir=KERNEL_MAPS_DIR,
+        verbose=verbose,
+    )
+
+
+def step_run_template_audit(args: argparse.Namespace) -> None:
+    """Run fail-fast pre-compile template audit gates for v7 onboarding."""
+    # TODO(contract): evolve this into full semantic bring-up gate runner:
+    # 1) template/manifest semantic contract resolved,
+    # 2) lowered-call invariants pass,
+    # 3) first-token logits parity pass,
+    # 4) post-attn chain check pass,
+    # 5) MLP contract check pass.
+    # Chat run should be blocked on any failed strict gate.
+    model_input = str(getattr(args, "model", "") or "").strip()
+    if not model_input:
+        log_error("template-audit requires a model input")
+        sys.exit(1)
+
+    requested_run_dir_raw = getattr(args, "run_dir", None)
+    requested_run_dir = Path(requested_run_dir_raw).expanduser().resolve() if requested_run_dir_raw else None
+
+    input_type, info = detect_input_type(model_input)
+    if input_type == "hf_id":
+        default_work_dir = CACHE_DIR / info["model_id"].replace("/", "--")
+    elif input_type == "hf_gguf":
+        default_work_dir = CACHE_DIR / info["repo_id"].replace("/", "--")
+    elif input_type == "gguf":
+        default_work_dir = CACHE_DIR / info["path"].stem
+    elif input_type == "local_dir":
+        default_work_dir = info["path"] / ".ck_build"
+    elif input_type == "local_config":
+        default_work_dir = info["path"].parent / ".ck_build"
+    else:
+        default_work_dir = CACHE_DIR / "template_audit"
+
+    work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    report_path = (
+        Path(getattr(args, "audit_json_out", "")).expanduser().resolve()
+        if getattr(args, "audit_json_out", None)
+        else (work_dir / "template_audit_latest.json")
+    )
+
+    report: dict[str, Any] = {
+        "command": "v7-template-audit",
+        "model_input": model_input,
+        "input_type": input_type,
+        "run_dir": str(work_dir),
+        "started_at": _utc_now_iso(),
+        "status": "running",
+        "gates": [],
+    }
+
+    def _record_gate(name: str, passed: bool, details: dict[str, Any], message: str) -> None:
+        report["gates"].append(
+            {
+                "name": name,
+                "pass": bool(passed),
+                "timestamp": _utc_now_iso(),
+                "message": message,
+                "details": details,
+            }
+        )
+
+    def _fail_gate(name: str, message: str, details: dict[str, Any]) -> None:
+        _record_gate(name, False, details, message)
+        report["status"] = "fail"
+        report["failed_gate"] = name
+        report["completed_at"] = _utc_now_iso()
+        _template_audit_write_report(report, report_path)
+        log_error(f"[template-audit] {name} failed: {message}")
+        log(f"  Report: {report_path}", C_DIM)
+        raise SystemExit(1)
+
+    log(f"{C_ORANGE}[template-audit]{C_RESET} v7 pre-compile audit", C_BOLD)
+    log(f"  Input: {model_input} ({input_type})", C_DIM)
+    log(f"  Run dir: {work_dir}", C_DIM)
+
+    step_regenerate_kernel_registry(force=bool(getattr(args, "force_compile", False)))
+
+    # Gate 1: source+weights contract (download/convert + manifest/config existence).
+    try:
+        prepared = _template_audit_prepare_artifacts(args, input_type, info, work_dir)
+    except SystemExit as exc:
+        _fail_gate(
+            "gate1_weights_contract",
+            "failed to resolve/convert model artifacts",
+            {"error": f"conversion exited with code {exc.code}"},
+        )
+        return
+    except Exception as exc:
+        _fail_gate(
+            "gate1_weights_contract",
+            "failed to resolve/convert model artifacts",
+            {"error": str(exc)},
+        )
+        return
+    _record_gate(
+        "gate1_weights_contract",
+        True,
+        {
+            "manifest_path": str(prepared["manifest_path"]),
+            "weights_path": str(prepared["weights_path"]),
+            "config_path": str(prepared["config_path"]),
+            "gguf_path": str(prepared["gguf_path"]) if prepared.get("gguf_path") else None,
+        },
+        "weights/config/manifest ready",
+    )
+
+    # Gate 2: template contract (embedded template or resolvable builtin template).
+    manifest_path = prepared["manifest_path"]
+    try:
+        manifest_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        _fail_gate(
+            "gate2_template_contract",
+            "manifest unreadable",
+            {"manifest_path": str(manifest_path), "error": str(exc)},
+        )
+        return
+
+    cfg = manifest_doc.get("config") if isinstance(manifest_doc.get("config"), dict) else {}
+    template_doc = manifest_doc.get("template") if isinstance(manifest_doc.get("template"), dict) else None
+    embedded_ok = bool(template_doc and isinstance(template_doc.get("sequence"), list) and template_doc.get("sequence"))
+    arch_candidates = []
+    for key in ("model", "arch"):
+        value = cfg.get(key)
+        if isinstance(value, str) and value.strip():
+            arch_candidates.append(value.strip())
+    built_in_path = None
+    for cand in arch_candidates:
+        path = V7_ROOT / "templates" / f"{cand.lower()}.json"
+        if path.exists():
+            built_in_path = path
+            break
+    builtin_doc = None
+    if built_in_path:
+        try:
+            builtin_doc = json.loads(built_in_path.read_text(encoding="utf-8"))
+        except Exception:
+            builtin_doc = None
+
+    if not embedded_ok and built_in_path is None:
+        _fail_gate(
+            "gate2_template_contract",
+            "missing template contract (no embedded template and no builtin match)",
+            {
+                "manifest_path": str(manifest_path),
+                "arch_candidates": arch_candidates,
+                "expected_templates": [str(V7_ROOT / "templates" / f"{cand.lower()}.json") for cand in arch_candidates],
+            },
+        )
+        return
+
+    strict_contracts = not bool(getattr(args, "no_strict_contracts", False))
+    contract_source = None
+    contract_doc = None
+    if template_doc and isinstance(template_doc.get("contract"), dict):
+        contract_source = "embedded_template"
+        contract_doc = template_doc.get("contract")
+    elif builtin_doc and isinstance(builtin_doc.get("contract"), dict):
+        contract_source = "builtin_template"
+        contract_doc = builtin_doc.get("contract")
+
+    contract_pass = True
+    contract_details: dict[str, Any] = {}
+    if strict_contracts:
+        contract_pass, contract_details = _template_audit_validate_contract(contract_doc)
+        if not contract_pass:
+            _fail_gate(
+                "gate2_template_contract",
+                "strict contract missing/invalid (required semantic sections not present)",
+                {
+                    "manifest_path": str(manifest_path),
+                    "embedded_template": bool(embedded_ok),
+                    "builtin_template_path": str(built_in_path) if built_in_path else None,
+                    "contract_source": contract_source,
+                    "contract_validation": contract_details,
+                },
+            )
+            return
+
+    semantic_pass, semantic_details = _template_manifest_semantic_check(manifest_path)
+    if strict_contracts and not semantic_pass:
+        _fail_gate(
+            "gate2_template_contract",
+            "template/manifest semantic mismatch",
+            {
+                "manifest_path": str(manifest_path),
+                "contract_source": contract_source,
+                "semantic_checks": semantic_details,
+            },
+        )
+        return
+
+    _record_gate(
+        "gate2_template_contract",
+        True,
+        {
+            "embedded_template": bool(embedded_ok),
+            "builtin_template_path": str(built_in_path) if built_in_path else None,
+            "arch_candidates": arch_candidates,
+            "manifest_path": str(manifest_path),
+            "strict_contracts": bool(strict_contracts),
+            "contract_source": contract_source,
+            "contract_validation": contract_details,
+            "semantic_checks": semantic_details,
+        },
+        "template contract resolved",
+    )
+
+    # Gate 3: IR stitching + reverse validation.
+    # TODO(contract): split into:
+    # - structural stitching gate
+    # - semantic per-op contract gate (rope/norm/mlp/logits/kv invariants)
+    try:
+        weight_dtype = normalize_weight_dtype(getattr(args, "weight_dtype", None), manifest_path)
+        ir1_path = step_build_ir(
+            prepared["config_path"],
+            work_dir,
+            manifest_path=manifest_path,
+            bump_path=prepared["weights_path"],
+            weight_dtype=weight_dtype,
+            force=bool(getattr(args, "force_compile", False)),
+            codegen_version="v7",
+            context_len=getattr(args, "context_len", None),
+            logits_layout=getattr(args, "logits_layout", None),
+            no_fusion=bool(getattr(args, "no_fusion", False)),
+            layout_mode=str(getattr(args, "layout_mode", "region") or "region"),
+            layer_limit=getattr(args, "layer_limit", None),
+        )
+    except SystemExit:
+        _fail_gate(
+            "gate3_ir_stitching",
+            "build_ir failed",
+            {"run_dir": str(work_dir)},
+        )
+        return
+
+    stitching = _template_audit_ir_stitching_report(work_dir, manifest_path)
+    if not bool(stitching.get("pass", False)):
+        _fail_gate(
+            "gate3_ir_stitching",
+            "lowered IR has unresolved errors or unbound weights",
+            stitching,
+        )
+        return
+
+    reverse_modes = ["decode", "prefill"] if bool(getattr(args, "reverse_all_modes", False)) else ["decode"]
+    reverse_results: dict[str, dict[str, Any]] = {}
+    reverse_verbose = bool(getattr(args, "reverse_test_verbose", False))
+    reverse_ok = True
+    for mode in reverse_modes:
+        lowered_path = work_dir / f"lowered_{mode}_call.json"
+        if not lowered_path.exists():
+            reverse_results[mode] = {"present": False, "pass": False}
+            reverse_ok = False
+            continue
+        try:
+            passed, report_text = _template_audit_run_reverse_validation_on_path(
+                lowered_path,
+                manifest_path,
+                verbose=reverse_verbose,
+            )
+        except Exception as exc:
+            passed = False
+            report_text = str(exc)
+        reverse_results[mode] = {"present": True, "pass": bool(passed)}
+        if (not passed) and reverse_verbose and report_text:
+            print(report_text)
+        reverse_ok = reverse_ok and bool(passed)
+
+    if not reverse_ok:
+        _fail_gate(
+            "gate3_ir_stitching",
+            "reverse validation failed",
+            {
+                **stitching,
+                "reverse_results": reverse_results,
+                "reverse_modes": reverse_modes,
+            },
+        )
+        return
+
+    _record_gate(
+        "gate3_ir_stitching",
+        True,
+        {
+            **stitching,
+            "ir1_path": str(ir1_path),
+            "reverse_results": reverse_results,
+            "reverse_modes": reverse_modes,
+        },
+        "IR lower/call stitching validated",
+    )
+
+    # Gate 4: codegen preflight (no compile/run).
+    try:
+        model_c_path = step_codegen(
+            ir1_path,
+            work_dir,
+            force=bool(getattr(args, "force_compile", False)),
+            profile=False,
+            dump=False,
+            strict_contracts=True,
+        )
+    except SystemExit:
+        _fail_gate(
+            "gate4_codegen_preflight",
+            "codegen failed",
+            {"run_dir": str(work_dir)},
+        )
+        return
+
+    if not model_c_path.exists():
+        _fail_gate(
+            "gate4_codegen_preflight",
+            "codegen did not produce model_v7.c",
+            {"expected": str(model_c_path)},
+        )
+        return
+
+    line_count = 0
+    try:
+        with model_c_path.open("r", encoding="utf-8", errors="ignore") as handle:
+            for _ in handle:
+                line_count += 1
+    except Exception:
+        line_count = 0
+
+    _record_gate(
+        "gate4_codegen_preflight",
+        True,
+        {
+            "model_c_path": str(model_c_path),
+            "line_count": int(line_count),
+        },
+        "codegen preflight passed",
+    )
+
+    report["status"] = "pass"
+    report["completed_at"] = _utc_now_iso()
+    _template_audit_write_report(report, report_path)
+    log(f"  {C_GREEN}v7-template-audit PASS{C_RESET}")
+    log(f"  Report: {report_path}", C_GREEN)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -7321,16 +8707,42 @@ def run_pipeline(args: argparse.Namespace):
 
     elif input_type == 'local_dir':
         model_dir = info['path']
+        local_gguf = _find_local_gguf(model_dir)
+        if local_gguf is not None:
+            gguf_path_for_tokenizer = local_gguf
         default_work_dir = model_dir / ".ck_build"
         work_dir = requested_run_dir if requested_run_dir is not None else default_work_dir
         config_path = model_dir / "config.json"
 
         # Local CK runtime/train run dir: reuse existing bump+manifest directly.
         if _is_ck_runtime_dir(model_dir):
-            try:
-                weights_path, config_path, manifest_path = _prepare_runtime_dir_from_local_ck_artifacts(
-                    model_dir, work_dir
+            should_reconvert = bool(args.force_convert)
+            if not should_reconvert and local_gguf is not None:
+                coverage_ok, _ = _gguf_manifest_weight_category_check(
+                    local_gguf,
+                    model_dir / "weights_manifest.json",
+                    verbose=False,
+                    report_out=model_dir / "gguf_weight_category_coverage.json",
                 )
+                should_reconvert = not coverage_ok
+                if should_reconvert:
+                    log("  Local runtime manifest category mismatch; reconverting from GGUF", C_ORANGE)
+
+            try:
+                if should_reconvert and local_gguf is not None:
+                    weights_path, config_path = step_convert_gguf(
+                        local_gguf,
+                        work_dir,
+                        force=True,
+                        validate=True,
+                    )
+                    manifest_path = work_dir / "weights_manifest.json"
+                else:
+                    if should_reconvert and local_gguf is None:
+                        log("  force-convert requested but no local GGUF found; using existing CK runtime artifacts", C_ORANGE)
+                    weights_path, config_path, manifest_path = _prepare_runtime_dir_from_local_ck_artifacts(
+                        model_dir, work_dir
+                    )
             except Exception as e:
                 log_error(f"failed to prepare local CK runtime dir: {e}")
                 sys.exit(1)
@@ -7588,6 +9000,7 @@ def run_pipeline(args: argparse.Namespace):
         parity_prompt = getattr(args, "prompt", None) or "Hello"
         parity_max_tokens = int(getattr(args, "max_tokens", 1) or 1)
         step_run_c_cli_parity_dump(lib_path, weights_bump, parity_prompt, parity_max_tokens, effective_ctx)
+        parity_family = _infer_parity_family(getattr(args, "model", None), work_dir)
         llama_ok = _run_llamacpp_parity(
             work_dir,
             prompt=parity_prompt,
@@ -7600,10 +9013,12 @@ def run_pipeline(args: argparse.Namespace):
             llama_include_global=getattr(args, "llama_include_global", False),
             llama_timeout=getattr(args, "llama_timeout", None),
             gguf_path_hint=gguf_path_for_tokenizer,
+            parity_family=parity_family,
+            require_token_aware_dumps=bool(getattr(args, "llama_require_token_aware_dumps", False)),
+            allow_raw_fallback=not bool(getattr(args, "llama_no_raw_fallback", False)),
         )
         if not llama_ok:
             log("  llama.cpp reference dump failed; generating diagnostic parity summaries from available artifacts", C_ORANGE)
-        parity_family = _infer_parity_family(getattr(args, "model", None), work_dir)
         parity_model_uri = str(gguf_path_for_tokenizer) if gguf_path_for_tokenizer else str(getattr(args, "model", ""))
         _run_detailed_inference_parity_reports(
             work_dir,
@@ -7965,6 +9380,16 @@ Examples:
                            help='Sampling temperature (default: 0.7)')
     run_parser.add_argument('--max-tokens', type=int, default=512,
                            help='Max tokens to generate (default: 512)')
+    run_parser.add_argument('--top-k', type=int, default=40,
+                           help='Top-k sampling size passed to ck_chat.py (default: 40)')
+    run_parser.add_argument('--top-p', type=float, default=1.0,
+                           help='Top-p nucleus sampling passed to ck_chat.py (default: 1.0)')
+    run_parser.add_argument('--min-p', type=float, default=0.0,
+                           help='Min-p filter passed to ck_chat.py (default: 0.0)')
+    run_parser.add_argument('--repeat-penalty', type=float, default=1.0,
+                           help='Repeat penalty passed to ck_chat.py (default: 1.0)')
+    run_parser.add_argument('--repeat-last-n', type=int, default=64,
+                           help='Repeat penalty history window passed to ck_chat.py (default: 64)')
     run_parser.add_argument('--prompt', help='Single prompt (non-interactive)')
     run_parser.add_argument('--train-e2e', action='store_true',
                            help='Run tiny training parity E2E (CK vs PyTorch) and exit')
@@ -8061,8 +9486,8 @@ Examples:
                            help='Optional external profiler for --train-e2e (none, perf, vtune, advisor)')
     run_parser.add_argument('--train-profile-dir', default=None,
                            help='Output directory for train profiler artifacts (default: run_dir/profile_train_latest)')
-    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma'], default='auto',
-                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, gemma)')
+    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma', 'llama'], default='auto',
+                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, gemma, llama)')
     run_parser.add_argument('--no-chat-template', action='store_true',
                            help='Disable chat template formatting (same as --chat-template=none)')
     run_parser.add_argument('--python-tokenizer', action='store_true',
@@ -8121,12 +9546,53 @@ Examples:
                            help='Include global tensors when using --llama-layer')
     run_parser.add_argument('--llama-timeout', type=int, default=None,
                            help='llama.cpp parity timeout in seconds (default 600)')
+    run_parser.add_argument('--llama-require-token-aware-dumps', action='store_true',
+                           help='Require token-aware llama CKDMP index (reject collapsed token_id=0 reference dumps)')
+    run_parser.add_argument('--llama-no-raw-fallback', action='store_true',
+                           help='Disable LLAMA_DUMP_LAYER0 raw fallback conversion during llama parity dump generation')
     run_parser.add_argument('--parallel-decode', action='store_true',
                            help='[DEPRECATED] Flag accepted for compatibility only.')
     run_parser.add_argument('--reverse-test', action='store_true',
                            help='Run IR reverse validation after codegen (validates IR Lower 3 consistency)')
     run_parser.add_argument('--reverse-test-verbose', action='store_true',
                            help='Show detailed info from reverse validation')
+
+    template_audit_parser = subparsers.add_parser(
+        'template-audit',
+        aliases=['v7-template-audit'],
+        help='Run fail-fast pre-compile v7 onboarding audit (4 gates)',
+    )
+    template_audit_parser.add_argument('model', help='Model ID, URL, GGUF file, or local path')
+    template_audit_parser.add_argument('--run', dest='run_dir', default=None,
+                                       help='Explicit run directory for audit artifacts/report')
+    template_audit_parser.add_argument('--weight-dtype',
+                                       choices=['float32', 'bf16', 'q4_0', 'q4_1', 'q4_k', 'q4_k_m',
+                                                'q5_0', 'q5_1', 'q6_k', 'q8_0'],
+                                       help='Weight dtype override for HF checkpoint conversion path')
+    template_audit_parser.add_argument('--context-len', type=int, default=None,
+                                       help='Context length passed to IR build audit')
+    template_audit_parser.add_argument('--logits-layout', choices=['auto', 'last', 'full'], default='auto',
+                                       help='Logits buffer layout passed to IR build audit')
+    template_audit_parser.add_argument('--no-fusion', action='store_true',
+                                       help='Disable kernel fusion during IR audit build')
+    template_audit_parser.add_argument('--layout-mode', choices=['region', 'packed'], default='region',
+                                       help='Memory layout mode for IR audit build')
+    template_audit_parser.add_argument('--layer-limit', type=int, default=None,
+                                       help='Limit to first N layers during audit build')
+    template_audit_parser.add_argument('--force-download', action='store_true',
+                                       help='Re-download model files for audit')
+    template_audit_parser.add_argument('--force-convert', action='store_true',
+                                       help='Re-convert weights for audit')
+    template_audit_parser.add_argument('--force-compile', action='store_true',
+                                       help='Rebuild IR/codegen artifacts during audit')
+    template_audit_parser.add_argument('--reverse-test-verbose', action='store_true',
+                                       help='Print detailed reverse-validation output')
+    template_audit_parser.add_argument('--reverse-all-modes', action='store_true',
+                                       help='Require reverse-validation pass for both decode and prefill (default: decode only)')
+    template_audit_parser.add_argument('--no-strict-contracts', action='store_true',
+                                       help='Allow template-audit gate2 without required semantic contract sections')
+    template_audit_parser.add_argument('--audit-json-out', default=None,
+                                       help='Override JSON output path (default: <run_dir>/template_audit_latest.json)')
 
     # Interactive command (also default when no command given)
     interactive_parser = subparsers.add_parser('interactive', aliases=['i'],
@@ -8225,6 +9691,8 @@ Examples:
         run_interactive(args)
     elif args.command == 'run':
         run_pipeline(args)
+    elif args.command in ('template-audit', 'v7-template-audit'):
+        step_run_template_audit(args)
     elif args.command in ('interactive', 'i'):
         run_interactive(args)
     elif args.command == 'init':

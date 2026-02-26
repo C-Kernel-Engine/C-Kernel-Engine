@@ -78,6 +78,60 @@ def _entry_size(entry: Dict[str, Any]) -> int:
         return 0
 
 
+def _coerce_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"1", "true", "yes", "on"}:
+            return True
+        if raw in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _has_untied_lm_head_weight(weight_index: Dict[str, Dict[str, Any]]) -> bool:
+    return any(
+        key in weight_index
+        for key in ("output.weight", "lm_head.weight", "lm_head_weight", "lm_head")
+    )
+
+
+def _resolve_logits_weight_source(
+    config: Dict[str, Any],
+    weight_index: Dict[str, Dict[str, Any]],
+) -> str:
+    """
+    Decide logits weight source for this manifest.
+
+    Returns:
+      - "lm_head": untied head (output/lm_head weight must be used)
+      - "token_emb": tied head (token embedding shared)
+
+    Rules:
+      - tie_word_embeddings=false -> strict untied (must not fallback to token_emb)
+      - tie_word_embeddings unknown + untied head present -> treat as untied
+      - otherwise -> tied path
+    """
+    tie_cfg = _coerce_bool(config.get("tie_word_embeddings"))
+    has_untied = _has_untied_lm_head_weight(weight_index)
+
+    if tie_cfg is False:
+        if not has_untied:
+            raise RuntimeError(
+                "Logits contract failed: tie_word_embeddings=false but no output/lm_head weight exists in manifest. "
+                "Fix conversion/template contract before lowering."
+            )
+        return "lm_head"
+
+    if tie_cfg is None and has_untied:
+        return "lm_head"
+
+    return "token_emb"
+
+
 def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[Dict[str, Any]]:
     name = str(template_name or "").strip().lower()
     if not name:
@@ -471,15 +525,23 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
             )
 
         # Special IDs: fall back to current if missing
+        special_ids_lines: List[str] = []
         if any(v is not None for v in [unk_id, bos_id, eos_id, pad_id, mask_id]):
-            config_lines.append("            ck_tokenizer_set_special_ids(g_model->tokenizer,")
-            config_lines.append("                " + (str(unk_id) if unk_id is not None else "g_model->tokenizer->unk_id") + ",")
-            config_lines.append("                " + (str(bos_id) if bos_id is not None else "g_model->tokenizer->bos_id") + ",")
-            config_lines.append("                " + (str(eos_id) if eos_id is not None else "g_model->tokenizer->eos_id") + ",")
-            config_lines.append("                " + (str(pad_id) if pad_id is not None else "g_model->tokenizer->pad_id") + ",")
-            config_lines.append("                " + (str(mask_id) if mask_id is not None else "g_model->tokenizer->mask_id") + ");")
+            special_ids_lines.append("            ck_tokenizer_set_special_ids(g_model->tokenizer,")
+            special_ids_lines.append("                " + (str(unk_id) if unk_id is not None else "g_model->tokenizer->unk_id") + ",")
+            special_ids_lines.append("                " + (str(bos_id) if bos_id is not None else "g_model->tokenizer->bos_id") + ",")
+            special_ids_lines.append("                " + (str(eos_id) if eos_id is not None else "g_model->tokenizer->eos_id") + ",")
+            special_ids_lines.append("                " + (str(pad_id) if pad_id is not None else "g_model->tokenizer->pad_id") + ",")
+            special_ids_lines.append("                " + (str(mask_id) if mask_id is not None else "g_model->tokenizer->mask_id") + ");")
+            config_lines.extend(special_ids_lines)
 
         config_block = "\n".join(config_lines)
+        special_ids_reset_block = ""
+        if special_ids_lines:
+            special_ids_reset_block = "\n".join([
+                "            /* Re-apply GGUF special IDs after alias registration. */",
+                *special_ids_lines
+            ])
         return {
             "type": "spm",
             "include": '#include "tokenizer/tokenizer.h"',
@@ -544,6 +606,7 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
                     }}
                 }}
             }}
+{special_ids_reset_block if special_ids_reset_block else ""}
             if (getenv("CK_DEBUG_TOKENIZER_INIT")) {{
                 fprintf(stderr, "[Tokenizer] SPM init: done\\n");
             }}
@@ -1659,8 +1722,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     template = manifest.get("template", {})
     quant_summary = manifest.get("quant_summary", {})
     header_quant = {}
+    entries = manifest.get("entries", [])
+    weight_index = {
+        str(e.get("name", "")): e
+        for e in entries
+        if isinstance(e, dict) and str(e.get("name", "")).strip()
+    }
     entry_dtype = {}
-    for e in (manifest.get("entries") or []):
+    for e in entries:
         n = e.get("name")
         d = e.get("dtype")
         if isinstance(n, str) and isinstance(d, str):
@@ -1686,6 +1755,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         if lm_head_entry:
             header_quant["lm_head"] = lm_head_entry
     config = manifest.get("config", {})
+    logits_weight_source = _resolve_logits_weight_source(config, weight_index)
+    print(f"  [contract/logits] source={logits_weight_source}")
     # Default to Q8 activation preference for v7 baseline parity and stable Qwen behavior.
     # Model-specific overrides can still force FP32 by setting config["prefer_q8_activation"]=false.
     prefer_q8_activation = bool(config.get("prefer_q8_activation", True))
@@ -1899,8 +1970,6 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         return kernel_id
 
     # Weight entries from manifest (for Pass 2 binding)
-    entries = manifest.get("entries", [])
-    weight_index = {e["name"]: e for e in entries}
 
     # ═══════════════════════════════════════════════════════════
     # Op → Weight mapping (which weights each op uses for quant lookup)
@@ -2031,7 +2100,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if op in ("dense_embedding_lookup", "embedding"):
                 weight_dtype = header_quant.get("token_emb", "q8_0")
             elif op == "logits":
-                weight_dtype = header_quant.get("lm_head") or header_quant.get("token_emb") or "q8_0"
+                if logits_weight_source == "lm_head":
+                    weight_dtype = header_quant.get("lm_head")
+                    if not weight_dtype:
+                        raise RuntimeError(
+                            "Logits contract failed: untied lm_head selected but lm_head dtype is missing "
+                            "(expected output.weight/lm_head.weight in manifest quant summary)."
+                        )
+                else:
+                    weight_dtype = header_quant.get("token_emb")
+                    if not weight_dtype:
+                        raise RuntimeError(
+                            "Logits contract failed: tied logits selected but token_emb dtype is missing."
+                        )
             else:
                 weight_dtype = "q8_0"
 
@@ -2358,9 +2439,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     FOOTER_OP_WEIGHTS = {
         "rmsnorm": ["final_ln_weight", "final_ln_bias"],
         "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
-        # Use lm_head aliases (lm_head.weight/output.weight/token_emb).
-        "logits": ["lm_head"],
     }
+
+    def _footer_weight_keys(op_name: str) -> List[str]:
+        if op_name == "logits":
+            return ["lm_head"] if logits_weight_source == "lm_head" else ["token_emb"]
+        return FOOTER_OP_WEIGHTS.get(op_name, [])
 
     def resolve_weight_name(weight_key: str, op_section: str, op_layer: int) -> Optional[str]:
         patterns = WEIGHT_PATTERNS.get(weight_key, [weight_key])
@@ -2392,8 +2476,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # Get weight keys for this op - check repeated op mapping first
         if section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
             weight_keys = REPEATED_OP_WEIGHTS[(op, instance_idx)]
-        elif section == "footer" and op in FOOTER_OP_WEIGHTS:
-            weight_keys = FOOTER_OP_WEIGHTS[op]
+        elif section == "footer":
+            weight_keys = _footer_weight_keys(op)
         else:
             weight_keys = TEMPLATE_OP_WEIGHTS.get(op, [])
 
@@ -2957,6 +3041,16 @@ def generate_ir_lower_1(
 
     lowered_ops = []
 
+    # TODO(contract): Carry an explicit semantic model contract through lowering.
+    # Current lower stages focus on op wiring + tensor binding. For robust new-model
+    # bring-up (e.g. Nanbeige/Llama variants), propagate and validate:
+    #   - tokenizer_contract (SP/BPE class, BOS/EOS policy, special IDs, stop IDs)
+    #   - attention_contract (rope type/theta/scaling, qk_norm, kv layout policy)
+    #   - block_contract (norm kind, residual order, MLP formula, activation, bias)
+    #   - logits_contract (final norm/head semantics, clamp/scale policy)
+    #   - quant_contract (per-op expected quant family and kernel class)
+    # This is additive first, then promoted to strict/fail-fast once model gates stay green.
+
     # Track activation buffers for dataflow
     # The output of one kernel becomes the input of the next
     current_activation = "input_tokens"  # Start with input token IDs
@@ -3001,6 +3095,8 @@ def generate_ir_lower_1(
             seq_len = 1 if mode == "decode" else manifest.get("config", {}).get("context_length", 2048)
             lowered_op["params"]["_memcpy_bytes"] = embed_dim * seq_len * 4  # FP32 = 4 bytes
         elif op_name == "kv_cache_batch_copy":
+            # NOTE: "batch" here means a token block in prefill, not multi-request batching.
+            # A clearer name would be kv_cache_token_block_copy (keep op ID for v7 compatibility).
             num_kv_heads = int(lowered_op["params"].get("num_kv_heads", manifest.get("config", {}).get("num_kv_heads", 1)))
             head_dim = int(lowered_op["params"].get("head_dim", manifest.get("config", {}).get("head_dim", 1)))
             seq_len = int(lowered_op["params"].get("seq_len", manifest.get("config", {}).get("context_length", 1)))
@@ -3090,6 +3186,8 @@ def generate_ir_lower_1(
     final_ops = []
     kv_store_count = 0
 
+    force_decode_attn_regular = str(os.environ.get("CK_V7_DECODE_ATTN_REGULAR", "")).strip().lower() in ("1", "true", "yes", "on")
+
     for i, op in enumerate(lowered_ops):
         final_ops.append(op)
 
@@ -3125,7 +3223,10 @@ def generate_ir_lower_1(
                 if op["op"] == "attn_sliding":
                     decode_kernel = "attention_forward_decode_head_major_gqa_flash_sliding"
                 else:
-                    decode_kernel = "attention_forward_decode_head_major_gqa_flash"
+                    if force_decode_attn_regular:
+                        decode_kernel = "attention_forward_decode_head_major_gqa_regular"
+                    else:
+                        decode_kernel = "attention_forward_decode_head_major_gqa_flash"
                 op["kernel"] = decode_kernel
                 op["function"] = decode_kernel
                 # Update inputs to use KV cache instead of scratch
@@ -3213,6 +3314,8 @@ def generate_ir_lower_1(
                 }
                 final_ops.append(transpose_attn_out_op)
                 # Second: kv_cache_batch_copy
+                # TODO(contract): validate this op against runtime_invariants contract:
+                # _kv_copy_bytes must exist and match (num_kv_heads * head_dim * seq_len * sizeof(fp32)).
                 kv_batch_copy_op = {
                     "idx": len(final_ops),
                     "kernel": "kv_cache_batch_copy",
@@ -3276,6 +3379,9 @@ def generate_ir_lower_1(
         print(f"  Inserted copy_last_logits op for prefill mode")
 
     # Renumber ops and normalize derived params for auto-inserted kernels.
+    # TODO(contract): centralize required-arg derivation/validation for all ops
+    # (not only kv_cache_batch_copy/residual_save) and fail in lower stage if any
+    # required call arg is missing/invalid.
     for i, op in enumerate(final_ops):
         op["idx"] = i
         if op.get("op") == "kv_cache_batch_copy":
@@ -3351,7 +3457,7 @@ WEIGHT_PATTERNS = {
     "vocab_merges": ["vocab_merges"],
 
     # Footer weights
-    "lm_head": ["lm_head.weight", "output.weight", "token_emb"],
+    "lm_head": ["lm_head.weight", "output.weight"],
     "final_ln_weight": ["final_ln_weight", "norm.weight"],
     "final_ln_bias": ["final_ln_bias", "norm.bias"],
     "output_weight": ["output.weight", "lm_head.weight"],
@@ -3395,7 +3501,9 @@ TEMPLATE_OP_WEIGHTS = {
 
     # Footer
     "weight_tying": [],  # Metadata only
-    # logits uses lm_head when present, otherwise falls back to token_emb via aliases.
+    # logits source is resolved at runtime contract time:
+    # - tied -> token_emb
+    # - untied -> lm_head/output.weight
     "logits": ["lm_head"],
 }
 
@@ -4193,6 +4301,20 @@ def generate_ir_lower_2(
     print(f"{'='*60}")
 
     config = manifest.get("config", {})
+    template_doc = manifest.get("template", {}) if isinstance(manifest.get("template"), dict) else {}
+    contract_doc = template_doc.get("contract") if isinstance(template_doc.get("contract"), dict) else None
+    if not contract_doc:
+        template_name = (
+            str(template_doc.get("name", "")).strip().lower()
+            or str(config.get("model", "")).strip().lower()
+        )
+        builtin_template = _load_builtin_template_doc(template_name)
+        if isinstance(builtin_template, dict) and isinstance(builtin_template.get("contract"), dict):
+            contract_doc = builtin_template.get("contract")
+    # Carry semantic contract forward so IR Lower 3/codegen can fail-fast on missing semantics.
+    if contract_doc:
+        config = dict(config)
+        config["contract"] = contract_doc
 
     # Build weight offset lookup from layout
     weight_offsets = {}
@@ -5156,6 +5278,24 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
         expr = f"{base} + {off}"
         return f"({cast})({expr})" if cast else expr
 
+    def parse_int_literal(expr: object) -> Optional[int]:
+        raw = str(expr or "").strip()
+        if not raw:
+            return None
+        # Accept C integer suffixes (e.g. 123u, 456UL).
+        while raw and raw[-1] in ("u", "U", "l", "L"):
+            raw = raw[:-1]
+        try:
+            return int(raw, 0)
+        except Exception:
+            return None
+
+    def arg_by_source(args_list: List[Dict[str, str]], source_key: str) -> Optional[Dict[str, str]]:
+        for item in args_list:
+            if str(item.get("source", "")) == source_key:
+                return item
+        return None
+
     def select_from_dict(name: str, dct: Dict, aliases: Dict[str, List[str]]) -> Optional[Dict]:
         if name in dct:
             return dct[name]
@@ -5457,6 +5597,53 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 "source": src,
                 "expr": expr,
             })
+
+        # Strict runtime invariant checks (lowered-call stage, before codegen).
+        if op_name == "kv_cache_batch_copy":
+            size_arg = arg_by_source(args, "dim:_kv_copy_bytes")
+            if not size_arg:
+                op_errors.append(
+                    f"{func}: missing required call arg dim:_kv_copy_bytes "
+                    "(kv token-block copy size)"
+                )
+            else:
+                size_expr = str(size_arg.get("expr", "")).strip()
+                if size_expr in {"", "0", "NULL"}:
+                    op_errors.append(f"{func}: invalid _kv_copy_bytes expression '{size_expr or '<empty>'}'")
+                size_val = parse_int_literal(size_expr)
+                if size_val is not None and size_val <= 0:
+                    op_errors.append(f"{func}: _kv_copy_bytes must be > 0 (got {size_val})")
+
+                n_kv_arg = arg_by_source(args, "dim:num_kv_heads")
+                hd_arg = arg_by_source(args, "dim:head_dim")
+                seq_arg = arg_by_source(args, "dim:seq_len")
+                n_kv = parse_int_literal(n_kv_arg.get("expr", "")) if n_kv_arg else None
+                hd = parse_int_literal(hd_arg.get("expr", "")) if hd_arg else None
+                seq = parse_int_literal(seq_arg.get("expr", "")) if seq_arg else None
+                if None not in (n_kv, hd, seq) and size_val is not None:
+                    expected = int(n_kv) * int(hd) * int(seq) * 4
+                    if expected <= 0:
+                        op_errors.append(
+                            f"{func}: invalid kv copy dimensions "
+                            f"(num_kv_heads={n_kv}, head_dim={hd}, seq_len={seq})"
+                        )
+                    elif size_val != expected:
+                        op_errors.append(
+                            f"{func}: _kv_copy_bytes mismatch (expected {expected}, got {size_val})"
+                        )
+
+            for src_key, label in (("activation:k_src", "k_src"), ("activation:v_src", "v_src")):
+                src_arg = arg_by_source(args, src_key)
+                if not src_arg:
+                    op_errors.append(f"{func}: missing required call arg {src_key}")
+                elif str(src_arg.get("expr", "")).strip() == "NULL":
+                    op_errors.append(f"{func}: {label} resolved to NULL")
+            for dst_key, label in (("output:k_dst", "k_dst"), ("output:v_dst", "v_dst")):
+                dst_arg = arg_by_source(args, dst_key)
+                if not dst_arg:
+                    op_errors.append(f"{func}: missing required call arg {dst_key}")
+                elif str(dst_arg.get("expr", "")).strip() == "NULL":
+                    op_errors.append(f"{func}: {label} resolved to NULL")
 
         if op_errors:
             all_errors.append({
@@ -5978,6 +6165,9 @@ def main(args: List[str]) -> int:
         print(f"✓ Wrote init call IR to: {init_call_path}")
 
     if lowered_call is not None:
+        # TODO(contract): extend this from structural checks (errors/missing args)
+        # to semantic per-op contract validation at lowered_*_call.json generation time.
+        # Example: verify rope/norm/logits/kv invariants before codegen.
         ir_errors = lowered_call.get("errors") if isinstance(lowered_call.get("errors"), list) else []
         call_ops = lowered_call.get("operations") if isinstance(lowered_call.get("operations"), list) else []
         op_errors = [op for op in call_ops if isinstance(op, dict) and isinstance(op.get("errors"), list) and op.get("errors")]

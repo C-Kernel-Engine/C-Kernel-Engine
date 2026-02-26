@@ -69,6 +69,44 @@ def _q8_0_row_bytes(embed_dim: int) -> Optional[int]:
     return (embed_dim // 32) * 34
 
 
+def _find_arg_expr(
+    args_list: List[Dict],
+    *,
+    source_prefix: Optional[str] = None,
+    arg_name: Optional[str] = None,
+) -> Optional[str]:
+    for item in args_list:
+        if not isinstance(item, dict):
+            continue
+        if arg_name is not None and str(item.get("name", "")) != arg_name:
+            continue
+        source = str(item.get("source", ""))
+        if source_prefix is not None and not source.startswith(source_prefix):
+            continue
+        expr = str(item.get("expr", "")).strip()
+        if expr:
+            return expr
+    return None
+
+
+def _last_token_row_offset_expr(func_name: str, embed_dim: int) -> Optional[str]:
+    """Return byte-offset expression for token-major activation row stride."""
+    if embed_dim <= 0:
+        return None
+    fn = str(func_name or "").lower()
+    if "q8_k" in fn:
+        return f"(size_t)(num_tokens - 1) * (size_t)({embed_dim} / QK_K) * sizeof(block_q8_K)"
+    if "q8_0" in fn:
+        return f"(size_t)(num_tokens - 1) * (size_t)({embed_dim} / QK8_0) * sizeof(block_q8_0)"
+    if "fp32" in fn or "f32" in fn:
+        return f"(size_t)(num_tokens - 1) * (size_t){embed_dim} * sizeof(float)"
+    # Conservative default for q8_0-style activation packing.
+    row_bytes = _q8_0_row_bytes(embed_dim)
+    if row_bytes is None:
+        return None
+    return f"(size_t)(num_tokens - 1) * (size_t){row_bytes}"
+
+
 def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False) -> str:
     """Emit a single op call for prefill mode.
 
@@ -101,18 +139,37 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
     if op_type == "logits" and str(config.get("logits_layout", "auto")).lower() == "last":
         vocab_size = int(config.get("vocab_size", 151936))
         embed_dim = int(config.get("embed_dim", 0))
-        row_bytes = _q8_0_row_bytes(embed_dim)
-        if row_bytes is not None:
+        if embed_dim > 0:
             gemv_func = func
             if gemv_func.startswith("gemm_nt_"):
                 gemv_func = "gemv_" + gemv_func[len("gemm_nt_"):]
             elif gemv_func.startswith("gemm_"):
                 gemv_func = "gemv_" + gemv_func[len("gemm_"):]
+            weight_expr = _find_arg_expr(args_list, source_prefix="weight:", arg_name="B") or _find_arg_expr(
+                args_list, source_prefix="weight:"
+            )
+            input_expr = _find_arg_expr(args_list, source_prefix="activation:", arg_name="A") or _find_arg_expr(
+                args_list, source_prefix="activation:"
+            )
+            output_expr = _find_arg_expr(args_list, source_prefix="output:", arg_name="C") or _find_arg_expr(
+                args_list, source_prefix="output:"
+            )
+            row_offset_expr = _last_token_row_offset_expr(gemv_func, embed_dim)
+            if not weight_expr:
+                raise RuntimeError("prefill logits(last): missing weight arg expression in lowered call IR")
+            if not input_expr:
+                raise RuntimeError("prefill logits(last): missing activation arg expression in lowered call IR")
+            if not output_expr:
+                raise RuntimeError("prefill logits(last): missing output arg expression in lowered call IR")
+            if not row_offset_expr:
+                raise RuntimeError(
+                    f"prefill logits(last): unable to derive row stride for func={gemv_func} embed_dim={embed_dim}"
+                )
             return f"""    /* Op {seq_idx}: logits (last-only) */
     {gemv_func}(
-        (float*)(model->bump + A_LOGITS),
-        (const void*)(model->bump + W_TOKEN_EMB),
-        (void*)(model->bump + A_LAYER_INPUT + (size_t)(num_tokens - 1) * {row_bytes}),
+        {output_expr},
+        {weight_expr},
+        (const void*)(((const uint8_t*)({input_expr})) + {row_offset_expr}),
         {vocab_size},
         {embed_dim}
     );"""
@@ -168,8 +225,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
         const int Hkv = {num_kv_heads};
         const int D = {head_dim};
         float *buf = (float*)(model->bump + {scratch_name});
-        /* Use temp buffer for out-of-place transpose (safe, no aliasing) */
-        static float _temp_buf[{num_kv_heads * max_tokens * head_dim}];
+        /* Reuse activation scratch to avoid huge per-op static BSS allocations. */
+        float *_temp_buf = (float*)(model->bump + A_LAYER_OUTPUT);
         /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */{omp_pragma}
         for (int t = 0; t < num_tokens; t++) {{
             for (int h = 0; h < Hkv; h++) {{
@@ -199,8 +256,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
         const int H = {num_heads};
         const int D = {head_dim};
         float *buf = (float*)(model->bump + {scratch_name});
-        /* Use temp buffer for out-of-place transpose */
-        static float _temp_buf[{num_heads * max_tokens * head_dim}];
+        /* Reuse activation scratch to avoid huge per-op static BSS allocations. */
+        float *_temp_buf = (float*)(model->bump + A_LAYER_OUTPUT);
         /* Copy with transpose: src[t, h*D+d] -> dst[h, t, d] */{omp_pragma}
         for (int t = 0; t < num_tokens; t++) {{
             for (int h = 0; h < H; h++) {{
@@ -229,8 +286,8 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
         const int H = {num_heads};
         const int D = {head_dim};
         float *buf = (float*)(model->bump + A_ATTN_SCRATCH);
-        /* Use temp buffer for out-of-place transpose */
-        static float _temp_buf[{num_heads * max_tokens * head_dim}];
+        /* Reuse activation scratch to avoid huge per-op static BSS allocations. */
+        float *_temp_buf = (float*)(model->bump + A_LAYER_OUTPUT);
         /* Copy with transpose: src[h, t, d] -> dst[t, h*D+d] */{omp_pragma}
         for (int h = 0; h < H; h++) {{
             for (int t = 0; t < num_tokens; t++) {{
@@ -276,27 +333,47 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
 
         args.append(expr)
 
-    # For quantize ops: use batch versions which output row-major Q8 data
-    # quantize_row_q8_0(x, y, k) -> quantize_batch_q8_0(x, y, num_tokens, k)
-    if func == "quantize_row_q8_0":
-        func = "quantize_batch_q8_0"
-        # Insert num_tokens as 3rd argument (before k)
-        args.insert(2, "num_tokens")
-    elif func == "quantize_row_q8_k":
-        func = "quantize_batch_q8_k"
-        args.insert(2, "num_tokens")
+    # Prefill quantization must preserve token-major row layout exactly for
+    # downstream GEMM kernels. Emit explicit per-token row quantization loops
+    # instead of batch helper calls to avoid ABI/dispatch ambiguity.
+    batch_quant_kind = None
+    if func in ("quantize_row_q8_0", "quantize_row_q8_k"):
+        batch_quant_kind = func
 
-    # Format the function call
-    if len(args) <= 3:
-        # Short call on one line
-        lines.append(f"    {func}({', '.join(args)});")
+    # Format the function call / quantization loop
+    if batch_quant_kind and len(args) >= 3:
+        x_expr = args[0]
+        y_expr = args[1]
+        k_expr = args[2]
+        if batch_quant_kind == "quantize_row_q8_k":
+            row_bytes_expr = "(size_t)(_k / QK_K) * sizeof(block_q8_K)"
+        else:
+            row_bytes_expr = "(size_t)(_k / QK8_0) * sizeof(block_q8_0)"
+        lines.append("    {")
+        lines.append(f"        const float *_x_base = (const float*)({x_expr});")
+        lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
+        lines.append(f"        const int _k = (int)({k_expr});")
+        lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
+        lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
+        lines.append(
+            f"            {batch_quant_kind}("
+            "_x_base + (size_t)_t * (size_t)_k, "
+            "(void*)(_y_base + (size_t)_t * _row_bytes), "
+            "_k);"
+        )
+        lines.append("        }")
+        lines.append("    }")
     else:
-        # Multi-line for readability
-        lines.append(f"    {func}(")
-        for i, arg in enumerate(args):
-            comma = "," if i < len(args) - 1 else ""
-            lines.append(f"        {arg}{comma}")
-        lines.append(f"    );")
+        if len(args) <= 3:
+            # Short call on one line
+            lines.append(f"    {func}({', '.join(args)});")
+        else:
+            # Multi-line for readability
+            lines.append(f"    {func}(")
+            for i, arg in enumerate(args):
+                comma = "," if i < len(args) - 1 else ""
+                lines.append(f"        {arg}{comma}")
+            lines.append("    );")
     if profile:
         lines.append(f'    CK_PROFILE_END("prefill", "{func}", "{op_type}", {layer});')
 
