@@ -16589,12 +16589,12 @@ function formatBytesHuman(bytes) {
     return `${Math.round(n)} B`;
 }
 
-function drawLineChart(svgEl, points, key, color, secondaryKey) {
+function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
     if (!svgEl || !window.d3 || !Array.isArray(points) || points.length === 0) return;
     const d3 = window.d3;
     const width = svgEl.clientWidth || 360;
     const height = svgEl.clientHeight || 150;
-    const margin = { top: 12, right: 12, bottom: 22, left: 36 };
+    const margin = { top: 12, right: 12, bottom: 22, left: 54 };
 
     const seriesA = points.filter((p) => Number.isFinite(p[key]));
     const seriesB = secondaryKey ? points.filter((p) => Number.isFinite(p[secondaryKey])) : [];
@@ -16607,21 +16607,48 @@ function drawLineChart(svgEl, points, key, color, secondaryKey) {
     const allYValues = [];
     seriesA.forEach((p) => allYValues.push(p[key]));
     seriesB.forEach((p) => allYValues.push(p[secondaryKey]));
-    const yMin = d3.min(allYValues);
-    const yMax = d3.max(allYValues);
+    const yMinRaw = d3.min(allYValues);
+    const yMaxRaw = d3.max(allYValues);
+    const yRangeRaw = Number.isFinite(yMinRaw) && Number.isFinite(yMaxRaw) ? (yMaxRaw - yMinRaw) : NaN;
+    const useZeroBaseline = /^loss/.test(String(key || '')) || /^loss/.test(String(secondaryKey || ''));
+    const maxAbsRaw = d3.max(allYValues, (v) => Math.abs(Number(v)));
+    let axisScalePow10 = 0;
+    if (!useZeroBaseline && Number.isFinite(maxAbsRaw) && maxAbsRaw > 0 && (maxAbsRaw < 1e-2 || maxAbsRaw >= 1e4)) {
+        axisScalePow10 = Math.max(-8, Math.min(8, -Math.floor(Math.log10(maxAbsRaw))));
+        if (Math.abs(axisScalePow10) <= 1) axisScalePow10 = 0;
+    }
+    const axisScale = Math.pow(10, axisScalePow10);
+    const yMin = Number.isFinite(yMinRaw) ? yMinRaw * axisScale : yMinRaw;
+    const yMax = Number.isFinite(yMaxRaw) ? yMaxRaw * axisScale : yMaxRaw;
+    const yRange = Number.isFinite(yRangeRaw) ? yRangeRaw * axisScale : yRangeRaw;
+    let yDomainMin = 0;
+    let yDomainMax = 1;
+    if (Number.isFinite(yRange) && Number.isFinite(yMin) && Number.isFinite(yMax)) {
+        if (yRange <= 0) {
+            const pad = Math.max(Math.abs(yMax) * 0.08, 1e-8);
+            yDomainMin = useZeroBaseline ? Math.min(0, yMin - pad) : (yMin - pad);
+            yDomainMax = yMax + pad;
+            if (yDomainMin === yDomainMax) yDomainMax = yDomainMin + 1e-6;
+        } else {
+            const pad = Math.max(yRange * 0.08, 1e-8);
+            yDomainMin = useZeroBaseline ? Math.min(0, yMin - pad) : (yMin - pad);
+            yDomainMax = yMax + pad;
+            if (yDomainMin === yDomainMax) yDomainMax = yDomainMin + 1e-6;
+        }
+    }
     const y = d3.scaleLinear()
-        .domain([Math.min(0, yMin), yMax === yMin ? yMax + 1 : yMax])
+        .domain([yDomainMin, yDomainMax])
         .nice()
         .range([height - margin.bottom, margin.top]);
 
     const line = d3.line()
         .x((p) => x(p.step))
-        .y((p) => y(p[key]))
+        .y((p) => y(p[key] * axisScale))
         .curve(d3.curveMonotoneX);
 
     const lineSecondary = secondaryKey ? d3.line()
         .x((p) => x(p.step))
-        .y((p) => y(p[secondaryKey]))
+        .y((p) => y(p[secondaryKey] * axisScale))
         .curve(d3.curveMonotoneX) : null;
 
     const svg = d3.select(svgEl);
@@ -16635,15 +16662,39 @@ function drawLineChart(svgEl, points, key, color, secondaryKey) {
         .attr('height', height)
         .attr('fill', '#232323');
 
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+
+    svg.append('g')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(5).tickSize(-innerH).tickFormat(''))
+        .call((g) => g.selectAll('line').attr('stroke', '#374151').attr('stroke-opacity', 0.45))
+        .call((g) => g.select('path').attr('stroke', 'none'));
+
+    svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(4).tickSize(-innerW).tickFormat(''))
+        .call((g) => g.selectAll('line').attr('stroke', '#374151').attr('stroke-opacity', 0.45))
+        .call((g) => g.select('path').attr('stroke', 'none'));
+
     svg.append('g')
         .attr('transform', `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(x).ticks(5).tickSizeOuter(0))
         .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
         .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
 
+    const yTickFmt = (v) => {
+        if (!Number.isFinite(v)) return '';
+        const abs = Math.abs(v);
+        if ((abs > 0 && abs < 1e-3) || abs >= 1e4) return d3.format('.2e')(v);
+        if (abs < 1) return d3.format('.3f')(v);
+        return d3.format('.3~g')(v);
+    };
+
     svg.append('g')
         .attr('transform', `translate(${margin.left},0)`)
         .call(d3.axisLeft(y).ticks(4).tickSizeOuter(0))
+        .call((g) => g.selectAll('.tick text').text((d) => yTickFmt(d)))
         .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
         .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
 
@@ -16664,6 +16715,141 @@ function drawLineChart(svgEl, points, key, color, secondaryKey) {
             .attr('stroke-width', 2)
             .attr('stroke-dasharray', '5,4')
             .attr('d', lineSecondary);
+    }
+
+    const primaryLast = seriesA.length > 0 ? seriesA[seriesA.length - 1] : null;
+    if (primaryLast) {
+        const stopX = x(primaryLast.step);
+        svg.append('line')
+            .attr('x1', stopX)
+            .attr('x2', stopX)
+            .attr('y1', margin.top)
+            .attr('y2', height - margin.bottom)
+            .attr('stroke', '#9ca3af')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '3,3')
+            .attr('opacity', 0.75);
+        const stopNearRight = stopX > (width - margin.right - 56);
+        svg.append('text')
+            .attr('x', stopNearRight ? (stopX - 4) : Math.min(width - margin.right - 2, stopX + 4))
+            .attr('y', margin.top + 10)
+            .attr('fill', '#9ca3af')
+            .attr('font-size', 10)
+            .attr('text-anchor', stopNearRight ? 'end' : 'start')
+            .text(`stop ${Math.round(primaryLast.step)}`);
+    }
+
+    if (axisScalePow10 !== 0) {
+        const invPow = -axisScalePow10;
+        const scaleLabel = `axis ×1e${axisScalePow10}  (actual = tick × 1e${invPow})`;
+        svg.append('text')
+            .attr('x', margin.left)
+            .attr('y', margin.top - 2)
+            .attr('fill', '#9ca3af')
+            .attr('font-size', 9)
+            .text(scaleLabel);
+    }
+
+    const mergedByStep = new Map();
+    seriesA.forEach((p) => {
+        mergedByStep.set(p.step, { step: p.step, a: p[key], b: NaN });
+    });
+    seriesB.forEach((p) => {
+        const existing = mergedByStep.get(p.step) || { step: p.step, a: NaN, b: NaN };
+        existing.b = p[secondaryKey];
+        mergedByStep.set(p.step, existing);
+    });
+    const hoverSeries = Array.from(mergedByStep.values()).sort((a, b) => a.step - b.step);
+    if (hoverSeries.length === 0) return;
+
+    const bisect = d3.bisector((d) => d.step).left;
+    const hoverRoot = svg.append('g').style('display', 'none');
+    const hoverLine = hoverRoot.append('line')
+        .attr('stroke', '#cbd5e1')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3')
+        .attr('y1', margin.top)
+        .attr('y2', height - margin.bottom);
+    const hoverDotA = hoverRoot.append('circle').attr('r', 3.2).attr('fill', color).attr('stroke', '#111827').attr('stroke-width', 1);
+    const hoverDotB = hoverRoot.append('circle').attr('r', 3.2).attr('fill', '#60a5fa').attr('stroke', '#111827').attr('stroke-width', 1).style('display', 'none');
+    const hoverBox = hoverRoot.append('g');
+    const hoverBoxBg = hoverBox.append('rect')
+        .attr('rx', 6)
+        .attr('ry', 6)
+        .attr('fill', '#0f172a')
+        .attr('stroke', '#334155')
+        .attr('opacity', 0.95);
+    const hoverLines = [
+        hoverBox.append('text').attr('fill', '#e5e7eb').attr('font-size', 10).attr('font-family', 'JetBrains Mono, monospace'),
+        hoverBox.append('text').attr('fill', color).attr('font-size', 10).attr('font-family', 'JetBrains Mono, monospace'),
+        hoverBox.append('text').attr('fill', '#60a5fa').attr('font-size', 10).attr('font-family', 'JetBrains Mono, monospace'),
+    ];
+
+    const fmtMetric = (v) => {
+        if (!Number.isFinite(v)) return '-';
+        const abs = Math.abs(v);
+        if ((abs > 0 && abs < 1e-3) || abs >= 1e4) return fmtExp(v, 2);
+        return fmt(v, 4);
+    };
+
+    const overlay = svg.append('rect')
+        .attr('x', margin.left)
+        .attr('y', margin.top)
+        .attr('width', innerW)
+        .attr('height', innerH)
+        .attr('fill', 'transparent')
+        .style('cursor', 'crosshair');
+
+    overlay
+        .on('mouseenter', () => hoverRoot.style('display', null))
+        .on('mouseleave', () => hoverRoot.style('display', 'none'))
+        .on('mousemove', function onMove(event) {
+            const [mx] = d3.pointer(event, this);
+            const xStep = x.invert(Math.max(margin.left, Math.min(width - margin.right, mx)));
+            let idx = bisect(hoverSeries, xStep, 1);
+            if (idx >= hoverSeries.length) idx = hoverSeries.length - 1;
+            const prev = hoverSeries[Math.max(0, idx - 1)];
+            const next = hoverSeries[idx];
+            const d = !next ? prev : (Math.abs(next.step - xStep) < Math.abs(xStep - prev.step) ? next : prev);
+            if (!d) return;
+
+            const px = x(d.step);
+            hoverLine.attr('x1', px).attr('x2', px);
+
+            if (Number.isFinite(d.a)) {
+                hoverDotA.style('display', null).attr('cx', px).attr('cy', y(d.a * axisScale));
+            } else {
+                hoverDotA.style('display', 'none');
+            }
+            if (secondaryKey && Number.isFinite(d.b)) {
+                hoverDotB.style('display', null).attr('cx', px).attr('cy', y(d.b * axisScale));
+            } else {
+                hoverDotB.style('display', 'none');
+            }
+
+            const lines = [`step ${Math.round(d.step)}`, `${key}: ${fmtMetric(d.a)}`];
+            if (secondaryKey) lines.push(`${secondaryKey}: ${fmtMetric(d.b)}`);
+            else lines.push('');
+
+            hoverLines[0].text(lines[0]);
+            hoverLines[1].text(lines[1]);
+            hoverLines[2].text(lines[2]);
+
+            const maxChars = lines.reduce((m, s) => Math.max(m, String(s).length), 0);
+            const tipW = Math.max(104, maxChars * 6.2 + 12);
+            const tipH = secondaryKey ? 46 : 32;
+            const tipX = px + 8 + tipW <= (width - margin.right) ? px + 8 : px - tipW - 8;
+            const tipYBase = margin.top + 6;
+            const tipY = Math.min(height - margin.bottom - tipH, Math.max(margin.top + 2, tipYBase));
+            hoverBox.attr('transform', `translate(${tipX},${tipY})`);
+            hoverBoxBg.attr('width', tipW).attr('height', tipH);
+            hoverLines[0].attr('x', 6).attr('y', 13);
+            hoverLines[1].attr('x', 6).attr('y', 26);
+            hoverLines[2].attr('x', 6).attr('y', 39).style('display', secondaryKey ? null : 'none');
+        });
+
+    if (opts && typeof opts.title === 'string' && opts.title) {
+        svgEl.setAttribute('data-ck-svg-expand', opts.title);
     }
 }
 
@@ -16803,15 +16989,24 @@ function renderTrainingDashboard(files) {
             <div class="parity-section">
                 <h3><span class="badge badge-blue">Loss</span> CK vs PyTorch</h3>
                 <svg id="trainLossChart" style="width:100%;height:160px;"></svg>
+                <button class="ck-svg-expand-btn" data-title="Training Loss: CK vs PyTorch">⛶ Expand</button>
             </div>
             <div class="parity-section">
                 <h3><span class="badge badge-orange">Gradient</span> Grad Norm vs Step</h3>
                 <svg id="trainGradChart" style="width:100%;height:160px;"></svg>
+                <button class="ck-svg-expand-btn" data-title="Training Gradient Norm vs Step">⛶ Expand</button>
             </div>
             <div class="parity-section">
                 <h3><span class="badge badge-green">Schedule</span> LR vs Step</h3>
                 <svg id="trainLrChart" style="width:100%;height:160px;"></svg>
+                <button class="ck-svg-expand-btn" data-title="Training Learning Rate vs Step">⛶ Expand</button>
             </div>
+        </div>
+        <div style="color:var(--text-muted);font-size:0.78rem;margin-top:0.35rem;">
+            Hover any chart for exact step/value. Dashed vertical line marks the final training step. Click chart or ⛶ to open fullscreen zoom/pan.
+        </div>
+        <div style="color:var(--text-muted);font-size:0.76rem;margin-top:0.15rem;">
+            LR chart shows base AdamW learning rate schedule; Adam's per-parameter adaptive scaling is internal and not plotted directly.
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
@@ -16829,9 +17024,9 @@ function renderTrainingDashboard(files) {
         </div>
     `;
 
-    drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt');
-    drawLineChart(document.getElementById('trainGradChart'), lossSteps, 'grad_norm', '#fbbf24');
-    drawLineChart(document.getElementById('trainLrChart'), lossSteps, 'lr', '#60a5fa');
+    drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt', { title: 'Training Loss: CK vs PyTorch' });
+    drawLineChart(document.getElementById('trainGradChart'), lossSteps, 'grad_norm', '#fbbf24', null, { title: 'Training Gradient Norm vs Step' });
+    drawLineChart(document.getElementById('trainLrChart'), lossSteps, 'lr', '#60a5fa', null, { title: 'Training Learning Rate vs Step' });
 
     const alertsEl = document.getElementById('trainAlertList');
     const alerts = healthAlerts(lossSteps, parityRows);
@@ -17259,13 +17454,6 @@ function renderDataLabPanel(files) {
     ];
     const mergeRows = Array.isArray(tokenizerPreview.merge_samples) ? tokenizerPreview.merge_samples.slice(0, 24) : [];
     const vocabRows = Array.isArray(tokenizerPreview.vocab_samples) ? tokenizerPreview.vocab_samples.slice(0, 24) : [];
-    const tokenLookupRows = Array.isArray(tokenizerPreview.token_lookup_rows)
-        ? tokenizerPreview.token_lookup_rows.slice(0, 200)
-        : [];
-    const tokenIndexPath = tokenizerPreview.token_index_path || '-';
-    const tokenIndexStatus = tokenizerPreview.token_index_status || '-';
-    const tokenIndexRows = tokenizerPreview.token_index_rows ?? '-';
-    const tokenIndexError = tokenizerPreview.token_index_error || '';
     const flowRows = tokenizerPreview.encode_decode_example && Array.isArray(tokenizerPreview.encode_decode_example.token_flow)
         ? tokenizerPreview.encode_decode_example.token_flow.slice(0, 32)
         : [];
@@ -17320,33 +17508,6 @@ function renderDataLabPanel(files) {
                             </table>
                         ` : '<div style="color:var(--text-muted);">No vocab samples available.</div>'}
                     </div>
-                </div>
-                <div style="margin-top:0.8rem;">
-                    <strong>Actual Token ID Map (from tokenizer.json)</strong>
-                    <div style="margin-top:0.25rem; color:var(--text-secondary); font-size:0.72rem;">
-                        Export status:
-                        <span class="${tokenIndexStatus === 'ok' ? 'badge badge-green' : 'badge badge-orange'}">${htmlEscape(tokenIndexStatus)}</span>
-                        rows: <code>${htmlEscape(tokenIndexRows)}</code>
-                        | file: <code style="overflow-wrap:anywhere;">${htmlEscape(tokenIndexPath)}</code>
-                        ${tokenIndexError ? `<br><span style="color:#f39c12;">export_error: ${htmlEscape(tokenIndexError)}</span>` : ''}
-                    </div>
-                    ${tokenLookupRows.length > 0 ? `
-                        <div style="margin-top:0.35rem; color:var(--text-muted); font-size:0.7rem;">
-                            Showing first ${tokenLookupRows.length} tokens by ID. Full index is written to <code>tokenizer_vocab_index.jsonl</code>.
-                        </div>
-                        <table style="margin-top:0.4rem;">
-                            <thead><tr><th>token_id</th><th>piece</th><th>bytes</th></tr></thead>
-                            <tbody>
-                                ${tokenLookupRows.map((row) => `
-                                    <tr>
-                                        <td>${htmlEscape(row.id ?? '-')}</td>
-                                        <td><code>${htmlEscape(row.piece ?? '-')}</code></td>
-                                        <td><code>${htmlEscape(row.bytes_hex ?? '-')}</code></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    ` : '<div style="color:var(--text-muted); margin-top:0.35rem;">No token lookup rows loaded from tokenizer preview.</div>'}
                 </div>
                 <div style="margin-top:0.7rem;">
                     <strong>Encode/Decode Walkthrough</strong>
@@ -17583,17 +17744,17 @@ function renderTrainingLogbookPanel(files) {
     );
     const roundtripPass = roundtripExact && (!Number.isFinite(lineRate) || lineRate >= 0.9999);
     const trainingPass = Number.isFinite(firstLoss) && Number.isFinite(latest) && reducedLoss;
-        const stageRows = [
-            {
-                stage: '1) Data Intake (SVG)',
-                status: dataPass ? 'pass' : 'check',
-                evidence: `dataset_rows=${datasetRows}, qc_status=${qc.status || '-'}, dataset_path=${dataLab.dataset_path || qc.path || '-'}`,
-            },
-            {
-                stage: '2) Tokenize (BPE / SentencePiece)',
-                status: tokenizePass ? 'pass' : 'check',
-                evidence: `tokenizer=${tokenizerPreview.model_type || 'bpe'} vocab=${tokenizerVocab} token_count=${tokenCount}`,
-            },
+    const stageRows = [
+        {
+            stage: '1) Data Intake (SVG)',
+            status: dataPass ? 'pass' : 'check',
+            evidence: `dataset_rows=${datasetRows}, qc_status=${qc.status || '-'}, dataset_path=${dataLab.dataset_path || qc.path || '-'}`,
+        },
+        {
+            stage: '2) Tokenize (ASCII BPE)',
+            status: tokenizePass ? 'pass' : 'check',
+            evidence: `tokenizer=${tokenizerPreview.model_type || 'bpe'} vocab=${tokenizerVocab} token_count=${tokenCount}`,
+        },
         {
             stage: '3) Encode -> Decode Fidelity',
             status: roundtripPass ? 'pass' : 'fail',

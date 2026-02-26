@@ -363,100 +363,226 @@ def render_html(index_payload: dict[str, Any]) -> str:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CK v7 Run Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --bg: #111318;
-      --panel: #1a1f28;
-      --line: #2c3442;
-      --text: #e6edf3;
-      --muted: #9fb0c0;
-      --accent: #ffb300;
-      --good: #4ad295;
-      --bad: #ff6b6b;
-      --warn: #ffd166;
+      --bg:      #232323;
+      --surface: #2a2a2a;
+      --card:    #323232;
+      --line:    #454545;
+      --sub:     #3a3a3a;
+      --text:    #f5f5f5;
+      --muted:   #b0b0b0;
+      --dim:     #808080;
+      --orange:  #ffb400;
+      --orange-d:#e5a200;
+      --orange-l:#ffc933;
+      --blue:    #07adf8;
+      --green:   #47b475;
+      --red:     #ef4444;
+      --warn:    #ffd166;
+      --shadow:  0 4px 12px rgba(0,0,0,0.4);
+      --radius:  8px;
+      --tr:      all 0.2s ease;
     }}
-    body {{ margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }}
-    .wrap {{ max-width: 100%; margin: 0 auto; padding: 12px; }}
-    h1 {{ margin: 0 0 10px; font-size: 24px; }}
-    .meta {{ color: var(--muted); font-size: 13px; margin-bottom: 14px; }}
-    .stats {{ display:grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom: 14px; }}
-    .card {{ background: var(--panel); border:1px solid var(--line); border-radius: 8px; padding: 10px; }}
-    .k {{ color: var(--muted); font-size: 12px; }}
-    .v {{ font-size: 20px; font-weight: 700; }}
-    .controls {{ display:flex; gap:8px; margin-bottom: 12px; flex-wrap: wrap; }}
-    input, select {{ background:#121722; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:7px 10px; }}
-    input {{ min-width: 280px; }}
-    table {{ width:100%; table-layout: fixed; border-collapse: collapse; background: var(--panel); border:1px solid var(--line); border-radius: 8px; overflow: hidden; }}
-    th, td {{ padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: top; overflow-wrap:anywhere; word-break:break-word; }}
-    th {{ text-align:left; color:#d4deea; position: sticky; top: 0; background:#1d2430; z-index:1; }}
-    tr:hover {{ background:#202838; }}
-    .mono {{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }}
-    .muted {{ color: var(--muted); }}
-    .badge {{ display:inline-block; border:1px solid var(--line); border-radius: 999px; padding:2px 8px; font-size: 11px; }}
-    .b-good {{ border-color:#2f7a5e; color:var(--good); }}
-    .b-bad {{ border-color:#7f3b3b; color:var(--bad); }}
-    .b-warn {{ border-color:#7a6a2f; color:var(--warn); }}
-    .b-muted {{ border-color:var(--line); color:var(--muted); }}
-    a {{ color: #8fc2ff; text-decoration: none; }}
-    a:hover {{ text-decoration: underline; }}
-    .actions a {{ margin-right: 6px; white-space: nowrap; }}
-    .copy-btn {{ margin-top: 6px; font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background:#121722; color:var(--text); cursor:pointer; }}
-    .copy-btn:hover {{ border-color:#3b4b62; }}
-    .cmdline {{ margin-top: 6px; background:#121722; border:1px solid var(--line); border-radius:6px; padding:6px; }}
-    .small {{ font-size: 11px; line-height: 1.35; }}
-    .rules {{ margin-bottom: 12px; }}
-    .status {{ display:flex; flex-direction:column; gap:3px; }}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+    body {{
+      font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }}
+
+    /* ── HEADER ── */
+    .site-header {{
+      background: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+      border-bottom: 3px solid var(--orange);
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }}
+    .header-brand {{ display: flex; align-items: center; gap: 0.75rem; }}
+    .header-logo {{
+      width: 36px; height: 36px;
+      background: var(--orange);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; color: #2a2a2a; font-size: 0.82rem;
+      font-family: 'JetBrains Mono', monospace;
+      flex-shrink: 0;
+    }}
+    .header-text {{ display: flex; flex-direction: column; line-height: 1.2; }}
+    .header-title {{ color: #f5f5f5; font-size: 1.15rem; font-weight: 700; }}
+    .header-sub   {{ color: var(--orange); font-size: 0.7rem; font-weight: 500; }}
+    .header-meta  {{ font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--dim); text-align: right; }}
+
+    /* ── LAYOUT ── */
+    .wrap {{ padding: 1.5rem 2rem; }}
+
+    /* ── STATS ── */
+    .stats {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 1.25rem;
+    }}
+    .stat {{
+      background: var(--card); border: 1px solid var(--sub);
+      border-top: 3px solid var(--orange);
+      border-radius: var(--radius); padding: 0.9rem 1.1rem;
+    }}
+    .stat.blue  {{ border-top-color: var(--blue);  }}
+    .stat.green {{ border-top-color: var(--green); }}
+    .stat-k {{ font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.2rem; }}
+    .stat-v {{ font-size: 1.9rem; font-weight: 700; line-height: 1; }}
+
+    /* ── CONTROLS ── */
+    .controls {{ display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }}
+    .controls input, .controls select {{
+      background: var(--card); color: var(--text);
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 7px 12px; font-family: inherit; font-size: 0.82rem; outline: none;
+      transition: var(--tr);
+    }}
+    .controls input {{ min-width: 260px; }}
+    .controls input:focus, .controls select:focus {{
+      border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(255,180,0,0.12);
+    }}
+
+    /* ── RULES ── */
+    .rules {{
+      background: var(--card); border: 1px solid var(--sub);
+      border-radius: var(--radius); padding: 0.8rem 1.1rem;
+      margin-bottom: 1.1rem; font-size: 0.78rem; line-height: 1.9;
+    }}
+    .rules-label {{ font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: block; margin-bottom: 0.3rem; }}
+
+    /* ── TABLE ── */
+    .table-wrap {{
+      background: var(--card); border: 1px solid var(--sub);
+      border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    }}
+    table {{ width: 100%; table-layout: fixed; border-collapse: collapse; }}
+    th, td {{ padding: 7px 10px; border-bottom: 1px solid var(--sub); font-size: 0.75rem; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }}
+    th {{
+      text-align: left; color: var(--muted); font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      position: sticky; top: 0; background: #1e1e1e; z-index: 1;
+      border-bottom: 2px solid var(--orange);
+    }}
+    tr:last-child td {{ border-bottom: none; }}
+    tr:hover td {{ background: #2e2e2e; }}
+
+    /* ── MISC ── */
+    .mono  {{ font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; }}
+    .small {{ font-size: 0.72rem; line-height: 1.35; }}
+    .muted {{ color: var(--dim); }}
     .tight {{ line-height: 1.2; }}
-    .kind {{ margin-right: 6px; }}
+    .status {{ display: flex; flex-direction: column; gap: 2px; }}
+    .kind   {{ margin-right: 5px; }}
+    .badge  {{ display: inline-block; border: 1px solid; border-radius: 999px; padding: 1px 7px; font-size: 0.68rem; font-weight: 600; }}
+    .b-good  {{ border-color: #1d6644; color: var(--green); }}
+    .b-bad   {{ border-color: #7a2f2f; color: var(--red); }}
+    .b-warn  {{ border-color: #7a6a2f; color: var(--warn); }}
+    .b-muted {{ border-color: var(--line); color: var(--muted); }}
+    a        {{ color: var(--blue); text-decoration: none; }}
+    a:hover  {{ color: var(--orange-l); text-decoration: underline; }}
+    .actions a {{ margin-right: 6px; white-space: nowrap; }}
+    .copy-btn {{
+      margin-top: 4px; font-size: 0.68rem; padding: 2px 7px;
+      border-radius: 4px; border: 1px solid var(--line);
+      background: var(--surface); color: var(--muted); cursor: pointer;
+      transition: var(--tr); font-family: inherit;
+    }}
+    .copy-btn:hover {{ border-color: var(--orange); color: var(--orange); }}
+    .cmdline {{
+      margin-top: 4px; background: #1a1a1a; border: 1px solid var(--sub);
+      border-radius: 5px; padding: 5px 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.66rem;
+      line-height: 1.45; word-break: break-all;
+    }}
+    details summary {{ cursor: pointer; color: var(--blue); font-size: 0.72rem; }}
   </style>
 </head>
 <body>
+  <header class="site-header">
+    <div class="header-brand">
+      <div class="header-logo">CK</div>
+      <div class="header-text">
+        <span class="header-title">CK v7 Run Hub</span>
+        <span class="header-sub">IR Visualizer · Training · Inference · Parity</span>
+      </div>
+    </div>
+    <div class="header-meta" id="meta"></div>
+  </header>
+
   <div class="wrap">
-    <h1>CK v7 Run Hub</h1>
-    <div class="meta mono" id="meta"></div>
     <div class="stats">
-      <div class="card"><div class="k">Runs</div><div class="v" id="s-runs">0</div></div>
-      <div class="card"><div class="k">Train Runs</div><div class="v" id="s-train">0</div></div>
-      <div class="card"><div class="k">With ir_report</div><div class="v" id="s-report">0</div></div>
-      <div class="card"><div class="k">Parity PASS</div><div class="v" id="s-pass">0</div></div>
+      <div class="stat">
+        <div class="stat-k">Total Runs</div>
+        <div class="stat-v" id="s-runs">0</div>
+      </div>
+      <div class="stat blue">
+        <div class="stat-k">Train Runs</div>
+        <div class="stat-v" id="s-train" style="color:var(--blue)">0</div>
+      </div>
+      <div class="stat green">
+        <div class="stat-k">With ir_report</div>
+        <div class="stat-v" id="s-report" style="color:var(--green)">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-k">Parity PASS</div>
+        <div class="stat-v" id="s-pass" style="color:var(--orange)">0</div>
+      </div>
     </div>
     <div class="controls">
-      <input id="q" placeholder="Search run/path..." />
+      <input id="q" placeholder="Search run / path…" />
       <select id="kind">
         <option value="all">All kinds</option>
         <option value="train">Train</option>
         <option value="inference">Inference</option>
       </select>
     </div>
-    <div class="card rules small">
-      <strong>Reuse Rules</strong><br/>
-      <span class="badge b-good">same-shape: YES</span> Continue from checkpoints/weights in same run.<br/>
-      <span class="badge b-warn">context_len change: MAYBE</span> Usually reusable with same weight shape, but regenerate IR/runtime and re-run parity gates.<br/>
-      <span class="badge b-bad">embed/vocab/layer/head change: NO</span> Weight shapes change; start a new compatible initialization or migration.
+    <div class="rules">
+      <span class="rules-label">Reuse Rules</span>
+      <span class="badge b-good">same-shape: YES</span> Continue from checkpoints/weights in same run.&nbsp;&nbsp;
+      <span class="badge b-warn">context_len change: MAYBE</span> Reusable with same weight shape; regenerate IR/runtime and re-run parity gates.&nbsp;&nbsp;
+      <span class="badge b-bad">embed/vocab/layer/head change: NO</span> Weight shapes change; start a new initialization or migration.
     </div>
-    <table>
-      <colgroup>
-        <col style="width:22%;" />
-        <col style="width:13%;" />
-        <col style="width:14%;" />
-        <col style="width:20%;" />
-        <col style="width:12%;" />
-        <col style="width:11%;" />
-        <col style="width:8%;" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Run</th>
-          <th>Dims</th>
-          <th>Status</th>
-          <th>Weights / Ckpt</th>
-          <th>Reuse</th>
-          <th>Updated (UTC)</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col style="width:22%;" />
+          <col style="width:13%;" />
+          <col style="width:14%;" />
+          <col style="width:20%;" />
+          <col style="width:12%;" />
+          <col style="width:11%;" />
+          <col style="width:8%;" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Dims</th>
+            <th>Status</th>
+            <th>Weights / Ckpt</th>
+            <th>Reuse</th>
+            <th>Updated (UTC)</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
   </div>
   <script>
     const HUB = {data_json};
