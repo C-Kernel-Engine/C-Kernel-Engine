@@ -1,0 +1,127 @@
+---
+layout: default
+title: v7 Training Parity Checklist
+---
+
+# v7 Training Parity Checklist
+
+Use this as a hard gate before long training runs.
+
+## Scope
+
+This checklist answers one question: "Is CK training numerically aligned enough with PyTorch to trust long runs?"
+
+- `A1` = Forward/Backward/Optimizer 10x canary gate.
+- If `A1` fails, treat run as experimental until fixed.
+
+## 0) Set Run Path
+
+```bash
+export RUN="$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1_seq128"
+cd /home/antshiv/Workspace/C-Kernel-Engine
+```
+
+## 1) Dataset + Tokenizer Gates
+
+```bash
+jq '{status, checks, non_empty_lines, path}' "$RUN/dataset_qc.json"
+jq '{status, exact_match, line_eval, tokenizer_json_path}' "$RUN/tokenizer_roundtrip.json"
+```
+
+Pass criteria:
+- `dataset_qc.status == "pass"`
+- `tokenizer_roundtrip.status == "pass"`
+- `tokenizer_roundtrip.exact_match == true`
+
+## 2) Run Full Parity Regimen (includes A1)
+
+```bash
+python3 version/v7/scripts/run_training_parity_regimen_v7.py \
+  --run-dir "$RUN" \
+  --force
+```
+
+Inspect summary:
+
+```bash
+jq '.summary' "$RUN/training_parity_regimen_latest.json"
+```
+
+Inspect stage table quickly:
+
+```bash
+jq '.stages[] | {id,name,status,metrics,artifact_json,artifact_log}' \
+  "$RUN/training_parity_regimen_latest.json"
+```
+
+## 3) A1 Definition (what it actually tests)
+
+A1 runs `train_parity_epochs_v7.py` with:
+- same tiny canary sample,
+- full forward pass,
+- backward pass,
+- optimizer updates,
+- for ~10 canary epochs,
+- then compares CK vs PyTorch drift.
+
+A1 pass requires all of the following:
+- parity run marked pass,
+- at least 2 parity steps present,
+- `max_loss_abs_diff_first_n <= loss_tol` (default `2e-5`),
+- `max_param_abs_diff_first_n <= param_tol` (default `3e-5`).
+
+Source:
+- `version/v7/scripts/run_training_parity_regimen_v7.py`
+
+## 4) If A1 Fails: Fast Attribution
+
+Backend xray is produced by the same regimen run:
+
+```bash
+jq '.summary, .improvement' "$RUN/regimen_backend_xray.json"
+```
+
+Read suspected source:
+
+```bash
+jq '.summary.suspected_source, .summary.rationale' "$RUN/regimen_backend_xray.json"
+```
+
+Inspect first-step gradient drift:
+
+```bash
+jq '{step, global_max_abs_diff, global_mean_abs_diff, worst_tensor, top5: (.per_tensor|sort_by(-.max_abs_diff)|.[0:5])}' \
+  "$RUN/regimen_debug_step_grads/step_00000001_grad_diff_summary.json"
+```
+
+## 5) Operator Code Touchpoints
+
+When diagnosing A1:
+
+- Regimen orchestration:
+  - `version/v7/scripts/run_training_parity_regimen_v7.py`
+- CK/PyTorch parity harness:
+  - `version/v7/scripts/train_parity_epochs_v7.py`
+- RMSNorm kernels:
+  - `src/kernels/rmsnorm_kernels.c`
+- SwiGLU kernels:
+  - `src/kernels/swiglu_kernels.c`
+
+## 6) Go / No-Go
+
+`GO` for strict training signoff only if:
+- dataset/tokenizer gates pass,
+- regimen `summary.passed == true`,
+- A1 status is `PASS`.
+
+`NO-GO` for strict signoff if A1 fails.
+You can still do exploratory runs, but treat them as non-certified.
+
+## 7) Exploratory Training (what it means)
+
+Exploratory means:
+- training is functional (loss can decrease, outputs can improve),
+- but CK-vs-PyTorch numerical equivalence is not guaranteed over horizon,
+- so behavior/regression conclusions are provisional.
+
+Use exploratory only for idea testing, not final parity claims.
