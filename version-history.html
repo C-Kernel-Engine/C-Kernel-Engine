@@ -1756,7 +1756,7 @@
         <td><strong>v15.0</strong></td>
         <td>Embedded AI Inference</td>
         <td>Bring LLM/AI inference to constrained flight-control and robotics hardware with deterministic runtime contracts and portable HAL integration</td>
-        <td>v1-v14</td>
+        <td>v7.x training sign-off + v1-v14 kernel families</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
@@ -1841,6 +1841,74 @@
       </div>
     </div>
   </div>
+
+  <h2>Execution Order (Current Priority: Training First)</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+    Methodical completion path: finish <strong>v7.x training sign-off</strong> end-to-end before opening active v15 embedded implementation.
+    v15-v17 stay visible as downstream roadmap, but are gated by training completion criteria.
+  </p>
+  <table class="roadmap-table">
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>Objective</th>
+        <th>Exit Criteria (must pass)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>T0</strong></td>
+        <td>Runbook Lock</td>
+        <td>Single canonical Stage A/B command path + deterministic env contract documented and reproducible on clean checkout</td>
+        <td><span class="version-status status-building">Building</span></td>
+      </tr>
+      <tr>
+        <td><strong>T1</strong></td>
+        <td>Data + Tokenizer Integrity</td>
+        <td>ASCII/SVG cleanup gates, tokenizer roundtrip gates, manifest invariants all passing</td>
+        <td><span class="version-status status-building">Building</span></td>
+      </tr>
+      <tr>
+        <td><strong>T2</strong></td>
+        <td>Train Correctness</td>
+        <td>CK-vs-PyTorch parity cadence, first-divergence triage closure, deterministic replay stability</td>
+        <td><span class="version-status status-building">Building</span></td>
+      </tr>
+      <tr>
+        <td><strong>T3</strong></td>
+        <td>Runtime + Throughput Stability</td>
+        <td>IR3 threaded dispatch, deterministic reductions, no regressions in train contracts/smokes</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>T4</strong></td>
+        <td>Release Gate + Handoff</td>
+        <td>One-command v7 train gate green, run-dir artifacts unified, operator docs frozen for release handoff</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>v15 Entry Criteria (Hard Gate)</h3>
+  <ul class="milestone-list">
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Stage A and Stage B runs reproducible from the runbook on a clean machine.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Parity/drift gates pass at declared cadence with stable replay artifacts.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">IR visualizer training cockpit stable for run-dir artifacts (data, tokenizer, parity, profile).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">v7 train release checklist and docs sign-off completed.</span>
+    </li>
+  </ul>
 
   <h2>Embedded + Interpretability Arc (v15 -> v17)</h2>
   <p style="color: var(--text-secondary); margin-bottom: 1rem;">
@@ -2120,6 +2188,10 @@
       </li>
       <li class="milestone">
         <span class="milestone-icon done">✓</span>
+        <span class="milestone-text">Execution discipline: close v7.x training gates before active v15 implementation</span>
+      </li>
+      <li class="milestone">
+        <span class="milestone-icon done">✓</span>
         <span class="milestone-text">Graph-based = easy optimization passes, validation, debugging</span>
       </li>
     </ul>
@@ -2155,6 +2227,7 @@
     Version numbers follow this convention:
   </p>
   <ul style="color: var(--text-secondary);">
+    <li><strong>Current priority (2026):</strong> Complete v7.x training sign-off end-to-end before opening v15 implementation</li>
     <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
     <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
     <li><strong>v8.x:</strong> MoE architecture (efficient large models)</li>
@@ -2179,12 +2252,12 @@
 // Version tracking data
 const versionData = {
   current: {
-    major: 6,
-    minor: 6,
-    date: "2026-01-15",
-    phase: "inference",
+    major: 7,
+    minor: 0,
+    date: "2026-02-26",
+    phase: "training_ir_runtime",
     milestones_completed: 4,
-    milestones_total: 4
+    milestones_total: 6
   },
   next: {
     major: 7,
@@ -2442,7 +2515,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-24</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-26</p>
             </div>
         </div>
     </footer>
