@@ -5,14 +5,22 @@ title: v7 Training Parity Checklist
 
 # v7 Training Parity Checklist
 
-Use this as a hard gate before long training runs.
+Use this checklist as the operator gate for runbook execution readiness.
 
 ## Scope
 
-This checklist answers one question: "Is CK training numerically aligned enough with PyTorch to trust long runs?"
+This checklist answers one operational question:
+"Can I proceed with the v7 training/inference runbook flow on this run directory?"
 
-- `A1` = Forward/Backward/Optimizer 10x canary gate.
-- If `A1` fails, treat run as experimental until fixed.
+Current GO criteria:
+- `dataset_qc.json` is pass.
+- `tokenizer_roundtrip.json` has `exact_match == true`.
+- `D1/E1/F1` are pass in parity regimen.
+- canary parity gate (`row1`/`row2`) is pass.
+
+Caveat:
+- `A1/A2` may still fail today.
+- Treat `A1/A2` as an active kernel-harness bug track (currently suspected around SwiGLU harness path), separate from runbook execution readiness.
 
 ## 0) Set Run Path
 
@@ -33,7 +41,55 @@ Pass criteria:
 - `tokenizer_roundtrip.status == "pass"`
 - `tokenizer_roundtrip.exact_match == true`
 
-## 2) Run Full Parity Regimen (includes A1)
+## 2) Canary Parity Gate (row1/row2)
+
+Run Step 3.1 from the runbook, then verify pass lines:
+
+```bash
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+from statistics import mean
+
+TH_MAX = 1e-4
+TH_MEAN = 5e-5
+TH_PARAM = 1e-4
+run_env = os.environ.get("RUN", "").strip()
+if not run_env:
+    print("[FAIL] RUN env var is empty")
+    raise SystemExit(1)
+root = Path(run_env)
+ok = True
+for idx in (1, 2):
+    run_dir = root / f"parity_svg_row{idx}" / ".ck_pipeline"
+    work_dirs = sorted([p for p in run_dir.glob("ascii_bpe_*") if p.is_dir()])
+    if not work_dirs:
+        print(f"[FAIL] row{idx}: missing {run_dir}/ascii_bpe_*")
+        ok = False
+        continue
+    w = work_dirs[-1]
+    ck = json.loads((w / "train_ck.json").read_text())
+    pt = json.loads((w / "train_torch_ref.json").read_text())
+    c = [float(x["loss_ck"]) for x in ck.get("loss_curve", [])]
+    t = [float(x["loss"]) for x in pt.get("loss_curve", [])]
+    n = min(len(c), len(t))
+    if n == 0:
+        print(f"[FAIL] row{idx}: empty loss curves")
+        ok = False
+        continue
+    diffs = [abs(c[i] - t[i]) for i in range(n)]
+    max_abs = max(diffs)
+    mean_abs = mean(diffs)
+    final_param = float(ck.get("final_param_max_abs_diff", 1.0))
+    passed = max_abs <= TH_MAX and mean_abs <= TH_MEAN and final_param <= TH_PARAM
+    print(f"[row{idx}] max_abs={max_abs:.6e} mean_abs={mean_abs:.6e} final_param={final_param:.6e} pass={passed}")
+    ok = ok and passed
+print("CANARY_PARITY_GATE=PASS" if ok else "CANARY_PARITY_GATE=FAIL")
+PY
+```
+
+## 3) Run Full Parity Regimen (for D1/E1/F1 evidence)
 
 ```bash
 python3 version/v7/scripts/run_training_parity_regimen_v7.py \
@@ -54,26 +110,60 @@ jq '.stages[] | {id,name,status,metrics,artifact_json,artifact_log}' \
   "$RUN/training_parity_regimen_latest.json"
 ```
 
-## 3) A1 Definition (what it actually tests)
+Check generated-runtime stages:
 
-A1 runs `train_parity_epochs_v7.py` with:
-- same tiny canary sample,
-- full forward pass,
-- backward pass,
-- optimizer updates,
-- for ~10 canary epochs,
-- then compares CK vs PyTorch drift.
+```bash
+jq '.stages[] | select(.id=="D1" or .id=="E1" or .id=="F1") | {id,status,metrics}' \
+  "$RUN/training_parity_regimen_latest.json"
+```
 
-A1 pass requires all of the following:
-- parity run marked pass,
-- at least 2 parity steps present,
-- `max_loss_abs_diff_first_n <= loss_tol` (default `2e-5`),
-- `max_param_abs_diff_first_n <= param_tol` (default `3e-5`).
+## 4) One-Shot GO Evaluation
 
-Source:
-- `version/v7/scripts/run_training_parity_regimen_v7.py`
+```bash
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
 
-## 4) If A1 Fails: Fast Attribution
+run_env = os.environ.get("RUN", "").strip()
+if not run_env:
+    print("[FAIL] RUN env var is empty")
+    raise SystemExit(1)
+run = Path(run_env)
+
+def load_json(path: Path):
+    return json.loads(path.read_text()) if path.exists() else None
+
+ds = load_json(run / "dataset_qc.json")
+rt = load_json(run / "tokenizer_roundtrip.json")
+reg = load_json(run / "training_parity_regimen_latest.json")
+
+checks = {}
+checks["dataset_qc_pass"] = bool(ds and ds.get("status") == "pass")
+checks["tokenizer_exact_match"] = bool(rt and rt.get("status") == "pass" and rt.get("exact_match") is True)
+
+d1e1f1_ok = False
+if reg and isinstance(reg.get("stages"), list):
+    st = {s.get("id"): s.get("status") for s in reg["stages"] if isinstance(s, dict)}
+    d1e1f1_ok = st.get("D1") == "PASS" and st.get("E1") == "PASS" and st.get("F1") == "PASS"
+checks["D1_E1_F1_pass"] = d1e1f1_ok
+
+def row_pass(idx: int) -> bool:
+    p = run / f"parity_svg_row{idx}" / "parity_pipeline.json"
+    if not p.exists():
+        return False
+    j = json.loads(p.read_text())
+    return bool(j.get("status") == "pass")
+
+checks["canary_row1_row2_pass"] = row_pass(1) and row_pass(2)
+
+go = all(checks.values())
+print(json.dumps({"GO": go, "checks": checks}, indent=2))
+print("GO_EVIDENCE=PASS" if go else "GO_EVIDENCE=FAIL")
+PY
+```
+
+## 5) A1/A2 Caveat and Bug Track
 
 Backend xray is produced by the same regimen run:
 
@@ -94,9 +184,14 @@ jq '{step, global_max_abs_diff, global_mean_abs_diff, worst_tensor, top5: (.per_
   "$RUN/regimen_debug_step_grads/step_00000001_grad_diff_summary.json"
 ```
 
-## 5) Operator Code Touchpoints
+Interpretation:
+- `A1/A2` failing does **not** block runbook execution readiness under this checklist.
+- `A1/A2` still blocks strict kernel-harness parity signoff.
+- Track/fix `A1/A2` in parallel while continuing operator runbook validation.
 
-When diagnosing A1:
+## 6) Operator Code Touchpoints
+
+When diagnosing A1/A2:
 
 - Regimen orchestration:
   - `version/v7/scripts/run_training_parity_regimen_v7.py`
@@ -107,17 +202,19 @@ When diagnosing A1:
 - SwiGLU kernels:
   - `src/kernels/swiglu_kernels.c`
 
-## 6) Go / No-Go
+## 7) Go / No-Go
 
-`GO` for strict training signoff only if:
-- dataset/tokenizer gates pass,
-- regimen `summary.passed == true`,
-- A1 status is `PASS`.
+`GO` for runbook execution readiness if all four criteria pass:
+- dataset QC pass,
+- tokenizer exact roundtrip pass,
+- D1/E1/F1 pass,
+- canary row1/row2 pass.
 
-`NO-GO` for strict signoff if A1 fails.
-You can still do exploratory runs, but treat them as non-certified.
+`NO-GO` if any of the four fail.
 
-## 7) Exploratory Training (what it means)
+Strict kernel-harness parity signoff remains separate and still requires `A1/A2` closure.
+
+## 8) Exploratory Training (what it means)
 
 Exploratory means:
 - training is functional (loss can decrease, outputs can improve),

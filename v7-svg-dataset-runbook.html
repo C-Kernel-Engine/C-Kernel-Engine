@@ -1180,6 +1180,28 @@ wc -l -c "$ASSET_UTF8" "$ASSET_ASCII" "$SYN_SVG" "$DATA_TXT"</pre>
     </div>
 </div>
 
+<div class="card card-blue" style="margin-top:0.75rem;">
+    <p style="margin-bottom: 0.4rem;"><strong>One-command corpus builder (recommended):</strong> stitch existing scripts into a single run that emits both pretrain and midtrain corpora.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
+  --out-dir "$DATA_DIR" \
+  --prefix svg_pretrain_pack \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --stage-a-samples 24000 \
+  --stage-b-samples 28000 \
+  --holdout-ratio 0.10 \
+  --seed 42
+
+export DATA_TXT="$DATA_DIR/svg_pretrain_pack_stage_a_plus_bridge.txt"
+export DATA_TXT_STAGE_B="$DATA_DIR/svg_pretrain_pack_stage_b.txt"
+echo "[OK] Stage-A+bridge: $DATA_TXT"
+echo "[OK] Stage-B:        $DATA_TXT_STAGE_B"
+wc -l "$DATA_TXT" "$DATA_TXT_STAGE_B"</pre>
+    </div>
+    <p class="mini-note">Synthetic families are produced by <code>generate_svg_instruction_dataset_v7.py</code> (line, triangle, rounded_triangle, ellipse, polygon, polyline, path, arrow, double_arrow, bar_chart, comparison_table, text, rect_circle) and then combined with <code>docs/site/assets/*.svg</code> via existing ASCII + bridge scripts.</p>
+</div>
+
 <h2 id="step-3">Step 3: Stage-A Bridge Pack (0.56)</h2>
 
 <div class="card">
@@ -1612,7 +1634,7 @@ tail -n 20 "$RUN/autopilot/summary.jsonl"</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-24</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-26</p>
             </div>
         </div>
     </footer>

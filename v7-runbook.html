@@ -1020,6 +1020,103 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Step headings ───────────────────────────────────────────────────── */
+.step-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+.step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.4rem;
+    background: linear-gradient(135deg, rgba(255,180,0,0.22), rgba(255,180,0,0.10));
+    border: 1.5px solid rgba(255,180,0,0.55);
+    border-radius: 8px;
+    color: var(--orange, #ffb400);
+    font-size: 0.75rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+}
+.step-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 1.4rem;
+    padding: 0 0.5rem;
+    border-radius: 20px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.tag-required   { background: rgba(231,76,60,0.15);  border: 1px solid rgba(231,76,60,0.45);  color: #e74c3c; }
+.tag-optional   { background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.38); color: #a070ff; }
+.tag-recommended{ background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.38); color: #47b475; }
+.tag-gate       { background: rgba(7,173,248,0.12);  border: 1px solid rgba(7,173,248,0.38);  color: #07adf8; }
+.tag-training   { background: rgba(71,180,117,0.10); border: 1px solid rgba(71,180,117,0.30); color: #7de59f; }
+.tag-inference  { background: rgba(7,173,248,0.10);  border: 1px solid rgba(7,173,248,0.30);  color: #8cb4ff; }
+
+/* ── "Produces" footer strip ─────────────────────────────────────────── */
+.step-produces {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(71,180,117,0.05);
+    border-top: 1px solid rgba(71,180,117,0.18);
+    border-radius: 0 0 8px 8px;
+    font-size: 0.73rem;
+    color: var(--text-muted, #888);
+}
+.produces-label {
+    color: #47b475;
+    font-weight: 700;
+    margin-right: 0.15rem;
+}
+.produces-item {
+    background: rgba(71,180,117,0.09);
+    border: 1px solid rgba(71,180,117,0.25);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #8cd9a8;
+}
+.produces-item.item-json { border-color: rgba(255,180,0,0.3); color: #ffd58a; background: rgba(255,180,0,0.07); }
+.produces-item.item-html { border-color: rgba(7,173,248,0.3); color: #8cb4ff; background: rgba(7,173,248,0.07); }
+
+/* ── Section divider ─────────────────────────────────────────────────── */
+.runbook-section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,180,0,0.2), transparent);
+    margin: 1.5rem 0;
+}
+
+/* ── Inline callout pill ─────────────────────────────────────────────── */
+.runbook-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(255,180,0,0.1);
+    border: 1px solid rgba(255,180,0,0.3);
+    color: #ffb400;
+    vertical-align: middle;
+}
 </style>
 
 <h1>v7 Inference + Training Runbook</h1>
@@ -1137,31 +1234,46 @@
 
 <nav class="toc">
     <h3>Contents</h3>
+
+    <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange,#ffb400);margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Foundation</div>
     <ul>
         <li><a href="#why-svg">Why SVG for v7</a></li>
-        <li><a href="#step-0-prereqs">Step 0: Prereqs + Paths</a></li>
-        <li><a href="#step-0-clean-start">Step 0.1: Clean Start (Optional)</a></li>
-        <li><a href="#step-0-data-prep">Step 0.5: Data Preparation (Training)</a></li>
-        <li><a href="#step-0-data-scale">Step 0.55: Build Larger ASCII SVG Corpus</a></li>
-        <li><a href="#step-0-stage-a-bridge">Step 0.56: Stage-A Syntax Bridge Pack</a></li>
-        <li><a href="#step-0-data-view">Step 0.6: Preview Dataset</a></li>
-        <li><a href="#step-0-tokenize">Step 0.7: Tokenize Dataset (true_bpe preview)</a></li>
-        <li><a href="#step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</a></li>
-        <li><a href="#step-0-data-lab">Step 0.9: Data Lab Artifacts + Paths</a></li>
-        <li><a href="#step-2-training-setup">Step 2: Training Setup (true_bpe)</a></li>
-        <li><a href="#step-3-5-parity-gate">Step 3.1: Mandatory CK vs PyTorch Parity Gate (10 epochs)</a></li>
-        <li><a href="#step-3-6-parity-regimen">Step 3.2: Automated Training Parity Regimen</a></li>
-        <li><a href="#step-3-train">Step 3.7: Run Full Training Pipeline</a></li>
-        <li><a href="#step-4-artifacts">Step 4: Artifact Locations + Data Format</a></li>
-        <li><a href="#step-5-promote">Step 5: Promote Latest Checkpoint to Inference Weights</a></li>
-        <li><a href="#step-6-infer-trained">Step 6: Build Inference from Trained Run</a></li>
-        <li><a href="#step-7-visualizer">Step 7: Open IR Visualizer</a></li>
-        <li><a href="#step-8-inference">Step 8: Inference from GGUF (HF URLs)</a></li>
-        <li><a href="#step-8-visualize-hf">Step 8.1: Generate IR Visualizer for HF GGUF Runs</a></li>
-        <li><a href="#step-9-quality-phases">Step 9: Quality Improvement Phases (SVG)</a></li>
-        <li><a href="#step-10-ablation">Step 10: Ablation Matrix Sweep (one command)</a></li>
-        <li><a href="#options">CLI Options Cheat Sheet</a></li>
-        <li><a href="#human-readable">Human-Readable Output Check</a></li>
+    </ul>
+
+    <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#47b475;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Training Path</div>
+    <ul>
+        <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
+        <li><a href="#step-0-clean-start"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.1</span> Clean Start</a></li>
+        <li><a href="#step-0-data-prep"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.5</span> Data Prep</a></li>
+        <li><a href="#step-0-data-scale"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.55</span> Scale Corpus</a></li>
+        <li><a href="#step-0-stage-a-bridge"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.56</span> Stage-A Bridge</a></li>
+        <li><a href="#step-0-data-view"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.6</span> Preview Dataset</a></li>
+        <li><a href="#step-0-tokenize"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.7</span> Tokenize</a></li>
+        <li><a href="#step-0-roundtrip"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.8</span> Roundtrip Gate</a></li>
+        <li><a href="#step-0-data-lab"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.9</span> Data Lab Artifacts</a></li>
+        <li><a href="#step-2-training-setup"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">2</span> Training Setup</a></li>
+        <li><a href="#step-3-5-parity-gate"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(231,76,60,0.15);border-color:rgba(231,76,60,0.4);color:#e74c3c;">3.1</span> Parity Gate</a></li>
+        <li><a href="#step-3-6-parity-regimen"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.2</span> Parity Regimen</a></li>
+        <li><a href="#step-3-6-nightly-core-stabilization"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.3</span> Nightly Matrix</a></li>
+        <li><a href="#step-3-train"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.2);border-color:rgba(71,180,117,0.5);color:#7de59f;">3.7</span> Full Train</a></li>
+        <li><a href="#step-4-artifacts"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">4</span> Artifact Locations</a></li>
+        <li><a href="#step-5-promote"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">5</span> Promote Checkpoint</a></li>
+    </ul>
+
+    <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#07adf8;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Inference Path</div>
+    <ul>
+        <li><a href="#step-6-infer-trained"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">6</span> Build Inference</a></li>
+        <li><a href="#step-7-visualizer"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">7</span> IR Visualizer</a></li>
+        <li><a href="#step-8-inference"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8</span> GGUF Inference</a></li>
+        <li><a href="#step-8-visualize-hf"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8.1</span> HF Visualizer</a></li>
+    </ul>
+
+    <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#a070ff;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Quality + Tools</div>
+    <ul>
+        <li><a href="#step-9-quality-phases"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(160,112,255,0.12);border-color:rgba(160,112,255,0.35);color:#c09cff;">9</span> Quality Phases</a></li>
+        <li><a href="#step-10-ablation"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(160,112,255,0.12);border-color:rgba(160,112,255,0.35);color:#c09cff;">10</span> Ablation Matrix</a></li>
+        <li><a href="#options">CLI Cheat Sheet</a></li>
+        <li><a href="#human-readable">Output Check</a></li>
     </ul>
 </nav>
 
@@ -1180,7 +1292,8 @@
 
 <div class="card card-blue" style="margin-top:0.75rem;">
     <p style="margin:0;"><strong>Dataset-only workflow:</strong> for focused pretrain/midtrain SVG corpus generation from <code>docs/site/assets/*.svg</code>, use <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a>.</p>
-    <p style="margin:0.35rem 0 0 0;"><strong>Parity gate checklist:</strong> run the operator checklist at <a href="v7-parity-checklist.html">v7-parity-checklist.html</a> before long training runs.</p>
+    <p style="margin:0.35rem 0 0 0;"><strong>Parity gate checklist:</strong> run <a href="v7-parity-checklist.html">v7-parity-checklist.html</a> for the current GO criteria (<code>dataset_qc</code>, <code>tokenizer_roundtrip exact_match</code>, <code>D1/E1/F1</code>, canary <code>row1/row2</code>).</p>
+    <p style="margin:0.35rem 0 0 0;"><strong>Caveat:</strong> <code>A1/A2</code> remain a separate kernel-harness bug track and do not block runbook execution readiness under the current operator gate.</p>
 </div>
 
 <h2 id="why-svg">Why SVG for v7</h2>
@@ -1377,6 +1490,13 @@ else
 fi</pre>
     </div>
     <p class="mini-note">Important: use <code>$HOME/.cache/...</code>, not <code>/.cache/...</code>. These vars are exported for later Python steps; if you open a new terminal, re-run Step 0 first. The repo includes a bundled demo file at <code>version/v7/data/svg_assets_train.txt</code>.</p>
+    <div class="step-produces">
+        <span class="produces-label">Exports:</span>
+        <span class="produces-item">$ROOT</span>
+        <span class="produces-item">$RUN</span>
+        <span class="produces-item">$DATA_DIR</span>
+        <span class="produces-item">$DATA_TXT</span>
+    </div>
     <p style="margin: 0.65rem 0 0.35rem;"><strong>Open Run Hub (all runs in one place):</strong></p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1494,6 +1614,26 @@ head -n 3 "$DATA_TXT"</pre>
 
 <div class="card card-accent">
     <p style="margin-bottom: 0.4rem;">This is the <strong>scale-up</strong> data path. It increases dataset diversity before you tune model hyperparameters. Output remains strictly ASCII while coverage expands using repo SVG assets + synthetic SVG generator data.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Recommended: one-command builder (stitches existing scripts).
+python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
+  --out-dir "$DATA_DIR" \
+  --prefix svg_pretrain_pack \
+  --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --stage-a-samples 24000 \
+  --stage-b-samples 28000 \
+  --holdout-ratio 0.10 \
+  --seed 42
+
+DATA_TXT="$DATA_DIR/svg_pretrain_pack_stage_a_plus_bridge.txt"
+DATA_TXT_STAGE_B="$DATA_DIR/svg_pretrain_pack_stage_b.txt"
+echo "[OK] Stage-A+bridge: $DATA_TXT"
+echo "[OK] Stage-B:        $DATA_TXT_STAGE_B"
+wc -l -c "$DATA_TXT" "$DATA_TXT_STAGE_B"</pre>
+    </div>
+    <p class="mini-note">This wrapper calls existing scripts (<code>build_svg_corpus_from_assets_v7.py</code>, <code>generate_svg_instruction_dataset_v7.py</code>, <code>build_stage_a_bridge_svg_v7.py</code>, <code>prepare_ascii_dataset_v7.py</code>) and emits train-ready Stage-A+bridge and Stage-B corpora.</p>
+    <p class="mini-note"><strong>Manual equivalent (advanced / debugging):</strong></p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>ASSET_UTF8="$DATA_DIR/svg_assets_docs_utf8.txt"
@@ -1664,6 +1804,12 @@ xdg-open "$TOKENIZE_RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">In the report, check: <strong>Architecture -> Tokenizer</strong> (click <code>tokenizer.json</code>) and <strong>Training -> Pipeline + Data Lab</strong> (dataset folder path + tokenizer path + roundtrip samples).</p>
 </div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item item-json">tokenizer.json</span>
+    <span class="produces-item">train_tokens.txt</span>
+    <span class="produces-item item-html">ir_report.html</span>
+</div>
 
 <h2 id="step-0-roundtrip">Step 0.8: Encode/Decode Determinism Gate</h2>
 
@@ -1694,6 +1840,12 @@ jq '{dataset_dir, line_length, duplicates, top_chars: (.top_chars|length), top_t
 jq '{status, exact_match, tokenizer_json_path, line_eval, sample_rows: (.sample_rows|length)}' "$TOKENIZE_RUN/tokenizer_roundtrip.json"</pre>
     </div>
     <p class="mini-note">Visualizer path: switch to <strong>Training mode</strong> and open <strong>Data Lab</strong>. This tab shows: <code>dataset_dir</code>, <code>dataset_path</code>, <code>tokenizer_json_path</code>, and row → token-id → decoded previews.</p>
+</div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item item-json">dataset_qc.json</span>
+    <span class="produces-item item-json">dataset_profile.json</span>
+    <span class="produces-item item-json">tokenizer_roundtrip.json</span>
 </div>
 
 <h2 id="step-2-training-setup">Step 2: Training Setup (true_bpe)</h2>
@@ -1869,6 +2021,12 @@ PY</pre>
     <p class="mini-note"><strong>Canonical operator path:</strong> use <code>$RUN/ir_report.html</code> as the single dashboard. Parity canaries run under <code>$RUN/parity_svg_row1</code> and <code>$RUN/parity_svg_row2</code> only for isolated diagnostics; Step 3.2 writes aggregated parity artifacts back into <code>$RUN</code>.</p>
     <p class="mini-note"><strong>Canary visibility:</strong> regenerate <code>$RUN/ir_report.html</code> and open <code>Training -&gt; Train Dashboard</code> / <code>Training -&gt; CK vs PyTorch</code> to see a canary summary (row1/row2 pass/fail) without opening sub-run reports.</p>
 </div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item item-json">parity_svg_row1/parity_pipeline.json</span>
+    <span class="produces-item item-json">parity_svg_row2/parity_pipeline.json</span>
+    <span class="produces-item" style="background:rgba(231,76,60,0.1);border-color:rgba(231,76,60,0.3);color:#e57c6e;">PARITY_GATE=PASS required</span>
+</div>
 
 <h2 id="step-3-6-parity-regimen">Step 3.2: Automated Training Parity Regimen (Recommended)</h2>
 
@@ -1881,6 +2039,7 @@ PY</pre>
   --run-dir "$RUN"</pre>
     </div>
     <p class="mini-note">Outputs: <code>$RUN/training_parity_regimen_latest.json</code>, <code>$RUN/training_parity_regimen_latest.md</code>, <code>$RUN/regimen_backend_xray.json</code>, and <code>$RUN/training_parity_regimen_logs/</code>.</p>
+    <p class="mini-note"><strong>Operator gate mapping:</strong> this step supplies the <code>D1/E1/F1</code> pass evidence used in the checklist GO criteria.</p>
     <p class="mini-note">Backend xray adds per-backend first-step deltas (<code>rmsnorm/swiglu/loss</code> swap table), suspected divergence source, and reference forward/backward formulas so operators can inspect exact math paths without scrolling large logs.</p>
     <p class="mini-note">Auto-skip behavior: if previous regimen passed and runtime/codegen fingerprint is unchanged, this script exits quickly with a reused PASS state. Use <code>--force</code> to rerun anyway.</p>
 </div>
@@ -1899,6 +2058,40 @@ python3 version/v7/scripts/ck_run_v7.py train --run "$RUN" --parity-regimen run
 python3 version/v7/scripts/ck_run_v7.py train --run "$RUN" --parity-regimen require</pre>
     </div>
     <p class="mini-note">Use <code>--parity-regimen off</code> only for deliberate fast-debug loops.</p>
+</div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item item-json">training_parity_regimen_latest.json</span>
+    <span class="produces-item">training_parity_regimen_latest.md</span>
+    <span class="produces-item item-json">regimen_backend_xray.json</span>
+    <span class="produces-item">training_parity_regimen_logs/</span>
+</div>
+
+<h2 id="step-3-6-nightly-core-stabilization">Step 3.3: Nightly Core Stabilization Matrix (1-4 Layers)</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.4rem;">Run one nightly matrix that combines strict tokenizer gates and parity gates:</p>
+    <ul style="margin-top: 0.2rem;">
+        <li>Tokenizer gates: <code>ascii_bpe</code> and <code>bpe</code> with strict encode/decode roundtrip exactness.</li>
+        <li>Parity matrix: layers <code>1,2,3,4</code>, variable token budgets, grad-accum sweep <code>2,4,8</code>.</li>
+        <li>Replay/runtime checks: determinism + accum snapshot checks included by default.</li>
+    </ul>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>cd "$ROOT"
+make v7-stabilization-nightly \
+  V7_STABILIZATION_RUN_ROOT="$RUN/nightly_stabilization" \
+  V7_STABILIZATION_DATA="$DATA_TXT"</pre>
+    </div>
+    <p class="mini-note">Optional main-run validation: add <code>V7_STABILIZATION_MAIN_RUN_DIR="$RUN"</code> to include your current run-dir weights as an extra parity case.</p>
+    <p class="mini-note">Outputs: <code>training_stabilization_scorecard_latest.json</code>, <code>training_stabilization_scorecard_latest.md</code>, and append-only <code>training_stabilization_history.jsonl</code>.</p>
+    <p class="mini-note">Tune matrix size with: <code>V7_STABILIZATION_LAYERS</code>, <code>V7_STABILIZATION_TOKEN_BUDGETS</code>, <code>V7_STABILIZATION_GRAD_ACCUM_SWEEP</code>.</p>
+</div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item item-json">training_stabilization_scorecard_latest.json</span>
+    <span class="produces-item">training_stabilization_scorecard_latest.md</span>
+    <span class="produces-item item-json">training_stabilization_history.jsonl</span>
 </div>
 
 <h2 id="step-3-train">Step 3.7: Run Full Training Pipeline (After Parity Gates)</h2>
@@ -2064,6 +2257,14 @@ python3 version/v7/scripts/ck_run_v7.py train --run "$RUN" --parity-regimen requ
         </div>
     </div>
 </div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item">weights.bump</span>
+    <span class="produces-item item-json">weights_manifest.json</span>
+    <span class="produces-item">checkpoints/</span>
+    <span class="produces-item item-json">pipeline_report.json</span>
+    <span class="produces-item item-html">ir_report.html</span>
+</div>
 
 
 <h2 id="step-4-artifacts">Step 4: Artifact Locations + Data Format</h2>
@@ -2224,6 +2425,11 @@ python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --step 1
     </div>
     <p class="mini-note">This helper picks the latest checkpoint by step and atomically updates <code>weights.bump</code> + <code>weights_manifest.json</code> in <code>$RUN</code>.</p>
 </div>
+<div class="step-produces">
+    <span class="produces-label">Promotes:</span>
+    <span class="produces-item">weights.bump</span>
+    <span class="produces-item item-json">weights_manifest.json</span>
+</div>
 
 <h2 id="step-6-infer-trained">Step 6: Build Inference from Trained Run</h2>
 
@@ -2239,6 +2445,11 @@ python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --step 1
   --show-token-ids --prompt "&lt;svg" --max-tokens 80 --temperature 0.0</pre>
     </div>
     <p class="mini-note">Use <code>$RUN/.ck_build</code> for chat so model + tokenizer artifacts come from the same run.</p>
+</div>
+<div class="step-produces">
+    <span class="produces-label">Produces:</span>
+    <span class="produces-item">.ck_build/</span>
+    <span class="produces-item">runtime binary</span>
 </div>
 
 <h2 id="step-7-visualizer">Step 7: Open IR Visualizer</h2>
@@ -2689,6 +2900,7 @@ python3 scripts/ck_chat.py --help</pre>
 
 <script>
 (function () {
+    /* ── Copy buttons ──────────────────────────────────────────── */
     var buttons = document.querySelectorAll('.copy-btn');
     buttons.forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -2697,12 +2909,83 @@ python3 scripts/ck_chat.py --help</pre>
             var text = pre.innerText;
             navigator.clipboard.writeText(text).then(function () {
                 var old = btn.textContent;
-                btn.textContent = 'Copied';
-                setTimeout(function () { btn.textContent = old; }, 1200);
+                btn.textContent = 'Copied ✓';
+                btn.style.color = '#47b475';
+                btn.style.borderColor = '#47b475';
+                setTimeout(function () {
+                    btn.textContent = old;
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 1400);
             }).catch(function () {
-                btn.textContent = 'Copy failed';
-                setTimeout(function () { btn.textContent = 'Copy'; }, 1200);
+                btn.textContent = '✗ Failed';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1400);
             });
+        });
+    });
+
+    /* ── Step heading badges ──────────────────────────────────── */
+    // Maps step-number string → tag info. Entries in parens in the title are
+    // parsed to pick a tag class. We auto-assign colors from step type.
+    var TAG_MAP = {
+        'optional':    { cls: 'tag-optional',    label: 'Optional'    },
+        'recommended': { cls: 'tag-recommended', label: 'Recommended' },
+        'required':    { cls: 'tag-required',    label: 'Required'    },
+        'gate':        { cls: 'tag-gate',         label: 'Gate'       },
+        'mandatory':   { cls: 'tag-required',    label: 'Gate'        },
+        'training':    { cls: 'tag-training',     label: 'Train'      },
+        'inference':   { cls: 'tag-inference',    label: 'Infer'      },
+    };
+
+    document.querySelectorAll('h2[id]').forEach(function (h2) {
+        var full = h2.textContent.trim();
+
+        // Extract step number (e.g. "Step 0.55", "Step 3", "Step 0.56")
+        var stepMatch = full.match(/^Step\s+([\d.]+)\s*:/);
+        var stepNum   = stepMatch ? stepMatch[1] : null;
+
+        // Extract parenthetical tag (e.g. "(Optional)", "(Recommended)", "(Optional, Recommended)")
+        var parenMatch = full.match(/\(([^)]+)\)/);
+        var tagRaw = parenMatch ? parenMatch[1].toLowerCase() : '';
+
+        // Pick the most prominent tag from the paren text
+        var tagInfo = null;
+        for (var key in TAG_MAP) {
+            if (tagRaw.indexOf(key) !== -1) {
+                tagInfo = TAG_MAP[key];
+                break;
+            }
+        }
+
+        // Remove the "Step N: " prefix and paren text from display
+        var title = full
+            .replace(/^Step\s+[\d.]+\s*:\s*/, '')
+            .replace(/\s*\([^)]*\)\s*/g, '')
+            .trim();
+
+        // Build new inner HTML
+        var html = '';
+        if (stepNum) {
+            html += '<span class="step-num">' + stepNum + '</span>';
+        }
+        html += '<span>' + title + '</span>';
+        if (tagInfo) {
+            html += '<span class="step-tag ' + tagInfo.cls + '">' + tagInfo.label + '</span>';
+        }
+        // Keep original heading text accessible via title attr
+        if (html) {
+            h2.classList.add('step-heading');
+            h2.innerHTML = html;
+        }
+    });
+
+    /* ── Smooth scroll for TOC links ─────────────────────────── */
+    document.querySelectorAll('nav.toc a[href^="#"]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            var target = document.querySelector(a.getAttribute('href'));
+            if (!target) return;
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
 
@@ -2936,7 +3219,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-24</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-26</p>
             </div>
         </div>
     </footer>
