@@ -17770,30 +17770,84 @@ function renderDataLabPanel(files) {
     const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
         ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
         : [];
+
+    // Split catalog into three tiers by kind
+    const trainedEntries   = datasetCatalog.filter((r) => r.kind === 'active_dataset');
+    const generatedEntries = datasetCatalog.filter((r) => r.kind === 'generated_dataset');
+    const manifestEntries  = datasetCatalog.filter((r) => r.kind !== 'active_dataset' && r.kind !== 'generated_dataset');
+
+    function catalogRow(row, highlight) {
+        const rowStyle = highlight
+            ? 'border-left:3px solid #47b475;background:rgba(71,180,117,0.06);'
+            : '';
+        return `<tr style="${rowStyle}">
+            <td>${htmlEscape(row.stage ?? '-')}</td>
+            <td>${htmlEscape(row.kind ?? '-')}</td>
+            <td>${htmlEscape(row.name ?? '-')}</td>
+            <td style="text-align:right;">${htmlEscape(row.rows ?? '-')}</td>
+            <td style="max-width:380px;overflow-wrap:anywhere;font-size:0.74rem;"><code>${htmlEscape(row.path ?? '-')}</code></td>
+            <td style="max-width:240px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
+        </tr>`;
+    }
+
+    const trainedSection = trainedEntries.length > 0 ? `
+        <div style="margin-bottom:0.75rem;">
+            <div style="font-size:0.78rem;color:#47b475;font-weight:600;margin-bottom:0.35rem;letter-spacing:0.04em;">
+                ▶ TRAINED ON (${trainedEntries.length} dataset${trainedEntries.length > 1 ? 's' : ''})
+            </div>
+            <table style="font-size:0.8rem;">
+                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Path</th><th>Note</th></tr></thead>
+                <tbody>${trainedEntries.map((r) => catalogRow(r, true)).join('')}</tbody>
+            </table>
+        </div>
+    ` : `
+        <div style="background:#2a2a2a;border-left:3px solid #4b5563;padding:0.45rem 0.75rem;border-radius:0 4px 4px 0;margin-bottom:0.75rem;font-size:0.78rem;color:#6b7280;">
+            No <code>active_dataset</code> entry found — cannot determine what this run trained on.
+        </div>
+    `;
+
+    const generatedSection = generatedEntries.length > 0 ? `
+        <div style="margin-bottom:0.75rem;">
+            <div style="font-size:0.78rem;color:#ffb400;font-weight:600;margin-bottom:0.35rem;letter-spacing:0.04em;">
+                ◈ GENERATED (${generatedEntries.length} file${generatedEntries.length > 1 ? 's' : ''} — available, not trained)
+            </div>
+            <table style="font-size:0.8rem;">
+                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Path</th><th>Note</th></tr></thead>
+                <tbody>${generatedEntries.map((r) => catalogRow(r, false)).join('')}</tbody>
+            </table>
+        </div>
+    ` : '';
+
+    const manifestSection = manifestEntries.length > 0 ? `
+        <details style="margin-bottom:0.5rem;">
+            <summary style="cursor:pointer;font-size:0.78rem;color:#6b7280;font-weight:600;letter-spacing:0.04em;user-select:none;padding:0.3rem 0;">
+                ◦ MANIFESTS &amp; REGISTRY (${manifestEntries.length} entries — data catalogs, not training data)
+            </summary>
+            <div style="margin-top:0.4rem;">
+                <table style="font-size:0.76rem;">
+                    <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Note</th></tr></thead>
+                    <tbody>
+                        ${manifestEntries.slice(0, 300).map((row) => `
+                            <tr>
+                                <td>${htmlEscape(row.stage ?? '-')}</td>
+                                <td>${htmlEscape(row.kind ?? '-')}</td>
+                                <td>${htmlEscape(row.name ?? '-')}</td>
+                                <td style="text-align:right;">${htmlEscape(row.rows ?? '-')}</td>
+                                <td style="max-width:260px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    ` : '';
+
     const datasetCatalogSection = `
         <div class="parity-section" style="margin-top:0.8rem;">
-            <h3><span class="badge badge-blue">Dataset Catalog</span> Generated Data + Manifests</h3>
+            <h3><span class="badge badge-blue">Dataset Catalog</span> What Was Trained vs Available</h3>
             ${datasetCatalog.length > 0
-                ? `
-                    <div style="margin-bottom:0.4rem;color:var(--text-muted);">
-                        ${datasetCatalog.length} entries discovered for this run scope.
-                    </div>
-                    <table>
-                        <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th>Rows</th><th>Path</th><th>Note</th></tr></thead>
-                        <tbody>
-                            ${datasetCatalog.slice(0, 200).map((row) => `
-                                <tr>
-                                    <td>${htmlEscape(row.stage ?? '-')}</td>
-                                    <td>${htmlEscape(row.kind ?? '-')}</td>
-                                    <td>${htmlEscape(row.name ?? '-')}</td>
-                                    <td>${htmlEscape(row.rows ?? '-')}</td>
-                                    <td style="max-width:500px;overflow-wrap:anywhere;"><code>${htmlEscape(row.path ?? '-')}</code></td>
-                                    <td style="max-width:300px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `
+                ? `<div style="color:var(--text-muted);font-size:0.78rem;margin-bottom:0.65rem;">${datasetCatalog.length} total entries — ${trainedEntries.length} trained · ${generatedEntries.length} generated · ${manifestEntries.length} manifests</div>
+                   ${trainedSection}${generatedSection}${manifestSection}`
                 : '<div style="color:var(--text-muted);">No dataset_catalog embedded yet. Regenerate report to derive from manifests.</div>'
             }
         </div>
