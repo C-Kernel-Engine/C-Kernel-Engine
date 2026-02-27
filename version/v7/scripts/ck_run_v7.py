@@ -87,6 +87,7 @@ C_RESET = "\033[0m"
 C_BOLD = "\033[1m"
 C_DIM = "\033[2m"
 C_ORANGE = "\033[38;5;214m"
+C_YELLOW = C_ORANGE
 C_GREEN = "\033[38;5;114m"
 C_BLUE = "\033[38;5;75m"
 C_RED = "\033[38;5;203m"
@@ -2375,15 +2376,74 @@ def _coerce_bool(value: Any) -> Optional[bool]:
     return None
 
 
+def _resolve_dataset_id_from_source(data_source: dict[str, Any]) -> str:
+    """Derive a stable dataset identifier from source metadata."""
+    path = str(data_source.get("source_path") or "").strip()
+    if path:
+        return Path(path).stem or "unknown"
+    name = str(data_source.get("dataset_name") or "").strip()
+    if name:
+        return Path(name).stem or name
+    return "unknown"
+
+
+def _build_corpus_sampling_log_payload(summary: dict[str, Any], run_dir: Optional[Path]) -> dict[str, Any]:
+    epochs = summary.get("corpus_sampling_epochs")
+    norm_epochs: list[dict[str, Any]] = []
+    if isinstance(epochs, list):
+        for row in epochs:
+            if isinstance(row, dict):
+                norm_epochs.append(dict(row))
+    run_id = str(summary.get("run_id") or (run_dir.name if isinstance(run_dir, Path) else "unknown"))
+    return {
+        "schema": "ck.corpus_sampling_log.v1",
+        "run_id": run_id,
+        "updated_at": _utc_now_iso(),
+        "epochs": norm_epochs,
+    }
+
+
 def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> dict:
     mode = str(summary.get("train_mode") or summary.get("mode") or "pretrain").strip().lower()
     if not mode:
         mode = "pretrain"
 
-    stage_order = ["pretrain", "sft", "dpo", "grpo", "ppo"]
+    stage_order = ["pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"]
     if mode not in stage_order:
         stage_order = [mode] + stage_order
     active_idx = stage_order.index(mode)
+    stage_ranges: dict[str, dict[str, Any]] = {}
+    raw_sampling = summary.get("corpus_sampling_epochs")
+    if isinstance(raw_sampling, list):
+        for row in raw_sampling:
+            if not isinstance(row, dict):
+                continue
+            stage = str(row.get("stage_id") or "").strip().lower()
+            if not stage:
+                continue
+            step_start = row.get("step_start")
+            step_end = row.get("step_end")
+            epoch_id = row.get("epoch")
+            cur = stage_ranges.get(stage)
+            if cur is None:
+                cur = {
+                    "step_start": int(step_start) if isinstance(step_start, (int, float)) else None,
+                    "step_end": int(step_end) if isinstance(step_end, (int, float)) else None,
+                    "epoch_start": int(epoch_id) if isinstance(epoch_id, (int, float)) else None,
+                    "epoch_end": int(epoch_id) if isinstance(epoch_id, (int, float)) else None,
+                }
+                stage_ranges[stage] = cur
+            else:
+                if isinstance(step_start, (int, float)):
+                    s = int(step_start)
+                    cur["step_start"] = s if cur.get("step_start") is None else min(int(cur["step_start"]), s)
+                if isinstance(step_end, (int, float)):
+                    e = int(step_end)
+                    cur["step_end"] = e if cur.get("step_end") is None else max(int(cur["step_end"]), e)
+                if isinstance(epoch_id, (int, float)):
+                    ep = int(epoch_id)
+                    cur["epoch_start"] = ep if cur.get("epoch_start") is None else min(int(cur["epoch_start"]), ep)
+                    cur["epoch_end"] = ep if cur.get("epoch_end") is None else max(int(cur["epoch_end"]), ep)
     stage_timeline = []
     for idx, stage in enumerate(stage_order):
         if idx < active_idx:
@@ -2392,14 +2452,23 @@ def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> 
             status = "active"
         else:
             status = "planned"
-        stage_timeline.append(
-            {
-                "stage": stage,
-                "order": idx,
-                "status": status,
-                "active": stage == mode,
-            }
-        )
+        row = {
+            "stage": stage,
+            "order": idx,
+            "status": status,
+            "active": stage == mode,
+        }
+        rng = stage_ranges.get(stage)
+        if isinstance(rng, dict):
+            if rng.get("step_start") is not None:
+                row["step_start"] = int(rng["step_start"])
+            if rng.get("step_end") is not None:
+                row["step_end"] = int(rng["step_end"])
+            if rng.get("epoch_start") is not None:
+                row["epoch_start"] = int(rng["epoch_start"])
+            if rng.get("epoch_end") is not None:
+                row["epoch_end"] = int(rng["epoch_end"])
+        stage_timeline.append(row)
 
     step_profile = summary.get("step_profile") if isinstance(summary.get("step_profile"), dict) else {}
     processed_tokens = int(step_profile.get("processed_tokens", summary.get("total_tokens", 0)) or 0)
@@ -2631,6 +2700,7 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         "files": ckpt_info.get("files", []),
     }
     training_pipeline = _build_training_pipeline_payload(s, None)
+    corpus_sampling_log = _build_corpus_sampling_log_payload(s, None)
 
     payloads = {
         "training_loss_curve_latest.json": training_loss_curve,
@@ -2639,6 +2709,7 @@ def _materialize_train_telemetry(summary_json: Path, profile_meta: Optional[dict
         "training_step_profile_latest.json": training_step_profile,
         "training_checkpoint_policy_latest.json": training_checkpoint_policy,
         "training_pipeline_latest.json": training_pipeline,
+        "corpus_sampling_log_latest.json": corpus_sampling_log,
     }
     for name, payload in payloads.items():
         with (report_dir / name).open("w", encoding="utf-8") as f:
@@ -2712,7 +2783,7 @@ def _resolve_train_mode(args: argparse.Namespace) -> str:
     mode = str(getattr(args, "train_mode", "pretrain") or "pretrain").lower()
     if getattr(args, "pretraining", False):
         mode = "pretrain"
-    if mode not in ("pretrain", "sft"):
+    if mode not in ("pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"):
         log_error(f"Unsupported train mode: {mode}")
         sys.exit(2)
     return mode
@@ -4992,12 +5063,21 @@ def _run_ck_train_runtime_body(
     last_checkpoint_step = 0
     oracle_points = 0
     last_oracle_loss = None
+    corpus_sampling_epochs: list[dict] = []
+    source_stage = str(train_mode or "pretrain").strip().lower() or "pretrain"
 
-    for _ in range(epochs):
+    for epoch_idx in range(epochs):
+        epoch_num = int(epoch_idx) + 1
+        epoch_step_start = int(step) + 1
+        epoch_loss_start: Optional[float] = None
+        epoch_loss_end: Optional[float] = None
+        epoch_rows_sampled = 0
+        epoch_tokens_consumed = 0
         for batch in batches:
             x_vals, y_vals, valid_tokens = _unpack_train_batch(batch)
             step += 1
             micro_steps += 1
+            epoch_rows_sampled += 1
             x_buf = (ctypes.c_int32 * len(x_vals))(*x_vals)
             y_buf = (ctypes.c_int32 * len(y_vals))(*y_vals)
             loss_out = ctypes.c_float(0.0)
@@ -5053,8 +5133,13 @@ def _run_ck_train_runtime_body(
 
             step_ms = (t1 - t0) * 1000.0
             total_ck_ms += step_ms
-            processed_tokens += min(int(valid_tokens), int(runtime_num_tokens))
+            consumed_tokens = min(int(valid_tokens), int(runtime_num_tokens))
+            processed_tokens += consumed_tokens
+            epoch_tokens_consumed += consumed_tokens
             loss_val = float(loss_out.value)
+            if epoch_loss_start is None:
+                epoch_loss_start = float(loss_val)
+            epoch_loss_end = float(loss_val)
 
             post_snapshot = None
             post_snapshot_numel = 0
@@ -5735,6 +5820,8 @@ def _run_ck_train_runtime_body(
             loss_curve.append(
                 {
                     "step": step,
+                    "epoch": epoch_num,
+                    "source_stage": source_stage,
                     "micro_steps": 1,
                     "tokens": len(x_vals),
                     "loss_ck": loss_val,
@@ -5818,6 +5905,37 @@ def _run_ck_train_runtime_body(
             )
             grad_steps.append(step)
             grad_global.append(0.0)
+
+        if epoch_rows_sampled > 0:
+            rows_total = train_data_source.get("rows_total")
+            if not isinstance(rows_total, int) or rows_total <= 0:
+                rows_total = len(batches)
+            coverage_pct = None
+            if isinstance(rows_total, int) and rows_total > 0:
+                coverage_pct = min(100.0, (float(epoch_rows_sampled) * 100.0) / float(rows_total))
+            corpus_sampling_epochs.append(
+                {
+                    "epoch": epoch_num,
+                    "stage_id": source_stage,
+                    "step_start": epoch_step_start,
+                    "step_end": int(step),
+                    "loss_start": float(epoch_loss_start if epoch_loss_start is not None else 0.0),
+                    "loss_end": float(epoch_loss_end if epoch_loss_end is not None else 0.0),
+                    "rows_sampled": int(epoch_rows_sampled),
+                    "tokens_consumed": int(epoch_tokens_consumed),
+                    "datasets": [
+                        {
+                            "dataset_id": _resolve_dataset_id_from_source(train_data_source),
+                            "label": str(train_data_source.get("dataset_name") or "train_data"),
+                            "path": train_data_source.get("source_path"),
+                            "rows_sampled": int(epoch_rows_sampled),
+                            "rows_total": int(rows_total) if isinstance(rows_total, int) and rows_total > 0 else None,
+                            "tokenized": True,
+                            "coverage_pct": float(coverage_pct) if coverage_pct is not None else None,
+                        }
+                    ],
+                }
+            )
 
     pending_accum = int(lib.ck_train_get_accum_counter()) if has_accum_counter_api else int(micro_steps % grad_accum)
     if pending_accum > 0:
@@ -5927,6 +6045,7 @@ def _run_ck_train_runtime_body(
         profile_meta.setdefault("artifacts", []).append({"label": "drift_report", "path": str(drift_path)})
 
     summary = {
+        "run_id": str(run_dir.name),
         "epochs": epochs,
         "seq_len": seq_len,
         "total_tokens": total_tokens,
@@ -6073,6 +6192,7 @@ def _run_ck_train_runtime_body(
             "accum_snapshot_files": accum_snapshot_artifacts,
             "check_dump_files": check_dump_artifacts[:dump_check_topk],
         },
+        "corpus_sampling_epochs": corpus_sampling_epochs,
     }
 
     json_out.parent.mkdir(parents=True, exist_ok=True)
@@ -6171,6 +6291,7 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         "files": ckpt_info.get("files", []),
     }
     training_pipeline = _build_training_pipeline_payload(s, run_dir)
+    corpus_sampling_log = _build_corpus_sampling_log_payload(s, run_dir)
 
     payloads = {
         "training_loss_curve.json": training_loss_curve,
@@ -6179,6 +6300,8 @@ def _export_train_telemetry_to_run_dir(summary_json: Path, run_dir: Path) -> Non
         "training_step_profile.json": training_step_profile,
         "training_checkpoint_policy.json": training_checkpoint_policy,
         "training_pipeline.json": training_pipeline,
+        "corpus_sampling_log.json": corpus_sampling_log,
+        "corpus_sampling_log_latest.json": corpus_sampling_log,
     }
     for name, payload in payloads.items():
         (run_dir / name).write_text(json.dumps(payload, indent=2), encoding="utf-8")

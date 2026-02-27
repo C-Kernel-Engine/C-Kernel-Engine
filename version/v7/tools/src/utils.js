@@ -65,6 +65,8 @@ export function parseLossSteps(lossCurve) {
             loss_pt: toNum(s.loss_pt, NaN),
             lr: toNum(s.lr, NaN),
             grad_norm: toNum(s.grad_norm, NaN),
+            epoch: toNum(s.epoch, NaN),
+            source_stage: typeof s.source_stage === 'string' ? s.source_stage : null,
         }))
         .filter((s) => Number.isFinite(s.step));
 }

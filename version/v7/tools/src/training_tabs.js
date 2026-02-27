@@ -271,31 +271,97 @@ function renderDataLabPanel(files) {
         : [];
     const artifactByStage = {};
     for (const row of stageArtifacts) {
-        if (typeof row.stage === 'string' && row.stage.trim()) artifactByStage[row.stage] = row;
+        const raw = String(row && row.stage ? row.stage : '').trim().toLowerCase();
+        const stage = raw === 'stage_a' ? 'pretrain' : (raw === 'stage_b' ? 'midtrain' : raw);
+        if (stage) artifactByStage[stage] = row;
     }
     const timelineByStage = {};
     for (const row of timeline) {
-        if (typeof row.stage === 'string' && row.stage.trim()) timelineByStage[row.stage] = row;
+        const raw = String(row && row.stage ? row.stage : '').trim().toLowerCase();
+        const stage = raw === 'stage_a' ? 'pretrain' : (raw === 'stage_b' ? 'midtrain' : raw);
+        if (stage) timelineByStage[stage] = row;
     }
-    const defaultStageOrder = ['pretrain', 'midtrain', 'sft', 'dpo', 'grpo', 'ppo'];
-    const orderedStages = [];
-    for (const s of defaultStageOrder) {
-        if (timelineByStage[s] || s === activeStage) orderedStages.push(s);
+    const fallbackStageOrder = ['pretrain', 'midtrain', 'sft', 'dpo', 'grpo', 'ppo'];
+    const runCtx = getRunContext();
+
+    function pathHref(pathValue) {
+        const raw = String(pathValue || '').trim();
+        if (!raw || raw === '-') return '';
+        if (/^(https?:\/\/|file:\/\/|\.{0,2}\/)/i.test(raw)) return raw;
+        if (runCtx.runDir && raw.startsWith(`${runCtx.runDir}/`)) {
+            const rel = raw.slice(runCtx.runDir.length + 1)
+                .split('/')
+                .map((seg) => encodeURIComponent(seg))
+                .join('/');
+            return `./${rel}`;
+        }
+        if (raw.startsWith('/')) {
+            const fsUrl = window.CK_LIVE_MODE && typeof window.CK_LIVE_MODE === 'object'
+                ? String(window.CK_LIVE_MODE.fsUrl || '').trim()
+                : '';
+            if (fsUrl) {
+                const sep = fsUrl.includes('?') ? '&' : '?';
+                return `${fsUrl}${sep}path=${encodeURIComponent(raw)}`;
+            }
+            // Absolute paths outside run_dir are not web-served in typical http mode.
+            // Keep file:// only in local file mode; otherwise render as non-link.
+            if (window.location && window.location.protocol === 'file:') return `file://${raw}`;
+            return '';
+        }
+        return raw;
     }
-    for (const row of timeline) {
-        const s = String(row.stage || '');
-        if (s && !orderedStages.includes(s)) orderedStages.push(s);
+
+    function pathCell(pathValue) {
+        const raw = String(pathValue || '').trim();
+        if (!raw || raw === '-') return '<code>-</code>';
+        const href = pathHref(raw);
+        if (!href) return `<span style="display:block;"><code>${htmlEscape(raw)}</code><span style="color:#6b7280;font-size:0.68rem;margin-left:0.3rem;">(not served by this report root)</span></span>`;
+        const title = href.startsWith('file://')
+            ? 'Local file path (may be blocked by browser when served over http)'
+            : raw;
+        return `<a href="${htmlEscape(href)}" target="_blank" rel="noopener" title="${htmlEscape(title)}" style="color:#7dd3fc;text-decoration:none;"><code>${htmlEscape(raw)}</code></a>`;
     }
-    if (!orderedStages.includes(activeStage)) orderedStages.push(activeStage);
+
+    function pathCellCompact(pathValue, label = '') {
+        const raw = String(pathValue || '').trim();
+        if (!raw || raw === '-') return `<span style="display:block;color:#6b7280;"><span style="color:#9ca3af;">${htmlEscape(label)}:</span> -</span>`;
+        const href = pathHref(raw);
+        if (!href) {
+            return `<span style="display:block;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><span style="color:#9ca3af;">${htmlEscape(label)}:</span> <code>${htmlEscape(raw)}</code> <span style="color:#6b7280;font-size:0.66rem;">(not served)</span></span>`;
+        }
+        const title = href.startsWith('file://')
+            ? 'Local file path (may be blocked by browser when served over http)'
+            : raw;
+        return `<span style="display:block;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${htmlEscape(title)}"><span style="color:#9ca3af;">${htmlEscape(label)}:</span> <a href="${htmlEscape(href)}" target="_blank" rel="noopener" style="color:#7dd3fc;text-decoration:none;"><code>${htmlEscape(raw)}</code></a></span>`;
+    }
+
+    function stageOrderKey(row, idx) {
+        if (!row || typeof row !== 'object') return idx + 1;
+        const seq = Number(row.seq);
+        if (Number.isFinite(seq)) return seq;
+        const order = Number(row.order);
+        if (Number.isFinite(order)) return order + 1;
+        const index = Number(row.index);
+        if (Number.isFinite(index)) return index + 1;
+        return idx + 1;
+    }
 
     // Per-stage lookup maps for clickable detail
     const provByStage = {};
     if (Array.isArray(pipeline.data_provenance)) {
-        pipeline.data_provenance.forEach((p) => { if (p && p.stage) provByStage[p.stage] = p; });
+        pipeline.data_provenance.forEach((p) => {
+            const raw = String(p && p.stage ? p.stage : '').trim().toLowerCase();
+            const stage = raw === 'stage_a' ? 'pretrain' : (raw === 'stage_b' ? 'midtrain' : raw);
+            if (p && stage) provByStage[stage] = p;
+        });
     }
     const catalogActiveByStage = {};
     if (Array.isArray(pipeline.dataset_catalog)) {
-        pipeline.dataset_catalog.forEach((c) => { if (c && c.kind === 'active_dataset' && c.stage) catalogActiveByStage[c.stage] = c; });
+        pipeline.dataset_catalog.forEach((c) => {
+            const raw = String(c && c.stage ? c.stage : '').trim().toLowerCase();
+            const stage = raw === 'stage_a' ? 'pretrain' : (raw === 'stage_b' ? 'midtrain' : raw);
+            if (c && c.kind === 'active_dataset' && stage) catalogActiveByStage[stage] = c;
+        });
     }
     const tokLineage = pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object'
         ? pipeline.tokenizer_lineage : {};
@@ -326,7 +392,8 @@ function renderDataLabPanel(files) {
             return found ? 'yes' : 'no';
         }
         // Heuristic: pretrain manifests fed the tokenizer corpus
-        if (row.stage === 'pretrain') return 'inferred';
+        const stage = normStageName(row && row.stage);
+        if (stage === 'pretrain') return 'inferred';
         return 'unknown';
     }
     function tokManifestBadge(cov) {
@@ -336,11 +403,141 @@ function renderDataLabPanel(files) {
         return '<span style="color:#4b5563;font-size:0.75rem;" title="Coverage unknown">?</span>';
     }
 
+    function normStageName(value) {
+        const s = String(value || '').trim().toLowerCase();
+        if (!s) return '';
+        if (s === 'stage_a') return 'pretrain';
+        if (s === 'stage_b') return 'midtrain';
+        return s;
+    }
+    const activeStageKey = normStageName(activeStage) || String(activeStage || 'pretrain');
+
+    const stageSequence = pipeline.stage_sequence && typeof pipeline.stage_sequence === 'object'
+        ? pipeline.stage_sequence
+        : {};
+    const stageSequenceEntries = Array.isArray(stageSequence.entries)
+        ? stageSequence.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const stageSeqMetaByStage = {};
+    const orderedStages = [];
+    const addOrderedStage = (rawStage, meta = null) => {
+        const stage = normStageName(rawStage);
+        if (!stage || orderedStages.includes(stage)) return;
+        orderedStages.push(stage);
+        if (meta && typeof meta === 'object') {
+            stageSeqMetaByStage[stage] = meta;
+        } else if (!stageSeqMetaByStage[stage]) {
+            stageSeqMetaByStage[stage] = {};
+        }
+    };
+
+    if (stageSequenceEntries.length > 0) {
+        const sorted = stageSequenceEntries
+            .map((row, idx) => {
+                const seq = Number(row.seq);
+                const order = Number(row.order);
+                const index = Number(row.index);
+                const key = Number.isFinite(seq)
+                    ? seq
+                    : (Number.isFinite(order) ? order + 1 : (Number.isFinite(index) ? index + 1 : idx + 1));
+                return { row, key, idx };
+            })
+            .sort((a, b) => (a.key - b.key) || (a.idx - b.idx));
+        for (const item of sorted) {
+            const row = item.row;
+            addOrderedStage(row.stage, {
+                seq: item.key,
+                status: row.status,
+                active: row.active === true,
+            });
+        }
+    } else if (timeline.length > 0) {
+        const timelineSorted = timeline
+            .map((row, idx) => ({ row, key: stageOrderKey(row, idx), idx }))
+            .sort((a, b) => (a.key - b.key) || (a.idx - b.idx));
+        for (const item of timelineSorted) {
+            const row = item.row;
+            addOrderedStage(row.stage, {
+                seq: item.key,
+                status: row.status,
+                active: row.active === true,
+            });
+        }
+    }
+    if (!orderedStages.includes(activeStageKey)) addOrderedStage(activeStageKey);
+
+    const stageLossHistory = pipeline.stage_loss_history && typeof pipeline.stage_loss_history === 'object'
+        ? pipeline.stage_loss_history
+        : {};
+    const stageLossEntries = Array.isArray(stageLossHistory.entries)
+        ? stageLossHistory.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const stageLossByStage = {};
+    for (const entry of stageLossEntries) {
+        const stage = normStageName(entry.stage);
+        if (!stage) continue;
+        if (!stageLossByStage[stage]) stageLossByStage[stage] = [];
+        stageLossByStage[stage].push(entry);
+    }
+    for (const stage of Object.keys(stageLossByStage)) {
+        stageLossByStage[stage].sort((a, b) => {
+            const aa = String(a.ended_at || a.run_id || '');
+            const bb = String(b.ended_at || b.run_id || '');
+            return aa.localeCompare(bb);
+        });
+    }
+    for (const s of fallbackStageOrder) {
+        if (stageLossByStage[s] && !orderedStages.includes(s)) addOrderedStage(s);
+    }
+    for (const s of Object.keys(stageLossByStage)) {
+        if (!orderedStages.includes(s)) addOrderedStage(s);
+    }
+    if (orderedStages.length === 0) {
+        addOrderedStage('pretrain');
+        addOrderedStage('midtrain');
+        addOrderedStage('sft');
+        addOrderedStage('dpo');
+        addOrderedStage('grpo');
+        addOrderedStage('ppo');
+    }
+
+    function fmtLoss(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '—';
+        if (Math.abs(n) >= 10) return n.toFixed(2);
+        if (Math.abs(n) >= 1) return n.toFixed(3);
+        return n.toFixed(4);
+    }
+
+    function stageLossSparkline(entry) {
+        if (!entry || !Array.isArray(entry.points) || entry.points.length < 2) return '';
+        const losses = entry.points
+            .map((p) => Number(p && p.loss))
+            .filter((v) => Number.isFinite(v));
+        if (losses.length < 2) return '';
+        const minV = Math.min(...losses);
+        const maxV = Math.max(...losses);
+        const span = Math.max(maxV - minV, 1e-9);
+        const width = 120;
+        const height = 24;
+        const pts = losses.map((v, i) => {
+            const x = losses.length === 1 ? 0 : (i / (losses.length - 1)) * width;
+            const y = ((maxV - v) / span) * (height - 2) + 1;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:24px;margin-top:0.18rem;display:block;">
+            <polyline points="${pts}" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        </svg>`;
+    }
+
     const stageCardMeta = {};
     const flowCards = orderedStages.map((stage, idx) => {
+        const seqMeta = stageSeqMetaByStage[stage] && typeof stageSeqMetaByStage[stage] === 'object'
+            ? stageSeqMetaByStage[stage]
+            : {};
         const t = timelineByStage[stage] || {};
-        const status = String(t.status || (stage === activeStage ? 'active' : 'planned'));
-        const isActive = Boolean(t.active === true || stage === activeStage);
+        const status = String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
+        const isActive = Boolean(t.active === true || seqMeta.active === true || stage === activeStageKey);
         const tone = stageTone(status);
         const chip = statusPill(status, tone);
         const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
@@ -349,16 +546,26 @@ function renderDataLabPanel(files) {
         const arts = Array.isArray(data.artifacts) ? data.artifacts : [];
         const cat = catalogActiveByStage[stage] || {};
         const prov = provByStage[stage] || {};
-        const dsName = data.dataset_name || cat.name || prov.dataset_name || null;
+        const lossRuns = stageLossByStage[normStageName(stage)] || [];
+        const latestLossRun = lossRuns.length > 0 ? lossRuns[lossRuns.length - 1] : null;
+        const dsName = data.dataset_name || cat.name || prov.dataset_name || (latestLossRun && latestLossRun.dataset_name) || null;
         const covered = stageTokCoverage(stage);
+        const hasLoss = latestLossRun && Number.isFinite(Number(latestLossRun.first_loss)) && Number.isFinite(Number(latestLossRun.final_loss));
+        const dropPct = hasLoss ? Number(latestLossRun.drop_pct) : NaN;
 
         stageCardMeta[stage] = {
             status, isActive, dsName,
             dsRows: cat.rows || null,
-            dsTok: data.token_count || prov.token_count || null,
+            dsTok: data.token_count || prov.token_count || (latestLossRun && latestLossRun.total_tokens) || null,
             byteSize: prov.byte_size || null,
+            sourcePath: data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.source_path) || null,
+            rawSourcePath: data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.raw_source_path) || null,
+            tokenStreamPath: (latestLossRun && latestLossRun.token_stream_path) || null,
             covered, artifacts: arts,
             catNote: cat.note || null,
+            lossRuns,
+            latestLossRun,
+            seq: Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1),
         };
 
         const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
@@ -371,16 +578,20 @@ function renderDataLabPanel(files) {
             : (covered === true && dsName
                 ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>`
                 : '');
+        const lossSummary = hasLoss
+            ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(latestLossRun.first_loss)} → ${fmtLoss(latestLossRun.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(latestLossRun)}`
+            : `<div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>`;
 
         return `
             <div data-dp-stage="${htmlEscape(stage)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(stage)} datasets &amp; artifacts">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
                     <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(stage)}</div>
-                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${orderedStages.length}</div>
+                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1)}/${orderedStages.length}</div>
                 </div>
                 <div style="margin-top:0.22rem;">${chip}</div>
                 ${dsPill}
                 ${covBadge}
+                ${lossSummary}
                 <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
             </div>
         `;
@@ -418,20 +629,253 @@ function renderDataLabPanel(files) {
 
     const stageFlowSection = `
         <div class="parity-section">
-            <h3><span class="badge badge-orange">Stage Flow</span> Pretrain -> Midtrain -> SFT/DPO/RL Readiness</h3>
+            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(orderedStages.join(' -> '))}</h3>
             ${tokSourcePanel}
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:stretch;">${flowCards}</div>
             <div id="dpStageDetail" style="display:none;margin-top:0.55rem;"></div>
             <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.8rem;">
-                active_stage=${htmlEscape(activeStage)} | model_dims: <code>${htmlEscape(dimsSummary)}</code>
+                active_stage=${htmlEscape(activeStageKey)} | model_dims: <code>${htmlEscape(dimsSummary)}</code>
             </div>
         </div>
     `;
     window._ckDpStageCardMeta = stageCardMeta;
 
+    function fmtPlanInt(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? Math.round(n).toLocaleString() : '—';
+    }
+    function fmtPlanPct(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? `${n >= 0 ? '↓' : '↑'} ${Math.abs(n).toFixed(1)}%` : '—';
+    }
+
+    const exec = pipeline.execution && typeof pipeline.execution === 'object' ? pipeline.execution : {};
+    const execSeqLen = Number(exec.seq_len);
+    const stagePlanRows = orderedStages.map((stage) => {
+        const meta = stageCardMeta[stage] || {};
+        const latest = meta.latestLossRun && typeof meta.latestLossRun === 'object' ? meta.latestLossRun : null;
+        const runs = Array.isArray(meta.lossRuns) ? meta.lossRuns.length : 0;
+        const seqLenRaw = latest && Number.isFinite(Number(latest.seq_len))
+            ? Number(latest.seq_len)
+            : (meta.isActive && Number.isFinite(execSeqLen) ? execSeqLen : NaN);
+        const tokenRaw = Number.isFinite(Number(meta.dsTok))
+            ? Number(meta.dsTok)
+            : (latest && Number.isFinite(Number(latest.total_tokens)) ? Number(latest.total_tokens) : NaN);
+        const estSteps = Number.isFinite(tokenRaw) && Number.isFinite(seqLenRaw) && seqLenRaw > 0
+            ? Math.ceil(tokenRaw / seqLenRaw)
+            : NaN;
+        const latestSteps = latest && Number.isFinite(Number(latest.steps)) ? Number(latest.steps) : NaN;
+        const stageLooksComplete = Number.isFinite(latestSteps) && Number.isFinite(estSteps) && estSteps > 0 && latestSteps >= estSteps;
+
+        let trainState = 'planned';
+        let stateColor = '#60a5fa';
+        if (stage === 'unassigned') {
+            trainState = 'legacy-unlabeled';
+            stateColor = '#fbbf24';
+        } else if (meta.isActive || String(meta.status || '').toLowerCase() === 'active') {
+            if (stageLooksComplete) {
+                trainState = 'completed(last run)';
+                stateColor = '#60a5fa';
+            } else {
+            trainState = 'active';
+            stateColor = '#6ee7b7';
+            }
+        } else if (runs > 0 || String(meta.status || '').toLowerCase() === 'completed') {
+            trainState = 'trained';
+            stateColor = '#60a5fa';
+        } else if (meta.dsName) {
+            trainState = 'ready';
+            stateColor = '#c084fc';
+        }
+
+        const coverage = meta.covered === true ? 'tok ok' : (meta.covered === false ? 'tok gap' : 'unknown');
+        const coverageColor = meta.covered === true ? '#6ee7b7' : (meta.covered === false ? '#fb923c' : '#9ca3af');
+        const lossCell = latest
+            ? `${fmtLoss(latest.first_loss)} → ${fmtLoss(latest.final_loss)} <span style="color:#9ca3af;">(${fmtPlanPct(latest.drop_pct)})</span>`
+            : '—';
+        const rawPath = meta.rawSourcePath || (latest && latest.raw_source_path) || (latest && latest.source_path) || meta.sourcePath || '-';
+        const tokenPath = meta.tokenStreamPath || (latest && latest.token_stream_path) || '-';
+        const pathsCell = (tokenPath !== '-' && tokenPath !== rawPath)
+            ? `${pathCellCompact(rawPath, 'raw')}${pathCellCompact(tokenPath, 'tok')}`
+            : pathCellCompact(rawPath, 'path');
+
+        return `
+            <tr>
+                <td>${htmlEscape(stage)}</td>
+                <td>${htmlEscape(meta.seq ?? '-')}</td>
+                <td><span style="color:${stateColor};font-weight:700;">${htmlEscape(trainState)}</span></td>
+                <td>${htmlEscape(meta.dsName || 'not assigned')}</td>
+                <td style="text-align:right;">${fmtPlanInt(meta.dsRows)}</td>
+                <td style="text-align:right;">${fmtPlanInt(tokenRaw)}</td>
+                <td style="text-align:right;">${fmtPlanInt(seqLenRaw)}</td>
+                <td style="text-align:right;">${fmtPlanInt(estSteps)}</td>
+                <td style="text-align:right;">${fmtPlanInt(runs)}</td>
+                <td>${lossCell}</td>
+                <td><span style="color:${coverageColor};font-weight:700;">${htmlEscape(coverage)}</span></td>
+                <td style="max-width:360px;overflow-wrap:anywhere;">${pathsCell}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const stageLedgerRows = stageLossEntries
+        .slice()
+        .sort((a, b) => {
+            const aa = String(a.ended_at || a.run_id || '');
+            const bb = String(b.ended_at || b.run_id || '');
+            return aa.localeCompare(bb);
+        })
+        .slice(-120)
+        .map((entry) => {
+            const stage = normStageName(entry.stage) || 'unassigned';
+            const dsName = String(entry.dataset_name || (entry.path ? String(entry.path).split('/').pop() : '') || '-');
+            const srcPath = String(entry.source_path || entry.path || '-');
+            const rawPath = String(entry.raw_source_path || (entry.token_stream_path ? '-' : srcPath) || '-');
+            const tokPath = String(entry.token_stream_path || '-');
+            const steps = Number.isFinite(Number(entry.steps)) ? Math.round(Number(entry.steps)).toLocaleString() : '—';
+            const tokens = Number.isFinite(Number(entry.total_tokens)) ? Math.round(Number(entry.total_tokens)).toLocaleString() : '—';
+            const seqLen = Number.isFinite(Number(entry.seq_len)) ? Math.round(Number(entry.seq_len)).toLocaleString() : '—';
+            const firstLoss = Number.isFinite(Number(entry.first_loss)) ? fmtLoss(entry.first_loss) : '—';
+            const finalLoss = Number.isFinite(Number(entry.final_loss)) ? fmtLoss(entry.final_loss) : '—';
+            const when = entry.ended_at ? String(entry.ended_at).replace('T', ' ').replace('+00:00', 'Z') : '-';
+            const prov = String(entry.dataset_provenance || '-');
+            return `
+                <tr>
+                    <td>${htmlEscape(stage)}</td>
+                    <td>${htmlEscape(String(entry.run_id || '-'))}</td>
+                    <td>${htmlEscape(when)}</td>
+                    <td>${htmlEscape(dsName)}</td>
+                    <td style="text-align:right;">${seqLen}</td>
+                    <td style="text-align:right;">${tokens}</td>
+                    <td style="text-align:right;">${steps}</td>
+                    <td>${firstLoss} → ${finalLoss}</td>
+                    <td>${htmlEscape(prov)}</td>
+                    <td style="max-width:360px;overflow-wrap:anywhere;">${pathCellCompact(rawPath, 'raw')}${tokPath && tokPath !== '-' ? pathCellCompact(tokPath, 'tok') : ''}</td>
+                </tr>
+            `;
+        })
+        .join('');
+
+    const stagePlanSection = `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Stage Plan</span> Dataset Training Plan & Progress</h3>
+            <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">
+                Per-stage status from sequence + artifacts + historical loss runs. Estimated steps/epoch = ceil(tokens / seq_len).
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="font-size:0.78rem;">
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>Seq</th>
+                            <th>Status</th>
+                            <th>Dataset</th>
+                            <th style="text-align:right;">Rows</th>
+                            <th style="text-align:right;">Tokens</th>
+                            <th style="text-align:right;">Seq Len</th>
+                            <th style="text-align:right;">Est Steps/Epoch</th>
+                            <th style="text-align:right;">Runs</th>
+                            <th>Latest Loss</th>
+                            <th>Tokenizer</th>
+                            <th>Data Paths</th>
+                        </tr>
+                    </thead>
+                    <tbody>${stagePlanRows}</tbody>
+                </table>
+            </div>
+            <details style="margin-top:0.6rem;">
+                <summary style="cursor:pointer;font-size:0.76rem;color:#9ca3af;">Run-level ledger (latest ${Math.min(stageLossEntries.length, 120)} stage runs)</summary>
+                ${stageLedgerRows
+                    ? `<div style="margin-top:0.45rem;overflow-x:auto;">
+                        <table style="font-size:0.75rem;">
+                            <thead>
+                                <tr>
+                                    <th>Stage</th>
+                                    <th>Run ID</th>
+                                    <th>When</th>
+                                    <th>Dataset</th>
+                                    <th style="text-align:right;">Seq</th>
+                                    <th style="text-align:right;">Tokens</th>
+                                    <th style="text-align:right;">Steps</th>
+                                    <th>Loss</th>
+                                    <th>Provenance</th>
+                                    <th>Data Paths</th>
+                                </tr>
+                            </thead>
+                            <tbody>${stageLedgerRows}</tbody>
+                        </table>
+                    </div>`
+                    : '<div style="margin-top:0.35rem;color:var(--text-muted);">No stage loss runs recorded yet.</div>'
+                }
+            </details>
+        </div>
+    `;
+
     const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
         ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
         : [];
+    const corpusSampling = files.corpus_sampling_log && typeof files.corpus_sampling_log === 'object'
+        ? files.corpus_sampling_log
+        : {};
+    const samplingEpochs = Array.isArray(corpusSampling.epochs)
+        ? corpusSampling.epochs.filter((row) => row && typeof row === 'object')
+        : [];
+
+    function normPath(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        return raw.replace(/\\/g, '/').replace(/\/+/g, '/').toLowerCase();
+    }
+
+    function normDatasetId(value) {
+        const raw = String(value || '').trim().toLowerCase();
+        return raw || '';
+    }
+
+    const samplingByPath = {};
+    const samplingByDatasetId = {};
+    for (const epochRow of samplingEpochs) {
+        const epochNum = Number(epochRow.epoch);
+        const datasets = Array.isArray(epochRow.datasets) ? epochRow.datasets : [];
+        for (const ds of datasets) {
+            if (!ds || typeof ds !== 'object') continue;
+            const rowsSampled = Number(ds.rows_sampled);
+            const rowsTotal = Number(ds.rows_total);
+            const pathKey = normPath(ds.path);
+            const idKey = normDatasetId(ds.dataset_id);
+            const slot = {
+                epoch: Number.isFinite(epochNum) ? epochNum : null,
+                rows_sampled: Number.isFinite(rowsSampled) ? rowsSampled : null,
+                rows_total: Number.isFinite(rowsTotal) ? rowsTotal : null,
+                coverage_pct: Number(ds.coverage_pct),
+            };
+            if (pathKey) samplingByPath[pathKey] = slot;
+            if (idKey) samplingByDatasetId[idKey] = slot;
+        }
+    }
+
+    function coverageCell(row) {
+        const pathKey = normPath(row && row.path);
+        const idKey = normDatasetId(row && row.name ? String(row.name).split('.')[0] : '');
+        const hit = (pathKey && samplingByPath[pathKey]) || (idKey && samplingByDatasetId[idKey]) || null;
+        if (!hit) {
+            return '<span style="color:#6b7280;">✗ Not sampled</span>';
+        }
+        const ep = hit.epoch != null ? `Ep ${Math.round(hit.epoch)}` : 'ep ?';
+        const rs = Number.isFinite(hit.rows_sampled) ? Math.round(hit.rows_sampled).toLocaleString() : '?';
+        const rt = Number.isFinite(hit.rows_total) ? Math.round(hit.rows_total).toLocaleString() : '?';
+        const cp = Number.isFinite(hit.coverage_pct)
+            ? `${Math.max(0, Math.min(100, hit.coverage_pct)).toFixed(1)}%`
+            : (Number.isFinite(hit.rows_sampled) && Number.isFinite(hit.rows_total) && hit.rows_total > 0
+                ? `${((hit.rows_sampled / hit.rows_total) * 100).toFixed(1)}%`
+                : null);
+        if (cp && Number(cp.replace('%', '')) >= 99.9) {
+            return `<span style="color:#6ee7b7;">✓ ${ep} · ${rs}/${rt} (${cp})</span>`;
+        }
+        if (cp) {
+            return `<span style="color:#fbbf24;">~ ${ep} · ${rs}/${rt} (${cp})</span>`;
+        }
+        return `<span style="color:#93c5fd;">~ ${ep} · sampled ${rs}</span>`;
+    }
 
     // Split catalog into three tiers by kind
     const trainedEntries   = datasetCatalog.filter((r) => r.kind === 'active_dataset');
@@ -447,7 +891,8 @@ function renderDataLabPanel(files) {
             <td>${htmlEscape(row.kind ?? '-')}</td>
             <td>${htmlEscape(row.name ?? '-')}</td>
             <td style="text-align:right;">${htmlEscape(row.rows ?? '-')}</td>
-            <td style="max-width:380px;overflow-wrap:anywhere;font-size:0.74rem;"><code>${htmlEscape(row.path ?? '-')}</code></td>
+            <td>${coverageCell(row)}</td>
+            <td style="max-width:380px;overflow-wrap:anywhere;font-size:0.74rem;">${pathCell(row.path ?? '-')}</td>
             <td style="max-width:240px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
         </tr>`;
     }
@@ -458,7 +903,7 @@ function renderDataLabPanel(files) {
                 ▶ TRAINED ON (${trainedEntries.length} dataset${trainedEntries.length > 1 ? 's' : ''})
             </div>
             <table style="font-size:0.8rem;">
-                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Path</th><th>Note</th></tr></thead>
+                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Coverage</th><th>Path</th><th>Note</th></tr></thead>
                 <tbody>${trainedEntries.map((r) => catalogRow(r, true)).join('')}</tbody>
             </table>
         </div>
@@ -474,7 +919,7 @@ function renderDataLabPanel(files) {
                 ◈ GENERATED (${generatedEntries.length} file${generatedEntries.length > 1 ? 's' : ''} — available, not trained)
             </div>
             <table style="font-size:0.8rem;">
-                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Path</th><th>Note</th></tr></thead>
+                <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Coverage</th><th>Path</th><th>Note</th></tr></thead>
                 <tbody>${generatedEntries.map((r) => catalogRow(r, false)).join('')}</tbody>
             </table>
         </div>
@@ -541,7 +986,7 @@ function renderDataLabPanel(files) {
                 ${pathRows.map((r) => `
                     <tr>
                         <td>${htmlEscape(r[0])}</td>
-                        <td style="max-width:620px;overflow-wrap:anywhere;"><code>${htmlEscape(r[1])}</code></td>
+                        <td style="max-width:620px;overflow-wrap:anywhere;">${pathCell(r[1])}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -700,6 +1145,7 @@ function renderDataLabPanel(files) {
             </div>
         </div>
         ${stageFlowSection}
+        ${stagePlanSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
             <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Verify correct dataset and tokenizer files were loaded for this run.</div>
@@ -756,82 +1202,207 @@ function renderDataLabPanel(files) {
             return n + ' B';
         }
 
+        function closeStageDetail() {
+            if (!detailBox) return;
+            detailBox.style.display = 'none';
+            detailBox.innerHTML = '';
+            openStage = null;
+            window._ckDpStageOpen = null;
+            cards.forEach((c) => { c.style.outline = ''; });
+        }
+
+        function buildStageChartSeries(meta) {
+            const runs = Array.isArray(meta?.lossRuns) ? meta.lossRuns : [];
+            const latestRun = runs.length > 0 ? runs[runs.length - 1] : null;
+            const previousRun = runs.length > 1 ? runs[runs.length - 2] : null;
+            const latestPointsRaw = Array.isArray(latestRun?.points) ? latestRun.points : [];
+            const previousPointsRaw = Array.isArray(previousRun?.points) ? previousRun.points : [];
+
+            const previousByStep = new Map();
+            previousPointsRaw.forEach((p, i) => {
+                const step = toNum(p && p.step, i + 1);
+                const loss = toNum(p && p.loss, NaN);
+                if (Number.isFinite(step) && Number.isFinite(loss)) previousByStep.set(step, loss);
+            });
+
+            const points = latestPointsRaw.map((p, i) => {
+                const step = toNum(p && p.step, i + 1);
+                const loss = toNum(p && p.loss, NaN);
+                return {
+                    step,
+                    loss,
+                    loss_prev: previousByStep.has(step) ? previousByStep.get(step) : NaN,
+                };
+            }).filter((p) => Number.isFinite(p.step) && Number.isFinite(p.loss));
+            points.sort((a, b) => a.step - b.step);
+
+            return {
+                points,
+                hasPrevious: points.some((p) => Number.isFinite(p.loss_prev)),
+                latestRunId: latestRun ? String(latestRun.run_id || latestRun.source || 'run') : '',
+                previousRunId: previousRun ? String(previousRun.run_id || previousRun.source || 'run') : '',
+            };
+        }
+
+        function renderStageDetail(stage, shouldScroll = true) {
+            const meta = (window._ckDpStageCardMeta || {})[stage];
+            if (!meta || !detailBox) return;
+
+            openStage = stage;
+            window._ckDpStageOpen = stage;
+            cards.forEach((c) => {
+                c.style.outline = c.dataset.dpStage === stage ? '2px solid rgba(71,180,117,0.75)' : '';
+            });
+
+            const covColor = meta.covered === true ? '#6ee7b7' : (meta.covered === false ? '#fb923c' : '#9ca3af');
+            const covMark = meta.covered === true ? '✓' : (meta.covered === false ? '⚠' : '?');
+            const covLabel = meta.covered === true
+                ? 'Tokenizer corpus covers this dataset — no novel boundaries expected'
+                : (meta.covered === false
+                    ? 'Tok gap — dataset outside tokenizer corpus; watch for boundary artifacts'
+                    : 'Coverage not recorded — add corpus_datasets to tokenizer_lineage');
+            const latestRun = meta.latestLossRun && typeof meta.latestLossRun === 'object' ? meta.latestLossRun : null;
+            const hasLatestLoss = latestRun && Number.isFinite(Number(latestRun.first_loss)) && Number.isFinite(Number(latestRun.final_loss));
+            const runCount = Array.isArray(meta.lossRuns) ? meta.lossRuns.length : 0;
+            const latestLossLabel = hasLatestLoss
+                ? `${fmtLoss(latestRun.first_loss)} → ${fmtLoss(latestRun.final_loss)}`
+                : 'not recorded';
+
+            const artRows = meta.artifacts.length > 0
+                ? meta.artifacts.map((a) => {
+                    const rawPath = typeof a === 'string' ? a : (a.path || a.name || '');
+                    if (rawPath) {
+                        return `<div style="font-family:monospace;font-size:0.73rem;color:var(--text-muted);word-break:break-all;padding:0.1rem 0;">${pathCell(rawPath)}</div>`;
+                    }
+                    return `<div style="font-family:monospace;font-size:0.73rem;color:var(--text-muted);word-break:break-all;padding:0.1rem 0;">${htmlEscape(JSON.stringify(a))}</div>`;
+                }).join('')
+                : '<div style="font-size:0.76rem;color:#4b5563;font-style:italic;">No artifacts recorded for this stage yet.</div>';
+            const lossRunsRows = runCount > 0
+                ? meta.lossRuns.map((run) => {
+                    const runId = String(run.run_id || run.source || 'run');
+                    const start = fmtLoss(run.first_loss);
+                    const end = fmtLoss(run.final_loss);
+                    const steps = Number.isFinite(Number(run.steps)) ? Number(run.steps).toLocaleString() : '—';
+                    const lr = Number.isFinite(Number(run.lr)) ? Number(run.lr).toExponential(1) : '—';
+                    const seq = Number.isFinite(Number(run.seq_len)) ? Number(run.seq_len) : '—';
+                    return `<tr>
+                        <td style="max-width:190px;overflow-wrap:anywhere;"><code>${htmlEscape(runId)}</code></td>
+                        <td>${start} → ${end}</td>
+                        <td>${steps}</td>
+                        <td>${seq}</td>
+                        <td>${lr}</td>
+                    </tr>`;
+                }).join('')
+                : '';
+
+            const chartSeries = buildStageChartSeries(meta);
+            const chartId = `dpStageLossChart_${String(stage).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            const chartTitle = `Stage ${stage} Loss vs Step`;
+            const chartLegend = chartSeries.hasPrevious
+                ? `latest run: <code>${htmlEscape(chartSeries.latestRunId)}</code> · baseline: <code>${htmlEscape(chartSeries.previousRunId)}</code> (dashed)`
+                : `latest run: <code>${htmlEscape(chartSeries.latestRunId || 'run')}</code>`;
+            const chartPanel = chartSeries.points.length > 1
+                ? `
+                    <div style="margin:0.1rem 0 0.5rem 0;border:1px solid rgba(255,255,255,0.10);border-radius:7px;padding:0.45rem 0.5rem;background:rgba(255,255,255,0.02);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+                            <div style="font-size:0.66rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;">STAGE LOSS CURVE</div>
+                            <button class="ck-svg-expand-btn" data-title="${htmlEscape(chartTitle)}">⛶ Expand</button>
+                        </div>
+                        <svg id="${chartId}" style="width:100%;height:210px;"></svg>
+                        <div style="font-size:0.72rem;color:#9ca3af;margin-top:0.25rem;">${chartLegend}</div>
+                    </div>
+                `
+                : '';
+
+            detailBox.innerHTML = `
+                <div style="border:1px solid rgba(71,180,117,0.25);border-radius:8px;background:rgba(8,18,10,0.88);padding:0.65rem 0.85rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <div style="font-weight:700;font-size:0.9rem;color:#e5e7eb;">${htmlEscape(stage)}</div>
+                        <button id="dpStageDetailClose" style="background:transparent;border:none;color:#6b7280;font-size:1.2rem;cursor:pointer;line-height:1;padding:0 0.2rem;" title="Close">×</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">DATASET</div>
+                            <div style="font-size:0.8rem;word-break:break-all;">${meta.dsName ? htmlEscape(meta.dsName) : '<span style="color:#4b5563;font-style:italic;">not assigned</span>'}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">DATA PATHS</div>
+                            <div style="font-size:0.74rem;word-break:break-all;">
+                                ${pathCellCompact(meta.rawSourcePath || (latestRun && latestRun.raw_source_path) || meta.sourcePath || (latestRun && latestRun.source_path) || '-', 'raw')}
+                                ${(meta.tokenStreamPath || (latestRun && latestRun.token_stream_path))
+                                    ? pathCellCompact(meta.tokenStreamPath || latestRun.token_stream_path, 'tok')
+                                    : ''
+                                }
+                            </div>
+                            <div style="font-size:0.68rem;color:#6b7280;margin-top:0.15rem;">${htmlEscape((latestRun && latestRun.dataset_provenance) ? String(latestRun.dataset_provenance) : 'stage_artifacts/data_provenance')}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">SHAPE</div>
+                            <div style="font-size:0.78rem;">rows: ${fmtNum(meta.dsRows)}</div>
+                            <div style="font-size:0.78rem;">tokens: ${fmtNum(meta.dsTok)}</div>
+                            <div style="font-size:0.78rem;">bytes: ${fmtBytes(meta.byteSize)}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TOKENIZER COVERAGE</div>
+                            <div style="font-size:0.78rem;color:${covColor};">${covMark} ${covLabel}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TRAINING LOSS</div>
+                            <div style="font-size:0.78rem;color:#fcd34d;">${latestLossLabel}</div>
+                            <div style="font-size:0.72rem;color:#9ca3af;">runs: ${runCount}</div>
+                        </div>
+                    </div>
+                    ${latestRun ? `<div style="margin:-0.05rem 0 0.45rem 0;">${stageLossSparkline(latestRun)}</div>` : ''}
+                    ${chartPanel}
+                    ${runCount > 0 ? `
+                        <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.22rem;">LOSS RUNS (${runCount})</div>
+                        <div style="overflow:auto;max-height:180px;margin-bottom:0.45rem;">
+                            <table style="font-size:0.74rem;">
+                                <thead><tr><th>Run</th><th>Loss (start → end)</th><th>Steps</th><th>Seq</th><th>LR</th></tr></thead>
+                                <tbody>${lossRunsRows}</tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+                    ${meta.catNote ? `<div style="font-size:0.74rem;color:#9ca3af;background:rgba(255,255,255,0.03);border-radius:4px;padding:0.3rem 0.5rem;margin-bottom:0.45rem;font-style:italic;">${htmlEscape(meta.catNote)}</div>` : ''}
+                    <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.22rem;">ARTIFACTS (${meta.artifacts.length})</div>
+                    ${artRows}
+                </div>
+            `;
+
+            detailBox.style.display = 'block';
+            const closeBtn = detailBox.querySelector('#dpStageDetailClose');
+            if (closeBtn) closeBtn.addEventListener('click', closeStageDetail);
+
+            if (typeof drawLineChart === 'function' && chartSeries.points.length > 1) {
+                drawLineChart(
+                    detailBox.querySelector(`#${chartId}`),
+                    chartSeries.points,
+                    'loss',
+                    '#fbbf24',
+                    chartSeries.hasPrevious ? 'loss_prev' : null,
+                    { title: chartTitle }
+                );
+            }
+
+            if (shouldScroll) detailBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
         cards.forEach((card) => {
             card.addEventListener('click', () => {
                 const stage = card.dataset.dpStage;
-                const meta = (window._ckDpStageCardMeta || {})[stage];
-                if (!meta || !detailBox) return;
-
-                // Toggle off on second click of same card
+                if (!stage || !(window._ckDpStageCardMeta || {})[stage] || !detailBox) return;
                 if (openStage === stage) {
-                    detailBox.style.display = 'none';
-                    detailBox.innerHTML = '';
-                    openStage = null;
-                    cards.forEach((c) => { c.style.outline = ''; });
+                    closeStageDetail();
                     return;
                 }
-
-                openStage = stage;
-                cards.forEach((c) => {
-                    c.style.outline = c.dataset.dpStage === stage ? '2px solid rgba(71,180,117,0.75)' : '';
-                });
-
-                const covColor = meta.covered === true ? '#6ee7b7' : (meta.covered === false ? '#fb923c' : '#9ca3af');
-                const covMark = meta.covered === true ? '✓' : (meta.covered === false ? '⚠' : '?');
-                const covLabel = meta.covered === true
-                    ? 'Tokenizer corpus covers this dataset — no novel boundaries expected'
-                    : (meta.covered === false
-                        ? 'Tok gap — dataset outside tokenizer corpus; watch for boundary artifacts'
-                        : 'Coverage not recorded — add corpus_datasets to tokenizer_lineage');
-
-                const artRows = meta.artifacts.length > 0
-                    ? meta.artifacts.map((a) => {
-                        const nm = typeof a === 'string' ? a : (a.name || a.path || JSON.stringify(a));
-                        return `<div style="font-family:monospace;font-size:0.73rem;color:var(--text-muted);word-break:break-all;padding:0.1rem 0;">${htmlEscape(nm)}</div>`;
-                    }).join('')
-                    : '<div style="font-size:0.76rem;color:#4b5563;font-style:italic;">No artifacts recorded for this stage yet.</div>';
-
-                detailBox.innerHTML = `
-                    <div style="border:1px solid rgba(71,180,117,0.25);border-radius:8px;background:rgba(8,18,10,0.88);padding:0.65rem 0.85rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                            <div style="font-weight:700;font-size:0.9rem;color:#e5e7eb;">${htmlEscape(stage)}</div>
-                            <button id="dpStageDetailClose" style="background:transparent;border:none;color:#6b7280;font-size:1.2rem;cursor:pointer;line-height:1;padding:0 0.2rem;" title="Close">×</button>
-                        </div>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
-                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
-                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">DATASET</div>
-                                <div style="font-size:0.8rem;word-break:break-all;">${meta.dsName ? htmlEscape(meta.dsName) : '<span style="color:#4b5563;font-style:italic;">not assigned</span>'}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
-                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">SHAPE</div>
-                                <div style="font-size:0.78rem;">rows: ${fmtNum(meta.dsRows)}</div>
-                                <div style="font-size:0.78rem;">tokens: ${fmtNum(meta.dsTok)}</div>
-                                <div style="font-size:0.78rem;">bytes: ${fmtBytes(meta.byteSize)}</div>
-                            </div>
-                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
-                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TOKENIZER COVERAGE</div>
-                                <div style="font-size:0.78rem;color:${covColor};">${covMark} ${covLabel}</div>
-                            </div>
-                        </div>
-                        ${meta.catNote ? `<div style="font-size:0.74rem;color:#9ca3af;background:rgba(255,255,255,0.03);border-radius:4px;padding:0.3rem 0.5rem;margin-bottom:0.45rem;font-style:italic;">${htmlEscape(meta.catNote)}</div>` : ''}
-                        <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.22rem;">ARTIFACTS (${meta.artifacts.length})</div>
-                        ${artRows}
-                    </div>
-                `;
-
-                detailBox.style.display = 'block';
-                const closeBtn = detailBox.querySelector('#dpStageDetailClose');
-                if (closeBtn) {
-                    closeBtn.addEventListener('click', () => {
-                        detailBox.style.display = 'none';
-                        detailBox.innerHTML = '';
-                        openStage = null;
-                        cards.forEach((c) => { c.style.outline = ''; });
-                    });
-                }
-                detailBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                renderStageDetail(stage, true);
             });
         });
+
+        const persistedStage = String(window._ckDpStageOpen || '').trim();
+        if (persistedStage && (window._ckDpStageCardMeta || {})[persistedStage]) {
+            renderStageDetail(persistedStage, false);
+        }
     }
 }
 

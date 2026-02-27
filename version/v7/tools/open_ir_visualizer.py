@@ -812,6 +812,8 @@ def _build_tokenizer_preview(
             "id": int(idx),
             "piece": _piece_display(piece),
             "bytes_hex": _bytes_hex_preview(piece),
+            "byte_len": len(piece.encode("utf-8", errors="replace")),
+            "char_len": len(piece),
         }
         for idx, piece in vocab_items[:48]
     ]
@@ -821,6 +823,8 @@ def _build_tokenizer_preview(
             "id": int(idx),
             "piece": _piece_display(piece),
             "bytes_hex": _bytes_hex_preview(piece),
+            "byte_len": len(piece.encode("utf-8", errors="replace")),
+            "char_len": len(piece),
         }
         for idx, piece in vocab_items[:token_lookup_row_limit]
     ]
@@ -836,6 +840,8 @@ def _build_tokenizer_preview(
                     "id": int(idx),
                     "piece": _piece_display(piece, limit=512),
                     "bytes_hex": _bytes_hex_preview(piece, limit=64),
+                    "byte_len": len(piece.encode("utf-8", errors="replace")),
+                    "char_len": len(piece),
                 }
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     except Exception as e:
@@ -1467,6 +1473,30 @@ def _derive_dataset_catalog(pipeline: dict, run_dir: Path | None) -> list[dict]:
     entries: list[dict] = []
     seen_paths: set[str] = set()
 
+    def _resolve_manifest_out_path(raw_path: str, manifest_path: Path | None = None) -> tuple[str, str]:
+        """
+        Resolve manifest out_path values that may be stale after dataset relocation.
+        Returns (resolved_path, remap_note_suffix).
+        """
+        p = _resolve_path_loose(Path(raw_path).expanduser())
+        if p.exists():
+            return str(p), ""
+
+        name = Path(raw_path).name
+        probes: list[Path] = []
+        if manifest_path is not None:
+            probes.append(manifest_path.parent / name)
+        probes.extend(
+            [
+                V7_ROOT / "data" / "generated" / name,
+                V7_ROOT / "data" / name,
+            ]
+        )
+        for cand in probes:
+            if cand.exists():
+                return str(cand), f"remapped from stale out_path ({raw_path})"
+        return raw_path, ""
+
     def _add_entry(
         *,
         stage: str,
@@ -1557,13 +1587,17 @@ def _derive_dataset_catalog(pipeline: dict, run_dir: Path | None) -> list[dict]:
             source="manifest",
         )
         if isinstance(out_path, str) and out_path.strip():
+            resolved_out_path, remap_note = _resolve_manifest_out_path(out_path, manifest_path)
+            out_note = f"derived from {manifest_path.name}"
+            if remap_note:
+                out_note = f"{out_note}; {remap_note}"
             _add_entry(
                 stage=stage,
                 kind="generated_dataset",
-                name=Path(out_path).name,
-                path=out_path,
+                name=Path(resolved_out_path).name,
+                path=resolved_out_path,
                 rows=rows,
-                note=f"derived from {manifest_path.name}",
+                note=out_note,
                 source="manifest_output",
             )
 
@@ -1608,6 +1642,7 @@ def _derive_stage_artifacts(pipeline: dict, loaded_paths: dict[str, str], run_di
     _push("tokenizer_roundtrip_json", artifacts.get("tokenizer_roundtrip_json"), required=True)
     _push("post_train_eval_json", artifacts.get("post_train_eval_json"), required=False)
     _push("training_pipeline_json", loaded_paths.get("training_pipeline"), required=True)
+    _push("corpus_sampling_log_json", loaded_paths.get("corpus_sampling_log"), required=False)
 
     if run_dir is not None:
         for label, rel in (
@@ -1642,6 +1677,426 @@ def _derive_stage_artifacts(pipeline: dict, loaded_paths: dict[str, str], run_di
             }
         )
     return rows
+
+
+def _normalize_curriculum_stage_name(raw_stage: Any) -> str | None:
+    stage = str(raw_stage or "").strip().lower()
+    if not stage:
+        return None
+    aliases = {
+        "stage_a": "pretrain",
+        "stage_b": "midtrain",
+        "pretrain": "pretrain",
+        "midtrain": "midtrain",
+        "sft": "sft",
+        "dpo": "dpo",
+        "grpo": "grpo",
+        "ppo": "ppo",
+    }
+    return aliases.get(stage, stage)
+
+
+def _extract_stage_loss_series(payload: Any) -> list[dict[str, float]]:
+    rows: list[Any] = []
+    if isinstance(payload, dict):
+        if isinstance(payload.get("loss_curve"), list):
+            rows = payload.get("loss_curve") or []
+        elif isinstance(payload.get("steps"), list):
+            rows = payload.get("steps") or []
+    elif isinstance(payload, list):
+        rows = payload
+
+    series: list[dict[str, float]] = []
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        step_raw = row.get("step")
+        if not isinstance(step_raw, (int, float)):
+            step_raw = idx + 1
+        loss_raw = row.get("loss_ck")
+        if not isinstance(loss_raw, (int, float)):
+            loss_raw = row.get("loss")
+        if not isinstance(loss_raw, (int, float)):
+            continue
+        step = float(step_raw)
+        loss = float(loss_raw)
+        if not (step >= 0):
+            continue
+        series.append({"step": step, "loss": loss})
+    return series
+
+
+def _extract_stage_loss_series_by_stage(payload: Any) -> dict[str, list[dict[str, float]]]:
+    rows: list[Any] = []
+    if isinstance(payload, dict):
+        if isinstance(payload.get("loss_curve"), list):
+            rows = payload.get("loss_curve") or []
+        elif isinstance(payload.get("steps"), list):
+            rows = payload.get("steps") or []
+    elif isinstance(payload, list):
+        rows = payload
+
+    by_stage: dict[str, list[dict[str, float]]] = {}
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        step_raw = row.get("step")
+        if not isinstance(step_raw, (int, float)):
+            step_raw = idx + 1
+        loss_raw = row.get("loss_ck")
+        if not isinstance(loss_raw, (int, float)):
+            loss_raw = row.get("loss")
+        if not isinstance(loss_raw, (int, float)):
+            continue
+        stage_raw = row.get("source_stage") or row.get("stage") or row.get("curriculum_stage")
+        stage = _normalize_curriculum_stage_name(stage_raw) or "unassigned"
+        step = float(step_raw)
+        loss = float(loss_raw)
+        if not (step >= 0):
+            continue
+        by_stage.setdefault(stage, []).append({"step": step, "loss": loss})
+    return by_stage
+
+
+def _sample_stage_loss_series(series: list[dict[str, float]], max_points: int = 160) -> list[dict[str, float]]:
+    if len(series) <= max_points:
+        return list(series)
+    stride = max(1, len(series) // max_points)
+    sampled = series[::stride]
+    if sampled[-1] != series[-1]:
+        sampled.append(series[-1])
+    return sampled
+
+
+def _derive_stage_loss_history(
+    pipeline: dict[str, Any],
+    files: dict[str, Any],
+    loaded_paths: dict[str, str],
+    run_dir: Path | None,
+) -> dict[str, Any]:
+    active_stage = _normalize_curriculum_stage_name(pipeline.get("active_stage")) or "pretrain"
+    entries: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    stage_refs: list[dict[str, Any]] = []
+    active_prov: dict[str, Any] = {}
+    prov_by_stage: dict[str, dict[str, Any]] = {}
+
+    prov_rows = pipeline.get("data_provenance")
+    if isinstance(prov_rows, list):
+        for row in prov_rows:
+            if not isinstance(row, dict):
+                continue
+            row_stage = _normalize_curriculum_stage_name(row.get("stage") or row.get("curriculum_stage"))
+            if row_stage and row_stage not in prov_by_stage:
+                prov_by_stage[row_stage] = row
+            if row_stage == active_stage:
+                active_prov = row
+                break
+
+    if run_dir is not None:
+        # Prefer latest snapshot first; only fall back to legacy file when latest
+        # is absent or malformed so stale stage ordering does not leak into stage refs.
+        for cand in (run_dir / "training_pipeline_latest.json", run_dir / "training_pipeline.json"):
+            snap = _load_json_loose(cand)
+            if not isinstance(snap, dict):
+                continue
+            prov = snap.get("data_provenance")
+            if not isinstance(prov, list):
+                continue
+            for row in prov:
+                if not isinstance(row, dict):
+                    continue
+                stage_name = _normalize_curriculum_stage_name(row.get("stage") or row.get("curriculum_stage"))
+                if not stage_name:
+                    continue
+                stage_refs.append(
+                    {
+                        "stage": stage_name,
+                        "token_count": row.get("token_count"),
+                        "dataset_name": row.get("dataset_name"),
+                        "source_path": row.get("source_path"),
+                    }
+                )
+
+    def _infer_stage_ref(train_ck: dict[str, Any]) -> dict[str, Any] | None:
+        if not stage_refs:
+            return None
+        total_tokens = train_ck.get("total_tokens")
+        if isinstance(total_tokens, (int, float)):
+            token_matches = [r for r in stage_refs if isinstance(r.get("token_count"), (int, float)) and int(r.get("token_count")) == int(total_tokens)]
+            if len(token_matches) == 1:
+                return token_matches[0]
+        data_source = train_ck.get("data_source")
+        ds_name = None
+        if isinstance(data_source, dict) and isinstance(data_source.get("dataset_name"), str):
+            ds_name = data_source.get("dataset_name")
+        if isinstance(ds_name, str) and ds_name.strip():
+            ds_name_l = ds_name.strip().lower()
+            for ref in stage_refs:
+                ref_name = ref.get("dataset_name")
+                if isinstance(ref_name, str) and ref_name.strip().lower() == ds_name_l:
+                    return ref
+        return None
+
+    def _ingest(
+        stage_hint: Any,
+        payload: Any,
+        *,
+        source: str,
+        path_hint: str | None = None,
+        run_id: str | None = None,
+        meta: dict[str, Any] | None = None,
+        series_override: list[dict[str, float]] | None = None,
+    ) -> None:
+        stage = _normalize_curriculum_stage_name(stage_hint) or "unassigned"
+        if isinstance(series_override, list) and series_override:
+            series = list(series_override)
+        else:
+            series = _extract_stage_loss_series(payload)
+        if not series:
+            return
+
+        path_key = str(path_hint or "")
+        dedupe_key = (stage, path_key or (run_id or source))
+        if dedupe_key in seen:
+            return
+        seen.add(dedupe_key)
+
+        losses = [p["loss"] for p in series]
+        first_loss = losses[0]
+        final_loss = losses[-1]
+        drop_abs = first_loss - final_loss
+        drop_pct = (drop_abs / first_loss * 100.0) if abs(first_loss) > 1e-12 else 0.0
+        points = _sample_stage_loss_series(series, max_points=180)
+
+        entry: dict[str, Any] = {
+            "stage": stage,
+            "source": source,
+            "run_id": run_id or source,
+            "path": path_hint,
+            "steps": len(series),
+            "first_loss": first_loss,
+            "final_loss": final_loss,
+            "min_loss": min(losses),
+            "max_loss": max(losses),
+            "drop_abs": drop_abs,
+            "drop_pct": drop_pct,
+            "points": points,
+        }
+        if isinstance(meta, dict):
+            for key, value in meta.items():
+                if value is not None:
+                    entry[key] = value
+        entries.append(entry)
+
+    # Current active curve loaded in files.
+    if "training_loss_curve" in files:
+        current_payload = files.get("training_loss_curve")
+        stage_series = _extract_stage_loss_series_by_stage(current_payload)
+        if stage_series:
+            for stage_name, series in stage_series.items():
+                prov = prov_by_stage.get(stage_name, active_prov if stage_name == active_stage else {})
+                _ingest(
+                    stage_name,
+                    current_payload,
+                    source="training_loss_curve",
+                    path_hint=loaded_paths.get("training_loss_curve"),
+                    run_id=f"current:{stage_name}",
+                    series_override=series,
+                    meta={
+                        "dataset_name": prov.get("dataset_name") if isinstance(prov.get("dataset_name"), str) else None,
+                        "source_path": prov.get("source_path") if isinstance(prov.get("source_path"), str) else None,
+                        "raw_source_path": prov.get("source_path") if isinstance(prov.get("source_path"), str) else None,
+                        "token_stream_path": None,
+                        "total_tokens": prov.get("token_count"),
+                        "dataset_provenance": "data_provenance",
+                    },
+                )
+        else:
+            _ingest(
+                active_stage,
+                current_payload,
+                source="training_loss_curve",
+                path_hint=loaded_paths.get("training_loss_curve"),
+                run_id="current",
+                meta={
+                    "dataset_name": active_prov.get("dataset_name") if isinstance(active_prov.get("dataset_name"), str) else None,
+                    "source_path": active_prov.get("source_path") if isinstance(active_prov.get("source_path"), str) else None,
+                    "raw_source_path": active_prov.get("source_path") if isinstance(active_prov.get("source_path"), str) else None,
+                    "token_stream_path": None,
+                    "total_tokens": active_prov.get("token_count"),
+                    "dataset_provenance": "data_provenance",
+                },
+            )
+
+    # Stage-artifact curve pointers (often from *_latest snapshots).
+    stage_artifacts = pipeline.get("stage_artifacts")
+    if isinstance(stage_artifacts, list):
+        for row in stage_artifacts:
+            if not isinstance(row, dict):
+                continue
+            stage_name = row.get("stage")
+            artifacts = row.get("artifacts")
+            if not isinstance(artifacts, list):
+                continue
+            for art in artifacts:
+                if not isinstance(art, dict):
+                    continue
+                if str(art.get("label") or "") != "training_loss_curve":
+                    continue
+                path_raw = art.get("path")
+                if not isinstance(path_raw, str) or not path_raw.strip():
+                    continue
+                p = Path(path_raw).expanduser()
+                payload = _load_json_loose(p)
+                if isinstance(payload, dict):
+                    _ingest(
+                        stage_name,
+                        payload,
+                        source="stage_artifact",
+                        path_hint=str(p),
+                        run_id=f"artifact:{p.name}",
+                    )
+
+    # Historical train runs under .ck_pipeline/ascii_bpe_*/train_ck.json.
+    if run_dir is not None:
+        pipe_root = run_dir / ".ck_pipeline"
+        if pipe_root.exists():
+            for sub in sorted(pipe_root.glob("ascii_bpe_*")):
+                train_ck_path = sub / "train_ck.json"
+                if not train_ck_path.exists():
+                    continue
+                train_ck = _load_json_loose(train_ck_path)
+                if not isinstance(train_ck, dict):
+                    continue
+
+                stage_name: str | None = None
+                report = _load_json_loose(sub / "pipeline_report.json")
+                if isinstance(report, dict):
+                    stage_name = _normalize_curriculum_stage_name(report.get("curriculum_stage") or report.get("stage"))
+                if not stage_name:
+                    prov = train_ck.get("data_provenance")
+                    if isinstance(prov, list) and prov and isinstance(prov[0], dict):
+                        stage_name = _normalize_curriculum_stage_name(prov[0].get("stage") or prov[0].get("curriculum_stage"))
+                inferred_ref = _infer_stage_ref(train_ck)
+                if not stage_name and isinstance(inferred_ref, dict):
+                    stage_name = _normalize_curriculum_stage_name(inferred_ref.get("stage"))
+                if not stage_name:
+                    stage_name = "unassigned"
+
+                try:
+                    ended_at = datetime.fromtimestamp(train_ck_path.stat().st_mtime, tz=timezone.utc).isoformat()
+                except Exception:
+                    ended_at = None
+
+                dataset_name = None
+                source_path = None
+                dataset_provenance = None
+                data_source = train_ck.get("data_source") if isinstance(train_ck.get("data_source"), dict) else {}
+                if isinstance(data_source.get("dataset_name"), str) and data_source.get("dataset_name", "").strip():
+                    dataset_name = data_source.get("dataset_name").strip()
+                    dataset_provenance = "train_ck.data_source"
+                if isinstance(data_source.get("source_path"), str) and data_source.get("source_path", "").strip():
+                    source_path = data_source.get("source_path").strip()
+                    dataset_provenance = dataset_provenance or "train_ck.data_source"
+                if not source_path and isinstance(data_source.get("source_uri"), str):
+                    source_uri = data_source.get("source_uri").strip()
+                    if source_uri.startswith("file://") and len(source_uri) > 7:
+                        source_path = source_uri[7:]
+                        dataset_provenance = dataset_provenance or "train_ck.data_source_uri"
+
+                if isinstance(report, dict):
+                    if not dataset_name and isinstance(report.get("dataset_name"), str) and report.get("dataset_name", "").strip():
+                        dataset_name = report.get("dataset_name").strip()
+                        dataset_provenance = dataset_provenance or "pipeline_report"
+                    if not source_path and isinstance(report.get("dataset_path"), str) and report.get("dataset_path", "").strip():
+                        source_path = report.get("dataset_path").strip()
+                        dataset_provenance = dataset_provenance or "pipeline_report"
+                    report_source = report.get("data_source")
+                    if isinstance(report_source, dict):
+                        if not dataset_name and isinstance(report_source.get("dataset_name"), str) and report_source.get("dataset_name", "").strip():
+                            dataset_name = report_source.get("dataset_name").strip()
+                            dataset_provenance = dataset_provenance or "pipeline_report.data_source"
+                        if not source_path and isinstance(report_source.get("source_path"), str) and report_source.get("source_path", "").strip():
+                            source_path = report_source.get("source_path").strip()
+                            dataset_provenance = dataset_provenance or "pipeline_report.data_source"
+
+                if isinstance(inferred_ref, dict):
+                    if not dataset_name and isinstance(inferred_ref.get("dataset_name"), str) and inferred_ref.get("dataset_name", "").strip():
+                        dataset_name = inferred_ref.get("dataset_name").strip()
+                        dataset_provenance = dataset_provenance or "stage_refs"
+                    if not source_path and isinstance(inferred_ref.get("source_path"), str) and inferred_ref.get("source_path", "").strip():
+                        source_path = inferred_ref.get("source_path").strip()
+                        dataset_provenance = dataset_provenance or "stage_refs"
+
+                if not source_path:
+                    corpus_dir = sub / "corpus"
+                    if corpus_dir.exists():
+                        corpus_files = sorted([p for p in corpus_dir.iterdir() if p.is_file()])
+                        if len(corpus_files) == 1:
+                            source_path = str(corpus_files[0])
+                            dataset_provenance = dataset_provenance or "ck_pipeline.corpus"
+                            if not dataset_name:
+                                dataset_name = corpus_files[0].name
+
+                if stage_name == "unassigned":
+                    hint_blob = f"{dataset_name or ''} {source_path or ''}".lower()
+                    if "stage_a" in hint_blob or "pretrain" in hint_blob:
+                        stage_name = "pretrain"
+                    elif "stage_b" in hint_blob or "midtrain" in hint_blob:
+                        stage_name = "midtrain"
+
+                token_stream_path = None
+                raw_source_path = None
+                if source_path:
+                    base_name = Path(source_path).name.lower()
+                    if base_name in {"train_tokens.txt", "tokens.txt"} or "token" in base_name:
+                        token_stream_path = source_path
+                    else:
+                        raw_source_path = source_path
+                if token_stream_path and isinstance(inferred_ref, dict):
+                    ref_path = inferred_ref.get("source_path")
+                    if isinstance(ref_path, str) and ref_path.strip():
+                        ref_path_s = ref_path.strip()
+                        ref_name = Path(ref_path_s).name.lower()
+                        if ref_path_s != token_stream_path and "token" not in ref_name:
+                            raw_source_path = ref_path_s
+                if not raw_source_path and source_path and not token_stream_path:
+                    raw_source_path = source_path
+
+                _ingest(
+                    stage_name,
+                    train_ck,
+                    source="ck_pipeline",
+                    path_hint=str(train_ck_path),
+                    run_id=sub.name,
+                    meta={
+                        "seq_len": train_ck.get("seq_len"),
+                        "total_tokens": train_ck.get("total_tokens"),
+                        "epochs": train_ck.get("epochs"),
+                        "lr": train_ck.get("lr"),
+                        "grad_accum": train_ck.get("grad_accum"),
+                        "ended_at": ended_at,
+                        "dataset_name": dataset_name,
+                        "source_path": source_path,
+                        "raw_source_path": raw_source_path,
+                        "token_stream_path": token_stream_path,
+                        "dataset_provenance": dataset_provenance,
+                    },
+                )
+
+    entries.sort(key=lambda item: (str(item.get("stage") or ""), str(item.get("ended_at") or ""), str(item.get("run_id") or "")))
+    by_stage: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        stage = str(entry.get("stage") or "unassigned")
+        by_stage.setdefault(stage, []).append(entry)
+
+    return {
+        "schema": "ck.stage_loss_history.v1",
+        "active_stage": active_stage,
+        "entries": entries,
+        "by_stage": by_stage,
+    }
 
 
 def _canon_path_str(path_like: str) -> str:
@@ -1799,6 +2254,194 @@ def _derive_stage_dataset_bindings_from_pipeline(pipeline: dict) -> list[dict]:
             }
         )
     return out
+
+
+def _derive_stage_sequence(pipeline: dict) -> dict[str, Any]:
+    """
+    Build an explicit stage sequence contract for UI ordering.
+    This keeps stage flow deterministic and driven by JSON metadata, not hardcoded UI order.
+    """
+    active_stage = _normalize_curriculum_stage_name(pipeline.get("active_stage")) or "pretrain"
+    timeline = pipeline.get("stage_timeline") if isinstance(pipeline.get("stage_timeline"), list) else []
+    stage_loss_history = pipeline.get("stage_loss_history") if isinstance(pipeline.get("stage_loss_history"), dict) else {}
+    stage_loss_entries = stage_loss_history.get("entries") if isinstance(stage_loss_history.get("entries"), list) else []
+    stage_artifacts = pipeline.get("stage_artifacts") if isinstance(pipeline.get("stage_artifacts"), list) else []
+    provenance = pipeline.get("data_provenance") if isinstance(pipeline.get("data_provenance"), list) else []
+    existing = pipeline.get("stage_sequence") if isinstance(pipeline.get("stage_sequence"), dict) else {}
+    existing_entries = existing.get("entries") if isinstance(existing.get("entries"), list) else []
+
+    def _to_int(raw: Any) -> int | None:
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float) and raw.is_integer():
+            return int(raw)
+        if isinstance(raw, str):
+            text = raw.strip()
+            if text and re.fullmatch(r"-?\d+", text):
+                try:
+                    return int(text)
+                except Exception:
+                    return None
+        return None
+
+    rows: dict[str, dict[str, Any]] = {}
+    insertion_order = 0
+    fallback_order = {"pretrain": 0, "midtrain": 1, "sft": 2, "dpo": 3, "grpo": 4, "ppo": 5}
+    status_rank = {"active": 3, "completed": 2, "pass": 2, "planned": 1, "missing": 0}
+
+    def _ingest(
+        raw_stage: Any,
+        *,
+        source: str,
+        declared_seq: Any = None,
+        status: Any = None,
+        active: Any = None,
+    ) -> None:
+        nonlocal insertion_order
+        stage = _normalize_curriculum_stage_name(raw_stage)
+        if not stage:
+            return
+
+        seq = _to_int(declared_seq)
+        if isinstance(seq, int) and seq <= 0:
+            seq = None
+        status_s = str(status).strip().lower() if isinstance(status, str) else ""
+        active_b = bool(active is True or stage == active_stage)
+
+        row = rows.get(stage)
+        if row is None:
+            row = {
+                "stage": stage,
+                "declared_seq": seq,
+                "status": status_s if status_s else ("active" if active_b else "planned"),
+                "active": active_b,
+                "sources": [source],
+                "_seen": insertion_order,
+            }
+            insertion_order += 1
+            rows[stage] = row
+        else:
+            if isinstance(seq, int):
+                if not isinstance(row.get("declared_seq"), int) or int(seq) < int(row["declared_seq"]):
+                    row["declared_seq"] = seq
+            if status_s:
+                prev = str(row.get("status") or "").lower()
+                if status_rank.get(status_s, 0) > status_rank.get(prev, 0):
+                    row["status"] = status_s
+            if active_b:
+                row["active"] = True
+                row["status"] = "active"
+            if source not in row["sources"]:
+                row["sources"].append(source)
+
+    # 1) Existing explicit stage_sequence (if present).
+    for idx, row in enumerate(existing_entries):
+        if not isinstance(row, dict):
+            continue
+        seq = row.get("seq")
+        if seq is None:
+            seq = _to_int(row.get("order"))
+            if isinstance(seq, int):
+                seq += 1
+        if seq is None:
+            seq = _to_int(row.get("index"))
+            if isinstance(seq, int):
+                seq += 1
+        if seq is None:
+            seq = idx + 1
+        _ingest(
+            row.get("stage"),
+            source="stage_sequence",
+            declared_seq=seq,
+            status=row.get("status"),
+            active=row.get("active"),
+        )
+
+    # 2) Stage timeline.
+    for idx, row in enumerate(timeline):
+        if not isinstance(row, dict):
+            continue
+        seq = _to_int(row.get("seq"))
+        if seq is None:
+            order = _to_int(row.get("order"))
+            if isinstance(order, int):
+                seq = order + 1
+        if seq is None:
+            index = _to_int(row.get("index"))
+            if isinstance(index, int):
+                seq = index + 1
+        if seq is None:
+            seq = idx + 1
+        _ingest(
+            row.get("stage"),
+            source="stage_timeline",
+            declared_seq=seq,
+            status=row.get("status"),
+            active=row.get("active"),
+        )
+
+    # 3) Data provenance (active datasets by stage).
+    for row in provenance:
+        if not isinstance(row, dict):
+            continue
+        _ingest(
+            row.get("stage") or row.get("curriculum_stage"),
+            source="data_provenance",
+            status=row.get("status"),
+        )
+
+    # 4) Stage artifacts.
+    for row in stage_artifacts:
+        if not isinstance(row, dict):
+            continue
+        _ingest(
+            row.get("stage"),
+            source="stage_artifacts",
+            status=row.get("status"),
+            active=row.get("active"),
+        )
+
+    # 5) Stage loss history (often includes legacy/unassigned).
+    for row in stage_loss_entries:
+        if not isinstance(row, dict):
+            continue
+        _ingest(
+            row.get("stage"),
+            source="stage_loss_history",
+        )
+
+    # Always include current active stage.
+    _ingest(active_stage, source="active_stage", status="active", active=True)
+
+    items = list(rows.values())
+    items.sort(
+        key=lambda row: (
+            int(row["declared_seq"]) if isinstance(row.get("declared_seq"), int) else 10_000 + fallback_order.get(str(row.get("stage") or ""), 100),
+            int(row.get("_seen", 0)),
+            str(row.get("stage") or ""),
+        )
+    )
+
+    entries: list[dict[str, Any]] = []
+    for idx, row in enumerate(items):
+        entry = {
+            "stage": str(row.get("stage") or ""),
+            "seq": idx + 1,
+            "status": str(row.get("status") or ("active" if row.get("active") else "planned")),
+            "active": bool(row.get("active") is True),
+            "source": ",".join(row.get("sources") or []),
+        }
+        if isinstance(row.get("declared_seq"), int):
+            entry["declared_seq"] = int(row["declared_seq"])
+        entries.append(entry)
+
+    return {
+        "schema": "ck.stage_sequence.v1",
+        "active_stage": active_stage,
+        "entries": entries,
+    }
 
 
 def _extract_loss_series(payload, preferred_keys: list[str]) -> list[float]:
@@ -2049,6 +2692,7 @@ def load_model_data(
         "training_step_profile",
         "training_checkpoint_policy",
         "training_pipeline",
+        "corpus_sampling_log",
         "training_logbook",
         "dataset_qc",
         "dataset_profile",
@@ -2123,7 +2767,8 @@ def load_model_data(
         "training_canary_summary": model_candidates("training_canary_summary.json"),
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
-        "training_pipeline": model_candidates("training_pipeline.json") + model_candidates("training_pipeline_latest.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
+        "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
+        "corpus_sampling_log": model_candidates("corpus_sampling_log_latest.json") + model_candidates("corpus_sampling_log.json") + [V7_REPORT_PATH / "corpus_sampling_log_latest.json", V7_REPORT_PATH_LEGACY / "corpus_sampling_log_latest.json"],
         "dataset_qc": model_candidates("dataset_qc.json"),
         "dataset_profile": model_candidates("dataset_profile.json"),
         "tokenizer_roundtrip": model_candidates("tokenizer_roundtrip.json"),
@@ -2327,7 +2972,7 @@ def load_model_data(
             active_stage = str(runtime_payload.get("train_mode") or runtime_payload.get("mode") or "pretrain").strip().lower()
             if not active_stage:
                 active_stage = "pretrain"
-            stages = ["pretrain", "sft", "dpo", "grpo", "ppo"]
+            stages = ["pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"]
             if active_stage not in stages:
                 stages = [active_stage] + stages
             active_idx = stages.index(active_stage)
@@ -2371,6 +3016,14 @@ def load_model_data(
                 "sources": {"summary": "runtime_parity", "run_dir": str(run_dir) if run_dir is not None else None},
             }
             loaded.append("training_pipeline(runtime)")
+        if "corpus_sampling_log" not in files and isinstance(runtime_payload.get("corpus_sampling_epochs"), list):
+            files["corpus_sampling_log"] = {
+                "schema": "ck.corpus_sampling_log.v1",
+                "run_id": str(runtime_payload.get("run_id") or (run_dir.name if run_dir is not None else "unknown")),
+                "updated_at": runtime_payload.get("generated_at"),
+                "epochs": runtime_payload.get("corpus_sampling_epochs"),
+            }
+            loaded.append("corpus_sampling_log(runtime)")
 
     # Some operators keep decode/prefill parity analyses in split JSON files.
     # Synthesize a combined payload so the viewer can render both together.
@@ -2572,12 +3225,53 @@ def load_model_data(
             data_lab["step_056"] = step_056
 
         dataset_catalog = pipeline.get("dataset_catalog")
+        derived_catalog = _derive_dataset_catalog(pipeline, run_dir)
         if not isinstance(dataset_catalog, list) or not dataset_catalog:
-            derived_catalog = _derive_dataset_catalog(pipeline, run_dir)
             if derived_catalog:
                 pipeline["dataset_catalog"] = derived_catalog
                 loaded.append("dataset_catalog(derived)")
                 dataset_catalog = derived_catalog
+        elif derived_catalog:
+            # Merge existing + derived to keep historical rows while repairing stale manifest paths.
+            existing_rows = [r for r in dataset_catalog if isinstance(r, dict)]
+            merged_rows: list[dict] = [dict(r) for r in existing_rows]
+            index: dict[tuple[str, str, str], int] = {}
+            for i, row in enumerate(merged_rows):
+                key = (
+                    str(row.get("stage") or ""),
+                    str(row.get("kind") or ""),
+                    str(row.get("name") or ""),
+                )
+                if any(key):
+                    index[key] = i
+            changed = False
+            for row in derived_catalog:
+                if not isinstance(row, dict):
+                    continue
+                key = (
+                    str(row.get("stage") or ""),
+                    str(row.get("kind") or ""),
+                    str(row.get("name") or ""),
+                )
+                if key in index:
+                    cur = merged_rows[index[key]]
+                    cur_path = str(cur.get("path") or "")
+                    new_path = str(row.get("path") or "")
+                    cur_exists = bool(cur_path and Path(cur_path).expanduser().exists())
+                    new_exists = bool(new_path and Path(new_path).expanduser().exists())
+                    if new_path and (not cur_path or (not cur_exists and new_exists)) and new_path != cur_path:
+                        cur["path"] = new_path
+                        changed = True
+                    if row.get("note") and row.get("note") != cur.get("note"):
+                        cur["note"] = row.get("note")
+                        changed = True
+                else:
+                    merged_rows.append(dict(row))
+                    changed = True
+            if changed:
+                pipeline["dataset_catalog"] = merged_rows
+                loaded.append("dataset_catalog(merged)")
+                dataset_catalog = merged_rows
 
         stage_artifacts = pipeline.get("stage_artifacts")
         if not isinstance(stage_artifacts, list) or not stage_artifacts:
@@ -2597,6 +3291,74 @@ def load_model_data(
             if derived_stage_bindings:
                 pipeline["stage_dataset_bindings"] = derived_stage_bindings
                 loaded.append("stage_dataset_bindings(derived)")
+
+        stage_loss_history = pipeline.get("stage_loss_history")
+        derived_stage_loss_history = _derive_stage_loss_history(
+            pipeline,
+            files,
+            loaded_paths,
+            run_dir,
+        )
+        if isinstance(derived_stage_loss_history, dict) and isinstance(derived_stage_loss_history.get("entries"), list):
+            if not isinstance(stage_loss_history, dict) or not isinstance(stage_loss_history.get("entries"), list):
+                if derived_stage_loss_history.get("entries"):
+                    pipeline["stage_loss_history"] = derived_stage_loss_history
+                    loaded.append("stage_loss_history(derived)")
+            else:
+                existing_entries = stage_loss_history.get("entries") if isinstance(stage_loss_history.get("entries"), list) else []
+                merged_map: dict[tuple[str, str], dict[str, Any]] = {}
+                for row in existing_entries:
+                    if not isinstance(row, dict):
+                        continue
+                    key = (str(row.get("stage") or ""), str(row.get("run_id") or row.get("path") or ""))
+                    merged_map[key] = dict(row)
+                for row in derived_stage_loss_history.get("entries", []):
+                    if not isinstance(row, dict):
+                        continue
+                    key = (str(row.get("stage") or ""), str(row.get("run_id") or row.get("path") or ""))
+                    cur = merged_map.get(key, {})
+                    authoritative_keys = {
+                        "dataset_name",
+                        "source_path",
+                        "raw_source_path",
+                        "token_stream_path",
+                        "dataset_provenance",
+                    }
+                    for k, v in row.items():
+                        if k in authoritative_keys:
+                            cur[k] = v
+                            continue
+                        if v is None:
+                            continue
+                        if k not in cur or cur.get(k) in (None, "", [], {}):
+                            cur[k] = v
+                    if row.get("token_stream_path") and not row.get("raw_source_path"):
+                        # Keep token-stream-only runs explicit: don't let stale merged history
+                        # backfill raw_source_path with the token stream path.
+                        cur["raw_source_path"] = None
+                    merged_map[key] = cur
+                merged_entries = list(merged_map.values())
+                merged_entries.sort(key=lambda item: (str(item.get("stage") or ""), str(item.get("ended_at") or ""), str(item.get("run_id") or "")))
+                merged_by_stage: dict[str, list[dict[str, Any]]] = {}
+                for item in merged_entries:
+                    st = str(item.get("stage") or "unassigned")
+                    merged_by_stage.setdefault(st, []).append(item)
+                merged_history = {
+                    "schema": str(stage_loss_history.get("schema") or derived_stage_loss_history.get("schema") or "ck.stage_loss_history.v1"),
+                    "active_stage": stage_loss_history.get("active_stage") or derived_stage_loss_history.get("active_stage"),
+                    "entries": merged_entries,
+                    "by_stage": merged_by_stage,
+                }
+                if merged_history != stage_loss_history:
+                    pipeline["stage_loss_history"] = merged_history
+                    loaded.append("stage_loss_history(merged)")
+
+        stage_sequence = _derive_stage_sequence(pipeline)
+        if isinstance(stage_sequence, dict) and isinstance(stage_sequence.get("entries"), list) and stage_sequence.get("entries"):
+            prev_stage_sequence = pipeline.get("stage_sequence")
+            pipeline["stage_sequence"] = stage_sequence
+            if not isinstance(prev_stage_sequence, dict) or prev_stage_sequence != stage_sequence:
+                loaded.append("stage_sequence(derived)")
 
         run_sequence = pipeline.get("run_sequence")
         if not isinstance(run_sequence, list) or not run_sequence:
@@ -2954,13 +3716,17 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
     auto-detect HTTP and start polling the JSON artifact files directly.
     """
     from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+    import mimetypes
 
     LIVE_FILES = [
+        "training_pipeline_latest.json",
         "training_loss_curve_latest.json",
         "training_grad_norms_latest.json",
         "training_parity_latest.json",
         "training_step_profile_latest.json",
         "training_checkpoint_policy_latest.json",
+        "corpus_sampling_log_latest.json",
         "run_index.json",
     ]
 
@@ -2968,7 +3734,7 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
     # /api/snapshot endpoint (one request per cycle instead of N file fetches).
     with open(html_path, "r", encoding="utf-8") as f:
         base_html = f.read()
-    live_cfg = json.dumps({"pollUrl": "/api/snapshot", "intervalMs": interval_ms})
+    live_cfg = json.dumps({"pollUrl": "/api/snapshot", "fsUrl": "/api/fs", "intervalMs": interval_ms})
     live_inject = f"<script>window.CK_LIVE_MODE = {live_cfg};</script>"
     served_html = base_html.replace("</body>", live_inject + "</body>")
     served_html_bytes = served_html.encode("utf-8")
@@ -2984,7 +3750,8 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
             self.send_header("Cache-Control", "no-store")
 
         def do_GET(self):
-            path = self.path.split("?")[0]
+            parsed = urlparse(self.path)
+            path = parsed.path
 
             if path in ("/", "/index.html", "/ir_report.html"):
                 self.send_response(200)
@@ -3009,6 +3776,40 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
                 body = json.dumps(snapshot).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
+
+            elif path == "/api/fs":
+                params = parse_qs(parsed.query or "")
+                raw_path = params.get("path", [""])[0]
+                if not isinstance(raw_path, str) or not raw_path.strip():
+                    self.send_error(400, "missing path")
+                    return
+                req_path = Path(raw_path).expanduser()
+                resolved = _resolve_path_loose(req_path)
+                allowed_roots = [
+                    _resolve_path_loose(run_dir),
+                    _resolve_path_loose(V7_ROOT),
+                    _resolve_path_loose(PROJECT_ROOT),
+                ]
+                if not _path_under_any_root(resolved, allowed_roots):
+                    self.send_error(403, "path outside allowed roots")
+                    return
+                if not resolved.exists() or not resolved.is_file():
+                    self.send_error(404, "file not found")
+                    return
+                try:
+                    body = resolved.read_bytes()
+                except Exception:
+                    self.send_error(500, "failed to read file")
+                    return
+                mime, _ = mimetypes.guess_type(str(resolved))
+                if not mime:
+                    mime = "text/plain; charset=utf-8"
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
                 self.send_header("Content-Length", str(len(body)))
                 self._cors_headers()
                 self.end_headers()

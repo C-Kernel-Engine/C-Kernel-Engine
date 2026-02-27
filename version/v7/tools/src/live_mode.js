@@ -15,19 +15,23 @@
 // initLiveMode() is called from main.js init(). No-ops if neither condition holds.
 
 const _LIVE_FILES = [
+    'training_pipeline_latest.json',
     'training_loss_curve_latest.json',
     'training_grad_norms_latest.json',
     'training_parity_latest.json',
     'training_step_profile_latest.json',
     'training_checkpoint_policy_latest.json',
+    'corpus_sampling_log_latest.json',
 ];
 
 const _LIVE_KEY_MAP = {
+    'training_pipeline_latest.json':        'training_pipeline',
     'training_loss_curve_latest.json':        'training_loss_curve',
     'training_grad_norms_latest.json':         'training_grad_norms',
     'training_parity_latest.json':             'training_parity',
     'training_step_profile_latest.json':       'training_step_profile',
     'training_checkpoint_policy_latest.json':  'training_checkpoint_policy',
+    'corpus_sampling_log_latest.json':         'corpus_sampling_log',
 };
 
 let _liveTimer  = null;
@@ -130,13 +134,20 @@ function _buildSummary() {
         const files = (window.EMBEDDED_IR_DATA || {}).files || {};
         const lc    = files.training_loss_curve || {};
         const cp    = files.training_checkpoint_policy || {};
+        const pipe  = files.training_pipeline && typeof files.training_pipeline === 'object'
+            ? files.training_pipeline
+            : {};
         const steps = Array.isArray(lc.steps) ? lc.steps : [];
         const last  = steps.length > 0 ? steps[steps.length - 1] : null;
         const step  = cp.latest_step ?? (last ? last.step : null);
         const loss  = last && last.loss_ck != null ? Number(last.loss_ck).toFixed(4) : null;
+        const stage = typeof pipe.active_stage === 'string' && pipe.active_stage.trim()
+            ? pipe.active_stage.trim()
+            : null;
         const prof  = files.training_step_profile || {};
         const tokS  = prof.train_tok_s != null ? Number(prof.train_tok_s).toFixed(1) + ' tok/s' : null;
         const parts = [];
+        if (stage)       parts.push('stage ' + stage);
         if (step != null) parts.push('step ' + step);
         if (loss != null) parts.push('loss ' + loss);
         if (tokS)         parts.push(tokS);

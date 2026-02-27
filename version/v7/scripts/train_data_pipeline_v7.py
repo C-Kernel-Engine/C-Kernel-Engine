@@ -1091,6 +1091,226 @@ def _manifest_rows(payload: dict[str, Any]) -> int | None:
     return None
 
 
+def _canon_path(path_like: str) -> str:
+    try:
+        return str(Path(path_like).expanduser().resolve())
+    except Exception:
+        return str(path_like)
+
+
+def _dataset_ref_from_provenance(row: dict[str, Any], *, origin: str) -> dict[str, Any]:
+    ds_hash = row.get("hash")
+    if isinstance(ds_hash, dict):
+        ds_hash = ds_hash.get("value")
+    elif not isinstance(ds_hash, str):
+        ds_hash = None
+    return {
+        "dataset_name": row.get("dataset_name"),
+        "source_path": row.get("source_path"),
+        "stage": row.get("stage"),
+        "curriculum_stage": row.get("curriculum_stage"),
+        "rows": row.get("rows"),
+        "token_count": row.get("token_count"),
+        "byte_size": row.get("byte_size"),
+        "sha256": ds_hash if isinstance(ds_hash, str) and ds_hash else None,
+        "origin": origin,
+    }
+
+
+def _build_tokenizer_corpus_contract(
+    *,
+    run_dir: Path,
+    dataset_path: Path,
+    active_stage: str,
+    curriculum_stage: str,
+    active_rows: int | None,
+    token_count: int,
+    dataset_size: int,
+    dataset_hash: str | None,
+    reused_run_tokenizer: bool,
+    tokenizer_sha256: str | None,
+    tokenizer_path: str | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    active_ref: dict[str, Any] = {
+        "dataset_name": dataset_path.name,
+        "source_path": str(dataset_path),
+        "stage": active_stage,
+        "curriculum_stage": curriculum_stage,
+        "rows": int(active_rows) if isinstance(active_rows, int) else None,
+        "token_count": int(token_count),
+        "byte_size": int(dataset_size),
+        "sha256": dataset_hash,
+        "origin": "current_run",
+    }
+
+    corpora: list[dict[str, Any]] = []
+    coverage_note = ""
+    if reused_run_tokenizer:
+        prev_path = run_dir / "training_pipeline_latest.json"
+        prev_payload: dict[str, Any] = {}
+        if prev_path.exists():
+            try:
+                prev_payload = _load_json(prev_path)
+            except Exception:
+                prev_payload = {}
+
+        prev_lineage = prev_payload.get("tokenizer_lineage") if isinstance(prev_payload, dict) else {}
+        same_tokenizer = True
+        if isinstance(prev_lineage, dict):
+            prev_sha = prev_lineage.get("tokenizer_sha256")
+            prev_tok_path = prev_lineage.get("tokenizer_path")
+            if isinstance(tokenizer_sha256, str) and tokenizer_sha256:
+                same_tokenizer = bool(isinstance(prev_sha, str) and prev_sha == tokenizer_sha256)
+            elif isinstance(tokenizer_path, str) and tokenizer_path and isinstance(prev_tok_path, str):
+                same_tokenizer = _canon_path(prev_tok_path) == _canon_path(tokenizer_path)
+
+            prev_corpora = prev_lineage.get("tokenizer_corpora")
+            if same_tokenizer and isinstance(prev_corpora, list) and prev_corpora:
+                for row in prev_corpora:
+                    if isinstance(row, dict):
+                        corpora.append(dict(row))
+
+        if not corpora and isinstance(prev_payload, dict):
+            prev_prov = prev_payload.get("data_provenance")
+            if isinstance(prev_prov, list):
+                for row in prev_prov:
+                    if isinstance(row, dict):
+                        corpora.append(_dataset_ref_from_provenance(row, origin="previous_run_inferred"))
+                        break
+        if not corpora:
+            coverage_note = "tokenizer was reused but prior tokenizer corpus metadata was unavailable"
+    else:
+        corpora = [active_ref]
+
+    # Deduplicate corpus refs by path/hash/name.
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for row in corpora:
+        if not isinstance(row, dict):
+            continue
+        path_key = _canon_path(str(row.get("source_path") or ""))
+        hash_key = str(row.get("sha256") or "")
+        name_key = str(row.get("dataset_name") or "")
+        key = (path_key, hash_key, name_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    corpora = deduped
+
+    active_in_corpus = False
+    active_path = _canon_path(str(active_ref.get("source_path") or ""))
+    active_hash = str(active_ref.get("sha256") or "")
+    for row in corpora:
+        r_path = _canon_path(str(row.get("source_path") or ""))
+        r_hash = str(row.get("sha256") or "")
+        if active_hash and r_hash and active_hash == r_hash:
+            active_in_corpus = True
+            break
+        if active_path and r_path and active_path == r_path:
+            active_in_corpus = True
+            break
+
+    if active_in_corpus:
+        status = "pass"
+        note = "active dataset is covered by tokenizer corpus metadata"
+    elif reused_run_tokenizer and corpora:
+        status = "warn"
+        note = "active dataset is not in tokenizer corpus metadata (tokenizer reused)"
+    elif reused_run_tokenizer and not corpora:
+        status = "unknown"
+        note = coverage_note or "tokenizer corpus metadata unavailable"
+    else:
+        status = "pass"
+        note = "tokenizer built in current run from active dataset"
+
+    coverage = {
+        "status": status,
+        "active_dataset_in_corpus": bool(active_in_corpus),
+        "active_dataset_name": active_ref.get("dataset_name"),
+        "active_dataset_path": active_ref.get("source_path"),
+        "active_dataset_sha256": active_ref.get("sha256"),
+        "note": note,
+    }
+    return corpora, coverage
+
+
+def _build_stage_dataset_bindings(
+    *,
+    stage_timeline: list[dict[str, Any]],
+    dataset_catalog: list[dict[str, Any]],
+    tokenizer_corpora: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    tok_path_set = {
+        _canon_path(str(row.get("source_path") or ""))
+        for row in tokenizer_corpora
+        if isinstance(row, dict) and isinstance(row.get("source_path"), str) and row.get("source_path")
+    }
+    tok_hash_set = {
+        str(row.get("sha256"))
+        for row in tokenizer_corpora
+        if isinstance(row, dict) and isinstance(row.get("sha256"), str) and row.get("sha256")
+    }
+
+    out: list[dict[str, Any]] = []
+    for row in stage_timeline:
+        stage = str(row.get("stage") or "")
+        if not stage:
+            continue
+        ds_rows: list[dict[str, Any]] = []
+        for entry in dataset_catalog:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("stage") or "") != stage:
+                continue
+            kind = str(entry.get("kind") or "")
+            if kind not in {"active_dataset", "generated_dataset"}:
+                continue
+            path = entry.get("path")
+            sha = entry.get("sha256")
+            in_tok = False
+            if isinstance(sha, str) and sha and sha in tok_hash_set:
+                in_tok = True
+            elif isinstance(path, str) and path and _canon_path(path) in tok_path_set:
+                in_tok = True
+            ds_rows.append(
+                {
+                    "name": entry.get("name"),
+                    "path": path,
+                    "rows": entry.get("rows"),
+                    "kind": kind,
+                    "status": entry.get("status"),
+                    "source": entry.get("source"),
+                    "sha256": sha if isinstance(sha, str) and sha else None,
+                    "in_tokenizer_corpus": bool(in_tok),
+                }
+            )
+
+        rows_total = 0
+        rows_known = False
+        for ds in ds_rows:
+            rv = ds.get("rows")
+            if isinstance(rv, int):
+                rows_total += int(rv)
+                rows_known = True
+        out.append(
+            {
+                "stage": stage,
+                "order": row.get("order"),
+                "status": row.get("status"),
+                "active": bool(row.get("active") is True),
+                "datasets": ds_rows,
+                "dataset_count": len(ds_rows),
+                "rows_total": rows_total if rows_known else None,
+                "tokenizer_coverage": {
+                    "in_corpus": sum(1 for ds in ds_rows if ds.get("in_tokenizer_corpus") is True),
+                    "not_in_corpus": sum(1 for ds in ds_rows if ds.get("in_tokenizer_corpus") is not True),
+                },
+            }
+        )
+    return out
+
+
 def _infer_dataset_stage(name: str, active_stage: str) -> str:
     probe = str(name or "").lower()
     if any(tok in probe for tok in ("dpo",)):
@@ -1099,8 +1319,10 @@ def _infer_dataset_stage(name: str, active_stage: str) -> str:
         return "grpo"
     if any(tok in probe for tok in ("ppo", "rl")):
         return "ppo"
-    if any(tok in probe for tok in ("stage_b", "midtrain", "instruction", "sft")):
+    if any(tok in probe for tok in ("stage_b", "midtrain")):
         return "midtrain"
+    if any(tok in probe for tok in ("instruction", "sft")):
+        return "sft"
     if any(tok in probe for tok in ("stage_a", "bridge", "assets", "ascii", "svg")):
         return "pretrain"
     return active_stage
@@ -1324,6 +1546,18 @@ def _build_training_pipeline_payload(
     elif curriculum_raw in {"stage_a", "pretrain"}:
         active_stage = "pretrain"
         curriculum_stage = "stage_a"
+    elif curriculum_raw in {"sft"}:
+        active_stage = "sft"
+        curriculum_stage = "sft"
+    elif curriculum_raw in {"dpo"}:
+        active_stage = "dpo"
+        curriculum_stage = "dpo"
+    elif curriculum_raw in {"grpo"}:
+        active_stage = "grpo"
+        curriculum_stage = "grpo"
+    elif curriculum_raw in {"ppo"}:
+        active_stage = "ppo"
+        curriculum_stage = "ppo"
     else:
         active_stage = "pretrain"
         curriculum_stage = "auto"
@@ -1338,6 +1572,18 @@ def _build_training_pipeline_payload(
         }
         for i, s in enumerate(stage_names)
     ]
+    stage_sequence = [
+        {
+            "stage": row["stage"],
+            "seq": i + 1,
+            "declared_seq": int(row.get("order", i)) + 1,
+            "status": row.get("status"),
+            "active": bool(row.get("active") is True),
+            "source": "stage_timeline",
+        }
+        for i, row in enumerate(stage_timeline)
+        if isinstance(row, dict) and row.get("stage")
+    ]
 
     # ── data provenance ─────────────────────────────────────────
     dataset_hash = _sha256_file(dataset_path) if dataset_path.exists() else None
@@ -1347,6 +1593,12 @@ def _build_training_pipeline_payload(
         # byte tokenizer: one token per byte
         token_count = dataset_size
 
+    active_rows = None
+    if isinstance(dataset_qc, dict):
+        qc_rows = dataset_qc.get("non_empty_lines")
+        if isinstance(qc_rows, int):
+            active_rows = int(qc_rows)
+
     data_provenance = [
         {
             "stage": active_stage,
@@ -1354,6 +1606,7 @@ def _build_training_pipeline_payload(
             "dataset_name": dataset_path.name,
             "source_path": str(dataset_path),
             "split": "train",
+            "rows": int(active_rows) if isinstance(active_rows, int) else None,
             "token_count": int(token_count),
             "byte_size": int(dataset_size),
             "hash": {"algorithm": "sha256", "value": dataset_hash} if dataset_hash else None,
@@ -1382,6 +1635,29 @@ def _build_training_pipeline_payload(
         tokenizer_lineage["bpe_vocab_size"] = int(args.bpe_vocab_size)
         tokenizer_lineage["bpe_min_freq"] = int(args.bpe_min_freq)
         tokenizer_lineage["bpe_mode"] = "ascii_bpe" if tokenizer_kind == "ascii_bpe" else "bytelevel_bpe"
+        # Operator-visible continuity signal:
+        # True => token IDs are frozen from run_dir/tokenizer.json (--reuse-run-tokenizer).
+        # False => tokenizer was rebuilt in this pass.
+        tokenizer_lineage["reused_run_tokenizer"] = bool(bpe_artifacts.get("reused_run_tokenizer", False))
+
+    reused_run_tokenizer = bool(bpe_artifacts.get("reused_run_tokenizer", False))
+    tokenizer_corpora, tokenizer_coverage = _build_tokenizer_corpus_contract(
+        run_dir=run_dir,
+        dataset_path=dataset_path,
+        active_stage=active_stage,
+        curriculum_stage=curriculum_stage,
+        active_rows=active_rows,
+        token_count=int(token_count),
+        dataset_size=int(dataset_size),
+        dataset_hash=dataset_hash,
+        reused_run_tokenizer=reused_run_tokenizer,
+        tokenizer_sha256=tokenizer_lineage.get("tokenizer_sha256"),
+        tokenizer_path=tokenizer_lineage.get("tokenizer_path"),
+    )
+    tokenizer_lineage["tokenizer_corpora"] = tokenizer_corpora
+    tokenizer_lineage["active_dataset_in_tokenizer_corpus"] = bool(tokenizer_coverage.get("active_dataset_in_corpus"))
+    tokenizer_lineage["coverage_status"] = str(tokenizer_coverage.get("status", "unknown"))
+    tokenizer_lineage["coverage_note"] = str(tokenizer_coverage.get("note", ""))
 
     data_lab = {
         "dataset_path": str(dataset_path),
@@ -1413,10 +1689,58 @@ def _build_training_pipeline_payload(
         bpe_artifacts=bpe_artifacts,
         run_dir=run_dir,
     )
-
+    stage_dataset_bindings = _build_stage_dataset_bindings(
+        stage_timeline=stage_timeline,
+        dataset_catalog=dataset_catalog,
+        tokenizer_corpora=tokenizer_corpora,
+    )
     # ── execution ───────────────────────────────────────────────
     steps = ck_loss.get("steps", 0) if isinstance(ck_loss, dict) else 0
     tokens_per_update = int(args.seq_len) * int(args.grad_accum)
+    roundtrip_status = str((tokenizer_roundtrip or {}).get("status") or "unknown")
+    run_sequence = [
+        {
+            "order": 1,
+            "op": "dataset_qc",
+            "status": "done" if isinstance(dataset_qc, dict) and dataset_qc else "unknown",
+            "details": {"dataset_path": str(dataset_path)},
+        },
+        {
+            "order": 2,
+            "op": "tokenizer_build_or_reuse",
+            "status": "reused" if reused_run_tokenizer else "built",
+            "details": {
+                "tokenizer_type": tokenizer_kind,
+                "tokenizer_path": tokenizer_lineage.get("tokenizer_path"),
+                "tokenizer_sha256": tokenizer_lineage.get("tokenizer_sha256"),
+            },
+        },
+        {
+            "order": 3,
+            "op": "tokenizer_roundtrip",
+            "status": roundtrip_status,
+            "details": {
+                "exact_match": bool((tokenizer_roundtrip or {}).get("exact_match", False)),
+                "line_exact_match_rate": (tokenizer_roundtrip or {}).get("line_eval", {}).get("exact_match_rate"),
+            },
+        },
+        {
+            "order": 4,
+            "op": "train",
+            "status": "done" if int(steps) > 0 else "missing",
+            "details": {"steps": int(steps), "seq_len": int(args.seq_len), "grad_accum": int(args.grad_accum)},
+        },
+        {
+            "order": 5,
+            "op": "post_train_eval",
+            "status": "done" if isinstance(post_train_eval, dict) and post_train_eval else "skipped",
+            "details": {
+                "valid_svg_rate": (post_train_eval or {}).get("valid_svg_rate"),
+                "closure_success_rate": (post_train_eval or {}).get("closure_success_rate"),
+                "loop_score": (post_train_eval or {}).get("repetition_loop_score"),
+            },
+        },
+    ]
 
     # ── model dims from manifest ────────────────────────────────
     train_dims: dict[str, Any] = {}
@@ -1440,6 +1764,11 @@ def _build_training_pipeline_payload(
         "active_stage": active_stage,
         "curriculum_stage": curriculum_stage,
         "stage_timeline": stage_timeline,
+        "stage_sequence": {
+            "schema": "ck.stage_sequence.v1",
+            "active_stage": active_stage,
+            "entries": stage_sequence,
+        },
         "stage_artifacts": stage_artifacts,
         "backend": "ck",
         "optimizer": {
@@ -1465,6 +1794,9 @@ def _build_training_pipeline_payload(
         "train_dims": train_dims,
         "data_provenance": data_provenance,
         "dataset_catalog": dataset_catalog,
+        "stage_dataset_bindings": stage_dataset_bindings,
+        "run_sequence": run_sequence,
+        "tokenizer_dataset_coverage": tokenizer_coverage,
         "tokenizer_lineage": tokenizer_lineage,
         "data_lab": data_lab,
         "sources": {
@@ -1473,6 +1805,442 @@ def _build_training_pipeline_payload(
             "resume_checkpoint": dict(resume_checkpoint or {}),
         },
     }
+
+
+def _normalize_stage_name(raw: Any) -> str | None:
+    s = str(raw or "").strip().lower()
+    if not s:
+        return None
+    if s in {"stage_a", "pretrain"}:
+        return "pretrain"
+    if s in {"stage_b", "midtrain"}:
+        return "midtrain"
+    if s in {"sft", "dpo", "grpo", "ppo"}:
+        return s
+    return s
+
+
+def _default_stage_order() -> list[str]:
+    return ["pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"]
+
+
+def _resolve_stage_order(
+    existing_plan: dict[str, Any] | None,
+    training_pipeline: dict[str, Any],
+) -> list[str]:
+    order: list[str] = []
+    seen: set[str] = set()
+
+    def _push(stage: Any) -> None:
+        st = _normalize_stage_name(stage)
+        if not st or st in seen:
+            return
+        order.append(st)
+        seen.add(st)
+
+    if isinstance(existing_plan, dict):
+        existing_order = existing_plan.get("stage_order")
+        if isinstance(existing_order, list):
+            for stage in existing_order:
+                _push(stage)
+    stage_seq = training_pipeline.get("stage_sequence")
+    if isinstance(stage_seq, dict):
+        entries = stage_seq.get("entries")
+        if isinstance(entries, list):
+            ordered = sorted(
+                [e for e in entries if isinstance(e, dict)],
+                key=lambda e: int(e.get("seq")) if isinstance(e.get("seq"), int) and int(e.get("seq")) > 0 else 10_000,
+            )
+            for entry in ordered:
+                _push(entry.get("stage"))
+    for stage in _default_stage_order():
+        _push(stage)
+    return order
+
+
+def _discover_pipeline_report_stage_rows(run_dir: Path) -> list[dict[str, Any]]:
+    pipeline_root = run_dir / ".ck_pipeline"
+    if not pipeline_root.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for report_path in sorted(pipeline_root.glob("*/pipeline_report.json")):
+        try:
+            report = _load_json(report_path)
+        except Exception:
+            continue
+        if not isinstance(report, dict):
+            continue
+        stage = _normalize_stage_name(report.get("curriculum_stage"))
+        if not stage:
+            continue
+        dataset_path = report.get("dataset")
+        dataset_name = Path(str(dataset_path)).name if isinstance(dataset_path, str) and dataset_path else None
+        dataset_qc = report.get("dataset_qc") if isinstance(report.get("dataset_qc"), dict) else {}
+        dataset_profile = report.get("dataset_profile") if isinstance(report.get("dataset_profile"), dict) else {}
+        token_count = dataset_profile.get("token_count")
+        byte_size = dataset_qc.get("bytes")
+        row_count = dataset_qc.get("non_empty_lines")
+        rows.append(
+            {
+                "stage": stage,
+                "dataset": {
+                    "name": dataset_name,
+                    "path": dataset_path if isinstance(dataset_path, str) else None,
+                    "rows": row_count if isinstance(row_count, int) else None,
+                    "tokens": token_count if isinstance(token_count, int) else None,
+                    "bytes": byte_size if isinstance(byte_size, int) else None,
+                    "source": "pipeline_report",
+                },
+                "report_path": str(report_path),
+                "mtime_ns": int(report_path.stat().st_mtime_ns),
+            }
+        )
+    return rows
+
+
+def _build_or_update_training_plan_payload(
+    *,
+    run_dir: Path,
+    training_pipeline: dict[str, Any],
+    existing_plan: dict[str, Any] | None,
+) -> dict[str, Any]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    stage_order = _resolve_stage_order(existing_plan, training_pipeline)
+    order_idx = {s: i for i, s in enumerate(stage_order)}
+    active_stage = _normalize_stage_name(training_pipeline.get("active_stage")) or "pretrain"
+    discovered_report_rows = _discover_pipeline_report_stage_rows(run_dir)
+    if discovered_report_rows:
+        latest = max(discovered_report_rows, key=lambda r: int(r.get("mtime_ns", 0)))
+        latest_stage = _normalize_stage_name(latest.get("stage"))
+        if latest_stage:
+            active_stage = latest_stage
+
+    stage_map: dict[str, dict[str, Any]] = {}
+
+    def _ensure_stage(stage: str) -> dict[str, Any]:
+        st = _normalize_stage_name(stage) or stage
+        row = stage_map.get(st)
+        if row is None:
+            row = {
+                "stage": st,
+                "seq": int(order_idx.get(st, len(order_idx)) + 1),
+                "status": "planned",
+                "datasets": [],
+            }
+            stage_map[st] = row
+        return row
+
+    def _dataset_key(row: dict[str, Any]) -> tuple[str, str]:
+        p = str(row.get("path") or "").strip()
+        n = str(row.get("name") or "").strip().lower()
+        return (_canon_path(p) if p else "", n)
+
+    def _upsert_dataset(stage: str, dataset_row: dict[str, Any]) -> None:
+        st = _ensure_stage(stage)
+        existing_rows = st.get("datasets")
+        if not isinstance(existing_rows, list):
+            existing_rows = []
+            st["datasets"] = existing_rows
+        key = _dataset_key(dataset_row)
+        if key == ("", ""):
+            return
+        for cur in existing_rows:
+            if not isinstance(cur, dict):
+                continue
+            if _dataset_key(cur) == key:
+                for k, v in dataset_row.items():
+                    if v is None:
+                        continue
+                    if k not in cur or cur.get(k) in (None, "", [], {}):
+                        cur[k] = v
+                return
+        existing_rows.append(dict(dataset_row))
+
+    # Merge existing plan first (preserve operator edits and prior stages).
+    if isinstance(existing_plan, dict):
+        existing_stages = existing_plan.get("stages")
+        if isinstance(existing_stages, list):
+            for row in existing_stages:
+                if not isinstance(row, dict):
+                    continue
+                stage = _normalize_stage_name(row.get("stage"))
+                if not stage:
+                    continue
+                st = _ensure_stage(stage)
+                seq = row.get("seq")
+                if isinstance(seq, int) and seq > 0:
+                    st["seq"] = seq
+                status = row.get("status")
+                if isinstance(status, str) and status.strip():
+                    st["status"] = status.strip().lower()
+                datasets = row.get("datasets")
+                if isinstance(datasets, list):
+                    for ds in datasets:
+                        if isinstance(ds, dict):
+                            _upsert_dataset(stage, ds)
+
+    # Ensure all canonical stages exist.
+    for s in stage_order:
+        _ensure_stage(s)
+
+    # Merge datasets discovered by current pipeline.
+    stage_bindings = training_pipeline.get("stage_dataset_bindings")
+    if isinstance(stage_bindings, list):
+        for bind in stage_bindings:
+            if not isinstance(bind, dict):
+                continue
+            stage = _normalize_stage_name(bind.get("stage"))
+            if not stage:
+                continue
+            datasets = bind.get("datasets")
+            if not isinstance(datasets, list):
+                continue
+            for ds in datasets:
+                if not isinstance(ds, dict):
+                    continue
+                _upsert_dataset(
+                    stage,
+                    {
+                        "name": ds.get("name"),
+                        "path": ds.get("path"),
+                        "rows": ds.get("rows"),
+                        "kind": ds.get("kind"),
+                        "source": ds.get("source"),
+                        "status": ds.get("status"),
+                        "in_tokenizer_corpus": ds.get("in_tokenizer_corpus"),
+                    },
+                )
+
+    # Merge active provenance rows as source-of-truth for "what just trained".
+    data_provenance = training_pipeline.get("data_provenance")
+    if isinstance(data_provenance, list):
+        for row in data_provenance:
+            if not isinstance(row, dict):
+                continue
+            stage = _normalize_stage_name(row.get("stage") or row.get("curriculum_stage"))
+            if not stage:
+                continue
+            _upsert_dataset(
+                stage,
+                {
+                    "name": row.get("dataset_name"),
+                    "path": row.get("source_path"),
+                    "rows": row.get("rows"),
+                    "tokens": row.get("token_count"),
+                    "bytes": row.get("byte_size"),
+                    "source": "data_provenance",
+                },
+            )
+
+    # Merge stage artifacts (for older runs with sparse provenance).
+    stage_artifacts = training_pipeline.get("stage_artifacts")
+    if isinstance(stage_artifacts, list):
+        for row in stage_artifacts:
+            if not isinstance(row, dict):
+                continue
+            stage = _normalize_stage_name(row.get("stage"))
+            if not stage:
+                continue
+            _upsert_dataset(
+                stage,
+                {
+                    "name": row.get("dataset_name"),
+                    "path": row.get("source_path"),
+                    "tokens": row.get("token_count"),
+                    "source": "stage_artifacts",
+                },
+            )
+
+    # Merge historical pipeline reports to backfill stage coverage.
+    for row in discovered_report_rows:
+        stage = _normalize_stage_name(row.get("stage"))
+        dataset = row.get("dataset")
+        if not stage or not isinstance(dataset, dict):
+            continue
+        _upsert_dataset(stage, dataset)
+
+    # Compute status from evidence (active > completed > planned).
+    timeline = training_pipeline.get("stage_timeline")
+    timeline_status: dict[str, str] = {}
+    if isinstance(timeline, list):
+        for row in timeline:
+            if not isinstance(row, dict):
+                continue
+            stage = _normalize_stage_name(row.get("stage"))
+            if not stage:
+                continue
+            status = str(row.get("status") or "").strip().lower()
+            if status:
+                timeline_status[stage] = status
+
+    loss_history = training_pipeline.get("stage_loss_history")
+    loss_runs: dict[str, int] = {}
+    if isinstance(loss_history, dict):
+        entries = loss_history.get("entries")
+        if isinstance(entries, list):
+            for row in entries:
+                if not isinstance(row, dict):
+                    continue
+                stage = _normalize_stage_name(row.get("stage"))
+                if stage:
+                    loss_runs[stage] = int(loss_runs.get(stage, 0)) + 1
+
+    active_idx = int(order_idx.get(active_stage, 0))
+    for stage, st in stage_map.items():
+        datasets = st.get("datasets")
+        ds_count = len(datasets) if isinstance(datasets, list) else 0
+        hint = str(timeline_status.get(stage, st.get("status") or "")).strip().lower()
+        idx = int(order_idx.get(stage, len(order_idx)))
+        completed_hint = (
+            hint in {"completed", "pass"}
+            or int(loss_runs.get(stage, 0)) > 0
+            or (idx < active_idx and ds_count > 0)
+        )
+        if stage == active_stage:
+            st["status"] = "active"
+        elif completed_hint:
+            st["status"] = "completed"
+        else:
+            st["status"] = "planned"
+        st["dataset_count"] = ds_count
+
+    stages_sorted = sorted(
+        stage_map.values(),
+        key=lambda r: (
+            int(r.get("seq")) if isinstance(r.get("seq"), int) else int(order_idx.get(str(r.get("stage")), 999) + 1),
+            int(order_idx.get(str(r.get("stage")), 999)),
+        ),
+    )
+
+    lineage = training_pipeline.get("tokenizer_lineage")
+    tokenizer = lineage if isinstance(lineage, dict) else {}
+    plan = {
+        "schema": "ck.training_plan.v1",
+        "created_at": (
+            str(existing_plan.get("created_at"))
+            if isinstance(existing_plan, dict) and isinstance(existing_plan.get("created_at"), str)
+            else now_iso
+        ),
+        "updated_at": now_iso,
+        "run_dir": str(run_dir),
+        "active_stage": active_stage,
+        "stage_order": stage_order,
+        "tokenizer": {
+            "type": tokenizer.get("type"),
+            "vocab_size": tokenizer.get("vocab_size"),
+            "tokenizer_path": tokenizer.get("tokenizer_path"),
+            "tokenizer_sha256": tokenizer.get("tokenizer_sha256"),
+            "reused_run_tokenizer": tokenizer.get("reused_run_tokenizer"),
+            "tokenizer_corpora": tokenizer.get("tokenizer_corpora") if isinstance(tokenizer.get("tokenizer_corpora"), list) else [],
+        },
+        "stages": stages_sorted,
+        "source_pipeline": "training_pipeline_latest.json",
+    }
+    return plan
+
+
+def _apply_training_plan_to_pipeline_payload(
+    training_pipeline: dict[str, Any],
+    training_plan: dict[str, Any],
+) -> None:
+    if not isinstance(training_plan, dict):
+        return
+    stages = training_plan.get("stages")
+    if not isinstance(stages, list):
+        return
+    active_stage = _normalize_stage_name(training_plan.get("active_stage")) or _normalize_stage_name(training_pipeline.get("active_stage")) or "pretrain"
+
+    stage_rows: list[dict[str, Any]] = []
+    stage_seq: list[dict[str, Any]] = []
+    stage_bindings: list[dict[str, Any]] = []
+    for idx, row in enumerate(stages):
+        if not isinstance(row, dict):
+            continue
+        stage = _normalize_stage_name(row.get("stage"))
+        if not stage:
+            continue
+        seq = row.get("seq")
+        if not isinstance(seq, int) or seq <= 0:
+            seq = idx + 1
+        status = str(row.get("status") or ("active" if stage == active_stage else "planned")).strip().lower()
+        active = bool(stage == active_stage or row.get("active") is True)
+        datasets = row.get("datasets")
+        if not isinstance(datasets, list):
+            datasets = []
+        rows_total = 0
+        rows_known = False
+        in_tok = 0
+        not_in_tok = 0
+        norm_ds: list[dict[str, Any]] = []
+        for ds in datasets:
+            if not isinstance(ds, dict):
+                continue
+            rv = ds.get("rows")
+            if isinstance(rv, int):
+                rows_total += int(rv)
+                rows_known = True
+            in_corpus = bool(ds.get("in_tokenizer_corpus") is True)
+            if in_corpus:
+                in_tok += 1
+            else:
+                not_in_tok += 1
+            norm_ds.append(
+                {
+                    "name": ds.get("name"),
+                    "path": ds.get("path"),
+                    "rows": rv if isinstance(rv, int) else None,
+                    "kind": ds.get("kind"),
+                    "status": ds.get("status"),
+                    "source": ds.get("source"),
+                    "sha256": ds.get("sha256") if isinstance(ds.get("sha256"), str) and ds.get("sha256") else None,
+                    "in_tokenizer_corpus": in_corpus,
+                    "tokens": ds.get("tokens"),
+                    "bytes": ds.get("bytes"),
+                }
+            )
+        stage_rows.append(
+            {
+                "stage": stage,
+                "order": int(seq) - 1,
+                "status": status,
+                "active": active,
+            }
+        )
+        stage_seq.append(
+            {
+                "stage": stage,
+                "seq": int(seq),
+                "declared_seq": int(seq),
+                "status": status,
+                "active": active,
+                "source": "training_plan",
+            }
+        )
+        stage_bindings.append(
+            {
+                "stage": stage,
+                "order": int(seq) - 1,
+                "status": status,
+                "active": active,
+                "datasets": norm_ds,
+                "dataset_count": len(norm_ds),
+                "rows_total": rows_total if rows_known else None,
+                "tokenizer_coverage": {
+                    "in_corpus": in_tok,
+                    "not_in_corpus": not_in_tok,
+                },
+            }
+        )
+
+    if stage_rows:
+        training_pipeline["active_stage"] = active_stage
+        training_pipeline["stage_timeline"] = stage_rows
+        training_pipeline["stage_sequence"] = {
+            "schema": "ck.stage_sequence.v1",
+            "active_stage": active_stage,
+            "entries": stage_seq,
+        }
+        training_pipeline["stage_dataset_bindings"] = stage_bindings
 
 
 def _run_ck_train(
@@ -1644,9 +2412,9 @@ def main() -> int:
     ap.add_argument("--template", default="qwen3")
     ap.add_argument(
         "--curriculum-stage",
-        choices=["auto", "stage_a", "stage_b"],
+        choices=["auto", "stage_a", "stage_b", "sft", "dpo", "grpo", "ppo"],
         default="auto",
-        help="Annotate training_pipeline stage metadata for visualizer flow (stage_a=pretrain, stage_b=midtrain)",
+        help="Annotate training_pipeline stage metadata for visualizer flow (stage_a=pretrain, stage_b=midtrain, sft/dpo/grpo/ppo=post-pretrain phases)",
     )
     ap.add_argument("--data", default=None, help="UTF-8 training text file path")
     ap.add_argument("--dataset-repeats", type=int, default=10, help="If --data missing, create repeated SVG rows")
@@ -1703,6 +2471,22 @@ def main() -> int:
     ap.add_argument("--bpe-vocab-size", type=int, default=1024)
     ap.add_argument("--bpe-min-freq", type=int, default=2)
     ap.add_argument("--bpe-threads", type=int, default=4)
+    ap.add_argument(
+        "--reuse-run-tokenizer",
+        action="store_true",
+        help=(
+            "For bpe/ascii_bpe modes, reuse run_dir tokenizer.json + tokenizer_bin "
+            "instead of retraining BPE. Recommended for checkpoint continuation."
+        ),
+    )
+    ap.add_argument(
+        "--allow-tokenizer-retrain-on-resume",
+        action="store_true",
+        help=(
+            "Dangerous override: permit tokenizer retrain while resuming checkpoints. "
+            "Use only when intentionally starting a new tokenizer/model line."
+        ),
+    )
     ap.add_argument(
         "--train-driver",
         choices=["ck_run", "ck_cli"],
@@ -1879,6 +2663,17 @@ def main() -> int:
 
     if args.resume_step is not None:
         args.resume_latest_checkpoint = True
+    if (
+        bool(getattr(args, "resume_latest_checkpoint", False))
+        and _is_bpe_tokenizer_mode(str(args.tokenizer))
+        and not bool(getattr(args, "reuse_run_tokenizer", False))
+        and not bool(getattr(args, "allow_tokenizer_retrain_on_resume", False))
+    ):
+        raise SystemExit(
+            "ERROR: refusing tokenizer retrain during checkpoint resume.\n"
+            "Use --reuse-run-tokenizer for true continuation, or pass\n"
+            "--allow-tokenizer-retrain-on-resume only if you intentionally want a new tokenizer/model line."
+        )
     resume_checkpoint: dict[str, Any] = {
         "status": "skipped",
         "reason": "resume_not_requested",
@@ -1934,33 +2729,51 @@ def main() -> int:
     if _is_bpe_tokenizer_mode(args.tokenizer):
         _ensure_binary(BPE_BIN, "ck-bpe-train")
         _ensure_binary(TOKENIZER_LIB, "tokenizer")
-        corpus_dir = _make_corpus_dir_from_dataset(dataset_path, work_dir)
-        tokenizer_json = work_dir / "tokenizer.json"
-        bpe_bin_dir = work_dir / "bpe_bin"
-        bpe_bin_dir.mkdir(parents=True, exist_ok=True)
-        bpe_cmd = [
-            str(BPE_BIN),
-            "--corpus-dir",
-            str(corpus_dir),
-            "--out",
-            str(tokenizer_json),
-            "--binary-out-dir",
-            str(bpe_bin_dir),
-            "--vocab-size",
-            str(args.bpe_vocab_size),
-            "--min-freq",
-            str(args.bpe_min_freq),
-            "--threads",
-            str(args.bpe_threads),
-        ]
-        if args.tokenizer == "ascii_bpe":
-            bpe_cmd.append("--ascii-only")
-        _run(bpe_cmd, cwd=ROOT)
-        bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, bpe_bin_dir)
+        run_tokenizer_json = run_dir / "tokenizer.json"
+        run_tokenizer_bin = run_dir / "tokenizer_bin"
+        if bool(getattr(args, "reuse_run_tokenizer", False)):
+            if not run_tokenizer_json.exists():
+                raise SystemExit(
+                    "ERROR: --reuse-run-tokenizer requested but run_dir/tokenizer.json is missing.\n"
+                    f"  run_dir: {run_dir}"
+                )
+            if not run_tokenizer_bin.exists():
+                raise SystemExit(
+                    "ERROR: --reuse-run-tokenizer requested but run_dir/tokenizer_bin is missing.\n"
+                    f"  run_dir: {run_dir}"
+                )
+            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, run_tokenizer_bin)
+            tokenizer_json = run_tokenizer_json
+            bpe_bin_dir = run_tokenizer_bin
+            run_bpe_bin_dir = run_tokenizer_bin
+        else:
+            corpus_dir = _make_corpus_dir_from_dataset(dataset_path, work_dir)
+            tokenizer_json = work_dir / "tokenizer.json"
+            bpe_bin_dir = work_dir / "bpe_bin"
+            bpe_bin_dir.mkdir(parents=True, exist_ok=True)
+            bpe_cmd = [
+                str(BPE_BIN),
+                "--corpus-dir",
+                str(corpus_dir),
+                "--out",
+                str(tokenizer_json),
+                "--binary-out-dir",
+                str(bpe_bin_dir),
+                "--vocab-size",
+                str(args.bpe_vocab_size),
+                "--min-freq",
+                str(args.bpe_min_freq),
+                "--threads",
+                str(args.bpe_threads),
+            ]
+            if args.tokenizer == "ascii_bpe":
+                bpe_cmd.append("--ascii-only")
+            _run(bpe_cmd, cwd=ROOT)
+            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, bpe_bin_dir)
+            run_bpe_bin_dir = _sync_bpe_artifacts_to_run(run_dir, tokenizer_json, bpe_bin_dir)
         ids = _encode_large_text_with_bpe_handle(bpe_handle, dataset_text)
         if len(ids) <= 1:
             raise SystemExit("ERROR: BPE encoding produced <=1 token; provide richer data.")
-        run_bpe_bin_dir = _sync_bpe_artifacts_to_run(run_dir, tokenizer_json, bpe_bin_dir)
         run_vocab = _read_run_vocab_size(run_dir)
         if isinstance(run_vocab, int) and run_vocab > 0:
             max_id = int(max(ids))
@@ -1983,11 +2796,12 @@ def main() -> int:
         bpe_artifacts = {
             "tokenizer_json": str(tokenizer_json),
             "binary_dir": str(bpe_bin_dir),
-            "run_tokenizer_json": str(run_dir / "tokenizer.json"),
+            "run_tokenizer_json": str(run_tokenizer_json),
             "run_binary_dir": str(run_bpe_bin_dir),
             "token_file": str(token_file),
             "token_count": int(len(ids)),
             "mode": "ascii_bpe" if args.tokenizer == "ascii_bpe" else "bytelevel_bpe",
+            "reused_run_tokenizer": bool(getattr(args, "reuse_run_tokenizer", False)),
         }
 
     if str(args.train_driver) == "ck_cli" and token_file is None:
@@ -2083,6 +2897,23 @@ def main() -> int:
             post_train_eval={"status": "skipped", "reason": "prepare_only"},
             resume_checkpoint=resume_checkpoint,
         )
+        training_plan_path = run_dir / "training_plan.json"
+        existing_plan: dict[str, Any] | None = None
+        if training_plan_path.exists():
+            try:
+                existing = _load_json(training_plan_path)
+                if isinstance(existing, dict):
+                    existing_plan = existing
+            except Exception:
+                existing_plan = None
+        training_plan = _build_or_update_training_plan_payload(
+            run_dir=run_dir,
+            training_pipeline=prepare_pipeline,
+            existing_plan=existing_plan,
+        )
+        _apply_training_plan_to_pipeline_payload(prepare_pipeline, training_plan)
+        _atomic_write_text(training_plan_path, json.dumps(training_plan, indent=2))
+        prepare_pipeline["training_plan_path"] = str(training_plan_path)
         _atomic_write_text(run_dir / "training_pipeline_latest.json", json.dumps(prepare_pipeline, indent=2))
         print("v7 train pipeline prepared")
         print(f"  run_dir:   {run_dir}")
@@ -2212,6 +3043,23 @@ def main() -> int:
         post_train_eval=post_train_eval,
         resume_checkpoint=resume_checkpoint,
     )
+    training_plan_path = run_dir / "training_plan.json"
+    existing_plan: dict[str, Any] | None = None
+    if training_plan_path.exists():
+        try:
+            existing = _load_json(training_plan_path)
+            if isinstance(existing, dict):
+                existing_plan = existing
+        except Exception:
+            existing_plan = None
+    training_plan = _build_or_update_training_plan_payload(
+        run_dir=run_dir,
+        training_pipeline=training_pipeline,
+        existing_plan=existing_plan,
+    )
+    _apply_training_plan_to_pipeline_payload(training_pipeline, training_plan)
+    _atomic_write_text(training_plan_path, json.dumps(training_plan, indent=2))
+    training_pipeline["training_plan_path"] = str(training_plan_path)
     pipeline_json_path = run_dir / "training_pipeline_latest.json"
     _atomic_write_text(pipeline_json_path, json.dumps(training_pipeline, indent=2))
 
@@ -2230,6 +3078,7 @@ def main() -> int:
             else:
                 print(f"  resume:    {r_status} ({r_strategy}, step={r_step})")
     print(f"  report:    {out_path}")
+    print(f"  plan:      {training_plan_path}")
     print(
         "  roundtrip:"
         f" exact={tokenizer_roundtrip.get('exact_match')}"

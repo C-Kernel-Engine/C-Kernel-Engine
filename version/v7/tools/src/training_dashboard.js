@@ -121,6 +121,37 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
         .call((g) => g.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10))
         .call((g) => g.selectAll('line,path').attr('stroke', '#4b5563'));
 
+    const boundaries = Array.isArray(opts.boundaries) ? opts.boundaries : [];
+    if (boundaries.length > 0) {
+        boundaries.slice(0, 12).forEach((b, idx) => {
+            const stepVal = Number(b && b.step);
+            if (!Number.isFinite(stepVal)) return;
+            const bx = x(stepVal);
+            if (!Number.isFinite(bx) || bx < margin.left || bx > (width - margin.right)) return;
+            const bColor = typeof b.color === 'string' && b.color.trim() ? b.color : '#6b7280';
+            svg.append('line')
+                .attr('x1', bx)
+                .attr('x2', bx)
+                .attr('y1', margin.top)
+                .attr('y2', height - margin.bottom)
+                .attr('stroke', bColor)
+                .attr('stroke-width', 1)
+                .attr('stroke-dasharray', '2,3')
+                .attr('opacity', 0.6);
+            const label = String((b && b.label) || '').trim();
+            if (label && idx < 8) {
+                const nearRight = bx > (width - margin.right - 70);
+                svg.append('text')
+                    .attr('x', nearRight ? (bx - 3) : (bx + 3))
+                    .attr('y', margin.top + 20 + (idx % 2) * 10)
+                    .attr('fill', bColor)
+                    .attr('font-size', 9)
+                    .attr('text-anchor', nearRight ? 'end' : 'start')
+                    .text(label);
+            }
+        });
+    }
+
     if (seriesA.length > 0) {
         svg.append('path')
             .datum(seriesA)
@@ -320,6 +351,110 @@ function getRunContext() {
         ? meta.path
         : null;
     return { runDir, modelPath };
+}
+
+const STAGE_COLOR = {
+    pretrain: '#60a5fa',
+    midtrain: '#22d3ee',
+    sft: '#f59e0b',
+    dpo: '#a78bfa',
+    grpo: '#8b5cf6',
+    ppo: '#c084fc',
+    unassigned: '#6b7280',
+};
+
+function normalizeStageName(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    if (!s) return '';
+    if (s === 'stage_a') return 'pretrain';
+    if (s === 'stage_b') return 'midtrain';
+    return s;
+}
+
+function stageRangesFromTimeline(timeline) {
+    const ranges = {};
+    if (!Array.isArray(timeline)) return ranges;
+    timeline.forEach((row) => {
+        if (!row || typeof row !== 'object') return;
+        const stage = normalizeStageName(row.stage);
+        if (!stage) return;
+        const start = Number(row.step_start);
+        const end = Number(row.step_end);
+        const hasStart = Number.isFinite(start);
+        const hasEnd = Number.isFinite(end);
+        if (!hasStart && !hasEnd) return;
+        ranges[stage] = {
+            start: hasStart ? start : null,
+            end: hasEnd ? end : null,
+        };
+    });
+    return ranges;
+}
+
+function resolvePointStage(point, stageRanges, activeStage) {
+    const direct = normalizeStageName(point && point.source_stage);
+    if (direct) return direct;
+    const step = Number(point && point.step);
+    if (Number.isFinite(step)) {
+        for (const [stage, range] of Object.entries(stageRanges || {})) {
+            const s = Number(range && range.start);
+            const e = Number(range && range.end);
+            const geStart = !Number.isFinite(s) || step >= s;
+            const leEnd = !Number.isFinite(e) || step <= e;
+            if (geStart && leEnd) return stage;
+        }
+    }
+    return normalizeStageName(activeStage) || 'unassigned';
+}
+
+function buildStageBoundaries(points) {
+    const out = [];
+    for (let i = 1; i < points.length; i++) {
+        const prev = normalizeStageName(points[i - 1] && points[i - 1]._stage);
+        const cur = normalizeStageName(points[i] && points[i]._stage);
+        if (!prev || !cur || prev === cur) continue;
+        const step = Number(points[i].step);
+        if (!Number.isFinite(step)) continue;
+        out.push({
+            step,
+            label: `${prev}→${cur}`,
+            color: STAGE_COLOR[cur] || STAGE_COLOR.unassigned,
+        });
+    }
+    return out;
+}
+
+function computeSaturation(points, activeStage, windowSize = 20) {
+    const stage = normalizeStageName(activeStage) || 'unassigned';
+    const stagePoints = points
+        .filter((p) => normalizeStageName(p && p._stage) === stage && Number.isFinite(Number(p && p.loss_ck)))
+        .map((p) => Number(p.loss_ck));
+    if (stagePoints.length < 4) return null;
+    const tail = stagePoints.slice(-Math.max(4, windowSize));
+    const n = tail.length;
+    const xs = Array.from({ length: n }, (_, i) => i);
+    const meanX = xs.reduce((a, b) => a + b, 0) / n;
+    const meanY = tail.reduce((a, b) => a + b, 0) / n;
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < n; i++) {
+        const dx = xs[i] - meanX;
+        num += dx * (tail[i] - meanY);
+        den += dx * dx;
+    }
+    const slope = den > 0 ? (num / den) : 0;
+    const variance = tail.reduce((acc, v) => acc + ((v - meanY) * (v - meanY)), 0) / n;
+    const std = Math.sqrt(Math.max(0, variance));
+    if (slope > 1e-3) {
+        return { verdict: 'EXPLODING', color: '#ef4444', text: 'Loss is rising; reduce LR or increase grad clipping.', slope, std, n, stage };
+    }
+    if (Math.abs(slope) < 1e-4 && std < 1e-2) {
+        return { verdict: 'PLATEAUED', color: '#f59e0b', text: 'Stage looks saturated; move to next curriculum stage.', slope, std, n, stage };
+    }
+    if (slope < -1e-4) {
+        return { verdict: 'DECLINING', color: '#47b475', text: 'Still learning in this stage; continue training.', slope, std, n, stage };
+    }
+    return { verdict: 'NOISY', color: '#9ca3af', text: 'Signal is noisy; monitor another 10-20 steps before switching.', slope, std, n, stage };
 }
 
 function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEval, lossSteps) {
@@ -686,6 +821,43 @@ export function renderTrainingDashboard(files) {
     const validSvgLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(validSvgRate) ? fmt(validSvgRate, 4) : '-');
     const closureLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(closureRate) ? fmt(closureRate, 4) : '-');
     const loopLabel = postEvalSkipped ? 'SKIP' : (Number.isFinite(loopScore) ? fmt(loopScore, 4) : '-');
+    const stageTimeline = Array.isArray(pipeline.stage_timeline) ? pipeline.stage_timeline : [];
+    const stageRanges = stageRangesFromTimeline(stageTimeline);
+    const activeStage = normalizeStageName(pipeline.active_stage) || 'unassigned';
+    const lossWithStage = lossSteps.map((p) => ({ ...p, _stage: resolvePointStage(p, stageRanges, activeStage) }));
+    const stagesPresent = Array.from(new Set(lossWithStage.map((p) => normalizeStageName(p._stage)).filter(Boolean)));
+    const stageFilterKey = `trainStageFilters:${runCtx.runDir || runCtx.modelPath || 'default'}`;
+    const savedFilters = window._ckTrainStageFilters && typeof window._ckTrainStageFilters === 'object'
+        ? window._ckTrainStageFilters[stageFilterKey]
+        : null;
+    const activeFilters = (savedFilters instanceof Set && savedFilters.size > 0)
+        ? new Set(Array.from(savedFilters).filter((s) => stagesPresent.includes(s)))
+        : new Set(stagesPresent);
+    if (activeFilters.size === 0) stagesPresent.forEach((s) => activeFilters.add(s));
+    const filteredLossSteps = lossWithStage.filter((p) => activeFilters.has(normalizeStageName(p._stage)));
+    const chartLossSteps = filteredLossSteps.length > 0 ? filteredLossSteps : lossWithStage;
+    const stageBoundaries = buildStageBoundaries(chartLossSteps);
+    const stageFilterHtml = stagesPresent.map((stage) => {
+        const selected = activeFilters.has(stage);
+        const clr = STAGE_COLOR[stage] || STAGE_COLOR.unassigned;
+        const bg = selected ? `${clr}22` : 'rgba(255,255,255,0.04)';
+        const border = selected ? clr : 'rgba(255,255,255,0.14)';
+        const txt = selected ? '#e5e7eb' : '#9ca3af';
+        return `<button type="button" data-train-stage-filter="${stage}" style="background:${bg};border:1px solid ${border};color:${txt};padding:0.12rem 0.5rem;border-radius:999px;font-size:0.72rem;cursor:pointer;">${stage}</button>`;
+    }).join('');
+    const saturation = computeSaturation(lossWithStage, activeStage, 20);
+    const saturationHtml = saturation
+        ? `<div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Saturation</span> Active Stage Trend</h3>
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+                <span style="background:${saturation.color}22;border:1px solid ${saturation.color};color:${saturation.color};padding:0.08rem 0.45rem;border-radius:4px;font-size:0.74rem;font-weight:700;">${saturation.verdict}</span>
+                <span style="color:var(--text-muted);font-size:0.78rem;">${saturation.text}</span>
+            </div>
+            <div style="color:#9ca3af;font-size:0.74rem;margin-top:0.35rem;">
+                stage=${saturation.stage} · slope=${fmt(saturation.slope, 6)} · std=${fmt(saturation.std, 4)} · window=${saturation.n} steps
+            </div>
+        </div>`
+        : '';
 
     const reportCmd = runCtx.runDir
         ? `python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runCtx.runDir} --html-only`
@@ -723,6 +895,11 @@ export function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${closureLabel}</div><div class="stat-label">Closure Success</div></div>
             <div class="stat-card"><div class="stat-value">${loopLabel}</div><div class="stat-label">Loop Score</div></div>
         </div>
+        <div style="margin-top:0.6rem;margin-bottom:0.4rem;display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;">
+            <span style="color:#9ca3af;font-size:0.72rem;">Stage filters:</span>
+            <button type="button" data-train-stage-filter="__all__" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.18);color:#d1d5db;padding:0.12rem 0.45rem;border-radius:999px;font-size:0.72rem;cursor:pointer;">all</button>
+            ${stageFilterHtml}
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0.8rem;">
             <div class="parity-section">
                 <h3><span class="badge badge-blue">Loss</span> CK vs PyTorch</h3>
@@ -749,6 +926,7 @@ export function renderTrainingDashboard(files) {
         <div style="color:var(--text-muted);font-size:0.76rem;margin-top:0.15rem;">
             Grad norm = global L2 norm of parameter gradients before optimizer update. If this line is flat at 0.00e+0 for all steps, gradients may be truly collapsed or grad telemetry may be missing in this runtime path; confirm using loss trend and parity/replay gates.
         </div>
+        ${saturationHtml}
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
             <div id="trainAlertList"></div>
@@ -766,9 +944,39 @@ export function renderTrainingDashboard(files) {
         </div>
     `;
 
-    drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt', { title: 'Training Loss: CK vs PyTorch' });
-    drawLineChart(document.getElementById('trainGradChart'), lossSteps, 'grad_norm', '#fbbf24', null, { title: 'Training Gradient Norm vs Step' });
-    drawLineChart(document.getElementById('trainLrChart'), lossSteps, 'lr', '#60a5fa', null, { title: 'Training Learning Rate vs Step' });
+    drawLineChart(document.getElementById('trainLossChart'), chartLossSteps, 'loss_ck', '#f87171', 'loss_pt', {
+        title: 'Training Loss: CK vs PyTorch',
+        boundaries: stageBoundaries,
+    });
+    drawLineChart(document.getElementById('trainGradChart'), chartLossSteps, 'grad_norm', '#fbbf24', null, {
+        title: 'Training Gradient Norm vs Step',
+        boundaries: stageBoundaries,
+    });
+    drawLineChart(document.getElementById('trainLrChart'), chartLossSteps, 'lr', '#60a5fa', null, {
+        title: 'Training Learning Rate vs Step',
+        boundaries: stageBoundaries,
+    });
+
+    const filterButtons = root.querySelectorAll('button[data-train-stage-filter]');
+    filterButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const stage = String(btn.getAttribute('data-train-stage-filter') || '');
+            const next = new Set(activeFilters);
+            if (stage === '__all__') {
+                stagesPresent.forEach((s) => next.add(s));
+            } else if (next.has(stage)) {
+                next.delete(stage);
+            } else {
+                next.add(stage);
+            }
+            if (next.size === 0) stagesPresent.forEach((s) => next.add(s));
+            if (!window._ckTrainStageFilters || typeof window._ckTrainStageFilters !== 'object') {
+                window._ckTrainStageFilters = {};
+            }
+            window._ckTrainStageFilters[stageFilterKey] = next;
+            renderTrainingDashboard(files);
+        });
+    });
 
     const alertsEl = document.getElementById('trainAlertList');
     const alerts = healthAlerts(lossSteps, parityRows);
