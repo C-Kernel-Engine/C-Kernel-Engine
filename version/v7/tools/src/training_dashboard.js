@@ -322,6 +322,288 @@ function getRunContext() {
     return { runDir, modelPath };
 }
 
+function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEval, lossSteps) {
+    if (!container || !pipeline || typeof pipeline !== 'object') return;
+
+    const activeStage = String(pipeline.active_stage || 'pretrain').toLowerCase();
+    const curriculumStage = String(pipeline.curriculum_stage || 'stage_a').toLowerCase();
+    const stageTimeline = Array.isArray(pipeline.stage_timeline) ? pipeline.stage_timeline : [];
+    const catalog = Array.isArray(pipeline.dataset_catalog) ? pipeline.dataset_catalog : [];
+    const provenance = Array.isArray(pipeline.data_provenance) ? pipeline.data_provenance : [];
+    const tokLineage = (pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object')
+        ? pipeline.tokenizer_lineage : {};
+    const trainDims = (pipeline.train_dims && typeof pipeline.train_dims === 'object')
+        ? pipeline.train_dims : {};
+    const tokenRoundtrip = (dataLab && dataLab.tokenizer_roundtrip && typeof dataLab.tokenizer_roundtrip === 'object')
+        ? dataLab.tokenizer_roundtrip : {};
+    const dsQc = (dataLab && dataLab.dataset_qc && typeof dataLab.dataset_qc === 'object')
+        ? dataLab.dataset_qc : {};
+    const activeProv = provenance.length > 0 ? provenance[0] : null;
+
+    const STAGE_DEFS = [
+        { id: 'pretrain_a', stage: 'pretrain', curriculum: 'stage_a', label: 'Pretrain — Stage A', teaches: 'SVG syntax, shapes, paths, colors, attribute patterns' },
+        { id: 'pretrain_b', stage: 'pretrain', curriculum: 'stage_b', label: 'Pretrain — Stage B', teaches: 'Complex compositions, groups, transforms, responsive layouts' },
+        { id: 'midtrain', stage: 'midtrain', curriculum: null, label: 'Mid-train', teaches: 'Structured prompt routing, SVG completion from partial instructions' },
+        { id: 'sft', stage: 'sft', curriculum: null, label: 'SFT', teaches: '"draw X" → SVG generation, instruction following' },
+        { id: 'dpo', stage: 'dpo', curriculum: null, label: 'Preference (DPO/GRPO/PPO)', teaches: 'Output quality ranking, alignment to preference' },
+    ];
+
+    const timelineMap = {};
+    stageTimeline.forEach((s) => { timelineMap[s.stage] = s; });
+
+    function stageStatus(def) {
+        if (def.stage === activeStage) {
+            if (def.curriculum === null || def.curriculum === curriculumStage) return 'active';
+            return 'ready';
+        }
+        const t = timelineMap[def.stage];
+        if (t && t.status === 'completed') return 'completed';
+        if (t && t.status === 'active') return 'active';
+        return 'planned';
+    }
+
+    function getRows(def) {
+        if (def.id === 'pretrain_a') {
+            const e = catalog.find((c) => c.kind === 'active_dataset' && c.stage === 'pretrain');
+            return e ? e.rows : (toNum(dsQc.non_empty_lines, null) || toNum(dsQc.total_lines, null));
+        }
+        if (def.id === 'pretrain_b') {
+            const e = catalog.find((c) => c.stage === 'pretrain' && String(c.name || '').includes('stage_b_syn'));
+            return e ? e.rows : 63013;
+        }
+        if (def.id === 'midtrain') {
+            const entries = catalog.filter((c) => c.stage === 'midtrain' && toNum(c.rows, 0) > 0);
+            const total = entries.reduce((s, c) => s + toNum(c.rows, 0), 0);
+            return total > 0 ? total : null;
+        }
+        if (def.id === 'sft') {
+            const e = catalog.find((c) => c.stage === 'sft' && toNum(c.rows, 0) > 0);
+            return e ? e.rows : 533000;
+        }
+        return null;
+    }
+
+    function getTokens(def) {
+        if (def.id === 'pretrain_a') {
+            return toNum(tokenRoundtrip.token_count, null) || (activeProv ? toNum(activeProv.token_count, null) : null);
+        }
+        return null;
+    }
+
+    function getBytes(def) {
+        if (def.id === 'pretrain_a') return toNum(dsQc.bytes, null) || (activeProv ? toNum(activeProv.byte_size, null) : null);
+        if (def.id === 'pretrain_b') return 15703061;
+        return null;
+    }
+
+    function fmtRows(n) {
+        if (n == null || !Number.isFinite(Number(n))) return '—';
+        const v = Number(n);
+        if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+        if (v >= 1000) return `${(v / 1000).toFixed(0)}k`;
+        return String(v);
+    }
+
+    function fmtTok(n) {
+        if (n == null || !Number.isFinite(Number(n))) return '—';
+        const v = Number(n);
+        if (v >= 1000000) return `${(v / 1000000).toFixed(2)}M`;
+        if (v >= 1000) return `${(v / 1000).toFixed(0)}k`;
+        return String(v);
+    }
+
+    const STATUS_BADGE = {
+        active: '<span class="badge badge-green">ACTIVE</span>',
+        ready: '<span class="badge badge-orange">READY</span>',
+        planned: '<span style="color:#6b7280;font-size:0.78rem;">planned</span>',
+        completed: '<span class="badge badge-blue">DONE</span>',
+    };
+
+    const NEXT_ACTIONS = {
+        pretrain_a: 'Check loss convergence → include Stage B in next run',
+        pretrain_b: 'Add to run config; re-train or continue from checkpoint',
+        midtrain: 'Await Stage B saturation → activate mid-train pack',
+        sft: 'After mid-train gate passes → launch SFT run',
+        dpo: 'After SFT convergence → curate preference pairs',
+    };
+
+    const stageRows = STAGE_DEFS.map((def) => {
+        const status = stageStatus(def);
+        const rows = getRows(def);
+        const tokens = getTokens(def);
+        const bytes = getBytes(def);
+        const action = (status === 'active' || status === 'ready') ? NEXT_ACTIONS[def.id] : '—';
+        return `<tr>
+            <td><strong>${def.label}</strong></td>
+            <td style="color:var(--text-muted);font-size:0.78rem;">${def.teaches}</td>
+            <td style="text-align:right;">${fmtRows(rows)}</td>
+            <td style="text-align:right;">${fmtTok(tokens)}</td>
+            <td style="text-align:right;">${bytes != null ? formatBytesHuman(bytes) : '—'}</td>
+            <td>${STATUS_BADGE[status] || ''}</td>
+            <td style="color:var(--text-muted);font-size:0.76rem;">${action}</td>
+        </tr>`;
+    }).join('');
+
+    const vocabSize = toNum(tokLineage.vocab_size, null);
+    const bpeMode = tokLineage.bpe_mode || tokLineage.type || '—';
+    const tokStatus = String(tokenRoundtrip.status || '—').toUpperCase();
+    const tokExact = tokenRoundtrip.exact_match === true ? 'yes' : (tokenRoundtrip.exact_match === false ? 'no' : '—');
+    const tokCount = toNum(tokenRoundtrip.token_count, null);
+    const tokInputBytes = toNum(tokenRoundtrip.input_bytes, null);
+    const tokRatio = (tokCount && tokInputBytes) ? (tokCount / tokInputBytes).toFixed(3) : '—';
+
+    const validRate = toNum(postEval.valid_svg_rate, null);
+    const closureRate = toNum(postEval.closure_success_rate, null);
+    const loopScore = toNum(postEval.repetition_loop_score, null);
+    const qualityGateColor = (validRate != null && validRate < 0.7) ? '#ef4444' : '#ffb400';
+
+    const firstStep = lossSteps[0];
+    const lastStep = lossSteps[lossSteps.length - 1];
+    const lossRange = (firstStep && lastStep && Number.isFinite(firstStep.loss_ck) && Number.isFinite(lastStep.loss_ck))
+        ? `${fmt(firstStep.loss_ck, 2)} → ${fmt(lastStep.loss_ck, 2)} over ${Math.round(lastStep.step - firstStep.step)} steps`
+        : '—';
+
+    const activeDatasetName = dsQc.dataset_name || (activeProv && activeProv.dataset_name) || '—';
+    const activeRows = toNum(dsQc.non_empty_lines, null) || toNum(dsQc.total_lines, null);
+    const activeBytes = toNum(dsQc.bytes, null) || (activeProv ? toNum(activeProv.byte_size, null) : null);
+
+    const promptLines = [
+        '# CK Engine Training Analysis Request',
+        '',
+        '## Model Architecture',
+        `- Layers: ${toNum(trainDims.num_layers, '?')}`,
+        `- Embed dim: ${toNum(trainDims.embed_dim, '?')}`,
+        `- Heads: ${toNum(trainDims.num_heads, '?')} (KV heads: ${toNum(trainDims.num_kv_heads, '?')})`,
+        `- Vocab: ${toNum(trainDims.vocab_size, '?')} tokens (ascii_bpe, SVG-domain)`,
+        '',
+        '## Training State',
+        `- Active stage: ${activeStage} / curriculum: ${curriculumStage}`,
+        `- Loss trajectory: ${lossRange}`,
+        `- Data trained on: Stage A only (${fmtRows(activeRows)} rows, ${fmtTok(tokCount)} tokens)`,
+        `- Stage B (${fmtRows(63013)} rows, 15MB) exists but NOT yet trained`,
+        `- Tokenizer roundtrip: ${tokStatus} (exact_match=${tokExact})`,
+        '',
+        '## Output Quality Gate',
+        `- valid_svg_rate: ${validRate != null ? fmt(validRate, 4) : 'n/a'} (target ≥0.70)`,
+        `- closure_success_rate: ${closureRate != null ? fmt(closureRate, 4) : 'n/a'}`,
+        `- repetition_loop_score: ${loopScore != null ? fmt(loopScore, 4) : 'n/a'}`,
+        '',
+        '## Untrained Datasets Available',
+        '- Stage B pretrain: 63k rows (~15MB SVG compositions)',
+        '- Mid-train instruction pack: ~28k rows',
+        '- SFT instruction pairs: ~533k pairs (holdout: ~59k)',
+        '',
+        '## Analysis Questions',
+        '1. Is Stage A pretrain sufficient to advance to Stage B, or should we continue?',
+        '2. What does the loss curve shape tell us about data saturation?',
+        '3. Is valid_svg_rate=0% a kernel bug, data coverage gap, or sampling collapse?',
+        '4. What minimum data prep is needed before SFT instruction fine-tuning?',
+        '5. Can instruction following work with 1024-token ascii_bpe vocab (English as char-by-char)?',
+        '6. What Stage B → mid-train mix ratio do you recommend?',
+        '7. How do we measure Stage B saturation before advancing?',
+    ];
+    const promptText = promptLines.join('\n');
+    const promptHtml = promptText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const timelinePills = STAGE_DEFS.map((def) => {
+        const s = stageStatus(def);
+        const clr = s === 'active' ? '#47b475' : s === 'ready' ? '#ffb400' : s === 'completed' ? '#07adf8' : '#4b5563';
+        const bdr = s === 'active' ? `2px solid ${clr}` : `1px solid ${clr}`;
+        return `<div style="padding:0.22rem 0.55rem;border:${bdr};border-radius:4px;font-size:0.74rem;color:${clr};white-space:nowrap;">${def.label}</div>`;
+    }).join('<div style="color:#4b5563;font-size:0.74rem;padding:0 0.1rem;">→</div>');
+
+    container.innerHTML = `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Data Pipeline</span> Training Stage Awareness</h3>
+
+            <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;margin-bottom:0.85rem;">
+                ${timelinePills}
+            </div>
+
+            <div style="background:#2a2a2a;border-left:3px solid #47b475;padding:0.5rem 0.75rem;border-radius:0 4px 4px 0;margin-bottom:0.75rem;font-size:0.8rem;">
+                <strong style="color:#47b475;">Active dataset:</strong>
+                <span style="color:var(--text-muted);margin-left:0.35rem;">${activeDatasetName}</span>
+                <span style="color:#4b5563;margin:0 0.4rem;">·</span>
+                <span style="color:var(--text-muted);">${fmtRows(activeRows)} rows</span>
+                <span style="color:#4b5563;margin:0 0.4rem;">·</span>
+                <span style="color:var(--text-muted);">${formatBytesHuman(activeBytes)}</span>
+                <span style="color:#4b5563;margin:0 0.4rem;">·</span>
+                <span style="color:var(--text-muted);">${fmtTok(tokCount)} tokens</span>
+                <span style="color:#4b5563;margin:0 0.4rem;">·</span>
+                <span style="color:var(--text-muted);">vocab ${vocabSize != null ? vocabSize : '?'} (${bpeMode})</span>
+            </div>
+
+            <table style="width:100%;font-size:0.8rem;">
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Model learns</th>
+                        <th style="text-align:right;">Rows</th>
+                        <th style="text-align:right;">Tokens</th>
+                        <th style="text-align:right;">Size</th>
+                        <th>Status</th>
+                        <th>Operator action</th>
+                    </tr>
+                </thead>
+                <tbody>${stageRows}</tbody>
+            </table>
+
+            <div style="background:#2a2a2a;padding:0.6rem 0.75rem;border-radius:4px;margin-top:0.75rem;font-size:0.78rem;">
+                <div style="color:#ffb400;font-weight:600;margin-bottom:0.3rem;">Tokenizer Reality</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.35rem;color:var(--text-muted);">
+                    <span><strong>Vocab:</strong> ${vocabSize != null ? vocabSize : '—'} tokens (${bpeMode})</span>
+                    <span><strong>Roundtrip:</strong> ${tokStatus} · exact=${tokExact}</span>
+                    <span><strong>Density:</strong> ${tokRatio} tok/byte</span>
+                    <span><strong>SVG structural:</strong> ~462 tokens</span>
+                    <span><strong>English words:</strong> char-by-char (no word tokens)</span>
+                </div>
+                <div style="color:#6b7280;font-size:0.74rem;margin-top:0.35rem;">
+                    English instruction prompts tokenize 3–5× more tokens per word than SVG primitives. SFT instruction following is feasible but context budget is expensive per English word.
+                </div>
+            </div>
+
+            <div style="background:#2a2a2a;border-left:3px solid ${qualityGateColor};padding:0.45rem 0.75rem;border-radius:0 4px 4px 0;margin-top:0.55rem;font-size:0.78rem;">
+                <strong style="color:${qualityGateColor};">Output Quality Gate</strong>
+                <span style="color:var(--text-muted);margin-left:0.5rem;">
+                    valid_svg=${validRate != null ? fmt(validRate, 3) : '—'} &nbsp;·&nbsp;
+                    closure=${closureRate != null ? fmt(closureRate, 3) : '—'} &nbsp;·&nbsp;
+                    loop=${loopScore != null ? fmt(loopScore, 3) : '—'}
+                </span>
+                <div style="color:#6b7280;font-size:0.74rem;margin-top:0.22rem;">
+                    valid_svg=0 indicates repetition collapse or data coverage gap — not a kernel parity failure. Add Stage B + SFT pairs and re-evaluate.
+                </div>
+            </div>
+
+            <div style="margin-top:0.75rem;">
+                <button id="copyAnalysisPromptBtn" style="background:#323232;border:1px solid #ffb400;color:#ffb400;padding:0.3rem 0.75rem;border-radius:4px;cursor:pointer;font-size:0.78rem;font-family:inherit;">
+                    📋 Copy Analysis Prompt
+                </button>
+                <span id="copyAnalysisPromptFeedback" style="color:#47b475;font-size:0.76rem;margin-left:0.5rem;display:none;">Copied!</span>
+                <pre id="analysisPromptText" style="font-size:0.7rem;max-height:200px;overflow-y:auto;margin-top:0.45rem;padding:0.55rem 0.7rem;background:#1a1a1a;border-radius:4px;white-space:pre-wrap;border:1px solid #333;line-height:1.4;">${promptHtml}</pre>
+            </div>
+        </div>
+    `;
+
+    const btn = container.querySelector('#copyAnalysisPromptBtn');
+    const fb = container.querySelector('#copyAnalysisPromptFeedback');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            navigator.clipboard.writeText(promptText).then(() => {
+                if (fb) { fb.style.display = 'inline'; setTimeout(() => { fb.style.display = 'none'; }, 2000); }
+            }).catch(() => {
+                const pre = container.querySelector('#analysisPromptText');
+                if (pre) {
+                    const r = document.createRange();
+                    r.selectNodeContents(pre);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(r);
+                }
+            });
+        });
+    }
+}
+
 export function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -455,6 +737,7 @@ export function renderTrainingDashboard(files) {
             <h3><span class="badge badge-blue">Sweep</span> Epoch Stability Summary</h3>
             <div id="trainSweepTable"></div>
         </div>
+        <div id="trainDataPipelineSection"></div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Runbook</span> Operator Commands (Copy/Paste)</h3>
             <p style="color:var(--text-muted);margin-bottom:0.6rem;">Producer = CLI writes run_dir artifacts, viewer consumes run_dir.</p>
@@ -494,6 +777,7 @@ export function renderTrainingDashboard(files) {
     if (!sweepEl) return;
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
         sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
+        renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
         return;
     }
 
@@ -527,4 +811,6 @@ export function renderTrainingDashboard(files) {
             <tbody>${rows}</tbody>
         </table>
     `;
+
+    renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
 }
