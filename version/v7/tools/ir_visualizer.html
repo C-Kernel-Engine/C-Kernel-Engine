@@ -16960,15 +16960,27 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
         return null;
     }
 
+    // dsQc may reflect a different dataset than what was trained (e.g. Stage B QC run after Stage A training).
+    // activeProv is the ground truth for what was actually trained — always prefer it.
+    const dsQcMatchesProv = activeProv && dsQc.dataset_name &&
+        (dsQc.dataset_name === activeProv.dataset_name ||
+         String(dsQc.dataset_name).includes('stage_a') === String(activeProv.dataset_name || '').includes('stage_a'));
+
     function getTokens(def) {
         if (def.id === 'pretrain_a') {
-            return toNum(tokenRoundtrip.token_count, null) || (activeProv ? toNum(activeProv.token_count, null) : null);
+            // Prefer provenance token count; fall back to roundtrip only if dsQc matches the trained dataset
+            return (activeProv ? toNum(activeProv.token_count, null) : null)
+                || (dsQcMatchesProv ? toNum(tokenRoundtrip.token_count, null) : null);
         }
         return null;
     }
 
     function getBytes(def) {
-        if (def.id === 'pretrain_a') return toNum(dsQc.bytes, null) || (activeProv ? toNum(activeProv.byte_size, null) : null);
+        if (def.id === 'pretrain_a') {
+            // Prefer provenance byte_size — dsQc.bytes could point to a different stage
+            return (activeProv ? toNum(activeProv.byte_size, null) : null)
+                || (dsQcMatchesProv ? toNum(dsQc.bytes, null) : null);
+        }
         if (def.id === 'pretrain_b') return 15703061;
         return null;
     }
@@ -17040,9 +17052,17 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
         ? `${fmt(firstStep.loss_ck, 2)} → ${fmt(lastStep.loss_ck, 2)} over ${Math.round(lastStep.step - firstStep.step)} steps`
         : '—';
 
-    const activeDatasetName = dsQc.dataset_name || (activeProv && activeProv.dataset_name) || '—';
-    const activeRows = toNum(dsQc.non_empty_lines, null) || toNum(dsQc.total_lines, null);
-    const activeBytes = toNum(dsQc.bytes, null) || (activeProv ? toNum(activeProv.byte_size, null) : null);
+    // activeProv is ground truth for what was actually trained.
+    // dsQc may point to a different (e.g. newer) dataset — only use it as fallback if dataset names match.
+    const activeDatasetName = (activeProv && activeProv.dataset_name)
+        || (dsQcMatchesProv ? dsQc.dataset_name : null) || '—';
+    const catalogActiveEntry = catalog.find((c) => c.kind === 'active_dataset' && c.stage === 'pretrain');
+    const activeRows = (catalogActiveEntry ? toNum(catalogActiveEntry.rows, null) : null)
+        || (dsQcMatchesProv ? (toNum(dsQc.non_empty_lines, null) || toNum(dsQc.total_lines, null)) : null);
+    const activeBytes = (activeProv ? toNum(activeProv.byte_size, null) : null)
+        || (dsQcMatchesProv ? toNum(dsQc.bytes, null) : null);
+    const activeTokCount = (activeProv ? toNum(activeProv.token_count, null) : null)
+        || (dsQcMatchesProv ? tokCount : null);
 
     const promptLines = [
         '# CK Engine Training Analysis Request',
@@ -17056,7 +17076,7 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
         '## Training State',
         `- Active stage: ${activeStage} / curriculum: ${curriculumStage}`,
         `- Loss trajectory: ${lossRange}`,
-        `- Data trained on: Stage A only (${fmtRows(activeRows)} rows, ${fmtTok(tokCount)} tokens)`,
+        `- Data trained on: Stage A only (${fmtRows(activeRows)} rows, ${fmtTok(activeTokCount)} tokens)`,
         `- Stage B (${fmtRows(63013)} rows, 15MB) exists but NOT yet trained`,
         `- Tokenizer roundtrip: ${tokStatus} (exact_match=${tokExact})`,
         '',
@@ -17105,7 +17125,7 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
                 <span style="color:#4b5563;margin:0 0.4rem;">·</span>
                 <span style="color:var(--text-muted);">${formatBytesHuman(activeBytes)}</span>
                 <span style="color:#4b5563;margin:0 0.4rem;">·</span>
-                <span style="color:var(--text-muted);">${fmtTok(tokCount)} tokens</span>
+                <span style="color:var(--text-muted);">${fmtTok(activeTokCount)} tokens</span>
                 <span style="color:#4b5563;margin:0 0.4rem;">·</span>
                 <span style="color:var(--text-muted);">vocab ${vocabSize != null ? vocabSize : '?'} (${bpeMode})</span>
             </div>
