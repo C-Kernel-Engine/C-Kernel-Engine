@@ -333,6 +333,7 @@
     <ul>
         <li><a href="#step-6-infer-trained"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">6</span> Build Inference</a></li>
         <li><a href="#step-7-visualizer"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">7</span> IR Visualizer</a></li>
+        <li><a href="#step-7-1-live-monitor"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.15);border-color:rgba(71,180,117,0.4);color:#7de59f;">7.1</span> Live Monitor</a></li>
         <li><a href="#step-8-inference"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8</span> GGUF Inference</a></li>
         <li><a href="#step-8-visualize-hf"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8.1</span> HF Visualizer</a></li>
     </ul>
@@ -1555,6 +1556,102 @@ xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
         <tr><td>After Step 3.7 training</td><td><code>$RUN</code></td><td><code>Training -> Data Lab</code> + <code>Train Dashboard</code> (valid SVG/closure/loop metrics)</td></tr>
         <tr><td>After Step 6 inference build</td><td><code>$RUN</code></td><td>kernel graph, runtime files, and artifact links</td></tr>
     </table>
+</div>
+
+<h2 id="step-7-1-live-monitor">Step 7.1: Live Training Monitor</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom:0.55rem;">
+        Watch loss, grad norm, step count, and tok/s update in real-time while training is running —
+        no need to regenerate the report or restart the training process.
+        Open a second terminal alongside your training run and pick the path that suits your setup.
+    </p>
+
+    <h3 style="margin-top:0;">Path A — Zero-config (python3 -m http.server)</h3>
+    <p style="margin-bottom:0.35rem;">
+        Works with <strong>any</strong> static HTTP server.
+        The visualizer auto-detects it is served over HTTP (not <code>file://</code>) and
+        starts polling the JSON artifact files that live next to <code>ir_report.html</code>.
+        No flags, no server code — just stdlib.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># In a second terminal while training is running:
+python3 -m http.server 7700 -d "$RUN"
+
+# Open in browser:
+xdg-open http://localhost:7700/ir_report.html 2>/dev/null || \
+  echo "Open: http://localhost:7700/ir_report.html"</pre>
+    </div>
+    <p class="mini-note">
+        <code>$RUN</code> is the training run directory (e.g.
+        <code>~/.cache/ck-engine-v7/models/train/svg_l16_d128_h512_v1024_ctx512</code>).
+        The <code>ir_report.html</code> must already exist in that directory (generated in Step 7 or by the
+        training pipeline's <code>--generate-visualizer</code> flag).
+    </p>
+
+    <h3>Path B — Custom live server (single snapshot endpoint)</h3>
+    <p style="margin-bottom:0.35rem;">
+        Generates a fresh report and starts a dedicated HTTP server that exposes a
+        <code>/api/snapshot</code> endpoint — one request per poll cycle instead of N file fetches.
+        Injects <code>window.CK_LIVE_MODE</code> automatically so the visualizer uses the snapshot path.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Generates report, starts server, opens browser:
+.venv/bin/python version/v7/tools/open_ir_visualizer.py \
+  --run "$RUN" \
+  --html-only \
+  --live \
+  --live-port 7700 \
+  --live-interval 4000
+
+# Press Ctrl+C to stop the server when done.</pre>
+    </div>
+    <p class="mini-note">
+        <code>--live-interval</code> is in milliseconds (default 5000 = 5 s).
+        Reduce to 2000–3000 for faster feedback during early training.
+    </p>
+
+    <h3>What the live bar shows</h3>
+    <p style="margin-bottom:0.35rem;">
+        A fixed status bar appears at the bottom of every page while live mode is active:
+    </p>
+    <div style="background:#07100a;border:1px solid rgba(71,180,117,0.28);border-radius:6px;padding:0.45rem 0.9rem;font-family:monospace;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#47b475;box-shadow:0 0 5px #47b475;flex-shrink:0;"></span>
+        <span style="color:#6ee7b7;font-weight:700;">LIVE</span>
+        <span>↺ step 42 · loss 3.2401 · 92.1 tok/s</span>
+        <span style="color:#6b7280;font-size:0.72rem;">·  just now</span>
+        <span style="margin-left:auto;color:#374151;font-size:0.72rem;">file poll · 5s</span>
+        <span style="border:1px solid rgba(255,255,255,0.1);border-radius:3px;color:#6b7280;font-size:0.72rem;padding:0.1rem 0.4rem;">stop</span>
+    </div>
+    <table>
+        <tr><th>Field</th><th>Source file</th><th>What to watch for</th></tr>
+        <tr><td><code>step N</code></td><td><code>training_checkpoint_policy_latest.json</code></td><td>Steps should increment steadily; gaps indicate stalls or restarts.</td></tr>
+        <tr><td><code>loss X.XXXX</code></td><td><code>training_loss_curve_latest.json</code></td><td>Healthy curve trends down. Spikes (&gt;2× recent baseline) may signal LR or data issues.</td></tr>
+        <tr><td><code>X tok/s</code></td><td><code>training_step_profile_latest.json</code></td><td>Drop in tok/s without loss spike → hardware throttle or memory pressure.</td></tr>
+        <tr><td><code>↺</code> prefix</td><td>—</td><td>Appears when any artifact changed this cycle. Absent = no new steps yet.</td></tr>
+    </table>
+    <p class="mini-note">
+        <strong>Which files are polled:</strong>
+        <code>training_loss_curve_latest.json</code>,
+        <code>training_grad_norms_latest.json</code>,
+        <code>training_parity_latest.json</code>,
+        <code>training_step_profile_latest.json</code>,
+        <code>training_checkpoint_policy_latest.json</code>.
+        All are &lt;5 KB and written atomically after each step by the training harness.
+        The active training tab (Train Dashboard, Grad Health, Parity, etc.) re-renders automatically on each change.
+    </p>
+    <p class="mini-note">
+        <strong>Stage detection:</strong> the active curriculum stage (<code>active_stage</code>,
+        <code>curriculum_stage</code>) is embedded from the last report generation.
+        It updates automatically if you regenerate the report mid-run:
+        <code>python3 version/v7/tools/open_ir_visualizer.py --run "$RUN" --html-only</code>
+        (no server restart needed for Path A — just refresh the browser after regeneration).
+    </p>
+    <div class="step-produces">
+        <span class="produces-item item-html">ir_report.html (live via HTTP)</span>
+    </div>
 </div>
 
 <h2 id="step-8-inference">Step 8: Inference from GGUF (HF URLs)</h2>
