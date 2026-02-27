@@ -64,6 +64,7 @@ function init() {
     initModeUI();
     applyQuestionHeaders();
     installListeners();
+    initLiveMode();
 
     const active = document.querySelector('.tabs .tab.active');
     const tabId = active ? (active.dataset.tab || '') : '';

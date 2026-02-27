@@ -1644,6 +1644,163 @@ def _derive_stage_artifacts(pipeline: dict, loaded_paths: dict[str, str], run_di
     return rows
 
 
+def _canon_path_str(path_like: str) -> str:
+    try:
+        return str(Path(path_like).expanduser().resolve())
+    except Exception:
+        return str(path_like)
+
+
+def _derive_tokenizer_dataset_coverage(pipeline: dict) -> dict:
+    lineage = pipeline.get("tokenizer_lineage") if isinstance(pipeline.get("tokenizer_lineage"), dict) else {}
+    provenance = pipeline.get("data_provenance") if isinstance(pipeline.get("data_provenance"), list) else []
+    active = provenance[0] if provenance and isinstance(provenance[0], dict) else {}
+    active_path = active.get("source_path") if isinstance(active.get("source_path"), str) else ""
+    active_hash = None
+    if isinstance(active.get("hash"), dict):
+        hv = active["hash"].get("value")
+        if isinstance(hv, str):
+            active_hash = hv
+
+    corpora = lineage.get("tokenizer_corpora")
+    if not isinstance(corpora, list) or not corpora:
+        reused = bool(lineage.get("reused_run_tokenizer", False))
+        if not reused and active:
+            corpora = [
+                {
+                    "dataset_name": active.get("dataset_name"),
+                    "source_path": active_path,
+                    "stage": active.get("stage"),
+                    "curriculum_stage": active.get("curriculum_stage"),
+                    "rows": active.get("rows"),
+                    "token_count": active.get("token_count"),
+                    "byte_size": active.get("byte_size"),
+                    "sha256": active_hash,
+                    "origin": "derived_current_run",
+                }
+            ]
+        else:
+            corpora = []
+    if isinstance(lineage, dict) and "tokenizer_corpora" not in lineage and corpora:
+        lineage["tokenizer_corpora"] = corpora
+        pipeline["tokenizer_lineage"] = lineage
+
+    active_in = False
+    active_path_c = _canon_path_str(active_path) if active_path else ""
+    active_hash_s = str(active_hash) if isinstance(active_hash, str) else ""
+    for row in corpora:
+        if not isinstance(row, dict):
+            continue
+        rh = row.get("sha256")
+        rp = row.get("source_path")
+        if isinstance(rh, str) and rh and active_hash_s and rh == active_hash_s:
+            active_in = True
+            break
+        if isinstance(rp, str) and rp and active_path_c and _canon_path_str(rp) == active_path_c:
+            active_in = True
+            break
+
+    reused = bool(lineage.get("reused_run_tokenizer", False))
+    if active_in:
+        status = "pass"
+        note = "active dataset is covered by tokenizer corpus metadata"
+    elif reused and corpora:
+        status = "warn"
+        note = "active dataset is not in tokenizer corpus metadata (tokenizer reused)"
+    elif reused and not corpora:
+        status = "unknown"
+        note = "tokenizer corpus metadata unavailable"
+    else:
+        status = "pass"
+        note = "tokenizer built in current run from active dataset"
+
+    return {
+        "status": status,
+        "active_dataset_in_corpus": bool(active_in),
+        "active_dataset_name": active.get("dataset_name"),
+        "active_dataset_path": active_path or None,
+        "active_dataset_sha256": active_hash_s or None,
+        "note": note,
+    }
+
+
+def _derive_stage_dataset_bindings_from_pipeline(pipeline: dict) -> list[dict]:
+    timeline = pipeline.get("stage_timeline") if isinstance(pipeline.get("stage_timeline"), list) else []
+    catalog = pipeline.get("dataset_catalog") if isinstance(pipeline.get("dataset_catalog"), list) else []
+    lineage = pipeline.get("tokenizer_lineage") if isinstance(pipeline.get("tokenizer_lineage"), dict) else {}
+    corpora = lineage.get("tokenizer_corpora") if isinstance(lineage.get("tokenizer_corpora"), list) else []
+
+    tok_path_set = {
+        _canon_path_str(str(r.get("source_path")))
+        for r in corpora
+        if isinstance(r, dict) and isinstance(r.get("source_path"), str) and r.get("source_path")
+    }
+    tok_hash_set = {
+        str(r.get("sha256"))
+        for r in corpora
+        if isinstance(r, dict) and isinstance(r.get("sha256"), str) and r.get("sha256")
+    }
+
+    out: list[dict] = []
+    for row in timeline:
+        if not isinstance(row, dict):
+            continue
+        stage = str(row.get("stage") or "")
+        if not stage:
+            continue
+        datasets: list[dict] = []
+        for entry in catalog:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("stage") or "") != stage:
+                continue
+            kind = str(entry.get("kind") or "")
+            if kind not in {"active_dataset", "generated_dataset"}:
+                continue
+            pth = entry.get("path")
+            sha = entry.get("sha256")
+            in_tok = False
+            if isinstance(sha, str) and sha and sha in tok_hash_set:
+                in_tok = True
+            elif isinstance(pth, str) and pth and _canon_path_str(pth) in tok_path_set:
+                in_tok = True
+            datasets.append(
+                {
+                    "name": entry.get("name"),
+                    "path": pth,
+                    "rows": entry.get("rows"),
+                    "kind": kind,
+                    "status": entry.get("status"),
+                    "source": entry.get("source"),
+                    "sha256": sha if isinstance(sha, str) and sha else None,
+                    "in_tokenizer_corpus": bool(in_tok),
+                }
+            )
+        rows_total = 0
+        rows_known = False
+        for ds in datasets:
+            rv = ds.get("rows")
+            if isinstance(rv, int):
+                rows_total += int(rv)
+                rows_known = True
+        out.append(
+            {
+                "stage": stage,
+                "order": row.get("order"),
+                "status": row.get("status"),
+                "active": bool(row.get("active") is True),
+                "datasets": datasets,
+                "dataset_count": len(datasets),
+                "rows_total": rows_total if rows_known else None,
+                "tokenizer_coverage": {
+                    "in_corpus": sum(1 for ds in datasets if ds.get("in_tokenizer_corpus") is True),
+                    "not_in_corpus": sum(1 for ds in datasets if ds.get("in_tokenizer_corpus") is not True),
+                },
+            }
+        )
+    return out
+
+
 def _extract_loss_series(payload, preferred_keys: list[str]) -> list[float]:
     if not isinstance(payload, dict):
         return []
@@ -2420,6 +2577,7 @@ def load_model_data(
             if derived_catalog:
                 pipeline["dataset_catalog"] = derived_catalog
                 loaded.append("dataset_catalog(derived)")
+                dataset_catalog = derived_catalog
 
         stage_artifacts = pipeline.get("stage_artifacts")
         if not isinstance(stage_artifacts, list) or not stage_artifacts:
@@ -2427,6 +2585,35 @@ def load_model_data(
             if derived_stage_artifacts:
                 pipeline["stage_artifacts"] = derived_stage_artifacts
                 loaded.append("stage_artifacts(derived)")
+
+        if not isinstance(pipeline.get("tokenizer_dataset_coverage"), dict):
+            derived_tok_cov = _derive_tokenizer_dataset_coverage(pipeline)
+            pipeline["tokenizer_dataset_coverage"] = derived_tok_cov
+            loaded.append("tokenizer_dataset_coverage(derived)")
+
+        stage_bindings = pipeline.get("stage_dataset_bindings")
+        if not isinstance(stage_bindings, list) or not stage_bindings:
+            derived_stage_bindings = _derive_stage_dataset_bindings_from_pipeline(pipeline)
+            if derived_stage_bindings:
+                pipeline["stage_dataset_bindings"] = derived_stage_bindings
+                loaded.append("stage_dataset_bindings(derived)")
+
+        run_sequence = pipeline.get("run_sequence")
+        if not isinstance(run_sequence, list) or not run_sequence:
+            data_lab_local = pipeline.get("data_lab") if isinstance(pipeline.get("data_lab"), dict) else {}
+            tok_cov = pipeline.get("tokenizer_dataset_coverage") if isinstance(pipeline.get("tokenizer_dataset_coverage"), dict) else {}
+            tok_round = data_lab_local.get("tokenizer_roundtrip") if isinstance(data_lab_local.get("tokenizer_roundtrip"), dict) else {}
+            exec_meta = pipeline.get("execution") if isinstance(pipeline.get("execution"), dict) else {}
+            post_eval = data_lab_local.get("post_train_eval") if isinstance(data_lab_local.get("post_train_eval"), dict) else {}
+            steps = exec_meta.get("steps") if isinstance(exec_meta.get("steps"), (int, float)) else 0
+            pipeline["run_sequence"] = [
+                {"order": 1, "op": "dataset_qc", "status": "done" if data_lab_local.get("dataset_qc") else "unknown"},
+                {"order": 2, "op": "tokenizer_build_or_reuse", "status": "reused" if tok_cov.get("status") == "warn" else "built_or_unknown"},
+                {"order": 3, "op": "tokenizer_roundtrip", "status": str(tok_round.get("status") or "unknown")},
+                {"order": 4, "op": "train", "status": "done" if int(steps) > 0 else "missing"},
+                {"order": 5, "op": "post_train_eval", "status": "done" if post_eval else "skipped"},
+            ]
+            loaded.append("run_sequence(derived)")
 
         if "tokenizer_json_path" not in data_lab:
             tok = pipeline.get("tokenizer_lineage")
@@ -2753,6 +2940,97 @@ def generate_html_report(
     return output_path
 
 
+def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: int = 5000) -> None:
+    """
+    Start a lightweight HTTP server for live training monitoring.
+
+    Serves ir_report.html at GET / and a JSON snapshot of all small training
+    metric files at GET /api/snapshot.  The visualizer JS auto-enables polling
+    when served over HTTP (or when window.CK_LIVE_MODE is present).
+
+    Tip: this function is optional.  A plain static server also works:
+        python3 -m http.server 7700 -d <run_dir>
+    then open  http://localhost:7700/ir_report.html  and the visualizer will
+    auto-detect HTTP and start polling the JSON artifact files directly.
+    """
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    LIVE_FILES = [
+        "training_loss_curve_latest.json",
+        "training_grad_norms_latest.json",
+        "training_parity_latest.json",
+        "training_step_profile_latest.json",
+        "training_checkpoint_policy_latest.json",
+        "run_index.json",
+    ]
+
+    # Inject window.CK_LIVE_MODE before </body> so the visualizer uses the
+    # /api/snapshot endpoint (one request per cycle instead of N file fetches).
+    with open(html_path, "r", encoding="utf-8") as f:
+        base_html = f.read()
+    live_cfg = json.dumps({"pollUrl": "/api/snapshot", "intervalMs": interval_ms})
+    live_inject = f"<script>window.CK_LIVE_MODE = {live_cfg};</script>"
+    served_html = base_html.replace("</body>", live_inject + "</body>")
+    served_html_bytes = served_html.encode("utf-8")
+
+    class _Handler(BaseHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            # Only print errors; suppress per-request success noise
+            if len(args) >= 2 and str(args[1]).startswith(("4", "5")):
+                print(f"[live] {args[0]} -> {args[1]}")
+
+        def _cors_headers(self):
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+
+        def do_GET(self):
+            path = self.path.split("?")[0]
+
+            if path in ("/", "/index.html", "/ir_report.html"):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(served_html_bytes)))
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(served_html_bytes)
+
+            elif path == "/api/snapshot":
+                snapshot: dict = {}
+                for fname in LIVE_FILES:
+                    fpath = run_dir / fname
+                    if not fpath.exists():
+                        continue
+                    try:
+                        stat = fpath.stat()
+                        content = json.loads(fpath.read_text(encoding="utf-8"))
+                        snapshot[fname] = {"mtime": stat.st_mtime, "size": stat.st_size, "content": content}
+                    except Exception:
+                        pass
+                body = json.dumps(snapshot).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self._cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
+
+            else:
+                self.send_error(404)
+
+    server = HTTPServer(("127.0.0.1", port), _Handler)
+    url = f"http://127.0.0.1:{port}"
+    print(f"[live] Serving at {url}")
+    print(f"[live] Polling artifacts from: {run_dir}")
+    print(f"[live] Poll interval: {interval_ms}ms  |  Ctrl+C to stop")
+    webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[live] Stopped.")
+    finally:
+        server.server_close()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="IR Visualizer Launcher for C-Kernel-Engine v7",
@@ -2897,6 +3175,33 @@ Examples:
         action=argparse.BooleanOptionalAction,
         default=None,
         help="When using --run, load artifacts only from run/model roots (default: enabled for --run)"
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        default=False,
+        help=(
+            "Start live polling server after generating the report. "
+            "Requires --run or a model argument. Opens a browser window at "
+            "http://localhost:<port>/  and polls training metric files every "
+            "--live-interval ms. "
+            "Tip: a plain  python3 -m http.server <port> -d <run_dir>  also works "
+            "without this flag — the visualizer auto-detects HTTP and starts polling."
+        ),
+    )
+    parser.add_argument(
+        "--live-port",
+        type=int,
+        default=7700,
+        metavar="PORT",
+        help="Port for the --live server (default: 7700)",
+    )
+    parser.add_argument(
+        "--live-interval",
+        type=int,
+        default=5000,
+        metavar="MS",
+        help="Poll interval in milliseconds for --live mode (default: 5000)",
     )
 
     args = parser.parse_args()
@@ -3276,10 +3581,21 @@ Examples:
         )
         print(f"\nGenerated: {report_path}")
 
-        if not args.generate:
+        if getattr(args, "live", False):
+            live_run_dir = run_dir or ck_build or model_root
+            serve_live(
+                run_dir=live_run_dir,
+                html_path=report_path,
+                port=args.live_port,
+                interval_ms=args.live_interval,
+            )
+        elif not args.generate:
             webbrowser.open(f"file://{report_path}")
     else:
-        # Open visualizer
+        # Open visualizer (no model specified)
+        if getattr(args, "live", False):
+            print("Error: --live requires --run or a model argument so artifacts can be located.")
+            return
         if VISUALIZER.exists():
             webbrowser.open(f"file://{VISUALIZER}")
         else:

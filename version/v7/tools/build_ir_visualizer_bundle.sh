@@ -26,6 +26,7 @@ FILES=(
   "question_headers.js"
   "mode_ui.js"
   "memory_explorer.js"
+  "live_mode.js"
   "main.js"
 )
 
