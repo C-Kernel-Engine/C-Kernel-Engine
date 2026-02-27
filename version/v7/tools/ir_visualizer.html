@@ -17728,6 +17728,28 @@ function renderDataLabPanel(files) {
         return (nm.includes('stage_a') && !nm.includes('stage_b')) ? true : false;
     }
 
+    // Per-manifest tokenizer coverage: explicit field > corpus_datasets lookup > stage heuristic
+    function tokManifestCoverage(row) {
+        if (typeof row.tokenizer_coverage === 'boolean') return row.tokenizer_coverage ? 'yes' : 'no';
+        if (Array.isArray(tokLineage.corpus_datasets) && tokLineage.corpus_datasets.length > 0) {
+            const rn = String(row.name || '').toLowerCase();
+            const found = tokLineage.corpus_datasets.some((c) => {
+                const cn = String(c.name || c || '').toLowerCase();
+                return cn && rn && cn.length > 4 && rn.includes(cn.slice(0, Math.min(cn.length, 20)));
+            });
+            return found ? 'yes' : 'no';
+        }
+        // Heuristic: pretrain manifests fed the tokenizer corpus
+        if (row.stage === 'pretrain') return 'inferred';
+        return 'unknown';
+    }
+    function tokManifestBadge(cov) {
+        if (cov === 'yes') return '<span style="color:#6ee7b7;font-size:0.75rem;" title="Confirmed in tokenizer corpus">✓</span>';
+        if (cov === 'no') return '<span style="color:#fb923c;font-size:0.75rem;" title="NOT in tokenizer corpus — tok gap risk if trained">✗</span>';
+        if (cov === 'inferred') return '<span style="color:#9ca3af;font-size:0.75rem;" title="Inferred: pretrain manifests typically feed the tokenizer corpus. Add corpus_datasets to tokenizer_lineage to confirm.">~✓</span>';
+        return '<span style="color:#4b5563;font-size:0.75rem;" title="Coverage unknown">?</span>';
+    }
+
     const stageCardMeta = {};
     const flowCards = orderedStages.map((stage, idx) => {
         const t = timelineByStage[stage] || {};
@@ -17875,21 +17897,30 @@ function renderDataLabPanel(files) {
     const manifestSection = manifestEntries.length > 0 ? `
         <details style="margin-bottom:0.5rem;">
             <summary style="cursor:pointer;font-size:0.78rem;color:#6b7280;font-weight:600;letter-spacing:0.04em;user-select:none;padding:0.3rem 0;">
-                ◦ MANIFESTS &amp; REGISTRY (${manifestEntries.length} entries — data catalogs, not training data)
+                ◦ CORPUS MANIFESTS (${manifestEntries.length} entries — the dataset library, not what was trained)
             </summary>
-            <div style="margin-top:0.4rem;">
+            <div style="background:rgba(255,255,255,0.02);border-left:2px solid rgba(255,255,255,0.07);border-radius:0 4px 4px 0;padding:0.45rem 0.65rem;margin:0.4rem 0 0.55rem 0;font-size:0.74rem;color:#9ca3af;">
+                <strong style="color:#d1d5db;">What are these?</strong> Each manifest describes a raw corpus dataset that exists in your data library — source files, row counts, symbol coverage.
+                They were assembled into the active training packs shown above (green rows).<br>
+                <strong style="color:#d1d5db;">Tok?</strong> column: was this dataset in the tokenizer training corpus?
+                ✓ = confirmed · ~✓ = inferred (pretrain-stage) · ✗ = not in corpus (tok gap risk if this data is trained on later) · ? = not tracked (add <code>corpus_datasets</code> to <code>tokenizer_lineage</code> in pipeline JSON to get exact coverage).<br>
+                <strong style="color:#d1d5db;">Operator use:</strong> verify all expected corpus files are registered, plan which to include in future stages, flag any ✗ entries before using them in midtrain/SFT.
+            </div>
+            <div style="margin-top:0.2rem;overflow-x:auto;">
                 <table style="font-size:0.76rem;">
-                    <thead><tr><th>Stage</th><th>Kind</th><th>Name</th><th style="text-align:right;">Rows</th><th>Note</th></tr></thead>
+                    <thead><tr><th>Stage</th><th title="Was this dataset in the tokenizer training corpus?">Tok?</th><th>Name</th><th style="text-align:right;">Rows</th><th>Note</th></tr></thead>
                     <tbody>
-                        ${manifestEntries.slice(0, 300).map((row) => `
-                            <tr>
+                        ${manifestEntries.slice(0, 300).map((row) => {
+                            const cov = tokManifestCoverage(row);
+                            const rowStyle = cov === 'no' ? 'background:rgba(234,88,12,0.05);' : '';
+                            return `<tr style="${rowStyle}">
                                 <td>${htmlEscape(row.stage ?? '-')}</td>
-                                <td>${htmlEscape(row.kind ?? '-')}</td>
+                                <td style="text-align:center;">${tokManifestBadge(cov)}</td>
                                 <td>${htmlEscape(row.name ?? '-')}</td>
                                 <td style="text-align:right;">${htmlEscape(row.rows ?? '-')}</td>
                                 <td style="max-width:260px;overflow-wrap:anywhere;">${htmlEscape(row.note ?? '-')}</td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -17977,10 +18008,22 @@ function renderDataLabPanel(files) {
     const flowRows = tokenizerPreview.encode_decode_example && Array.isArray(tokenizerPreview.encode_decode_example.token_flow)
         ? tokenizerPreview.encode_decode_example.token_flow.slice(0, 32)
         : [];
+    const tokVocabMismatch = tokenizerPreview.vocab_size != null && trainDims.vocab_size != null
+        && Number(tokenizerPreview.vocab_size) !== Number(trainDims.vocab_size);
     const tokenizerSection = tokenizerPreview && Object.keys(tokenizerPreview).length > 0
         ? `
             <div class="parity-section" style="margin-top:0.8rem;">
                 <h3><span class="badge badge-blue">Tokenizer Internals</span> Merges + Piece Map + Decode Behavior</h3>
+                <div style="background:rgba(255,255,255,0.02);border-left:2px solid rgba(7,173,248,0.2);border-radius:0 4px 4px 0;padding:0.4rem 0.65rem;margin-bottom:0.55rem;font-size:0.73rem;color:#9ca3af;">
+                    <strong style="color:#d1d5db;">This section vs the Data &amp; Tokenizer tab:</strong>
+                    Here you see a static audit of the <code>tokenizer.json</code> artifact — what BPE merges were learned, what vocab pieces exist, and how a sample string encodes.
+                    The <em>Data &amp; Tokenizer</em> tab shows live runtime tokenizer behavior used during inference.
+                    Both reference the same file; this view focuses on training-data fidelity.<br>
+                    <strong style="color:#d1d5db;">Key checks:</strong>
+                    vocab_size here should equal your model config (${trainDims.vocab_size ?? '?'} declared).
+                    ${tokVocabMismatch ? '<span style="color:#fb923c;font-weight:600;">MISMATCH: tokenizer vocab_size (' + (tokenizerPreview.vocab_size ?? '?') + ') ≠ model config (' + (trainDims.vocab_size ?? '?') + ') — embedding matrix size will be wrong.</span>' : (tokenizerPreview.vocab_size != null ? '<span style="color:#6ee7b7;">vocab_size matches model config.</span>' : '')}
+                    ascii_piece_count = vocab_size means 100% ASCII vocabulary coverage — ideal for SVG data.
+                </div>
                 <table>
                     <thead><tr><th>Field</th><th>Value</th></tr></thead>
                     <tbody>
@@ -18097,7 +18140,12 @@ function renderDataLabPanel(files) {
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-green">Sample Browser</span> Row → Token IDs → Decoded</h3>
-            <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Row-level roundtrip: original line → token IDs → decoded. Low exact-match rate signals tokenizer drift or encoding issues.</div>
+            <div style="background:rgba(255,255,255,0.02);border-left:2px solid rgba(71,180,117,0.2);border-radius:0 4px 4px 0;padding:0.4rem 0.65rem;margin-bottom:0.55rem;font-size:0.73rem;color:#9ca3af;">
+                Each row: training line → token IDs the model sees → decoded back to text.
+                <strong style="color:#d1d5db;">All Exact=yes</strong> → tokenizer is healthy, training data round-trips cleanly.
+                <strong style="color:#d1d5db;">Any Exact=no</strong> → that row's decoded text differs from the original; the model trains on a subtly wrong signal — investigate which characters fail to round-trip (likely non-ASCII, BOMs, or unusual whitespace).
+                <strong style="color:#d1d5db;">Token count</strong> → high token-per-character ratio (e.g. 242 tokens for a multi-element SVG) is expected; watch for single-line rows that exceed your context length (${trainDims.context_length ?? '?'} tokens).
+            </div>
             <div style="overflow:auto;">${sampleTable}</div>
         </div>
         ${tokenizerSection}
