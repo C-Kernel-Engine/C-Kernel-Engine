@@ -27,6 +27,7 @@ import shutil
 import webbrowser
 import argparse
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1189,6 +1190,137 @@ def collect_training_logbook(
     return None
 
 
+def collect_training_checkpoint_history(run_root: Path | None) -> dict | None:
+    """Collect pass-level and checkpoint-level history for training dashboards."""
+    if run_root is None or not run_root.exists() or not run_root.is_dir():
+        return None
+
+    history: dict[str, Any] = {
+        "schema": "ck.training_checkpoint_history.v1",
+        "run_dir": str(run_root),
+        "passes": [],
+        "checkpoints": [],
+    }
+
+    def _mtime_fields(path: Path) -> dict[str, Any]:
+        try:
+            ts = float(path.stat().st_mtime)
+            return {
+                "mtime_unix": ts,
+                "mtime_iso": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(),
+            }
+        except Exception:
+            return {}
+
+    pipeline_root = run_root / ".ck_pipeline"
+    if pipeline_root.exists() and pipeline_root.is_dir():
+        workdirs = sorted(
+            [p for p in pipeline_root.iterdir() if p.is_dir() and p.name.startswith("ascii_bpe_")],
+            key=lambda p: p.name,
+        )
+        for order, work_dir in enumerate(workdirs, start=1):
+            row: dict[str, Any] = {
+                "order": order,
+                "id": work_dir.name,
+                "work_dir": str(work_dir),
+                "train_ck_json": str(work_dir / "train_ck.json"),
+                "train_torch_ref_json": str(work_dir / "train_torch_ref.json"),
+                "has_torch_ref": (work_dir / "train_torch_ref.json").exists(),
+            }
+
+            ck_payload = _load_json_loose(work_dir / "train_ck.json")
+            if isinstance(ck_payload, dict):
+                row["source"] = ck_payload.get("source")
+                curve = ck_payload.get("loss_curve")
+                if isinstance(curve, list):
+                    row["steps"] = len(curve)
+                    losses: list[float] = []
+                    grad_norms: list[float] = []
+                    lrs: list[float] = []
+                    for item in curve:
+                        if not isinstance(item, dict):
+                            continue
+                        loss = item.get("loss_ck")
+                        if not isinstance(loss, (int, float)):
+                            loss = item.get("loss")
+                        if isinstance(loss, (int, float)):
+                            losses.append(float(loss))
+                        grad = item.get("grad_norm")
+                        if isinstance(grad, (int, float)):
+                            grad_norms.append(float(grad))
+                        lr = item.get("lr")
+                        if isinstance(lr, (int, float)):
+                            lrs.append(float(lr))
+
+                    if losses:
+                        row["loss_first"] = losses[0]
+                        row["loss_final"] = losses[-1]
+                        row["loss_min"] = min(losses)
+                    if grad_norms:
+                        row["grad_norm_final"] = grad_norms[-1]
+                    if lrs:
+                        row["lr_final"] = lrs[-1]
+
+            row.update(_mtime_fields(work_dir / "train_ck.json" if (work_dir / "train_ck.json").exists() else work_dir))
+            history["passes"].append(row)
+
+    checkpoint_by_step: dict[int, dict[str, Any]] = {}
+    checkpoints_dir = run_root / "checkpoints"
+    if checkpoints_dir.exists() and checkpoints_dir.is_dir():
+        for manifest_path in sorted(checkpoints_dir.glob("weights_step_*_manifest.json")):
+            m = re.search(r"weights_step_(\d+)_manifest\.json$", manifest_path.name)
+            if not m:
+                continue
+            step = int(m.group(1))
+            bump_path = checkpoints_dir / f"weights_step_{m.group(1)}.bump"
+            row: dict[str, Any] = checkpoint_by_step.get(step, {"step": step})
+            row["manifest"] = str(manifest_path)
+            row["bump"] = str(bump_path)
+            row["bump_exists"] = bump_path.exists()
+            row.update(_mtime_fields(manifest_path))
+
+            manifest_payload = _load_json_loose(manifest_path)
+            if isinstance(manifest_payload, dict):
+                for key in ("weights", "floats", "bytes", "reason"):
+                    if key in manifest_payload:
+                        row[key] = manifest_payload.get(key)
+            checkpoint_by_step[step] = row
+
+    policy_candidates = [
+        run_root / "training_checkpoint_policy_latest.json",
+        run_root / "training_checkpoint_policy.json",
+    ]
+    for policy_path in policy_candidates:
+        policy_payload = _load_json_loose(policy_path)
+        if not isinstance(policy_payload, dict):
+            continue
+        files = policy_payload.get("files")
+        if not isinstance(files, list):
+            continue
+        for item in files:
+            if not isinstance(item, dict):
+                continue
+            step = item.get("step")
+            if not isinstance(step, int):
+                continue
+            row = checkpoint_by_step.get(step, {"step": step})
+            row["policy_source"] = str(policy_path)
+            for key in ("reason", "weights", "floats", "bytes", "bump", "manifest"):
+                if key in item:
+                    row[key] = item.get(key)
+            checkpoint_by_step[step] = row
+
+    history["checkpoints"] = [checkpoint_by_step[k] for k in sorted(checkpoint_by_step.keys())]
+    history["summary"] = {
+        "passes": len(history["passes"]),
+        "checkpoints": len(history["checkpoints"]),
+    }
+
+    if history["summary"]["passes"] == 0 and history["summary"]["checkpoints"] == 0:
+        return None
+    return history
+
+
 def _has_renderable_profile_payload(payload) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -1994,6 +2126,13 @@ def load_model_data(
         loaded.append("training_logbook")
     else:
         missing_optional.append("training_logbook")
+
+    checkpoint_history_payload = collect_training_checkpoint_history(run_dir if run_dir is not None else model_root)
+    if checkpoint_history_payload is not None:
+        data["files"]["training_checkpoint_history"] = checkpoint_history_payload
+        loaded.append("training_checkpoint_history(derived)")
+    else:
+        missing_optional.append("training_checkpoint_history")
 
     if "training_canary_summary" not in data["files"]:
         canary_summary = _build_training_canary_summary(run_dir if run_dir is not None else model_root)

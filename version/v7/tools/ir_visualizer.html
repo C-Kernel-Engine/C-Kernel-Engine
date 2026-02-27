@@ -16918,6 +16918,20 @@ function renderTrainingDashboard(files) {
     const fallbackTokS = toNum(profile.decode_tok_s, NaN);
     const throughputTokS = Number.isFinite(trainTokS) ? trainTokS : fallbackTokS;
     const checkpoints = Array.isArray(files?.analysis_checkpoints?.checkpoints) ? files.analysis_checkpoints.checkpoints : [];
+    const checkpointHistory = files.training_checkpoint_history && typeof files.training_checkpoint_history === 'object'
+        ? files.training_checkpoint_history
+        : {};
+    const passRows = Array.isArray(checkpointHistory.passes) ? checkpointHistory.passes : [];
+    const checkpointRows = Array.isArray(checkpointHistory.checkpoints) ? checkpointHistory.checkpoints : [];
+    const passLossPoints = passRows
+        .map((row, idx) => ({
+            step: idx + 1,
+            loss_final: toNum(row.loss_final, NaN),
+            loss_min: toNum(row.loss_min, NaN),
+        }))
+        .filter((row) => Number.isFinite(row.loss_final));
+    const passRowsRecent = [...passRows].reverse().slice(0, 8);
+    const checkpointRowsRecent = [...checkpointRows].sort((a, b) => toNum(a.step, 0) - toNum(b.step, 0)).slice(-10);
     const trainE2E = files.train_e2e || {};
     const layoutTrain = files.layout_train || {};
     const layoutBytes = toNum(layoutTrain.total_bytes, NaN);
@@ -16989,6 +17003,7 @@ function renderTrainingDashboard(files) {
             <div class="stat-card"><div class="stat-value">${Number.isFinite(maxParamDiff) ? fmtExp(maxParamDiff, 2) : '-'}</div><div class="stat-label">Max Param Diff</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(throughputTokS) ? fmt(throughputTokS, 2) : '-'}</div><div class="stat-label">Train tok/s</div></div>
             <div class="stat-card"><div class="stat-value">${checkpoints.length}</div><div class="stat-label">Analysis Checkpoints</div></div>
+            <div class="stat-card"><div class="stat-value">${passRows.length > 0 ? passRows.length : '-'}</div><div class="stat-label">Pipeline Passes</div></div>
             <div class="stat-card"><div class="stat-value">${Number.isFinite(layoutBytes) ? formatBytesHuman(layoutBytes) : '-'}</div><div class="stat-label">Train Memory Arena</div></div>
             <div class="stat-card"><div class="stat-value">${layoutRegionCount > 0 ? layoutRegionCount : '-'}</div><div class="stat-label">Memory Regions</div></div>
             <div class="stat-card"><div class="stat-value">${trainE2EStatus}</div><div class="stat-label">Train E2E Status</div></div>
@@ -17025,6 +17040,49 @@ function renderTrainingDashboard(files) {
             Grad norm = global L2 norm of parameter gradients before optimizer update. If this line is flat at 0.00e+0 for all steps, gradients may be truly collapsed or grad telemetry may be missing in this runtime path; confirm using loss trend and parity/replay gates.
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">History</span> Pass + Checkpoint Timeline</h3>
+            <div style="color:var(--text-muted);font-size:0.78rem;margin-bottom:0.6rem;">
+                Latest charts above use <code>*_latest.json</code>. Older passes are retained under <code>.ck_pipeline/ascii_bpe_*</code>.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0.8rem;">
+                <div>
+                    <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.35rem;">Pass Final Loss (latest ${passRowsRecent.length} visible in table)</div>
+                    <svg id="trainPassHistoryChart" style="width:100%;height:160px;"></svg>
+                </div>
+                <div style="overflow:auto;">
+                    <table>
+                        <thead><tr><th>Pass</th><th>Steps</th><th>Final Loss</th><th>Final Grad</th><th>Final LR</th></tr></thead>
+                        <tbody>
+                            ${passRowsRecent.length > 0 ? passRowsRecent.map((row) => `
+                                <tr>
+                                    <td><code>${String(row.id || '-')}</code></td>
+                                    <td>${Number.isFinite(toNum(row.steps, NaN)) ? Math.round(toNum(row.steps, NaN)).toLocaleString() : '-'}</td>
+                                    <td>${Number.isFinite(toNum(row.loss_final, NaN)) ? fmt(toNum(row.loss_final, NaN), 4) : '-'}</td>
+                                    <td>${Number.isFinite(toNum(row.grad_norm_final, NaN)) ? fmtExp(toNum(row.grad_norm_final, NaN), 2) : '-'}</td>
+                                    <td>${Number.isFinite(toNum(row.lr_final, NaN)) ? fmtExp(toNum(row.lr_final, 0), 2) : '-'}</td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="5" style="color:var(--text-muted);">No pass history found.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div style="margin-top:0.8rem;overflow:auto;">
+                <table>
+                    <thead><tr><th>Checkpoint Step</th><th>Reason</th><th>Bytes</th><th>Manifest</th></tr></thead>
+                    <tbody>
+                        ${checkpointRowsRecent.length > 0 ? checkpointRowsRecent.map((cp) => `
+                            <tr>
+                                <td>${Number.isFinite(toNum(cp.step, NaN)) ? Math.round(toNum(cp.step, NaN)).toLocaleString() : '-'}</td>
+                                <td>${String(cp.reason || '-')}</td>
+                                <td>${Number.isFinite(toNum(cp.bytes, NaN)) ? formatBytesHuman(toNum(cp.bytes, 0)) : '-'}</td>
+                                <td style="font-size:0.72rem;color:var(--text-muted);"><code>${String(cp.manifest || '-')}</code></td>
+                            </tr>
+                        `).join('') : '<tr><td colspan="4" style="color:var(--text-muted);">No checkpoint history found.</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Health</span> Training Alerts</h3>
             <div id="trainAlertList"></div>
         </div>
@@ -17043,6 +17101,7 @@ function renderTrainingDashboard(files) {
     drawLineChart(document.getElementById('trainLossChart'), lossSteps, 'loss_ck', '#f87171', 'loss_pt', { title: 'Training Loss: CK vs PyTorch' });
     drawLineChart(document.getElementById('trainGradChart'), lossSteps, 'grad_norm', '#fbbf24', null, { title: 'Training Gradient Norm vs Step' });
     drawLineChart(document.getElementById('trainLrChart'), lossSteps, 'lr', '#60a5fa', null, { title: 'Training Learning Rate vs Step' });
+    drawLineChart(document.getElementById('trainPassHistoryChart'), passLossPoints, 'loss_final', '#f59e0b', 'loss_min', { title: 'Training Pass History: Final vs Min Loss' });
 
     const alertsEl = document.getElementById('trainAlertList');
     const alerts = healthAlerts(lossSteps, parityRows);
