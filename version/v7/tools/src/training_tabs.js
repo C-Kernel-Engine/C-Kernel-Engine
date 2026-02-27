@@ -23,38 +23,104 @@ function renderGradientPanel(files) {
 
     const grad = files.training_grad_norms || {};
     const steps = Array.isArray(grad.steps) ? grad.steps : [];
+    const globalNorms = Array.isArray(grad.global) ? grad.global : [];
     const params = grad.params && typeof grad.params === 'object' ? grad.params : {};
     const names = Object.keys(params);
 
-    if (names.length === 0) {
-        root.innerHTML = '<p style="color:var(--text-muted);">No training_grad_norms.json loaded.</p>';
+    // No data at all — file missing or genuinely empty
+    if (steps.length === 0 && names.length === 0 && globalNorms.length === 0) {
+        root.innerHTML = '<div class="parity-section"><h3><span class="badge badge-orange">No Gradient Data</span></h3><p style="color:var(--text-muted);">training_grad_norms_latest.json not found or empty. This file is written automatically during training.</p></div>';
         return;
     }
 
-    const summary = names.map((name) => {
-        const arr = Array.isArray(params[name]) ? params[name] : [];
-        const last = arr.length > 0 ? toNum(arr[arr.length - 1], NaN) : NaN;
-        return { name, last };
-    }).sort((a, b) => Math.abs(b.last) - Math.abs(a.last));
+    // Build point series for chart
+    const globalSeries = steps.map((s, i) => ({
+        step: toNum(s, i + 1),
+        grad_norm: toNum(globalNorms[i], NaN),
+    })).filter((p) => Number.isFinite(p.grad_norm));
 
-    const rows = summary.slice(0, 40).map((s) => {
-        let badge = '<span class="grad-healthy">healthy</span>';
-        if (!Number.isFinite(s.last) || s.last < 1e-7) badge = '<span class="grad-dead">dead</span>';
-        else if (s.last < 1e-5 || s.last > 0.1) badge = '<span class="grad-danger">danger</span>';
-        else if (s.last < 1e-4 || s.last > 0.05) badge = '<span class="grad-warning">warning</span>';
-        return `<tr><td>${s.name}</td><td>${fmtExp(s.last, 2)}</td><td>${badge}</td></tr>`;
-    }).join('');
+    // Health stats
+    const validNorms = globalSeries.map((p) => p.grad_norm);
+    const lastNorm = validNorms.length > 0 ? validNorms[validNorms.length - 1] : NaN;
+    const minNorm = validNorms.length > 0 ? Math.min(...validNorms) : NaN;
+    const maxNorm = validNorms.length > 0 ? Math.max(...validNorms) : NaN;
+    const meanNorm = validNorms.length > 0 ? validNorms.reduce((s, v) => s + v, 0) / validNorms.length : NaN;
+    const allZero = validNorms.length > 0 && validNorms.every((v) => Math.abs(v) < 1e-12);
 
-    root.innerHTML = `
-        <div class="parity-section">
-            <h3><span class="badge badge-orange">Gradient Health</span> Top Parameters by Latest Norm</h3>
-            <div style="color:var(--text-muted);margin-bottom:0.5rem;">steps: ${steps.length} | params: ${names.length}</div>
+    let statusBadge, statusClass;
+    if (allZero) {
+        statusBadge = 'dead / no telemetry'; statusClass = 'grad-dead';
+    } else if (!Number.isFinite(lastNorm)) {
+        statusBadge = 'unknown'; statusClass = 'grad-warning';
+    } else if (lastNorm > 2.0) {
+        statusBadge = 'elevated'; statusClass = 'grad-warning';
+    } else if (lastNorm < 1e-5) {
+        statusBadge = 'vanishing'; statusClass = 'grad-warning';
+    } else {
+        statusBadge = 'healthy'; statusClass = 'grad-healthy';
+    }
+
+    // Per-param section (when available)
+    let paramSection = '';
+    if (names.length > 0) {
+        const summary = names.map((name) => {
+            const arr = Array.isArray(params[name]) ? params[name] : [];
+            const last = arr.length > 0 ? toNum(arr[arr.length - 1], NaN) : NaN;
+            return { name, last };
+        }).sort((a, b) => Math.abs(b.last) - Math.abs(a.last));
+
+        const paramRows = summary.slice(0, 40).map((s) => {
+            let badge = '<span class="grad-healthy">healthy</span>';
+            if (!Number.isFinite(s.last) || s.last < 1e-7) badge = '<span class="grad-dead">dead</span>';
+            else if (s.last < 1e-5 || s.last > 0.1) badge = '<span class="grad-danger">danger</span>';
+            else if (s.last < 1e-4 || s.last > 0.05) badge = '<span class="grad-warning">warning</span>';
+            return `<tr><td>${s.name}</td><td>${fmtExp(s.last, 2)}</td><td>${badge}</td></tr>`;
+        }).join('');
+
+        paramSection = `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-orange">Per-Parameter</span> Top ${Math.min(names.length, 40)} by Latest Norm</h3>
+            <div style="color:var(--text-muted);margin-bottom:0.5rem;">params tracked: ${names.length}</div>
             <table>
                 <thead><tr><th>Parameter</th><th>Latest Norm</th><th>Status</th></tr></thead>
-                <tbody>${rows}</tbody>
+                <tbody>${paramRows}</tbody>
             </table>
+        </div>`;
+    } else {
+        paramSection = `
+        <div style="background:#2a2a2a;border-left:3px solid #4b5563;padding:0.45rem 0.75rem;border-radius:0 4px 4px 0;margin-top:0.6rem;font-size:0.78rem;color:#6b7280;">
+            Per-parameter breakdown not available — only global norm logged. Add <code>--grad-norms-per-param</code> to the training run to see per-layer gradient health.
+        </div>`;
+    }
+
+    root.innerHTML = `
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:0.8rem;">
+            <div class="stat-card"><div class="stat-value"><span class="${statusClass}">${statusBadge}</span></div><div class="stat-label">Global Status</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(lastNorm) ? fmtExp(lastNorm, 2) : '—'}</div><div class="stat-label">Latest Norm</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(minNorm) ? fmtExp(minNorm, 2) : '—'}</div><div class="stat-label">Min</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(maxNorm) ? fmtExp(maxNorm, 2) : '—'}</div><div class="stat-label">Max</div></div>
+            <div class="stat-card"><div class="stat-value">${Number.isFinite(meanNorm) ? fmtExp(meanNorm, 2) : '—'}</div><div class="stat-label">Mean</div></div>
+            <div class="stat-card"><div class="stat-value">${globalSeries.length}</div><div class="stat-label">Steps Logged</div></div>
         </div>
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Global Norm</span> L2 Gradient Norm vs Step</h3>
+            <svg id="gradGlobalNormChart" style="width:100%;height:160px;"></svg>
+            <button class="ck-svg-expand-btn" data-title="Global Gradient Norm vs Step">⛶ Expand</button>
+            <div style="color:var(--text-muted);font-size:0.76rem;margin-top:0.3rem;">
+                Global L2 norm of all parameter gradients before the optimizer step. Values 0.5–3.0 are typical for this model size. Spikes above 5 risk instability; sustained values near zero indicate vanishing gradients or missing telemetry.
+            </div>
+        </div>
+        ${paramSection}
     `;
+
+    // drawLineChart is defined in training_dashboard.js — accessible in the same bundle scope
+    if (typeof drawLineChart === 'function' && globalSeries.length > 0) {
+        drawLineChart(
+            document.getElementById('gradGlobalNormChart'),
+            globalSeries, 'grad_norm', '#fbbf24', null,
+            { title: 'Global Gradient Norm vs Step' }
+        );
+    }
 }
 
 function renderParityPanel(files) {
@@ -63,6 +129,29 @@ function renderParityPanel(files) {
     clear(root);
 
     const rows = parseParityRows(files.training_parity);
+
+    // Detect CK-only mode: parity file exists but worst_param = 'ck_only' means no PyTorch reference ran
+    const allCkOnly = rows.length > 0 && rows.every((r) => String(r.worst_param || '').toLowerCase() === 'ck_only');
+    if (allCkOnly) {
+        const runCtx = getRunContext();
+        const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+        const parityCmd = runCtx.runDir
+            ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+            : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+        root.innerHTML = `
+            <div class="parity-section">
+                <h3><span class="badge badge-blue">CK-Only Mode</span> No PyTorch Reference Available</h3>
+                <p style="color:var(--text-muted);margin-bottom:0.6rem;">
+                    This run was trained without a PyTorch reference process. The zeros in the parity file indicate
+                    <strong style="color:var(--text-primary);">no comparison was performed</strong>, not that parity passed.
+                    Run with <code>--parity-on</code> to enable CK vs PyTorch numerical validation.
+                </p>
+                <pre style="font-size:0.8rem;white-space:pre-wrap;">${parityCmd}</pre>
+            </div>
+        `;
+        return;
+    }
+
     if (rows.length === 0) {
         const runCtx = getRunContext();
         const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
