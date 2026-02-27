@@ -17702,47 +17702,81 @@ function renderDataLabPanel(files) {
     }
     if (!orderedStages.includes(activeStage)) orderedStages.push(activeStage);
 
-    const flowCards = orderedStages.map((stage) => {
+    // Per-stage lookup maps for clickable detail
+    const provByStage = {};
+    if (Array.isArray(pipeline.data_provenance)) {
+        pipeline.data_provenance.forEach((p) => { if (p && p.stage) provByStage[p.stage] = p; });
+    }
+    const catalogActiveByStage = {};
+    if (Array.isArray(pipeline.dataset_catalog)) {
+        pipeline.dataset_catalog.forEach((c) => { if (c && c.kind === 'active_dataset' && c.stage) catalogActiveByStage[c.stage] = c; });
+    }
+    const tokLineage = pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object'
+        ? pipeline.tokenizer_lineage : {};
+    const tokCorpusEntry = catalogActiveByStage['pretrain'] || null;
+    const tokCorpusName = (Array.isArray(tokLineage.corpus_datasets) && tokLineage.corpus_datasets.length > 0)
+        ? tokLineage.corpus_datasets[0].name
+        : (tokCorpusEntry ? tokCorpusEntry.name : null);
+    const tokRtStatus = String((dataLab.tokenizer_roundtrip && dataLab.tokenizer_roundtrip.status) || '—').toUpperCase();
+
+    function stageTokCoverage(stage) {
+        const cat = catalogActiveByStage[stage];
+        if (cat && typeof cat.tokenizer_coverage === 'boolean') return cat.tokenizer_coverage;
+        if (stage === 'pretrain') return true;
+        const nm = String((cat && cat.name) || (artifactByStage[stage] && artifactByStage[stage].dataset_name) || '');
+        if (!nm) return null;
+        return (nm.includes('stage_a') && !nm.includes('stage_b')) ? true : false;
+    }
+
+    const stageCardMeta = {};
+    const flowCards = orderedStages.map((stage, idx) => {
         const t = timelineByStage[stage] || {};
         const status = String(t.status || (stage === activeStage ? 'active' : 'planned'));
         const isActive = Boolean(t.active === true || stage === activeStage);
         const tone = stageTone(status);
         const chip = statusPill(status, tone);
-        const border = isActive ? '1px solid rgba(71,180,117,0.55)' : '1px solid rgba(255,255,255,0.10)';
-        const bg = isActive ? 'rgba(71,180,117,0.12)' : 'rgba(255,255,255,0.03)';
+        const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
+        const bg = isActive ? 'rgba(71,180,117,0.09)' : 'rgba(255,255,255,0.03)';
         const data = artifactByStage[stage] && typeof artifactByStage[stage] === 'object' ? artifactByStage[stage] : {};
-        const artifactsForStage = Array.isArray(data.artifacts) ? data.artifacts : [];
-        const artifactCount = artifactsForStage.length;
+        const arts = Array.isArray(data.artifacts) ? data.artifacts : [];
+        const cat = catalogActiveByStage[stage] || {};
+        const prov = provByStage[stage] || {};
+        const dsName = data.dataset_name || cat.name || prov.dataset_name || null;
+        const covered = stageTokCoverage(stage);
+
+        stageCardMeta[stage] = {
+            status, isActive, dsName,
+            dsRows: cat.rows || null,
+            dsTok: data.token_count || prov.token_count || null,
+            byteSize: prov.byte_size || null,
+            covered, artifacts: arts,
+            catNote: cat.note || null,
+        };
+
+        const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
+        const dsPill = short
+            ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:${isActive ? 'rgba(71,180,117,0.12)' : 'rgba(255,255,255,0.05)'};border:1px solid ${isActive ? 'rgba(71,180,117,0.28)' : 'rgba(255,255,255,0.10)'};border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
+            : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">${status === 'planned' ? 'not assigned' : '—'}</div>`;
+
+        const covBadge = covered === false
+            ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#fb923c;">⚠ tok gap</div>`
+            : (covered === true && dsName
+                ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>`
+                : '');
+
         return `
-            <div style="min-width:130px;padding:0.45rem 0.55rem;border-radius:10px;${`border:${border};background:${bg};`}">
-                <div style="font-weight:700;">${htmlEscape(stage)}</div>
-                <div style="margin-top:0.2rem;">${chip}</div>
-                <div style="margin-top:0.2rem;color:var(--text-muted);font-size:0.78rem;">artifacts: ${artifactCount}</div>
+            <div data-dp-stage="${htmlEscape(stage)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(stage)} datasets &amp; artifacts">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
+                    <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(stage)}</div>
+                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${orderedStages.length}</div>
+                </div>
+                <div style="margin-top:0.22rem;">${chip}</div>
+                ${dsPill}
+                ${covBadge}
+                <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
             </div>
         `;
-    }).join('<div style="align-self:center;color:var(--text-muted);">-></div>');
-
-    const activeStageMeta = artifactByStage[activeStage] && typeof artifactByStage[activeStage] === 'object'
-        ? artifactByStage[activeStage]
-        : {};
-    const activeStageArtifacts = Array.isArray(activeStageMeta.artifacts) ? activeStageMeta.artifacts : [];
-    const activeArtifactTable = activeStageArtifacts.length > 0
-        ? `
-            <table>
-                <thead><tr><th>Label</th><th>Path</th><th>Required</th><th>Exists</th></tr></thead>
-                <tbody>
-                    ${activeStageArtifacts.map((a) => `
-                        <tr>
-                            <td>${htmlEscape(a.label ?? '-')}</td>
-                            <td style="max-width:620px;overflow-wrap:anywhere;"><code>${htmlEscape(a.path ?? '-')}</code></td>
-                            <td>${a.required ? statusPill('yes', 'blue') : statusPill('no', 'blue')}</td>
-                            <td>${a.exists ? statusPill('yes', 'green') : statusPill('no', 'red')}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `
-        : '<div style="color:var(--text-muted);">No active-stage artifact map found. Regenerate training_pipeline_latest.json.</div>';
+    }).join('<div style="align-self:center;color:var(--text-muted);font-size:0.75rem;padding:0 0.05rem;">→</div>');
 
     const trainDims = pipeline.train_dims && typeof pipeline.train_dims === 'object' ? pipeline.train_dims : {};
     const dimsSummary = [
@@ -17753,19 +17787,39 @@ function renderDataLabPanel(files) {
         `heads=${trainDims.num_heads ?? '-'}`,
         `ctx=${trainDims.context_length ?? '-'}`,
     ].join(' | ');
+
+    const tokSourcePanel = `
+        <div style="background:#192019;border:1px solid rgba(71,180,117,0.22);border-radius:8px;padding:0.55rem 0.75rem;margin-bottom:0.7rem;">
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.38rem;">
+                <span style="font-size:0.66rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;">TOKENIZER</span>
+                <span class="badge badge-green">${htmlEscape(tokLineage.type || 'unknown')}</span>
+                <span style="background:rgba(255,255,255,0.07);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.72rem;color:var(--text-muted);">vocab: ${tokLineage.vocab_size ?? '?'}</span>
+                ${tokLineage.reused_run_tokenizer ? '<span style="background:rgba(7,173,248,0.08);border:1px solid rgba(7,173,248,0.22);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.68rem;color:#7dd3fc;">↗ reused</span>' : ''}
+                <span style="background:rgba(255,255,255,0.06);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.7rem;color:var(--text-muted);">roundtrip: ${htmlEscape(tokRtStatus)}</span>
+            </div>
+            <div style="font-size:0.75rem;margin-bottom:0.28rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                <span style="color:#6b7280;">Trained on:</span>
+                ${tokCorpusName
+                    ? `<span style="background:rgba(71,180,117,0.12);border:1px solid rgba(71,180,117,0.25);border-radius:4px;padding:0.1rem 0.45rem;font-size:0.7rem;color:#6ee7b7;" title="${htmlEscape(tokCorpusName)}">${htmlEscape(tokCorpusName.length > 44 ? tokCorpusName.slice(0, 42) + '…' : tokCorpusName)}</span>`
+                    : '<span style="color:#4b5563;font-size:0.71rem;">corpus not recorded · add <code>corpus_datasets</code> to tokenizer_lineage</span>'
+                }
+            </div>
+            <div style="font-size:0.7rem;color:#6b7280;">⚠ Stages using datasets outside this corpus may encounter novel token boundaries — check ⚠ tok gap badges above.</div>
+        </div>
+    `;
+
     const stageFlowSection = `
         <div class="parity-section">
             <h3><span class="badge badge-orange">Stage Flow</span> Pretrain -> Midtrain -> SFT/DPO/RL Readiness</h3>
-            <div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">${flowCards}</div>
-            <div style="margin-top:0.6rem;color:var(--text-muted);font-size:0.85rem;">
+            ${tokSourcePanel}
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:stretch;">${flowCards}</div>
+            <div id="dpStageDetail" style="display:none;margin-top:0.55rem;"></div>
+            <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.8rem;">
                 active_stage=${htmlEscape(activeStage)} | model_dims: <code>${htmlEscape(dimsSummary)}</code>
-            </div>
-            <div style="margin-top:0.6rem;">
-                <strong>Active Stage Evidence</strong>
-                <div style="margin-top:0.35rem;overflow:auto;">${activeArtifactTable}</div>
             </div>
         </div>
     `;
+    window._ckDpStageCardMeta = stageCardMeta;
 
     const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
         ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
@@ -17845,6 +17899,7 @@ function renderDataLabPanel(files) {
     const datasetCatalogSection = `
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-blue">Dataset Catalog</span> What Was Trained vs Available</h3>
+            <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Green rows = actively trained on this run · Amber = generated but not trained · Grey (collapsed) = manifests and registry entries.</div>
             ${datasetCatalog.length > 0
                 ? `<div style="color:var(--text-muted);font-size:0.78rem;margin-bottom:0.65rem;">${datasetCatalog.length} total entries — ${trainedEntries.length} trained · ${generatedEntries.length} generated · ${manifestEntries.length} manifests</div>
                    ${trainedSection}${generatedSection}${manifestSection}`
@@ -18003,9 +18058,22 @@ function renderDataLabPanel(files) {
         `;
 
     root.innerHTML = `
+        <div style="background:rgba(71,180,117,0.05);border:1px solid rgba(71,180,117,0.17);border-radius:8px;padding:0.55rem 0.85rem;margin-bottom:0.75rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.35rem;">
+                <span style="font-size:0.82rem;font-weight:700;color:#6ee7b7;">Data Lab</span>
+                <span style="font-size:0.74rem;color:var(--text-muted);">Operator view — what the model trained on, tokenizer health, and output quality gates</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:0.28rem 0.65rem;">
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Stage Flow</span> — click a card to inspect datasets &amp; artifacts per stage</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#fb923c;font-weight:600;">⚠ tok gap</span> — stage dataset was outside the tokenizer training corpus</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Dataset Catalog</span> — trained (green) · generated (amber) · manifests (collapsed)</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Sample Browser</span> — row-level tokenizer roundtrip and exact-match rate</div>
+            </div>
+        </div>
         ${stageFlowSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
+            <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Verify correct dataset and tokenizer files were loaded for this run.</div>
             ${pathTable}
         </div>
         ${datasetCatalogSection}
@@ -18029,10 +18097,108 @@ function renderDataLabPanel(files) {
         </div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-green">Sample Browser</span> Row → Token IDs → Decoded</h3>
+            <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Row-level roundtrip: original line → token IDs → decoded. Low exact-match rate signals tokenizer drift or encoding issues.</div>
             <div style="overflow:auto;">${sampleTable}</div>
         </div>
         ${tokenizerSection}
     `;
+
+    // --- Stage card click handlers (post-render) ---
+    {
+        const cards = root.querySelectorAll('[data-dp-stage]');
+        const detailBox = root.querySelector('#dpStageDetail');
+        let openStage = null;
+
+        function fmtNum(n) {
+            return n != null && Number.isFinite(Number(n)) ? Number(n).toLocaleString() : '—';
+        }
+        function fmtBytes(b) {
+            if (b == null) return '—';
+            const n = Number(b);
+            if (!Number.isFinite(n)) return String(b);
+            if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + ' KB';
+            return n + ' B';
+        }
+
+        cards.forEach((card) => {
+            card.addEventListener('click', () => {
+                const stage = card.dataset.dpStage;
+                const meta = (window._ckDpStageCardMeta || {})[stage];
+                if (!meta || !detailBox) return;
+
+                // Toggle off on second click of same card
+                if (openStage === stage) {
+                    detailBox.style.display = 'none';
+                    detailBox.innerHTML = '';
+                    openStage = null;
+                    cards.forEach((c) => { c.style.outline = ''; });
+                    return;
+                }
+
+                openStage = stage;
+                cards.forEach((c) => {
+                    c.style.outline = c.dataset.dpStage === stage ? '2px solid rgba(71,180,117,0.75)' : '';
+                });
+
+                const covColor = meta.covered === true ? '#6ee7b7' : (meta.covered === false ? '#fb923c' : '#9ca3af');
+                const covMark = meta.covered === true ? '✓' : (meta.covered === false ? '⚠' : '?');
+                const covLabel = meta.covered === true
+                    ? 'Tokenizer corpus covers this dataset — no novel boundaries expected'
+                    : (meta.covered === false
+                        ? 'Tok gap — dataset outside tokenizer corpus; watch for boundary artifacts'
+                        : 'Coverage not recorded — add corpus_datasets to tokenizer_lineage');
+
+                const artRows = meta.artifacts.length > 0
+                    ? meta.artifacts.map((a) => {
+                        const nm = typeof a === 'string' ? a : (a.name || a.path || JSON.stringify(a));
+                        return `<div style="font-family:monospace;font-size:0.73rem;color:var(--text-muted);word-break:break-all;padding:0.1rem 0;">${htmlEscape(nm)}</div>`;
+                    }).join('')
+                    : '<div style="font-size:0.76rem;color:#4b5563;font-style:italic;">No artifacts recorded for this stage yet.</div>';
+
+                detailBox.innerHTML = `
+                    <div style="border:1px solid rgba(71,180,117,0.25);border-radius:8px;background:rgba(8,18,10,0.88);padding:0.65rem 0.85rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <div style="font-weight:700;font-size:0.9rem;color:#e5e7eb;">${htmlEscape(stage)}</div>
+                            <button id="dpStageDetailClose" style="background:transparent;border:none;color:#6b7280;font-size:1.2rem;cursor:pointer;line-height:1;padding:0 0.2rem;" title="Close">×</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:0.5rem;margin-bottom:0.5rem;">
+                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">DATASET</div>
+                                <div style="font-size:0.8rem;word-break:break-all;">${meta.dsName ? htmlEscape(meta.dsName) : '<span style="color:#4b5563;font-style:italic;">not assigned</span>'}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">SHAPE</div>
+                                <div style="font-size:0.78rem;">rows: ${fmtNum(meta.dsRows)}</div>
+                                <div style="font-size:0.78rem;">tokens: ${fmtNum(meta.dsTok)}</div>
+                                <div style="font-size:0.78rem;">bytes: ${fmtBytes(meta.byteSize)}</div>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                                <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TOKENIZER COVERAGE</div>
+                                <div style="font-size:0.78rem;color:${covColor};">${covMark} ${covLabel}</div>
+                            </div>
+                        </div>
+                        ${meta.catNote ? `<div style="font-size:0.74rem;color:#9ca3af;background:rgba(255,255,255,0.03);border-radius:4px;padding:0.3rem 0.5rem;margin-bottom:0.45rem;font-style:italic;">${htmlEscape(meta.catNote)}</div>` : ''}
+                        <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.22rem;">ARTIFACTS (${meta.artifacts.length})</div>
+                        ${artRows}
+                    </div>
+                `;
+
+                detailBox.style.display = 'block';
+                const closeBtn = detailBox.querySelector('#dpStageDetailClose');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => {
+                        detailBox.style.display = 'none';
+                        detailBox.innerHTML = '';
+                        openStage = null;
+                        cards.forEach((c) => { c.style.outline = ''; });
+                    });
+                }
+                detailBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+    }
 }
 
 function statusPill(label, tone) {
