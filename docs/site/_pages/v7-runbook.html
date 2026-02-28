@@ -584,6 +584,7 @@
         <li><a href="#step-0-0-config-init"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.0</span> Config + Pipeline Designer</a></li>
         <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
         <li><a href="#step-0a-pipeline-bootstrap"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0A</span> Pipeline Bootstrap</a></li>
+        <li><a href="#step-0b-tag-contract"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0B</span> Tag Contract</a></li>
         <li><a href="#step-0-clean-start"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.1</span> Clean Start</a></li>
     </ul>
 
@@ -1169,7 +1170,7 @@ python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \
   --num-samples 1000 --jsonl
 
 # 2) Canonical stage dataset bindings for this run
-export TOKENIZER_CORPUS="$GEN_DIR/svg_pretrain_pack_l16d128_stage_a_plus_bridge.txt"
+export TOKENIZER_CORPUS="$GEN_DIR/svg_pretrain_pack_l16d128_tokenizer_corpus.txt"
 export PRETRAIN_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_stage_a_plus_bridge.txt"
 export MIDTRAIN_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_stage_b.txt"
 export SFT_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_instruction_train.txt"
@@ -1203,6 +1204,69 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
         <span class="produces-item item-json">$RUN/training_pipeline_latest.json</span>
         <span class="produces-item item-html">$RUN/ir_report.html</span>
         <span class="produces-item">$HOME/.cache/ck-engine-v7/models/ir_hub.html</span>
+    </div>
+</div>
+
+<h2 id="step-0b-tag-contract">Step 0B: Tag Contract — Specialist Model Interface</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom:0.5rem;">This model is a <strong>tag→SVG specialist renderer</strong>, not a general instruction-following LLM. The interface is a closed vocabulary of structured tags — understand this contract before training or running inference.</p>
+
+    <h3 style="margin-top:0.6rem;margin-bottom:0.3rem;font-size:0.95rem;">Training Row Format</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Every training row and inference prompt uses the same closed-vocab tag prefix:
+[circle][palette:cool][style:minimal][layout:center]&lt;svg width="140" height="140"&gt;...&lt;/svg&gt;&lt;eos&gt;
+[bar-chart][bars:5][ascending][palette:warm][axes][trend-line]&lt;svg width="280" height="180"&gt;...&lt;/svg&gt;&lt;eos&gt;
+[infographic][palette:dark][style:gradient][labeled][complexity:rich]&lt;svg width="320" height="180"&gt;...&lt;/svg&gt;&lt;eos&gt;</pre>
+    </div>
+    <p class="mini-note">The old <code>&lt;task&gt;...&lt;/task&gt;&lt;svg&gt;</code> format is superseded. All spec-driven corpus rows use the tag prefix format above. Do not mix formats in the tokenizer corpus.</p>
+
+    <h3 style="margin-top:0.8rem;margin-bottom:0.4rem;font-size:0.95rem;">Tag Vocabulary</h3>
+    <table class="path-table" style="width:100%;font-size:0.81rem;">
+        <thead><tr><th style="width:18%">Category</th><th>Tags</th></tr></thead>
+        <tbody>
+            <tr><td>Shape</td><td><code>[circle]</code> <code>[rect]</code> <code>[line]</code> <code>[triangle]</code> <code>[ellipse]</code> <code>[polygon]</code> <code>[path]</code> <code>[arrow]</code> <code>[double-arrow]</code> <code>[polyline]</code></td></tr>
+            <tr><td>Chart</td><td><code>[bar-chart]</code> <code>[line-chart]</code> <code>[table]</code> <code>[pie-chart]</code> <code>[scatter]</code></td></tr>
+            <tr><td>Infographic</td><td><code>[infographic]</code> <code>[badge]</code> <code>[flow]</code> <code>[timeline]</code> <code>[legend]</code> <code>[progress]</code></td></tr>
+            <tr><td>Count</td><td><code>[bars:3]</code> <code>[bars:5]</code> <code>[bars:7]</code> <code>[points:4]</code> <code>[points:6]</code> <code>[points:8]</code> <code>[slices:3]</code> <code>[slices:4]</code> <code>[shapes:2]</code> <code>[shapes:3]</code></td></tr>
+            <tr><td>Data order</td><td><code>[ascending]</code> <code>[descending]</code> <code>[mixed]</code> <code>[axes]</code> <code>[trend-line]</code> <code>[labeled]</code> <code>[values]</code></td></tr>
+            <tr><td>Palette</td><td><code>[palette:neutral]</code> <code>[palette:bold]</code> <code>[palette:warm]</code> <code>[palette:cool]</code> <code>[palette:pastel]</code> <code>[palette:dark]</code></td></tr>
+            <tr><td>Style</td><td><code>[style:gradient]</code> <code>[style:minimal]</code> <code>[style:filled]</code> <code>[style:outline]</code></td></tr>
+            <tr><td>Layout</td><td><code>[layout:center]</code> <code>[layout:tiled]</code> <code>[layout:grid]</code> <code>[layout:stacked]</code> <code>[layout:horizontal]</code> <code>[layout:header]</code> <code>[layout:flow]</code></td></tr>
+            <tr><td>Complexity</td><td><code>[complexity:simple]</code> <code>[complexity:moderate]</code> <code>[complexity:rich]</code></td></tr>
+            <tr><td>Prompt style</td><td><code>[prompt:concise]</code> <code>[prompt:descriptive]</code> <code>[prompt:coordinate]</code> <code>[prompt:imperative]</code></td></tr>
+        </tbody>
+    </table>
+    <p class="mini-note">Custom BPE is trained on this corpus — frequent patterns like <code>[bar-chart]</code> merge into a single token. Verify this after Step 0A: <code>[bar-chart]</code> should appear as 1 token ID, not 11 characters.</p>
+
+    <h3 style="margin-top:0.8rem;margin-bottom:0.3rem;font-size:0.95rem;">Two-Model Cascade (Inference)</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Big model (GPT/Claude): natural language → structured tags
+# Small model (128d CK specialist): tags → SVG
+
+# User: "5-bar ascending chart, warm colors"
+#   → Big model → [bar-chart][bars:5][ascending][palette:warm][axes]
+#   → Small model → &lt;svg&gt;...&lt;/svg&gt;
+
+# Direct inference after training:
+echo "[bar-chart][bars:5][ascending][palette:cool][axes]" | \
+  ./build/ck-cli-v7 --model "$CKPT_PATH" --max-tokens 512</pre>
+    </div>
+
+    <h3 style="margin-top:0.8rem;margin-bottom:0.3rem;font-size:0.95rem;">Coverage Gate Rules</h3>
+    <ul style="font-size:0.88rem;margin:0.2rem 0 0.5rem 1.2rem;">
+        <li><strong>≥ 200 train variants per spec</strong> — enough diversity per tag combination</li>
+        <li><strong>≥ 20 holdout variants per spec</strong> — holdout set is meaningful per spec</li>
+        <li><strong>≥ 30 pairwise co-occurrences</strong> — every key tag pair appears together ≥ 30 times</li>
+    </ul>
+    <p class="mini-note">Gate is enforced by <code>--strict-coverage</code> in the corpus builder. Spec catalog: <code>version/v7/data/spec_catalog_v1.json</code> (128 specs across 6 groups). Coverage manifests are emitted per stage and consumed by the pipeline gate in Step 3.7.</p>
+
+    <div class="step-produces">
+        <span class="produces-label">Reference:</span>
+        <span class="produces-item item-json">version/v7/data/spec_catalog_v1.json</span>
+        <span class="produces-item item-json">$DATA_DIR/*_coverage_manifest.json</span>
     </div>
 </div>
 
@@ -1314,15 +1378,18 @@ python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
   --out-dir "$DATA_DIR" \
   --prefix svg_pretrain_pack \
   --assets-glob "$ROOT/docs/site/assets/*.svg" \
+  --spec-catalog "$ROOT/version/v7/data/spec_catalog_v1.json" \
   --stage-a-samples 24000 \
   --stage-b-samples 28000 \
   --holdout-ratio 0.10 \
-  --seed 42
+  --seed 42 \
+  --strict-coverage
 
 DATA_TXT="$DATA_DIR/svg_pretrain_pack_stage_a_plus_bridge.txt"
 DATA_TXT_STAGE_B="$DATA_DIR/svg_pretrain_pack_stage_b.txt"
 echo "[OK] Stage-A+bridge: $DATA_TXT"
 echo "[OK] Stage-B:        $DATA_TXT_STAGE_B"
+echo "[OK] Coverage gate:  passed (strict)"
 wc -l -c "$DATA_TXT" "$DATA_TXT_STAGE_B"</pre>
     </div>
     <p class="mini-note">This wrapper calls existing scripts (<code>build_svg_corpus_from_assets_v7.py</code>, <code>generate_svg_instruction_dataset_v7.py</code>, <code>build_stage_a_bridge_svg_v7.py</code>, <code>prepare_ascii_dataset_v7.py</code>) and emits train-ready Stage-A+bridge and Stage-B corpora.</p>
@@ -1805,6 +1872,32 @@ make v7-stabilization-nightly \
     Default Step 3.7 below is a <strong>functional end-to-end</strong> run (parity-first, quality gate non-blocking) so operators can complete the pipeline in one pass.
     For strict output-quality enforcement (<code>valid_svg_rate</code> gate), use the strict command in Step 9 after data scaling/SFT expansion.
 </p>
+
+<div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-top:0;margin-bottom:0.5rem;font-size:0.95rem;">Stage Pass Criteria (SVG Specialist Model)</h3>
+    <p style="margin-bottom:0.5rem;font-size:0.88rem;">Before advancing to the next training stage, verify these minimum bars. Check manually on 5–10 holdout samples using the tag sequences below.</p>
+    <table class="path-table" style="width:100%;font-size:0.82rem;">
+        <thead><tr><th style="width:18%">Stage</th><th style="width:30%">Pass condition</th><th>Quick check command</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>Stage A</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">primitives</span></td>
+                <td>Loss converges. <code>[circle][palette:cool]</code> → valid SVG containing <code>&lt;circle</code>. Output parses without error.</td>
+                <td><code style="font-size:0.78rem;">echo "[circle][palette:cool][style:minimal]" | ./build/ck-cli-v7 --model $CKPT</code></td>
+            </tr>
+            <tr>
+                <td><strong>Stage B</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">charts/infographic</span></td>
+                <td><code>[bar-chart][bars:5][ascending]</code> → bars are actually ascending in output. <code>[palette:warm]</code> → output uses warm-family hex colors, not random CSS names.</td>
+                <td><code style="font-size:0.78rem;">echo "[bar-chart][bars:5][ascending][palette:warm][axes]" | ./build/ck-cli-v7 --model $CKPT</code></td>
+            </tr>
+            <tr>
+                <td><strong>SFT</strong><br><span style="color:var(--text-muted);font-size:0.78rem;">enriched</span></td>
+                <td><code>[infographic][palette:dark][labeled][complexity:moderate]</code> → labeled dashboard with dark background. Multiple elements visible and in-bounds.</td>
+                <td><code style="font-size:0.78rem;">echo "[infographic][palette:dark][style:gradient][labeled][complexity:moderate]" | ./build/ck-cli-v7 --model $CKPT</code></td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="mini-note">If Stage A fails the circle test, check that <code>[circle]</code> merged to a single BPE token (Step 0B). If Stage B bars are not ascending, the bar_chart generator's ascending constraint may not be wired — check <code>spec_catalog_v1.json</code> constraint field vs generator logic.</p>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      SVG INFOGRAPHIC: Training Pipeline Architecture
@@ -2836,7 +2929,7 @@ python3 scripts/ck_chat.py --help</pre>
             'export RUN=$HOME/.cache/ck-engine-v7/models/train/$CK_NAME',
             'export DATA_DIR=$ROOT/version/v7/data',
             'export GEN_DIR=$RUN/data',
-            'export TOKENIZER_CORPUS=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
+            'export TOKENIZER_CORPUS=$GEN_DIR/${CK_NAME}_tokenizer_corpus.txt',
             'export PRETRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
             'export MIDTRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_b.txt',
             'export SFT_DATA=$GEN_DIR/${CK_NAME}_instruction_train.txt',
@@ -2870,7 +2963,7 @@ python3 scripts/ck_chat.py --help</pre>
             '  "created_by": "v7-runbook-config-builder",',
             '  "active_stage": "' + initialActiveStage + '",',
             '  "stage_order": ["pretrain","midtrain","sft","dpo","grpo","ppo"],',
-            '  "tokenizer": {"type":"' + tokenizer + '","vocab_size":' + vocab + ',"tokenizer_corpora":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$TOKENIZER_CORPUS"}]},',
+            '  "tokenizer": {"type":"' + tokenizer + '","vocab_size":' + vocab + ',"tokenizer_corpora":[{"name":"${CK_NAME}_tokenizer_corpus.txt","path":"$TOKENIZER_CORPUS"}]},',
             '  "stages": [',
             '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset"}]},',
             '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset"}]},',

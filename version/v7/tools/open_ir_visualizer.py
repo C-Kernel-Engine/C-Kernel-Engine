@@ -3724,6 +3724,7 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
         "training_loss_curve_latest.json",
         "training_grad_norms_latest.json",
         "training_parity_latest.json",
+        "training_parity_regimen_latest.json",
         "training_step_profile_latest.json",
         "training_checkpoint_policy_latest.json",
         "corpus_sampling_log_latest.json",
