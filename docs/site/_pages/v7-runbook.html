@@ -613,7 +613,7 @@
     <p style="margin-bottom: 0.45rem;">Set model shape once (name/layers/embed/context/vocab), then auto-generate the full export + command block with consistent run/data paths.</p>
     <div class="variant-box">
         <h3>Interactive Config Builder (JS)</h3>
-        <p>Pick model settings, then click <strong>Generate</strong> to produce copy-ready commands for this runbook.</p>
+        <p>Pick model settings and stage plan, then click <strong>Generate</strong> to produce copy-ready commands in strict operator sequence.</p>
         <p class="mini-note"><strong>Preset note:</strong> family defaults here are toy-scale operator starters (not exact published model sizes).</p>
         <div class="preset-grid">
             <div class="preset-field"><label for="cfg-name">Run Name</label><input id="cfg-name" type="text" value="svg_l16_d128_h512_v1024_ctx512_clean02" /></div>
@@ -635,7 +635,22 @@
             <div class="preset-field"><label for="cfg-lr-pre">LR Pretrain</label><input id="cfg-lr-pre" type="text" value="3e-4" /></div>
             <div class="preset-field"><label for="cfg-lr-mid">LR Midtrain</label><input id="cfg-lr-mid" type="text" value="3e-4" /></div>
             <div class="preset-field"><label for="cfg-lr-sft">LR SFT</label><input id="cfg-lr-sft" type="text" value="1e-4" /></div>
+            <div class="preset-field"><label for="cfg-stage-a-samples">Stage-A Samples</label><input id="cfg-stage-a-samples" type="number" min="1" value="27000" /></div>
+            <div class="preset-field"><label for="cfg-stage-b-samples">Stage-B Samples</label><input id="cfg-stage-b-samples" type="number" min="1" value="63000" /></div>
+            <div class="preset-field"><label for="cfg-sft-samples">SFT Samples</label><input id="cfg-sft-samples" type="number" min="1" value="55000" /></div>
         </div>
+        <details style="margin:0.15rem 0 0.5rem;">
+            <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.8rem;">Stage Script Activation</summary>
+            <div class="preset-grid" style="margin-top:0.5rem;">
+                <div class="preset-field"><label><input id="cfg-run-pretrain" type="checkbox" checked /> run pretrain (stage_a)</label></div>
+                <div class="preset-field"><label><input id="cfg-run-midtrain" type="checkbox" checked /> run midtrain (stage_b)</label></div>
+                <div class="preset-field"><label><input id="cfg-run-sft" type="checkbox" checked /> run sft</label></div>
+                <div class="preset-field"><label><input id="cfg-run-dpo" type="checkbox" /> run dpo (plan only)</label></div>
+                <div class="preset-field"><label><input id="cfg-run-grpo" type="checkbox" /> run grpo (plan only)</label></div>
+                <div class="preset-field"><label><input id="cfg-run-ppo" type="checkbox" /> run ppo/rlhf (plan only)</label></div>
+            </div>
+            <p class="mini-note">Current executable stages in this runbook: <code>stage_a</code>, <code>stage_b</code>, <code>sft</code>. DPO/GRPO/PPO emit TODO placeholders so the operator sees full pipeline intent.</p>
+        </details>
         <details style="margin:0.35rem 0 0.6rem;">
             <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.8rem;">Advanced: token budget override</summary>
             <div class="preset-grid" style="margin-top:0.5rem;">
@@ -653,6 +668,7 @@
             <button class="copy-btn" type="button">Copy</button>
 <pre id="cfg-output"># Click "Generate Commands" to populate this block.</pre>
         </div>
+        <p class="mini-note"><strong>Generated sequence:</strong> config -> dataset build -> pipeline bootstrap -> tokenizer check -> pretrain -> parity gate -> midtrain -> sft -> dashboards.</p>
     </div>
     <p class="mini-note" style="margin-top:0.6rem;"><strong>Shell script alternative</strong> — same config, run directly in terminal instead of using the builder above:</p>
     <div class="cmd-block">
@@ -692,6 +708,7 @@ bash version/v7/scripts/v7_train_init_preset.sh \
         <span class="produces-label">Produces:</span>
         <span class="produces-item">$RUN path from config name</span>
         <span class="produces-item">consistent stage dataset paths</span>
+        <span class="produces-item item-json">$RUN/training_plan.json seed block</span>
         <span class="produces-item item-json">copyable train command set</span>
     </div>
 </div>
@@ -2324,6 +2341,11 @@ python3 scripts/ck_chat.py --help</pre>
         var el = _cfgEl(id);
         if (el && value !== undefined && value !== null) el.value = String(value);
     }
+    function _cfgChecked(id, fallback) {
+        var el = _cfgEl(id);
+        if (!el) return !!fallback;
+        return !!el.checked;
+    }
     function _applyFamilyDefaults() {
         var family = _cfgVal('cfg-family', 'qwen3');
         var p = FAMILY_PRESETS[family] || FAMILY_PRESETS.qwen3;
@@ -2374,6 +2396,33 @@ python3 scripts/ck_chat.py --help</pre>
         var lrPre = _cfgVal('cfg-lr-pre', '3e-4');
         var lrMid = _cfgVal('cfg-lr-mid', '3e-4');
         var lrSft = _cfgVal('cfg-lr-sft', '1e-4');
+        var stageASamples = _cfgVal('cfg-stage-a-samples', '27000');
+        var stageBSamples = _cfgVal('cfg-stage-b-samples', '63000');
+        var sftSamples = _cfgVal('cfg-sft-samples', '55000');
+        var runPretrain = _cfgChecked('cfg-run-pretrain', true);
+        var runMidtrain = _cfgChecked('cfg-run-midtrain', true);
+        var runSft = _cfgChecked('cfg-run-sft', true);
+        var runDpo = _cfgChecked('cfg-run-dpo', false);
+        var runGrpo = _cfgChecked('cfg-run-grpo', false);
+        var runPpo = _cfgChecked('cfg-run-ppo', false);
+        var initialActiveStage = runPretrain
+            ? 'pretrain'
+            : (runMidtrain
+                ? 'midtrain'
+                : (runSft
+                    ? 'sft'
+                    : (runDpo
+                        ? 'dpo'
+                        : (runGrpo ? 'grpo' : (runPpo ? 'ppo' : 'pretrain')))));
+        var statusPretrain = runPretrain ? (initialActiveStage === 'pretrain' ? 'active' : 'planned') : 'planned';
+        var statusMidtrain = runMidtrain ? (initialActiveStage === 'midtrain' ? 'active' : 'planned') : 'planned';
+        var statusSft = runSft ? (initialActiveStage === 'sft' ? 'active' : 'planned') : 'planned';
+        var statusDpo = runDpo ? (initialActiveStage === 'dpo' ? 'active' : 'planned') : 'planned';
+        var statusGrpo = runGrpo ? (initialActiveStage === 'grpo' ? 'active' : 'planned') : 'planned';
+        var statusPpo = runPpo ? (initialActiveStage === 'ppo' ? 'active' : 'planned') : 'planned';
+        var dpoDatasets = runDpo ? '[{"name":"${CK_NAME}_dpo_pairs.jsonl","path":"$GEN_DIR/${CK_NAME}_dpo_pairs.jsonl","kind":"alignment_dataset"}]' : '[]';
+        var grpoDatasets = runGrpo ? '[{"name":"${CK_NAME}_grpo_rollouts.jsonl","path":"$GEN_DIR/${CK_NAME}_grpo_rollouts.jsonl","kind":"alignment_dataset"}]' : '[]';
+        var ppoDatasets = runPpo ? '[{"name":"${CK_NAME}_rlhf_preferences.jsonl","path":"$GEN_DIR/${CK_NAME}_rlhf_preferences.jsonl","kind":"alignment_dataset"}]' : '[]';
         var bpeArgs = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' \\\n  --vocab-size ' + vocab + ' --bpe-vocab-size ' + vocab : '';
         var reuseTok = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' --reuse-run-tokenizer' : '';
 
@@ -2401,16 +2450,43 @@ python3 scripts/ck_chat.py --help</pre>
             'fi',
             'echo "[token-budget] mode=$CK_TOTAL_MODE total_tokens=$CK_TOTAL_TOKENS"',
             '',
+            '# stage-plan: pretrain=' + (runPretrain ? 'on' : 'off')
+                + ' midtrain=' + (runMidtrain ? 'on' : 'off')
+                + ' sft=' + (runSft ? 'on' : 'off')
+                + ' dpo=' + (runDpo ? 'on' : 'off')
+                + ' grpo=' + (runGrpo ? 'on' : 'off')
+                + ' ppo=' + (runPpo ? 'on' : 'off'),
+            '',
             '# build stage datasets (required before bootstrap)',
             'mkdir -p "$GEN_DIR" "$RUN"',
+            '# seed explicit pipeline plan (single source of truth)',
+            'cat > "$RUN/training_plan.json" <<JSON',
+            '{',
+            '  "schema": "ck.training_plan.v1",',
+            '  "created_by": "v7-runbook-config-builder",',
+            '  "active_stage": "' + initialActiveStage + '",',
+            '  "stage_order": ["pretrain","midtrain","sft","dpo","grpo","ppo"],',
+            '  "tokenizer": {"type":"' + tokenizer + '","vocab_size":' + vocab + ',"tokenizer_corpora":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$TOKENIZER_CORPUS"}]},',
+            '  "stages": [',
+            '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset"}]},',
+            '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset"}]},',
+            '    {"stage":"sft","seq":3,"status":"' + statusSft + '","enabled":' + (runSft ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_instruction_train.txt","path":"$SFT_DATA","kind":"instruction_dataset"}]},',
+            '    {"stage":"dpo","seq":4,"status":"' + statusDpo + '","enabled":' + (runDpo ? 'true' : 'false') + ',"datasets":' + dpoDatasets + '},',
+            '    {"stage":"grpo","seq":5,"status":"' + statusGrpo + '","enabled":' + (runGrpo ? 'true' : 'false') + ',"datasets":' + grpoDatasets + '},',
+            '    {"stage":"ppo","seq":6,"status":"' + statusPpo + '","enabled":' + (runPpo ? 'true' : 'false') + ',"datasets":' + ppoDatasets + '}',
+            '  ]',
+            '}',
+            'JSON',
             'python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \\',
             '  --out-dir "$GEN_DIR" \\',
             '  --prefix "$CK_NAME" \\',
-            '  --assets-glob "$ROOT/docs/site/assets/*.svg"',
+            '  --assets-glob "$ROOT/docs/site/assets/*.svg" \\',
+            '  --stage-a-samples ' + stageASamples + ' \\',
+            '  --stage-b-samples ' + stageBSamples,
             'python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \\',
             '  --out-dir "$GEN_DIR" \\',
             '  --prefix "$CK_NAME" \\',
-            '  --num-samples 1000 --jsonl',
+            '  --num-samples ' + sftSamples + ' --jsonl',
             '',
             '# bootstrap tokenizer + manifest',
             '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
@@ -2421,46 +2497,69 @@ python3 scripts/ck_chat.py --help</pre>
             '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
             '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
             '  --optimizer ' + optimizer + ' \\',
-            '  --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --prepare-only',
-            '',
-            '# stage_a pretrain',
-            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
-            '  --run "$RUN" --curriculum-stage stage_a --tokenizer ' + tokenizer + ' --require-svg-rows --strict-data-gates \\',
-            '  --data "$PRETRAIN_DATA"' + bpeArgs + ' \\',
-            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
-            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
-            '  --optimizer ' + optimizer + ' \\',
-            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrPre,
-            '',
-            '# REQUIRED: parity gates before long/full runs',
-            '#   Step 3.1: v7-runbook.html#step-3-5-parity-gate',
-            '.venv/bin/python version/v7/scripts/run_training_parity_regimen_v7.py \\',
-            '  --run-dir "$RUN" \\',
-            '  --json-out "$RUN/training_parity_regimen_latest.json" \\',
-            '  --md-out "$RUN/training_parity_regimen_latest.md"',
-            '',
-            '# stage_b midtrain',
-            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
-            '  --run "$RUN" --curriculum-stage stage_b --tokenizer ' + tokenizer + reuseTok + ' --require-svg-rows --strict-data-gates \\',
-            '  --data "$MIDTRAIN_DATA" \\',
-            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
-            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
-            '  --optimizer ' + optimizer + ' \\',
-            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrMid,
-            '',
-            '# sft',
-            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
-            '  --run "$RUN" --curriculum-stage sft --tokenizer ' + tokenizer + reuseTok + ' --strict-data-gates \\',
-            '  --data "$SFT_DATA" \\',
-            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
-            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
-            '  --optimizer ' + optimizer + ' \\',
-            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrSft,
+            '  --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --prepare-only'
+        ];
+        if (runPretrain) {
+            lines = lines.concat([
+                '',
+                '# stage_a pretrain',
+                '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+                '  --run "$RUN" --curriculum-stage stage_a --tokenizer ' + tokenizer + ' --require-svg-rows --strict-data-gates \\',
+                '  --data "$PRETRAIN_DATA"' + bpeArgs + ' \\',
+                '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+                '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+                '  --optimizer ' + optimizer + ' \\',
+                '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrPre,
+                '',
+                '# REQUIRED: parity gates before long/full runs',
+                '#   Step 3.1: v7-runbook.html#step-3-5-parity-gate',
+                '.venv/bin/python version/v7/scripts/run_training_parity_regimen_v7.py \\',
+                '  --run-dir "$RUN" \\',
+                '  --json-out "$RUN/training_parity_regimen_latest.json" \\',
+                '  --md-out "$RUN/training_parity_regimen_latest.md"'
+            ]);
+        }
+        if (runMidtrain) {
+            lines = lines.concat([
+                '',
+                '# stage_b midtrain',
+                '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+                '  --run "$RUN" --curriculum-stage stage_b --tokenizer ' + tokenizer + reuseTok + ' --require-svg-rows --strict-data-gates \\',
+                '  --data "$MIDTRAIN_DATA" \\',
+                '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+                '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+                '  --optimizer ' + optimizer + ' \\',
+                '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrMid
+            ]);
+        }
+        if (runSft) {
+            lines = lines.concat([
+                '',
+                '# sft',
+                '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+                '  --run "$RUN" --curriculum-stage sft --tokenizer ' + tokenizer + reuseTok + ' --strict-data-gates \\',
+                '  --data "$SFT_DATA" \\',
+                '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+                '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+                '  --optimizer ' + optimizer + ' \\',
+                '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrSft
+            ]);
+        }
+        if (runDpo || runGrpo || runPpo) {
+            lines = lines.concat([
+                '',
+                '# alignment stages (plan-only placeholders)',
+                runDpo ? '# TODO dpo: connect dpo dataset + script once v7 DPO pipeline is wired.' : '# dpo: off',
+                runGrpo ? '# TODO grpo: connect grpo dataset + script once v7 GRPO pipeline is wired.' : '# grpo: off',
+                runPpo ? '# TODO ppo/rlhf: connect reward/preference pipeline once v7 PPO is wired.' : '# ppo/rlhf: off'
+            ]);
+        }
+        lines = lines.concat([
             '',
             '# refresh dashboards',
             'python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts',
             'python3 version/v7/tools/open_ir_hub.py --open'
-        ];
+        ]);
         var out = _cfgEl('cfg-output');
         if (out) out.textContent = lines.join('\n');
     }

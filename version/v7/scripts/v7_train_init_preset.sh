@@ -174,6 +174,55 @@ emit_commands() {
 # Build staged corpora and instruction data
 mkdir -p "$GEN_DIR" "$RUN"
 
+# Seed explicit stage plan (visualizer can show full pipeline before training starts)
+cat > "$RUN/training_plan.json" <<JSON
+{
+  "schema": "ck.training_plan.v1",
+  "created_by": "v7_train_init_preset.sh",
+  "active_stage": "pretrain",
+  "stage_order": ["pretrain", "midtrain", "sft", "dpo", "grpo", "ppo"],
+  "tokenizer": {
+    "type": "$CK_TOKENIZER",
+    "vocab_size": $CK_VOCAB_SIZE,
+    "tokenizer_corpora": [
+      { "name": "${CK_PREFIX}_stage_a_plus_bridge.txt", "path": "$TOKENIZER_CORPUS" }
+    ]
+  },
+  "stages": [
+    {
+      "stage": "pretrain",
+      "seq": 1,
+      "status": "active",
+      "enabled": true,
+      "datasets": [
+        { "name": "${CK_PREFIX}_stage_a_plus_bridge.txt", "path": "$PRETRAIN_DATA", "kind": "generated_dataset" }
+      ]
+    },
+    {
+      "stage": "midtrain",
+      "seq": 2,
+      "status": "planned",
+      "enabled": true,
+      "datasets": [
+        { "name": "${CK_PREFIX}_stage_b.txt", "path": "$MIDTRAIN_DATA", "kind": "generated_dataset" }
+      ]
+    },
+    {
+      "stage": "sft",
+      "seq": 3,
+      "status": "planned",
+      "enabled": true,
+      "datasets": [
+        { "name": "${CK_PREFIX}_instruction_train.txt", "path": "$SFT_DATA", "kind": "instruction_dataset" }
+      ]
+    },
+    { "stage": "dpo", "seq": 4, "status": "planned", "enabled": false, "datasets": [] },
+    { "stage": "grpo", "seq": 5, "status": "planned", "enabled": false, "datasets": [] },
+    { "stage": "ppo", "seq": 6, "status": "planned", "enabled": false, "datasets": [] }
+  ]
+}
+JSON
+
 # tokenizer arguments for bpe/ascii_bpe only
 BPE_ARGS=""
 REUSE_TOK_ARG=""
