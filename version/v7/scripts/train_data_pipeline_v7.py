@@ -183,6 +183,181 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _read_bpe_meta_max_piece_bytes(bin_dir: Path | None) -> int | None:
+    if bin_dir is None:
+        return None
+    meta_path = bin_dir / "tokenizer_meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        meta = _load_json(meta_path)
+    except Exception:
+        return None
+    v = meta.get("max_piece_bytes") if isinstance(meta, dict) else None
+    if isinstance(v, int) and v >= 0:
+        return int(v)
+    return None
+
+
+def _resolve_coverage_manifest_path(
+    dataset_path: Path,
+    spec_catalog: str | None,
+) -> Path | None:
+    candidates: list[Path] = []
+    explicit: Path | None = None
+    if isinstance(spec_catalog, str) and spec_catalog.strip():
+        explicit = Path(spec_catalog).expanduser().resolve()
+        if explicit.suffix == ".json" and explicit.name.endswith("_coverage_manifest.json"):
+            if explicit.exists():
+                return explicit
+            return explicit
+
+    parent = dataset_path.parent
+    if not parent.exists():
+        return explicit
+    candidates.extend(sorted(parent.glob("*_coverage_manifest.json")))
+    if not candidates:
+        return explicit
+
+    # Prefer stage-aware manifests first, then same-prefix manifests.
+    stem = dataset_path.stem.lower()
+    stage_hint: str | None = None
+    if "stage_a" in stem or "pretrain_a" in stem:
+        stage_hint = "stage_a"
+    elif "stage_b" in stem or "pretrain_b" in stem or "midtrain" in stem:
+        stage_hint = "stage_b"
+    elif "sft" in stem:
+        stage_hint = "sft"
+
+    if stage_hint:
+        stage_matches = [p for p in candidates if stage_hint in p.name.lower()]
+        if stage_matches:
+            candidates = stage_matches
+
+    prefix = stem.split("_instruction_", 1)[0]
+    prefix = prefix.split("_svg_", 1)[0]
+    if prefix:
+        prefix_matches = [p for p in candidates if p.name.lower().startswith(prefix)]
+        if prefix_matches:
+            candidates = prefix_matches
+
+    candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+    return candidates[0]
+
+
+def _check_coverage_gate(
+    *,
+    dataset_path: Path,
+    spec_catalog: str | None,
+    strict: bool,
+) -> dict[str, Any]:
+    # Tokenizer corpora may aggregate multiple stages; enforce all matching
+    # stage coverage manifests instead of picking one by mtime.
+    dataset_stem = dataset_path.stem.lower()
+    if "tokenizer_corpus" in dataset_stem:
+        parent = dataset_path.parent
+        candidates = sorted(parent.glob("*_coverage_manifest.json")) if parent.exists() else []
+        prefix = dataset_stem.split("_tokenizer_corpus", 1)[0]
+        if prefix:
+            pref = [p for p in candidates if p.name.lower().startswith(prefix)]
+            if pref:
+                candidates = pref
+        if candidates:
+            failures: list[str] = []
+            checked: list[str] = []
+            for manifest in candidates:
+                checked.append(str(manifest))
+                try:
+                    payload = _load_json(manifest)
+                except Exception as exc:
+                    failures.append(f"{manifest.name}: invalid_manifest:{exc}")
+                    continue
+                gate = payload.get("gate")
+                if not isinstance(gate, dict):
+                    failures.append(f"{manifest.name}: missing_gate_block")
+                    continue
+                if not bool(gate.get("passed")):
+                    local_failures = list(gate.get("failures") or [])
+                    if local_failures:
+                        for item in local_failures:
+                            failures.append(f"{manifest.name}: {item}")
+                    else:
+                        failures.append(f"{manifest.name}: gate_failed")
+            if failures and strict:
+                raise SystemExit(
+                    "ERROR: strict coverage gate failed for tokenizer corpus aggregate.\n"
+                    f"  dataset: {dataset_path}\n"
+                    "  failures:\n  - "
+                    + "\n  - ".join([str(x) for x in failures])
+                )
+            return {
+                "status": "ok" if not failures else "warn",
+                "passed": len(failures) == 0,
+                "failures": failures,
+                "manifest_path": str(candidates[-1]),
+                "checked_manifests": checked,
+            }
+
+    manifest_path = _resolve_coverage_manifest_path(dataset_path, spec_catalog)
+    if manifest_path is None:
+        if strict:
+            raise SystemExit(
+                "ERROR: strict coverage gate enabled but no coverage manifest found.\n"
+                f"  dataset: {dataset_path}\n"
+                "  expected: *_coverage_manifest.json beside dataset"
+            )
+        return {"status": "skipped", "reason": "manifest_not_found", "manifest_path": None}
+
+    if not manifest_path.exists():
+        if strict:
+            raise SystemExit(
+                "ERROR: strict coverage gate enabled but coverage manifest path is missing.\n"
+                f"  manifest: {manifest_path}"
+            )
+        return {"status": "skipped", "reason": "manifest_path_missing", "manifest_path": str(manifest_path)}
+
+    payload: dict[str, Any]
+    try:
+        payload = _load_json(manifest_path)
+    except Exception as exc:
+        if strict:
+            raise SystemExit(
+                "ERROR: strict coverage gate failed to read coverage manifest.\n"
+                f"  manifest: {manifest_path}\n"
+                f"  reason: {exc}"
+            )
+        return {
+            "status": "warn",
+            "reason": f"invalid_manifest:{exc}",
+            "manifest_path": str(manifest_path),
+        }
+
+    gate = payload.get("gate")
+    if not isinstance(gate, dict):
+        if strict:
+            raise SystemExit(
+                "ERROR: strict coverage gate found manifest without gate block.\n"
+                f"  manifest: {manifest_path}"
+            )
+        return {"status": "warn", "reason": "missing_gate_block", "manifest_path": str(manifest_path)}
+
+    passed = bool(gate.get("passed"))
+    failures = list(gate.get("failures") or [])
+    if not passed and strict:
+        raise SystemExit(
+            "ERROR: strict coverage gate failed.\n"
+            f"  manifest: {manifest_path}\n"
+            "  failures:\n  - "
+            + "\n  - ".join([str(x) for x in failures])
+        )
+    return {
+        "status": "ok" if passed else "warn",
+        "passed": passed,
+        "failures": failures,
+        "manifest_path": str(manifest_path),
+    }
+
+
 def _read_run_vocab_size(run_dir: Path) -> int | None:
     manifest = run_dir / "weights_manifest.json"
     if not manifest.exists():
@@ -454,6 +629,17 @@ def _validate_dataset_rows(
     ascii_issues: list[tuple[int, int, int, bytes]] = []
     svg_issues: list[tuple[int, bytes]] = []
 
+    def _is_svg_compatible_row(raw: bytes) -> bool:
+        probe = raw.lstrip().lower()
+        if probe.startswith(b"<svg"):
+            return True
+        if probe.startswith(b"<task>") and (b"</task>" in probe) and (b"<svg" in probe):
+            return True
+        svg_pos = probe.find(b"<svg")
+        if svg_pos > 0 and probe.startswith(b"[") and b"]" in probe[:svg_pos]:
+            return True
+        return False
+
     for line_no, row in enumerate(rows, start=1):
         stripped = row.lstrip()
         if not stripped:
@@ -471,7 +657,7 @@ def _validate_dataset_rows(
             if bad_col is not None and bad_byte is not None and len(ascii_issues) < max_issues:
                 ascii_issues.append((line_no, bad_col, bad_byte, row))
 
-        if require_svg_rows and (not stripped.startswith(b"<svg")) and len(svg_issues) < max_issues:
+        if require_svg_rows and (not _is_svg_compatible_row(stripped)) and len(svg_issues) < max_issues:
             svg_issues.append((line_no, row))
 
     if non_empty == 0:
@@ -497,6 +683,8 @@ def _validate_dataset_rows(
             [
                 "Fix with cleanup:",
                 f"  python3 version/v7/scripts/prepare_ascii_dataset_v7.py --input {shlex.quote(str(dataset_path))} --output {shlex.quote(str(dataset_path))} --input-format text --ascii-mode xml_escape --svg-only",
+                "  # For instruction/tag-prefixed rows (<task>...</task><svg...> or [tags]<svg...>), omit --svg-only:",
+                f"  python3 version/v7/scripts/prepare_ascii_dataset_v7.py --input {shlex.quote(str(dataset_path))} --output {shlex.quote(str(dataset_path))} --input-format text --ascii-mode xml_escape",
             ]
         )
         raise SystemExit("\n".join(msg))
@@ -1632,8 +1820,15 @@ def _build_training_pipeline_payload(
             tok_path = Path(tok_json_path)
             if tok_path.exists():
                 tokenizer_lineage["tokenizer_sha256"] = _sha256_file(tok_path)
+        bpe_meta_cap: int | None = None
+        bpe_bin_dir_any = bpe_artifacts.get("run_binary_dir") or bpe_artifacts.get("binary_dir")
+        if isinstance(bpe_bin_dir_any, str) and bpe_bin_dir_any:
+            bpe_meta_cap = _read_bpe_meta_max_piece_bytes(Path(bpe_bin_dir_any))
         tokenizer_lineage["bpe_vocab_size"] = int(args.bpe_vocab_size)
         tokenizer_lineage["bpe_min_freq"] = int(args.bpe_min_freq)
+        tokenizer_lineage["bpe_max_piece_bytes"] = (
+            int(bpe_meta_cap) if isinstance(bpe_meta_cap, int) else int(args.bpe_max_piece_bytes)
+        )
         tokenizer_lineage["bpe_mode"] = "ascii_bpe" if tokenizer_kind == "ascii_bpe" else "bytelevel_bpe"
         # Operator-visible continuity signal:
         # True => token IDs are frozen from run_dir/tokenizer.json (--reuse-run-tokenizer).
@@ -2540,7 +2735,17 @@ def main() -> int:
     ap.add_argument(
         "--require-svg-rows",
         action="store_true",
-        help="Fail if any non-empty dataset row does not start with <svg",
+        help="Fail if any non-empty row is not SVG-compatible (<svg...>, <task>...</task><svg...>, or [tags]<svg...>)",
+    )
+    ap.add_argument(
+        "--spec-catalog",
+        default=None,
+        help="Optional spec catalog JSON associated with this dataset generation run.",
+    )
+    ap.add_argument(
+        "--strict-coverage-gate",
+        action="store_true",
+        help="Fail fast if coverage manifest gate reports missing spec/tag coverage.",
     )
     ap.add_argument("--work-dir", default=None, help="Optional work dir for generated artifacts")
     # Training hyper-parameter defaults.  These are always passed explicitly to
@@ -2576,6 +2781,12 @@ def main() -> int:
     ap.add_argument("--json-out", default=None, help="Optional pipeline report JSON")
     ap.add_argument("--bpe-vocab-size", type=int, default=1024)
     ap.add_argument("--bpe-min-freq", type=int, default=2)
+    ap.add_argument(
+        "--bpe-max-piece-bytes",
+        type=int,
+        default=0,
+        help="Max merged token piece length in bytes for BPE training (0 = unbounded).",
+    )
     ap.add_argument("--bpe-threads", type=int, default=4)
     ap.add_argument(
         "--reuse-run-tokenizer",
@@ -2707,6 +2918,8 @@ def main() -> int:
         _errors.append(f"--hidden-dim must be >= 1, got {args.hidden_dim}")
     if args.bpe_vocab_size < 2:
         _errors.append(f"--bpe-vocab-size must be >= 2, got {args.bpe_vocab_size}")
+    if args.bpe_max_piece_bytes < 0:
+        _errors.append(f"--bpe-max-piece-bytes must be >= 0, got {args.bpe_max_piece_bytes}")
     if args.roundtrip_max_lines < 1:
         _errors.append(f"--roundtrip-max-lines must be >= 1, got {args.roundtrip_max_lines}")
     if args.roundtrip_sample_limit < 1:
@@ -2822,6 +3035,18 @@ def main() -> int:
         f"require_ascii={dataset_qc['require_ascii']} "
         f"require_svg_rows={dataset_qc['require_svg_rows']}"
     )
+    coverage_gate = _check_coverage_gate(
+        dataset_path=dataset_path,
+        spec_catalog=(str(args.spec_catalog) if args.spec_catalog else None),
+        strict=bool(args.strict_coverage_gate),
+    )
+    if str(coverage_gate.get("status")) != "skipped":
+        print(
+            "[coverage-gate] "
+            f"status={coverage_gate.get('status')} "
+            f"passed={coverage_gate.get('passed')} "
+            f"manifest={coverage_gate.get('manifest_path')}"
+        )
 
     ck_json = work_dir / "train_ck.json"
     torch_json = work_dir / "train_torch_ref.json"
@@ -2872,6 +3097,8 @@ def main() -> int:
                 str(args.bpe_vocab_size),
                 "--min-freq",
                 str(args.bpe_min_freq),
+                "--max-piece-bytes",
+                str(args.bpe_max_piece_bytes),
                 "--threads",
                 str(args.bpe_threads),
             ]
@@ -2959,6 +3186,9 @@ def main() -> int:
         dataset_profile=dataset_profile,
         tokenizer_roundtrip=tokenizer_roundtrip,
     )
+    cov_manifest_path = coverage_gate.get("manifest_path")
+    if isinstance(cov_manifest_path, str) and cov_manifest_path:
+        data_lab_artifacts["coverage_manifest_json"] = cov_manifest_path
     if bpe_handle is not None:
         bpe_handle.close()
     if args.strict_data_gates and args.tokenizer == "ascii_bpe":
@@ -2985,6 +3215,7 @@ def main() -> int:
                 "data_lab": data_lab_artifacts,
             },
             "dataset_qc": dataset_qc,
+            "coverage_gate": coverage_gate,
             "dataset_profile": dataset_profile,
             "tokenizer_roundtrip": tokenizer_roundtrip,
         }
@@ -3115,6 +3346,7 @@ def main() -> int:
             "post_train_eval_json": post_train_eval_path,
         },
         "dataset_qc": dataset_qc,
+        "coverage_gate": coverage_gate,
         "dataset_profile": dataset_profile,
         "tokenizer_roundtrip": tokenizer_roundtrip,
         "post_train_eval": post_train_eval,

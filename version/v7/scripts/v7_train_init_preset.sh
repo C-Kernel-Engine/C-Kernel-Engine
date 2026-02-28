@@ -23,6 +23,7 @@ SFT_SAMPLES=55000
 LR_PRETRAIN="3e-4"
 LR_MIDTRAIN="3e-4"
 LR_SFT="1e-4"
+BPE_MAX_PIECE_BYTES=0
 ROOT="$ROOT_DEFAULT"
 MODE="both" # env|commands|both
 
@@ -52,6 +53,7 @@ Options:
   --lr-pretrain FLOAT
   --lr-midtrain FLOAT
   --lr-sft FLOAT
+  --bpe-max-piece-bytes N
   --root PATH
   --mode env|commands|both
   -h, --help
@@ -95,6 +97,7 @@ while [[ $# -gt 0 ]]; do
     --lr-pretrain) LR_PRETRAIN="${2:?}"; shift 2 ;;
     --lr-midtrain) LR_MIDTRAIN="${2:?}"; shift 2 ;;
     --lr-sft) LR_SFT="${2:?}"; shift 2 ;;
+    --bpe-max-piece-bytes) BPE_MAX_PIECE_BYTES="${2:?}"; shift 2 ;;
     --root) ROOT="${2:?}"; shift 2 ;;
     --mode) MODE="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -112,6 +115,10 @@ for v in LAYERS EMBED_DIM HIDDEN_DIM CONTEXT_LEN VOCAB_SIZE NUM_HEADS NUM_KV_HEA
     exit 2
   fi
 done
+if [[ ! "$BPE_MAX_PIECE_BYTES" =~ ^[0-9]+$ ]]; then
+  echo "[ERROR] BPE_MAX_PIECE_BYTES must be >= 0, got '$BPE_MAX_PIECE_BYTES'" >&2
+  exit 2
+fi
 
 if [ "$NUM_KV_HEADS" -gt "$NUM_HEADS" ]; then
   echo "[ERROR] NUM_KV_HEADS ($NUM_KV_HEADS) cannot exceed NUM_HEADS ($NUM_HEADS)" >&2
@@ -156,12 +163,13 @@ export CK_SFT_SAMPLES=$SFT_SAMPLES
 export CK_LR_PRETRAIN="$LR_PRETRAIN"
 export CK_LR_MIDTRAIN="$LR_MIDTRAIN"
 export CK_LR_SFT="$LR_SFT"
+export CK_BPE_MAX_PIECE_BYTES=$BPE_MAX_PIECE_BYTES
 
 export RUN="\$HOME/.cache/ck-engine-v7/models/train/\$CK_NAME"
 export DATA_DIR="\$ROOT/version/v7/data"
 export GEN_DIR="\$RUN/data"
 export CK_PREFIX="\$CK_NAME"
-export TOKENIZER_CORPUS="\$GEN_DIR/\${CK_PREFIX}_stage_a_plus_bridge.txt"
+export TOKENIZER_CORPUS="\$GEN_DIR/\${CK_PREFIX}_tokenizer_corpus.txt"
 export PRETRAIN_DATA="\$GEN_DIR/\${CK_PREFIX}_stage_a_plus_bridge.txt"
 export MIDTRAIN_DATA="\$GEN_DIR/\${CK_PREFIX}_stage_b.txt"
 export SFT_DATA="\$GEN_DIR/\${CK_PREFIX}_instruction_train.txt"
@@ -185,7 +193,7 @@ cat > "$RUN/training_plan.json" <<JSON
     "type": "$CK_TOKENIZER",
     "vocab_size": $CK_VOCAB_SIZE,
     "tokenizer_corpora": [
-      { "name": "${CK_PREFIX}_stage_a_plus_bridge.txt", "path": "$TOKENIZER_CORPUS" }
+      { "name": "${CK_PREFIX}_tokenizer_corpus.txt", "path": "$TOKENIZER_CORPUS" }
     ]
   },
   "stages": [
@@ -227,7 +235,7 @@ JSON
 BPE_ARGS=""
 REUSE_TOK_ARG=""
 if [ "$CK_TOKENIZER" = "ascii_bpe" ] || [ "$CK_TOKENIZER" = "bpe" ]; then
-  BPE_ARGS="--vocab-size $CK_VOCAB_SIZE --bpe-vocab-size $CK_VOCAB_SIZE"
+  BPE_ARGS="--vocab-size $CK_VOCAB_SIZE --bpe-vocab-size $CK_VOCAB_SIZE --bpe-max-piece-bytes $CK_BPE_MAX_PIECE_BYTES"
   REUSE_TOK_ARG="--reuse-run-tokenizer"
 fi
 
