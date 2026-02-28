@@ -365,8 +365,8 @@
 
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#47b475;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Training Path</div>
     <ul>
-        <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
         <li><a href="#step-0-0-config-init"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.0</span> Config Init Generator</a></li>
+        <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
         <li><a href="#step-0a-pipeline-bootstrap"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0A</span> Pipeline Bootstrap</a></li>
         <li><a href="#step-0-clean-start"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.1</span> Clean Start</a></li>
         <li><a href="#step-0-data-prep"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.5</span> Data Prep</a></li>
@@ -607,78 +607,10 @@
 </svg>
 </div>
 
-<h2 id="step-0-prereqs">Step 0: Prereqs + Paths</h2>
-
-<div class="card">
-    <p style="margin-bottom: 0.4rem;">Use these canonical local paths:</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>export ROOT=/home/antshiv/Workspace/C-Kernel-Engine
-export RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1
-export DATA_DIR=$ROOT/version/v7/data
-export DATA_TXT=$DATA_DIR/svg_assets_train.txt
-
-mkdir -p "$RUN" "$DATA_DIR"
-if [ ! -f "$DATA_TXT" ]; then
-  echo "[ERROR] Missing data file: $DATA_TXT"
-  echo "Set DATA_TXT to a real file or create one in $DATA_DIR."
-else
-  echo "[OK] Found data file: $DATA_TXT"
-fi</pre>
-    </div>
-    <p class="mini-note">Important: use <code>$HOME/.cache/...</code>, not <code>/.cache/...</code>. These vars are exported for later Python steps; if you open a new terminal, re-run Step 0 first. The repo includes a bundled demo file at <code>version/v7/data/svg_assets_train.txt</code>.</p>
-    <div class="step-produces">
-        <span class="produces-label">Exports:</span>
-        <span class="produces-item">$ROOT</span>
-        <span class="produces-item">$RUN</span>
-        <span class="produces-item">$DATA_DIR</span>
-        <span class="produces-item">$DATA_TXT</span>
-    </div>
-    <p style="margin: 0.65rem 0 0.35rem;"><strong>Open Run Hub (all runs in one place):</strong></p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Generate + open consolidated run dashboard for ~/.cache/ck-engine-v7/models
-python3 version/v7/tools/open_ir_hub.py --open
-
-# Optional explicit paths
-# python3 version/v7/tools/open_ir_hub.py \
-#   --models-root "$HOME/.cache/ck-engine-v7/models" \
-#   --output "$HOME/.cache/ck-engine-v7/models/ir_hub.html" \
-#   --index-out "$HOME/.cache/ck-engine-v7/models/runs_hub_index.json" \
-#   --open</pre>
-    </div>
-    <p class="mini-note">Use Run Hub as the parent operator view, then drill into each run's <code>ir_report.html</code>.</p>
-    <p class="mini-note"><strong>Guardrail:</strong> keep <code>RUN</code> under <code>$HOME/.cache/ck-engine-v7/models/train/...</code> for automatic hub indexing. Repo-local run dirs are easy to forget and usually need manual move/symlink later.</p>
-</div>
-
 <h2 id="step-0-0-config-init">Step 0.0: Config Init Generator (Recommended)</h2>
 
 <div class="card card-accent">
     <p style="margin-bottom: 0.45rem;">Set model shape once (name/layers/embed/context/vocab), then auto-generate the full export + command block with consistent run/data paths.</p>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre># Print exports + full command plan (copy/paste result)
-bash version/v7/scripts/v7_train_init_preset.sh \
-  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
-  --template qwen3 --init xavier_uniform \
-  --tokenizer ascii_bpe --optimizer adamw \
-  --layers 16 \
-  --embed-dim 128 \
-  --hidden-dim 512 \
-  --context-len 512 \
-  --vocab-size 1024 \
-  --num-heads 8 \
-  --num-kv-heads 4 \
-  --mode both
-
-# Optional: apply exports directly in current shell
-eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
-  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
-  --template qwen3 --init xavier_uniform \
-  --tokenizer ascii_bpe --optimizer adamw \
-  --layers 16 --embed-dim 128 --hidden-dim 512 \
-  --context-len 512 --vocab-size 1024 --mode env)"</pre>
-    </div>
     <div class="variant-box">
         <h3>Interactive Config Builder (JS)</h3>
         <p>Pick model settings, then click <strong>Generate</strong> to produce copy-ready commands for this runbook.</p>
@@ -722,6 +654,39 @@ eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
 <pre id="cfg-output"># Click "Generate Commands" to populate this block.</pre>
         </div>
     </div>
+    <p class="mini-note" style="margin-top:0.6rem;"><strong>Shell script alternative</strong> — same config, run directly in terminal instead of using the builder above:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Print exports + full command plan (copy/paste result; does NOT execute training)
+bash version/v7/scripts/v7_train_init_preset.sh \
+  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 \
+  --embed-dim 128 \
+  --hidden-dim 512 \
+  --context-len 512 \
+  --vocab-size 1024 \
+  --num-heads 8 \
+  --num-kv-heads 4 \
+  --mode both
+
+# Optional: apply exports directly in current shell
+eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
+  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 512 --vocab-size 1024 --mode env)"
+
+# Optional: execute generated command plan directly
+bash version/v7/scripts/v7_train_init_preset.sh \
+  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 512 --vocab-size 1024 --mode commands | bash</pre>
+    </div>
     <p class="mini-note">The helper derives <code>RUN</code> under <code>$HOME/.cache/ck-engine-v7/models/train/$CK_NAME</code> and binds stage dataset paths using the same prefix, so the IR hub and visualizer stay aligned.</p>
     <div class="step-produces">
         <span class="produces-label">Produces:</span>
@@ -731,6 +696,50 @@ eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
     </div>
 </div>
 
+<h2 id="step-0-prereqs">Step 0: Prereqs + Paths</h2>
+
+<div class="card">
+    <p style="margin-bottom: 0.4rem;"><strong>If you used the Config Builder above</strong>, <code>$ROOT</code>, <code>$RUN</code>, and <code>$GEN_DIR</code> are already exported — skip to Step 0A. Use this step when setting paths manually or after opening a new terminal.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>export ROOT=/home/antshiv/Workspace/C-Kernel-Engine
+export RUN=$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1
+export DATA_DIR=$ROOT/version/v7/data
+export DATA_TXT=$DATA_DIR/svg_assets_train.txt
+
+mkdir -p "$RUN" "$DATA_DIR"
+if [ ! -f "$DATA_TXT" ]; then
+  echo "[ERROR] Missing data file: $DATA_TXT"
+  echo "Set DATA_TXT to a real file or create one in $DATA_DIR."
+else
+  echo "[OK] Found data file: $DATA_TXT"
+fi</pre>
+    </div>
+    <p class="mini-note">Important: use <code>$HOME/.cache/...</code>, not <code>/.cache/...</code>. These vars are exported for later Python steps; if you open a new terminal, re-run Step 0 first. The repo includes a bundled demo file at <code>version/v7/data/svg_assets_train.txt</code>.</p>
+    <div class="step-produces">
+        <span class="produces-label">Exports:</span>
+        <span class="produces-item">$ROOT</span>
+        <span class="produces-item">$RUN</span>
+        <span class="produces-item">$DATA_DIR</span>
+        <span class="produces-item">$DATA_TXT</span>
+    </div>
+    <p style="margin: 0.65rem 0 0.35rem;"><strong>Open Run Hub (all runs in one place):</strong></p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Generate + open consolidated run dashboard for ~/.cache/ck-engine-v7/models
+python3 version/v7/tools/open_ir_hub.py --open
+
+# Optional explicit paths
+# python3 version/v7/tools/open_ir_hub.py \
+#   --models-root "$HOME/.cache/ck-engine-v7/models" \
+#   --output "$HOME/.cache/ck-engine-v7/models/ir_hub.html" \
+#   --index-out "$HOME/.cache/ck-engine-v7/models/runs_hub_index.json" \
+#   --open</pre>
+    </div>
+    <p class="mini-note">Use Run Hub as the parent operator view, then drill into each run's <code>ir_report.html</code>.</p>
+    <p class="mini-note"><strong>Guardrail:</strong> keep <code>RUN</code> under <code>$HOME/.cache/ck-engine-v7/models/train/...</code> for automatic hub indexing. Repo-local run dirs are easy to forget and usually need manual move/symlink later.</p>
+</div>
+
 <h2 id="step-0a-pipeline-bootstrap">Step 0A: Pipeline Bootstrap (Recommended)</h2>
 
 <div class="card card-blue">
@@ -738,7 +747,7 @@ eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># 1) Build staged SVG corpora + instruction corpus
-export GEN_DIR="$DATA_DIR/generated"
+export GEN_DIR="$RUN/data"
 mkdir -p "$GEN_DIR"
 
 python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
@@ -2373,7 +2382,7 @@ python3 scripts/ck_chat.py --help</pre>
             'export CK_NAME=' + name,
             'export RUN=$HOME/.cache/ck-engine-v7/models/train/$CK_NAME',
             'export DATA_DIR=$ROOT/version/v7/data',
-            'export GEN_DIR=$DATA_DIR/generated',
+            'export GEN_DIR=$RUN/data',
             'export TOKENIZER_CORPUS=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
             'export PRETRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
             'export MIDTRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_b.txt',
@@ -2392,13 +2401,16 @@ python3 scripts/ck_chat.py --help</pre>
             'fi',
             'echo "[token-budget] mode=$CK_TOTAL_MODE total_tokens=$CK_TOTAL_TOKENS"',
             '',
-            '# optional helper script (same config)',
-            'bash version/v7/scripts/v7_train_init_preset.sh \\',
-            '  --name "' + name + '" \\',
-            '  --template ' + family + ' --init ' + init + ' --tokenizer ' + tokenizer + ' --optimizer ' + optimizer + ' \\',
-            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
-            '  --context-len ' + contextLen + ' --vocab-size ' + vocab + ' \\',
-            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --mode both',
+            '# build stage datasets (required before bootstrap)',
+            'mkdir -p "$GEN_DIR" "$RUN"',
+            'python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \\',
+            '  --out-dir "$GEN_DIR" \\',
+            '  --prefix "$CK_NAME" \\',
+            '  --assets-glob "$ROOT/docs/site/assets/*.svg"',
+            'python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \\',
+            '  --out-dir "$GEN_DIR" \\',
+            '  --prefix "$CK_NAME" \\',
+            '  --num-samples 1000 --jsonl',
             '',
             '# bootstrap tokenizer + manifest',
             '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',

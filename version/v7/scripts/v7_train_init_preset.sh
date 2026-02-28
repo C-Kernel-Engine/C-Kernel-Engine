@@ -159,7 +159,7 @@ export CK_LR_SFT="$LR_SFT"
 
 export RUN="\$HOME/.cache/ck-engine-v7/models/train/\$CK_NAME"
 export DATA_DIR="\$ROOT/version/v7/data"
-export GEN_DIR="\$DATA_DIR/generated"
+export GEN_DIR="\$RUN/data"
 export CK_PREFIX="\$CK_NAME"
 export TOKENIZER_CORPUS="\$GEN_DIR/\${CK_PREFIX}_stage_a_plus_bridge.txt"
 export PRETRAIN_DATA="\$GEN_DIR/\${CK_PREFIX}_stage_a_plus_bridge.txt"
@@ -170,6 +170,7 @@ EOF
 
 emit_commands() {
   cat <<'EOF'
+# NOTE: generator output only; commands below are NOT auto-executed.
 # Build staged corpora and instruction data
 mkdir -p "$GEN_DIR" "$RUN"
 
@@ -277,6 +278,7 @@ case "$MODE" in
   env) emit_env ;;
   commands) emit_commands ;;
   both)
+    printf '# NOTE: generator output only; commands below are NOT auto-executed.\n\n'
     emit_env
     printf '\n'
     emit_commands
