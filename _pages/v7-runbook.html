@@ -87,6 +87,14 @@
     .runbook-hero {
         grid-template-columns: 1fr;
     }
+    .preset-grid {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+}
+@media (max-width: 560px) {
+    .preset-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ── Step headings ───────────────────────────────────────────────────── */
@@ -184,6 +192,52 @@
     border: 1px solid rgba(255,180,0,0.3);
     color: #ffb400;
     vertical-align: middle;
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 0.6rem;
+    margin: 0.5rem 0 0.8rem;
+}
+.preset-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.preset-field label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+}
+.preset-field input,
+.preset-field select {
+    background: var(--dark-lighter);
+    color: var(--white);
+    border: 1px solid var(--grey);
+    border-radius: 6px;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.82rem;
+}
+.preset-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.6rem;
+}
+.preset-btn {
+    border: 1px solid var(--grey-light);
+    background: var(--dark-lighter);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.28rem 0.6rem;
+    cursor: pointer;
+}
+.preset-btn:hover {
+    color: var(--white);
+    border-color: var(--orange);
 }
 </style>
 
@@ -312,6 +366,8 @@
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#47b475;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Training Path</div>
     <ul>
         <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
+        <li><a href="#step-0-0-config-init"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.0</span> Config Init Generator</a></li>
+        <li><a href="#step-0a-pipeline-bootstrap"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0A</span> Pipeline Bootstrap</a></li>
         <li><a href="#step-0-clean-start"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.1</span> Clean Start</a></li>
         <li><a href="#step-0-data-prep"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.5</span> Data Prep</a></li>
         <li><a href="#step-0-data-scale"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.55</span> Scale Corpus</a></li>
@@ -333,6 +389,7 @@
     <ul>
         <li><a href="#step-6-infer-trained"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">6</span> Build Inference</a></li>
         <li><a href="#step-7-visualizer"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">7</span> IR Visualizer</a></li>
+        <li><a href="#step-7-1-live-monitor"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.15);border-color:rgba(71,180,117,0.4);color:#7de59f;">7.1</span> Live Monitor</a></li>
         <li><a href="#step-8-inference"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8</span> GGUF Inference</a></li>
         <li><a href="#step-8-visualize-hf"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8.1</span> HF Visualizer</a></li>
     </ul>
@@ -594,6 +651,144 @@ python3 version/v7/tools/open_ir_hub.py --open
     <p class="mini-note"><strong>Guardrail:</strong> keep <code>RUN</code> under <code>$HOME/.cache/ck-engine-v7/models/train/...</code> for automatic hub indexing. Repo-local run dirs are easy to forget and usually need manual move/symlink later.</p>
 </div>
 
+<h2 id="step-0-0-config-init">Step 0.0: Config Init Generator (Recommended)</h2>
+
+<div class="card card-accent">
+    <p style="margin-bottom: 0.45rem;">Set model shape once (name/layers/embed/context/vocab), then auto-generate the full export + command block with consistent run/data paths.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Print exports + full command plan (copy/paste result)
+bash version/v7/scripts/v7_train_init_preset.sh \
+  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 \
+  --embed-dim 128 \
+  --hidden-dim 512 \
+  --context-len 512 \
+  --vocab-size 1024 \
+  --num-heads 8 \
+  --num-kv-heads 4 \
+  --mode both
+
+# Optional: apply exports directly in current shell
+eval "$(bash version/v7/scripts/v7_train_init_preset.sh \
+  --name svg_l16_d128_h512_v1024_ctx512_clean02 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 512 --vocab-size 1024 --mode env)"</pre>
+    </div>
+    <div class="variant-box">
+        <h3>Interactive Config Builder (JS)</h3>
+        <p>Pick model settings, then click <strong>Generate</strong> to produce copy-ready commands for this runbook.</p>
+        <p class="mini-note"><strong>Preset note:</strong> family defaults here are toy-scale operator starters (not exact published model sizes).</p>
+        <div class="preset-grid">
+            <div class="preset-field"><label for="cfg-name">Run Name</label><input id="cfg-name" type="text" value="svg_l16_d128_h512_v1024_ctx512_clean02" /></div>
+            <div class="preset-field"><label for="cfg-family">Model Family</label><select id="cfg-family"><option value="qwen3" selected>qwen3</option><option value="qwen2">qwen2</option><option value="gemma3">gemma3</option><option value="llama">llama</option></select></div>
+            <div class="preset-field"><label for="cfg-init">Init</label><select id="cfg-init"><option value="xavier_uniform" selected>xavier_uniform</option><option value="xavier_normal">xavier_normal</option><option value="normal_0p02">normal_0p02</option><option value="kaiming_uniform">kaiming_uniform</option><option value="zeros">zeros</option></select></div>
+            <div class="preset-field"><label for="cfg-tokenizer">Tokenizer</label><select id="cfg-tokenizer"><option value="ascii_bpe" selected>ascii_bpe</option><option value="bpe">bpe</option><option value="byte">byte</option></select></div>
+            <div class="preset-field"><label for="cfg-optimizer">Optimizer</label><select id="cfg-optimizer"><option value="adamw" selected>adamw</option><option value="sgd">sgd</option></select></div>
+
+            <div class="preset-field"><label for="cfg-layers">Layers</label><input id="cfg-layers" type="number" min="1" value="16" /></div>
+            <div class="preset-field"><label for="cfg-embed">Embed Dim</label><input id="cfg-embed" type="number" min="1" value="128" /></div>
+            <div class="preset-field"><label for="cfg-hidden">Hidden Dim</label><input id="cfg-hidden" type="number" min="1" value="512" /></div>
+            <div class="preset-field"><label for="cfg-context">Context Len</label><input id="cfg-context" type="number" min="1" value="512" /></div>
+
+            <div class="preset-field"><label for="cfg-vocab">Vocab Size</label><input id="cfg-vocab" type="number" min="2" value="1024" /></div>
+            <div class="preset-field"><label for="cfg-heads">Num Heads</label><input id="cfg-heads" type="number" min="1" value="8" /></div>
+            <div class="preset-field"><label for="cfg-kv-heads">Num KV Heads</label><input id="cfg-kv-heads" type="number" min="1" value="4" /></div>
+            <div class="preset-field"><label for="cfg-seq">Seq Len</label><input id="cfg-seq" type="number" min="1" value="512" /></div>
+
+            <div class="preset-field"><label for="cfg-lr-pre">LR Pretrain</label><input id="cfg-lr-pre" type="text" value="3e-4" /></div>
+            <div class="preset-field"><label for="cfg-lr-mid">LR Midtrain</label><input id="cfg-lr-mid" type="text" value="3e-4" /></div>
+            <div class="preset-field"><label for="cfg-lr-sft">LR SFT</label><input id="cfg-lr-sft" type="text" value="1e-4" /></div>
+        </div>
+        <details style="margin:0.35rem 0 0.6rem;">
+            <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.8rem;">Advanced: token budget override</summary>
+            <div class="preset-grid" style="margin-top:0.5rem;">
+                <div class="preset-field"><label for="cfg-total-mode">Total Tokens Mode</label><select id="cfg-total-mode"><option value="auto" selected>auto (from tokenized dataset)</option><option value="manual">manual override</option></select></div>
+                <div class="preset-field"><label for="cfg-tokens">Total Tokens (manual only)</label><input id="cfg-tokens" type="number" min="1" value="1048576" /></div>
+            </div>
+            <p class="mini-note">Auto mode reads pretrain token count from <code>$RUN/training_pipeline_latest.json</code> after <code>--prepare-only</code>.</p>
+        </details>
+        <div class="preset-actions">
+            <button class="preset-btn" id="cfg-apply-family" type="button">Apply Family Defaults</button>
+            <button class="preset-btn" id="cfg-auto-name" type="button">Auto-Name</button>
+            <button class="preset-btn" id="cfg-generate" type="button">Generate Commands</button>
+        </div>
+        <div class="cmd-block" style="margin-top: 0.2rem;">
+            <button class="copy-btn" type="button">Copy</button>
+<pre id="cfg-output"># Click "Generate Commands" to populate this block.</pre>
+        </div>
+    </div>
+    <p class="mini-note">The helper derives <code>RUN</code> under <code>$HOME/.cache/ck-engine-v7/models/train/$CK_NAME</code> and binds stage dataset paths using the same prefix, so the IR hub and visualizer stay aligned.</p>
+    <div class="step-produces">
+        <span class="produces-label">Produces:</span>
+        <span class="produces-item">$RUN path from config name</span>
+        <span class="produces-item">consistent stage dataset paths</span>
+        <span class="produces-item item-json">copyable train command set</span>
+    </div>
+</div>
+
+<h2 id="step-0a-pipeline-bootstrap">Step 0A: Pipeline Bootstrap (Recommended)</h2>
+
+<div class="card card-blue">
+    <p style="margin-bottom: 0.45rem;">Use this once per new run to make the training pipeline explicit from the start: generate staged datasets, lock tokenizer corpus, seed run artifacts, and generate the first operator view.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># 1) Build staged SVG corpora + instruction corpus
+export GEN_DIR="$DATA_DIR/generated"
+mkdir -p "$GEN_DIR"
+
+python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
+  --out-dir "$GEN_DIR" \
+  --prefix svg_pretrain_pack_l16d128 \
+  --assets-glob "$ROOT/docs/site/assets/*.svg"
+
+python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \
+  --out-dir "$GEN_DIR" \
+  --prefix svg_pretrain_pack_l16d128 \
+  --num-samples 1000 --jsonl
+
+# 2) Canonical stage dataset bindings for this run
+export TOKENIZER_CORPUS="$GEN_DIR/svg_pretrain_pack_l16d128_stage_a_plus_bridge.txt"
+export PRETRAIN_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_stage_a_plus_bridge.txt"
+export MIDTRAIN_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_stage_b.txt"
+export SFT_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_instruction_train.txt"
+
+# 3) Bootstrap run + tokenizer artifacts (no training yet)
+.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \
+  --run "$RUN" \
+  --init-if-missing \
+  --init xavier_uniform \
+  --template qwen3 \
+  --curriculum-stage stage_a \
+  --tokenizer ascii_bpe \
+  --require-svg-rows \
+  --strict-data-gates \
+  --data "$TOKENIZER_CORPUS" \
+  --vocab-size 1024 --bpe-vocab-size 1024 \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --seq-len 512 --total-tokens 1048576 \
+  --prepare-only \
+  --json-out "$RUN/train_prepare_stage_a.json"
+
+# 4) Generate initial operator artifacts
+python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts
+python3 version/v7/tools/open_ir_hub.py --open</pre>
+    </div>
+    <p class="mini-note"><strong>Canonical path:</strong> Step 0A is the real bootstrap path. Use Step 0.7 only as a tiny tokenizer preview smoke-check (it uses stub dims and should not be your production bootstrap).</p>
+    <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
+    <div class="step-produces">
+        <span class="produces-label">Produces:</span>
+        <span class="produces-item item-json">$RUN/train_prepare_stage_a.json</span>
+        <span class="produces-item item-json">$RUN/training_pipeline_latest.json</span>
+        <span class="produces-item item-html">$RUN/ir_report.html</span>
+        <span class="produces-item">$HOME/.cache/ck-engine-v7/models/ir_hub.html</span>
+    </div>
+</div>
+
 <h2 id="step-0-clean-start">Step 0.1: Clean Start (Optional)</h2>
 
 <div class="card">
@@ -838,6 +1033,7 @@ perl -ne 'if (/[^\x00-\x7F]/) { print "$.:$_"; $c++; exit if $c >= 20 }' "$DATA_
 <h2 id="step-0-tokenize">Step 0.7: Tokenize Dataset (true_bpe preview)</h2>
 
 <div class="card">
+    <p class="mini-note"><strong>Optional preview only:</strong> skip this if you already ran Step 0A. Step 0.7 is a quick tokenizer smoke-check path with intentionally tiny/stub dims.</p>
     <p style="margin-bottom: 0.4rem;">Create tokenizer artifacts and a token stream in the main run so operators use one dashboard path from start to finish.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -929,10 +1125,10 @@ jq '{status, exact_match, tokenizer_json_path, line_eval, sample_rows: (.sample_
     <span class="produces-item item-json">tokenizer_roundtrip.json</span>
 </div>
 
-<h2 id="step-2-training-setup">Step 2: Training Setup (true_bpe)</h2>
+<h2 id="step-2-training-setup">Step 2: Optional Alternative Data Ingestion (true_bpe)</h2>
 
 <div class="card">
-    <p>Training input must be a <strong>UTF-8 text file</strong>. If you use the bundled demo file, skip this section and go straight to Step 3.1.</p>
+    <p>This section is an alternative ingest path. Step 0.5 already covers the canonical data-prep flow; if you completed Step 0.5, skip this section and go straight to Step 3.1.</p>
     <div class="grid grid-2">
         <div>
             <h3 style="margin-top: 0;">JSONL -> text with <code>jq</code></h3>
@@ -1557,6 +1753,102 @@ xdg-open "$RUN/ir_report.html" >/dev/null 2>&1 || true</pre>
     </table>
 </div>
 
+<h2 id="step-7-1-live-monitor">Step 7.1: Live Training Monitor</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom:0.55rem;">
+        Watch loss, grad norm, step count, and tok/s update in real-time while training is running —
+        no need to regenerate the report or restart the training process.
+        Open a second terminal alongside your training run and pick the path that suits your setup.
+    </p>
+
+    <h3 style="margin-top:0;">Path A — Zero-config (python3 -m http.server)</h3>
+    <p style="margin-bottom:0.35rem;">
+        Works with <strong>any</strong> static HTTP server.
+        The visualizer auto-detects it is served over HTTP (not <code>file://</code>) and
+        starts polling the JSON artifact files that live next to <code>ir_report.html</code>.
+        No flags, no server code — just stdlib.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># In a second terminal while training is running:
+python3 -m http.server 7700 -d "$RUN"
+
+# Open in browser:
+xdg-open http://localhost:7700/ir_report.html 2>/dev/null || \
+  echo "Open: http://localhost:7700/ir_report.html"</pre>
+    </div>
+    <p class="mini-note">
+        <code>$RUN</code> is the training run directory (e.g.
+        <code>~/.cache/ck-engine-v7/models/train/svg_l16_d128_h512_v1024_ctx512</code>).
+        The <code>ir_report.html</code> must already exist in that directory (generated in Step 7 or by the
+        training pipeline's <code>--generate-visualizer</code> flag).
+    </p>
+
+    <h3>Path B — Custom live server (single snapshot endpoint)</h3>
+    <p style="margin-bottom:0.35rem;">
+        Generates a fresh report and starts a dedicated HTTP server that exposes a
+        <code>/api/snapshot</code> endpoint — one request per poll cycle instead of N file fetches.
+        Injects <code>window.CK_LIVE_MODE</code> automatically so the visualizer uses the snapshot path.
+    </p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Generates report, starts server, opens browser:
+.venv/bin/python version/v7/tools/open_ir_visualizer.py \
+  --run "$RUN" \
+  --html-only \
+  --live \
+  --live-port 7700 \
+  --live-interval 4000
+
+# Press Ctrl+C to stop the server when done.</pre>
+    </div>
+    <p class="mini-note">
+        <code>--live-interval</code> is in milliseconds (default 5000 = 5 s).
+        Reduce to 2000–3000 for faster feedback during early training.
+    </p>
+
+    <h3>What the live bar shows</h3>
+    <p style="margin-bottom:0.35rem;">
+        A fixed status bar appears at the bottom of every page while live mode is active:
+    </p>
+    <div style="background:#07100a;border:1px solid rgba(71,180,117,0.28);border-radius:6px;padding:0.45rem 0.9rem;font-family:monospace;font-size:0.8rem;color:#9ca3af;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#47b475;box-shadow:0 0 5px #47b475;flex-shrink:0;"></span>
+        <span style="color:#6ee7b7;font-weight:700;">LIVE</span>
+        <span>↺ step 42 · loss 3.2401 · 92.1 tok/s</span>
+        <span style="color:#6b7280;font-size:0.72rem;">·  just now</span>
+        <span style="margin-left:auto;color:#374151;font-size:0.72rem;">file poll · 5s</span>
+        <span style="border:1px solid rgba(255,255,255,0.1);border-radius:3px;color:#6b7280;font-size:0.72rem;padding:0.1rem 0.4rem;">stop</span>
+    </div>
+    <table>
+        <tr><th>Field</th><th>Source file</th><th>What to watch for</th></tr>
+        <tr><td><code>step N</code></td><td><code>training_checkpoint_policy_latest.json</code></td><td>Steps should increment steadily; gaps indicate stalls or restarts.</td></tr>
+        <tr><td><code>loss X.XXXX</code></td><td><code>training_loss_curve_latest.json</code></td><td>Healthy curve trends down. Spikes (&gt;2× recent baseline) may signal LR or data issues.</td></tr>
+        <tr><td><code>X tok/s</code></td><td><code>training_step_profile_latest.json</code></td><td>Drop in tok/s without loss spike → hardware throttle or memory pressure.</td></tr>
+        <tr><td><code>↺</code> prefix</td><td>—</td><td>Appears when any artifact changed this cycle. Absent = no new steps yet.</td></tr>
+    </table>
+    <p class="mini-note">
+        <strong>Which files are polled:</strong>
+        <code>training_loss_curve_latest.json</code>,
+        <code>training_grad_norms_latest.json</code>,
+        <code>training_parity_latest.json</code>,
+        <code>training_step_profile_latest.json</code>,
+        <code>training_checkpoint_policy_latest.json</code>.
+        All are &lt;5 KB and written atomically after each step by the training harness.
+        The active training tab (Train Dashboard, Grad Health, Parity, etc.) re-renders automatically on each change.
+    </p>
+    <p class="mini-note">
+        <strong>Stage detection:</strong> the active curriculum stage (<code>active_stage</code>,
+        <code>curriculum_stage</code>) is embedded from the last report generation.
+        It updates automatically if you regenerate the report mid-run:
+        <code>python3 version/v7/tools/open_ir_visualizer.py --run "$RUN" --html-only</code>
+        (no server restart needed for Path A — just refresh the browser after regeneration).
+    </p>
+    <div class="step-produces">
+        <span class="produces-item item-html">ir_report.html (live via HTTP)</span>
+    </div>
+</div>
+
 <h2 id="step-8-inference">Step 8: Inference from GGUF (HF URLs)</h2>
 
 <div class="card card-blue">
@@ -2004,6 +2296,194 @@ python3 scripts/ck_chat.py --help</pre>
             });
         });
     });
+
+    /* ── Config generator (Step 0.0) ─────────────────────────── */
+    var FAMILY_PRESETS = {
+        qwen3: { layers: 16, embed: 128, hidden: 512, context: 512, vocab: 1024, heads: 8, kvHeads: 4, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
+        qwen2: { layers: 12, embed: 96, hidden: 384, context: 512, vocab: 1024, heads: 8, kvHeads: 4, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
+        gemma3: { layers: 18, embed: 160, hidden: 640, context: 1024, vocab: 1536, heads: 10, kvHeads: 5, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1572864, lrPre: '2e-4', lrMid: '2e-4', lrSft: '1e-4' },
+        llama: { layers: 16, embed: 128, hidden: 512, context: 1024, vocab: 1024, heads: 8, kvHeads: 8, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' }
+    };
+    function _cfgEl(id) { return document.getElementById(id); }
+    function _cfgVal(id, fallback) {
+        var el = _cfgEl(id);
+        if (!el) return fallback;
+        var v = (el.value || '').trim();
+        return v === '' ? fallback : v;
+    }
+    function _setCfgVal(id, value) {
+        var el = _cfgEl(id);
+        if (el && value !== undefined && value !== null) el.value = String(value);
+    }
+    function _applyFamilyDefaults() {
+        var family = _cfgVal('cfg-family', 'qwen3');
+        var p = FAMILY_PRESETS[family] || FAMILY_PRESETS.qwen3;
+        _setCfgVal('cfg-layers', p.layers);
+        _setCfgVal('cfg-embed', p.embed);
+        _setCfgVal('cfg-hidden', p.hidden);
+        _setCfgVal('cfg-context', p.context);
+        _setCfgVal('cfg-vocab', p.vocab);
+        _setCfgVal('cfg-heads', p.heads);
+        _setCfgVal('cfg-kv-heads', p.kvHeads);
+        _setCfgVal('cfg-tokenizer', p.tokenizer);
+        _setCfgVal('cfg-init', p.init);
+        _setCfgVal('cfg-optimizer', p.optimizer);
+        _setCfgVal('cfg-seq', p.seq);
+        _setCfgVal('cfg-tokens', p.tokens);
+        _setCfgVal('cfg-lr-pre', p.lrPre);
+        _setCfgVal('cfg-lr-mid', p.lrMid);
+        _setCfgVal('cfg-lr-sft', p.lrSft);
+    }
+    function _autoName() {
+        var layers = _cfgVal('cfg-layers', '16');
+        var embed = _cfgVal('cfg-embed', '128');
+        var hidden = _cfgVal('cfg-hidden', '512');
+        var vocab = _cfgVal('cfg-vocab', '1024');
+        var ctx = _cfgVal('cfg-context', '512');
+        var family = _cfgVal('cfg-family', 'qwen3');
+        return family + '_l' + layers + '_d' + embed + '_h' + hidden + '_v' + vocab + '_ctx' + ctx;
+    }
+    function _renderConfigBlock() {
+        var name = _cfgVal('cfg-name', _autoName());
+        var family = _cfgVal('cfg-family', 'qwen3');
+        var init = _cfgVal('cfg-init', 'xavier_uniform');
+        var tokenizer = _cfgVal('cfg-tokenizer', 'ascii_bpe');
+        var optimizer = _cfgVal('cfg-optimizer', 'adamw');
+        var layers = _cfgVal('cfg-layers', '16');
+        var embed = _cfgVal('cfg-embed', '128');
+        var hidden = _cfgVal('cfg-hidden', '512');
+        var contextLen = _cfgVal('cfg-context', '512');
+        var vocab = _cfgVal('cfg-vocab', '1024');
+        var heads = _cfgVal('cfg-heads', '8');
+        var kvHeads = _cfgVal('cfg-kv-heads', '4');
+        var seqLen = _cfgVal('cfg-seq', contextLen);
+        var totalMode = _cfgVal('cfg-total-mode', 'auto');
+        var totalTokensManual = _cfgVal('cfg-tokens', '1048576');
+        var seqNum = parseInt(seqLen, 10);
+        if (!Number.isFinite(seqNum) || seqNum < 1) seqNum = 512;
+        var fallbackTotalTokens = String(seqNum * 2048);
+        var lrPre = _cfgVal('cfg-lr-pre', '3e-4');
+        var lrMid = _cfgVal('cfg-lr-mid', '3e-4');
+        var lrSft = _cfgVal('cfg-lr-sft', '1e-4');
+        var bpeArgs = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' \\\n  --vocab-size ' + vocab + ' --bpe-vocab-size ' + vocab : '';
+        var reuseTok = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' --reuse-run-tokenizer' : '';
+
+        var lines = [
+            'export ROOT=/home/antshiv/Workspace/C-Kernel-Engine',
+            'export CK_NAME=' + name,
+            'export RUN=$HOME/.cache/ck-engine-v7/models/train/$CK_NAME',
+            'export DATA_DIR=$ROOT/version/v7/data',
+            'export GEN_DIR=$DATA_DIR/generated',
+            'export TOKENIZER_CORPUS=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
+            'export PRETRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_a_plus_bridge.txt',
+            'export MIDTRAIN_DATA=$GEN_DIR/${CK_NAME}_stage_b.txt',
+            'export SFT_DATA=$GEN_DIR/${CK_NAME}_instruction_train.txt',
+            'export CK_TOTAL_MODE=' + totalMode,
+            'export CK_TOTAL_TOKENS_MANUAL=' + totalTokensManual,
+            '',
+            '# total token budget (auto from prepare-only manifest, or manual override)',
+            'if [ "$CK_TOTAL_MODE" = "manual" ]; then',
+            '  export CK_TOTAL_TOKENS="$CK_TOTAL_TOKENS_MANUAL"',
+            'else',
+            '  export CK_TOTAL_TOKENS="$(jq -r \'[.pipeline.stages[]? | select(.stage==\"pretrain\") | .datasets[]?.token_count // empty] | first // 0\' \"$RUN/training_pipeline_latest.json\" 2>/dev/null || echo 0)"',
+            '  if [ -z "$CK_TOTAL_TOKENS" ] || [ "$CK_TOTAL_TOKENS" = "0" ] || [ "$CK_TOTAL_TOKENS" = "null" ]; then',
+            '    export CK_TOTAL_TOKENS=' + fallbackTotalTokens,
+            '  fi',
+            'fi',
+            'echo "[token-budget] mode=$CK_TOTAL_MODE total_tokens=$CK_TOTAL_TOKENS"',
+            '',
+            '# optional helper script (same config)',
+            'bash version/v7/scripts/v7_train_init_preset.sh \\',
+            '  --name "' + name + '" \\',
+            '  --template ' + family + ' --init ' + init + ' --tokenizer ' + tokenizer + ' --optimizer ' + optimizer + ' \\',
+            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+            '  --context-len ' + contextLen + ' --vocab-size ' + vocab + ' \\',
+            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --mode both',
+            '',
+            '# bootstrap tokenizer + manifest',
+            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+            '  --run "$RUN" --init-if-missing --init ' + init + ' \\',
+            '  --template ' + family + ' --curriculum-stage stage_a \\',
+            '  --tokenizer ' + tokenizer + ' --require-svg-rows --strict-data-gates \\',
+            '  --data "$TOKENIZER_CORPUS"' + bpeArgs + ' \\',
+            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+            '  --optimizer ' + optimizer + ' \\',
+            '  --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --prepare-only',
+            '',
+            '# stage_a pretrain',
+            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+            '  --run "$RUN" --curriculum-stage stage_a --tokenizer ' + tokenizer + ' --require-svg-rows --strict-data-gates \\',
+            '  --data "$PRETRAIN_DATA"' + bpeArgs + ' \\',
+            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+            '  --optimizer ' + optimizer + ' \\',
+            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrPre,
+            '',
+            '# REQUIRED: parity gates before long/full runs',
+            '#   Step 3.1: v7-runbook.html#step-3-5-parity-gate',
+            '.venv/bin/python version/v7/scripts/run_training_parity_regimen_v7.py \\',
+            '  --run-dir "$RUN" \\',
+            '  --json-out "$RUN/training_parity_regimen_latest.json" \\',
+            '  --md-out "$RUN/training_parity_regimen_latest.md"',
+            '',
+            '# stage_b midtrain',
+            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+            '  --run "$RUN" --curriculum-stage stage_b --tokenizer ' + tokenizer + reuseTok + ' --require-svg-rows --strict-data-gates \\',
+            '  --data "$MIDTRAIN_DATA" \\',
+            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+            '  --optimizer ' + optimizer + ' \\',
+            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrMid,
+            '',
+            '# sft',
+            '.venv/bin/python version/v7/scripts/train_data_pipeline_v7.py \\',
+            '  --run "$RUN" --curriculum-stage sft --tokenizer ' + tokenizer + reuseTok + ' --strict-data-gates \\',
+            '  --data "$SFT_DATA" \\',
+            '  --layers ' + layers + ' --embed-dim ' + embed + ' --hidden-dim ' + hidden + ' \\',
+            '  --num-heads ' + heads + ' --num-kv-heads ' + kvHeads + ' --context-len ' + contextLen + ' \\',
+            '  --optimizer ' + optimizer + ' \\',
+            '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --lr ' + lrSft,
+            '',
+            '# refresh dashboards',
+            'python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts',
+            'python3 version/v7/tools/open_ir_hub.py --open'
+        ];
+        var out = _cfgEl('cfg-output');
+        if (out) out.textContent = lines.join('\n');
+    }
+    var autoBtn = _cfgEl('cfg-auto-name');
+    if (autoBtn) {
+        autoBtn.addEventListener('click', function () {
+            var nameEl = _cfgEl('cfg-name');
+            if (nameEl) nameEl.value = _autoName();
+            _renderConfigBlock();
+        });
+    }
+    var applyFamilyBtn = _cfgEl('cfg-apply-family');
+    if (applyFamilyBtn) {
+        applyFamilyBtn.addEventListener('click', function () {
+            _applyFamilyDefaults();
+            var nameEl = _cfgEl('cfg-name');
+            if (nameEl && (!nameEl.value || nameEl.value.trim() === '')) nameEl.value = _autoName();
+            _renderConfigBlock();
+        });
+    }
+    var familyEl = _cfgEl('cfg-family');
+    if (familyEl) {
+        familyEl.addEventListener('change', function () {
+            _applyFamilyDefaults();
+            var nameEl = _cfgEl('cfg-name');
+            if (nameEl && (!nameEl.value || nameEl.value.trim() === '' || nameEl.value.indexOf('_l') > -1)) {
+                nameEl.value = _autoName();
+            }
+            _renderConfigBlock();
+        });
+    }
+    var genBtn = _cfgEl('cfg-generate');
+    if (genBtn) genBtn.addEventListener('click', _renderConfigBlock);
+    if (_cfgEl('cfg-family')) _applyFamilyDefaults();
+    if (_cfgEl('cfg-output')) _renderConfigBlock();
 
     /* ── Step heading badges ──────────────────────────────────── */
     // Maps step-number string → tag info. Entries in parens in the title are
