@@ -2586,9 +2586,209 @@ def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> 
         }
 
     optimizer_hparams = summary.get("optimizer_hparams") if isinstance(summary.get("optimizer_hparams"), dict) else {}
+    train_dims_payload = summary.get("train_dims") if isinstance(summary.get("train_dims"), dict) else {}
+    effective_dims = train_dims_payload.get("effective") if isinstance(train_dims_payload.get("effective"), dict) else {}
+    requested_dims = train_dims_payload.get("requested") if isinstance(train_dims_payload.get("requested"), dict) else {}
+    resolved_dims = train_dims_payload.get("resolved") if isinstance(train_dims_payload.get("resolved"), dict) else {}
+
+    def _dim(*names: str, default: int = 0) -> int:
+        for src in (effective_dims, resolved_dims, requested_dims):
+            if not isinstance(src, dict):
+                continue
+            for name in names:
+                val = src.get(name)
+                if isinstance(val, (int, float)):
+                    return int(val)
+        return int(default)
+
+    model_contract = {
+        "family": str(tokenizer_lineage.get("template") or "unknown"),
+        "layers": _dim("num_layers", "layers"),
+        "embed_dim": _dim("d_model", "embed_dim"),
+        "hidden_dim": _dim("hidden", "hidden_dim"),
+        "num_heads": _dim("num_heads"),
+        "num_kv_heads": _dim("num_kv_heads"),
+        "context_len": _dim("context_length", "context_len", "context"),
+        "vocab_size": _dim("vocab", "vocab_size"),
+    }
+
+    tokenizer_inputs = []
+    corpora = tokenizer_lineage.get("tokenizer_corpora")
+    if isinstance(corpora, list):
+        for row in corpora:
+            if not isinstance(row, dict):
+                continue
+            tokenizer_inputs.append(
+                {
+                    "name": row.get("name"),
+                    "path": row.get("source_path"),
+                    "rows": row.get("rows"),
+                    "tokens": row.get("token_count"),
+                    "bytes": row.get("byte_size"),
+                    "sha256": row.get("sha256"),
+                    "source": "tokenizer_lineage.tokenizer_corpora",
+                }
+            )
+    if not tokenizer_inputs:
+        for row in data_entries:
+            if not isinstance(row, dict):
+                continue
+            tokenizer_inputs.append(
+                {
+                    "name": row.get("dataset_name"),
+                    "path": row.get("source_path"),
+                    "rows": row.get("rows"),
+                    "tokens": row.get("token_count"),
+                    "bytes": row.get("byte_size"),
+                    "sha256": (row.get("hash") or {}).get("value") if isinstance(row.get("hash"), dict) else None,
+                    "source": "data_provenance",
+                }
+            )
+            break
+    data_by_stage = {}
+    for row in data_entries:
+        if not isinstance(row, dict):
+            continue
+        st = str(row.get("stage") or "").strip().lower()
+        if st and st not in data_by_stage:
+            data_by_stage[st] = row
+
+    # Preserve previously emitted stage contracts so non-active stages are not
+    # wiped when the current run only reports active-stage provenance.
+    existing_stage_by_name: dict[str, dict[str, Any]] = {}
+    if isinstance(run_dir, Path):
+        existing_doc = _load_json_dict(run_dir / "training_pipeline_latest.json")
+        existing_pipeline = (
+            existing_doc.get("pipeline")
+            if isinstance(existing_doc.get("pipeline"), dict)
+            else {}
+        )
+        existing_rows = (
+            existing_pipeline.get("stages")
+            if isinstance(existing_pipeline.get("stages"), list)
+            else []
+        )
+        for prev in existing_rows:
+            if not isinstance(prev, dict):
+                continue
+            stage_name = str(prev.get("stage") or prev.get("name") or "").strip().lower()
+            if stage_name:
+                existing_stage_by_name[stage_name] = dict(prev)
+
+    data_prep_stage = {
+        "stage": "data_preparation",
+        "stage_id": 0,
+        "status": "done",
+        "type": "dataset_qc_ascii_prepare",
+        "datasets": [
+            {
+                "name": data_entries[0].get("dataset_name"),
+                "path": data_entries[0].get("source_path"),
+                "rows": data_entries[0].get("rows"),
+                "tokens": data_entries[0].get("token_count"),
+                "bytes": data_entries[0].get("byte_size"),
+                "sha256": (data_entries[0].get("hash") or {}).get("value")
+                if isinstance(data_entries[0].get("hash"), dict)
+                else None,
+                "source": "data_provenance",
+            }
+        ] if data_entries else [],
+        "ops": ["dataset_qc", "dataset_profile", "tokenizer_roundtrip"],
+    }
+    existing_data_prep = existing_stage_by_name.get("data_preparation")
+    if isinstance(existing_data_prep, dict):
+        data_prep_stage = dict(existing_data_prep)
+        data_prep_stage["stage"] = "data_preparation"
+        data_prep_stage["stage_id"] = 0
+
+    tokenizer_stage = {
+        "stage": "tokenizer",
+        "stage_id": 1,
+        "status": "built_or_reused",
+        "type": str(tokenizer_lineage.get("type") or "unknown"),
+        "tokenizer": {
+            "type": tokenizer_lineage.get("type"),
+            "vocab_size": tokenizer_lineage.get("vocab_size"),
+            "path": tokenizer_lineage.get("tokenizer_path"),
+            "sha256": tokenizer_lineage.get("tokenizer_sha256"),
+            "reused_run_tokenizer": tokenizer_lineage.get("reused_run_tokenizer"),
+        },
+        "datasets": tokenizer_inputs,
+        "coverage": {
+            "active_dataset_in_corpus": tokenizer_lineage.get("active_dataset_in_tokenizer_corpus"),
+            "status": tokenizer_lineage.get("coverage_status"),
+            "note": tokenizer_lineage.get("coverage_note"),
+        },
+        "ops": ["tokenizer_build_or_reuse"],
+    }
+    existing_tokenizer = existing_stage_by_name.get("tokenizer")
+    if isinstance(existing_tokenizer, dict):
+        tokenizer_stage = dict(existing_tokenizer)
+        tokenizer_stage["stage"] = "tokenizer"
+        tokenizer_stage["stage_id"] = 1
+        if tokenizer_stage.get("status") in (None, ""):
+            tokenizer_stage["status"] = "built_or_reused"
+
+    pipeline_stages = [data_prep_stage, tokenizer_stage]
+    next_stage_id = 2
+    for row in stage_timeline:
+        if not isinstance(row, dict):
+            continue
+        st = str(row.get("stage") or "").strip().lower()
+        if not st:
+            continue
+        prov = data_by_stage.get(st, {})
+        datasets = []
+        if isinstance(prov, dict) and prov:
+            datasets.append(
+                {
+                    "name": prov.get("dataset_name"),
+                    "path": prov.get("source_path"),
+                    "rows": prov.get("rows"),
+                    "tokens": prov.get("token_count"),
+                    "bytes": prov.get("byte_size"),
+                    "sha256": (prov.get("hash") or {}).get("value") if isinstance(prov.get("hash"), dict) else None,
+                    "source": "data_provenance",
+                }
+            )
+        prev_stage = existing_stage_by_name.get(st)
+        prev_datasets = (
+            prev_stage.get("datasets")
+            if isinstance(prev_stage, dict) and isinstance(prev_stage.get("datasets"), list)
+            else None
+        )
+        if st != mode and prev_datasets is not None:
+            datasets = prev_datasets
+        elif st == mode and not datasets and prev_datasets is not None:
+            datasets = prev_datasets
+        tokenizer_coverage = (
+            prev_stage.get("tokenizer_coverage")
+            if isinstance(prev_stage, dict) and isinstance(prev_stage.get("tokenizer_coverage"), dict)
+            else {}
+        )
+        pipeline_stages.append(
+            {
+                "stage": st,
+                "stage_id": int(next_stage_id),
+                "status": str(row.get("status") or "planned"),
+                "type": "training_stage",
+                "datasets": datasets,
+                "tokenizer_coverage": tokenizer_coverage,
+                "ops": ["train"] if st == mode else [],
+            }
+        )
+        next_stage_id += 1
+
     payload = {
         "schema": "ck.training_pipeline.v1",
         "generated_at": _utc_now_iso(),
+        "model": model_contract,
+        "pipeline": {
+            "schema": "ck.training_pipeline_contract.v1",
+            "source_of_truth": "training_pipeline_latest.json",
+            "active_stage": mode,
+            "stages": pipeline_stages,
+        },
         "active_stage": mode,
         "stage_timeline": stage_timeline,
         "backend": str(summary.get("backend") or ""),
@@ -2608,7 +2808,7 @@ def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> 
             "tokens_per_update": tokens_per_update,
             "processed_tokens": processed_tokens,
         },
-        "train_dims": summary.get("train_dims") if isinstance(summary.get("train_dims"), dict) else {},
+        "train_dims": train_dims_payload,
         "data_provenance": data_entries,
         "tokenizer_lineage": tokenizer_lineage,
         "sources": {

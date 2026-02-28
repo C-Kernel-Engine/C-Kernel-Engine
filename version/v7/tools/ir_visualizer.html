@@ -18091,15 +18091,67 @@ function renderDataLabPanel(files) {
             if (c && c.kind === 'active_dataset' && stage) catalogActiveByStage[stage] = c;
         });
     }
+    const stageBindingByStage = {};
+    if (Array.isArray(pipeline.stage_dataset_bindings)) {
+        pipeline.stage_dataset_bindings.forEach((row) => {
+            const stage = normStageName(row && row.stage);
+            if (stage) stageBindingByStage[stage] = row;
+        });
+    }
+    function primaryBindingDataset(stage) {
+        const row = stageBindingByStage[stage];
+        if (!row || !Array.isArray(row.datasets) || row.datasets.length === 0) return null;
+        const datasets = row.datasets.filter((d) => d && typeof d === 'object');
+        if (datasets.length === 0) return null;
+        return datasets.find((d) => d.status === 'ready') || datasets[0];
+    }
     const tokLineage = pipeline.tokenizer_lineage && typeof pipeline.tokenizer_lineage === 'object'
         ? pipeline.tokenizer_lineage : {};
+    const activeStageKey = normStageName(activeStage) || String(activeStage || 'pretrain');
+    const pipelineContract = pipeline.pipeline && typeof pipeline.pipeline === 'object'
+        ? pipeline.pipeline
+        : {};
+    const pipelineSchema = String(pipeline.schema || '').trim();
+    const pipelineContractRows = Array.isArray(pipelineContract.stages)
+        ? pipelineContract.stages
+        : [];
+    const manifestV2Rows = (pipelineSchema === 'ck-pipeline-manifest-v2' && Array.isArray(pipeline.pipeline))
+        ? pipeline.pipeline
+        : [];
+    const strictStageContractRows = pipelineContractRows.length > 0 ? pipelineContractRows : manifestV2Rows;
+    const strictManifestMode = strictStageContractRows.length > 0;
+    const strictStageRowByStage = {};
     const tokCorpusEntry = catalogActiveByStage['pretrain'] || null;
-    const tokCorpusName = (Array.isArray(tokLineage.corpus_datasets) && tokLineage.corpus_datasets.length > 0)
-        ? tokLineage.corpus_datasets[0].name
-        : (tokCorpusEntry ? tokCorpusEntry.name : null);
+    const tokCorpusName = strictManifestMode
+        ? ((Array.isArray(tokLineage.tokenizer_corpora) && tokLineage.tokenizer_corpora.length > 0)
+            ? tokLineage.tokenizer_corpora[0].name
+            : null)
+        : ((Array.isArray(tokLineage.corpus_datasets) && tokLineage.corpus_datasets.length > 0)
+            ? tokLineage.corpus_datasets[0].name
+            : (tokCorpusEntry ? tokCorpusEntry.name : null));
     const tokRtStatus = String((dataLab.tokenizer_roundtrip && dataLab.tokenizer_roundtrip.status) || '—').toUpperCase();
 
     function stageTokCoverage(stage) {
+        if (strictManifestMode) {
+            const strictRow = strictStageRowByStage[stage];
+            const strictDatasets = strictRow && Array.isArray(strictRow.datasets)
+                ? strictRow.datasets.filter((d) => d && typeof d === 'object')
+                : [];
+            const strictDs = strictDatasets.find((d) => d.status === 'ready') || strictDatasets[0] || null;
+            if (strictDs && typeof strictDs.in_tokenizer_corpus === 'boolean') return strictDs.in_tokenizer_corpus;
+            return null;
+        }
+        const bindDs = primaryBindingDataset(stage);
+        if (bindDs && typeof bindDs.in_tokenizer_corpus === 'boolean') return bindDs.in_tokenizer_corpus;
+        const bind = stageBindingByStage[stage];
+        if (bind && bind.tokenizer_coverage && typeof bind.tokenizer_coverage === 'object') {
+            const notIn = Number(bind.tokenizer_coverage.not_in_corpus);
+            const inC = Number(bind.tokenizer_coverage.in_corpus);
+            if (Number.isFinite(notIn) && Number.isFinite(inC)) {
+                if (notIn > 0 && inC === 0) return false;
+                if (inC > 0 && notIn === 0) return true;
+            }
+        }
         const cat = catalogActiveByStage[stage];
         if (cat && typeof cat.tokenizer_coverage === 'boolean') return cat.tokenizer_coverage;
         if (stage === 'pretrain') return true;
@@ -18138,7 +18190,6 @@ function renderDataLabPanel(files) {
         if (s === 'stage_b') return 'midtrain';
         return s;
     }
-    const activeStageKey = normStageName(activeStage) || String(activeStage || 'pretrain');
 
     const stageSequence = pipeline.stage_sequence && typeof pipeline.stage_sequence === 'object'
         ? pipeline.stage_sequence
@@ -18159,7 +18210,34 @@ function renderDataLabPanel(files) {
         }
     };
 
-    if (stageSequenceEntries.length > 0) {
+    if (strictManifestMode) {
+        const strictStages = strictStageContractRows
+            .filter((row) => row && typeof row === 'object')
+            .map((row, idx) => {
+                const stage = normStageName(row.stage || row.name);
+                if (!stage) return null;
+                const type = String(row.type || '').toLowerCase();
+                const isTrainingLike = type === 'training_stage' || type === 'training';
+                if (!isTrainingLike) return null;
+                const stageId = Number(row.stage_id);
+                const seq = Number(row.seq);
+                const key = Number.isFinite(stageId)
+                    ? (stageId + 1)
+                    : (Number.isFinite(seq) ? seq : (idx + 1));
+                return { row, key, idx, stage };
+            })
+            .filter((x) => !!x)
+            .sort((a, b) => (a.key - b.key) || (a.idx - b.idx));
+        for (const item of strictStages) {
+            strictStageRowByStage[item.stage] = item.row;
+            addOrderedStage(item.stage, {
+                seq: item.key,
+                status: item.row.status,
+                active: item.row.active === true || item.stage === activeStageKey,
+                strict: true,
+            });
+        }
+    } else if (stageSequenceEntries.length > 0) {
         const sorted = stageSequenceEntries
             .map((row, idx) => {
                 const seq = Number(row.seq);
@@ -18192,7 +18270,7 @@ function renderDataLabPanel(files) {
             });
         }
     }
-    if (!orderedStages.includes(activeStageKey)) addOrderedStage(activeStageKey);
+    if (!strictManifestMode && !orderedStages.includes(activeStageKey)) addOrderedStage(activeStageKey);
 
     const stageLossHistory = pipeline.stage_loss_history && typeof pipeline.stage_loss_history === 'object'
         ? pipeline.stage_loss_history
@@ -18214,13 +18292,15 @@ function renderDataLabPanel(files) {
             return aa.localeCompare(bb);
         });
     }
-    for (const s of fallbackStageOrder) {
-        if (stageLossByStage[s] && !orderedStages.includes(s)) addOrderedStage(s);
+    if (!strictManifestMode) {
+        for (const s of fallbackStageOrder) {
+            if (stageLossByStage[s] && !orderedStages.includes(s)) addOrderedStage(s);
+        }
+        for (const s of Object.keys(stageLossByStage)) {
+            if (!orderedStages.includes(s)) addOrderedStage(s);
+        }
     }
-    for (const s of Object.keys(stageLossByStage)) {
-        if (!orderedStages.includes(s)) addOrderedStage(s);
-    }
-    if (orderedStages.length === 0) {
+    if (!strictManifestMode && orderedStages.length === 0) {
         addOrderedStage('pretrain');
         addOrderedStage('midtrain');
         addOrderedStage('sft');
@@ -18263,9 +18343,16 @@ function renderDataLabPanel(files) {
         const seqMeta = stageSeqMetaByStage[stage] && typeof stageSeqMetaByStage[stage] === 'object'
             ? stageSeqMetaByStage[stage]
             : {};
+        const strictRow = strictManifestMode && strictStageRowByStage[stage] && typeof strictStageRowByStage[stage] === 'object'
+            ? strictStageRowByStage[stage]
+            : null;
         const t = timelineByStage[stage] || {};
-        const status = String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
-        const isActive = Boolean(t.active === true || seqMeta.active === true || stage === activeStageKey);
+        const status = strictManifestMode
+            ? String((strictRow && strictRow.status) || (stage === activeStageKey ? 'active' : 'planned'))
+            : String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
+        const isActive = strictManifestMode
+            ? Boolean((strictRow && strictRow.active === true) || stage === activeStageKey || status === 'active')
+            : Boolean(t.active === true || seqMeta.active === true || stage === activeStageKey);
         const tone = stageTone(status);
         const chip = statusPill(status, tone);
         const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
@@ -18274,23 +18361,33 @@ function renderDataLabPanel(files) {
         const arts = Array.isArray(data.artifacts) ? data.artifacts : [];
         const cat = catalogActiveByStage[stage] || {};
         const prov = provByStage[stage] || {};
+        const bindDs = strictManifestMode
+            ? (() => {
+                const rows = strictRow && Array.isArray(strictRow.datasets)
+                    ? strictRow.datasets.filter((d) => d && typeof d === 'object')
+                    : [];
+                return rows.find((d) => d.status === 'ready') || rows[0] || {};
+            })()
+            : (primaryBindingDataset(stage) || {});
         const lossRuns = stageLossByStage[normStageName(stage)] || [];
         const latestLossRun = lossRuns.length > 0 ? lossRuns[lossRuns.length - 1] : null;
-        const dsName = data.dataset_name || cat.name || prov.dataset_name || (latestLossRun && latestLossRun.dataset_name) || null;
+        const dsName = strictManifestMode
+            ? (bindDs.name || null)
+            : (bindDs.name || data.dataset_name || cat.name || prov.dataset_name || (latestLossRun && latestLossRun.dataset_name) || null);
         const covered = stageTokCoverage(stage);
         const hasLoss = latestLossRun && Number.isFinite(Number(latestLossRun.first_loss)) && Number.isFinite(Number(latestLossRun.final_loss));
         const dropPct = hasLoss ? Number(latestLossRun.drop_pct) : NaN;
 
         stageCardMeta[stage] = {
             status, isActive, dsName,
-            dsRows: cat.rows || null,
-            dsTok: data.token_count || prov.token_count || (latestLossRun && latestLossRun.total_tokens) || null,
-            byteSize: prov.byte_size || null,
-            sourcePath: data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.source_path) || null,
-            rawSourcePath: data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.raw_source_path) || null,
+            dsRows: strictManifestMode ? (bindDs.rows || null) : (bindDs.rows || cat.rows || null),
+            dsTok: strictManifestMode ? (bindDs.tokens || null) : (bindDs.tokens || data.token_count || prov.token_count || (latestLossRun && latestLossRun.total_tokens) || null),
+            byteSize: strictManifestMode ? (bindDs.bytes || null) : (bindDs.bytes || prov.byte_size || null),
+            sourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.source_path) || null),
+            rawSourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.raw_source_path) || null),
             tokenStreamPath: (latestLossRun && latestLossRun.token_stream_path) || null,
             covered, artifacts: arts,
-            catNote: cat.note || null,
+            catNote: strictManifestMode ? null : (cat.note || null),
             lossRuns,
             latestLossRun,
             seq: Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1),
@@ -18352,6 +18449,7 @@ function renderDataLabPanel(files) {
                 }
             </div>
             <div style="font-size:0.7rem;color:#6b7280;">⚠ Stages using datasets outside this corpus may encounter novel token boundaries — check ⚠ tok gap badges above.</div>
+            ${strictManifestMode ? '<div style="font-size:0.7rem;color:#6ee7b7;margin-top:0.2rem;">strict contract mode: stage/data mapping from pipeline contract only (fallbacks disabled)</div>' : ''}
         </div>
     `;
 

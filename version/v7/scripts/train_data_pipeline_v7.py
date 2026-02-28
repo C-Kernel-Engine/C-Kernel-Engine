@@ -1758,9 +1758,110 @@ def _build_training_pipeline_payload(
         except Exception:
             pass
 
+    model_contract = {
+        "family": str(getattr(args, "template", "qwen3") or "qwen3"),
+        "layers": int(train_dims.get("num_layers", getattr(args, "layers", 0) or 0)),
+        "embed_dim": int(train_dims.get("embed_dim", getattr(args, "embed_dim", 0) or 0)),
+        "hidden_dim": int(train_dims.get("hidden_dim", getattr(args, "hidden_dim", 0) or 0)),
+        "num_heads": int(train_dims.get("num_heads", getattr(args, "num_heads", 0) or 0)),
+        "num_kv_heads": int(train_dims.get("num_kv_heads", getattr(args, "num_kv_heads", 0) or 0)),
+        "context_len": int(train_dims.get("context_length", getattr(args, "context_len", 0) or 0)),
+        "vocab_size": int(train_dims.get("vocab_size", vocab_size or 0)),
+    }
+
+    binding_by_stage = {}
+    for bind in stage_dataset_bindings:
+        if not isinstance(bind, dict):
+            continue
+        st = str(bind.get("stage") or "")
+        if st:
+            binding_by_stage[st] = bind
+    tokenizer_inputs = []
+    for row in tokenizer_corpora:
+        if not isinstance(row, dict):
+            continue
+        tokenizer_inputs.append(
+            {
+                "name": row.get("name"),
+                "path": row.get("source_path"),
+                "rows": row.get("rows"),
+                "tokens": row.get("token_count"),
+                "bytes": row.get("byte_size"),
+                "sha256": row.get("sha256"),
+                "source": "tokenizer_lineage.tokenizer_corpora",
+            }
+        )
+
+    pipeline_stages: list[dict[str, Any]] = [
+        {
+            "stage": "data_preparation",
+            "stage_id": 0,
+            "status": "done",
+            "type": "dataset_qc_ascii_prepare",
+            "datasets": [
+                {
+                    "name": dataset_path.name,
+                    "path": str(dataset_path),
+                    "rows": active_rows,
+                    "tokens": int(token_count),
+                    "bytes": int(dataset_size),
+                    "sha256": dataset_hash,
+                    "source": "data_provenance",
+                }
+            ],
+            "ops": ["dataset_qc", "dataset_profile", "tokenizer_roundtrip"],
+        },
+        {
+            "stage": "tokenizer",
+            "stage_id": 1,
+            "status": "reused" if reused_run_tokenizer else "built",
+            "type": str(tokenizer_kind),
+            "tokenizer": {
+                "type": tokenizer_kind,
+                "vocab_size": int(vocab_size),
+                "path": tokenizer_lineage.get("tokenizer_path"),
+                "sha256": tokenizer_lineage.get("tokenizer_sha256"),
+                "reused_run_tokenizer": reused_run_tokenizer,
+            },
+            "datasets": tokenizer_inputs,
+            "coverage": tokenizer_coverage,
+            "ops": ["tokenizer_build_or_reuse"],
+        },
+    ]
+    training_stage_id = 2
+    for row in stage_timeline:
+        if not isinstance(row, dict):
+            continue
+        st = str(row.get("stage") or "")
+        if not st:
+            continue
+        bind = binding_by_stage.get(st, {})
+        datasets = bind.get("datasets") if isinstance(bind, dict) else []
+        if not isinstance(datasets, list):
+            datasets = []
+        pipeline_stages.append(
+            {
+                "stage": st,
+                "stage_id": int(training_stage_id),
+                "status": str(row.get("status") or "planned"),
+                "type": "training_stage",
+                "datasets": datasets,
+                "tokenizer_coverage": bind.get("tokenizer_coverage") if isinstance(bind, dict) else {},
+                "ops": ["train"] if st == active_stage else [],
+            }
+        )
+        training_stage_id += 1
+
     return {
         "schema": "ck.training_pipeline.v1",
         "generated_at": now_iso,
+        "model": model_contract,
+        "pipeline": {
+            "schema": "ck.training_pipeline_contract.v1",
+            "source_of_truth": "training_pipeline_latest.json",
+            "active_stage": active_stage,
+            "stages": pipeline_stages,
+        },
         "active_stage": active_stage,
         "curriculum_stage": curriculum_stage,
         "stage_timeline": stage_timeline,
@@ -1772,7 +1873,7 @@ def _build_training_pipeline_payload(
         "stage_artifacts": stage_artifacts,
         "backend": "ck",
         "optimizer": {
-            "name": "adamw",
+            "name": str(args.optimizer),
             "lr": float(args.lr),
             "hparams": {
                 "max_grad_norm": float(args.max_grad_norm),
@@ -2252,6 +2353,8 @@ def _run_ck_train(
     run_dir = Path(args.run).expanduser().resolve()
     train_driver = str(getattr(args, "train_driver", "ck_run") or "ck_run").strip().lower()
     if train_driver == "ck_cli":
+        if str(args.optimizer).lower() != "adamw":
+            raise RuntimeError("ck_cli train driver currently supports optimizer=adamw only.")
         if token_file is None:
             raise RuntimeError("ck_cli train driver requires --tokenizer bpe/ascii_bpe or prebuilt --token-file-out.")
         _ensure_binary(CK_CLI_BIN, "ck-cli-v7")
@@ -2301,6 +2404,8 @@ def _run_ck_train(
         str(args.total_tokens),
         "--train-grad-accum",
         str(args.grad_accum),
+        "--train-optimizer",
+        str(args.optimizer),
         "--train-lr",
         str(args.lr),
         "--train-max-grad-norm",
@@ -2446,6 +2551,7 @@ def main() -> int:
     ap.add_argument("--seq-len", type=int, default=32)
     ap.add_argument("--total-tokens", type=int, default=1024)
     ap.add_argument("--grad-accum", type=int, default=1)
+    ap.add_argument("--optimizer", choices=["adamw", "sgd"], default="adamw")
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--max-grad-norm", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=42)
@@ -2619,6 +2725,9 @@ def main() -> int:
         _errors.append(f"--resume-step must be >= 0, got {args.resume_step}")
     if _errors:
         raise SystemExit("ERROR: invalid arguments:\\n  " + "\\n  ".join(_errors))
+
+    if bool(getattr(args, "with_torch_ref", False)) and str(args.optimizer).lower() != "adamw":
+        raise SystemExit("ERROR: --with-torch-ref currently supports --optimizer adamw only.")
 
     if args.require_ascii_data is None:
         args.require_ascii_data = args.tokenizer == "ascii_bpe"
