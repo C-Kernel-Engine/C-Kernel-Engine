@@ -112,6 +112,7 @@ typedef struct {
     const char *exts_csv;
     int vocab_size;
     int min_freq;
+    int max_piece_bytes;
     int threads;
     int verbose;
     int ascii_only;
@@ -133,6 +134,7 @@ typedef struct Trainer {
     int use_a;
 
     SymbolNode *symbols;
+    int32_t *symbol_text_lens;
     int num_symbols;
     int max_symbols;
     int base_symbol_count;
@@ -520,11 +522,20 @@ static void merge_local_counts(Trainer *tr) {
 static bool select_best_pair(Trainer *tr, int32_t *out_left, int32_t *out_right, uint32_t *out_freq) {
     uint64_t best_slot_key = 0;
     uint32_t best_count = 0;
+    const int max_piece_bytes = tr->opt.max_piece_bytes;
 
     for (size_t i = 0; i < tr->global_cap; i++) {
         uint64_t sk = tr->global_table[i].key;
         uint32_t ct = tr->global_table[i].count;
         if (sk == 0 || ct == 0) continue;
+        if (max_piece_bytes > 0) {
+            uint64_t k = slot_key_decode(sk);
+            int32_t L = (int32_t)(k >> 32);
+            int32_t R = (int32_t)(k & 0xFFFFFFFFu);
+            if (L < 0 || R < 0 || L >= tr->num_symbols || R >= tr->num_symbols) continue;
+            int64_t merged_len = (int64_t)tr->symbol_text_lens[L] + (int64_t)tr->symbol_text_lens[R];
+            if (merged_len > (int64_t)max_piece_bytes) continue;
+        }
         if (ct > best_count || (ct == best_count && sk < best_slot_key)) {
             best_count = ct;
             best_slot_key = sk;
@@ -554,21 +565,37 @@ static bool is_ascii_train_byte(uint8_t b) {
            (b >= ASCII_PRINT_MIN && b <= ASCII_PRINT_MAX);
 }
 
+static int base_piece_text_len(uint8_t byte, int ascii_only) {
+    if (ascii_only) return 1;
+    if (byte >= 0x21 && byte <= 0x7E) return 1;
+    unsigned int codepoint;
+    if (byte <= 0x20) codepoint = 0x100u + byte;
+    else if (byte >= 0x7F && byte <= 0xA0) codepoint = 0x100u + byte;
+    else codepoint = byte;
+    if (codepoint < 0x80u) return 1;
+    if (codepoint < 0x800u) return 2;
+    return 3;
+}
+
 static void init_symbols(Trainer *tr) {
     for (int i = 0; i < 256; i++) tr->byte_to_symbol[i] = -1;
 
     tr->symbols[ID_UNK].left = -1;
     tr->symbols[ID_UNK].right = -1;
     tr->symbols[ID_UNK].is_base = 0;
+    tr->symbol_text_lens[ID_UNK] = (int32_t)(sizeof("<|unk|>") - 1);
     tr->symbols[ID_BOS].left = -1;
     tr->symbols[ID_BOS].right = -1;
     tr->symbols[ID_BOS].is_base = 0;
+    tr->symbol_text_lens[ID_BOS] = (int32_t)(sizeof("<|bos|>") - 1);
     tr->symbols[ID_EOS].left = -1;
     tr->symbols[ID_EOS].right = -1;
     tr->symbols[ID_EOS].is_base = 0;
+    tr->symbol_text_lens[ID_EOS] = (int32_t)(sizeof("<|eos|>") - 1);
     tr->symbols[ID_PAD].left = -1;
     tr->symbols[ID_PAD].right = -1;
     tr->symbols[ID_PAD].is_base = 0;
+    tr->symbol_text_lens[ID_PAD] = (int32_t)(sizeof("<|pad|>") - 1);
 
     int next_id = BASE_BYTE_ID;
     if (tr->opt.ascii_only) {
@@ -578,6 +605,7 @@ static void init_symbols(Trainer *tr) {
             tr->symbols[next_id].right = -1;
             tr->symbols[next_id].byte = (uint8_t)b;
             tr->symbols[next_id].is_base = 1;
+            tr->symbol_text_lens[next_id] = (int32_t)base_piece_text_len((uint8_t)b, 1);
             tr->byte_to_symbol[b] = next_id;
             next_id++;
         }
@@ -588,6 +616,7 @@ static void init_symbols(Trainer *tr) {
             tr->symbols[id].right = -1;
             tr->symbols[id].byte = (uint8_t)b;
             tr->symbols[id].is_base = 1;
+            tr->symbol_text_lens[id] = (int32_t)base_piece_text_len((uint8_t)b, 0);
             tr->byte_to_symbol[b] = id;
             next_id++;
         }
@@ -628,6 +657,7 @@ static void run_bpe_training(Trainer *tr) {
         tr->symbols[new_id].right = R;
         tr->symbols[new_id].byte = 0;
         tr->symbols[new_id].is_base = 0;
+        tr->symbol_text_lens[new_id] = tr->symbol_text_lens[L] + tr->symbol_text_lens[R];
 
         tr->merges[tr->num_merges].left = L;
         tr->merges[tr->num_merges].right = R;
@@ -925,6 +955,7 @@ static void write_binary_exports(const char *out_dir, const Trainer *tr) {
     fprintf(f, "  \"mode\": \"%s\",\n", tr->opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     fprintf(f, "  \"vocab_size\": %d,\n", tr->num_symbols);
     fprintf(f, "  \"num_merges\": %d,\n", tr->num_merges);
+    fprintf(f, "  \"max_piece_bytes\": %d,\n", tr->opt.max_piece_bytes);
     fprintf(f, "  \"offsets\": \"%s\",\n", path_offsets);
     fprintf(f, "  \"strings\": \"%s\",\n", path_strings);
     fprintf(f, "  \"merges\": \"%s\"\n", path_merges);
@@ -950,6 +981,7 @@ static void print_help(const char *prog) {
         "Options:\n"
         "  --vocab-size N           Target vocab size (default: %d)\n"
         "  --min-freq N             Minimum pair frequency to merge (default: %d)\n"
+        "  --max-piece-bytes N      Max token byte-length after merges (default: %d, 0=unbounded)\n"
         "  --threads N              Worker threads (default: cpu cores)\n"
         "  --ext LIST               Comma-separated file extensions (default: %s)\n"
         "                           Use '*' for all regular files\n"
@@ -958,13 +990,14 @@ static void print_help(const char *prog) {
         "                           Allowed bytes: \\t, \\n, \\r, and 0x20-0x7E\n"
         "  --verbose                Print training progress\n"
         "  --help                   Show this help\n",
-        CK_BPE_VERSION, prog, DEFAULT_VOCAB_SIZE, DEFAULT_MIN_FREQ, DEFAULT_EXTS);
+        CK_BPE_VERSION, prog, DEFAULT_VOCAB_SIZE, DEFAULT_MIN_FREQ, 0, DEFAULT_EXTS);
 }
 
 static void parse_args(int argc, char **argv, Options *opt) {
     memset(opt, 0, sizeof(*opt));
     opt->vocab_size = DEFAULT_VOCAB_SIZE;
     opt->min_freq = DEFAULT_MIN_FREQ;
+    opt->max_piece_bytes = 0;
     opt->threads = 0;
     opt->exts_csv = DEFAULT_EXTS;
 
@@ -983,6 +1016,8 @@ static void parse_args(int argc, char **argv, Options *opt) {
             opt->vocab_size = atoi(argv[++i]);
         } else if (!strcmp(a, "--min-freq") && i + 1 < argc) {
             opt->min_freq = atoi(argv[++i]);
+        } else if (!strcmp(a, "--max-piece-bytes") && i + 1 < argc) {
+            opt->max_piece_bytes = atoi(argv[++i]);
         } else if (!strcmp(a, "--threads") && i + 1 < argc) {
             opt->threads = atoi(argv[++i]);
         } else if (!strcmp(a, "--ext") && i + 1 < argc) {
@@ -1004,6 +1039,7 @@ static void parse_args(int argc, char **argv, Options *opt) {
         fatalf("--vocab-size must be >= %d for selected mode", SPECIAL_COUNT + base_count);
     }
     if (opt->min_freq < 1) opt->min_freq = 1;
+    if (opt->max_piece_bytes < 0) fatalf("--max-piece-bytes must be >= 0");
     if (opt->threads <= 0) {
         long n = sysconf(_SC_NPROCESSORS_ONLN);
         opt->threads = (n > 0) ? (int)n : 4;
@@ -1078,6 +1114,7 @@ int main(int argc, char **argv) {
     arena_bytes += align_up((size_t)files.count * sizeof(int), 64) * 3;           /* offsets/lens/caps */
     arena_bytes += align_up(total_tokens * sizeof(int32_t), 64) * 2;               /* seq_a, seq_b */
     arena_bytes += align_up((size_t)opt.vocab_size * sizeof(SymbolNode), 64);      /* symbols */
+    arena_bytes += align_up((size_t)opt.vocab_size * sizeof(int32_t), 64);          /* symbol text lengths */
     arena_bytes += align_up((size_t)opt.vocab_size * sizeof(MergeRule), 64);       /* merges */
     arena_bytes += align_up((size_t)nthreads * sizeof(Worker), 64);                 /* workers */
     arena_bytes += align_up((size_t)nthreads * sizeof(pthread_t), 64);              /* threads */
@@ -1105,6 +1142,7 @@ int main(int argc, char **argv) {
     tr.seq_a = (int32_t *)arena_alloc(&arena, total_tokens * sizeof(int32_t), 64);
     tr.seq_b = (int32_t *)arena_alloc(&arena, total_tokens * sizeof(int32_t), 64);
     tr.symbols = (SymbolNode *)arena_alloc(&arena, (size_t)opt.vocab_size * sizeof(SymbolNode), 64);
+    tr.symbol_text_lens = (int32_t *)arena_alloc(&arena, (size_t)opt.vocab_size * sizeof(int32_t), 64);
     tr.merges = (MergeRule *)arena_alloc(&arena, (size_t)opt.vocab_size * sizeof(MergeRule), 64);
     tr.workers = (Worker *)arena_alloc(&arena, (size_t)nthreads * sizeof(Worker), 64);
     tr.threads = (pthread_t *)arena_alloc(&arena, (size_t)nthreads * sizeof(pthread_t), 64);
@@ -1154,6 +1192,7 @@ int main(int argc, char **argv) {
     printf("  mode:       %s\n", opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     printf("  vocab_size: %d\n", tr.num_symbols);
     printf("  merges:     %d\n", tr.num_merges);
+    printf("  max_piece_bytes: %d\n", opt.max_piece_bytes);
     printf("  out:        %s\n", opt.out_json);
     if (opt.binary_out_dir && *opt.binary_out_dir) {
         printf("  binary_out: %s\n", opt.binary_out_dir);
