@@ -20,6 +20,16 @@
  *
  * Note: AdamW applies weight decay directly to weights, not to gradients.
  * This is different from L2 regularization (Adam with L2 adds decay to gradient).
+ *
+ * Epsilon amplification at early steps: at step 1 with bc2=0.001, elements where
+ * v≈0 (sparse/near-zero gradients) produce sqrt(v_hat)+eps ≈ eps=1e-8, amplifying
+ * any fp32 rounding in the accumulated gradient by up to lr/eps = 1e6. This is
+ * expected AdamW behavior, not a bug. In parity tests, gate on mean_param_diff
+ * (not max_param_diff) for grad_accum > 1 to avoid false alarms from these outliers.
+ *
+ * Long-horizon fp32 risk: at lr=1e-3 with all-fp32 SIMD paths, known drift begins
+ * around step ~800 due to accumulated rounding. Use ck_strict_parity_enabled() (fp64
+ * path) for parity validation; for production training keep lr < 1e-3 or monitor.
  */
 
 #include <math.h>
