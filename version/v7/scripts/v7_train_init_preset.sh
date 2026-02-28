@@ -317,6 +317,18 @@ python3 version/v7/scripts/run_training_parity_regimen_v7.py \
   --epochs 1 --seq-len "$CK_SEQ_LEN" --total-tokens "$CK_TOTAL_TOKENS" \
   --lr "$CK_LR_SFT" $REUSE_TOK_ARG
 
+# Optional alignment phases (DPO/GRPO/PPO; default plan-only)
+bash version/v7/scripts/run_svg_alignment_stages_v7.sh \
+  --run "$RUN" \
+  --instruction-data "$SFT_DATA" \
+  --out-dir "$GEN_DIR" \
+  --prefix "$CK_PREFIX" \
+  --max-samples 50000 \
+  --epochs 1 --seq-len "$CK_SEQ_LEN" --total-tokens "$CK_TOTAL_TOKENS" --grad-accum 1 \
+  --lr-dpo 8e-5 --lr-grpo 6e-5 --lr-ppo 5e-5 \
+  --plan-only \
+  --run-dpo --run-grpo --run-ppo
+
 # Generate operator views
 python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts
 python3 version/v7/tools/open_ir_hub.py --open

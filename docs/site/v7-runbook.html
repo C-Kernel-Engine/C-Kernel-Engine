@@ -1171,6 +1171,149 @@
     color: var(--white);
     border-color: var(--orange);
 }
+
+/* ── Pipeline Designer ───────────────────────────────────────────────── */
+.pipeline-track {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 0.7rem 0 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+}
+.pipeline-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 130px;
+    flex: 1;
+    position: relative;
+}
+.pipeline-stage + .pipeline-stage::before {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--grey);
+    pointer-events: none;
+}
+.pipeline-stage-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.3rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    user-select: none;
+    letter-spacing: 0.02em;
+}
+.pipeline-stage-header .stage-label { flex: 1; }
+.pipeline-stage-header input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--orange); }
+.pipeline-stage-body {
+    padding: 0.4rem 0.5rem 0.45rem;
+    background: rgba(21, 27, 38, 0.75);
+    border: 1px solid var(--grey);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex: 1;
+}
+.pipeline-stage-body.stage-disabled { opacity: 0.38; pointer-events: none; }
+.pipeline-stage-field { display: flex; flex-direction: column; gap: 0.15rem; }
+.pipeline-stage-field label { font-size: 0.67rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.pipeline-stage-field input,
+.pipeline-stage-field select,
+.pipeline-stage-field textarea {
+    background: var(--dark-lighter);
+    color: var(--white);
+    border: 1px solid var(--grey);
+    border-radius: 5px;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    width: 100%;
+    box-sizing: border-box;
+}
+.pipeline-stage-field textarea { resize: vertical; min-height: 2.5rem; font-size: 0.72rem; }
+.pstage-pretrain .pipeline-stage-header  { background: rgba(71,180,117,0.13); color: #7de59f; border: 1px solid rgba(71,180,117,0.35); border-bottom: none; }
+.pstage-midtrain .pipeline-stage-header  { background: rgba(7,173,248,0.10);  color: #8cb4ff; border: 1px solid rgba(7,173,248,0.30);   border-bottom: none; }
+.pstage-sft      .pipeline-stage-header  { background: rgba(255,180,0,0.12);  color: #ffd58a; border: 1px solid rgba(255,180,0,0.35);   border-bottom: none; }
+.pstage-dpo      .pipeline-stage-header  { background: rgba(160,112,255,0.10);color: #c09cff; border: 1px solid rgba(160,112,255,0.30); border-bottom: none; }
+.pstage-grpo     .pipeline-stage-header  { background: rgba(231,76,60,0.10);  color: #ff9b8c; border: 1px solid rgba(231,76,60,0.30);   border-bottom: none; }
+.pstage-rlhf     .pipeline-stage-header  { background: rgba(255,140,60,0.10); color: #ffba80; border: 1px solid rgba(255,140,60,0.30);  border-bottom: none; }
+.pipeline-json-out {
+    background: var(--dark-card, #181e28);
+    border: 1px solid var(--grey);
+    border-radius: 6px;
+    padding: 0.5rem 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #9ecaff;
+    white-space: pre;
+    overflow-x: auto;
+    margin-top: 0.4rem;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.pipeline-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0 0.2rem; }
+
+/* ── Operator progress bar ───────────────────────────────────────────── */
+.op-progress-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(21,27,38,0.9);
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+.op-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.18rem;
+    min-width: 52px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.2s;
+}
+.op-step:hover { opacity: 1; }
+.op-step.op-active { opacity: 1; }
+.op-step.op-done { opacity: 0.75; }
+.op-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--grey);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--dark-card);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.op-step.op-active .op-dot  { border-color: var(--orange); background: rgba(255,180,0,0.15); color: var(--orange); }
+.op-step.op-done   .op-dot  { border-color: #47b475;       background: rgba(71,180,117,0.12); color: #47b475; }
+.op-label { font-size: 0.6rem; color: var(--text-muted); white-space: nowrap; }
+.op-step.op-active .op-label { color: var(--orange); font-weight: 600; }
+.op-step.op-done   .op-label { color: #47b475; }
+.op-connector { flex: 1; min-width: 12px; height: 2px; background: var(--grey); margin-bottom: 1rem; flex-shrink: 0; }
+.op-connector.conn-done { background: #47b475; opacity: 0.5; }
 </style>
 
 <h1>v7 Inference + Training Runbook</h1>
@@ -1286,6 +1429,59 @@
     </div>
 </div>
 
+<div class="op-progress-bar" id="op-progress" aria-label="Operator training workflow progress">
+    <div class="op-step" data-href="#step-0-0-config-init" data-key="config">
+        <div class="op-dot">0.0</div>
+        <div class="op-label">Config</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-0a-pipeline-bootstrap" data-key="bootstrap">
+        <div class="op-dot">0A</div>
+        <div class="op-label">Bootstrap</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-0-data-prep" data-key="data">
+        <div class="op-dot">0.5</div>
+        <div class="op-label">Data</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-0-tokenize" data-key="tokenize">
+        <div class="op-dot">0.7</div>
+        <div class="op-label">Tokenize</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-3-5-parity-gate" data-key="parity">
+        <div class="op-dot" style="border-color:rgba(231,76,60,0.5);color:#ff9b8c;">3.1</div>
+        <div class="op-label">Parity Gate</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-3-train" data-key="train">
+        <div class="op-dot" style="border-color:rgba(71,180,117,0.5);color:#7de59f;">3.7</div>
+        <div class="op-label">Train</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-5-promote" data-key="promote">
+        <div class="op-dot">5</div>
+        <div class="op-label">Promote</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-6-infer-trained" data-key="build">
+        <div class="op-dot">6</div>
+        <div class="op-label">Build</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-7-visualizer" data-key="viz">
+        <div class="op-dot">7</div>
+        <div class="op-label">Visualizer</div>
+    </div>
+    <div class="op-connector"></div>
+    <div class="op-step" data-href="#step-8-inference" data-key="chat">
+        <div class="op-dot">8</div>
+        <div class="op-label">Chat</div>
+    </div>
+</div>
+<p class="mini-note" style="margin-top:-0.5rem;margin-bottom:0.8rem;">Click any step above to jump there. Steps light up as you work through the training path.</p>
+
 <nav class="toc">
     <h3>Contents</h3>
 
@@ -1296,23 +1492,41 @@
     </ul>
 
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#47b475;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Training Path</div>
+
+    <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Setup</div>
     <ul>
-        <li><a href="#step-0-0-config-init"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.0</span> Config Init Generator</a></li>
+        <li><a href="#step-0-0-config-init"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.0</span> Config + Pipeline Designer</a></li>
         <li><a href="#step-0-prereqs"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0</span> Prereqs + Paths</a></li>
         <li><a href="#step-0a-pipeline-bootstrap"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0A</span> Pipeline Bootstrap</a></li>
         <li><a href="#step-0-clean-start"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.1</span> Clean Start</a></li>
+    </ul>
+
+    <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Data</div>
+    <ul>
         <li><a href="#step-0-data-prep"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.5</span> Data Prep</a></li>
         <li><a href="#step-0-data-scale"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.55</span> Scale Corpus</a></li>
         <li><a href="#step-0-stage-a-bridge"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.56</span> Stage-A Bridge</a></li>
         <li><a href="#step-0-data-view"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.6</span> Preview Dataset</a></li>
+        <li><a href="#step-2-training-setup"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">2</span> Alt. Ingest (JSONL)</a></li>
+    </ul>
+
+    <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Tokenize</div>
+    <ul>
         <li><a href="#step-0-tokenize"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.7</span> Tokenize</a></li>
         <li><a href="#step-0-roundtrip"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.8</span> Roundtrip Gate</a></li>
         <li><a href="#step-0-data-lab"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">0.9</span> Data Lab Artifacts</a></li>
-        <li><a href="#step-2-training-setup"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">2</span> Training Setup</a></li>
+    </ul>
+
+    <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Validate + Train</div>
+    <ul>
         <li><a href="#step-3-5-parity-gate"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(231,76,60,0.15);border-color:rgba(231,76,60,0.4);color:#e74c3c;">3.1</span> Parity Gate</a></li>
         <li><a href="#step-3-6-parity-regimen"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.2</span> Parity Regimen</a></li>
         <li><a href="#step-3-6-nightly-core-stabilization"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">3.3</span> Nightly Matrix</a></li>
         <li><a href="#step-3-train"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.2);border-color:rgba(71,180,117,0.5);color:#7de59f;">3.7</span> Full Train</a></li>
+    </ul>
+
+    <div style="font-size:0.63rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0.5rem 0 0.15rem 0.5rem;">Promote</div>
+    <ul>
         <li><a href="#step-4-artifacts"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">4</span> Artifact Locations</a></li>
         <li><a href="#step-5-promote"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;">5</span> Promote Checkpoint</a></li>
     </ul>
@@ -1539,7 +1753,7 @@
 </svg>
 </div>
 
-<h2 id="step-0-0-config-init">Step 0.0: Config Init Generator (Recommended)</h2>
+<h2 id="step-0-0-config-init">Step 0.0: Config Init + Pipeline Designer (Recommended)</h2>
 
 <div class="card card-accent">
     <p style="margin-bottom: 0.45rem;">Set model shape once (name/layers/embed/context/vocab), then auto-generate the full export + command block with consistent run/data paths.</p>
@@ -1581,7 +1795,7 @@
                 <div class="preset-field"><label><input id="cfg-run-grpo" type="checkbox" /> run grpo (plan only)</label></div>
                 <div class="preset-field"><label><input id="cfg-run-ppo" type="checkbox" /> run ppo/rlhf (plan only)</label></div>
             </div>
-            <p class="mini-note">Current executable stages in this runbook: <code>stage_a</code>, <code>stage_b</code>, <code>sft</code>. DPO/GRPO/PPO emit TODO placeholders so the operator sees full pipeline intent.</p>
+            <p class="mini-note">DPO/GRPO/PPO are generated in <code>--plan-only</code> mode by default (datasets + manifests + workflow artifacts). Remove <code>--plan-only</code> to execute CE-surrogate alignment updates.</p>
         </details>
         <details style="margin:0.35rem 0 0.6rem;">
             <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.8rem;">Advanced: token budget override</summary>
@@ -2169,7 +2383,7 @@ sed -n '2p' "$CANARY_SRC" > "$PARITY_ROOT/svg_row2.txt"
 
 if [ ! -s "$PARITY_ROOT/svg_row1.txt" ] || [ ! -s "$PARITY_ROOT/svg_row2.txt" ]; then
   echo "[FAIL] Need at least 2 non-empty rows in DATA_TXT for parity canaries."
-  echo "[FAIL] Re-run Step 1 and Step 0.5/0.55/0.56, then retry Step 3.1."
+  echo "[FAIL] Re-run Step 0A and Step 0.5/0.55/0.56, then retry Step 3.1."
   exit 1
 else
   for idx in 1 2; do
@@ -3478,12 +3692,24 @@ python3 scripts/ck_chat.py --help</pre>
             ]);
         }
         if (runDpo || runGrpo || runPpo) {
+            var alignFlags = [];
+            if (runDpo) alignFlags.push('--run-dpo');
+            if (runGrpo) alignFlags.push('--run-grpo');
+            if (runPpo) alignFlags.push('--run-ppo');
             lines = lines.concat([
                 '',
-                '# alignment stages (plan-only placeholders)',
-                runDpo ? '# TODO dpo: connect dpo dataset + script once v7 DPO pipeline is wired.' : '# dpo: off',
-                runGrpo ? '# TODO grpo: connect grpo dataset + script once v7 GRPO pipeline is wired.' : '# grpo: off',
-                runPpo ? '# TODO ppo/rlhf: connect reward/preference pipeline once v7 PPO is wired.' : '# ppo/rlhf: off'
+                '# alignment stages (svg)',
+                '# default here is plan-only: builds objective jsonl + ce fallback rows + summaries',
+                'bash version/v7/scripts/run_svg_alignment_stages_v7.sh \\',
+                '  --run "$RUN" \\',
+                '  --instruction-data "$SFT_DATA" \\',
+                '  --out-dir "$GEN_DIR" \\',
+                '  --prefix "$CK_NAME" \\',
+                '  --max-samples 50000 \\',
+                '  --epochs 1 --seq-len ' + seqLen + ' --total-tokens "$CK_TOTAL_TOKENS" --grad-accum 1 \\',
+                '  --lr-dpo 8e-5 --lr-grpo 6e-5 --lr-ppo 5e-5 \\',
+                '  --plan-only \\',
+                '  ' + alignFlags.join(' ')
             ]);
         }
         lines = lines.concat([
