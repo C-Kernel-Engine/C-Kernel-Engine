@@ -6,7 +6,6 @@ var annotated_dup =
     [ "block_q4_K", "structblock__q4__K.html", "structblock__q4__K" ],
     [ "block_q5_0", "structblock__q5__0.html", "structblock__q5__0" ],
     [ "block_q5_1", "structblock__q5__1.html", "structblock__q5__1" ],
-    [ "block_q5_K", "structblock__q5__K.html", "structblock__q5__K" ],
     [ "block_q6_K", "structblock__q6__K.html", "structblock__q6__K" ],
     [ "block_q8_0", "structblock__q8__0.html", "structblock__q8__0" ],
     [ "block_q8_K", "structblock__q8__K.html", "structblock__q8__K" ],
