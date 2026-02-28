@@ -18668,32 +18668,38 @@ function renderDataLabPanel(files) {
         .join('');
 
     // ── Training Readiness Panel ─────────────────────────────────────────────
-    // Static catalog: what each stage tests and why it matters.
-    // Group naming intent:
-    //   A / B / C — test the C *math kernels* via a Python/PyTorch parity harness (no generated runtime).
-    //   D / E / F — test the *generated C training runtime* code that actually runs during a training job.
+    // Stage hierarchy:
+    //   D / E / F  — PRIMARY PRODUCTION GATE. Tests the *generated C training runtime* — the code
+    //                that actually executes during a training job. ALL must pass before training.
+    //   A / B / C  — KERNEL ISOLATION (diagnostic). Tests the C math primitives via a Python/PyTorch
+    //                harness. If D/E/F fail, A/B/C tell you which kernel is the root cause.
+    //                A/B/C passing does NOT substitute for D/E/F.
+    const _DEF_GROUP = 'D/E/F \u2014 Production Runtime (must all pass)';
+    const _A_GROUP   = 'A \u2014 Kernel Isolation';
+    const _B_GROUP   = 'B \u2014 Kernel Isolation: Grad Accum';
+    const _C_GROUP   = 'C \u2014 Kernel Isolation: Stability';
     const _rkCatalog = {
-        A1: { group: 'A \u2014 C Kernel Math', name: 'Fwd / Bwd / SGD', tests: 'Single micro-step forward+backward+SGD update via Python/PyTorch harness. grad_accum=1, max 2 optimizer steps. Gates on loss diff < 2e-5 and param max diff < 3e-5.', why: 'Lowest bar. Baseline smoke test for the C kernel math path \u2014 if A1 fails, forward or backward kernels are broken before any training budget is spent.' },
-        A3: { group: 'A \u2014 C Kernel Math', name: 'Backend Xray', tests: 'Swaps rmsnorm / swiglu / loss C backends one at a time on identical weights (Python harness) to isolate which C kernel causes numeric drift.', why: 'Pinpoints divergence source in minutes, not hours. Required before diagnosing any A1 regression.' },
-        A4: { group: 'A \u2014 C Kernel Math', name: 'AdamW Sentinel', tests: 'Fixed toy model (d=64/v=256/l=2) with AdamW, 10 optimizer steps, NO run-dir weights. Strict hardcoded tol (param=3e-5) never relaxed by --param-tol. Model-independent kernel regression gate.', why: 'Regression sentinel independent of model scale. If B/C pass but A4 fails, a C-kernel math regression caused it \u2014 not a fresh-init or large-model tolerance issue.' },
-        D1: { group: 'D/E/F \u2014 Generated C Training Runtime', name: 'Backprop Stitch', tests: 'Generated C fwd+bwd on a real sequence \u2014 gradients must match PyTorch reference. Script: check_backprop_stitch_runtime_v7.py.', why: 'A/B/C test the Python harness; D1 is the first gate on the actual generated C runtime code that runs during training.' },
-        D2: { group: 'D/E/F \u2014 Generated C Training Runtime', name: 'Stitch Multi-step', tests: 'Generated C multi-step fwd+bwd loop with grad_accum. Tests the ck_train_step loop end-to-end at the generated-C level.', why: 'ck_train_step runs millions of times in a training job. This is its direct correctness gate.' },
-        E1: { group: 'D/E/F \u2014 Generated C Training Runtime', name: 'Replay Determinism', tests: 'Re-running the same fwd+bwd on generated C produces bit-identical results. Script: check_replay_determinism_v7.py.', why: 'Non-determinism in generated C silently corrupts gradient accumulation across micro-steps. Must be zero-diff for reproducible training.' },
-        F1: { group: 'D/E/F \u2014 Generated C Training Runtime', name: 'Runtime Accum', tests: 'Accumulated gradients over N micro-steps in generated C match a single full-batch gradient. Script: check_runtime_replay_accum_v7.py.', why: 'Most critical generated-code gate. Gradient accumulation in the generated C runtime is the core training operation \u2014 if this fails, every multi-batch training step is wrong.' },
+        A1: { group: _A_GROUP, name: 'Fwd / Bwd / SGD', tests: 'Single micro-step forward+backward+SGD update via Python/PyTorch harness. grad_accum=1, max 2 optimizer steps. Kernel isolation — not a generated-runtime test.', why: 'Baseline smoke test for the C kernel math path. If A1 fails, use A3 xray to localize the broken kernel before spending training budget.' },
+        A3: { group: _A_GROUP, name: 'Backend Xray', tests: 'Swaps rmsnorm / swiglu / loss C backends one at a time on identical weights (Python harness) to isolate which C kernel causes numeric drift.', why: 'Diagnostic localizer. Pinpoints the specific broken kernel in minutes. Only needed when A1 fails.' },
+        A4: { group: _A_GROUP, name: 'AdamW Sentinel', tests: 'Fixed toy model (d=64/v=256/l=2) with AdamW, 10 optimizer steps, NO run-dir weights. Strict immutable tol (param=3e-5). Model-independent kernel math regression gate.', why: 'Regression sentinel independent of model scale or policy. If A4 fails while D/E/F still pass, a C-kernel math change is present but not yet surfacing in the generated runtime.' },
+        D1: { group: _DEF_GROUP, name: 'Backprop Stitch', tests: 'Generated C fwd+bwd on a real sequence — gradients must match PyTorch reference. This is the generated C code, not the Python harness.', why: 'PRODUCTION GATE. First end-to-end test of the actual C runtime. A/B/C can pass while D1 fails if the code-generation step introduced a bug.' },
+        D2: { group: _DEF_GROUP, name: 'Stitch Multi-step', tests: 'Generated C multi-step fwd+bwd loop with grad_accum — the ck_train_step loop end-to-end.', why: 'PRODUCTION GATE. ck_train_step runs millions of times in a training job. Every grad_accum iteration must be correct.' },
+        E1: { group: _DEF_GROUP, name: 'Replay Determinism', tests: 'Re-running the same fwd+bwd on generated C produces bit-identical results. Zero tolerance.', why: 'PRODUCTION GATE. Non-determinism in the generated runtime silently corrupts gradient accumulation. Must be exactly zero-diff to guarantee reproducible training.' },
+        F1: { group: _DEF_GROUP, name: 'Runtime Accum', tests: 'Accumulated gradients over N micro-steps in generated C match a single full-batch gradient exactly.', why: 'PRODUCTION GATE \u2014 most critical. Gradient accumulation is the core operation of every training step. If this fails, the model is learning from wrong gradients on every multi-batch step.' },
     };
     // B and C stages are dynamic (driven by the regimen config). Fill catalog from actual stage rows.
     for (const row of regimenStages) {
         const id = String(row.id || '').trim().toUpperCase();
         if (/^B\d+$/.test(id) && !_rkCatalog[id]) {
             const g = id.slice(1);
-            _rkCatalog[id] = { group: 'B \u2014 C Kernel: Grad Accum', name: 'AdamW g=' + g, tests: 'C kernel math via Python harness. AdamW optimizer with grad_accum=' + g + ' micro-steps per optimizer step. Gates on mean param diff (not max) to exclude AdamW epsilon-amplification outliers at step 1.', why: 'Validates the C kernel gradient averaging path for ' + g + '\u00d7 effective batch size. Required before scaling throughput via accumulation.' };
+            _rkCatalog[id] = { group: _B_GROUP, name: 'AdamW g=' + g, tests: 'Kernel isolation (Python harness). AdamW optimizer with grad_accum=' + g + ' micro-steps. Gates on mean param diff to exclude AdamW epsilon-amplification outliers.', why: 'Diagnostic: confirms the C AdamW kernel handles gradient averaging correctly for ' + g + '\u00d7 batch size. Use A4 as the stricter AdamW math sentinel.' };
         }
         if (/^C\d+$/.test(id) && !_rkCatalog[id]) {
             const nm = String(row.name || id);
-            _rkCatalog[id] = { group: 'C \u2014 C Kernel: Stability', name: nm.length > 28 ? id : nm, tests: 'C kernel math via Python harness. Multi-epoch stability sweep across multiple epochs + grad_accum combos to catch divergence that short A/B runs miss.', why: 'Longer-horizon C kernel regression gate. Protects against fp32 optimizer drift and epoch-boundary edge cases that only surface after \u2265 5 optimizer steps.' };
+            _rkCatalog[id] = { group: _C_GROUP, name: nm.length > 28 ? id : nm, tests: 'Kernel isolation (Python harness). Multi-epoch stability sweep to catch fp32 optimizer drift and epoch-boundary edge cases that short A/B runs miss.', why: 'Diagnostic: longer-horizon kernel regression gate. Catches drift that only emerges after \u2265 5 optimizer steps across epoch boundaries.' };
         }
     }
-    const _rkGroupOrder = ['A \u2014 C Kernel Math', 'B \u2014 C Kernel: Grad Accum', 'C \u2014 C Kernel: Stability', 'D/E/F \u2014 Generated C Training Runtime'];
+    const _rkGroupOrder = [_DEF_GROUP, _A_GROUP, _B_GROUP, _C_GROUP];
     const _rkByGroup = {};
     for (const g of _rkGroupOrder) _rkByGroup[g] = [];
 
@@ -18716,11 +18722,24 @@ function renderDataLabPanel(files) {
     const _rkFmtDur = (s) => { const n = Number(s); if (!Number.isFinite(n)) return ''; return n < 60 ? n.toFixed(1) + 's' : (n / 60).toFixed(1) + 'm'; };
 
     // Overall readiness signal.
-    // A1 = C kernel math baseline; A4 = AdamW strict sentinel (immutable tol); D1/E1/F1 = generated runtime.
-    const _rkCriticalFails = ['A1', 'A4', 'D1', 'E1', 'F1'].filter((id) => {
+    // Production gate = D1, D2, E1, F1 (generated runtime — ALL must pass before training).
+    // Kernel gate = A1, A4 (math isolation — must also pass; A4 is the immutable AdamW sentinel).
+    // B/C stages are diagnostic: their failure means kernel math drift but D/E/F are the final word.
+    const _rkProductionIds = ['D1', 'D2', 'E1', 'F1'];
+    const _rkProductionFails = _rkProductionIds.filter((id) => {
         const r = regimenStageById[id];
         if (r) return stageIsFail(r);
         if (id === 'D1') return dPass === false;
+        if (id === 'D2') return d2Pass === false;
+        if (id === 'E1') return ePass === false;
+        if (id === 'F1') return fPass === false;
+        return false;
+    });
+    const _rkCriticalFails = ['A1', 'A4', 'D1', 'D2', 'E1', 'F1'].filter((id) => {
+        const r = regimenStageById[id];
+        if (r) return stageIsFail(r);
+        if (id === 'D1') return dPass === false;
+        if (id === 'D2') return d2Pass === false;
         if (id === 'E1') return ePass === false;
         if (id === 'F1') return fPass === false;
         return false;
@@ -18728,14 +18747,17 @@ function renderDataLabPanel(files) {
     const _rkAnyFail  = regimenStages.some((r) => stageIsFail(r)) || runtimeFailed;
     const _rkAnyLoaded = regimenStages.length > 0 || runtimeLoadedCount > 0;
     const _rkAllPass  = _rkAnyLoaded && !_rkAnyFail;
-    const _rkBannerColor = !_rkAnyLoaded ? '#fcd34d' : (_rkAllPass ? '#6ee7b7' : (_rkCriticalFails.length > 0 ? '#fca5a5' : '#fbbf24'));
+    const _rkProdAllPass = _rkProductionFails.length === 0 && (_rkByGroup[_DEF_GROUP] || []).length > 0;
+    const _rkBannerColor = !_rkAnyLoaded ? '#fcd34d'
+        : (_rkAllPass ? '#6ee7b7'
+        : (_rkProductionFails.length > 0 ? '#fca5a5' : '#fbbf24'));
     const _rkBannerMsg = !_rkAnyLoaded
         ? '\u26a0\ufe0f  No parity data loaded \u2014 run the regimen before training'
         : (_rkAllPass
-            ? '\u2713  All parity gates passing \u2014 code is ready to train'
-            : (_rkCriticalFails.length > 0
-                ? '\u2717  Critical gates failing (' + _rkCriticalFails.join(', ') + ') \u2014 do not start a long training run'
-                : '\u26a0\ufe0f  Some gates failing \u2014 review before committing training budget'));
+            ? '\u2713  All gates passing \u2014 production runtime verified, code is ready to train'
+            : (_rkProductionFails.length > 0
+                ? '\u2717  Production runtime failing (' + _rkProductionFails.join(', ') + ') \u2014 do NOT start training'
+                : '\u26a0\ufe0f  Production runtime passes \u2014 some kernel isolation stages failing (diagnostic only, check A/B/C)'));
 
     // Build group + card HTML (string concatenation to avoid nested backtick issues).
     const _rkGroupHtml = _rkGroupOrder.map((grp) => {
@@ -18808,9 +18830,11 @@ function renderDataLabPanel(files) {
         +   '<span style="color:#6ee7b7;">\u2713 green = pass</span> \u00b7 '
         +   '<span style="color:#f87171;">\u2717 red = fail</span> \u00b7 '
         +   'grey = not yet run. \u00a0'
-        +   '<span style="color:#9ca3af;">A/B/C = C kernel math, tested via Python/PyTorch harness</span> \u00b7 '
-        +   '<span style="color:#9ca3af;">D/E/F = Generated C training runtime signoff (the code that actually runs during training). '
-        +   'A4 = immutable AdamW sentinel with strict tolerance \u2014 catches math regressions independent of model scale.</span>'
+        +   '<span style="color:#6ee7b7;font-weight:700;">D/E/F = production gate</span>'
+        +   '<span style="color:#9ca3af;"> \u2014 generated C runtime, ALL must pass before training. \u00a0</span>'
+        +   '<span style="color:#9ca3af;">A/B/C = kernel isolation (diagnostic) \u2014 A/B/C passing does NOT substitute for D/E/F. '
+        +   'Use them to locate root cause when D/E/F fail. '
+        +   'A4 = immutable AdamW sentinel (strict tol=3e-5) independent of model scale.</span>'
         + '</div>'
         + _rkGroupHtml
         + '</div>';
