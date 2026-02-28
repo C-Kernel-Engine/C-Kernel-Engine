@@ -18667,6 +18667,149 @@ function renderDataLabPanel(files) {
         })
         .join('');
 
+    // ── Training Readiness Panel ─────────────────────────────────────────────
+    // Static catalog: what each stage tests and why it matters.
+    const _rkCatalog = {
+        A1: { group: 'A \u2014 Baseline Kernels', name: 'Fwd / Bwd / SGD', tests: 'Single micro-step forward+backward+SGD update, grad_accum=1, max 2 optimizer steps. Gates on loss diff < 2e-5 and param diff < 3e-5.', why: 'Lowest bar. Baseline smoke test \u2014 if A1 fails, forward or backward kernels are broken before any training budget is spent.' },
+        A3: { group: 'A \u2014 Baseline Kernels', name: 'Backend Xray', tests: 'Swaps rmsnorm / swiglu / loss backends one at a time on identical weights to isolate which C kernel (if any) causes numeric drift.', why: 'Pinpoints divergence source in minutes, not hours. Required before diagnosing any A1 regression.' },
+        D1: { group: 'D/E/F \u2014 Generated C Runtime', name: 'Backprop Stitch', tests: 'Generated C fwd+bwd on a real sequence \u2014 gradients must match PyTorch reference. Script: check_backprop_stitch_runtime_v7.py.', why: 'A/B/C test the Python harness. D1 is the first gate on the actual generated C that runs during training.' },
+        D2: { group: 'D/E/F \u2014 Generated C Runtime', name: 'Stitch Multi-step', tests: 'Generated C multi-step fwd+bwd loop with grad_accum. Tests the ck_train_step loop end-to-end at the C level.', why: 'ck_train_step runs millions of times in a training run. This is its direct correctness gate.' },
+        E1: { group: 'D/E/F \u2014 Generated C Runtime', name: 'Replay Determinism', tests: 'Re-running the same fwd+bwd on generated C produces bit-identical results. Script: check_replay_determinism_v7.py.', why: 'Non-determinism silently corrupts gradient accumulation across micro-steps. Must be zero-diff for reproducible training.' },
+        F1: { group: 'D/E/F \u2014 Generated C Runtime', name: 'Runtime Accum', tests: 'Accumulated gradients over N micro-steps in generated C match a single full-batch gradient. Script: check_runtime_replay_accum_v7.py.', why: 'Most critical generated-code gate. Gradient accumulation in the C runtime is the core training operation \u2014 if this fails, every multi-batch step is wrong.' },
+    };
+    // B and C stages are dynamic (driven by the regimen config). Fill catalog from actual stage rows.
+    for (const row of regimenStages) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (/^B\d+$/.test(id) && !_rkCatalog[id]) {
+            const g = id.slice(1);
+            _rkCatalog[id] = { group: 'B \u2014 Grad Accum', name: 'AdamW g=' + g, tests: 'AdamW optimizer with grad_accum=' + g + ' micro-steps per optimizer step. Gates on mean param diff (not max) to exclude AdamW epsilon-amplification outliers at step 1.', why: 'Validates gradient averaging for ' + g + '\u00d7 effective batch size. Required before scaling throughput via accumulation.' };
+        }
+        if (/^C\d+$/.test(id) && !_rkCatalog[id]) {
+            const nm = String(row.name || id);
+            _rkCatalog[id] = { group: 'C \u2014 Stability', name: nm.length > 28 ? id : nm, tests: 'Multi-epoch stability sweep. Runs the optimizer for more steps across multiple epochs to catch divergence that short A/B runs miss.', why: 'Longer-horizon regression gate. Protects against fp32 optimizer drift and edge cases that only surface after \u2265 5 optimizer steps.' };
+        }
+    }
+    const _rkGroupOrder = ['A \u2014 Baseline Kernels', 'B \u2014 Grad Accum', 'C \u2014 Stability', 'D/E/F \u2014 Generated C Runtime'];
+    const _rkByGroup = {};
+    for (const g of _rkGroupOrder) _rkByGroup[g] = [];
+
+    // Merge harness stages + standalone runtime rows into one list.
+    const _rkAllRows = [...regimenStages];
+    for (const [id, passVal] of [['D1', dPass], ['D2', d2Pass], ['E1', ePass], ['F1', fPass]]) {
+        if (!regimenStageById[id] && passVal !== null) {
+            _rkAllRows.push({ id, status: passVal === true ? 'PASS' : 'FAIL', metrics: {}, notes: [] });
+        }
+    }
+    for (const row of _rkAllRows) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (!id) continue;
+        const info = _rkCatalog[id] || { group: 'Other', name: id, tests: String(row.name || ''), why: '' };
+        if (!_rkByGroup[info.group]) _rkByGroup[info.group] = [];
+        _rkByGroup[info.group].push({ id, row, info });
+    }
+
+    const _rkFmtExp = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toExponential(2) : null; };
+    const _rkFmtDur = (s) => { const n = Number(s); if (!Number.isFinite(n)) return ''; return n < 60 ? n.toFixed(1) + 's' : (n / 60).toFixed(1) + 'm'; };
+
+    // Overall readiness signal.
+    const _rkCriticalFails = ['A1', 'D1', 'E1', 'F1'].filter((id) => {
+        const r = regimenStageById[id];
+        if (r) return stageIsFail(r);
+        if (id === 'D1') return dPass === false;
+        if (id === 'E1') return ePass === false;
+        if (id === 'F1') return fPass === false;
+        return false;
+    });
+    const _rkAnyFail  = regimenStages.some((r) => stageIsFail(r)) || runtimeFailed;
+    const _rkAnyLoaded = regimenStages.length > 0 || runtimeLoadedCount > 0;
+    const _rkAllPass  = _rkAnyLoaded && !_rkAnyFail;
+    const _rkBannerColor = !_rkAnyLoaded ? '#fcd34d' : (_rkAllPass ? '#6ee7b7' : (_rkCriticalFails.length > 0 ? '#fca5a5' : '#fbbf24'));
+    const _rkBannerMsg = !_rkAnyLoaded
+        ? '\u26a0\ufe0f  No parity data loaded \u2014 run the regimen before training'
+        : (_rkAllPass
+            ? '\u2713  All parity gates passing \u2014 code is ready to train'
+            : (_rkCriticalFails.length > 0
+                ? '\u2717  Critical gates failing (' + _rkCriticalFails.join(', ') + ') \u2014 do not start a long training run'
+                : '\u26a0\ufe0f  Some gates failing \u2014 review before committing training budget'));
+
+    // Build group + card HTML (string concatenation to avoid nested backtick issues).
+    const _rkGroupHtml = _rkGroupOrder.map((grp) => {
+        const items = _rkByGroup[grp] || [];
+        if (!items.length) return '';
+        const passCount = items.filter(({ row }) => stageIsPass(row)).length;
+        const grpAnyFail = items.some(({ row }) => stageIsFail(row));
+        const grpAllPass = passCount === items.length;
+        const grpLabelColor = grpAllPass ? '#6ee7b7' : (grpAnyFail ? '#fca5a5' : '#9ca3af');
+
+        const cards = items.map(({ id, row, info }) => {
+            const isPass    = stageIsPass(row);
+            const isFail    = stageIsFail(row);
+            const cardBorder = isPass ? '#47b475'               : (isFail ? '#f87171'               : '#4b5563');
+            const cardBg     = isPass ? 'rgba(71,180,117,0.07)' : (isFail ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.02)');
+            const badgeCls   = isPass ? 'badge-green'           : (isFail ? 'badge-orange'           : '');
+            const dur        = _rkFmtDur(row.duration_s);
+            const mx         = (row && typeof row.metrics === 'object') ? row.metrics : {};
+            const metricBits = [];
+            const lD = _rkFmtExp(mx.max_loss_abs_diff);
+            const pD = _rkFmtExp(mx.final_param_mean_abs_diff !== undefined ? mx.final_param_mean_abs_diff : mx.final_param_max_abs_diff);
+            if (lD)  metricBits.push('loss\u0394=' + lD);
+            if (pD)  metricBits.push('param\u0394=' + pD);
+            if (mx.optimizer_steps) metricBits.push(mx.optimizer_steps + ' opt steps');
+            const notes    = Array.isArray(row && row.notes) ? row.notes.filter(Boolean) : [];
+            const lastNote = notes.length ? notes[notes.length - 1] : '';
+            return '<div style="border:1px solid ' + cardBorder + ';border-radius:6px;padding:0.5rem 0.65rem;'
+                +   'background:' + cardBg + ';flex:1 1 200px;min-width:190px;max-width:340px;">'
+                + '<div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.16rem;">'
+                +   '<span class="badge ' + badgeCls + '" style="min-width:2.3rem;text-align:center;font-size:0.72rem;">'
+                +     htmlEscape(id) + '</span>'
+                +   '<span style="font-size:0.8rem;font-weight:700;color:#e5e7eb;">' + htmlEscape(info.name) + '</span>'
+                +   (dur ? '<span style="color:#6b7280;font-size:0.67rem;margin-left:auto;">' + htmlEscape(dur) + '</span>' : '')
+                + '</div>'
+                + '<div style="font-size:0.71rem;color:#9ca3af;line-height:1.4;">' + htmlEscape(info.tests) + '</div>'
+                + (metricBits.length
+                    ? '<div style="font-size:0.69rem;color:#60a5fa;margin-top:0.22rem;font-family:monospace;">'
+                    +   htmlEscape(metricBits.join(' \u00b7 ')) + '</div>'
+                    : '')
+                + (lastNote
+                    ? '<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">\u26a0\ufe0f ' + htmlEscape(lastNote) + '</div>'
+                    : '')
+                + '<div style="font-size:0.67rem;color:#a78bfa;margin-top:0.18rem;line-height:1.35;">'
+                +   '\u21b3 ' + htmlEscape(info.why) + '</div>'
+                + '</div>';
+        }).join('');
+
+        return '<div style="margin-bottom:0.9rem;">'
+            + '<div style="font-size:0.72rem;font-weight:700;color:' + grpLabelColor + ';margin-bottom:0.38rem;'
+            +   'letter-spacing:0.03em;text-transform:uppercase;">'
+            +   htmlEscape(grp) + ' <span style="opacity:0.5;font-weight:400;text-transform:none;">('
+            +   passCount + '/' + items.length + ' pass)</span>'
+            + '</div>'
+            + '<div style="display:flex;flex-wrap:wrap;gap:0.4rem;">' + cards + '</div>'
+            + '</div>';
+    }).join('');
+
+    const trainingReadinessSection = '<div class="parity-section" style="margin-top:0.8rem;">'
+        + '<h3><span class="badge ' + (_rkAllPass ? 'badge-green' : (_rkAnyLoaded ? 'badge-orange' : '')) + '">'
+        +   'Training Readiness</span> Parity Gate \u2014 Stage-by-Stage</h3>'
+        + '<div style="border-radius:6px;padding:0.55rem 0.9rem;margin-bottom:0.7rem;font-size:0.84rem;'
+        +   'font-weight:700;color:' + _rkBannerColor + ';border:1px solid ' + _rkBannerColor + ';'
+        +   'background:' + _rkBannerColor + '1a;">'
+        +   htmlEscape(_rkBannerMsg)
+        + '</div>'
+        + '<div style="font-size:0.71rem;color:#6b7280;margin-bottom:0.7rem;line-height:1.6;">'
+        +   'Each card: <strong style="color:#9ca3af;">what the test verifies</strong> \u00b7 '
+        +   '<span style="color:#60a5fa;font-family:monospace;">key metrics</span> \u00b7 '
+        +   '<span style="color:#a78bfa;">\u21b3 why it matters</span>. '
+        +   '<span style="color:#6ee7b7;">\u2713 green = pass</span> \u00b7 '
+        +   '<span style="color:#f87171;">\u2717 red = fail</span> \u00b7 '
+        +   'grey = not yet run. \u00a0'
+        +   '<span style="color:#9ca3af;">A/B/C = Python harness stress tests</span> \u00b7 '
+        +   '<span style="color:#9ca3af;">D/E/F = Generated C runtime signoff (the code that actually trains).</span>'
+        + '</div>'
+        + _rkGroupHtml
+        + '</div>';
+    // ── end Training Readiness Panel ─────────────────────────────────────────
+
     const stagePlanSection = `
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-blue">Stage Plan</span> Dataset Training Plan & Progress</h3>
@@ -19067,6 +19210,7 @@ function renderDataLabPanel(files) {
             </div>
         </div>
         ${stageFlowSection}
+        ${trainingReadinessSection}
         ${stagePlanSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
