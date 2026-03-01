@@ -1329,6 +1329,144 @@
     flex-shrink: 0;
 }
 .op-connector.conn-done { background: #47b475; opacity: 0.5; }
+
+/* ── Pipeline Graph Visualizer ─────────────────────────────────────────── */
+.pg-section {
+    margin: 1.5rem 0 2rem;
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.pg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.1rem 0.75rem;
+    border-bottom: 1px solid var(--grey);
+    flex-wrap: wrap;
+}
+.pg-header h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+.pg-header p  { margin: 0; font-size: 0.8rem; color: var(--text-muted); flex: 1; min-width: 200px; }
+.pg-controls {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px solid #1e2738;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.pg-btn {
+    padding: 0.35rem 0.8rem;
+    border-radius: 5px;
+    border: 1px solid var(--grey);
+    background: #1e2738;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.pg-btn:hover { background: #263348; border-color: var(--orange); }
+.pg-btn.pg-btn-primary { background: var(--orange); color: #0a0e1a; border-color: var(--orange); font-weight: 700; }
+.pg-btn.pg-btn-primary:hover { background: #e6a200; }
+.pg-input-row {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px solid #1e2738;
+    align-items: flex-start;
+}
+.pg-textarea {
+    flex: 1;
+    min-height: 64px;
+    max-height: 140px;
+    background: #0a0e1a;
+    border: 1px solid var(--grey);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-family: monospace;
+    padding: 0.5rem 0.7rem;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.pg-textarea:focus { border-color: var(--orange); }
+.pg-canvas-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.75rem 1.1rem 0.9rem;
+    min-height: 220px;
+}
+.pg-canvas-wrap svg { display: block; }
+.pg-legend {
+    display: flex;
+    gap: 1.2rem;
+    padding: 0 1.1rem 0.75rem;
+    flex-wrap: wrap;
+}
+.pg-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.pg-legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.pg-btn-add { background: #0f2d1a; border-color: #4ade80; color: #4ade80; }
+.pg-btn-add:hover { background: #1a4a2a; border-color: #86efac; }
+
+/* ── Pipeline Graph Popup ─────────────────────────────────────────────────── */
+.pg-popup-overlay {
+    position: fixed; inset: 0; background: rgba(5,10,25,0.78);
+    backdrop-filter: blur(4px); z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+}
+.pg-popup {
+    background: #111827; border: 1px solid #334155; border-radius: 12px;
+    padding: 1.25rem 1.5rem 1.4rem; max-width: 440px; width: 90%;
+    position: relative; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.75);
+}
+.pg-popup-close {
+    position: absolute; top: 0.7rem; right: 0.85rem;
+    background: none; border: none; color: #64748b;
+    font-size: 1.1rem; cursor: pointer; line-height: 1; padding: 0.1rem 0.3rem;
+}
+.pg-popup-close:hover { color: #f1f5f9; }
+.pg-popup h4 { margin: 0 0 0.9rem; font-size: 0.95rem; color: #e2e8f0; font-weight: 700; }
+.pg-popup-row { margin-bottom: 0.65rem; }
+.pg-popup-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
+.pg-popup-val { font-size: 0.85rem; color: #cbd5e1; font-family: monospace; }
+.pg-popup-input {
+    width: 100%; background: #0a0e1a; border: 1px solid #334155;
+    border-radius: 5px; color: #e2e8f0; font-size: 0.82rem;
+    padding: 0.35rem 0.55rem; outline: none; box-sizing: border-box; font-family: monospace;
+}
+.pg-popup-input:focus { border-color: var(--orange); }
+.pg-popup-select {
+    width: 100%; background: #0a0e1a; border: 1px solid #334155;
+    border-radius: 5px; color: #e2e8f0; font-size: 0.82rem;
+    padding: 0.35rem 0.55rem; outline: none; box-sizing: border-box;
+}
+.pg-popup-select:focus { border-color: var(--orange); }
+.pg-popup-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+.pg-popup-save { background: var(--orange); border-color: var(--orange); color: #0a0e1a; font-weight: 700; }
+.pg-popup-save:hover { background: #e6a200; border-color: #e6a200; }
+.pg-popup-del { background: #2d0a0a; border-color: #f87171; color: #f87171; }
+.pg-popup-del:hover { background: #450a0a; border-color: #fca5a5; }
+.pg-run-row {
+    background: #0a0e1a; border: 1px solid #1e2738; border-radius: 5px;
+    padding: 0.4rem 0.6rem; margin-bottom: 0.35rem;
+    font-size: 0.77rem; color: #94a3b8; font-family: monospace;
+}
+.pg-run-row .run-id { color: #60a5fa; }
+#pg-svg g[onclick] { transition: opacity 0.12s; }
+#pg-svg g[onclick]:hover { opacity: 0.72; }
 </style>
 
 <h1>v7 Inference + Training Runbook</h1>
@@ -1772,6 +1910,471 @@
 </svg>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════════
+     PIPELINE GRAPH VISUALIZER
+     Paste any training_plan.json → renders compute + data pipeline as SVG.
+     Also has a sample built-in so anyone can see how stages connect.
+     ════════════════════════════════════════════════════════════════════════ -->
+<section class="pg-section" id="pipeline-graph-section">
+    <div class="pg-header">
+        <span class="badge badge-orange" style="font-size:0.7rem;">Visual</span>
+        <h3>Training Pipeline Graph</h3>
+        <p>Paste a <code>training_plan.json</code> to visualize compute stages + data flow. Share as a clean public diagram — no internals exposed.</p>
+    </div>
+    <div class="pg-controls">
+        <button class="pg-btn pg-btn-primary" onclick="pgRender()">Render Graph</button>
+        <button class="pg-btn" onclick="pgLoadExample()">Load Example</button>
+        <button class="pg-btn" onclick="pgClearJSON()">Clear</button>
+        <button class="pg-btn pg-btn-add" onclick="pgShowAddStagePopup()">+ Add Stage</button>
+        <span id="pg-status" style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;"></span>
+    </div>
+    <div class="pg-input-row">
+        <textarea class="pg-textarea" id="pg-json-input" placeholder='Paste training_plan.json here, or click "Load Example" →'></textarea>
+    </div>
+    <div class="pg-canvas-wrap" id="pg-canvas-wrap">
+        <svg id="pg-svg" width="100%" height="220"><text x="50%" y="50%" text-anchor="middle" fill="#334155" font-size="13" font-family="Inter,system-ui,sans-serif">Click "Load Example" or paste a training_plan.json and click Render Graph.</text></svg>
+    </div>
+    <div class="pg-legend">
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#4ade80;"></div>Completed</div>
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#fbbf24;"></div>Active</div>
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#64748b;"></div>Planned</div>
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#334155;border:1px solid #475569;"></div>Deferred</div>
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#60a5fa;"></div>Dataset node</div>
+        <div class="pg-legend-item"><div class="pg-legend-dot" style="background:#a78bfa;"></div>Output / Checkpoint</div>
+    </div>
+</section>
+
+<div id="pg-popup-overlay" class="pg-popup-overlay" onclick="if(event.target===this)pgPopupClose()" style="display:none;">
+    <div class="pg-popup" id="pg-popup">
+        <button class="pg-popup-close" onclick="pgPopupClose()" title="Close">✕</button>
+        <div id="pg-popup-content"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+// ─── Pipeline Graph Visualizer (interactive) ───────────────────────────────
+let pgState = null; // mutable plan object
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const EXAMPLE_PLAN = {
+    schema: "ck.training_plan.v1",
+    active_stage: "sft",
+    stage_order: ["pretrain","midtrain","sft","dpo","grpo"],
+    stages: [
+        { stage:"pretrain",  status:"completed", datasets:[{name:"stage_a_plus_bridge.txt", rows:10014}],
+          runs:[{run_id:"181208",first_loss:6.97,final_loss:1.17,lr:3e-4,steps:2048}] },
+        { stage:"midtrain",  status:"completed", datasets:[{name:"stage_b.txt", rows:23228}],
+          runs:[{run_id:"210719",first_loss:3.35,final_loss:1.12,lr:3e-4,steps:2048}] },
+        { stage:"sft",       status:"active",    datasets:[{name:"sft_mix_overnight_v1.txt", rows:88000}],
+          runs:[
+              {run_id:"220504",first_loss:0.96,final_loss:0.79,lr:1e-4,steps:2048},
+              {run_id:"022100",first_loss:0.82,final_loss:0.73,lr:1e-4,steps:2048},
+              {run_id:"064948",first_loss:0.82,final_loss:null, lr:8e-5,steps:null}
+          ] },
+        { stage:"dpo",  status:"deferred", datasets:[], runs:[] },
+        { stage:"grpo", status:"planned",  datasets:[], runs:[],
+          detail:"Only if eval valid_svg_rate < 0.85 after SFT" }
+    ]
+};
+
+const STATUS = {
+    completed: { color:"#4ade80", bg:"#052e16", label:"done"    },
+    active:    { color:"#fbbf24", bg:"#1c1200", label:"active"  },
+    planned:   { color:"#64748b", bg:"#0f172a", label:"planned" },
+    deferred:  { color:"#475569", bg:"#0f172a", label:"deferred"},
+    blocked:   { color:"#f87171", bg:"#2d0a0a", label:"blocked" },
+};
+function sc(s) { return STATUS[s] || STATUS.planned; }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _pgEsc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _pgTrunc(s, n) { s = String(s||''); return s.length > n ? s.slice(0,n-1)+'…' : s; }
+function _pgFmtLoss(v) { return v==null ? '—' : Number(v).toFixed(3); }
+function _pgFmtLR(v) {
+    if (v == null) return '—';
+    const n = Number(v);
+    if (n >= 1e-2) return n.toFixed(4);
+    return n.toExponential(0).replace('e-0','e-').replace('e+0','').replace('e0','');
+}
+function pgSetStatus(msg, err) {
+    const el = document.getElementById('pg-status');
+    if (el) { el.textContent = msg; el.style.color = err ? '#f87171' : '#64748b'; }
+}
+
+// ── Textarea sync ─────────────────────────────────────────────────────────────
+function pgUpdateTextarea() {
+    if (!pgState) return;
+    const t = document.getElementById('pg-json-input');
+    if (t) t.value = JSON.stringify(pgState, null, 2);
+}
+
+// ── Toolbar actions ───────────────────────────────────────────────────────────
+function pgClearJSON() {
+    pgState = null;
+    const t = document.getElementById('pg-json-input');
+    if (t) t.value = '';
+    const svg = document.getElementById('pg-svg');
+    if (svg) { svg.setAttribute('height','220'); svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#334155" font-size="13" font-family="Inter,system-ui,sans-serif">Paste a training_plan.json and click Render Graph.</text>'; }
+    pgSetStatus('');
+}
+function pgLoadExample() {
+    pgState = JSON.parse(JSON.stringify(EXAMPLE_PLAN));
+    pgUpdateTextarea();
+    _pgDraw(pgState);
+    pgSetStatus('Example loaded — click any node to inspect or edit');
+}
+function pgRender() {
+    const t = document.getElementById('pg-json-input');
+    if (!t || !t.value.trim()) { pgSetStatus('Nothing to render — paste JSON or load example', true); return; }
+    let plan;
+    try { plan = JSON.parse(t.value.trim()); }
+    catch(e) { pgSetStatus('JSON parse error: ' + e.message, true); return; }
+    pgState = plan;
+    try { _pgDraw(pgState); pgSetStatus(''); }
+    catch(e) { pgSetStatus('Render error: ' + e.message, true); }
+}
+
+// ── Popup helpers ─────────────────────────────────────────────────────────────
+function pgPopupClose() {
+    const ov = document.getElementById('pg-popup-overlay');
+    if (ov) ov.style.display = 'none';
+}
+function _pgPopupShow(html) {
+    const c = document.getElementById('pg-popup-content');
+    if (c) c.innerHTML = html;
+    const ov = document.getElementById('pg-popup-overlay');
+    if (ov) ov.style.display = 'flex';
+}
+
+// ── Node click (called from SVG inline onclick) ───────────────────────────────
+function pgNodeClick(type, stageIdx) {
+    if (!pgState) return;
+    const st = (pgState.stages || [])[stageIdx];
+    if (!st) return;
+    if (type === 'stage')      _pgPopupShowStage(st, stageIdx);
+    else if (type === 'dataset')    _pgPopupShowDataset(st, stageIdx);
+    else if (type === 'checkpoint') _pgPopupShowCheckpoint(st, stageIdx);
+}
+
+// ── Stage popup (editable) ────────────────────────────────────────────────────
+function _pgPopupShowStage(st, idx) {
+    const runs = Array.isArray(st.runs) ? st.runs : [];
+    const statusOpts = ['planned','active','completed','deferred','blocked']
+        .map(s => `<option value="${s}"${s===st.status?' selected':''}>${s}</option>`).join('');
+    const ds = Array.isArray(st.datasets) && st.datasets[0] ? st.datasets[0] : {};
+    const runsHtml = runs.length
+        ? runs.map(r =>
+            `<div class="pg-run-row"><span class="run-id">${_pgEsc(r.run_id||'?')}</span>`
+            + ` &nbsp;·&nbsp; ${_pgFmtLoss(r.first_loss)} → ${_pgFmtLoss(r.final_loss)}`
+            + ` &nbsp;·&nbsp; lr&nbsp;${_pgFmtLR(r.lr)} &nbsp;·&nbsp; ${r.steps||'?'}&nbsp;steps</div>`
+          ).join('')
+        : '<div style="color:#475569;font-size:0.78rem;padding:0.2rem 0;">No runs recorded.</div>';
+
+    _pgPopupShow(`
+        <h4>Stage: ${_pgEsc(st.stage)}</h4>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Status</div>
+            <select class="pg-popup-select" id="pg-edit-status">${statusOpts}</select>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Dataset name</div>
+            <input class="pg-popup-input" id="pg-edit-ds-name" value="${_pgEsc(ds.name||'')}" placeholder="e.g. sft_mix_v2.txt"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Dataset rows</div>
+            <input class="pg-popup-input" type="number" id="pg-edit-ds-rows" value="${ds.rows||''}" placeholder="e.g. 13200"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Gate / detail note</div>
+            <input class="pg-popup-input" id="pg-edit-detail" value="${_pgEsc(st.detail||'')}" placeholder="e.g. Only if valid_svg_rate &lt; 0.85"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Training runs (${runs.length})</div>
+            ${runsHtml}
+        </div>
+        <div class="pg-popup-actions">
+            <button class="pg-btn pg-popup-save" onclick="pgSaveEditStage(${idx})">Save</button>
+            <button class="pg-btn pg-popup-del" onclick="pgDeleteStage(${idx})">Delete Stage</button>
+            <button class="pg-btn" onclick="pgPopupClose()">Cancel</button>
+        </div>`);
+}
+
+// ── Dataset popup (info only, hints to edit via stage) ────────────────────────
+function _pgPopupShowDataset(st, idx) {
+    const ds = Array.isArray(st.datasets) && st.datasets[0] ? st.datasets[0] : {};
+    const packRow = ds.pack_mode
+        ? `<div class="pg-popup-row"><div class="pg-popup-label">Pack mode</div><div class="pg-popup-val">${_pgEsc(ds.pack_mode)}</div></div>` : '';
+    const tokRow = ds.tokens != null
+        ? `<div class="pg-popup-row"><div class="pg-popup-label">Tokens</div><div class="pg-popup-val">${(ds.tokens/1e6).toFixed(2)}M</div></div>` : '';
+    _pgPopupShow(`
+        <h4>Dataset</h4>
+        <div class="pg-popup-row"><div class="pg-popup-label">Name</div><div class="pg-popup-val">${_pgEsc(ds.name||'—')}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">Rows</div><div class="pg-popup-val">${ds.rows!=null?Number(ds.rows).toLocaleString():'—'}</div></div>
+        ${tokRow}${packRow}
+        <div class="pg-popup-row"><div class="pg-popup-label">Stage</div><div class="pg-popup-val">${_pgEsc(st.stage)}</div></div>
+        <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 0;">To edit dataset details, click the stage node above it.</p>
+        <div class="pg-popup-actions"><button class="pg-btn" onclick="pgPopupClose()">Close</button></div>`);
+}
+
+// ── Checkpoint popup (info) ───────────────────────────────────────────────────
+function _pgPopupShowCheckpoint(st, idx) {
+    const runs  = Array.isArray(st.runs) ? st.runs : [];
+    const last  = runs.filter(r=>r.final_loss!=null).slice(-1)[0];
+    _pgPopupShow(`
+        <h4>Checkpoint: ${_pgEsc(st.stage)}</h4>
+        <div class="pg-popup-row"><div class="pg-popup-label">State</div><div class="pg-popup-val">${st.status==='active'?'in progress':'saved'}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">Final loss</div><div class="pg-popup-val">${_pgFmtLoss(last?last.final_loss:null)}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">LR</div><div class="pg-popup-val">${_pgFmtLR(last?last.lr:null)}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">Steps</div><div class="pg-popup-val">${(last&&last.steps)||'—'}</div></div>
+        <div class="pg-popup-actions"><button class="pg-btn" onclick="pgPopupClose()">Close</button></div>`);
+}
+
+// ── Save / delete stage ───────────────────────────────────────────────────────
+function pgSaveEditStage(idx) {
+    if (!pgState) return;
+    const st = (pgState.stages||[])[idx];
+    if (!st) return;
+    const status = (document.getElementById('pg-edit-status')||{}).value;
+    const dsName = ((document.getElementById('pg-edit-ds-name')||{}).value||'').trim();
+    const dsRows = (document.getElementById('pg-edit-ds-rows')||{}).value;
+    const detail = ((document.getElementById('pg-edit-detail')||{}).value||'').trim();
+    if (status) st.status = status;
+    if (detail) st.detail = detail; else delete st.detail;
+    if (dsName) {
+        if (!Array.isArray(st.datasets)||!st.datasets.length) st.datasets = [{}];
+        st.datasets[0].name = dsName;
+        if (dsRows) st.datasets[0].rows = parseInt(dsRows,10)||st.datasets[0].rows;
+    }
+    pgUpdateTextarea(); _pgDraw(pgState); pgPopupClose();
+    pgSetStatus('Saved: ' + st.stage);
+}
+
+function pgDeleteStage(idx) {
+    if (!pgState) return;
+    const stages = pgState.stages||[];
+    const name = stages[idx] && stages[idx].stage;
+    if (!name || !window.confirm('Delete stage "' + name + '"?')) return;
+    stages.splice(idx, 1);
+    pgState.stages = stages;
+    pgUpdateTextarea(); _pgDraw(pgState); pgPopupClose();
+    pgSetStatus('Deleted: ' + name);
+}
+
+// ── Add Stage popup ───────────────────────────────────────────────────────────
+function pgShowAddStagePopup() {
+    if (!pgState) { pgSetStatus('Load or paste a plan first', true); return; }
+    _pgPopupShow(`
+        <h4>+ Add Stage</h4>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Stage name *</div>
+            <input class="pg-popup-input" id="pg-add-name" placeholder="e.g. sft, dpo, grpo, boundary_pack"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Status</div>
+            <select class="pg-popup-select" id="pg-add-status">
+                <option value="planned" selected>planned</option>
+                <option value="active">active</option>
+                <option value="completed">completed</option>
+                <option value="deferred">deferred</option>
+            </select>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Dataset name (optional)</div>
+            <input class="pg-popup-input" id="pg-add-ds-name" placeholder="e.g. boundary_pack_v1.txt"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Dataset rows (optional)</div>
+            <input class="pg-popup-input" type="number" id="pg-add-ds-rows" placeholder="e.g. 88000"/>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Pack mode</div>
+            <select class="pg-popup-select" id="pg-add-pack">
+                <option value="">none</option>
+                <option value="sample">sample — boundary-aware</option>
+                <option value="full">full</option>
+            </select>
+        </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Gate / detail note (optional)</div>
+            <input class="pg-popup-input" id="pg-add-detail" placeholder="e.g. Only if valid_svg_rate &lt; 0.85"/>
+        </div>
+        <div class="pg-popup-actions">
+            <button class="pg-btn pg-popup-save" onclick="pgSaveAddStage()">Add Stage</button>
+            <button class="pg-btn" onclick="pgPopupClose()">Cancel</button>
+        </div>`);
+}
+
+function pgSaveAddStage() {
+    if (!pgState) return;
+    const name = ((document.getElementById('pg-add-name')||{}).value||'').trim();
+    if (!name) { pgSetStatus('Stage name is required', true); return; }
+    const status   = (document.getElementById('pg-add-status')||{}).value||'planned';
+    const dsName   = ((document.getElementById('pg-add-ds-name')||{}).value||'').trim();
+    const dsRows   = (document.getElementById('pg-add-ds-rows')||{}).value;
+    const packMode = (document.getElementById('pg-add-pack')||{}).value||'';
+    const detail   = ((document.getElementById('pg-add-detail')||{}).value||'').trim();
+    const newSt = { stage:name, status, datasets:[], runs:[] };
+    if (dsName) {
+        const ds = { name:dsName };
+        if (dsRows) ds.rows = parseInt(dsRows,10)||undefined;
+        if (packMode) ds.pack_mode = packMode;
+        newSt.datasets = [ds];
+    }
+    if (detail) newSt.detail = detail;
+    if (!Array.isArray(pgState.stages)) pgState.stages = [];
+    pgState.stages.push(newSt);
+    if (!Array.isArray(pgState.stage_order)) pgState.stage_order = [];
+    if (!pgState.stage_order.includes(name)) pgState.stage_order.push(name);
+    pgUpdateTextarea(); _pgDraw(pgState); pgPopupClose();
+    pgSetStatus('Stage "' + name + '" added');
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function _pgDraw(plan) {
+    const wrap  = document.getElementById('pg-canvas-wrap');
+    const svgEl = document.getElementById('pg-svg');
+    if (!wrap || !svgEl) return;
+
+    const stages = Array.isArray(plan.stages) ? plan.stages : [];
+    const order  = Array.isArray(plan.stage_order) ? plan.stage_order : stages.map(s=>s.stage);
+    const orderedStages = [...stages].sort((a,b) => {
+        const ai = order.indexOf(a.stage); const bi = order.indexOf(b.stage);
+        return (ai<0?999:ai) - (bi<0?999:bi);
+    });
+
+    // Layout
+    const SW = 164, SH = 90;
+    const DW = 144, DH = 54;
+    const OW = 120, OH = 42;
+    const GAP = 44;
+    const ML = 32, MT = 16, MR = 32, MB = 24;
+    const ROW_DS  = MT;
+    const ROW_ST  = MT + DH + 26;
+    const ROW_OUT = ROW_ST + SH + 26;
+    const TOTAL_H = ROW_OUT + OH + MB;
+    const TOTAL_W = ML + orderedStages.length * (SW + GAP) - GAP + MR;
+
+    svgEl.setAttribute('width',   Math.max(TOTAL_W, 400));
+    svgEl.setAttribute('height',  TOTAL_H);
+    svgEl.setAttribute('viewBox', `0 0 ${Math.max(TOTAL_W,400)} ${TOTAL_H}`);
+    wrap.style.minHeight = TOTAL_H + 'px';
+
+    const uid = 'pg' + Date.now();
+    let html = `<defs>
+        <marker id="${uid}_arr"  markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#334155"/></marker>
+        <marker id="${uid}_arrA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#fbbf2488"/></marker>
+        <marker id="${uid}_arrG" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#4ade8088"/></marker>
+        <filter id="${uid}_glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>`;
+
+    const stageXC = [];
+
+    orderedStages.forEach((st, i) => {
+        const cfg = sc(st.status);
+        const x   = ML + i * (SW + GAP);
+        const cx  = x + SW / 2;
+        stageXC.push(cx);
+
+        // ── Dataset node ──────────────────────────────────────────────────────
+        const ds = Array.isArray(st.datasets) ? st.datasets[0] : null;
+        if (ds && (ds.name || ds.rows)) {
+            const dsName   = _pgTrunc(ds.name||'', 22);
+            const dsRows   = ds.rows != null ? Number(ds.rows).toLocaleString() + ' rows' : '';
+            const dsTokens = ds.tokens != null ? ' · ' + (ds.tokens/1e6).toFixed(1) + 'M tok' : '';
+            const dsX = cx - DW/2;
+            html += `<g onclick="pgNodeClick('dataset',${i})" style="cursor:pointer;">
+                <rect x="${dsX}" y="${ROW_DS}" width="${DW}" height="${DH}" rx="7" fill="#0a1628" stroke="#1e4d7b" stroke-width="1.2"/>
+                <text x="${cx}" y="${ROW_DS+14}" text-anchor="middle" fill="#60a5fa" font-size="9.5" font-weight="700" font-family="Inter,system-ui,sans-serif">dataset</text>
+                <text x="${cx}" y="${ROW_DS+27}" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-family="monospace">${_pgEsc(dsName)}</text>
+                <text x="${cx}" y="${ROW_DS+42}" text-anchor="middle" fill="#4b6a8a" font-size="8" font-family="Inter,system-ui,sans-serif">${_pgEsc(dsRows+dsTokens)}</text>
+            </g>`;
+            html += `<line x1="${cx}" y1="${ROW_DS+DH}" x2="${cx}" y2="${ROW_ST-3}" stroke="#1e4d7b" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#${uid}_arr)"/>`;
+        }
+
+        // ── Stage node ────────────────────────────────────────────────────────
+        const runs     = Array.isArray(st.runs) ? st.runs : [];
+        const lastRun  = runs.filter(r=>r.final_loss!=null).slice(-1)[0];
+        const firstRun = runs[0];
+        const lossStr  = firstRun && lastRun
+            ? `${_pgFmtLoss(firstRun.first_loss)} → ${_pgFmtLoss(lastRun.final_loss)}`
+            : firstRun ? `${_pgFmtLoss(firstRun.first_loss)} → …` : '';
+        const lrStr    = lastRun ? `lr ${_pgFmtLR(lastRun.lr)}` : (runs[0] ? `lr ${_pgFmtLR(runs[0].lr)}` : '');
+        const glow     = st.status === 'active' ? `filter="url(#${uid}_glow)"` : '';
+        const strokeW  = st.status === 'active' ? '2' : '1.4';
+        const chipW = 52, chipX = x + SW - chipW - 6;
+
+        html += `<g onclick="pgNodeClick('stage',${i})" style="cursor:pointer;">
+            <rect x="${x}" y="${ROW_ST}" width="${SW}" height="${SH}" rx="9" fill="${cfg.bg}" stroke="${cfg.color}" stroke-width="${strokeW}" ${glow}/>
+            <text x="${cx}" y="${ROW_ST+18}" text-anchor="middle" fill="${cfg.color}" font-size="12" font-weight="700" font-family="Inter,system-ui,sans-serif">${_pgEsc(st.stage)}</text>
+            <rect x="${chipX}" y="${ROW_ST+6}" width="${chipW}" height="14" rx="4" fill="${cfg.color}22" stroke="${cfg.color}55" stroke-width="0.8"/>
+            <text x="${chipX+chipW/2}" y="${ROW_ST+16}" text-anchor="middle" fill="${cfg.color}" font-size="8" font-family="Inter,system-ui,sans-serif">${_pgEsc(cfg.label)}</text>`;
+        if (lossStr) {
+            html += `<text x="${cx}" y="${ROW_ST+37}" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="Inter,system-ui,sans-serif">loss: ${_pgEsc(lossStr)}</text>`;
+        }
+        const subLine = [lrStr, runs.length > 0 ? `${runs.length} run${runs.length>1?'s':''}` : ''].filter(Boolean).join(' · ');
+        if (subLine) {
+            html += `<text x="${cx}" y="${ROW_ST+52}" text-anchor="middle" fill="#475569" font-size="8.5" font-family="Inter,system-ui,sans-serif">${_pgEsc(subLine)}</text>`;
+        }
+        if (st.detail) {
+            html += `<text x="${cx}" y="${ROW_ST+66}" text-anchor="middle" fill="#374151" font-size="7.5" font-style="italic" font-family="Inter,system-ui,sans-serif">${_pgEsc(_pgTrunc(st.detail,32))}</text>`;
+        }
+        const completedRuns = runs.filter(r=>r.final_loss!=null);
+        if (completedRuns.length > 1) {
+            const sparkW = SW-24, sparkH = 10, sparkX = x+12, sparkY = ROW_ST+SH-16;
+            const allL = completedRuns.flatMap(r=>[r.first_loss,r.final_loss]).filter(v=>v!=null);
+            const lMin = Math.min(...allL), lMax = Math.max(...allL);
+            const pts = completedRuns.map((r,ri) => {
+                const px = sparkX + (ri/(completedRuns.length-1))*sparkW;
+                const py = sparkY + sparkH - ((r.final_loss-lMin)/(lMax-lMin+1e-9))*sparkH;
+                return `${px},${py}`;
+            }).join(' ');
+            html += `<polyline points="${pts}" fill="none" stroke="${cfg.color}88" stroke-width="1.2" stroke-linejoin="round"/>`;
+        }
+        html += `</g>`;
+
+        // ── Checkpoint node ───────────────────────────────────────────────────
+        if (st.status === 'completed' || st.status === 'active') {
+            const outX = cx - OW/2, isActive = st.status === 'active';
+            html += `<line x1="${cx}" y1="${ROW_ST+SH}" x2="${cx}" y2="${ROW_OUT-3}" stroke="${isActive?'#fbbf2455':'#4c1d9555'}" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#${uid}_${isActive?'arrA':'arr'})"/>`;
+            html += `<g onclick="pgNodeClick('checkpoint',${i})" style="cursor:pointer;">
+                <rect x="${outX}" y="${ROW_OUT}" width="${OW}" height="${OH}" rx="6" fill="#0f0a20" stroke="#4c1d95" stroke-width="1.2"/>
+                <text x="${cx}" y="${ROW_OUT+14}" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="700" font-family="Inter,system-ui,sans-serif">checkpoint</text>
+                <text x="${cx}" y="${ROW_OUT+27}" text-anchor="middle" fill="#6d4db5" font-size="8.5" font-family="Inter,system-ui,sans-serif">${_pgEsc(st.stage)} weights</text>
+                ${isActive?`<text x="${cx}" y="${ROW_OUT+37}" text-anchor="middle" fill="#fbbf2488" font-size="7.5" font-family="Inter,system-ui,sans-serif">in progress…</text>`:''}
+            </g>`;
+        }
+    });
+
+    // ── Horizontal arrows ──────────────────────────────────────────────────────
+    for (let i = 0; i < orderedStages.length - 1; i++) {
+        const isDone = orderedStages[i].status === 'completed';
+        html += `<line x1="${stageXC[i]+SW/2}" y1="${ROW_ST+SH/2}" x2="${stageXC[i+1]-SW/2-4}" y2="${ROW_ST+SH/2}" stroke="${isDone?'#4ade8055':'#33415588'}" stroke-width="1.5" marker-end="url(#${uid}_${isDone?'arrG':'arr'})"/>`;
+    }
+
+    svgEl.innerHTML = html;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    const t = document.getElementById('pg-json-input');
+    if (t && t.value.trim()) pgRender();
+});
+
+window.pgRender           = pgRender;
+window.pgLoadExample      = pgLoadExample;
+window.pgClearJSON        = pgClearJSON;
+window.pgPopupClose       = pgPopupClose;
+window.pgNodeClick        = pgNodeClick;
+window.pgShowAddStagePopup = pgShowAddStagePopup;
+window.pgSaveAddStage     = pgSaveAddStage;
+window.pgSaveEditStage    = pgSaveEditStage;
+window.pgDeleteStage      = pgDeleteStage;
+})();
+</script>
+
 <h2 id="step-0-0-config-init">Step 0.0: Config Init + Pipeline Designer (Recommended)</h2>
 
 <div class="card card-accent">
@@ -1980,7 +2583,7 @@
                 <button class="copy-btn" type="button" id="pd-copy-btn">Copy</button>
                 <pre class="pipeline-json-out" id="pd-json-out"># Click "Generate training_plan.json" to produce the plan.</pre>
             </div>
-            <p class="mini-note">Save this JSON as <code>$RUN/training_plan.json</code>. The IR Visualizer reads it to render the pipeline timeline. Toggle stages on/off to define exactly what you intend to run — this becomes your commit-alongside-code pipeline contract.</p>
+            <p class="mini-note">Save this JSON as <code>$RUN/training_plan.json</code>. The IR Visualizer reads it to render the pipeline timeline. Toggle stages on/off to define exactly what you intend to run — this becomes your commit-alongside-code pipeline contract. For repeated SFT passes, keep the current dataset in <code>stages[].datasets</code> and append each run record to <code>stages[].runs</code> (do not overwrite history).</p>
         </details>
 
         <div class="preset-actions">
@@ -3897,12 +4500,12 @@ python3 scripts/ck_chat.py --help</pre>
             '  "stage_order": ["pretrain","midtrain","sft","dpo","grpo","ppo"],',
             '  "tokenizer": {"type":"' + tokenizer + '","vocab_size":' + vocab + ',"tokenizer_corpora":[{"name":"${CK_NAME}_tokenizer_corpus.txt","path":"$TOKENIZER_CORPUS"}]},',
             '  "stages": [',
-            '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset"}]},',
-            '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset"}]},',
-            '    {"stage":"sft","seq":3,"status":"' + statusSft + '","enabled":' + (runSft ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_instruction_train.txt","path":"$SFT_DATA","kind":"instruction_dataset"}]},',
-            '    {"stage":"dpo","seq":4,"status":"' + statusDpo + '","enabled":' + (runDpo ? 'true' : 'false') + ',"datasets":' + dpoDatasets + '},',
-            '    {"stage":"grpo","seq":5,"status":"' + statusGrpo + '","enabled":' + (runGrpo ? 'true' : 'false') + ',"datasets":' + grpoDatasets + '},',
-            '    {"stage":"ppo","seq":6,"status":"' + statusPpo + '","enabled":' + (runPpo ? 'true' : 'false') + ',"datasets":' + ppoDatasets + '}',
+            '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset"}],"runs":[]},',
+            '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset"}],"runs":[]},',
+            '    {"stage":"sft","seq":3,"status":"' + statusSft + '","enabled":' + (runSft ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_instruction_train.txt","path":"$SFT_DATA","kind":"instruction_dataset"}],"runs":[]},',
+            '    {"stage":"dpo","seq":4,"status":"' + statusDpo + '","enabled":' + (runDpo ? 'true' : 'false') + ',"datasets":' + dpoDatasets + ',"runs":[]},',
+            '    {"stage":"grpo","seq":5,"status":"' + statusGrpo + '","enabled":' + (runGrpo ? 'true' : 'false') + ',"datasets":' + grpoDatasets + ',"runs":[]},',
+            '    {"stage":"ppo","seq":6,"status":"' + statusPpo + '","enabled":' + (runPpo ? 'true' : 'false') + ',"datasets":' + ppoDatasets + ',"runs":[]}',
             '  ]',
             '}',
             'JSON',
@@ -4109,6 +4712,19 @@ python3 scripts/ck_chat.py --help</pre>
     function _pdVal(id, fb) { var e = _pdEl(id); return (e && e.value && e.value.trim()) || fb || ''; }
     function _pdChecked(id) { var e = _pdEl(id); return e ? !!e.checked : false; }
 
+    function _pdBasename(p) {
+        var s = String(p || '').trim();
+        if (!s) return '';
+        var parts = s.split('/');
+        return parts[parts.length - 1] || s;
+    }
+
+    function _pdStageKind(stageName) {
+        if (stageName === 'pretrain' || stageName === 'midtrain') return 'generated_dataset';
+        if (stageName === 'sft') return 'instruction_dataset';
+        return 'alignment_dataset';
+    }
+
     function _pdBuildJson() {
         var name = _cfgVal('cfg-name', _autoName());
         var family = _cfgVal('cfg-family', 'qwen3');
@@ -4121,26 +4737,47 @@ python3 scripts/ck_chat.py --help</pre>
         var kvHeads = _cfgVal('cfg-kv-heads', '4');
 
         var stages = [];
+        var stageOrder = [];
+        var firstEnabled = null;
+        var seq = 1;
         PD_STAGES.forEach(function (s) {
             if (!_pdChecked('pstage-' + s + '-en')) return;
+            if (!firstEnabled) firstEnabled = s;
+            stageOrder.push(s);
+            var dsPath = _pdVal('pstage-' + s + '-dataset', '');
+            var dsSamples = parseInt(_pdVal('pstage-' + s + '-samples', '0'), 10) || null;
+            var datasets = [];
+            if (dsPath) {
+                var ds = {
+                    name: _pdBasename(dsPath),
+                    path: dsPath,
+                    kind: _pdStageKind(s)
+                };
+                if (dsSamples) ds.target_samples = dsSamples;
+                datasets.push(ds);
+            }
             var stageEntry = {
-                name: s,
+                stage: s,
+                seq: seq++,
+                status: (firstEnabled === s ? 'active' : 'planned'),
                 enabled: true,
-                dataset: _pdVal('pstage-' + s + '-dataset', ''),
+                datasets: datasets,
                 lr: _pdVal('pstage-' + s + '-lr', ''),
-                target_samples: parseInt(_pdVal('pstage-' + s + '-samples', '0'), 10) || null,
-                notes: _pdVal('pstage-' + s + '-notes', '')
+                notes: _pdVal('pstage-' + s + '-notes', ''),
+                runs: []
             };
-            if (!stageEntry.target_samples) delete stageEntry.target_samples;
+            if (!stageEntry.lr) delete stageEntry.lr;
             if (!stageEntry.notes) delete stageEntry.notes;
-            if (!stageEntry.dataset) delete stageEntry.dataset;
             stages.push(stageEntry);
         });
 
         var plan = {
-            schema_version: '1',
+            schema: 'ck.training_plan.v1',
+            created_by: 'v7-runbook-pipeline-designer',
             name: name,
             model_family: family,
+            active_stage: firstEnabled || 'pretrain',
+            stage_order: stageOrder,
             model_shape: {
                 layers: parseInt(layers, 10),
                 embed_dim: parseInt(embed, 10),
@@ -4151,7 +4788,7 @@ python3 scripts/ck_chat.py --help</pre>
                 num_kv_heads: parseInt(kvHeads, 10)
             },
             stages: stages,
-            notes: 'Generated by v7-runbook Pipeline Designer'
+            notes: 'Generated by v7-runbook Pipeline Designer; append stage runs under stages[].runs after each completed run.'
         };
         return JSON.stringify(plan, null, 2);
     }
@@ -4506,7 +5143,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-02-28</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-01</p>
             </div>
         </div>
     </footer>
