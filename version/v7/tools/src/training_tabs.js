@@ -908,6 +908,85 @@ function renderDataLabPanel(files) {
         </div>
     `;
 
+    const runLedgerRaw = (files && files.run_ledger && Array.isArray(files.run_ledger.entries))
+        ? files.run_ledger.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const runLedgerById = new Map();
+    runLedgerRaw.forEach((row) => {
+        const runId = String(row.run_id || '').trim();
+        if (!runId) return;
+        const prev = runLedgerById.get(runId);
+        if (!prev) {
+            runLedgerById.set(runId, row);
+            return;
+        }
+        const prevEnded = String(prev.ended_at || prev.started_at || '');
+        const nextEnded = String(row.ended_at || row.started_at || '');
+        if (nextEnded >= prevEnded) runLedgerById.set(runId, row);
+    });
+    const runLedgerEntries = Array.from(runLedgerById.values()).sort((a, b) => {
+        const ao = Number(a.run_order);
+        const bo = Number(b.run_order);
+        if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+        return String(a.run_id || '').localeCompare(String(b.run_id || ''));
+    });
+    const runLedgerCompleted = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'completed').length;
+    const runLedgerRunning = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'running').length;
+    const runLedgerFailed = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'failed').length;
+    const runLedgerRows = runLedgerEntries
+        .slice(-40)
+        .map((row) => {
+            const status = String(row.status || 'unknown').toLowerCase();
+            const tone = status === 'completed' ? '#6ee7b7' : (status === 'running' ? '#fbbf24' : (status === 'failed' ? '#f87171' : '#9ca3af'));
+            const when = row.ended_at || row.started_at || '-';
+            const dataset = row.dataset_name || row.dataset || '-';
+            return `
+                <tr>
+                    <td>${htmlEscape(String(row.run_order ?? '-'))}</td>
+                    <td><code>${htmlEscape(String(row.run_id || '-'))}</code></td>
+                    <td>${htmlEscape(String(row.stage_id || '-'))}</td>
+                    <td>${htmlEscape(String(row.stage_pass ?? '-'))}</td>
+                    <td><span style="color:${tone};font-weight:700;">${htmlEscape(status)}</span></td>
+                    <td style="text-align:right;">${fmtPlanInt(row.steps)}</td>
+                    <td>${Number.isFinite(Number(row.loss_first)) && Number.isFinite(Number(row.loss_final))
+                        ? `${fmtLoss(row.loss_first)} → ${fmtLoss(row.loss_final)}`
+                        : '-'
+                    }</td>
+                    <td>${htmlEscape(String(when).replace('T', ' ').replace('+00:00', 'Z'))}</td>
+                    <td style="max-width:360px;overflow-wrap:anywhere;">${pathCellCompact(String(dataset), 'dataset')}</td>
+                </tr>
+            `;
+        })
+        .join('');
+    const runLedgerSection = runLedgerEntries.length > 0
+        ? `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-green">Run Ledger</span> All Recorded Stage Runs</h3>
+                <div style="font-size:0.74rem;color:#9ca3af;margin-bottom:0.45rem;">
+                    total=${runLedgerEntries.length} · completed=${runLedgerCompleted} · running=${runLedgerRunning} · failed=${runLedgerFailed}
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="font-size:0.75rem;">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Run ID</th>
+                                <th>Stage</th>
+                                <th>Pass</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Steps</th>
+                                <th>Loss</th>
+                                <th>When</th>
+                                <th>Dataset</th>
+                            </tr>
+                        </thead>
+                        <tbody>${runLedgerRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        `
+        : '';
+
     const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
         ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
         : [];
@@ -1244,6 +1323,7 @@ function renderDataLabPanel(files) {
         </div>
         ${stageFlowSection}
         ${stagePlanSection}
+        ${runLedgerSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
             <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Verify correct dataset and tokenizer files were loaded for this run.</div>

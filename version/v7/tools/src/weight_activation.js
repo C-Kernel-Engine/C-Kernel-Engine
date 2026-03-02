@@ -108,7 +108,18 @@ export function renderWeightActivation(files) {
 
     const checkpoints = getCheckpoints(files);
     if (checkpoints.length === 0) {
-        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        const runCtx = getRunContext();
+        const runRef = runCtx.runDir || '$RUN';
+        root.innerHTML = `
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">No Checkpoints</span> Weights/Activations Needs Analysis Snapshots</h3>
+                <div style="color:var(--text-muted);margin-bottom:0.45rem;">
+                    Missing artifact: <code>analysis_checkpoint_step_*.json</code>. This tab requires sampled weights/activations/gradients saved during training.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runRef} --html-only</pre>
+            </div>
+        `;
         return;
     }
 

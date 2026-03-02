@@ -2360,11 +2360,11 @@
                         <div class="brief-value" id="summaryLayerCount">-</div>
                     </div>
                     <div class="brief-card">
-                        <div class="brief-label">Required Files</div>
+                        <div class="brief-label" id="summaryRequiredLabel">Required Files</div>
                         <div class="brief-value" id="summaryRequired">-</div>
                     </div>
                     <div class="brief-card">
-                        <div class="brief-label">Optional Files</div>
+                        <div class="brief-label" id="summaryOptionalLabel">Optional Files</div>
                         <div class="brief-value" id="summaryOptional">-</div>
                     </div>
                 </div>
@@ -2448,15 +2448,15 @@
                         <div class="pipeline-legend" id="pipelineLegend">No IR files loaded.</div>
                     </div>
                     <div class="infographic-card">
-                        <h3>Artifact Coverage Ring</h3>
+                        <h3 id="coverageTitle">Readiness Ring (Core Required)</h3>
                         <svg viewBox="0 0 220 220" width="200" height="200" aria-label="Artifact coverage">
                             <circle cx="110" cy="110" r="78" fill="none" stroke="#404040" stroke-width="18"></circle>
                             <circle id="coverageArc" cx="110" cy="110" r="78" fill="none" stroke="#ffb400" stroke-width="18"
                                 stroke-linecap="round" stroke-dasharray="0 490.088" transform="rotate(-90 110 110)"></circle>
                             <text id="coveragePercent" x="110" y="110" dominant-baseline="middle" text-anchor="middle"
                                 fill="#f5f5f5" font-size="30" font-weight="700">0%</text>
-                            <text x="110" y="136" dominant-baseline="middle" text-anchor="middle"
-                                fill="#808080" font-size="12">artifacts</text>
+                            <text id="coverageLabel" x="110" y="136" dominant-baseline="middle" text-anchor="middle"
+                                fill="#808080" font-size="12">required</text>
                         </svg>
                         <div class="coverage-breakdown" id="coverageBreakdown">Required 0/3, optional 0/3.</div>
                     </div>
@@ -2467,6 +2467,9 @@ make v7-validate-parity-matrix-required
 make v7-test-quick</pre>
                     </div>
                 </div>
+
+            <!-- ── Artifact Matrix ─────────────────────────────── -->
+            <div id="artifactMatrix" style="margin-top:1rem;"></div>
 
             <div class="summary-warnings" id="summaryWarnings"></div>
             </div>
@@ -3776,6 +3779,14 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             }
         }
 
+        function setPipelineNodeLabel(groupId, label) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            const text = group.querySelector('text');
+            if (!text || !label) return;
+            text.textContent = label;
+        }
+
         function formatGeneratedAt(value) {
             if (!value) return '-';
             const d = new Date(value);
@@ -4276,8 +4287,12 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const ops = (opsData && (opsData.operations || opsData.ops)) || [];
             const cfg = (layoutData && layoutData.config) || (opsData && opsData.config) || (manifestData && manifestData.config) || {};
             const hasTrainRuntimeContext = hasEmbeddedTrainRuntimeContext();
+            const reportMode = window.__ckReportMode === 'training' ? 'training' : 'inference';
+            const isTrainingScope = reportMode === 'training';
+            const filesView = typeof currentFiles === 'function' ? currentFiles() : ((window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files) || {});
+            const dataLab = (trainPipelineData && typeof trainPipelineData.data_lab === 'object') ? trainPipelineData.data_lab : {};
 
-            const required = [
+            const inferenceRequired = [
                 { key: 'ir1', label: `ir1_${currentMode}.json`, ready: Boolean(modeSnapshot.ir1) },
                 { key: 'layout', label: `layout_${currentMode}.json`, ready: Boolean(modeSnapshot.layout) },
                 {
@@ -4286,7 +4301,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     ready: Boolean(modeSnapshot.call || modeSnapshot.lowered),
                 },
             ];
-            const optional = [
+            const inferenceOptional = [
                 { key: 'manifest', label: 'weights_manifest.json', ready: Boolean(manifestData) },
                 { key: 'profile', label: 'profile_summary.json', ready: hasRenderableProfileData(profileData) },
                 { key: 'perf_stat', label: 'perf_stat_summary.json', ready: Boolean(perfStatData) },
@@ -4299,14 +4314,48 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
             ];
             if (hasTrainRuntimeContext || Boolean(asanSummaryData)) {
-                optional.push({ key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) });
+                inferenceOptional.push({ key: 'asan_summary', label: 'asan_summary.json', ready: Boolean(asanSummaryData) });
             }
+
+            const trainingRequired = [
+                { key: 'ir1_train', label: 'ir1_train_forward.json', ready: Boolean(ir1TrainData) },
+                { key: 'ir2_train', label: 'ir2_train_backward.json|ir2_train_summary.json', ready: Boolean(ir2TrainData || ir2TrainSummaryData) },
+                { key: 'layout_train', label: 'layout_train.json', ready: Boolean(filesView && filesView.layout_train) },
+                { key: 'train_exec_plan', label: 'train_exec_plan.json', ready: Boolean(trainExecPlanData) },
+                { key: 'training_pipeline', label: 'training_pipeline_latest.json', ready: Boolean(trainPipelineData) },
+            ];
+            const trainingOptional = [
+                { key: 'training_loss_curve', label: 'training_loss_curve.json', ready: Boolean(filesView && filesView.training_loss_curve) },
+                { key: 'training_grad_norms', label: 'training_grad_norms.json', ready: Boolean(filesView && filesView.training_grad_norms) },
+                { key: 'training_parity', label: 'training_parity.json', ready: Boolean(filesView && filesView.training_parity) },
+                { key: 'training_step_profile', label: 'training_step_profile.json', ready: Boolean(filesView && filesView.training_step_profile) },
+                { key: 'train_e2e', label: 'train_e2e_latest.json', ready: Boolean(filesView && filesView.train_e2e) },
+                { key: 'training_parity_regimen', label: 'training_parity_regimen_latest.json', ready: Boolean(filesView && filesView.training_parity_regimen) },
+                { key: 'backprop_stitch_runtime', label: 'backprop_stitch_runtime_latest.json', ready: Boolean(trainBackpropStitchData) },
+                { key: 'replay_determinism', label: 'replay_determinism_latest.json', ready: Boolean(trainReplayData) },
+                { key: 'replay_accum', label: 'replay_accum_latest.json', ready: Boolean(filesView && filesView.replay_accum) },
+                { key: 'layout_train_audit', label: 'layout_train_audit.json', ready: Boolean(filesView && filesView.layout_train_audit) },
+                { key: 'memory_diagnostic', label: 'memory_diagnostic_latest.json', ready: Boolean(filesView && filesView.memory_diagnostic) },
+                { key: 'generated_train_runtime_summary', label: 'generated_train_runtime_summary_v7.json', ready: Boolean(filesView && filesView.generated_train_runtime_summary) },
+                { key: 'dataset_qc', label: 'dataset_qc.json', ready: Boolean((filesView && filesView.dataset_qc) || dataLab.dataset_qc) },
+                { key: 'tokenizer_roundtrip', label: 'tokenizer_roundtrip.json', ready: Boolean((filesView && filesView.tokenizer_roundtrip) || dataLab.tokenizer_roundtrip) },
+                { key: 'post_train_eval', label: 'post_train_eval.json', ready: Boolean((filesView && filesView.post_train_eval) || dataLab.post_train_eval) },
+                { key: 'stage_eval_matrix', label: 'stage_eval_matrix.json', ready: Boolean(filesView && filesView.stage_eval_matrix) },
+                { key: 'analysis_checkpoints', label: 'analysis_checkpoint_step_*.json', ready: Boolean(filesView && filesView.analysis_checkpoints && Array.isArray(filesView.analysis_checkpoints.checkpoints) && filesView.analysis_checkpoints.checkpoints.length > 0) },
+                { key: 'run_ledger', label: 'run_ledger.jsonl', ready: Boolean(filesView && filesView.run_ledger && Array.isArray(filesView.run_ledger.entries) && filesView.run_ledger.entries.length > 0) },
+            ];
+
+            const required = isTrainingScope ? trainingRequired : inferenceRequired;
+            const optional = isTrainingScope ? trainingOptional : inferenceOptional;
+            const scopeLabel = isTrainingScope ? 'training' : `inference:${currentMode}`;
 
             const requiredPresent = required.filter(x => x.ready).length;
             const optionalPresent = optional.filter(x => x.ready).length;
-            const totalFiles = required.length + optional.length;
-            const totalPresent = requiredPresent + optionalPresent;
-            const coveragePct = totalFiles > 0 ? Math.round((totalPresent / totalFiles) * 100) : 0;
+            const requiredPct = required.length > 0 ? Math.round((requiredPresent / required.length) * 100) : 0;
+            const optionalPct = optional.length > 0 ? Math.round((optionalPresent / optional.length) * 100) : 0;
+            // Readiness ring tracks required artifacts only. Optional progress is
+            // shown in breakdown text and the optional counter card.
+            const coveragePct = requiredPct;
             const statusText = requiredPresent === required.length ? 'ready' : 'partial';
 
             const modelName = (embeddedMeta && embeddedMeta.model) ||
@@ -4326,6 +4375,10 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const summaryLayerCount = document.getElementById('summaryLayerCount');
             const summaryRequired = document.getElementById('summaryRequired');
             const summaryOptional = document.getElementById('summaryOptional');
+            const summaryRequiredLabel = document.getElementById('summaryRequiredLabel');
+            const summaryOptionalLabel = document.getElementById('summaryOptionalLabel');
+            const coverageTitle = document.getElementById('coverageTitle');
+            const coverageLabel = document.getElementById('coverageLabel');
             const coverageBreakdown = document.getElementById('coverageBreakdown');
             const coveragePercent = document.getElementById('coveragePercent');
             const coverageArc = document.getElementById('coverageArc');
@@ -4343,7 +4396,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 else el.classList.add('status-chip-muted');
             };
 
-            if (summaryModeChip) summaryModeChip.textContent = `mode: ${currentMode}`;
+            if (summaryModeChip) summaryModeChip.textContent = isTrainingScope ? 'mode: training' : `mode: ${currentMode}`;
             if (summaryStatusChip) {
                 setChipState(summaryStatusChip, `status: ${statusText}`, statusText === 'ready' ? 'good' : 'warn');
             }
@@ -4353,12 +4406,33 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             if (summaryLayerCount) summaryLayerCount.textContent = layerCount;
             if (summaryRequired) summaryRequired.textContent = `${requiredPresent}/${required.length}`;
             if (summaryOptional) summaryOptional.textContent = `${optionalPresent}/${optional.length}`;
+            if (summaryRequiredLabel) summaryRequiredLabel.textContent = isTrainingScope ? 'Core Train Files' : 'Core IR Files';
+            if (summaryOptionalLabel) summaryOptionalLabel.textContent = isTrainingScope ? 'Telemetry Files' : 'Perf/Obs Files';
+            if (coverageTitle) coverageTitle.textContent = isTrainingScope
+                ? 'Training Readiness Ring (Core Required)'
+                : 'Inference Readiness Ring (Core Required)';
+            if (coverageLabel) coverageLabel.textContent = 'required';
             updateTestCommandSnippets();
 
-            setPipelineNodeState('pipelineNodeIr1', Boolean(modeSnapshot.ir1));
-            setPipelineNodeState('pipelineNodeLayout', Boolean(modeSnapshot.layout));
-            setPipelineNodeState('pipelineNodeLowered', Boolean(modeSnapshot.call || modeSnapshot.lowered));
-            setPipelineNodeState('pipelineNodeManifest', Boolean(manifestData));
+            if (isTrainingScope) {
+                setPipelineNodeLabel('pipelineNodeIr1', 'IR1');
+                setPipelineNodeLabel('pipelineNodeLayout', 'Layout');
+                setPipelineNodeLabel('pipelineNodeLowered', 'Exec');
+                setPipelineNodeLabel('pipelineNodeManifest', 'Pipeline');
+                setPipelineNodeState('pipelineNodeIr1', Boolean(ir1TrainData));
+                setPipelineNodeState('pipelineNodeLayout', Boolean(filesView && filesView.layout_train));
+                setPipelineNodeState('pipelineNodeLowered', Boolean(trainExecPlanData));
+                setPipelineNodeState('pipelineNodeManifest', Boolean(trainPipelineData));
+            } else {
+                setPipelineNodeLabel('pipelineNodeIr1', 'IR1');
+                setPipelineNodeLabel('pipelineNodeLayout', 'Layout');
+                setPipelineNodeLabel('pipelineNodeLowered', 'Lowered');
+                setPipelineNodeLabel('pipelineNodeManifest', 'Manifest');
+                setPipelineNodeState('pipelineNodeIr1', Boolean(modeSnapshot.ir1));
+                setPipelineNodeState('pipelineNodeLayout', Boolean(modeSnapshot.layout));
+                setPipelineNodeState('pipelineNodeLowered', Boolean(modeSnapshot.call || modeSnapshot.lowered));
+                setPipelineNodeState('pipelineNodeManifest', Boolean(manifestData));
+            }
 
             if (pipelineLegend) {
                 const readyNames = required.filter(x => x.ready).map(x => x.label);
@@ -4368,8 +4442,16 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             }
 
             if (coverageBreakdown) {
-                coverageBreakdown.textContent =
-                    `Required ${requiredPresent}/${required.length}, optional ${optionalPresent}/${optional.length}.`;
+                const missingRequired = required.filter(x => !x.ready).map(x => x.label);
+                const missingOptional = optional.filter(x => !x.ready).map(x => x.label);
+                const reqTxt = missingRequired.length > 0
+                    ? `Missing required: ${missingRequired.join(', ')}`
+                    : 'All required artifacts loaded.';
+                const optTxt = missingOptional.length > 0
+                    ? `Missing optional: ${missingOptional.slice(0, 4).join(', ')}${missingOptional.length > 4 ? ' ...' : ''}`
+                    : 'All optional artifacts loaded.';
+                coverageBreakdown.innerHTML =
+                    `Scope <code>${escapeHtml(scopeLabel)}</code> · Readiness ${requiredPct}% (required ${requiredPresent}/${required.length}) · Optional ${optionalPct}% (${optionalPresent}/${optional.length}).<br>${escapeHtml(reqTxt)}<br>${escapeHtml(optTxt)}`;
             }
             if (coveragePercent) coveragePercent.textContent = `${coveragePct}%`;
             if (coverageArc) {
@@ -4473,7 +4555,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const warnings = [];
             const missingRequired = required.filter(x => !x.ready).map(x => x.label);
             if (missingRequired.length > 0) {
-                warnings.push(`Missing required (${currentMode}): ${missingRequired.join(', ')}`);
+                warnings.push(`Missing required (${scopeLabel}): ${missingRequired.join(', ')}`);
             }
 
             const usedKernelNames = new Set();
@@ -4573,15 +4655,21 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             }
 
             if (summaryRunbook) {
-                const runbook = [
-                    `make v7-gate`,
-                    `make v7-validate-parity-matrix-required`,
-                    `make v7-test-quick`,
-                ];
+                const runbook = isTrainingScope
+                    ? [
+                        `make v7-gate-train`,
+                        `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir "$RUN" --json-out "$RUN/training_parity_regimen_latest.json" --md-out "$RUN/training_parity_regimen_latest.md"`,
+                        `python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only`,
+                    ]
+                    : [
+                        `make v7-gate`,
+                        `make v7-validate-parity-matrix-required`,
+                        `make v7-test-quick`,
+                    ];
                 if (missingRequired.length > 0) {
                     runbook.push('# missing artifacts detected');
-                    runbook.push('make v7-validate-contracts');
-                    runbook.push('make v7-validate-matrix-smoke');
+                    runbook.push(isTrainingScope ? 'version/v7/scripts/cks-v7-run train-suite --run "$RUN"' : 'make v7-validate-contracts');
+                    if (!isTrainingScope) runbook.push('make v7-validate-matrix-smoke');
                 }
                 if (missingKernels.length > 0) {
                     runbook.push('# missing kernel mappings');
@@ -4589,6 +4677,85 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     runbook.push('make v7-validate-contracts');
                 }
                 summaryRunbook.textContent = runbook.join('\n');
+            }
+
+            // ── Artifact Matrix ──────────────────────────────────────────
+            const artifactMatrixEl = document.getElementById('artifactMatrix');
+            if (artifactMatrixEl) {
+                const abadge = (label, ready) => {
+                    const bg = ready ? 'rgba(71,180,117,0.15)' : 'rgba(255,255,255,0.05)';
+                    const border = ready ? '1px solid rgba(71,180,117,0.4)' : '1px solid rgba(255,255,255,0.10)';
+                    const color = ready ? '#6ee7b7' : '#4b5563';
+                    const dot = ready ? '●' : '○';
+                    return `<span title="${escapeHtml(label)}" style="display:inline-flex;align-items:center;gap:0.22rem;background:${bg};border:${border};border-radius:4px;padding:0.1rem 0.4rem;font-size:0.67rem;color:${color};margin:0.15rem 0.18rem;white-space:nowrap;">${dot} ${escapeHtml(label)}</span>`;
+                };
+                const asection = (title, icon, items) => {
+                    const total = items.length;
+                    const present = items.filter(x => x.ready).length;
+                    const hc = present === total ? '#6ee7b7' : (present > 0 ? '#fbbf24' : '#6b7280');
+                    return `<div style="min-width:180px;flex:1 1 180px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.55rem 0.7rem;"><div style="font-size:0.67rem;font-weight:700;letter-spacing:0.07em;color:${hc};margin-bottom:0.35rem;">${icon} ${escapeHtml(title)} <span style="font-weight:400;color:#6b7280;">${present}/${total}</span></div><div style="display:flex;flex-wrap:wrap;">${items.map(x => abadge(x.label, x.ready)).join('')}</div></div>`;
+                };
+
+                let mhtml = '';
+                if (isTrainingScope) {
+                    mhtml = `<div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                        ${asection('Compile-time', '⚙', [
+                            { label: 'ir1_train', ready: Boolean(ir1TrainData) },
+                            { label: 'ir2_train', ready: Boolean(ir2TrainData || ir2TrainSummaryData) },
+                            { label: 'layout_train', ready: Boolean(filesView && filesView.layout_train) },
+                            { label: 'train_exec_plan', ready: Boolean(trainExecPlanData) },
+                            { label: 'gen_runtime', ready: Boolean(filesView && filesView.generated_train_runtime_summary) },
+                        ])}
+                        ${asection('Data / Pipeline', '📦', [
+                            { label: 'training_pipeline', ready: Boolean(trainPipelineData) },
+                            { label: 'dataset_qc', ready: Boolean((filesView && filesView.dataset_qc) || dataLab.dataset_qc) },
+                            { label: 'tokenizer_roundtrip', ready: Boolean((filesView && filesView.tokenizer_roundtrip) || dataLab.tokenizer_roundtrip) },
+                            { label: 'run_ledger', ready: Boolean(filesView && filesView.run_ledger && Array.isArray(filesView.run_ledger.entries) && filesView.run_ledger.entries.length > 0) },
+                            { label: 'stage_eval_matrix', ready: Boolean(filesView && filesView.stage_eval_matrix) },
+                            { label: 'analysis_checkpoints', ready: Boolean(filesView && filesView.analysis_checkpoints && Array.isArray(filesView.analysis_checkpoints.checkpoints) && filesView.analysis_checkpoints.checkpoints.length > 0) },
+                        ])}
+                        ${asection('Training Runs', '📉', [
+                            { label: 'loss_curve', ready: Boolean(filesView && filesView.training_loss_curve) },
+                            { label: 'grad_norms', ready: Boolean(filesView && filesView.training_grad_norms) },
+                            { label: 'parity', ready: Boolean(filesView && filesView.training_parity) },
+                            { label: 'parity_regimen', ready: Boolean(filesView && filesView.training_parity_regimen) },
+                            { label: 'post_train_eval', ready: Boolean((filesView && filesView.post_train_eval) || dataLab.post_train_eval) },
+                        ])}
+                        ${asection('Runtime / Perf', '⚡', [
+                            { label: 'step_profile', ready: Boolean(filesView && filesView.training_step_profile) },
+                            { label: 'backprop_stitch', ready: Boolean(trainBackpropStitchData) },
+                            { label: 'replay_determinism', ready: Boolean(trainReplayData) },
+                            { label: 'replay_accum', ready: Boolean(filesView && filesView.replay_accum) },
+                            { label: 'memory_diag', ready: Boolean(filesView && filesView.memory_diagnostic) },
+                            { label: 'train_e2e', ready: Boolean(filesView && filesView.train_e2e) },
+                            { label: 'layout_audit', ready: Boolean(filesView && filesView.layout_train_audit) },
+                        ])}
+                    </div>`;
+                } else {
+                    mhtml = `<div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                        ${asection('Compile-time', '⚙', [
+                            { label: 'ir1', ready: Boolean(modeSnapshot.ir1) },
+                            { label: 'layout', ready: Boolean(modeSnapshot.layout) },
+                            { label: 'lowered', ready: Boolean(modeSnapshot.call || modeSnapshot.lowered) },
+                            { label: 'manifest', ready: Boolean(manifestData) },
+                            { label: 'kernel_registry', ready: Boolean(kernelRegistryData) },
+                        ])}
+                        ${asection('Correctness', '✓', [
+                            { label: 'asan_summary', ready: Boolean(asanSummaryData) },
+                            { label: 'memory_signoff', ready: Boolean(memorySignoffData) },
+                            { label: 'perf_gate', ready: Boolean(perfGateData) },
+                        ])}
+                        ${asection('Perf / Profiling', '⚡', [
+                            { label: 'profile', ready: hasRenderableProfileData(profileData) },
+                            { label: 'perf_stat', ready: Boolean(perfStatData) },
+                            { label: 'flamegraph', ready: Boolean(flamegraphManifestData) },
+                            { label: 'cachegrind', ready: Boolean(cachegrindSummaryData) },
+                            { label: 'vtune', ready: Boolean(vtuneSummaryData) },
+                            { label: 'advisor', ready: Boolean(advisorSummaryData) },
+                        ])}
+                    </div>`;
+                }
+                artifactMatrixEl.innerHTML = `<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:0.75rem 0.9rem;"><div style="font-size:0.72rem;font-weight:700;color:#9ca3af;letter-spacing:0.06em;margin-bottom:0.5rem;">ARTIFACT COVERAGE</div>${mhtml}</div>`;
             }
         }
 
@@ -16779,10 +16946,7 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
 
     const allYValues = [];
     seriesA.forEach((p) => allYValues.push(p[key]));
-    // fitToPrimary: scale y-axis to the primary series only; baseline clipped to chart area
-    if (!opts.fitToPrimary) {
-        seriesB.forEach((p) => allYValues.push(p[secondaryKey]));
-    }
+    seriesB.forEach((p) => allYValues.push(p[secondaryKey]));
     const yMinRaw = d3.min(allYValues);
     const yMaxRaw = d3.max(allYValues);
     const yRangeRaw = Number.isFinite(yMinRaw) && Number.isFinite(yMaxRaw) ? (yMaxRaw - yMinRaw) : NaN;
@@ -16840,14 +17004,6 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
 
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
-
-    const _clipId = `ck_lc_clip_${Math.random().toString(36).slice(2, 9)}`;
-    svg.append('defs').append('clipPath').attr('id', _clipId)
-        .append('rect')
-        .attr('x', margin.left)
-        .attr('y', margin.top)
-        .attr('width', innerW)
-        .attr('height', innerH);
 
     svg.append('g')
         .attr('transform', `translate(0,${height - margin.bottom})`)
@@ -16919,7 +17075,6 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
             .attr('fill', 'none')
             .attr('stroke', color)
             .attr('stroke-width', 2)
-            .attr('clip-path', `url(#${_clipId})`)
             .attr('d', line);
     }
 
@@ -16930,7 +17085,6 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
             .attr('stroke', '#60a5fa')
             .attr('stroke-width', 2)
             .attr('stroke-dasharray', '5,4')
-            .attr('clip-path', `url(#${_clipId})`)
             .attr('d', lineSecondary);
     }
 
@@ -17667,6 +17821,7 @@ function renderStageEvalMatrix(container, files) {
         </div>
     `;
 }
+
 
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
@@ -18508,6 +18663,7 @@ function renderDataLabPanel(files) {
         : (runtimeFailed
             ? `Generated-runtime stitch/replay gates failed (${runtimeFailedIds.join(', ')}). scripts=${runtimeScriptHint}`
             : `Generated-runtime stitch/replay gates not fully loaded (${runtimeLoadedCount}/${runtimeExpectedCount}).`);
+
     const stageSeqMetaByStage = {};
     const orderedStages = [];
     const addOrderedStage = (rawStage, meta = null) => {
@@ -18589,6 +18745,12 @@ function renderDataLabPanel(files) {
     const stageLossEntries = Array.isArray(stageLossHistory.entries)
         ? stageLossHistory.entries.filter((row) => row && typeof row === 'object')
         : [];
+    const sortedLossEntries = [...stageLossEntries].sort((a, b) => {
+        const ra = Number.isFinite(Number(a.run_order)) ? Number(a.run_order) : 9999;
+        const rb = Number.isFinite(Number(b.run_order)) ? Number(b.run_order) : 9999;
+        if (ra !== rb) return ra - rb;
+        return String(a.ended_at || a.run_id || '').localeCompare(String(b.ended_at || b.run_id || ''));
+    });
     const stageLossByStage = {};
     for (const entry of stageLossEntries) {
         const stage = normStageName(entry.stage);
@@ -18620,6 +18782,18 @@ function renderDataLabPanel(files) {
         addOrderedStage('ppo');
     }
 
+    // Expanded flow: one card per completed entry + planned stages not yet run
+    const executedStageSet = new Set(sortedLossEntries.map((e) => normStageName(e.stage)));
+    const plannedFlowItems = orderedStages
+        .filter((s) => !executedStageSet.has(normStageName(s)))
+        .map((s) => ({ _isPlanned: true, stage: normStageName(s), phase_label: s }));
+
+    const useExpandedFlow = sortedLossEntries.length > 0;
+    const expandedFlowItems = useExpandedFlow
+        ? [...sortedLossEntries, ...plannedFlowItems]
+        : null;
+    const allFlowItems = expandedFlowItems || orderedStages.map((s) => ({ _isPlanned: true, stage: normStageName(s), phase_label: s }));
+
     function fmtLoss(value) {
         const n = Number(value);
         if (!Number.isFinite(n)) return '—';
@@ -18650,87 +18824,95 @@ function renderDataLabPanel(files) {
     }
 
     const stageCardMeta = {};
-    const flowCards = orderedStages.map((stage, idx) => {
-        const seqMeta = stageSeqMetaByStage[stage] && typeof stageSeqMetaByStage[stage] === 'object'
-            ? stageSeqMetaByStage[stage]
-            : {};
-        const strictRow = strictManifestMode && strictStageRowByStage[stage] && typeof strictStageRowByStage[stage] === 'object'
-            ? strictStageRowByStage[stage]
-            : null;
-        const t = timelineByStage[stage] || {};
-        const status = strictManifestMode
-            ? String((strictRow && strictRow.status) || (stage === activeStageKey ? 'active' : 'planned'))
-            : String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
-        const isActive = strictManifestMode
-            ? Boolean((strictRow && strictRow.active === true) || stage === activeStageKey || status === 'active')
-            : Boolean(t.active === true || seqMeta.active === true || stage === activeStageKey);
-        const tone = stageTone(status);
-        const chip = statusPill(status, tone);
+    const totalCards = allFlowItems.length;
+    const flowCards = allFlowItems.map((item, idx) => {
+        const isPlannedItem = Boolean(item._isPlanned);
+        const stage = normStageName(item.stage || item.phase_label || 'pretrain');
+        const phaseLabel = item.phase_label || stage;
+
+        if (isPlannedItem) {
+            // Planned card — status/dataset from pipeline contract
+            const seqMeta = stageSeqMetaByStage[stage] || {};
+            const t = timelineByStage[stage] || {};
+            const status = String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
+            const isActive = stage === activeStageKey;
+            const tone = stageTone(status);
+            const chip = statusPill(status, tone);
+            const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
+            const bg = isActive ? 'rgba(71,180,117,0.09)' : 'rgba(255,255,255,0.03)';
+            const bindDs = primaryBindingDataset(stage) || {};
+            const cat = catalogActiveByStage[stage] || {};
+            const dsName = bindDs.name || cat.name || null;
+            const covered = stageTokCoverage(stage);
+            const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
+            const dsPill = short
+                ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
+                : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">${status === 'planned' ? 'not assigned' : '—'}</div>`;
+            const covBadge = covered === false
+                ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#fb923c;">⚠ tok gap</div>`
+                : (covered === true && dsName ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>` : '');
+            const arts = (artifactByStage[stage] && Array.isArray(artifactByStage[stage].artifacts)) ? artifactByStage[stage].artifacts : [];
+
+            stageCardMeta[phaseLabel] = {
+                status, isActive, dsName, dsRows: bindDs.rows || cat.rows || null,
+                dsTok: bindDs.tokens || null, byteSize: bindDs.bytes || null,
+                sourcePath: bindDs.path || cat.path || null, rawSourcePath: bindDs.path || null,
+                tokenStreamPath: null, covered, artifacts: arts,
+                catNote: cat.note || null, lossRuns: [], latestLossRun: null, seq: idx + 1,
+            };
+
+            return `
+                <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(stage)}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
+                        <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(phaseLabel)}</div>
+                        <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${totalCards}</div>
+                    </div>
+                    <div style="margin-top:0.22rem;">${chip}</div>
+                    ${dsPill}${covBadge}
+                    <div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>
+                    <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
+                </div>`;
+        }
+
+        // Completed / running entry card
+        const entry = item;
+        const entryStatus = stage === activeStageKey && idx === sortedLossEntries.length - 1 ? 'active' : 'completed';
+        const isActive = entryStatus === 'active';
+        const tone = stageTone(entryStatus);
+        const chip = statusPill(entryStatus, tone);
         const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
         const bg = isActive ? 'rgba(71,180,117,0.09)' : 'rgba(255,255,255,0.03)';
-        const data = artifactByStage[stage] && typeof artifactByStage[stage] === 'object' ? artifactByStage[stage] : {};
-        const arts = Array.isArray(data.artifacts) ? data.artifacts : [];
-        const cat = catalogActiveByStage[stage] || {};
-        const prov = provByStage[stage] || {};
-        const bindDs = strictManifestMode
-            ? (() => {
-                const rows = strictRow && Array.isArray(strictRow.datasets)
-                    ? strictRow.datasets.filter((d) => d && typeof d === 'object')
-                    : [];
-                return rows.find((d) => d.status === 'ready') || rows[0] || {};
-            })()
-            : (primaryBindingDataset(stage) || {});
-        const lossRuns = stageLossByStage[normStageName(stage)] || [];
-        const latestLossRun = lossRuns.length > 0 ? lossRuns[lossRuns.length - 1] : null;
-        const dsName = strictManifestMode
-            ? (bindDs.name || null)
-            : (bindDs.name || data.dataset_name || cat.name || prov.dataset_name || (latestLossRun && latestLossRun.dataset_name) || null);
-        const covered = stageTokCoverage(stage);
-        const hasLoss = latestLossRun && Number.isFinite(Number(latestLossRun.first_loss)) && Number.isFinite(Number(latestLossRun.final_loss));
-        const dropPct = hasLoss ? Number(latestLossRun.drop_pct) : NaN;
-
-        stageCardMeta[stage] = {
-            status, isActive, dsName,
-            dsRows: strictManifestMode ? (bindDs.rows || null) : (bindDs.rows || cat.rows || null),
-            dsTok: strictManifestMode ? (bindDs.tokens || null) : (bindDs.tokens || data.token_count || prov.token_count || (latestLossRun && latestLossRun.total_tokens) || null),
-            byteSize: strictManifestMode ? (bindDs.bytes || null) : (bindDs.bytes || prov.byte_size || null),
-            sourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.source_path) || null),
-            rawSourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.raw_source_path) || null),
-            tokenStreamPath: (latestLossRun && latestLossRun.token_stream_path) || null,
-            covered, artifacts: arts,
-            catNote: strictManifestMode ? null : (cat.note || null),
-            lossRuns,
-            latestLossRun,
-            seq: Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1),
-        };
-
+        const dsName = entry.dataset_name || null;
         const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
         const dsPill = short
-            ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:${isActive ? 'rgba(71,180,117,0.12)' : 'rgba(255,255,255,0.05)'};border:1px solid ${isActive ? 'rgba(71,180,117,0.28)' : 'rgba(255,255,255,0.10)'};border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
-            : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">${status === 'planned' ? 'not assigned' : '—'}</div>`;
-
-        const covBadge = covered === false
-            ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#fb923c;">⚠ tok gap</div>`
-            : (covered === true && dsName
-                ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>`
-                : '');
+            ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
+            : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">—</div>`;
+        const hasLoss = Number.isFinite(Number(entry.first_loss)) && Number.isFinite(Number(entry.final_loss));
+        const dropPct = hasLoss ? Number(entry.drop_pct) : NaN;
         const lossSummary = hasLoss
-            ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(latestLossRun.first_loss)} → ${fmtLoss(latestLossRun.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(latestLossRun)}`
+            ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(entry.first_loss)} → ${fmtLoss(entry.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(entry)}`
             : `<div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>`;
 
+        stageCardMeta[phaseLabel] = {
+            status: entryStatus, isActive, dsName, dsRows: null,
+            dsTok: entry.total_tokens || null, byteSize: null,
+            sourcePath: null, rawSourcePath: null, tokenStreamPath: null,
+            covered: null, artifacts: [], catNote: null,
+            lossRuns: [entry], latestLossRun: entry, seq: idx + 1,
+        };
+
         return `
-            <div data-dp-stage="${htmlEscape(stage)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(stage)} datasets &amp; artifacts">
+            <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(phaseLabel)} loss &amp; dataset">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
-                    <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(stage)}</div>
-                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1)}/${orderedStages.length}</div>
+                    <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(phaseLabel)}</div>
+                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${totalCards}</div>
                 </div>
                 <div style="margin-top:0.22rem;">${chip}</div>
                 ${dsPill}
-                ${covBadge}
                 ${lossSummary}
-                <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
-            </div>
-        `;
+                <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">tap ↓</div>
+            </div>`;
+
     }).join('<div style="align-self:center;color:var(--text-muted);font-size:0.75rem;padding:0 0.05rem;">→</div>');
 
     const trainDims = pipeline.train_dims && typeof pipeline.train_dims === 'object' ? pipeline.train_dims : {};
@@ -18751,8 +18933,6 @@ function renderDataLabPanel(files) {
                 <span style="background:rgba(255,255,255,0.07);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.72rem;color:var(--text-muted);">vocab: ${tokLineage.vocab_size ?? '?'}</span>
                 ${tokLineage.reused_run_tokenizer ? '<span style="background:rgba(7,173,248,0.08);border:1px solid rgba(7,173,248,0.22);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.68rem;color:#7dd3fc;">↗ reused</span>' : ''}
                 <span style="background:rgba(255,255,255,0.06);border-radius:4px;padding:0.08rem 0.38rem;font-size:0.7rem;color:var(--text-muted);">roundtrip: ${htmlEscape(tokRtStatus)}</span>
-                ${runtimeGateChip}
-                ${regimenGateChip}
             </div>
             <div style="font-size:0.75rem;margin-bottom:0.28rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                 <span style="color:#6b7280;">Trained on:</span>
@@ -18761,8 +18941,6 @@ function renderDataLabPanel(files) {
                     : '<span style="color:#4b5563;font-size:0.71rem;">corpus not recorded · add <code>corpus_datasets</code> to tokenizer_lineage</span>'
                 }
             </div>
-            <div style="font-size:0.72rem;margin-bottom:0.2rem;color:${runtimeGateTone};">Generated runtime gate: ${htmlEscape(runtimeGateDetail)}</div>
-            <div style="font-size:0.72rem;margin-bottom:0.24rem;color:${regimenGateTone};">Harness regimen gate: ${htmlEscape(regimenGateDetail)}</div>
             <div style="font-size:0.7rem;color:#6b7280;">⚠ Stages using datasets outside this corpus may encounter novel token boundaries — check ⚠ tok gap badges above.</div>
             ${strictManifestMode ? '<div style="font-size:0.7rem;color:#6ee7b7;margin-top:0.2rem;">strict contract mode: stage/data mapping from pipeline contract only (fallbacks disabled)</div>' : ''}
         </div>
@@ -18770,7 +18948,7 @@ function renderDataLabPanel(files) {
 
     const stageFlowSection = `
         <div class="parity-section">
-            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(orderedStages.join(' -> '))}</h3>
+            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(allFlowItems.map((i) => i.phase_label || i.stage).join(' -> '))}</h3>
             ${tokSourcePanel}
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:stretch;">${flowCards}</div>
             <div id="dpStageDetail" style="display:none;margin-top:0.55rem;"></div>
@@ -18792,8 +18970,10 @@ function renderDataLabPanel(files) {
 
     const exec = pipeline.execution && typeof pipeline.execution === 'object' ? pipeline.execution : {};
     const execSeqLen = Number(exec.seq_len);
-    const stagePlanRows = orderedStages.map((stage) => {
-        const meta = stageCardMeta[stage] || {};
+    const stagePlanRows = allFlowItems.map((item) => {
+        const phaseLabel = item.phase_label || item.stage;
+        const stage = normStageName(item.stage || phaseLabel);
+        const meta = stageCardMeta[phaseLabel] || {};
         const latest = meta.latestLossRun && typeof meta.latestLossRun === 'object' ? meta.latestLossRun : null;
         const runs = Array.isArray(meta.lossRuns) ? meta.lossRuns.length : 0;
         const seqLenRaw = latest && Number.isFinite(Number(latest.seq_len))
@@ -18810,7 +18990,7 @@ function renderDataLabPanel(files) {
 
         let trainState = 'planned';
         let stateColor = '#60a5fa';
-        if (stage === 'unassigned') {
+        if (stage === 'unassigned' || phaseLabel === 'unassigned') {
             trainState = 'legacy-unlabeled';
             stateColor = '#fbbf24';
         } else if (meta.isActive || String(meta.status || '').toLowerCase() === 'active') {
@@ -18842,7 +19022,7 @@ function renderDataLabPanel(files) {
 
         return `
             <tr>
-                <td>${htmlEscape(stage)}</td>
+                <td>${htmlEscape(phaseLabel)}</td>
                 <td>${htmlEscape(meta.seq ?? '-')}</td>
                 <td><span style="color:${stateColor};font-weight:700;">${htmlEscape(trainState)}</span></td>
                 <td>${htmlEscape(meta.dsName || 'not assigned')}</td>
@@ -18895,6 +19075,7 @@ function renderDataLabPanel(files) {
             `;
         })
         .join('');
+
 
     // ── Training Readiness Panel ─────────────────────────────────────────────
     // Stage hierarchy:
@@ -19069,19 +19250,10 @@ function renderDataLabPanel(files) {
         + '</div>';
     // ── end Training Readiness Panel ─────────────────────────────────────────
 
+
     const stagePlanSection = `
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-blue">Stage Plan</span> Dataset Training Plan & Progress</h3>
-            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-bottom:0.45rem;font-size:0.74rem;">
-                <span style="color:#6b7280;">Generated C ↔ PyTorch gates:</span>
-                ${runtimeGateChip}
-                <span style="color:${runtimeGateTone};">${htmlEscape(runtimeGateDetail)}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-bottom:0.45rem;font-size:0.74rem;">
-                <span style="color:#6b7280;">Harness stress gates:</span>
-                ${regimenGateChip}
-                <span style="color:${regimenGateTone};">${htmlEscape(regimenGateDetail)}</span>
-            </div>
             <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">
                 Per-stage status from sequence + artifacts + historical loss runs. Estimated steps/epoch = ceil(tokens / seq_len).
             </div>
@@ -19133,6 +19305,85 @@ function renderDataLabPanel(files) {
             </details>
         </div>
     `;
+
+    const runLedgerRaw = (files && files.run_ledger && Array.isArray(files.run_ledger.entries))
+        ? files.run_ledger.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const runLedgerById = new Map();
+    runLedgerRaw.forEach((row) => {
+        const runId = String(row.run_id || '').trim();
+        if (!runId) return;
+        const prev = runLedgerById.get(runId);
+        if (!prev) {
+            runLedgerById.set(runId, row);
+            return;
+        }
+        const prevEnded = String(prev.ended_at || prev.started_at || '');
+        const nextEnded = String(row.ended_at || row.started_at || '');
+        if (nextEnded >= prevEnded) runLedgerById.set(runId, row);
+    });
+    const runLedgerEntries = Array.from(runLedgerById.values()).sort((a, b) => {
+        const ao = Number(a.run_order);
+        const bo = Number(b.run_order);
+        if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+        return String(a.run_id || '').localeCompare(String(b.run_id || ''));
+    });
+    const runLedgerCompleted = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'completed').length;
+    const runLedgerRunning = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'running').length;
+    const runLedgerFailed = runLedgerEntries.filter((row) => String(row.status || '').toLowerCase() === 'failed').length;
+    const runLedgerRows = runLedgerEntries
+        .slice(-40)
+        .map((row) => {
+            const status = String(row.status || 'unknown').toLowerCase();
+            const tone = status === 'completed' ? '#6ee7b7' : (status === 'running' ? '#fbbf24' : (status === 'failed' ? '#f87171' : '#9ca3af'));
+            const when = row.ended_at || row.started_at || '-';
+            const dataset = row.dataset_name || row.dataset || '-';
+            return `
+                <tr>
+                    <td>${htmlEscape(String(row.run_order ?? '-'))}</td>
+                    <td><code>${htmlEscape(String(row.run_id || '-'))}</code></td>
+                    <td>${htmlEscape(String(row.stage_id || '-'))}</td>
+                    <td>${htmlEscape(String(row.stage_pass ?? '-'))}</td>
+                    <td><span style="color:${tone};font-weight:700;">${htmlEscape(status)}</span></td>
+                    <td style="text-align:right;">${fmtPlanInt(row.steps)}</td>
+                    <td>${Number.isFinite(Number(row.loss_first)) && Number.isFinite(Number(row.loss_final))
+                        ? `${fmtLoss(row.loss_first)} → ${fmtLoss(row.loss_final)}`
+                        : '-'
+                    }</td>
+                    <td>${htmlEscape(String(when).replace('T', ' ').replace('+00:00', 'Z'))}</td>
+                    <td style="max-width:360px;overflow-wrap:anywhere;">${pathCellCompact(String(dataset), 'dataset')}</td>
+                </tr>
+            `;
+        })
+        .join('');
+    const runLedgerSection = runLedgerEntries.length > 0
+        ? `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-green">Run Ledger</span> All Recorded Stage Runs</h3>
+                <div style="font-size:0.74rem;color:#9ca3af;margin-bottom:0.45rem;">
+                    total=${runLedgerEntries.length} · completed=${runLedgerCompleted} · running=${runLedgerRunning} · failed=${runLedgerFailed}
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="font-size:0.75rem;">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Run ID</th>
+                                <th>Stage</th>
+                                <th>Pass</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Steps</th>
+                                <th>Loss</th>
+                                <th>When</th>
+                                <th>Dataset</th>
+                            </tr>
+                        </thead>
+                        <tbody>${runLedgerRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        `
+        : '';
 
     const datasetCatalog = Array.isArray(pipeline.dataset_catalog)
         ? pipeline.dataset_catalog.filter((row) => row && typeof row === 'object')
@@ -19471,6 +19722,7 @@ function renderDataLabPanel(files) {
         ${stageFlowSection}
         ${trainingReadinessSection}
         ${stagePlanSection}
+        ${runLedgerSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
             <div style="font-size:0.74rem;color:#6b7280;margin-bottom:0.5rem;">Verify correct dataset and tokenizer files were loaded for this run.</div>
@@ -19623,13 +19875,9 @@ function renderDataLabPanel(files) {
             const chartSeries = buildStageChartSeries(meta);
             const chartId = `dpStageLossChart_${String(stage).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
             const chartTitle = `Stage ${stage} Loss vs Step`;
-            const _prevRun = meta.lossRuns && meta.lossRuns.length > 1 ? meta.lossRuns[meta.lossRuns.length - 2] : null;
-            const _prevRange = _prevRun && Number.isFinite(Number(_prevRun.first_loss)) && Number.isFinite(Number(_prevRun.final_loss))
-                ? ` (${fmtLoss(_prevRun.first_loss)} → ${fmtLoss(_prevRun.final_loss)}, clipped to current scale)`
-                : '';
             const chartLegend = chartSeries.hasPrevious
-                ? `<span style="color:#fbbf24;">●</span> latest: <code>${htmlEscape(chartSeries.latestRunId)}</code> &nbsp;·&nbsp; <span style="color:#60a5fa;">– –</span> baseline: <code>${htmlEscape(chartSeries.previousRunId)}</code>${htmlEscape(_prevRange)}`
-                : `<span style="color:#fbbf24;">●</span> latest: <code>${htmlEscape(chartSeries.latestRunId || 'run')}</code>`;
+                ? `latest run: <code>${htmlEscape(chartSeries.latestRunId)}</code> · baseline: <code>${htmlEscape(chartSeries.previousRunId)}</code> (dashed)`
+                : `latest run: <code>${htmlEscape(chartSeries.latestRunId || 'run')}</code>`;
             const chartPanel = chartSeries.points.length > 1
                 ? `
                     <div style="margin:0.1rem 0 0.5rem 0;border:1px solid rgba(255,255,255,0.10);border-radius:7px;padding:0.45rem 0.5rem;background:rgba(255,255,255,0.02);">
@@ -19709,7 +19957,7 @@ function renderDataLabPanel(files) {
                     'loss',
                     '#fbbf24',
                     chartSeries.hasPrevious ? 'loss_prev' : null,
-                    { title: chartTitle, fitToPrimary: true }
+                    { title: chartTitle }
                 );
             }
 
@@ -20290,7 +20538,18 @@ function renderGradientFlow(files) {
 
     const checkpoints = getCheckpoints(files);
     if (checkpoints.length === 0) {
-        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        const runCtx = getRunContext();
+        const runRef = runCtx.runDir || '$RUN';
+        root.innerHTML = `
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">No Checkpoints</span> Gradient Flow Needs Analysis Snapshots</h3>
+                <div style="color:var(--text-muted);margin-bottom:0.45rem;">
+                    Missing artifact: <code>analysis_checkpoint_step_*.json</code>. These files drive Gradient Flow, Weights &amp; Activations, and Attention Inspector tabs.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runRef} --html-only</pre>
+            </div>
+        `;
         return;
     }
 
@@ -20445,7 +20704,18 @@ function renderWeightActivation(files) {
 
     const checkpoints = getCheckpoints(files);
     if (checkpoints.length === 0) {
-        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        const runCtx = getRunContext();
+        const runRef = runCtx.runDir || '$RUN';
+        root.innerHTML = `
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">No Checkpoints</span> Weights/Activations Needs Analysis Snapshots</h3>
+                <div style="color:var(--text-muted);margin-bottom:0.45rem;">
+                    Missing artifact: <code>analysis_checkpoint_step_*.json</code>. This tab requires sampled weights/activations/gradients saved during training.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runRef} --html-only</pre>
+            </div>
+        `;
         return;
     }
 
@@ -20724,7 +20994,18 @@ function renderAttentionInspector(files) {
 
     const checkpoints = getCheckpoints(files);
     if (checkpoints.length === 0) {
-        root.innerHTML = '<p style="color:var(--text-muted);">No analysis checkpoints loaded (expected analysis_checkpoint_step_*.json).</p>';
+        const runCtx = getRunContext();
+        const runRef = runCtx.runDir || '$RUN';
+        root.innerHTML = `
+            <div class="parity-section">
+                <h3><span class="badge badge-orange">No Checkpoints</span> Attention Inspector Needs Analysis Snapshots</h3>
+                <div style="color:var(--text-muted);margin-bottom:0.45rem;">
+                    Missing artifact: <code>analysis_checkpoint_step_*.json</code> with attention blocks per step/head.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+python3 version/v7/tools/open_ir_visualizer.py --generate --run ${runRef} --html-only</pre>
+            </div>
+        `;
         return;
     }
 
@@ -21653,6 +21934,14 @@ function applyReportMode(mode) {
         }
     } else if (normalized === 'training' && INFERENCE_ONLY.includes(activeTabId)) {
         window.showTab('train-dashboard');
+    }
+
+    // Shared panels (e.g. Memory Layout snapshot) need an explicit refresh when
+    // report scope flips between inference/training.
+    if (typeof window.updateOperatorSummary === 'function') {
+        window.updateOperatorSummary();
+    } else if (typeof updateOperatorSummary === 'function') {
+        updateOperatorSummary();
     }
 }
 
@@ -23105,7 +23394,6 @@ const _LIVE_FILES = [
     'training_loss_curve_latest.json',
     'training_grad_norms_latest.json',
     'training_parity_latest.json',
-    'training_parity_regimen_latest.json',
     'training_step_profile_latest.json',
     'training_checkpoint_policy_latest.json',
     'corpus_sampling_log_latest.json',
@@ -23116,7 +23404,6 @@ const _LIVE_KEY_MAP = {
     'training_loss_curve_latest.json':        'training_loss_curve',
     'training_grad_norms_latest.json':         'training_grad_norms',
     'training_parity_latest.json':             'training_parity',
-    'training_parity_regimen_latest.json':     'training_parity_regimen',
     'training_step_profile_latest.json':       'training_step_profile',
     'training_checkpoint_policy_latest.json':  'training_checkpoint_policy',
     'corpus_sampling_log_latest.json':         'corpus_sampling_log',
@@ -23222,13 +23509,6 @@ function _buildSummary() {
         const files = (window.EMBEDDED_IR_DATA || {}).files || {};
         const lc    = files.training_loss_curve || {};
         const cp    = files.training_checkpoint_policy || {};
-        const regimen = files.training_parity_regimen || {};
-        const regimenStages = Array.isArray(regimen.stages) ? regimen.stages : [];
-        const stageById = {};
-        regimenStages.forEach((row) => {
-            const id = String(row && row.id ? row.id : '').trim().toUpperCase();
-            if (id) stageById[id] = row;
-        });
         const pipe  = files.training_pipeline && typeof files.training_pipeline === 'object'
             ? files.training_pipeline
             : {};
@@ -23241,43 +23521,10 @@ function _buildSummary() {
             : null;
         const prof  = files.training_step_profile || {};
         const tokS  = prof.train_tok_s != null ? Number(prof.train_tok_s).toFixed(1) + ' tok/s' : null;
-        const regSummary = regimen && typeof regimen.summary === 'object' ? regimen.summary : {};
-        const abcIds = regimenStages
-            .map((row) => String(row && row.id ? row.id : '').trim().toUpperCase())
-            .filter((id) => /^[ABC]/.test(id));
-        const abcLoaded = abcIds.length > 0;
-        const abcFailed = abcIds.some((id) => String((stageById[id] || {}).status || '').toUpperCase() === 'FAIL')
-            || (regSummary.passed === false || String(regimen.status || '').toLowerCase() === 'fail');
-        const abcPassed = abcLoaded && !abcFailed;
-        const regimenGate = abcPassed ? 'regimen pass' : (abcFailed ? 'regimen fail' : 'regimen missing');
-
-        const dPass = String((stageById.D1 || {}).status || '').toUpperCase() === 'PASS'
-            || (files.backprop_stitch_runtime && files.backprop_stitch_runtime.passed === true);
-        const d2Known = (stageById.D2 && stageById.D2.status);
-        const d2Pass = String((stageById.D2 || {}).status || '').toUpperCase() === 'PASS';
-        const ePass = String((stageById.E1 || {}).status || '').toUpperCase() === 'PASS'
-            || (files.replay_determinism && files.replay_determinism.passed === true);
-        const fPass = String((stageById.F1 || {}).status || '').toUpperCase() === 'PASS'
-            || (files.replay_accum && files.replay_accum.passed === true);
-        const dKnown = (stageById.D1 && stageById.D1.status) || files.backprop_stitch_runtime;
-        const eKnown = (stageById.E1 && stageById.E1.status) || files.replay_determinism;
-        const fKnown = (stageById.F1 && stageById.F1.status) || files.replay_accum;
-        const runtimeRows = [
-            { known: dKnown, pass: dPass },
-            ...(d2Known ? [{ known: d2Known, pass: d2Pass }] : []),
-            { known: eKnown, pass: ePass },
-            { known: fKnown, pass: fPass },
-        ];
-        const runtimeKnown = runtimeRows.filter((row) => Boolean(row.known)).length;
-        const runtimeFailed = runtimeRows.some((row) => Boolean(row.known) && !row.pass);
-        const runtimePassed = runtimeKnown === runtimeRows.length && runtimeRows.every((row) => row.pass === true);
-        const runtimeGate = runtimePassed ? 'runtime pass' : (runtimeFailed ? 'runtime fail' : 'runtime missing');
         const parts = [];
         if (stage)       parts.push('stage ' + stage);
         if (step != null) parts.push('step ' + step);
         if (loss != null) parts.push('loss ' + loss);
-        parts.push(runtimeGate);
-        parts.push(regimenGate);
         if (tokS)         parts.push(tokS);
         return parts.length > 0 ? parts.join(' · ') : 'no data yet';
     } catch (_) { return ''; }

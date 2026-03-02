@@ -316,6 +316,14 @@ export function applyReportMode(mode) {
     } else if (normalized === 'training' && INFERENCE_ONLY.includes(activeTabId)) {
         window.showTab('train-dashboard');
     }
+
+    // Shared panels (e.g. Memory Layout snapshot) need an explicit refresh when
+    // report scope flips between inference/training.
+    if (typeof window.updateOperatorSummary === 'function') {
+        window.updateOperatorSummary();
+    } else if (typeof updateOperatorSummary === 'function') {
+        updateOperatorSummary();
+    }
 }
 
 export function initModeUI() {
