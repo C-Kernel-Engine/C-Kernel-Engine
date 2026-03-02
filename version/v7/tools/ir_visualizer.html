@@ -3379,6 +3379,11 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <h3><span class="badge badge-blue">Dataset Corpus</span> Generated Corpus Catalog</h3>
                 <div id="trainingCorpusCatalog" style="color: var(--text-muted);">No corpus catalog loaded.</div>
             </div>
+
+            <div class="parity-section" style="margin-top: 1rem;">
+                <h3><span class="badge badge-orange">Next Steps</span> Model Roadmap</h3>
+                <div id="trainingRoadmap" style="color: var(--text-muted);">No roadmap loaded.</div>
+            </div>
         </div>
 
         <div id="profile" class="panel">
@@ -8134,6 +8139,7 @@ function renderTraining() {
     refreshTrainingSelectionUI(backwardList);
     renderTrainingRuntimeGraph();
     renderTrainingCorpusCatalog();
+    renderTrainingRoadmap();
 }
 
         function renderTrainingCorpusCatalog() {
@@ -8344,6 +8350,67 @@ function renderTraining() {
             }
 
             panel.innerHTML = parts.length ? parts.join('') : '<span style="color:#555;">Corpus data available but empty.</span>';
+        }
+
+        function renderTrainingRoadmap() {
+            const panel = document.getElementById('trainingRoadmap');
+            if (!panel) return;
+            const pipeline = (trainPipelineData && typeof trainPipelineData === 'object') ? trainPipelineData : {};
+            const plan = pipeline.training_plan || {};
+            const roadmap = plan.roadmap || (typeof files !== 'undefined' && files.training_plan && files.training_plan.roadmap) || null;
+            if (!roadmap || !Array.isArray(roadmap.steps) || roadmap.steps.length === 0) {
+                panel.innerHTML = '<span style="color:#555;">No roadmap found in training_plan.json. Add a <code>roadmap</code> field to persist your next steps.</span>';
+                return;
+            }
+
+            const STATUS_CFG = {
+                'done':        { icon: '✓', color: '#4ade80', label: 'Done' },
+                'completed':   { icon: '✓', color: '#4ade80', label: 'Done' },
+                'in_progress': { icon: '◉', color: '#fbbf24', label: 'In Progress' },
+                'pending':     { icon: '○', color: '#94a3b8', label: 'Pending' },
+                'deferred':    { icon: '…', color: '#64748b', label: 'Deferred' },
+                'blocked':     { icon: '✗', color: '#f87171', label: 'Blocked' },
+            };
+
+            const fmtStatus = s => STATUS_CFG[s] || { icon: '?', color: '#94a3b8', label: s || 'unknown' };
+
+            const objHtml = roadmap.objective
+                ? `<div style="margin-bottom:1rem;padding:0.6rem 0.85rem;background:#1e293b;border-left:3px solid var(--orange);border-radius:0 6px 6px 0;font-size:0.85rem;color:var(--text-primary);">${roadmap.objective}</div>`
+                : '';
+
+            const stepsHtml = roadmap.steps.map((step, idx) => {
+                const cfg = fmtStatus(step.status);
+                const gateHtml = step.gate
+                    ? `<span style="font-size:0.72rem;color:#64748b;margin-left:0.5rem;">gate: ${step.gate}</span>`
+                    : '';
+                const detailHtml = step.detail
+                    ? `<div style="margin-top:0.3rem;font-size:0.8rem;color:var(--text-muted);line-height:1.5;">${step.detail}</div>`
+                    : '';
+                const isActive = step.status === 'in_progress';
+                const isDone = step.status === 'done' || step.status === 'completed';
+                const rowBg = isActive ? 'background:#1e293b;border:1px solid #fbbf2440;' : isDone ? 'opacity:0.6;' : '';
+                return `<div style="display:flex;gap:0.75rem;padding:0.65rem 0.75rem;border-radius:6px;margin-bottom:0.4rem;${rowBg}">
+                    <div style="flex-shrink:0;width:1.4rem;height:1.4rem;border-radius:50%;background:${cfg.color}22;border:1.5px solid ${cfg.color};display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:${cfg.color};margin-top:0.1rem;">${cfg.icon}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.88rem;font-weight:600;color:${isActive ? '#fbbf24' : isDone ? '#4ade80' : 'var(--text-primary)'};">${idx + 1}. ${step.label || step.id}${gateHtml}</div>
+                        ${detailHtml}
+                    </div>
+                    <div style="flex-shrink:0;font-size:0.72rem;color:${cfg.color};padding-top:0.15rem;">${cfg.label}</div>
+                </div>`;
+            }).join('');
+
+            const noRestartItems = Array.isArray(roadmap.when_to_restart_pretrain) && roadmap.when_to_restart_pretrain.length
+                ? `<div style="margin-top:1rem;padding:0.6rem 0.85rem;background:#0f172a;border:1px solid #334155;border-radius:6px;font-size:0.8rem;">
+                    <div style="color:#94a3b8;font-weight:600;margin-bottom:0.35rem;">When to restart pretrain from scratch:</div>
+                    ${roadmap.when_to_restart_pretrain.map(r => `<div style="color:#64748b;padding:0.15rem 0;">· ${r}</div>`).join('')}
+                  </div>`
+                : '';
+
+            const updatedAt = roadmap.updated_at
+                ? `<div style="margin-top:0.75rem;font-size:0.72rem;color:#475569;">Updated: ${roadmap.updated_at.slice(0,16).replace('T',' ')} UTC</div>`
+                : '';
+
+            panel.innerHTML = objHtml + stepsHtml + noRestartItems + updatedAt;
         }
 
         function filterKernels(query) {
@@ -16712,7 +16779,10 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
 
     const allYValues = [];
     seriesA.forEach((p) => allYValues.push(p[key]));
-    seriesB.forEach((p) => allYValues.push(p[secondaryKey]));
+    // fitToPrimary: scale y-axis to the primary series only; baseline clipped to chart area
+    if (!opts.fitToPrimary) {
+        seriesB.forEach((p) => allYValues.push(p[secondaryKey]));
+    }
     const yMinRaw = d3.min(allYValues);
     const yMaxRaw = d3.max(allYValues);
     const yRangeRaw = Number.isFinite(yMinRaw) && Number.isFinite(yMaxRaw) ? (yMaxRaw - yMinRaw) : NaN;
@@ -16770,6 +16840,14 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
 
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
+
+    const _clipId = `ck_lc_clip_${Math.random().toString(36).slice(2, 9)}`;
+    svg.append('defs').append('clipPath').attr('id', _clipId)
+        .append('rect')
+        .attr('x', margin.left)
+        .attr('y', margin.top)
+        .attr('width', innerW)
+        .attr('height', innerH);
 
     svg.append('g')
         .attr('transform', `translate(0,${height - margin.bottom})`)
@@ -16841,6 +16919,7 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
             .attr('fill', 'none')
             .attr('stroke', color)
             .attr('stroke-width', 2)
+            .attr('clip-path', `url(#${_clipId})`)
             .attr('d', line);
     }
 
@@ -16851,6 +16930,7 @@ function drawLineChart(svgEl, points, key, color, secondaryKey, opts = {}) {
             .attr('stroke', '#60a5fa')
             .attr('stroke-width', 2)
             .attr('stroke-dasharray', '5,4')
+            .attr('clip-path', `url(#${_clipId})`)
             .attr('d', lineSecondary);
     }
 
@@ -17442,6 +17522,152 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
     }
 }
 
+// ---------------------------------------------------------------------------
+// Stage Eval Matrix
+// ---------------------------------------------------------------------------
+function renderStageEvalMatrix(container, files) {
+    if (!container) return;
+    const matrix = files && typeof files.stage_eval_matrix === 'object' && files.stage_eval_matrix
+        ? files.stage_eval_matrix
+        : null;
+    const runCtx = (typeof getRunContext === 'function') ? getRunContext() : {};
+    const runDir = runCtx.runDir || '';
+
+    const evalCmd = runDir
+        ? `python3 version/v7/scripts/eval_stage_v7.py --run ${runDir} --all-stages`
+        : 'python3 version/v7/scripts/eval_stage_v7.py --run RUN_DIR --all-stages';
+
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        container.innerHTML = `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-orange">Eval Matrix</span> Stage Performance</h3>
+                <p style="color:var(--text-muted);margin-bottom:0.5rem;">
+                    No <code>stage_eval_matrix.json</code> found. Run the eval script to generate per-stage quality metrics.
+                </p>
+                <pre style="font-size:0.78rem;white-space:pre-wrap;">${escapeHtml(evalCmd)}</pre>
+            </div>
+        `;
+        return;
+    }
+
+    const entries = [...matrix.entries].sort((a, b) => (a.run_order || 0) - (b.run_order || 0));
+
+    // ── Color cell helper ──────────────────────────────────────────────────
+    function _metricCell(val, { green = 0.75, yellow = 0.35, inverted = false, fmt = 'pct' } = {}) {
+        const n = Number(val);
+        if (!Number.isFinite(n)) return `<td style="color:var(--text-muted);">—</td>`;
+        const effective = inverted ? (1 - n) : n;
+        const color = effective >= green ? '#4ade80' : effective >= yellow ? '#fbbf24' : '#f87171';
+        const label = fmt === 'pct' ? `${(n * 100).toFixed(0)}%` : n.toFixed(3);
+        return `<td style="color:${color};font-weight:600;">${label}</td>`;
+    }
+
+    // ── Sparkline for valid_svg_rate progression ───────────────────────────
+    function _sparkline(values) {
+        if (!values || values.length < 2) return '';
+        const clean = values.map(Number).filter(Number.isFinite);
+        if (clean.length < 2) return '';
+        const minV = Math.min(...clean);
+        const maxV = Math.max(...clean);
+        const span = Math.max(maxV - minV, 0.01);
+        const W = 140, H = 28;
+        const pts = clean.map((v, i) => {
+            const x = (i / (clean.length - 1)) * (W - 4) + 2;
+            const y = ((maxV - v) / span) * (H - 6) + 3;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px;vertical-align:middle;">
+            <polyline points="${pts}" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+    }
+
+    const svgRates = entries.map((e) => e.metrics && Number.isFinite(Number(e.metrics.valid_svg_rate)) ? Number(e.metrics.valid_svg_rate) : NaN);
+    const hasSparkline = svgRates.filter(Number.isFinite).length >= 2;
+
+    // ── Stage color pill ───────────────────────────────────────────────────
+    const STAGE_COL = { pretrain: '#60a5fa', midtrain: '#a78bfa', sft: '#fbbf24', dpo: '#fb923c', grpo: '#34d399', ppo: '#f472b6' };
+    function _stagePill(stage, label) {
+        const c = STAGE_COL[stage] || '#9ca3af';
+        return `<span style="background:${c}22;border:1px solid ${c};color:${c};padding:0.05rem 0.38rem;border-radius:4px;font-size:0.68rem;font-weight:700;">${escapeHtml(label || stage)}</span>`;
+    }
+
+    // ── Build rows ─────────────────────────────────────────────────────────
+    const rowsHtml = entries.map((e) => {
+        const m = e.metrics || {};
+        const lossStr = Number.isFinite(Number(e.final_loss)) ? Number(e.final_loss).toFixed(4) : '—';
+        const evalAt = e.evaluated_at ? e.evaluated_at.slice(0, 16).replace('T', ' ') : '';
+        const probeCount = Array.isArray(e.probe_results) ? e.probe_results.length : (m.n_probes || '—');
+        return `<tr>
+            <td style="white-space:nowrap;">${_stagePill(e.stage, e.phase_label || e.stage)}</td>
+            <td style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(lossStr)}</td>
+            ${_metricCell(m.valid_svg_rate, { green: 0.75, yellow: 0.35 })}
+            ${_metricCell(m.closure_success_rate, { green: 0.70, yellow: 0.30 })}
+            ${_metricCell(m.prefix_integrity, { green: 0.80, yellow: 0.40 })}
+            ${_metricCell(m.ood_robustness, { green: 0.50, yellow: 0.20 })}
+            ${_metricCell(m.adherence, { green: 0.70, yellow: 0.30 })}
+            ${_metricCell(m.repetition_loop_score, { green: 0.10, yellow: 0.30, inverted: true, fmt: 'pct' })}
+            <td style="color:var(--text-muted);font-size:0.70rem;white-space:nowrap;">${escapeHtml(String(probeCount))} probes · ${escapeHtml(String(m.n_samples || '?'))} samples</td>
+        </tr>`;
+    }).join('');
+
+    // ── Summary header stats ───────────────────────────────────────────────
+    const latestEntry = entries[entries.length - 1];
+    const latestM = latestEntry && latestEntry.metrics ? latestEntry.metrics : {};
+    const latestSvg = Number.isFinite(Number(latestM.valid_svg_rate)) ? `${(Number(latestM.valid_svg_rate) * 100).toFixed(0)}%` : '—';
+    const latestOod = Number.isFinite(Number(latestM.ood_robustness)) ? `${(Number(latestM.ood_robustness) * 100).toFixed(0)}%` : '—';
+    const latestAdh = Number.isFinite(Number(latestM.adherence)) ? `${(Number(latestM.adherence) * 100).toFixed(0)}%` : '—';
+
+    const sparkHtml = hasSparkline ? `
+        <div style="margin-top:0.6rem;margin-bottom:0.15rem;">
+            <span style="color:var(--text-muted);font-size:0.72rem;margin-right:0.5rem;">valid_svg progression →</span>
+            ${_sparkline(svgRates)}
+            <span style="color:#4ade80;font-size:0.72rem;margin-left:0.5rem;">${latestSvg}</span>
+        </div>` : '';
+
+    const genAt = matrix.generated_at ? matrix.generated_at.slice(0, 16).replace('T', ' ') + ' UTC' : '';
+
+    container.innerHTML = `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Eval Matrix</span> Stage Performance Progression</h3>
+            <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:0.7rem;">
+                <div><span style="color:var(--text-muted);font-size:0.72rem;">Latest valid_svg</span><br><span style="color:#4ade80;font-size:1.1rem;font-weight:700;">${latestSvg}</span></div>
+                <div><span style="color:var(--text-muted);font-size:0.72rem;">OOD robustness</span><br><span style="color:#fbbf24;font-size:1.1rem;font-weight:700;">${latestOod}</span></div>
+                <div><span style="color:var(--text-muted);font-size:0.72rem;">Adherence</span><br><span style="color:#60a5fa;font-size:1.1rem;font-weight:700;">${latestAdh}</span></div>
+                <div><span style="color:var(--text-muted);font-size:0.72rem;">Runs evaluated</span><br><span style="color:var(--text-primary);font-size:1.1rem;font-weight:700;">${entries.length}</span></div>
+            </div>
+            ${sparkHtml}
+            <div style="overflow-x:auto;margin-top:0.6rem;">
+                <table style="min-width:700px;">
+                    <thead><tr>
+                        <th>Phase</th>
+                        <th>Loss</th>
+                        <th title="Fraction of samples with valid &lt;svg&gt;...&lt;/svg&gt;">Valid SVG</th>
+                        <th title="Output ends with &lt;/svg&gt;">Closure</th>
+                        <th title="Output begins with &lt;svg">Prefix</th>
+                        <th title="Valid SVG on unlabeled/OOD prompts">OOD</th>
+                        <th title="Shape/palette attributes present in output">Adherence</th>
+                        <th title="n-gram repetition rate (lower = better)">Loop Score</th>
+                        <th>Coverage</th>
+                    </tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.72rem;margin-top:0.55rem;">
+                Color: <span style="color:#4ade80;">■ good</span> &nbsp;
+                <span style="color:#fbbf24;">■ marginal</span> &nbsp;
+                <span style="color:#f87171;">■ needs work</span> &nbsp;·&nbsp;
+                Loop Score: inverted (lower raw = green) &nbsp;·&nbsp;
+                ${genAt ? `Generated: ${genAt}` : ''}
+            </div>
+            <details style="margin-top:0.8rem;">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Regenerate eval matrix</summary>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.4rem;">${escapeHtml(evalCmd)}</pre>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">${escapeHtml(evalCmd.replace('--all-stages', '--stage sft --stage-pass 4 --n-samples 5'))}</pre>
+            </details>
+        </div>
+    `;
+}
+
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -17619,6 +17845,7 @@ function renderTrainingDashboard(files) {
             <div id="trainSweepTable"></div>
         </div>
         <div id="trainDataPipelineSection"></div>
+        <div id="trainEvalMatrixSection"></div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Runbook</span> Operator Commands (Copy/Paste)</h3>
             <p style="color:var(--text-muted);margin-bottom:0.6rem;">Producer = CLI writes run_dir artifacts, viewer consumes run_dir.</p>
@@ -17689,6 +17916,7 @@ function renderTrainingDashboard(files) {
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
         sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
+        renderStageEvalMatrix(document.getElementById('trainEvalMatrixSection'), files);
         return;
     }
 
@@ -17724,6 +17952,7 @@ function renderTrainingDashboard(files) {
     `;
 
     renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
+    renderStageEvalMatrix(document.getElementById('trainEvalMatrixSection'), files);
 }
 
 /* ===== training_tabs.js ===== */
@@ -19394,9 +19623,13 @@ function renderDataLabPanel(files) {
             const chartSeries = buildStageChartSeries(meta);
             const chartId = `dpStageLossChart_${String(stage).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
             const chartTitle = `Stage ${stage} Loss vs Step`;
+            const _prevRun = meta.lossRuns && meta.lossRuns.length > 1 ? meta.lossRuns[meta.lossRuns.length - 2] : null;
+            const _prevRange = _prevRun && Number.isFinite(Number(_prevRun.first_loss)) && Number.isFinite(Number(_prevRun.final_loss))
+                ? ` (${fmtLoss(_prevRun.first_loss)} → ${fmtLoss(_prevRun.final_loss)}, clipped to current scale)`
+                : '';
             const chartLegend = chartSeries.hasPrevious
-                ? `latest run: <code>${htmlEscape(chartSeries.latestRunId)}</code> · baseline: <code>${htmlEscape(chartSeries.previousRunId)}</code> (dashed)`
-                : `latest run: <code>${htmlEscape(chartSeries.latestRunId || 'run')}</code>`;
+                ? `<span style="color:#fbbf24;">●</span> latest: <code>${htmlEscape(chartSeries.latestRunId)}</code> &nbsp;·&nbsp; <span style="color:#60a5fa;">– –</span> baseline: <code>${htmlEscape(chartSeries.previousRunId)}</code>${htmlEscape(_prevRange)}`
+                : `<span style="color:#fbbf24;">●</span> latest: <code>${htmlEscape(chartSeries.latestRunId || 'run')}</code>`;
             const chartPanel = chartSeries.points.length > 1
                 ? `
                     <div style="margin:0.1rem 0 0.5rem 0;border:1px solid rgba(255,255,255,0.10);border-radius:7px;padding:0.45rem 0.5rem;background:rgba(255,255,255,0.02);">
@@ -19476,7 +19709,7 @@ function renderDataLabPanel(files) {
                     'loss',
                     '#fbbf24',
                     chartSeries.hasPrevious ? 'loss_prev' : null,
-                    { title: chartTitle }
+                    { title: chartTitle, fitToPrimary: true }
                 );
             }
 

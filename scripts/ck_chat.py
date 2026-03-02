@@ -1129,7 +1129,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              top_p: float = 1.0,
              min_p: float = 0.0,
              repeat_penalty: float = 1.0,
-             repeat_last_n: int = 64) -> str:
+             repeat_last_n: int = 64,
+             stop_on_text: Optional[List[str]] = None) -> str:
     """Generate text from prompt.
 
     Args:
@@ -1144,6 +1145,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     generated_tokens: List[int] = []
     generated_text: str = ""
     gibberish_detected: bool = False
+    stop_markers = [m for m in (stop_on_text or []) if isinstance(m, str) and m]
+    stopped_on_text: Optional[str] = None
 
     if verbose:
         print(f"[Prompt tokens: {prompt_tokens}]")
@@ -1153,6 +1156,16 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     decode_times = []
     prefill_time = 0.0
     start_time = time.time()
+
+    def _check_text_stop() -> bool:
+        nonlocal stopped_on_text
+        if not stop_markers:
+            return False
+        for marker in stop_markers:
+            if marker in generated_text:
+                stopped_on_text = marker
+                return True
+        return False
 
     if model.has_kv_decode and model.kv_cache_enable():
         # Each generate() call is a fresh prompt pass.
@@ -1205,6 +1218,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
                     print(f"<{next_token}:{display_text}>", end='', flush=True)
             else:
                 print(display_text, end='', flush=True)
+            if _check_text_stop():
+                break
 
             # Periodic gibberish check
             if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
@@ -1275,6 +1290,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
                     print(f"<{next_token}:{display_text}>", end='', flush=True)
             else:
                 print(display_text, end='', flush=True)
+            if _check_text_stop():
+                break
 
             # Periodic gibberish check
             if validator and (i + 1) % check_every_n == 0 and len(generated_tokens) >= 10:
@@ -1345,6 +1362,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     elif verbose:
         tokens_per_sec = gen_count / total_time if total_time > 0 else 0
         print(f"\n[Generated {gen_count} tokens in {total_time:.2f}s ({tokens_per_sec:.1f} tok/s)]")
+    if verbose and stopped_on_text:
+        print(f"[Stop marker hit: {stopped_on_text!r}]")
 
     return model.decode(generated)
 
@@ -1359,7 +1378,8 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               top_p: float = 1.0,
               min_p: float = 0.0,
               repeat_penalty: float = 1.0,
-              repeat_last_n: int = 64):
+              repeat_last_n: int = 64,
+              stop_on_text: Optional[List[str]] = None):
     """Interactive chat loop."""
     print("\n" + "=" * 60)
     print("  C-Kernel-Engine Chat")
@@ -1423,7 +1443,8 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
                           top_p=top_p,
                           min_p=min_p,
                           repeat_penalty=repeat_penalty,
-                          repeat_last_n=repeat_last_n)
+                          repeat_last_n=repeat_last_n,
+                          stop_on_text=stop_on_text)
         print()
 
 
@@ -1466,6 +1487,10 @@ def main():
                        help="Print token IDs inline as <id:text>")
     parser.add_argument("--show-token-pieces", action="store_true",
                        help="With --show-token-ids, also show raw vocab piece as <id|piece:text>")
+    parser.add_argument("--stop-at-eos", action="store_true",
+                       help="Stop generation when '<eos>' appears in decoded text")
+    parser.add_argument("--stop-on-text", action="append", default=[],
+                       help="Stop generation when this decoded text marker appears (repeatable)")
     parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "gemma"], default="auto",
                        help="Chat template mode: auto (from GGUF), none, qwen, or gemma")
     parser.add_argument("--no-chat-template", action="store_true",
@@ -1507,6 +1532,9 @@ def main():
         sys.exit(1)
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")
+    stop_markers = list(args.stop_on_text or [])
+    if args.stop_at_eos:
+        stop_markers.append("<eos>")
 
     try:
         if args.prompt:
@@ -1536,7 +1564,8 @@ def main():
                     top_p=args.top_p,
                     min_p=args.min_p,
                     repeat_penalty=args.repeat_penalty,
-                    repeat_last_n=args.repeat_last_n)
+                    repeat_last_n=args.repeat_last_n,
+                    stop_on_text=stop_markers)
             print()
         else:
             # Interactive chat mode
@@ -1552,7 +1581,8 @@ def main():
                      top_p=args.top_p,
                      min_p=args.min_p,
                      repeat_penalty=args.repeat_penalty,
-                     repeat_last_n=args.repeat_last_n)
+                     repeat_last_n=args.repeat_last_n,
+                     stop_on_text=stop_markers)
     finally:
         model.free()
 

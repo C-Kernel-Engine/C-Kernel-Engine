@@ -1894,15 +1894,26 @@ def _derive_stage_loss_history(
         current_payload = files.get("training_loss_curve")
         stage_series = _extract_stage_loss_series_by_stage(current_payload)
         if stage_series:
-            for stage_name, series in stage_series.items():
-                prov = prov_by_stage.get(stage_name, active_prov if stage_name == active_stage else {})
+            # Always use active_stage from the pipeline plan rather than the per-step
+            # source_stage labels in training_loss_curve.json.  Those labels can be
+            # stale or mislabeled (e.g. showing "pretrain" when the run was SFT) because
+            # the training script copies source_stage from the dataset provenance field
+            # rather than the actual curriculum_stage of the current run.
+            # training_loss_curve.json is the live artifact for the currently-active
+            # training stage, so active_stage is always authoritative here.
+            combined: list[dict] = []
+            for series in stage_series.values():
+                combined.extend(series)
+            combined.sort(key=lambda p: p["step"])
+            if combined:
+                prov = prov_by_stage.get(active_stage, active_prov)
                 _ingest(
-                    stage_name,
+                    active_stage,
                     current_payload,
                     source="training_loss_curve",
                     path_hint=loaded_paths.get("training_loss_curve"),
-                    run_id=f"current:{stage_name}",
-                    series_override=series,
+                    run_id=f"current:{active_stage}",
+                    series_override=combined,
                     meta={
                         "dataset_name": prov.get("dataset_name") if isinstance(prov.get("dataset_name"), str) else None,
                         "source_path": prov.get("source_path") if isinstance(prov.get("source_path"), str) else None,
@@ -1958,6 +1969,31 @@ def _derive_stage_loss_history(
                         run_id=f"artifact:{p.name}",
                     )
 
+    # Build ledger index from files.run_ledger for historical run attribution.
+    ledger_by_run_id: dict[str, dict] = {}
+    _run_ledger_payload = files.get("run_ledger")
+    if isinstance(_run_ledger_payload, dict):
+        for _led_rec in (_run_ledger_payload.get("entries") or []):
+            if isinstance(_led_rec, dict) and _led_rec.get("run_id"):
+                ledger_by_run_id[str(_led_rec["run_id"])] = _led_rec
+    # Also attempt direct read from run_dir if not loaded via files dict.
+    if not ledger_by_run_id and run_dir is not None:
+        _ledger_path = run_dir / "run_ledger.jsonl"
+        if _ledger_path.exists():
+            try:
+                for _line in _ledger_path.read_text(encoding="utf-8").splitlines():
+                    _line = _line.strip()
+                    if not _line:
+                        continue
+                    try:
+                        _rec = json.loads(_line)
+                    except Exception:
+                        continue
+                    if isinstance(_rec, dict) and _rec.get("run_id"):
+                        ledger_by_run_id[str(_rec["run_id"])] = _rec
+            except OSError:
+                pass
+
     # Historical train runs under .ck_pipeline/ascii_bpe_*/train_ck.json.
     if run_dir is not None:
         pipe_root = run_dir / ".ck_pipeline"
@@ -1971,9 +2007,23 @@ def _derive_stage_loss_history(
                     continue
 
                 stage_name: str | None = None
+                extra_meta: dict = {}
+
+                # ── 1. run_ledger (primary) ────────────────────────────────
+                led = ledger_by_run_id.get(sub.name)
+                if isinstance(led, dict):
+                    stage_name = _normalize_curriculum_stage_name(led.get("stage_id"))
+                    extra_meta = {
+                        "stage_pass": led.get("stage_pass"),
+                        "phase_label": led.get("phase_label"),
+                        "run_order": led.get("run_order"),
+                    }
+
+                # ── 2. pipeline_report.json (legacy fallback) ──────────────
                 report = _load_json_loose(sub / "pipeline_report.json")
                 if isinstance(report, dict):
-                    stage_name = _normalize_curriculum_stage_name(report.get("curriculum_stage") or report.get("stage"))
+                    if not stage_name:
+                        stage_name = _normalize_curriculum_stage_name(report.get("curriculum_stage") or report.get("stage"))
                 if not stage_name:
                     prov = train_ck.get("data_provenance")
                     if isinstance(prov, list) and prov and isinstance(prov[0], dict):
@@ -1981,6 +2031,38 @@ def _derive_stage_loss_history(
                 inferred_ref = _infer_stage_ref(train_ck)
                 if not stage_name and isinstance(inferred_ref, dict):
                     stage_name = _normalize_curriculum_stage_name(inferred_ref.get("stage"))
+
+                # ── 3. train_token_pack.json -> training_plan.json cross-ref ──
+                if not stage_name or stage_name == "unassigned":
+                    pack = _load_json_loose(sub / "train_token_pack.json")
+                    if isinstance(pack, dict):
+                        ds_raw = str(pack.get("dataset") or "").strip()
+                        if ds_raw:
+                            pack_ds_name = Path(ds_raw).name
+                            for plan_cand in (
+                                run_dir / "training_plan.json",
+                                run_dir / "training_pipeline_latest.json",
+                            ):
+                                snap = _load_json_loose(plan_cand)
+                                if not isinstance(snap, dict):
+                                    continue
+                                for ps in snap.get("stages") or []:
+                                    if not isinstance(ps, dict):
+                                        continue
+                                    for pds in ps.get("datasets") or []:
+                                        if not isinstance(pds, dict):
+                                            continue
+                                        pds_name = Path(str(pds.get("name") or pds.get("path") or "")).name
+                                        if pds_name and pds_name == pack_ds_name:
+                                            _resolved = _normalize_curriculum_stage_name(str(ps.get("stage") or ""))
+                                            if _resolved:
+                                                stage_name = _resolved
+                                                break
+                                    if stage_name and stage_name != "unassigned":
+                                        break
+                                if stage_name and stage_name != "unassigned":
+                                    break
+
                 if not stage_name:
                     stage_name = "unassigned"
 
@@ -2082,10 +2164,18 @@ def _derive_stage_loss_history(
                         "raw_source_path": raw_source_path,
                         "token_stream_path": token_stream_path,
                         "dataset_provenance": dataset_provenance,
+                        **extra_meta,
                     },
                 )
 
-    entries.sort(key=lambda item: (str(item.get("stage") or ""), str(item.get("ended_at") or ""), str(item.get("run_id") or "")))
+    # Sort: prefer run_order from ledger when available, else fall back to stage+ended_at.
+    def _sort_key(item: dict) -> tuple:
+        ro = item.get("run_order")
+        if isinstance(ro, int):
+            return (0, ro, str(item.get("stage") or ""), str(item.get("ended_at") or ""))
+        return (1, 0, str(item.get("stage") or ""), str(item.get("ended_at") or ""))
+
+    entries.sort(key=_sort_key)
     by_stage: dict[str, list[dict[str, Any]]] = {}
     for entry in entries:
         stage = str(entry.get("stage") or "unassigned")
@@ -2768,11 +2858,14 @@ def load_model_data(
         "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
         "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
+        "training_plan": model_candidates("training_plan.json") + [V7_REPORT_PATH / "training_plan.json", V7_REPORT_PATH_LEGACY / "training_plan.json"],
+        "run_ledger": model_candidates("run_ledger.jsonl"),
         "corpus_sampling_log": model_candidates("corpus_sampling_log_latest.json") + model_candidates("corpus_sampling_log.json") + [V7_REPORT_PATH / "corpus_sampling_log_latest.json", V7_REPORT_PATH_LEGACY / "corpus_sampling_log_latest.json"],
         "dataset_qc": model_candidates("dataset_qc.json"),
         "dataset_profile": model_candidates("dataset_profile.json"),
         "tokenizer_roundtrip": model_candidates("tokenizer_roundtrip.json"),
         "post_train_eval": model_candidates("post_train_eval.json"),
+        "stage_eval_matrix": model_candidates("stage_eval_matrix.json"),
         "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
         "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
         "run_index": model_candidates("run_index.json"),
@@ -2873,8 +2966,23 @@ def load_model_data(
             if not path.exists():
                 continue
             try:
-                with open(path, "r") as f:
-                    payload = json.load(f)
+                if path.suffix == ".jsonl":
+                    # Parse newline-delimited JSON; last record per run_id wins.
+                    _by_run: dict[str, dict] = {}
+                    for _line in path.read_text(encoding="utf-8").splitlines():
+                        _line = _line.strip()
+                        if not _line:
+                            continue
+                        try:
+                            _rec = json.loads(_line)
+                        except Exception:
+                            continue
+                        if isinstance(_rec, dict) and _rec.get("run_id"):
+                            _by_run[str(_rec["run_id"])] = _rec
+                    payload = {"entries": sorted(_by_run.values(), key=lambda r: int(r.get("run_order") or 0))}
+                else:
+                    with open(path, "r") as f:
+                        payload = json.load(f)
             except Exception as e:
                 if first_error is None:
                     first_error = (path, e)
@@ -3306,11 +3414,23 @@ def load_model_data(
                     loaded.append("stage_loss_history(derived)")
             else:
                 existing_entries = stage_loss_history.get("entries") if isinstance(stage_loss_history.get("entries"), list) else []
+                # Build set of run_ids that the derived scan resolved — derived stage
+                # attribution is always authoritative over stale JSON entries (which can
+                # have wrong stage labels, e.g. 171735 mis-labeled "pretrain").
+                _derived_run_ids: set[str] = {
+                    str(r.get("run_id") or r.get("path") or "")
+                    for r in derived_stage_loss_history.get("entries", [])
+                    if isinstance(r, dict) and (r.get("run_id") or r.get("path"))
+                }
                 merged_map: dict[tuple[str, str], dict[str, Any]] = {}
                 for row in existing_entries:
                     if not isinstance(row, dict):
                         continue
-                    key = (str(row.get("stage") or ""), str(row.get("run_id") or row.get("path") or ""))
+                    row_run_id = str(row.get("run_id") or row.get("path") or "")
+                    # Skip stale JSON entries whose run_id is covered by derived scan.
+                    if row_run_id and row_run_id in _derived_run_ids:
+                        continue
+                    key = (str(row.get("stage") or ""), row_run_id)
                     merged_map[key] = dict(row)
                 for row in derived_stage_loss_history.get("entries", []):
                     if not isinstance(row, dict):

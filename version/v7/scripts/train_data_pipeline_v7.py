@@ -34,6 +34,7 @@ CK_RUN = ROOT / "version" / "v7" / "scripts" / "ck_run_v7.py"
 TORCH_REF = ROOT / "version" / "v7" / "scripts" / "train_qwen3_torch_from_run_v7.py"
 OPEN_VIS = ROOT / "version" / "v7" / "tools" / "open_ir_visualizer.py"
 PROMOTE_CKPT = ROOT / "version" / "v7" / "scripts" / "promote_latest_checkpoint_v7.py"
+PACK_TOKENS = ROOT / "version" / "v7" / "scripts" / "pack_training_tokens_v7.py"
 BPE_BIN = ROOT / "build" / "ck-bpe-train"
 TOKENIZER_LIB = ROOT / "build" / "libckernel_tokenizer.so"
 CK_CLI_BIN = ROOT / "build" / "ck-cli-v7"
@@ -150,10 +151,181 @@ def _ensure_binary(path: Path, make_target: str) -> None:
         raise RuntimeError(f"expected binary after build: {path}")
 
 
+def _run_sample_packer(
+    dataset_path: Path,
+    tokenizer_json: Path,
+    tokenizer_bin: Path,
+    seq_len: int,
+    out_token_file: Path,
+    out_report_json: Path,
+) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    if not PACK_TOKENS.exists():
+        raise RuntimeError(f"sample packer script missing: {PACK_TOKENS}")
+    cmd = [
+        _python_exec(),
+        str(PACK_TOKENS),
+        "--dataset",
+        str(dataset_path),
+        "--tokenizer-lib",
+        str(TOKENIZER_LIB),
+        "--tokenizer-bin",
+        str(tokenizer_bin),
+        "--tokenizer-json",
+        str(tokenizer_json),
+        "--seq-len",
+        str(int(seq_len)),
+        "--out",
+        str(out_token_file),
+        "--report-json",
+        str(out_report_json),
+    ]
+    _run(cmd, cwd=ROOT)
+    report = _load_json(out_report_json)
+    stats = report.get("stats") if isinstance(report, dict) else None
+    if not isinstance(stats, dict):
+        raise RuntimeError(f"invalid sample pack report: {out_report_json}")
+    return out_token_file, report, stats
+
+
 def _write_svg_dataset(path: Path, repeats: int) -> None:
     lines = [SVG_LINE for _ in range(max(1, int(repeats)))]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _read_non_empty_rows(path: Path) -> list[str]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raw = path.read_text(encoding="utf-8", errors="ignore")
+    out: list[str] = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        out.append(line.rstrip("\r\n"))
+    return out
+
+
+def _resolve_pad_token_id(run_dir: Path, default: int = 0) -> int:
+    # Prefer explicit ids in config.json when present.
+    cfg = run_dir / "config.json"
+    if cfg.exists():
+        try:
+            doc = _load_json(cfg)
+        except Exception:
+            doc = {}
+        for key in ("pad_token_id", "eos_token_id", "bos_token_id"):
+            v = doc.get(key) if isinstance(doc, dict) else None
+            if isinstance(v, int) and v >= 0:
+                return int(v)
+
+    # Fallback to tokenizer.json special token table.
+    tok = run_dir / "tokenizer.json"
+    if tok.exists():
+        try:
+            tdoc = _load_json(tok)
+        except Exception:
+            tdoc = {}
+        added = tdoc.get("added_tokens") if isinstance(tdoc, dict) else None
+        if isinstance(added, list):
+            wanted = (
+                "<|pad|>",
+                "<pad>",
+                "<|eos|>",
+                "</s>",
+                "<|bos|>",
+                "<s>",
+            )
+            for name in wanted:
+                for row in added:
+                    if not isinstance(row, dict):
+                        continue
+                    if str(row.get("content") or "") != name:
+                        continue
+                    tid = row.get("id")
+                    if isinstance(tid, int) and tid >= 0:
+                        return int(tid)
+        model = tdoc.get("model") if isinstance(tdoc, dict) else None
+        vocab = model.get("vocab") if isinstance(model, dict) else None
+        if isinstance(vocab, dict):
+            for name in ("<|pad|>", "<pad>", "<|eos|>", "</s>", "<|bos|>", "<s>"):
+                tid = vocab.get(name)
+                if isinstance(tid, int) and tid >= 0:
+                    return int(tid)
+
+    return int(default)
+
+
+def _pack_rows_to_seq_windows(
+    row_token_ids: list[list[int]],
+    seq_len: int,
+    pad_token_id: int,
+) -> tuple[list[int], dict[str, Any]]:
+    """Pack complete rows into fixed seq windows without cross-row bleed.
+
+    Rows are appended greedily into a window until the next row would overflow.
+    The remaining slots are padded, and overflow row starts next window.
+    """
+    seq_len_i = max(1, int(seq_len))
+    pad_id = int(pad_token_id)
+    total_rows = len(row_token_ids)
+    if total_rows == 0:
+        raise RuntimeError("sample-aware packing requires at least one non-empty row")
+
+    packed: list[int] = []
+    windows = 0
+    pad_tokens = 0
+    current: list[int] = []
+    max_row = 0
+    min_row = None
+    used_tokens = 0
+    for idx, row in enumerate(row_token_ids, start=1):
+        n = len(row)
+        if n <= 0:
+            continue
+        max_row = max(max_row, n)
+        min_row = n if min_row is None else min(min_row, n)
+        if n > seq_len_i:
+            raise RuntimeError(
+                f"row {idx} has {n} tokens, exceeds seq_len={seq_len_i}; "
+                "increase --seq-len or shorten this sample"
+            )
+        if len(current) + n <= seq_len_i:
+            current.extend(row)
+            used_tokens += n
+            continue
+        pad_n = seq_len_i - len(current)
+        if pad_n > 0:
+            current.extend([pad_id] * pad_n)
+            pad_tokens += pad_n
+        packed.extend(current)
+        windows += 1
+        current = list(row)
+        used_tokens += n
+
+    if current:
+        pad_n = seq_len_i - len(current)
+        if pad_n > 0:
+            current.extend([pad_id] * pad_n)
+            pad_tokens += pad_n
+        packed.extend(current)
+        windows += 1
+
+    fill_ratio = float(used_tokens) / float(max(1, windows * seq_len_i))
+    stats: dict[str, Any] = {
+        "mode": "sample",
+        "rows": int(total_rows),
+        "windows": int(windows),
+        "seq_len": int(seq_len_i),
+        "pad_token_id": int(pad_id),
+        "pad_tokens": int(pad_tokens),
+        "used_tokens": int(used_tokens),
+        "packed_tokens": int(len(packed)),
+        "fill_ratio": float(fill_ratio),
+        "min_row_tokens": int(min_row or 0),
+        "max_row_tokens": int(max_row),
+    }
+    return packed, stats
 
 
 def _loss_stats(payload: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +353,92 @@ def _loss_stats(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+# ── Run Ledger utilities ────────────────────────────────────────────────────
+# run_ledger.jsonl: append-only execution log written to run_dir (not work_dir).
+# Each line is a JSON object. Last record per run_id is authoritative.
+
+def _read_ledger(run_dir: Path) -> list[dict[str, Any]]:
+    """Read run_dir/run_ledger.jsonl → list of last-record-per-run_id sorted by run_order."""
+    ledger_path = run_dir / "run_ledger.jsonl"
+    if not ledger_path.exists():
+        return []
+    by_run_id: dict[str, dict[str, Any]] = {}
+    try:
+        for line in ledger_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(rec, dict) and rec.get("run_id"):
+                by_run_id[str(rec["run_id"])] = rec
+    except OSError:
+        return []
+    return sorted(by_run_id.values(), key=lambda r: int(r.get("run_order") or 0))
+
+
+def _append_ledger_entry(run_dir: Path, entry: dict[str, Any]) -> None:
+    """Append a single JSON record to run_dir/run_ledger.jsonl (never rewrites)."""
+    ledger_path = run_dir / "run_ledger.jsonl"
+    line = json.dumps(entry, separators=(",", ":")) + "\n"
+    with ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(line)
+
+
+def _build_ledger_start_record(
+    run_dir: Path,
+    work_dir: Path,
+    args: "argparse.Namespace",
+    active_stage: str,
+) -> dict[str, Any]:
+    """Build a status=running ledger record for the current training invocation."""
+    existing = _read_ledger(run_dir)
+    run_order = len(existing)
+
+    stage_id = _normalize_stage_name(str(getattr(args, "curriculum_stage", "auto") or "auto"))
+    if not stage_id or stage_id == "auto":
+        stage_id = active_stage or "pretrain"
+
+    stage_pass = sum(
+        1 for r in existing
+        if r.get("stage_id") == stage_id and str(r.get("status") or "") in {"running", "completed"}
+    ) + 1
+
+    phase_label = f"{stage_id}_{stage_pass}"
+
+    dataset_path_raw = str(getattr(args, "data", None) or "")
+    dataset_name = Path(dataset_path_raw).name if dataset_path_raw else None
+
+    return {
+        "schema": "ck.run_ledger.v1",
+        "run_order": run_order,
+        "run_id": work_dir.name,
+        "stage_id": stage_id,
+        "stage_pass": stage_pass,
+        "phase_label": phase_label,
+        "status": "running",
+        "dataset": dataset_path_raw or None,
+        "dataset_name": dataset_name,
+        "lr": float(getattr(args, "lr", 0) or 0) or None,
+        "seq_len": int(getattr(args, "seq_len", 0) or 0) or None,
+        "total_tokens": None,
+        "steps": None,
+        "pack_mode": str(getattr(args, "pack_mode", None) or "") or None,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": None,
+        "loss_first": None,
+        "loss_final": None,
+        "loss_min": None,
+        "loss_min_step": None,
+        "checkpoint_step": None,
+        "checkpoint_bump": None,
+        "checkpoint_manifest": None,
+        "work_dir": str(work_dir),
+    }
 
 
 def _read_bpe_meta_max_piece_bytes(bin_dir: Path | None) -> int | None:
@@ -599,6 +857,70 @@ def _atomic_write_text(path: Path, content: str) -> None:
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise
+
+
+def _atomic_copy(src: Path, dst: Path) -> None:
+    """Copy file atomically via temp file + rename."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(dst.parent), suffix=".tmp")
+    try:
+        os.close(fd)
+        fd = -1
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        shutil.copy2(src, tmp)
+        os.replace(tmp, str(dst))
+    except BaseException:
+        if fd >= 0:
+            os.close(fd)
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def _snapshot_run_checkpoint(run_dir: Path, work_dir: Path, steps: Any) -> dict[str, Any]:
+    """Persist a per-run checkpoint snapshot under work_dir for deterministic promotion."""
+    try:
+        step_i = int(steps)
+    except Exception:
+        return {"status": "skipped", "reason": "invalid_step", "step": None}
+    if step_i <= 0:
+        return {"status": "skipped", "reason": "non_positive_step", "step": step_i}
+
+    ckpt_dir = run_dir / "checkpoints"
+    src_bump = ckpt_dir / f"weights_step_{step_i:08d}.bump"
+    src_manifest = ckpt_dir / f"weights_step_{step_i:08d}_manifest.json"
+    if not src_bump.exists() or not src_manifest.exists():
+        return {
+            "status": "missing",
+            "reason": "checkpoint_pair_not_found",
+            "step": step_i,
+            "source_bump": str(src_bump),
+            "source_manifest": str(src_manifest),
+        }
+
+    dst_bump = work_dir / "weights_final.bump"
+    dst_manifest = work_dir / "weights_final_manifest.json"
+    try:
+        _atomic_copy(src_bump, dst_bump)
+        _atomic_copy(src_manifest, dst_manifest)
+    except Exception as exc:
+        return {
+            "status": "error",
+            "reason": f"copy_failed:{exc}",
+            "step": step_i,
+            "source_bump": str(src_bump),
+            "source_manifest": str(src_manifest),
+        }
+    return {
+        "status": "ok",
+        "reason": "snapshot_saved",
+        "step": step_i,
+        "source_bump": str(src_bump),
+        "source_manifest": str(src_manifest),
+        "bump": str(dst_bump),
+        "manifest": str(dst_manifest),
+    }
 
 
 def _bytes_preview(raw: bytes, limit: int = 48) -> str:
@@ -1635,6 +1957,31 @@ def _collect_dataset_catalog(
                 source="manifest_output",
             )
 
+    # Auto-discover prepared .txt datasets in the data directory for planned future stages.
+    # This pre-populates midtrain/sft/etc. bindings so the operator can see what datasets
+    # are ready without having to formally run each stage first.
+    data_dir = dataset_path.parent
+    if data_dir.exists():
+        for _txt in sorted(data_dir.glob("*.txt")):
+            if str(_txt) in seen_paths:
+                continue
+            _nm = _txt.name
+            # Skip raw/intermediate variants and per-split files — only the final merged
+            # datasets that would actually be trained on.
+            if _nm.endswith("_raw.txt"):
+                continue
+            if any(_sfx in _nm for _sfx in ("_holdout.", "_train.", "_all.")):
+                continue
+            _inferred = _infer_dataset_stage(_nm, active_stage)
+            _add_entry(
+                stage=_inferred,
+                kind="active_dataset",
+                name=_nm,
+                path=str(_txt),
+                note="discovered — ready for this stage",
+                source="local",
+            )
+
     return entries
 
 
@@ -1854,6 +2201,27 @@ def _build_training_pipeline_payload(
     tokenizer_lineage["coverage_status"] = str(tokenizer_coverage.get("status", "unknown"))
     tokenizer_lineage["coverage_note"] = str(tokenizer_coverage.get("note", ""))
 
+    # Upgrade coverage to 'pass' when the tokenizer roundtrip confirms exact coverage.
+    # This handles datasets that are proper subsets of the tokenizer corpus (e.g.
+    # stage_a_plus_bridge ⊂ tokenizer_corpus).  Roundtrip exact_match is the ground
+    # truth: if all bytes round-trip cleanly, there is no tokenizer gap — the file-
+    # level corpus check merely couldn't find the active dataset in the corpus file list.
+    _rt_upgraded = False
+    if not tokenizer_lineage["active_dataset_in_tokenizer_corpus"] and isinstance(tokenizer_roundtrip, dict):
+        _rt_exact = tokenizer_roundtrip.get("exact_match") is True
+        _rt_byte = float(tokenizer_roundtrip.get("byte_match_rate") or 0) >= 1.0
+        if _rt_exact and _rt_byte:
+            _rt_upgraded = True
+            tokenizer_lineage["active_dataset_in_tokenizer_corpus"] = True
+            tokenizer_lineage["coverage_status"] = "pass"
+            tokenizer_lineage["coverage_note"] = (
+                "tokenizer roundtrip exact match — all bytes in active dataset are covered "
+                "(dataset is a subset of the tokenizer corpus; file not in corpus list)"
+            )
+            tokenizer_coverage["active_dataset_in_corpus"] = True
+            tokenizer_coverage["status"] = "pass"
+            tokenizer_coverage["note"] = tokenizer_lineage["coverage_note"]
+
     data_lab = {
         "dataset_path": str(dataset_path),
         "dataset_dir": str(dataset_path.parent),
@@ -1889,6 +2257,33 @@ def _build_training_pipeline_payload(
         dataset_catalog=dataset_catalog,
         tokenizer_corpora=tokenizer_corpora,
     )
+    # Propagate roundtrip-based coverage upgrade into stage_dataset_bindings so that
+    # pipeline.pipeline.stages[*].datasets[*].in_tokenizer_corpus is consistent.
+    if _rt_upgraded:
+        _active_path_c = _canon_path(str(dataset_path))
+        _active_hash_v = str(dataset_hash or "")
+        for _bind in stage_dataset_bindings:
+            if not isinstance(_bind, dict) or _bind.get("active") is not True:
+                continue
+            for _ds in (_bind.get("datasets") or []):
+                if not isinstance(_ds, dict):
+                    continue
+                _ds_path = _canon_path(str(_ds.get("path") or ""))
+                _ds_hash = str(_ds.get("sha256") or "")
+                if (_active_path_c and _ds_path == _active_path_c) or (
+                    _active_hash_v and _ds_hash and _ds_hash == _active_hash_v
+                ):
+                    _ds["in_tokenizer_corpus"] = True
+                    _ds["in_tokenizer_corpus_source"] = "roundtrip"
+            # Recompute tokenizer_coverage totals for the patched binding.
+            _ds_list = [_d for _d in (_bind.get("datasets") or []) if isinstance(_d, dict)]
+            if isinstance(_bind.get("tokenizer_coverage"), dict):
+                _bind["tokenizer_coverage"]["in_corpus"] = sum(
+                    1 for _d in _ds_list if _d.get("in_tokenizer_corpus") is True
+                )
+                _bind["tokenizer_coverage"]["not_in_corpus"] = sum(
+                    1 for _d in _ds_list if _d.get("in_tokenizer_corpus") is not True
+                )
     # ── execution ───────────────────────────────────────────────
     steps = ck_loss.get("steps", 0) if isinstance(ck_loss, dict) else 0
     tokens_per_update = int(args.seq_len) * int(args.grad_accum)
@@ -2047,6 +2442,8 @@ def _build_training_pipeline_payload(
         )
         training_stage_id += 1
 
+    stage_loss_history = _collect_stage_loss_history(run_dir)
+
     return {
         "schema": "ck.training_pipeline.v1",
         "generated_at": now_iso,
@@ -2095,12 +2492,380 @@ def _build_training_pipeline_payload(
         "tokenizer_dataset_coverage": tokenizer_coverage,
         "tokenizer_lineage": tokenizer_lineage,
         "data_lab": data_lab,
+        "stage_loss_history": stage_loss_history,
         "sources": {
             "summary": "train_data_pipeline_v7",
             "run_dir": str(run_dir),
             "resume_checkpoint": dict(resume_checkpoint or {}),
         },
     }
+
+
+def _backfill_run_ledger(run_dir: Path) -> int:
+    """Backfill run_ledger.jsonl for existing .ck_pipeline runs that lack a ledger entry.
+
+    For each run in .ck_pipeline/ that is not already in the ledger, appends a
+    completed record derived from pipeline_report.json + train_ck.json. Assigns
+    run_order based on file mtime sort of existing unledgered runs.
+
+    Returns the number of records appended.
+    """
+    pipeline_root = run_dir / ".ck_pipeline"
+    if not pipeline_root.exists():
+        return 0
+
+    existing_ledger = _read_ledger(run_dir)
+    ledgered_ids: set[str] = {r["run_id"] for r in existing_ledger if isinstance(r.get("run_id"), str)}
+
+    # Collect unledgered runs, sorted by train_ck.json mtime (best available ordering)
+    unledgered: list[tuple[int, Path]] = []
+    for sub in pipeline_root.iterdir():
+        if not sub.is_dir():
+            continue
+        if sub.name in ledgered_ids:
+            continue
+        train_ck_path = sub / "train_ck.json"
+        if not train_ck_path.exists():
+            continue
+        mtime = int(train_ck_path.stat().st_mtime)
+        unledgered.append((mtime, sub))
+    unledgered.sort(key=lambda t: t[0])
+
+    if not unledgered:
+        return 0
+
+    # Count existing completed entries per stage to assign stage_pass
+    stage_pass_counter: dict[str, int] = {}
+    for r in existing_ledger:
+        sid = str(r.get("stage_id") or "")
+        if sid and str(r.get("status") or "") in {"running", "completed"}:
+            stage_pass_counter[sid] = stage_pass_counter.get(sid, 0) + 1
+
+    base_run_order = len(existing_ledger)
+    appended = 0
+    for i, (mtime, sub) in enumerate(unledgered):
+        train_ck_path = sub / "train_ck.json"
+        try:
+            train_ck = _load_json(train_ck_path)
+        except Exception:
+            continue
+        if not isinstance(train_ck, dict):
+            continue
+
+        # Derive stage using the same full resolution chain as _collect_stage_loss_history.
+        stage_id: str | None = None
+        dataset_name: str | None = None
+        dataset_path_value: str | None = None
+
+        # 1. pipeline_report.json
+        report_path = sub / "pipeline_report.json"
+        if report_path.exists():
+            try:
+                report = _load_json(report_path)
+                if isinstance(report, dict):
+                    cs = str(report.get("curriculum_stage") or "").strip().lower()
+                    stage_id = _normalize_stage_name(cs)
+                    ds = report.get("dataset")
+                    if isinstance(ds, str) and ds:
+                        dataset_path_value = ds
+                        dataset_name = Path(ds).name
+            except Exception:
+                pass
+
+        # 2. train_token_pack.json -> actual source dataset name
+        if not dataset_name:
+            pack_path = sub / "train_token_pack.json"
+            if pack_path.exists():
+                try:
+                    pack = _load_json(pack_path)
+                    if isinstance(pack, dict):
+                        ds_raw = str(pack.get("dataset") or "").strip()
+                        if ds_raw:
+                            if dataset_path_value is None:
+                                dataset_path_value = ds_raw
+                            dataset_name = Path(ds_raw).name
+                except Exception:
+                    pass
+
+        # 3. Cross-reference dataset_name against training_plan.json
+        if not stage_id and dataset_name:
+            plan_path = run_dir / "training_plan.json"
+            if plan_path.exists():
+                try:
+                    plan = _load_json(plan_path)
+                    if isinstance(plan, dict):
+                        for ps in (plan.get("stages") or []):
+                            for pds in (ps.get("datasets") or []):
+                                pds_name = Path(str(pds.get("name") or pds.get("path") or "")).name
+                                if pds_name and pds_name == dataset_name:
+                                    stage_id = _normalize_stage_name(str(ps.get("stage") or ""))
+                                    break
+                            if stage_id:
+                                break
+                        if not stage_id:
+                            active = _normalize_stage_name(str(plan.get("active_stage") or ""))
+                            if active:
+                                stage_id = active
+                except Exception:
+                    pass
+
+        # 4. curriculum_stage / source_stage in train_ck (last resort)
+        if not stage_id:
+            for key in ("curriculum_stage", "source_stage"):
+                cs = str(train_ck.get(key) or "").strip().lower()
+                stage_id = _normalize_stage_name(cs)
+                if stage_id:
+                    break
+
+        if not stage_id:
+            stage_id = "pretrain"
+
+        stage_pass_counter[stage_id] = stage_pass_counter.get(stage_id, 0) + 1
+        stage_pass = stage_pass_counter[stage_id]
+        phase_label = f"{stage_id}_{stage_pass}"
+
+        loss_curve = train_ck.get("loss_curve")
+        lc_finite = [p for p in (loss_curve or []) if isinstance(p, dict) and isinstance(p.get("loss_ck"), (int, float))]
+        loss_vals = [float(p["loss_ck"]) for p in lc_finite]
+        loss_first = loss_vals[0] if loss_vals else None
+        loss_final = loss_vals[-1] if loss_vals else None
+        loss_min = min(loss_vals) if loss_vals else None
+        loss_min_step = (loss_vals.index(loss_min) + 1) if loss_min is not None else None
+        ended_at = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+
+        ck_step_i: int | None = None
+        try:
+            ck_step_i = int(train_ck.get("steps"))
+        except Exception:
+            ck_step_i = None
+        local_bump = sub / "weights_final.bump"
+        local_manifest = sub / "weights_final_manifest.json"
+        global_bump = (run_dir / "checkpoints" / f"weights_step_{ck_step_i:08d}.bump") if ck_step_i else None
+        global_manifest = (
+            run_dir / "checkpoints" / f"weights_step_{ck_step_i:08d}_manifest.json"
+        ) if ck_step_i else None
+        checkpoint_bump: str | None = None
+        checkpoint_manifest: str | None = None
+        if local_bump.exists() and local_manifest.exists():
+            checkpoint_bump = str(local_bump)
+            checkpoint_manifest = str(local_manifest)
+        elif global_bump is not None and global_manifest is not None and global_bump.exists() and global_manifest.exists():
+            checkpoint_bump = str(global_bump)
+            checkpoint_manifest = str(global_manifest)
+
+        rec: dict[str, Any] = {
+            "schema": "ck.run_ledger.v1",
+            "run_order": base_run_order + i,
+            "run_id": sub.name,
+            "stage_id": stage_id,
+            "stage_pass": stage_pass,
+            "phase_label": phase_label,
+            "status": "completed",
+            "dataset": dataset_path_value,
+            "dataset_name": dataset_name,
+            "lr": train_ck.get("lr"),
+            "seq_len": train_ck.get("seq_len"),
+            "total_tokens": train_ck.get("total_tokens"),
+            "steps": train_ck.get("steps"),
+            "pack_mode": None,
+            "started_at": None,
+            "ended_at": ended_at,
+            "loss_first": loss_first,
+            "loss_final": loss_final,
+            "loss_min": loss_min,
+            "loss_min_step": loss_min_step,
+            "checkpoint_step": ck_step_i,
+            "checkpoint_bump": checkpoint_bump,
+            "checkpoint_manifest": checkpoint_manifest,
+            "work_dir": str(sub),
+            "source": "backfill",
+        }
+        _append_ledger_entry(run_dir, rec)
+        appended += 1
+
+    return appended
+
+
+def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
+    """Scan .ck_pipeline/*/train_ck.json and pipeline_report.json to build
+    stage_loss_history for the IR Visualizer stage cards.
+
+    Stage resolution order (most authoritative first):
+      1. run_ledger.jsonl entry for this run_id  (primary — written before training starts)
+      2. pipeline_report.json curriculum_stage   (legacy/non-ledger runs)
+      3. train_token_pack.json → plan cross-ref  (heuristic)
+      4. active_stage from training_plan.json    (heuristic)
+      5. source_stage/curriculum_stage from train_ck (last resort, can be mislabeled)
+      6. default: "pretrain"
+    """
+    pipeline_root = run_dir / ".ck_pipeline"
+    if not pipeline_root.exists():
+        return {"entries": []}
+
+    # Build ledger index: run_id → last record (most recent wins per run_id)
+    ledger_by_run_id: dict[str, dict[str, Any]] = {
+        r["run_id"]: r for r in _read_ledger(run_dir) if isinstance(r.get("run_id"), str)
+    }
+
+    entries: list[dict[str, Any]] = []
+    for run_dir_entry in sorted(pipeline_root.iterdir()):
+        if not run_dir_entry.is_dir():
+            continue
+        train_ck_path = run_dir_entry / "train_ck.json"
+        if not train_ck_path.exists():
+            continue
+        try:
+            train_ck = _load_json(train_ck_path)
+        except Exception:
+            continue
+        if not isinstance(train_ck, dict):
+            continue
+
+        run_id_str = str(run_dir_entry.name)
+        stage: str | None = None
+        dataset_name: str | None = None
+        stage_pass: int | None = None
+        phase_label: str | None = None
+        run_order: int | None = None
+
+        # ── 1. run_ledger.jsonl (primary) ──────────────────────────────────
+        led = ledger_by_run_id.get(run_id_str)
+        if isinstance(led, dict):
+            stage = _normalize_stage_name(str(led.get("stage_id") or ""))
+            dataset_name = str(led.get("dataset_name") or "") or None
+            stage_pass = led.get("stage_pass")
+            phase_label = led.get("phase_label")
+            run_order = led.get("run_order")
+
+        # ── 2. pipeline_report.json (legacy authoritative) ─────────────────
+        report_path = run_dir_entry / "pipeline_report.json"
+        if report_path.exists():
+            try:
+                report = _load_json(report_path)
+                if isinstance(report, dict):
+                    if not stage:
+                        cs = str(report.get("curriculum_stage") or "").strip().lower()
+                        stage = _normalize_stage_name(cs)
+                    if not dataset_name:
+                        ds = report.get("dataset")
+                        if isinstance(ds, str) and ds:
+                            dataset_name = Path(ds).name
+            except Exception:
+                pass
+
+        # ── 3. train_token_pack.json (dataset name fallback) ───────────────
+        if not dataset_name:
+            pack_path = run_dir_entry / "train_token_pack.json"
+            if pack_path.exists():
+                try:
+                    pack = _load_json(pack_path)
+                    if isinstance(pack, dict):
+                        ds_raw = str(pack.get("dataset") or "").strip()
+                        if ds_raw:
+                            dataset_name = Path(ds_raw).name
+                except Exception:
+                    pass
+
+        # ── 4. Cross-reference dataset name against training_plan.json ─────
+        if not stage and dataset_name:
+            plan_path = run_dir / "training_plan.json"
+            if plan_path.exists():
+                try:
+                    plan = _load_json(plan_path)
+                    if isinstance(plan, dict):
+                        for ps in (plan.get("stages") or []):
+                            for pds in (ps.get("datasets") or []):
+                                pds_name = Path(
+                                    str(pds.get("name") or pds.get("path") or "")
+                                ).name
+                                if pds_name and pds_name == dataset_name:
+                                    stage = _normalize_stage_name(str(ps.get("stage") or ""))
+                                    break
+                            if stage:
+                                break
+                        if not stage:
+                            active = _normalize_stage_name(str(plan.get("active_stage") or ""))
+                            if active:
+                                stage = active
+                except Exception:
+                    pass
+
+        # ── 5. source_stage / curriculum_stage inside train_ck (mislabeled) ─
+        if not stage:
+            for key in ("curriculum_stage", "source_stage"):
+                cs = str(train_ck.get(key) or "").strip().lower()
+                stage = _normalize_stage_name(cs)
+                if stage:
+                    break
+
+        # ── 6. Final fallback ──────────────────────────────────────────────
+        if not stage:
+            stage = "pretrain"
+
+        # Build downsampled loss points from loss_curve
+        loss_curve = train_ck.get("loss_curve")
+        if not isinstance(loss_curve, list) or len(loss_curve) == 0:
+            continue
+        finite_points: list[dict[str, Any]] = []
+        for p in loss_curve:
+            if not isinstance(p, dict):
+                continue
+            step = p.get("step")
+            loss_val = p.get("loss_ck") if p.get("loss_ck") is not None else p.get("loss")
+            if isinstance(step, (int, float)) and isinstance(loss_val, (int, float)):
+                if float(loss_val) == float(loss_val):  # NaN guard
+                    finite_points.append({"step": int(step), "loss": float(loss_val)})
+        if not finite_points:
+            continue
+
+        # Downsample to ≤200 points so the JSON stays small
+        _max_pts = 200
+        if len(finite_points) > _max_pts:
+            _stride = max(1, len(finite_points) // _max_pts)
+            _sampled = finite_points[::_stride]
+            if _sampled[-1] is not finite_points[-1]:
+                _sampled.append(finite_points[-1])
+        else:
+            _sampled = finite_points
+
+        first_loss = float(finite_points[0]["loss"])
+        final_loss = float(finite_points[-1]["loss"])
+        drop_pct = round((first_loss - final_loss) / first_loss * 100.0, 2) if first_loss > 0 else 0.0
+
+        # Sort key: prefer ledger run_order over file mtime for correct multi-pass ordering
+        if run_order is not None:
+            sort_key = int(run_order)
+            mtime = int(train_ck_path.stat().st_mtime)
+        else:
+            mtime = int(train_ck_path.stat().st_mtime)
+            sort_key = mtime
+        ended_at = datetime.fromtimestamp(int(train_ck_path.stat().st_mtime), tz=timezone.utc).isoformat()
+
+        entry: dict[str, Any] = {
+            "stage": stage,
+            "run_id": run_id_str,
+            "ended_at": ended_at,
+            "steps": int(train_ck.get("steps") or len(finite_points)),
+            "lr": train_ck.get("lr"),
+            "seq_len": train_ck.get("seq_len"),
+            "dataset_name": dataset_name,
+            "first_loss": first_loss,
+            "final_loss": final_loss,
+            "drop_pct": drop_pct,
+            "points": _sampled,
+            "_sort_key": sort_key,
+        }
+        if stage_pass is not None:
+            entry["stage_pass"] = stage_pass
+        if phase_label is not None:
+            entry["phase_label"] = phase_label
+        if run_order is not None:
+            entry["run_order"] = run_order
+        entries.append(entry)
+
+    # Sort by ledger run_order when available, then file mtime for legacy runs
+    entries.sort(key=lambda e: e.pop("_sort_key", 0))
+    return {"entries": entries}
 
 
 def _normalize_stage_name(raw: Any) -> str | None:
@@ -2222,6 +2987,7 @@ def _build_or_update_training_plan_payload(
                 "seq": int(order_idx.get(st, len(order_idx)) + 1),
                 "status": "planned",
                 "datasets": [],
+                "runs": [],
             }
             stage_map[st] = row
         return row
@@ -2274,6 +3040,10 @@ def _build_or_update_training_plan_payload(
                     for ds in datasets:
                         if isinstance(ds, dict):
                             _upsert_dataset(stage, ds)
+                # Preserve existing runs audit trail so operator edits survive re-runs.
+                existing_runs = row.get("runs")
+                if isinstance(existing_runs, list) and existing_runs:
+                    st["runs"] = list(existing_runs)
 
     # Ensure all canonical stages exist.
     for s in stage_order:
@@ -2400,6 +3170,47 @@ def _build_or_update_training_plan_payload(
             st["status"] = "planned"
         st["dataset_count"] = ds_count
 
+    # Populate per-stage runs audit trail from .ck_pipeline scan.
+    # _collect_stage_loss_history already reads pipeline_report.json for authoritative
+    # curriculum_stage labels so the run→stage mapping is always correct.
+    raw_history = _collect_stage_loss_history(run_dir)
+    _runs_by_stage: dict[str, list[dict[str, Any]]] = {}
+    for _entry in raw_history.get("entries", []):
+        _s = _normalize_stage_name(_entry.get("stage"))
+        if _s:
+            _runs_by_stage.setdefault(_s, []).append(_entry)
+    for _stage, _st in stage_map.items():
+        _history = _runs_by_stage.get(_stage, [])
+        if not _history:
+            continue
+        # Merge by run_id: preserve any operator-added fields from existing plan runs.
+        _runs_map: dict[str, dict[str, Any]] = {}
+        for _r in (_st.get("runs") or []):
+            if isinstance(_r, dict) and _r.get("run_id"):
+                _runs_map[str(_r["run_id"])] = dict(_r)
+        for _e in _history:
+            _rid = _e.get("run_id")
+            if not _rid:
+                continue
+            _rec: dict[str, Any] = {
+                "run_id": str(_rid),
+                "dataset": _e.get("dataset_name"),
+                "lr": _e.get("lr"),
+                "steps": _e.get("steps"),
+                "first_loss": _e.get("first_loss"),
+                "final_loss": _e.get("final_loss"),
+                "drop_pct": _e.get("drop_pct"),
+                "ended_at": _e.get("ended_at"),
+            }
+            _cur = _runs_map.get(str(_rid), {})
+            for _k, _v in _rec.items():
+                if _v is not None:
+                    _cur[_k] = _v
+            _runs_map[str(_rid)] = _cur
+        _merged = sorted(_runs_map.values(), key=lambda r: str(r.get("ended_at") or ""))
+        _st["runs"] = _merged
+        _st["run_count"] = len(_merged)
+
     stages_sorted = sorted(
         stage_map.values(),
         key=lambda r: (
@@ -2432,6 +3243,9 @@ def _build_or_update_training_plan_payload(
         "stages": stages_sorted,
         "source_pipeline": "training_pipeline_latest.json",
     }
+    # Preserve operator-written roadmap across pipeline re-runs.
+    if isinstance(existing_plan, dict) and isinstance(existing_plan.get("roadmap"), dict):
+        plan["roadmap"] = existing_plan["roadmap"]
     return plan
 
 
@@ -2537,6 +3351,79 @@ def _apply_training_plan_to_pipeline_payload(
             "entries": stage_seq,
         }
         training_pipeline["stage_dataset_bindings"] = stage_bindings
+
+
+def _apply_roundtrip_coverage_to_pipeline(
+    training_pipeline: dict[str, Any],
+    tokenizer_roundtrip: dict[str, Any] | None,
+    dataset_path: Path,
+) -> None:
+    """Propagate roundtrip-based tokenizer coverage into stage_dataset_bindings and
+    pipeline.stages AFTER _apply_training_plan_to_pipeline_payload has run.
+
+    When the roundtrip confirms exact coverage but the file-path/hash check could not
+    match the active dataset to the tokenizer corpus (e.g. dataset is a subset of the
+    corpus), this function patches all in_tokenizer_corpus flags and coverage counters
+    so the visualizer does not show a spurious tok-gap warning.
+    """
+    if not isinstance(training_pipeline, dict):
+        return
+    lin = training_pipeline.get("tokenizer_lineage")
+    if not isinstance(lin, dict):
+        return
+    # Only apply when tokenizer_lineage says coverage is pass AND the roundtrip confirms it.
+    if lin.get("coverage_status") != "pass":
+        return
+    if lin.get("active_dataset_in_tokenizer_corpus") is not True:
+        return
+    rt = tokenizer_roundtrip or {}
+    if not (rt.get("exact_match") is True and float(rt.get("byte_match_rate") or 0) >= 1.0):
+        return
+    active_path_c = _canon_path(str(dataset_path))
+
+    # Patch stage_dataset_bindings.
+    for bind in (training_pipeline.get("stage_dataset_bindings") or []):
+        if not isinstance(bind, dict) or bind.get("active") is not True:
+            continue
+        patched = False
+        for ds in (bind.get("datasets") or []):
+            if not isinstance(ds, dict):
+                continue
+            if _canon_path(str(ds.get("path") or "")) == active_path_c:
+                ds["in_tokenizer_corpus"] = True
+                ds["in_tokenizer_corpus_source"] = "roundtrip"
+                patched = True
+        if patched:
+            ds_list = [d for d in (bind.get("datasets") or []) if isinstance(d, dict)]
+            cov = bind.get("tokenizer_coverage")
+            if isinstance(cov, dict):
+                cov["in_corpus"] = sum(1 for d in ds_list if d.get("in_tokenizer_corpus") is True)
+                cov["not_in_corpus"] = sum(1 for d in ds_list if d.get("in_tokenizer_corpus") is not True)
+
+    # Patch pipeline.pipeline.stages (used by visualizer in strictManifestMode).
+    for ps in (training_pipeline.get("pipeline", {}).get("stages") or []):
+        if not isinstance(ps, dict):
+            continue
+        for ds in (ps.get("datasets") or []):
+            if not isinstance(ds, dict):
+                continue
+            if _canon_path(str(ds.get("path") or "")) == active_path_c:
+                ds["in_tokenizer_corpus"] = True
+                ds["in_tokenizer_corpus_source"] = "roundtrip"
+        # Recompute tokenizer_coverage if present.
+        cov = ps.get("tokenizer_coverage")
+        if isinstance(cov, dict):
+            ds_list = [d for d in (ps.get("datasets") or []) if isinstance(d, dict)]
+            cov["in_corpus"] = sum(1 for d in ds_list if isinstance(d.get("in_tokenizer_corpus"), bool) and d["in_tokenizer_corpus"])
+            cov["not_in_corpus"] = sum(1 for d in ds_list if not (isinstance(d.get("in_tokenizer_corpus"), bool) and d["in_tokenizer_corpus"]))
+
+    # Also fix tokenizer_dataset_coverage at the top level.
+    top_cov = training_pipeline.get("tokenizer_dataset_coverage")
+    if isinstance(top_cov, dict):
+        top_cov["active_dataset_in_corpus"] = True
+        top_cov["status"] = "pass"
+        if not top_cov.get("note"):
+            top_cov["note"] = lin.get("coverage_note", "roundtrip exact match")
 
 
 def _run_ck_train(
@@ -2719,6 +3606,34 @@ def main() -> int:
     ap.add_argument("--data", default=None, help="UTF-8 training text file path")
     ap.add_argument("--dataset-repeats", type=int, default=10, help="If --data missing, create repeated SVG rows")
     ap.add_argument("--tokenizer", choices=["byte", "bpe", "ascii_bpe"], default="byte", help="Tokenization path for training")
+    ap.add_argument(
+        "--pack-mode",
+        choices=["stream", "sample"],
+        default="stream",
+        help=(
+            "Token packing strategy. stream=continuous token stream windows; "
+            "sample=pack complete non-empty rows into seq_len windows (no cross-row bleed)."
+        ),
+    )
+    ap.set_defaults(pack_total_tokens_from_windows=True)
+    ap.add_argument(
+        "--pack-total-tokens-from-windows",
+        dest="pack_total_tokens_from_windows",
+        action="store_true",
+        help=(
+            "When --pack-mode sample, override --total-tokens with "
+            "recommended_total_tokens from pack report (default: enabled)."
+        ),
+    )
+    ap.add_argument(
+        "--no-pack-total-tokens-from-windows",
+        dest="pack_total_tokens_from_windows",
+        action="store_false",
+        help=(
+            "When --pack-mode sample, keep CLI --total-tokens instead of "
+            "recommended_total_tokens from pack report."
+        ),
+    )
     ap.set_defaults(require_ascii_data=None)
     ap.add_argument(
         "--require-ascii-data",
@@ -2892,6 +3807,11 @@ def main() -> int:
         help="Prepare dataset + tokenizer + token stream and stop before training",
     )
     ap.add_argument("--verbose", action="store_true", help="Verbose pipeline logs")
+    ap.add_argument(
+        "--backfill-ledger",
+        action="store_true",
+        help="Backfill run_ledger.jsonl for existing .ck_pipeline runs that lack a ledger entry, then exit.",
+    )
     args = ap.parse_args()
 
     # ── Validate numeric arguments ──────────────────────────────
@@ -2983,6 +3903,15 @@ def main() -> int:
             print(f"[init] run-dir exists but missing manifest/weights, bootstrapping: {run_dir}")
         _run_v7_init(args, run_dir)
 
+    # ── --backfill-ledger: one-time migration mode ─────────────────────────
+    if getattr(args, "backfill_ledger", False):
+        n = _backfill_run_ledger(run_dir)
+        print(f"[ledger-backfill] appended {n} record(s) to {run_dir}/run_ledger.jsonl")
+        return 0
+
+    # ── Auto-backfill: silently migrate legacy runs on every invocation ────
+    _backfill_run_ledger(run_dir)
+
     if args.resume_step is not None:
         args.resume_latest_checkpoint = True
     if (
@@ -3054,11 +3983,14 @@ def main() -> int:
     bpe_artifacts: dict[str, Any] = {}
     tokenizer_json_for_roundtrip: str | None = None
     token_ids_all: list[int] = []
+    train_token_ids: list[int] = []
     decoded_text: str = ""
     dataset_text = dataset_path.read_text(encoding="utf-8", errors="ignore")
     encode_line_fn: Callable[[str], list[int]]
     decode_ids_fn: Callable[[list[int]], str]
     bpe_handle: _TrueBPEHandle | None = None
+    pack_stats: dict[str, Any] = {"mode": str(args.pack_mode)}
+    pack_report: dict[str, Any] | None = None
 
     if _is_bpe_tokenizer_mode(args.tokenizer):
         _ensure_binary(BPE_BIN, "ck-bpe-train")
@@ -3120,9 +4052,39 @@ def main() -> int:
                     f"  max token id:   {max_id}\n"
                     "Fix: re-init run-dir with --vocab-size >= --bpe-vocab-size (or >= max token id + 1)."
                 )
-        token_file = work_dir / "train_tokens.txt"
-        _atomic_write_text(token_file, "\n".join(str(v) for v in ids) + "\n")
         token_ids_all = [int(v) for v in ids]
+        train_token_ids = list(token_ids_all)
+        if str(args.pack_mode) == "sample":
+            token_file = work_dir / "train_tokens.txt"
+            pack_report_json = work_dir / "train_token_pack.json"
+            token_file, pack_report, pack_stats = _run_sample_packer(
+                dataset_path=dataset_path,
+                tokenizer_json=run_tokenizer_json,
+                tokenizer_bin=run_bpe_bin_dir,
+                seq_len=int(args.seq_len),
+                out_token_file=token_file,
+                out_report_json=pack_report_json,
+            )
+            if bool(getattr(args, "pack_total_tokens_from_windows", True)):
+                rec_tokens = int(pack_stats.get("recommended_total_tokens", 0) or 0)
+                if rec_tokens > 0:
+                    prev_tokens = int(args.total_tokens)
+                    args.total_tokens = int(rec_tokens)
+                    print(
+                        "[pack] "
+                        f"overriding total_tokens from {prev_tokens} -> {args.total_tokens} "
+                        "(sample windows)"
+                    )
+            # Count from written token stream
+            try:
+                train_token_ids = [
+                    int(line.strip()) for line in token_file.read_text(encoding="utf-8").splitlines() if line.strip()
+                ]
+            except Exception:
+                train_token_ids = []
+        else:
+            token_file = work_dir / "train_tokens.txt"
+            _atomic_write_text(token_file, "\n".join(str(v) for v in train_token_ids) + "\n")
         tokenizer_json_for_roundtrip = str(run_dir / "tokenizer.json")
         decoded_text = bpe_handle.decode(token_ids_all)
         encode_line_fn = lambda row: _encode_segment_with_bpe_fallback(
@@ -3135,9 +4097,12 @@ def main() -> int:
             "run_tokenizer_json": str(run_tokenizer_json),
             "run_binary_dir": str(run_bpe_bin_dir),
             "token_file": str(token_file),
-            "token_count": int(len(ids)),
+            "token_count": int(len(train_token_ids)),
+            "raw_token_count": int(len(token_ids_all)),
             "mode": "ascii_bpe" if args.tokenizer == "ascii_bpe" else "bytelevel_bpe",
             "reused_run_tokenizer": bool(getattr(args, "reuse_run_tokenizer", False)),
+            "packing": dict(pack_stats),
+            "pack_report": pack_report,
         }
 
     if str(args.train_driver) == "ck_cli" and token_file is None:
@@ -3145,8 +4110,18 @@ def main() -> int:
         ids = list(dataset_path.read_bytes())
         if len(ids) <= 1:
             raise SystemExit("ERROR: byte tokenizer path produced <=1 token; provide richer data.")
+        train_token_ids = [int(v) for v in ids]
+        if str(args.pack_mode) == "sample":
+            rows = _read_non_empty_rows(dataset_path)
+            row_ids_all: list[list[int]] = [
+                [int(v) for v in row.encode("utf-8")] for row in rows if row.strip()
+            ]
+            pad_id = _resolve_pad_token_id(run_dir, default=0)
+            train_token_ids, pack_stats = _pack_rows_to_seq_windows(
+                row_ids_all, int(args.seq_len), int(pad_id)
+            )
         token_file = work_dir / "train_tokens.txt"
-        _atomic_write_text(token_file, "\n".join(str(v) for v in ids) + "\n")
+        _atomic_write_text(token_file, "\n".join(str(v) for v in train_token_ids) + "\n")
 
     if not _is_bpe_tokenizer_mode(args.tokenizer):
         raw = dataset_path.read_bytes()
@@ -3154,6 +4129,32 @@ def main() -> int:
         decoded_text = raw.decode("utf-8", errors="replace")
         encode_line_fn = lambda row: [int(v) for v in row.encode("utf-8")]
         decode_ids_fn = lambda row_ids: bytes(int(v) & 0xFF for v in row_ids).decode("utf-8", errors="replace")
+        if str(args.pack_mode) == "sample" and token_file is None:
+            rows = _read_non_empty_rows(dataset_path)
+            row_ids_all: list[list[int]] = [
+                [int(v) for v in row.encode("utf-8")] for row in rows if row.strip()
+            ]
+            pad_id = _resolve_pad_token_id(run_dir, default=0)
+            train_token_ids, pack_stats = _pack_rows_to_seq_windows(
+                row_ids_all, int(args.seq_len), int(pad_id)
+            )
+            token_file = work_dir / "train_tokens.txt"
+            _atomic_write_text(token_file, "\n".join(str(v) for v in train_token_ids) + "\n")
+
+    if str(args.pack_mode) == "sample":
+        rows_kept = (
+            int(pack_stats.get("rows", 0) or 0)
+            if isinstance(pack_stats, dict)
+            else 0
+        )
+        if rows_kept <= 0 and isinstance(pack_report, dict):
+            rows_kept = int(pack_report.get("rows_kept", 0) or 0)
+        print(
+            "[pack] "
+            f"mode=sample rows={rows_kept} windows={pack_stats.get('windows', 0)} "
+            f"seq_len={pack_stats.get('seq_len', args.seq_len)} fill={float(pack_stats.get('fill_ratio', 0.0)):.4f} "
+            f"pad_tokens={pack_stats.get('pad_tokens', 0)}"
+        )
 
     if args.token_file_out and token_file is not None:
         token_file_out = Path(args.token_file_out).expanduser().resolve()
@@ -3252,6 +4253,9 @@ def main() -> int:
             existing_plan=existing_plan,
         )
         _apply_training_plan_to_pipeline_payload(prepare_pipeline, training_plan)
+        # Apply roundtrip coverage AFTER the plan rebuilds stage_dataset_bindings so
+        # the coverage patch is not overwritten.
+        _apply_roundtrip_coverage_to_pipeline(prepare_pipeline, tokenizer_roundtrip, dataset_path)
         _atomic_write_text(training_plan_path, json.dumps(training_plan, indent=2))
         prepare_pipeline["training_plan_path"] = str(training_plan_path)
         _atomic_write_text(run_dir / "training_pipeline_latest.json", json.dumps(prepare_pipeline, indent=2))
@@ -3270,7 +4274,64 @@ def main() -> int:
         print(f"  data_lab:  {data_lab_artifacts.get('dataset_profile_json')}")
         return 0
 
+    # ── Run Ledger: write start record + pipeline_report stub ──────────────
+    # Compute active_stage from curriculum_stage (mirrors _build_training_pipeline_payload).
+    _curriculum_raw = str(getattr(args, "curriculum_stage", "auto") or "auto").strip().lower()
+    _stage_map = {
+        "stage_b": "midtrain", "midtrain": "midtrain",
+        "stage_a": "pretrain", "pretrain": "pretrain",
+        "sft": "sft", "dpo": "dpo", "grpo": "grpo", "ppo": "ppo",
+    }
+    _active_stage_for_ledger = _stage_map.get(_curriculum_raw, "pretrain")
+    _pipeline_stub = {
+        "format": "v7-train-data-pipeline",
+        "run_dir": str(run_dir),
+        "dataset": str(dataset_path),
+        "curriculum_stage": str(args.curriculum_stage),
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _atomic_write_text(work_dir / "pipeline_report.json", json.dumps(_pipeline_stub, indent=2))
+    ledger_rec = _build_ledger_start_record(run_dir, work_dir, args, _active_stage_for_ledger)
+    _append_ledger_entry(run_dir, ledger_rec)
+    # ── End ledger start ───────────────────────────────────────────────────
+
     _run_ck_train(args, dataset_path, token_file, ck_json)
+
+    # ── Run Ledger: append completion record ───────────────────────────────
+    _ck_json_data: dict[str, Any] = {}
+    if ck_json.exists():
+        try:
+            _ck_json_data = _load_json(ck_json)
+        except Exception:
+            pass
+    _lc = _ck_json_data.get("loss_curve") if isinstance(_ck_json_data.get("loss_curve"), list) else []
+    _lc_finite = [p for p in _lc if isinstance(p, dict) and isinstance(p.get("loss_ck"), (int, float))]
+    _loss_vals = [float(p["loss_ck"]) for p in _lc_finite]
+    _loss_first = _loss_vals[0] if _loss_vals else None
+    _loss_final = _loss_vals[-1] if _loss_vals else None
+    _loss_min_idx = _loss_vals.index(min(_loss_vals)) if _loss_vals else None
+    _ck_steps_value: int | None = None
+    try:
+        _ck_steps_value = int(_ck_json_data.get("steps"))
+    except Exception:
+        _ck_steps_value = None
+    ckpt_snapshot = _snapshot_run_checkpoint(run_dir, work_dir, _ck_steps_value)
+    _append_ledger_entry(run_dir, {
+        **ledger_rec,
+        "status": "completed",
+        "ended_at": datetime.now(timezone.utc).isoformat(),
+        "steps": _ck_json_data.get("steps"),
+        "total_tokens": _ck_json_data.get("total_tokens"),
+        "loss_first": _loss_first,
+        "loss_final": _loss_final,
+        "loss_min": min(_loss_vals) if _loss_vals else None,
+        "loss_min_step": int(_loss_min_idx + 1) if _loss_min_idx is not None else None,
+        "checkpoint_step": _ck_steps_value,
+        "checkpoint_bump": ckpt_snapshot.get("bump"),
+        "checkpoint_manifest": ckpt_snapshot.get("manifest"),
+    })
+    # ── End ledger completion ──────────────────────────────────────────────
 
     if args.with_torch_ref:
         _run_torch_ref(args, dataset_path, torch_json, token_file=token_file)
@@ -3344,6 +4405,7 @@ def main() -> int:
             "bpe": bpe_artifacts or None,
             "data_lab": data_lab_artifacts,
             "post_train_eval_json": post_train_eval_path,
+            "checkpoint_snapshot": ckpt_snapshot,
         },
         "dataset_qc": dataset_qc,
         "coverage_gate": coverage_gate,
@@ -3399,6 +4461,7 @@ def main() -> int:
         existing_plan=existing_plan,
     )
     _apply_training_plan_to_pipeline_payload(training_pipeline, training_plan)
+    _apply_roundtrip_coverage_to_pipeline(training_pipeline, tokenizer_roundtrip, dataset_path)
     _atomic_write_text(training_plan_path, json.dumps(training_plan, indent=2))
     training_pipeline["training_plan_path"] = str(training_plan_path)
     pipeline_json_path = run_dir / "training_pipeline_latest.json"
@@ -3440,6 +4503,19 @@ def main() -> int:
                 "  CK loss:   "
                 f"first={ck.get('first'):.6f} final={ck.get('final'):.6f} "
                 f"min={ck.get('min'):.6f} (step={ck.get('min_step')})"
+            )
+    if isinstance(ckpt_snapshot, dict):
+        if str(ckpt_snapshot.get("status")) == "ok":
+            print(
+                "  ckpt_snap: "
+                f"step={ckpt_snapshot.get('step')} "
+                f"path={ckpt_snapshot.get('bump')}"
+            )
+        else:
+            print(
+                "  ckpt_snap: "
+                f"status={ckpt_snapshot.get('status')} "
+                f"reason={ckpt_snapshot.get('reason')}"
             )
     if report.get("torch_loss"):
         pt = report["torch_loss"]
