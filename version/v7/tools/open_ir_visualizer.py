@@ -2143,6 +2143,19 @@ def _derive_stage_loss_history(
                         ref_name = Path(ref_path_s).name.lower()
                         if ref_path_s != token_stream_path and "token" not in ref_name:
                             raw_source_path = ref_path_s
+                # Fallback: read train_token_pack.json for the original corpus path
+                # when we only have a token stream and inferred_ref didn't resolve it.
+                if token_stream_path and not raw_source_path:
+                    try:
+                        pack = _load_json_loose(sub / "train_token_pack.json")
+                        if isinstance(pack, dict):
+                            ds_raw = str(pack.get("dataset") or "").strip()
+                            if ds_raw:
+                                ds_base = Path(ds_raw).name.lower()
+                                if ds_base not in {"train_tokens.txt", "tokens.txt"} and "token" not in ds_base:
+                                    raw_source_path = ds_raw
+                    except Exception:
+                        pass
                 if not raw_source_path and source_path and not token_stream_path:
                     raw_source_path = source_path
 
