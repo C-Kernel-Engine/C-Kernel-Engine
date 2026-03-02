@@ -789,6 +789,7 @@
 
 <div class="card card-blue" style="margin-top:0.75rem;">
     <p style="margin:0;"><strong>Dataset-only workflow:</strong> for focused pretrain/midtrain SVG corpus generation from <code>docs/site/assets/*.svg</code>, use <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a>.</p>
+    <p style="margin:0.35rem 0 0 0;"><strong>Multi-domain training progression (experimental):</strong> for staged playbooks across SVG, reasoning/agent routing, and code domains, use <a href="v7-training-progression-playbook.html">v7-training-progression-playbook.html</a>.</p>
     <p style="margin:0.35rem 0 0 0;"><strong>Parity gate checklist:</strong> run <a href="v7-parity-checklist.html">v7-parity-checklist.html</a> for the current GO criteria (<code>dataset_qc</code>, <code>tokenizer_roundtrip exact_match</code>, <code>D1/E1/F1</code>, canary <code>row1/row2</code>).</p>
     <p style="margin:0.35rem 0 0 0;"><strong>Caveat:</strong> <code>A1/A2</code> remain a separate kernel-harness bug track and do not block runbook execution readiness under the current operator gate.</p>
 </div>
@@ -2815,24 +2816,69 @@ make v7-stabilization-nightly \
 <h2 id="step-5-promote">Step 5: Promote Latest Checkpoint to Inference Weights</h2>
 
 <div class="card card-accent">
-    <p style="margin-bottom: 0.4rem;">Training writes runtime checkpoints under <code>$RUN/checkpoints</code>, while inference consumes <code>$RUN/weights.bump</code> + <code>$RUN/weights_manifest.json</code>. Promote the latest checkpoint before Step 6 to guarantee post-train inference weights.</p>
+    <p style="margin-bottom: 0.4rem;">Training writes runtime checkpoints under <code>$RUN/checkpoints</code>, while inference consumes <code>$RUN/weights.bump</code> + <code>$RUN/weights_manifest.json</code>. Promote by stage/pass for deterministic analysis.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre># Promote latest checkpoint
+<pre># Inspect stage history + pass numbers first
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --list-runs
+
+# Promote latest checkpoint (legacy default: max step)
 python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN"
 
 # Optional: preview selected checkpoint only
 python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --dry-run
 
 # Optional: promote a specific step
-python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --step 1234</pre>
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --step 1234
+
+# Preferred: promote latest available pass for a stage (scales to any model)
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage pretrain
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage midtrain
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage sft
+
+# Optional: exact stage pass (when multiple passes exist)
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage sft --stage-pass 2
+
+# Optional: promote exact run_id
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --run-id ascii_bpe_YYYYmmdd_HHMMSS</pre>
     </div>
-    <p class="mini-note">This helper picks the latest checkpoint by step and atomically updates <code>weights.bump</code> + <code>weights_manifest.json</code> in <code>$RUN</code>.</p>
+    <p class="mini-note">Promotion is atomic and updates <code>weights.bump</code> + <code>weights_manifest.json</code> in <code>$RUN</code>. Use <code>--stage/--stage-pass</code> for apples-to-apples stage comparisons.</p>
 </div>
 <div class="step-produces">
     <span class="produces-label">Promotes:</span>
     <span class="produces-item">weights.bump</span>
     <span class="produces-item item-json">weights_manifest.json</span>
+</div>
+
+<h2 id="step-5-1-stage-test-loop">Step 5.1: Stage Completion Test Loop (Promote -&gt; Infer -&gt; Refresh)</h2>
+
+<div class="card card-green">
+    <p style="margin-bottom: 0.45rem;">Run this loop after each completed stage to validate behavior before continuing.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># 0) List runs once (find stage_pass values)
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --list-runs
+
+# 1) Promote target stage checkpoint (latest pass for that stage)
+python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage pretrain
+# python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage midtrain
+# python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run "$RUN" --stage sft
+
+# 2) Build inference runtime from promoted weights
+.venv/bin/python version/v7/scripts/ck_run_v7.py run "$RUN" --generate-only --context-len 512
+
+# 3) Probe behavior for this stage
+.venv/bin/python scripts/ck_chat.py \
+  --model-dir "$RUN/.ck_build" \
+  --python-tokenizer --chat-template none \
+  --prompt "[circle][palette:cool][style:minimal]&lt;svg" \
+  --max-tokens 96 --temperature 0 --top-p 1.0 --repeat-penalty 1.05 --repeat-last-n 256 \
+  --stop-at-eos
+
+# 4) Refresh visualizer to capture this state
+python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts</pre>
+    </div>
+    <p class="mini-note"><strong>Recommended probes by stage:</strong> pretrain: shape syntax + closure; midtrain: chart/layout structure; sft: strict tag-following + SVG validity.</p>
 </div>
 
 <h2 id="step-6-infer-trained">Step 6: Build Inference from Trained Run</h2>
@@ -3374,7 +3420,7 @@ python3 scripts/ck_chat.py --help</pre>
             <tr><th>Command</th><th>Useful flags</th></tr>
             <tr><td><code>ck_run_v7.py run</code></td><td><code>--context-len</code>, <code>--force-compile</code>, <code>--force-convert</code>, <code>--chat-template</code>, <code>--generate-only</code>, <code>--generate-visualizer</code></td></tr>
             <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen3</code>, <code>--curriculum-stage stage_a|stage_b</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code>, <code>--roundtrip-max-lines</code>, <code>--strict-data-gates</code>, <code>--min-valid-svg-rate</code>, <code>--post-train-eval</code></td></tr>
-            <tr><td><code>promote_latest_checkpoint_v7.py</code></td><td><code>--run</code>, <code>--dry-run</code>, <code>--step</code></td></tr>
+            <tr><td><code>promote_latest_checkpoint_v7.py</code></td><td><code>--run</code>, <code>--list-runs</code>, <code>--stage</code>, <code>--stage-pass</code>, <code>--run-id</code>, <code>--dry-run</code>, <code>--step</code></td></tr>
             <tr><td><code>run_ablation_matrix_v7.py</code></td><td><code>--embed-dims</code>, <code>--layers-list</code>, <code>--bpe-vocab-sizes</code>, <code>--dataset-fracs</code>, <code>--kv-divisors</code>, <code>--resume</code></td></tr>
             <tr><td><code>ck_chat.py</code></td><td><code>--python-tokenizer</code>, <code>--show-token-ids</code>, <code>--show-token-pieces</code>, <code>--ascii-display</code>, <code>--temperature</code></td></tr>
         </table>
