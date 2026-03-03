@@ -372,6 +372,7 @@ def _run_operator_inference_parity_cmd(run_dir: Path, model_input: str, context_
     report_model_dir = shlex.quote(str(run_dir))
     model_input_q = shlex.quote(model_input)
     script = f"""
+set -e
 REPORT_MODEL_DIR={report_model_dir}
 MODEL_INPUT="$REPORT_MODEL_DIR"
 if [ -d "$MODEL_INPUT" ]; then

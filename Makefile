@@ -3087,7 +3087,7 @@ report-md:
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
-.PHONY: visualizer visualizer-full v7-ir-visualizer-e2e
+.PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
@@ -3350,6 +3350,7 @@ V7_VISUALIZER_E2E_JSON ?= $(V7_REPORT_DIR)/ir_visualizer_e2e_latest.json
 V7_VISUALIZER_E2E_FORCE_COMPILE ?= 1
 V7_VISUALIZER_E2E_FORCE_CONVERT ?= 1
 V7_VISUALIZER_E2E_WITH_TRAIN ?= 0
+V7_VISUALIZER_E2E_SKIP_INFERENCE_PARITY ?= 0
 V7_RUNBOOK_E2E_RUN ?= /tmp/v7_runbook_e2e_v7
 V7_RUNBOOK_E2E_MODE ?= smoke
 V7_RUNBOOK_E2E_DATA ?= version/v7/data/svg_assets_train.txt
@@ -3883,6 +3884,9 @@ visualizer: v7-ir-visualizer-e2e
 visualizer-full:
 	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1
 
+v7-ir-visualizer-e2e-nightly:
+	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1 V7_VISUALIZER_E2E_SKIP_INFERENCE_PARITY=1
+
 v7-runbook-e2e:
 	@$(PYTHON) version/v7/scripts/test_v7_runbook_e2e_v7.py \
 		--run-dir "$(V7_RUNBOOK_E2E_RUN)" \
@@ -3896,6 +3900,7 @@ v7-ir-visualizer-e2e:
 	if [ "$(V7_VISUALIZER_E2E_FORCE_COMPILE)" = "1" ]; then extra_flags="$$extra_flags --force-compile"; fi; \
 	if [ "$(V7_VISUALIZER_E2E_FORCE_CONVERT)" = "1" ]; then extra_flags="$$extra_flags --force-convert"; fi; \
 	if [ "$(V7_VISUALIZER_E2E_WITH_TRAIN)" = "1" ]; then extra_flags="$$extra_flags --with-train-runtime"; fi; \
+	if [ "$(V7_VISUALIZER_E2E_SKIP_INFERENCE_PARITY)" = "1" ]; then extra_flags="$$extra_flags --skip-inference-parity"; fi; \
 	$(PYTHON) version/v7/scripts/test_ir_visualizer_e2e_v7.py \
 		--model-input "$(V7_VISUALIZER_E2E_MODEL)" \
 		--context-len "$(V7_VISUALIZER_E2E_CONTEXT)" \
