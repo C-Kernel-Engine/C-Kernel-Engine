@@ -2902,6 +2902,7 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
         stage_pass: int | None = None
         phase_label: str | None = None
         run_order: int | None = None
+        parent_run_id: str | None = None
 
         # ── 1. run_ledger.jsonl (primary) ──────────────────────────────────
         led = ledger_by_run_id.get(run_id_str)
@@ -2911,6 +2912,8 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
             stage_pass = led.get("stage_pass")
             phase_label = led.get("phase_label")
             run_order = led.get("run_order")
+            parent_raw = str(led.get("parent_run_id") or "").strip()
+            parent_run_id = parent_raw or None
 
         # ── 2. pipeline_report.json (legacy authoritative) ─────────────────
         report_path = run_dir_entry / "pipeline_report.json"
@@ -3036,6 +3039,8 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
             entry["phase_label"] = phase_label
         if run_order is not None:
             entry["run_order"] = run_order
+        if parent_run_id is not None:
+            entry["parent_run_id"] = parent_run_id
         entries.append(entry)
 
     # Sort by ledger run_order when available, then file mtime for legacy runs

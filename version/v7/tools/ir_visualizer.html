@@ -4660,6 +4660,8 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                         `make v7-gate-train`,
                         `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir "$RUN" --json-out "$RUN/training_parity_regimen_latest.json" --md-out "$RUN/training_parity_regimen_latest.md"`,
                         `python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only`,
+                        `# verify lineage: parent_run_id should match previous completed run_id`,
+                        `tail -n 8 "$RUN/run_ledger.jsonl"`,
                     ]
                     : [
                         `make v7-gate`,
@@ -17705,15 +17707,190 @@ function renderStageEvalMatrix(container, files) {
     }
 
     const entries = [...matrix.entries].sort((a, b) => (a.run_order || 0) - (b.run_order || 0));
+    const matrixDatasetType = String(matrix.dataset_type || '').trim().toLowerCase() || 'svg';
 
-    // ── Color cell helper ──────────────────────────────────────────────────
-    function _metricCell(val, { green = 0.75, yellow = 0.35, inverted = false, fmt = 'pct' } = {}) {
-        const n = Number(val);
-        if (!Number.isFinite(n)) return `<td style="color:var(--text-muted);">—</td>`;
-        const effective = inverted ? (1 - n) : n;
-        const color = effective >= green ? '#4ade80' : effective >= yellow ? '#fbbf24' : '#f87171';
-        const label = fmt === 'pct' ? `${(n * 100).toFixed(0)}%` : n.toFixed(3);
-        return `<td style="color:${color};font-weight:600;">${label}</td>`;
+    const defaultMetricColumns = [
+        { key: 'valid_svg_rate', label: 'Valid SVG', description: 'Fraction of probe outputs that parse as valid SVG/XML.', good: 0.75, warn: 0.35, format: 'pct', higher_is_better: true },
+        { key: 'closure_success_rate', label: 'Closure', description: 'Fraction of outputs containing closing </svg> tag.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
+        { key: 'prefix_integrity', label: 'Prefix', description: 'How often output starts at expected boundary (without preamble drift).', good: 0.80, warn: 0.40, format: 'pct', higher_is_better: true },
+        { key: 'ood_robustness', label: 'OOD', description: 'Validity on out-of-distribution probes.', good: 0.50, warn: 0.20, format: 'pct', higher_is_better: true },
+        { key: 'adherence', label: 'Adherence', description: 'Instruction following score for requested controls (shape/palette/style).', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true, regression_watch: true },
+        { key: 'repetition_loop_score', label: 'Loop Score', description: 'Repetition risk (lower is better).', good: 0.10, warn: 0.30, format: 'pct', higher_is_better: false },
+    ];
+    const defaultProbeMetricColumns = [
+        { key: 'valid_svg', label: 'Valid', description: 'This probe output parsed as valid SVG/XML.', good: 0.75, warn: 0.35, format: 'pct', higher_is_better: true },
+        { key: 'closure', label: 'Closure', description: 'This probe output includes closing </svg>.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
+        { key: 'prefix_integrity', label: 'Prefix', description: 'Output starts where expected for this probe.', good: 0.80, warn: 0.40, format: 'pct', higher_is_better: true },
+        { key: 'repetition', label: 'Loop', description: 'Repetition score for this probe output (lower is better).', good: 0.10, warn: 0.30, format: 'pct', higher_is_better: false },
+        { key: 'adherence', label: 'Adh', description: 'Instruction adherence for this probe.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
+        { key: 'tag_adherence', label: 'Tag Adh', description: 'Tag-level adherence for this probe.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
+    ];
+    function _normalizeColumns(rawCols, fallback) {
+        const cols = Array.isArray(rawCols) ? rawCols : [];
+        const normalized = cols
+            .filter((c) => c && typeof c === 'object' && String(c.key || '').trim())
+            .map((c) => ({
+                key: String(c.key || '').trim(),
+                label: String(c.label || c.key || '').trim(),
+                description: String(c.description || c.tooltip || c.help || '').trim(),
+                good: Number.isFinite(Number(c.good)) ? Number(c.good) : null,
+                warn: Number.isFinite(Number(c.warn)) ? Number(c.warn) : null,
+                format: String(c.format || 'pct').trim().toLowerCase(),
+                higher_is_better: c.higher_is_better !== false,
+                regression_watch: Boolean(c.regression_watch),
+            }));
+        return normalized.length > 0 ? normalized : fallback.map((c) => ({ ...c }));
+    }
+    const metricColumns = _normalizeColumns(matrix.metric_columns, defaultMetricColumns);
+    const probeMetricColumns = _normalizeColumns(matrix.probe_metric_columns, defaultProbeMetricColumns);
+    const colByKey = Object.fromEntries(metricColumns.map((c) => [c.key, c]));
+    const headlineMetricsRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
+    const headlineMetrics = headlineMetricsRaw
+        .map((k) => String(k || '').trim())
+        .filter((k) => k && colByKey[k]);
+    const headlineKeys = headlineMetrics.length > 0 ? headlineMetrics.slice(0, 3) : metricColumns.slice(0, 3).map((c) => c.key);
+    const sparkKey = headlineKeys.length > 0 ? headlineKeys[0] : (metricColumns[0] ? metricColumns[0].key : '');
+
+    function _fmtMetric(value, fmt) {
+        if (fmt === 'text') return String(value ?? '—');
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '—';
+        if (fmt === 'int') return `${Math.round(n)}`;
+        if (fmt === 'float') return n.toFixed(3);
+        return `${(n * 100).toFixed(0)}%`;
+    }
+    function _metricColor(value, col) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 'var(--text-muted)';
+        const good = Number.isFinite(Number(col.good)) ? Number(col.good) : 0.75;
+        const warn = Number.isFinite(Number(col.warn)) ? Number(col.warn) : 0.35;
+        const higher = col.higher_is_better !== false;
+        const effective = higher ? n : (1 - n);
+        if (effective >= good) return '#4ade80';
+        if (effective >= warn) return '#fbbf24';
+        return '#f87171';
+    }
+    function _metricSeverity(value, col) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 'na';
+        const good = Number.isFinite(Number(col.good)) ? Number(col.good) : 0.75;
+        const warn = Number.isFinite(Number(col.warn)) ? Number(col.warn) : 0.35;
+        const higher = col.higher_is_better !== false;
+        const effective = higher ? n : (1 - n);
+        if (effective >= good) return 'good';
+        if (effective >= warn) return 'warn';
+        return 'bad';
+    }
+    function _metricFailureHint(key, value, col) {
+        if (_metricSeverity(value, col) !== 'bad') return '';
+        const k = String(key || '').trim();
+        const specific = {
+            valid_svg_rate: 'Output is not reliably parseable as valid SVG/XML.',
+            valid_svg: 'This output did not parse as valid SVG/XML.',
+            closure_success_rate: 'Many outputs miss proper closing </svg>.',
+            closure: 'This output is missing proper closing </svg>.',
+            prefix_integrity: 'Output starts with extra preamble/drift before expected content.',
+            ood_robustness: 'Model fails on out-of-distribution prompts (unlabeled/unknown tags).',
+            adherence: 'Model is ignoring requested controls (shape/palette/style).',
+            tag_adherence: 'Model tag block does not match expected control tags.',
+            repetition_loop_score: 'High repetition suggests loop/collapse behavior.',
+            repetition: 'This output shows high repetition/loop behavior.',
+            contains_all: 'Output is missing expected required tokens/fragments.',
+            contains_rate: 'Outputs are not consistently including required tokens/fragments.',
+            forbid_clean: 'Output contains forbidden token(s).',
+            forbid_clean_rate: 'Outputs frequently contain forbidden token(s).',
+            non_empty: 'Model returned empty output for this probe.',
+            non_empty_rate: 'Model is returning empty output too often.',
+            prefix_match: 'Output does not start with required prefix.',
+            exact_match: 'Output does not match exact expected target.',
+            regex_match: 'Output does not satisfy expected regex pattern.'
+        };
+        if (specific[k]) return specific[k];
+        const higher = col.higher_is_better !== false;
+        const warnTxt = Number.isFinite(Number(col.warn)) ? _fmtThreshold(col.warn, col.format) : 'configured warn threshold';
+        return higher
+            ? `Metric is below warning threshold (${warnTxt}).`
+            : `Metric is above warning threshold (${warnTxt}).`;
+    }
+    function _metricCell(value, col) {
+        const label = _fmtMetric(value, col.format);
+        if (label === '—') return `<td style="color:var(--text-muted);">—</td>`;
+        const color = col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col);
+        return `<td style="color:${color};font-weight:600;">${escapeHtml(label)}</td>`;
+    }
+    function _scoreBadge(value, col) {
+        const label = _fmtMetric(value, col && col.format);
+        if (label === '—') return '<span style="color:var(--text-muted);">—</span>';
+        const color = col && col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col || {});
+        return `<span style="color:${color};font-weight:700;">${escapeHtml(label)}</span>`;
+    }
+    function _thWithTip(label, description) {
+        const lab = escapeHtml(String(label || ''));
+        const desc = String(description || '').trim();
+        if (!desc) return `<th>${lab}</th>`;
+        return `<th title="${escapeHtml(desc)}">${lab} <span style="color:#9ca3af;font-size:0.65rem;">[?]</span></th>`;
+    }
+    function _fallbackMetricDescription(key) {
+        const k = String(key || '').trim();
+        const known = {
+            valid_svg_rate: 'Fraction of outputs that parse as valid SVG/XML.',
+            valid_svg: 'This output parsed as valid SVG/XML.',
+            closure_success_rate: 'Fraction of outputs that include closing </svg>.',
+            closure: 'This output includes closing </svg>.',
+            prefix_integrity: 'Checks whether output starts where expected (no extra preamble drift).',
+            ood_robustness: 'Validity on out-of-distribution probes (unlabeled/unknown tags).',
+            adherence: 'Instruction-following score for requested controls (shape/palette/style).',
+            tag_adherence: 'Tag-level match score for control tags.',
+            repetition_loop_score: 'Repetition risk (lower is better). High values suggest loop/collapse.',
+            repetition: 'Per-probe repetition score (lower is better).',
+        };
+        return known[k] || '';
+    }
+    function _fmtThreshold(v, fmt) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return '—';
+        if (fmt === 'int') return String(Math.round(n));
+        if (fmt === 'float') return n.toFixed(3);
+        return `${(n * 100).toFixed(0)}%`;
+    }
+    function _metricGuideRow(col) {
+        const desc = String(col.description || _fallbackMetricDescription(col.key) || '').trim() || 'No description provided in eval contract.';
+        const higher = col.higher_is_better !== false;
+        const direction = higher ? 'higher is better' : 'lower is better';
+        const goodTxt = Number.isFinite(Number(col.good)) ? _fmtThreshold(col.good, col.format) : '—';
+        const warnTxt = Number.isFinite(Number(col.warn)) ? _fmtThreshold(col.warn, col.format) : '—';
+        const gateHint = higher
+            ? `good ≥ ${goodTxt}, warn ≥ ${warnTxt}`
+            : `good ≤ ${goodTxt}, warn ≤ ${warnTxt}`;
+        return `
+            <tr>
+                <td><code>${escapeHtml(String(col.label || col.key))}</code></td>
+                <td style="color:var(--text-muted);max-width:420px;overflow-wrap:anywhere;">${escapeHtml(desc)}</td>
+                <td style="white-space:nowrap;color:var(--text-muted);">${escapeHtml(direction)}</td>
+                <td style="white-space:nowrap;color:var(--text-muted);">${escapeHtml(gateHint)}</td>
+            </tr>
+        `;
+    }
+    function _metricGuideTable(cols) {
+        const rows = Array.isArray(cols) ? cols.map((col) => _metricGuideRow(col)).join('') : '';
+        if (!rows) {
+            return `<div style="color:var(--text-muted);font-size:0.72rem;">No metric metadata available.</div>`;
+        }
+        return `
+            <div style="overflow-x:auto;margin-top:0.35rem;">
+                <table style="min-width:760px;font-size:0.72rem;">
+                    <thead><tr>
+                        <th>Column</th>
+                        <th>Meaning</th>
+                        <th>Direction</th>
+                        <th>Guide</th>
+                    </tr></thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     // ── Sparkline for valid_svg_rate progression ───────────────────────────
@@ -17735,8 +17912,8 @@ function renderStageEvalMatrix(container, files) {
         </svg>`;
     }
 
-    const svgRates = entries.map((e) => e.metrics && Number.isFinite(Number(e.metrics.valid_svg_rate)) ? Number(e.metrics.valid_svg_rate) : NaN);
-    const hasSparkline = svgRates.filter(Number.isFinite).length >= 2;
+    const sparkValues = entries.map((e) => e && e.metrics ? Number(e.metrics[sparkKey]) : NaN);
+    const hasSparkline = sparkValues.filter(Number.isFinite).length >= 2;
 
     // ── Stage color pill ───────────────────────────────────────────────────
     const STAGE_COL = { pretrain: '#60a5fa', midtrain: '#a78bfa', sft: '#fbbf24', dpo: '#fb923c', grpo: '#34d399', ppo: '#f472b6' };
@@ -17744,49 +17921,245 @@ function renderStageEvalMatrix(container, files) {
         const c = STAGE_COL[stage] || '#9ca3af';
         return `<span style="background:${c}22;border:1px solid ${c};color:${c};padding:0.05rem 0.38rem;border-radius:4px;font-size:0.68rem;font-weight:700;">${escapeHtml(label || stage)}</span>`;
     }
+    function _clipText(text, maxLen = 220) {
+        const s = String(text || '').replace(/\s+/g, ' ').trim();
+        if (s.length <= maxLen) return s;
+        return `${s.slice(0, Math.max(0, maxLen - 1))}…`;
+    }
+    function _svgDataUri(svgText) {
+        const svg = String(svgText || '').trim();
+        if (!svg) return '';
+        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+    function _responseParts(rawResponse) {
+        const raw = String(rawResponse || '');
+        const svgStart = raw.indexOf('<svg');
+        const svgEnd = raw.lastIndexOf('</svg>');
+        const hasSvg = svgStart !== -1 && svgEnd > svgStart;
+        const preambleRaw = hasSvg ? raw.slice(0, svgStart).trim() : '';
+        const preamble = preambleRaw.replace(/^\]+/, '').trim();
+        const svg = hasSvg ? raw.slice(svgStart, svgEnd + 6).trim() : '';
+        return { raw, preamble, svg, hasSvg };
+    }
+    function _responsePreview(parts, opts = {}) {
+        const preambleMax = Number.isFinite(Number(opts.preambleMax)) ? Number(opts.preambleMax) : 80;
+        const textMax = Number.isFinite(Number(opts.textMax)) ? Number(opts.textMax) : 120;
+        if (!parts || typeof parts !== 'object') return '-';
+        if (parts.hasSvg) {
+            return `<div style="display:flex;flex-direction:column;gap:0.2rem;">
+                ${parts.preamble ? `<div style="font-size:0.58rem;color:#6b7280;font-family:monospace;max-width:160px;overflow-wrap:anywhere;">${escapeHtml(_clipText(parts.preamble, preambleMax))}</div>` : ''}
+                <div style="width:80px;height:60px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);border-radius:3px;background:#fff;">
+                    <img src="${_svgDataUri(parts.svg)}" alt="svg preview" style="width:100%;height:100%;object-fit:contain;display:block;" />
+                </div>
+            </div>`;
+        }
+        return `<code style="font-size:0.66rem;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(_clipText(parts.raw, textMax) || '-')}</code>`;
+    }
+    function _responseRawDetails(parts, maxLen = 360) {
+        const raw = _clipText(parts && parts.raw ? parts.raw : '', maxLen);
+        if (!raw) return '';
+        return `<details style="margin-top:0.12rem;"><summary style="cursor:pointer;color:#9ca3af;font-size:0.62rem;">view text</summary><code style="display:block;margin-top:0.15rem;font-size:0.62rem;white-space:pre-wrap;overflow-wrap:anywhere;max-width:180px;">${escapeHtml(raw)}</code></details>`;
+    }
+    function _expectedFromProbeRow(p) {
+        if (!p || typeof p !== 'object') return 'none';
+        const baked = String(p.expected || '').trim();
+        if (baked) return baked;
+        const parts = [];
+        if (p.expect_shape) parts.push(`shape=${p.expect_shape}`);
+        if (p.expect_palette) parts.push(`palette=${p.expect_palette}`);
+        if (p.expect_style) parts.push(`style=${p.expect_style}`);
+        const contains = p.expect_contains || p.expect_contains_all;
+        if (Array.isArray(contains) && contains.length) parts.push(`contains=${contains.slice(0, 4).join(',')}`);
+        else if (typeof contains === 'string' && contains.trim()) parts.push(`contains=${contains.trim()}`);
+        const forbid = p.expect_forbid;
+        if (Array.isArray(forbid) && forbid.length) parts.push(`forbid=${forbid.slice(0, 4).join(',')}`);
+        else if (typeof forbid === 'string' && forbid.trim()) parts.push(`forbid=${forbid.trim()}`);
+        return parts.length ? parts.join('; ') : 'none';
+    }
 
     // ── Build rows ─────────────────────────────────────────────────────────
-    const rowsHtml = entries.map((e) => {
+    const rowsHtml = entries.map((e, idx) => {
         const m = e.metrics || {};
+        const prev = idx > 0 ? entries[idx - 1] : null;
+        const prevM = prev && prev.metrics && typeof prev.metrics === 'object' ? prev.metrics : {};
         const lossStr = Number.isFinite(Number(e.final_loss)) ? Number(e.final_loss).toFixed(4) : '—';
-        const evalAt = e.evaluated_at ? e.evaluated_at.slice(0, 16).replace('T', ' ') : '';
         const probeCount = Array.isArray(e.probe_results) ? e.probe_results.length : (m.n_probes || '—');
+        const nSamples = Number.isFinite(Number(m.n_samples)) ? Number(m.n_samples) : 1;
+        const sampleWarn = nSamples === 1
+            ? `<span title="Single-sample metrics are noisy; rerun with --n-samples 5"
+                     style="color:#f59e0b;font-size:0.62rem;margin-left:0.28rem;">⚠ n=1</span>`
+            : '';
+        const metricCells = metricColumns.map((col) => {
+            const currentVal = m[col.key];
+            const prevVal = prevM[col.key];
+            const higher = col.higher_is_better !== false;
+            let regressionMarker = '';
+            if (col.regression_watch && Number.isFinite(Number(currentVal)) && Number.isFinite(Number(prevVal)) && Number(prevVal) !== 0) {
+                const regress = higher ? (Number(currentVal) < Number(prevVal) * 0.7) : (Number(currentVal) > Number(prevVal) * 1.3);
+                if (regress) {
+                    regressionMarker = nSamples > 1
+                        ? ` <span title="Regression vs previous run (>30%)" style="color:#ef4444;font-weight:700;">↓</span>`
+                        : ` <span title="Potential regression vs previous run (low confidence at n=1)" style="color:#f59e0b;font-weight:700;">↓?</span>`;
+                }
+            } else if (col.key === 'adherence') {
+                const tagAdh = Number(m.tag_adherence);
+                const prevTagAdh = Number(prevM.tag_adherence);
+                const hasTagRegression = Number.isFinite(tagAdh) && Number.isFinite(prevTagAdh) && prevTagAdh > 0 && tagAdh < prevTagAdh * 0.7;
+                if (hasTagRegression) {
+                    regressionMarker = nSamples > 1
+                        ? ` <span title="Regression vs previous run: tag_adherence dropped >30%" style="color:#ef4444;font-weight:700;">↓</span>`
+                        : ` <span title="Potential tag_adherence regression vs previous run (n=1)" style="color:#f59e0b;font-weight:700;">↓?</span>`;
+                }
+            }
+            const baseCell = _metricCell(currentVal, col);
+            const failHint = _metricFailureHint(col.key, currentVal, col);
+            const hintMarker = failHint
+                ? ` <span title="${escapeHtml(failHint)}" style="color:#f87171;font-weight:700;">!</span>`
+                : '';
+            const suffix = `${regressionMarker}${hintMarker}`;
+            if (!suffix) return baseCell;
+            return baseCell.replace('</td>', `${suffix}</td>`);
+        }).join('');
         return `<tr>
             <td style="white-space:nowrap;">${_stagePill(e.stage, e.phase_label || e.stage)}</td>
             <td style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(lossStr)}</td>
-            ${_metricCell(m.valid_svg_rate, { green: 0.75, yellow: 0.35 })}
-            ${_metricCell(m.closure_success_rate, { green: 0.70, yellow: 0.30 })}
-            ${_metricCell(m.prefix_integrity, { green: 0.80, yellow: 0.40 })}
-            ${_metricCell(m.ood_robustness, { green: 0.50, yellow: 0.20 })}
-            ${_metricCell(m.adherence, { green: 0.70, yellow: 0.30 })}
-            ${_metricCell(m.repetition_loop_score, { green: 0.10, yellow: 0.30, inverted: true, fmt: 'pct' })}
-            <td style="color:var(--text-muted);font-size:0.70rem;white-space:nowrap;">${escapeHtml(String(probeCount))} probes · ${escapeHtml(String(m.n_samples || '?'))} samples</td>
+            ${metricCells}
+            <td style="color:var(--text-muted);font-size:0.70rem;white-space:nowrap;">${escapeHtml(String(probeCount))} probes · ${escapeHtml(String(nSamples))} samples${sampleWarn}</td>
         </tr>`;
+    }).join('');
+    const probeDetailsHtml = entries.map((e) => {
+        const phaseLabel = String(e.phase_label || e.stage || 'stage');
+        const runId = String(e.run_id || '-');
+        const probes = Array.isArray(e.probe_results) ? e.probe_results : [];
+        if (probes.length === 0) {
+            return `
+                <details style="margin-top:0.55rem;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.25rem 0.45rem;">
+                    <summary style="cursor:pointer;color:var(--text-muted);font-size:0.75rem;">${escapeHtml(phaseLabel)} · <code>${escapeHtml(runId)}</code> · no probe rows</summary>
+                </details>
+            `;
+        }
+        const showModelTagCol = probes.some((p) => {
+            const agg = p && typeof p.agg === 'object' ? p.agg : {};
+            return String(agg.dominant_tag_block || '').trim().length > 0;
+        });
+        const probeRows = probes.map((p) => {
+            const agg = p && typeof p.agg === 'object' ? p.agg : {};
+            const samples = Array.isArray(p.samples) ? p.samples : [];
+            const first = samples.length > 0 && samples[0] && typeof samples[0] === 'object' ? samples[0] : null;
+            const prompt = _clipText(p.prompt || '', 160);
+            const parts = _responseParts(first && first.response);
+            const dominantTag = _clipText(agg.dominant_tag_block || '-', 48);
+            const expected = _clipText(_expectedFromProbeRow(p), 96);
+            const probeDesc = String(
+                p.description
+                || (p.probe_id === 'ood_unlabeled'
+                    ? 'Out-of-distribution unlabeled probe: prompt is only <svg and tests unconditional robustness.'
+                    : '')
+            ).trim();
+            const nSamples = Number.isFinite(Number(samples.length)) ? samples.length : 0;
+            const firstPreview = _responsePreview(parts, { preambleMax: 80, textMax: 120 }) + _responseRawDetails(parts);
+            const responseCell = nSamples > 1
+                ? (() => {
+                    const allSamplesHtml = samples.map((sample, sampleIdx) => {
+                        const sampleParts = _responseParts(sample && sample.response);
+                        return `
+                            <div style="padding:0.25rem 0;border-top:${sampleIdx === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)'};">
+                                <div style="font-size:0.6rem;color:#9ca3af;margin-bottom:0.12rem;">sample ${sampleIdx + 1}/${nSamples}</div>
+                                ${_responsePreview(sampleParts, { preambleMax: 64, textMax: 100 })}${_responseRawDetails(sampleParts, 260)}
+                            </div>
+                        `;
+                    }).join('');
+                    return `
+                        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+                            ${firstPreview}
+                            <details style="margin-top:0.1rem;">
+                                <summary style="cursor:pointer;color:#93c5fd;font-size:0.64rem;">view all ${nSamples} outputs</summary>
+                                <div style="margin-top:0.2rem;max-height:220px;overflow:auto;background:rgba(0,0,0,0.16);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:0.2rem 0.25rem;">
+                                    ${allSamplesHtml}
+                                </div>
+                            </details>
+                        </div>
+                    `;
+                })()
+                : firstPreview;
+            const probeMetricCells = probeMetricColumns.map((col) => {
+                const failHint = _metricFailureHint(col.key, agg[col.key], col);
+                const hintMarker = failHint
+                    ? ` <span title="${escapeHtml(failHint)}" style="color:#f87171;font-weight:700;">!</span>`
+                    : '';
+                return `<td>${_scoreBadge(agg[col.key], col)}${hintMarker}</td>`;
+            }).join('');
+            return `
+                <tr>
+                    <td title="${escapeHtml(probeDesc)}"><code>${escapeHtml(String(p.probe_id || '-'))}</code></td>
+                    <td title="${escapeHtml(probeDesc)}">${escapeHtml(String(p.type || '-'))}</td>
+                    <td title="${escapeHtml(String(p.prompt || ''))}" style="max-width:260px;overflow-wrap:anywhere;">${escapeHtml(prompt)}</td>
+                    <td title="${escapeHtml(_expectedFromProbeRow(p))}" style="max-width:220px;overflow-wrap:anywhere;">${escapeHtml(expected)}</td>
+                    <td style="text-align:right;">${nSamples}</td>
+                    ${probeMetricCells}
+                    ${showModelTagCol ? `<td title="${escapeHtml(String(agg.dominant_tag_block || '-'))}" style="max-width:170px;overflow-wrap:anywhere;">${escapeHtml(dominantTag)}</td>` : ''}
+                    <td title="${escapeHtml(parts.raw)}" style="max-width:160px;">${responseCell}</td>
+                </tr>
+            `;
+        }).join('');
+        const probeMetricHeaders = probeMetricColumns.map((col) => _thWithTip(String(col.label || col.key), col.description || '')).join('');
+        return `
+            <details style="margin-top:0.55rem;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.25rem 0.45rem;">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.75rem;">
+                    ${escapeHtml(phaseLabel)} · <code>${escapeHtml(runId)}</code> · ${probes.length} probe(s)
+                </summary>
+                <div style="overflow-x:auto;margin-top:0.4rem;">
+                    <table style="min-width:1200px;font-size:0.73rem;">
+                        <thead><tr>
+                            <th title="Probe identifier from eval contract">Probe</th>
+                            <th title="Probe group/type from eval contract (e.g., svg_gen, ood, core)">Type</th>
+                            <th title="Input prompt used for this evaluation probe">Prompt</th>
+                            <th title="Expected behavior/constraints for this probe (from contract)">Expected</th>
+                            <th style="text-align:right;">N</th>
+                            ${probeMetricHeaders}
+                            ${showModelTagCol ? '<th>Model Tags</th>' : ''}
+                            <th title="Actual model output sampled for this stage/probe">Actual Output</th>
+                        </tr></thead>
+                        <tbody>${probeRows}</tbody>
+                    </table>
+                </div>
+            </details>
+        `;
     }).join('');
 
     // ── Summary header stats ───────────────────────────────────────────────
     const latestEntry = entries[entries.length - 1];
     const latestM = latestEntry && latestEntry.metrics ? latestEntry.metrics : {};
-    const latestSvg = Number.isFinite(Number(latestM.valid_svg_rate)) ? `${(Number(latestM.valid_svg_rate) * 100).toFixed(0)}%` : '—';
-    const latestOod = Number.isFinite(Number(latestM.ood_robustness)) ? `${(Number(latestM.ood_robustness) * 100).toFixed(0)}%` : '—';
-    const latestAdh = Number.isFinite(Number(latestM.adherence)) ? `${(Number(latestM.adherence) * 100).toFixed(0)}%` : '—';
+    const headlineCards = headlineKeys.map((key) => {
+        const col = colByKey[key] || { key, label: key, format: 'pct', higher_is_better: true };
+        const value = latestM[key];
+        const label = _fmtMetric(value, col.format);
+        const color = label === '—' ? 'var(--text-primary)' : (col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col));
+        return `<div><span style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(String(col.label || key))}</span><br><span style="color:${color};font-size:1.1rem;font-weight:700;">${escapeHtml(label)}</span></div>`;
+    }).join('');
+    const sparkCol = colByKey[sparkKey] || { label: sparkKey, format: 'pct' };
+    const latestSparkLabel = _fmtMetric(latestM[sparkKey], sparkCol.format);
 
     const sparkHtml = hasSparkline ? `
         <div style="margin-top:0.6rem;margin-bottom:0.15rem;">
-            <span style="color:var(--text-muted);font-size:0.72rem;margin-right:0.5rem;">valid_svg progression →</span>
-            ${_sparkline(svgRates)}
-            <span style="color:#4ade80;font-size:0.72rem;margin-left:0.5rem;">${latestSvg}</span>
+            <span style="color:var(--text-muted);font-size:0.72rem;margin-right:0.5rem;">${escapeHtml(String(sparkCol.label || sparkKey))} progression →</span>
+            ${_sparkline(sparkValues)}
+            <span style="color:#4ade80;font-size:0.72rem;margin-left:0.5rem;">${escapeHtml(latestSparkLabel)}</span>
         </div>` : '';
 
     const genAt = matrix.generated_at ? matrix.generated_at.slice(0, 16).replace('T', ' ') + ' UTC' : '';
+    const stageMetricLegend = metricColumns.length
+        ? metricColumns.map((col) => `<code>${escapeHtml(String(col.label || col.key))}</code>`).join(', ')
+        : '<span style="color:var(--text-muted);">none</span>';
+    const probeMetricLegend = probeMetricColumns.length
+        ? probeMetricColumns.map((col) => `<code>${escapeHtml(String(col.label || col.key))}</code>`).join(', ')
+        : '<span style="color:var(--text-muted);">none</span>';
 
     container.innerHTML = `
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-green">Eval Matrix</span> Stage Performance Progression</h3>
             <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:0.7rem;">
-                <div><span style="color:var(--text-muted);font-size:0.72rem;">Latest valid_svg</span><br><span style="color:#4ade80;font-size:1.1rem;font-weight:700;">${latestSvg}</span></div>
-                <div><span style="color:var(--text-muted);font-size:0.72rem;">OOD robustness</span><br><span style="color:#fbbf24;font-size:1.1rem;font-weight:700;">${latestOod}</span></div>
-                <div><span style="color:var(--text-muted);font-size:0.72rem;">Adherence</span><br><span style="color:#60a5fa;font-size:1.1rem;font-weight:700;">${latestAdh}</span></div>
+                ${headlineCards}
                 <div><span style="color:var(--text-muted);font-size:0.72rem;">Runs evaluated</span><br><span style="color:var(--text-primary);font-size:1.1rem;font-weight:700;">${entries.length}</span></div>
             </div>
             ${sparkHtml}
@@ -17795,12 +18168,7 @@ function renderStageEvalMatrix(container, files) {
                     <thead><tr>
                         <th>Phase</th>
                         <th>Loss</th>
-                        <th title="Fraction of samples with valid &lt;svg&gt;...&lt;/svg&gt;">Valid SVG</th>
-                        <th title="Output ends with &lt;/svg&gt;">Closure</th>
-                        <th title="Output begins with &lt;svg">Prefix</th>
-                        <th title="Valid SVG on unlabeled/OOD prompts">OOD</th>
-                        <th title="Shape/palette attributes present in output">Adherence</th>
-                        <th title="n-gram repetition rate (lower = better)">Loop Score</th>
+                        ${metricColumns.map((col) => _thWithTip(String(col.label || col.key), col.description || '')).join('')}
                         <th>Coverage</th>
                     </tr></thead>
                     <tbody>${rowsHtml}</tbody>
@@ -17810,9 +18178,30 @@ function renderStageEvalMatrix(container, files) {
                 Color: <span style="color:#4ade80;">■ good</span> &nbsp;
                 <span style="color:#fbbf24;">■ marginal</span> &nbsp;
                 <span style="color:#f87171;">■ needs work</span> &nbsp;·&nbsp;
-                Loop Score: inverted (lower raw = green) &nbsp;·&nbsp;
+                Dataset type: ${escapeHtml(matrixDatasetType)} &nbsp;·&nbsp;
                 ${genAt ? `Generated: ${genAt}` : ''}
             </div>
+            <details style="margin-top:0.6rem;">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Metric guide (contract-driven columns)</summary>
+                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
+                    Columns, descriptions, and thresholds come from <code>stage_eval_matrix.json</code> (fed by your eval contract). Red <strong>!</strong> markers mean that metric is in a bad range; hover for a failure hint.
+                </div>
+                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
+                    <strong>Stage metrics:</strong> ${stageMetricLegend}
+                </div>
+                ${_metricGuideTable(metricColumns)}
+                <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.72rem;">
+                    <strong>Probe metrics:</strong> ${probeMetricLegend}
+                </div>
+                ${_metricGuideTable(probeMetricColumns)}
+            </details>
+            <details style="margin-top:0.8rem;">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Probe details (prompt + sample response + per-probe scores)</summary>
+                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
+                    Use this to audit exact prompts and model outputs for each stage. Add/edit probes in <code>RUN_DIR/eval_probes.json</code> (or pass <code>--probe-config</code> to eval runner).
+                </div>
+                <div style="margin-top:0.35rem;">${probeDetailsHtml}</div>
+            </details>
             <details style="margin-top:0.8rem;">
                 <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Regenerate eval matrix</summary>
                 <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.4rem;">${escapeHtml(evalCmd)}</pre>
@@ -18572,6 +18961,8 @@ function renderDataLabPanel(files) {
         if (!s) return '';
         if (s === 'stage_a') return 'pretrain';
         if (s === 'stage_b') return 'midtrain';
+        const m = s.match(/^(pretrain|midtrain|sft|dpo|grpo|ppo)(?:[_-]\d+)?$/);
+        if (m) return m[1];
         return s;
     }
 
@@ -18793,6 +19184,16 @@ function renderDataLabPanel(files) {
         ? [...sortedLossEntries, ...plannedFlowItems]
         : null;
     const allFlowItems = expandedFlowItems || orderedStages.map((s) => ({ _isPlanned: true, stage: normStageName(s), phase_label: s }));
+    const flowLabelCounts = {};
+    const flowLabelSequence = allFlowItems.map((item) => {
+        const stage = normStageName(item.stage || item.phase_label || 'pretrain');
+        const rawPhaseLabel = item.phase_label || stage;
+        if (rawPhaseLabel === stage) {
+            flowLabelCounts[stage] = (flowLabelCounts[stage] || 0) + 1;
+            return flowLabelCounts[stage] > 1 ? `${stage}_${flowLabelCounts[stage]}` : stage;
+        }
+        return rawPhaseLabel;
+    });
 
     function fmtLoss(value) {
         const n = Number(value);
@@ -18825,18 +19226,11 @@ function renderDataLabPanel(files) {
 
     const stageCardMeta = {};
     const totalCards = allFlowItems.length;
+    let lastCompletedRunId = null;
     const flowCards = allFlowItems.map((item, idx) => {
         const isPlannedItem = Boolean(item._isPlanned);
         const stage = normStageName(item.stage || item.phase_label || 'pretrain');
-        const rawPhaseLabel = item.phase_label || stage;
-        const phaseLabel = (rawPhaseLabel === stage)
-            ? (() => {
-                const priorCount = allFlowItems.slice(0, idx + 1)
-                    .filter((i) => normStageName(i.stage || i.phase_label || '') === stage)
-                    .length;
-                return priorCount > 1 ? `${stage}_${priorCount}` : stage;
-            })()
-            : rawPhaseLabel;
+        const phaseLabel = flowLabelSequence[idx];
 
         if (isPlannedItem) {
             // Planned card — status/dataset from pipeline contract
@@ -18867,6 +19261,7 @@ function renderDataLabPanel(files) {
                 sourcePath: bindDs.path || cat.path || null, rawSourcePath: bindDs.path || null,
                 tokenStreamPath: null, covered, artifacts: arts,
                 catNote: cat.note || null, lossRuns: [], latestLossRun: null, seq: idx + 1,
+                runId: null, parentRunId: null, expectedParentRunId: null, lineageStatus: 'unknown',
             };
 
             return `
@@ -18897,6 +19292,12 @@ function renderDataLabPanel(files) {
             : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">—</div>`;
         const hasLoss = Number.isFinite(Number(entry.first_loss)) && Number.isFinite(Number(entry.final_loss));
         const dropPct = hasLoss ? Number(entry.drop_pct) : NaN;
+        const runId = entry.run_id ? String(entry.run_id) : null;
+        const parentRunId = entry.parent_run_id ? String(entry.parent_run_id) : null;
+        const expectedParentRunId = lastCompletedRunId;
+        const lineageStatus = expectedParentRunId
+            ? (parentRunId ? (parentRunId === expectedParentRunId ? 'ok' : 'mismatch') : 'missing')
+            : 'root';
         const lossSummary = hasLoss
             ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(entry.first_loss)} → ${fmtLoss(entry.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(entry)}`
             : `<div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>`;
@@ -18907,7 +19308,9 @@ function renderDataLabPanel(files) {
             sourcePath: null, rawSourcePath: null, tokenStreamPath: null,
             covered: null, artifacts: [], catNote: null,
             lossRuns: [entry], latestLossRun: entry, seq: idx + 1,
+            runId, parentRunId, expectedParentRunId, lineageStatus,
         };
+        if (runId) lastCompletedRunId = runId;
 
         return `
             <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(phaseLabel)} loss &amp; dataset">
@@ -18956,7 +19359,7 @@ function renderDataLabPanel(files) {
 
     const stageFlowSection = `
         <div class="parity-section">
-            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(allFlowItems.map((i) => i.phase_label || i.stage).join(' -> '))}</h3>
+            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(flowLabelSequence.join(' -> '))}</h3>
             ${tokSourcePanel}
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:stretch;">${flowCards}</div>
             <div id="dpStageDetail" style="display:none;margin-top:0.55rem;"></div>
@@ -19057,6 +19460,7 @@ function renderDataLabPanel(files) {
         .map((entry) => {
             const stage = normStageName(entry.stage) || 'unassigned';
             const dsName = String(entry.dataset_name || (entry.path ? String(entry.path).split('/').pop() : '') || '-');
+            const parentRunId = String(entry.parent_run_id || '-');
             const srcPath = String(entry.source_path || entry.path || '-');
             const rawPath = String(entry.raw_source_path || (entry.token_stream_path ? '-' : srcPath) || '-');
             const tokPath = String(entry.token_stream_path || '-');
@@ -19071,6 +19475,7 @@ function renderDataLabPanel(files) {
                 <tr>
                     <td>${htmlEscape(stage)}</td>
                     <td>${htmlEscape(String(entry.run_id || '-'))}</td>
+                    <td>${htmlEscape(parentRunId)}</td>
                     <td>${htmlEscape(when)}</td>
                     <td>${htmlEscape(dsName)}</td>
                     <td style="text-align:right;">${seqLen}</td>
@@ -19295,6 +19700,7 @@ function renderDataLabPanel(files) {
                                 <tr>
                                     <th>Stage</th>
                                     <th>Run ID</th>
+                                    <th>Parent Run ID</th>
                                     <th>When</th>
                                     <th>Dataset</th>
                                     <th style="text-align:right;">Seq</th>
@@ -19722,6 +20128,7 @@ function renderDataLabPanel(files) {
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:0.28rem 0.65rem;">
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Stage Flow</span> — click a card to inspect datasets &amp; artifacts per stage</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Eval Matrix</span> — stage quality trend with probe-level prompt/response details</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#fb923c;font-weight:600;">⚠ tok gap</span> — stage dataset was outside the tokenizer training corpus</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Dataset Catalog</span> — trained (green) · generated (amber) · manifests (collapsed)</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Sample Browser</span> — row-level tokenizer roundtrip and exact-match rate</div>
@@ -19729,6 +20136,7 @@ function renderDataLabPanel(files) {
         </div>
         ${stageFlowSection}
         ${trainingReadinessSection}
+        <div id="trainDataLabEvalMatrixSection"></div>
         ${stagePlanSection}
         ${runLedgerSection}
         <div class="parity-section">
@@ -19767,6 +20175,8 @@ function renderDataLabPanel(files) {
         </div>
         ${tokenizerSection}
     `;
+
+    renderStageEvalMatrix(document.getElementById('trainDataLabEvalMatrixSection'), files);
 
     // --- Stage card click handlers (post-render) ---
     {
@@ -19852,6 +20262,28 @@ function renderDataLabPanel(files) {
             const latestLossLabel = hasLatestLoss
                 ? `${fmtLoss(latestRun.first_loss)} → ${fmtLoss(latestRun.final_loss)}`
                 : 'not recorded';
+            const runId = String(meta.runId || (latestRun && latestRun.run_id) || '').trim();
+            const parentRunId = String(meta.parentRunId || (latestRun && latestRun.parent_run_id) || '').trim();
+            const expectedParentRunId = String(meta.expectedParentRunId || '').trim();
+            const lineageStatus = String(meta.lineageStatus || '').toLowerCase();
+            const lineageBadge = lineageStatus === 'ok'
+                ? '<span class="badge badge-green">lineage: ok</span>'
+                : (lineageStatus === 'mismatch'
+                    ? '<span class="badge badge-orange">lineage: mismatch</span>'
+                    : (lineageStatus === 'missing'
+                        ? '<span class="badge badge-orange">lineage: missing</span>'
+                        : (lineageStatus === 'root'
+                            ? '<span class="badge badge-blue">lineage: root</span>'
+                            : '<span class="badge badge-blue">lineage: unknown</span>')));
+            const lineageNote = lineageStatus === 'ok'
+                ? 'parent_run_id matches expected prior completed run_id.'
+                : (lineageStatus === 'mismatch'
+                    ? 'parent_run_id does not match expected prior completed run_id.'
+                    : (lineageStatus === 'missing'
+                        ? 'parent_run_id missing while a prior completed run exists.'
+                        : (lineageStatus === 'root'
+                            ? 'No prior completed run expected for this entry.'
+                            : 'Lineage not recorded for this entry.')));
 
             const artRows = meta.artifacts.length > 0
                 ? meta.artifacts.map((a) => {
@@ -19935,6 +20367,14 @@ function renderDataLabPanel(files) {
                             <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TRAINING LOSS</div>
                             <div style="font-size:0.78rem;color:#fcd34d;">${latestLossLabel}</div>
                             <div style="font-size:0.72rem;color:#9ca3af;">runs: ${runCount}</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
+                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">RUN LINEAGE</div>
+                            <div style="font-size:0.75rem;margin-bottom:0.18rem;">${lineageBadge}</div>
+                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">run_id: ${runId ? `<code>${htmlEscape(runId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
+                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">parent_run_id: ${parentRunId ? `<code>${htmlEscape(parentRunId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
+                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">expected parent: ${expectedParentRunId ? `<code>${htmlEscape(expectedParentRunId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
+                            <div style="font-size:0.68rem;color:#9ca3af;margin-top:0.18rem;">${lineageNote}</div>
                         </div>
                     </div>
                     ${latestRun ? `<div style="margin:-0.05rem 0 0.45rem 0;">${stageLossSparkline(latestRun)}</div>` : ''}

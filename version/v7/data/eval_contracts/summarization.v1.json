@@ -1,0 +1,88 @@
+{
+  "schema": "ck.eval_contract.v1",
+  "dataset_type": "summarization",
+  "scorer": "text_rules",
+  "probes": [
+    {
+      "id": "sum_cpu_cache",
+      "type": "core",
+      "prompt": "Summarize: CPUs need cache locality and TLB-aware memory layout for low-latency inference.",
+      "expect_contains_all": ["cache", "TLB", "inference"]
+    },
+    {
+      "id": "sum_tradeoff",
+      "type": "core",
+      "prompt": "Summarize in 2 sentences: training loss can decrease while instruction adherence regresses.",
+      "expect_contains_all": ["loss", "adherence"]
+    },
+    {
+      "id": "ood_svg_instruction",
+      "type": "ood",
+      "prompt": "Write one sentence on how to verify SVG output quality.",
+      "expect_contains_all": ["SVG", "quality"]
+    }
+  ],
+  "stage_metrics": [
+    {
+      "key": "non_empty_rate",
+      "label": "Non-empty",
+      "source": "non_empty",
+      "probe_type": "all",
+      "good": 0.95,
+      "warn": 0.7,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true
+    },
+    {
+      "key": "coverage_rate",
+      "label": "Coverage",
+      "source": "contains_all",
+      "probe_type": "core",
+      "good": 0.75,
+      "warn": 0.45,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true,
+      "regression_watch": true
+    },
+    {
+      "key": "loop_score",
+      "label": "Loop",
+      "source": "repetition",
+      "probe_type": "all",
+      "good": 0.1,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": false,
+      "headline": true
+    }
+  ],
+  "probe_metrics": [
+    {
+      "key": "non_empty",
+      "label": "Non-empty",
+      "good": 0.95,
+      "warn": 0.7,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "contains_all",
+      "label": "Contains",
+      "good": 0.75,
+      "warn": 0.45,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "repetition",
+      "label": "Loop",
+      "good": 0.1,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": false
+    }
+  ],
+  "headline_metrics": ["non_empty_rate", "coverage_rate", "loop_score"]
+}

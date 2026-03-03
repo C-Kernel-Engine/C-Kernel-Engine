@@ -1,0 +1,108 @@
+{
+  "schema": "ck.eval_contract.v1",
+  "dataset_type": "code",
+  "scorer": "text_rules",
+  "probes": [
+    {
+      "id": "c_add_fn",
+      "type": "core",
+      "prompt": "Write a C function int add(int a, int b) using one return statement.",
+      "expect_contains_all": ["int add", "return", "{", "}"],
+      "expect_forbid": ["<svg", "```"]
+    },
+    {
+      "id": "cpp_vector_sum",
+      "type": "core",
+      "prompt": "Write C++ code that sums a std::vector<int> and returns the value.",
+      "expect_contains_all": ["std::vector<int>", "return"],
+      "expect_forbid": ["<svg", "```"]
+    },
+    {
+      "id": "ood_unrelated",
+      "type": "ood",
+      "prompt": "Describe why cache locality matters for CPU performance in one paragraph.",
+      "expect_contains_all": ["cache", "performance"]
+    }
+  ],
+  "stage_metrics": [
+    {
+      "key": "non_empty_rate",
+      "label": "Non-empty",
+      "source": "non_empty",
+      "probe_type": "all",
+      "good": 0.95,
+      "warn": 0.7,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true
+    },
+    {
+      "key": "contains_rate",
+      "label": "Contains",
+      "source": "contains_all",
+      "probe_type": "core",
+      "good": 0.8,
+      "warn": 0.5,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true,
+      "regression_watch": true
+    },
+    {
+      "key": "forbid_clean_rate",
+      "label": "Forbid Clean",
+      "source": "forbid_clean",
+      "probe_type": "all",
+      "good": 0.9,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "loop_score",
+      "label": "Loop",
+      "source": "repetition",
+      "probe_type": "all",
+      "good": 0.1,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": false,
+      "headline": true
+    }
+  ],
+  "probe_metrics": [
+    {
+      "key": "non_empty",
+      "label": "Non-empty",
+      "good": 0.95,
+      "warn": 0.7,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "contains_all",
+      "label": "Contains",
+      "good": 0.8,
+      "warn": 0.5,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "forbid_clean",
+      "label": "Forbid",
+      "good": 0.9,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "repetition",
+      "label": "Loop",
+      "good": 0.1,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": false
+    }
+  ],
+  "headline_metrics": ["non_empty_rate", "contains_rate", "loop_score"]
+}
