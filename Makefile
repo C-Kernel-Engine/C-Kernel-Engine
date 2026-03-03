@@ -2300,6 +2300,7 @@ help:
 	@echo "  make v6.6-validate-contracts   Static tooling contract checks"
 	@echo "  make v6.6-kernel-map-gate      Kernel-map generator/test/registry gate"
 	@echo "  make v6.6-validate-matrix      Dynamic 3-model build matrix (Gemma/Qwen2/Qwen3)"
+	@echo "  make v6.6-validate-matrix-nightly  Nightly matrix (skip static preflight + retries)"
 	@echo "  make v6.6-validate-matrix-smoke  Matrix + smoke checks"
 	@echo "  make v6.6-validate-parity-matrix  Parity matrix (runtime-optional)"
 	@echo "  make v6.6-validate-parity-matrix-required  Strict parity matrix (runtime-required)"
@@ -3082,7 +3083,7 @@ report-md:
 	@echo ""
 	@$(PYTHON) scripts/optimization_status.py --markdown
 
-.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-advisor profile-v7-cachegrind profile-v7-full
+.PHONY: all clean test test-bf16 test-libs test-quant test-flash-attention test_flash_attention unittest unittest-show show_test help litmus litmus-test test-quick test-full test-stress profile-memory profile-heap profile-cpu profile-flash-attn profile-cache flamegraph ck-cli ck-cli-v4 ck-cli-v5 ck-chat ck-server ck-chat-py ck-server-py generate-model gguf-inspect gguf-list gguf-to-bump gguf-to-bump-v4 hf-to-bump-v4 ir-v4 ir-v4-q4k opt-status opt-pending opt-inference opt-training opt-kernels opt-targets opt-md kernel-coverage kernel-coverage-md test-coverage test-coverage-md meta-check meta-sync meta-init report report-md show_config show-config v5 demo-v5 demo-v5-debug llamacpp-parity llamacpp-parity-full llamacpp-parity-full-all-isa-variants showtests version version-history e2e e2e-quick e2e-qwen e2e-smollm e2e-v66 e2e-v66-full v6.6-test-help v6.6-test-quick v6.6-sanity v6.6-test-parity v6.6-test-memory v6.6-test-divergence v6.6-test-nan v6.6-test-all v6.6-test v6.6-download v6.6-kernel-map-regenerate v6.6-kernel-map-gate v6.6-validate-contracts v6.6-validate-matrix v6.6-validate-matrix-nightly v6.6-validate-matrix-smoke v6.6-validate-parity-matrix v6.6-validate-parity-matrix-required v6.6-validate-longdecode v6.6-gate v6.6-build v6.6 v6.6-full v6.6-ir-visualizer v6.6-memory-signoff v6.6-perf-gate v6.6-perf-gate-evaluate v7-help v7-sync-inference v7-infer-run v7-infer-gate v7-validate-contracts v7-parity-1tok v7-train-ir-smoke v7-train-ir-backward v7-train-parity-3 v7-train-parity-5 v7-gate-train v7-gate v7 profile-v6-prepare-runtime profile-v6-decode profile-v6-prefill profile-v6-flamegraph profile-v6-perf-stat profile-v6-vtune profile-v6-cachegrind profile-v6-full profile-v7-prepare-runtime profile-v7-decode profile-v7-prefill profile-v7-flamegraph profile-v7-perf-stat profile-v7-vtune profile-v7-advisor profile-v7-cachegrind profile-v7-full
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
@@ -3199,6 +3200,12 @@ v6.6-validate-contracts:
 
 v6.6-validate-matrix:
 	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/model_matrix_report_latest.json
+
+# Nightly matrix variant:
+# - skips static preflight that is already covered by v6.6-validate-contracts
+# - allows extra retries for transient build/cache fetch issues
+v6.6-validate-matrix-nightly:
+	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --skip-static-contracts --retries 2 --retry-backoff-sec 3 --json-out version/v6.6/tools/model_matrix_report_latest.json
 
 v6.6-validate-matrix-smoke:
 	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --with-smoke --require-all --json-out version/v6.6/tools/model_matrix_report_latest.json

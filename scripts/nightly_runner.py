@@ -40,6 +40,23 @@ UNITTEST_DIR = ROOT / "unittest"
 BF16_DIR = UNITTEST_DIR / "bf16"
 BASELINE_FILE = ROOT / ".test_baseline.json"
 
+# Keep pass logs compact, but preserve substantially more context for failures.
+PASS_STDOUT_CHARS = 5000
+PASS_STDERR_CHARS = 2000
+FAIL_STDOUT_CHARS = 40000
+FAIL_STDERR_CHARS = 12000
+
+
+def _trim_output(text: str, limit: int, keep_head_tail: bool = False) -> str:
+    if not text or len(text) <= limit:
+        return text
+    if not keep_head_tail:
+        return text[-limit:]
+    marker = "\n... [truncated] ...\n"
+    head = max(0, int(limit * 0.4))
+    tail = max(0, limit - head - len(marker))
+    return text[:head] + marker + text[-tail:]
+
 
 def parse_sub_tests(stdout: str) -> list:
     """
@@ -328,7 +345,7 @@ MAKE_TARGETS = {
     "v6_6_model_matrix": {
         "name": "v6.6 Model Matrix (Build)",
         "category": "parity",
-        "target": "v6.6-validate-matrix",
+        "target": "v6.6-validate-matrix-nightly",
         "timeout_sec": 2400,
     },
     "v7_backprop_long_epoch_nightly": {
@@ -416,8 +433,8 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
                 category=suite.category,
                 status="pass",
                 duration_sec=duration,
-                stdout=result.stdout[-5000:] if len(result.stdout) > 5000 else result.stdout,
-                stderr=result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr,
+                stdout=_trim_output(result.stdout, PASS_STDOUT_CHARS),
+                stderr=_trim_output(result.stderr, PASS_STDERR_CHARS),
                 perf_metric=perf_metric,
                 perf_unit=suite.perf_pattern and "unit" or "",
                 sub_tests=sub_tests,
@@ -435,8 +452,8 @@ def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
                 category=suite.category,
                 status="fail",
                 duration_sec=duration,
-                stdout=result.stdout[-5000:] if len(result.stdout) > 5000 else result.stdout,
-                stderr=result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr,
+                stdout=_trim_output(result.stdout, FAIL_STDOUT_CHARS, keep_head_tail=True),
+                stderr=_trim_output(result.stderr, FAIL_STDERR_CHARS, keep_head_tail=True),
                 error_msg=error_msg,
                 sub_tests=sub_tests,
             )
@@ -504,8 +521,16 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
             category=target_info["category"],
             status=status,
             duration_sec=duration,
-            stdout=result.stdout[-5000:] if len(result.stdout) > 5000 else result.stdout,
-            stderr=result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr,
+            stdout=_trim_output(
+                result.stdout,
+                FAIL_STDOUT_CHARS if status == "fail" else PASS_STDOUT_CHARS,
+                keep_head_tail=(status == "fail"),
+            ),
+            stderr=_trim_output(
+                result.stderr,
+                FAIL_STDERR_CHARS if status == "fail" else PASS_STDERR_CHARS,
+                keep_head_tail=(status == "fail"),
+            ),
             error_msg=error_msg,
             perf_metric=perf_metric,
             perf_unit=perf_unit,
