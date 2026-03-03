@@ -86,6 +86,7 @@ def _promote_checkpoint(
     strict: bool,
     step: int | None = None,
     purpose: str = "eval",
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "status": "skipped",
@@ -106,7 +107,9 @@ def _promote_checkpoint(
             "--run",
             str(run_dir),
         ]
-        if step is not None:
+        if run_id is not None:
+            cmd.extend(["--run-id", str(run_id)])
+        elif step is not None:
             cmd.extend(["--step", str(int(step))])
         _run(
             cmd,
@@ -114,7 +117,8 @@ def _promote_checkpoint(
         )
         return {
             "status": "ok",
-            "strategy": "exact_step" if step is not None else "latest_checkpoint",
+            "strategy": "by_run_id" if run_id is not None else ("exact_step" if step is not None else "latest_checkpoint"),
+            "run_id": str(run_id) if run_id is not None else None,
             "step": int(step) if step is not None else None,
             "purpose": str(purpose),
         }
@@ -134,12 +138,14 @@ def _promote_latest_checkpoint_for_eval(
     run_dir: Path,
     *,
     strict: bool,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     return _promote_checkpoint(
         run_dir,
         strict=bool(strict),
         step=None,
         purpose="eval",
+        run_id=run_id,
     )
 
 
@@ -278,6 +284,7 @@ def _pack_rows_to_seq_windows(
     current: list[int] = []
     max_row = 0
     min_row = None
+    row_lengths: list[int] = []
     used_tokens = 0
     for idx, row in enumerate(row_token_ids, start=1):
         n = len(row)
@@ -285,6 +292,7 @@ def _pack_rows_to_seq_windows(
             continue
         max_row = max(max_row, n)
         min_row = n if min_row is None else min(min_row, n)
+        row_lengths.append(int(n))
         if n > seq_len_i:
             raise RuntimeError(
                 f"row {idx} has {n} tokens, exceeds seq_len={seq_len_i}; "
@@ -324,6 +332,10 @@ def _pack_rows_to_seq_windows(
         "fill_ratio": float(fill_ratio),
         "min_row_tokens": int(min_row or 0),
         "max_row_tokens": int(max_row),
+        "row_tokens_p50": int(_percentile_int(row_lengths, 0.50)),
+        "row_tokens_p90": int(_percentile_int(row_lengths, 0.90)),
+        "row_tokens_p95": int(_percentile_int(row_lengths, 0.95)),
+        "row_tokens_p99": int(_percentile_int(row_lengths, 0.99)),
     }
     return packed, stats
 
@@ -349,6 +361,18 @@ def _loss_stats(payload: dict[str, Any]) -> dict[str, Any]:
         "min": float(vals[min_idx]),
         "min_step": int(min_idx + 1),
     }
+
+
+def _percentile_int(values: list[int], q: float) -> int:
+    if not values:
+        return 0
+    vals = sorted(int(v) for v in values)
+    if len(vals) == 1:
+        return int(vals[0])
+    qq = max(0.0, min(1.0, float(q)))
+    idx = int(math.ceil(qq * len(vals)) - 1)
+    idx = max(0, min(idx, len(vals) - 1))
+    return int(vals[idx])
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -412,11 +436,17 @@ def _build_ledger_start_record(
 
     dataset_path_raw = str(getattr(args, "data", None) or "")
     dataset_name = Path(dataset_path_raw).name if dataset_path_raw else None
+    completed_with_ckpt = [
+        r for r in existing
+        if str(r.get("status") or "") == "completed" and r.get("checkpoint_bump")
+    ]
+    parent_run_id = str(completed_with_ckpt[-1].get("run_id")) if completed_with_ckpt else None
 
     return {
         "schema": "ck.run_ledger.v1",
         "run_order": run_order,
         "run_id": work_dir.name,
+        "parent_run_id": parent_run_id,
         "stage_id": stage_id,
         "stage_pass": stage_pass,
         "phase_label": phase_label,
@@ -1309,25 +1339,169 @@ def _is_valid_svg_fragment(fragment: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def _candidate_dataset_manifests(dataset_path: Path) -> list[Path]:
+    p = dataset_path.expanduser().resolve()
+    stem = p.stem
+    candidates: list[Path] = []
+    transforms = [
+        stem,
+        stem.replace("_instruction_train", ""),
+        stem.replace("_instruction_holdout", ""),
+        stem.replace("_instruction_all", ""),
+        stem.replace("_train", ""),
+        stem.replace("_holdout", ""),
+        stem.replace("_all", ""),
+    ]
+    seen: set[str] = set()
+    for t in transforms:
+        if not t:
+            continue
+        cand = p.with_name(f"{t}_manifest.json")
+        key = str(cand)
+        if key not in seen:
+            candidates.append(cand)
+            seen.add(key)
+    return candidates
+
+
+def _extract_eval_budget_from_manifest(dataset_path: Path) -> tuple[int | None, int | None, str | None]:
+    for manifest_path in _candidate_dataset_manifests(dataset_path):
+        if not manifest_path.exists():
+            continue
+        try:
+            doc = _load_json(manifest_path)
+        except Exception:
+            continue
+        if not isinstance(doc, dict):
+            continue
+
+        sources: list[tuple[str, dict[str, Any]]] = []
+        ctr = doc.get("completion_token_stats")
+        if isinstance(ctr, dict):
+            sources.append(("completion_token_stats", ctr))
+        ctr = doc.get("eval_contract")
+        if isinstance(ctr, dict):
+            sources.append(("eval_contract", ctr))
+        sources.append(("manifest_root", doc))
+
+        p95: int | None = None
+        p99: int | None = None
+        src_name: str | None = None
+        for src, payload in sources:
+            v95 = payload.get("p95_completion_tokens")
+            v99 = payload.get("p99_completion_tokens")
+            if isinstance(v95, (int, float)) and int(v95) > 0:
+                p95 = int(v95)
+                src_name = src
+            if isinstance(v99, (int, float)) and int(v99) > 0:
+                p99 = int(v99)
+                src_name = src
+            if p95 is not None or p99 is not None:
+                break
+        if p95 is None and p99 is None:
+            continue
+        source = f"dataset_manifest:{manifest_path.name}:{src_name or 'root'}"
+        return p95, p99, source
+    return None, None, None
+
+
+def _resolve_eval_max_tokens(
+    args: argparse.Namespace,
+    *,
+    run_dir: Path,
+    dataset_path: Path,
+    pack_report: dict[str, Any] | None,
+    pack_stats: dict[str, Any] | None,
+) -> tuple[int, dict[str, Any]]:
+    context_len = max(64, int(getattr(args, "context_len", 512)))
+    hard_cap = max(64, context_len - 16)
+    fallback = min(512, hard_cap)
+    multiplier = float(getattr(args, "eval_token_budget_multiplier", 1.15))
+
+    override = int(getattr(args, "eval_max_tokens", 0) or 0)
+    if override > 0:
+        return int(max(64, min(override, hard_cap))), {
+            "source": "cli_override",
+            "base_tokens": int(override),
+            "multiplier": 1.0,
+            "fallback": int(fallback),
+            "cap": int(hard_cap),
+        }
+
+    p95, p99, manifest_source = _extract_eval_budget_from_manifest(dataset_path)
+    if isinstance(p99, int) and p99 > 0:
+        base = int(p99)
+        src = manifest_source or "dataset_manifest:p99"
+    elif isinstance(p95, int) and p95 > 0:
+        base = int(p95)
+        src = manifest_source or "dataset_manifest:p95"
+    else:
+        base = 0
+        src = None
+
+    if base <= 0 and isinstance(pack_report, dict):
+        for key in ("row_tokens_p99", "row_tokens_p95", "row_tokens_max", "max_row_tokens"):
+            v = pack_report.get(key)
+            if isinstance(v, (int, float)) and int(v) > 0:
+                base = int(v)
+                src = f"pack_report:{key}"
+                break
+    if base <= 0 and isinstance(pack_stats, dict):
+        for key in ("row_tokens_p99", "row_tokens_p95", "max_row_tokens", "row_tokens_max"):
+            v = pack_stats.get(key)
+            if isinstance(v, (int, float)) and int(v) > 0:
+                base = int(v)
+                src = f"pack_stats:{key}"
+                break
+
+    if base <= 0:
+        return int(fallback), {
+            "source": "fallback",
+            "base_tokens": None,
+            "multiplier": float(multiplier),
+            "fallback": int(fallback),
+            "cap": int(hard_cap),
+        }
+
+    budget = int(math.ceil(float(base) * float(multiplier)))
+    budget = max(64, min(budget, hard_cap))
+    return int(budget), {
+        "source": str(src or "auto"),
+        "base_tokens": int(base),
+        "multiplier": float(multiplier),
+        "fallback": int(fallback),
+        "cap": int(hard_cap),
+    }
+
+
 def _run_post_train_svg_eval(
     args: argparse.Namespace,
     run_dir: Path,
+    *,
+    dataset_path: Path,
+    pack_report: dict[str, Any] | None = None,
+    pack_stats: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str | None]:
     eval_prompt_arg = getattr(args, "eval_prompt", None)
     prompt = str(eval_prompt_arg or ("<svg" if args.require_svg_rows else "Hello"))
+    eval_max_tokens, budget_meta = _resolve_eval_max_tokens(
+        args,
+        run_dir=run_dir,
+        dataset_path=dataset_path,
+        pack_report=pack_report,
+        pack_stats=pack_stats,
+    )
     eval_payload: dict[str, Any] = {
         "status": "skipped",
         "mode": "svg_output_eval",
         "prompt": prompt,
-        "max_tokens": int(getattr(args, "eval_max_tokens", 160)),
+        "max_tokens": int(eval_max_tokens),
+        "token_budget_source": str(budget_meta.get("source") or "unknown"),
+        "token_budget_base_tokens": budget_meta.get("base_tokens"),
+        "token_budget_multiplier": float(budget_meta.get("multiplier") or 1.0),
+        "token_budget_cap": int(budget_meta.get("cap") or max(64, int(getattr(args, "context_len", 512)) - 16)),
         "temperature": float(getattr(args, "eval_temperature", 0.0)),
         "min_valid_svg_rate": float(getattr(args, "min_valid_svg_rate", 0.70)),
-        "valid_svg_rate": 0.0,
-        "closure_success_rate": 0.0,
-        "repetition_loop_score": 1.0,
-        "sample_count": 0,
-        "valid_count": 0,
-        "invalid_count": 0,
     }
 
     if not bool(getattr(args, "post_train_eval", True)):
@@ -1363,9 +1537,10 @@ def _run_post_train_svg_eval(
                 "--prompt",
                 prompt,
                 "--max-tokens",
-                str(int(getattr(args, "eval_max_tokens", 160))),
+                str(int(eval_max_tokens)),
                 "--temperature",
                 str(float(getattr(args, "eval_temperature", 0.0))),
+                "--stop-at-eos",
             ],
             cwd=ROOT,
         )
@@ -3786,8 +3961,14 @@ def main() -> int:
     ap.add_argument(
         "--eval-max-tokens",
         type=int,
-        default=160,
-        help="Max generated tokens for post-train eval",
+        default=0,
+        help="Override max generated tokens for post-train eval (0 = auto from dataset stats, fallback 512)",
+    )
+    ap.add_argument(
+        "--eval-token-budget-multiplier",
+        type=float,
+        default=1.15,
+        help="Multiplier applied to auto-derived eval token budget",
     )
     ap.add_argument(
         "--eval-temperature",
@@ -3848,8 +4029,12 @@ def main() -> int:
         _errors.append(f"--profile-top-k must be >= 1, got {args.profile_top_k}")
     if not (0.0 <= float(args.min_valid_svg_rate) <= 1.0):
         _errors.append(f"--min-valid-svg-rate must be in [0,1], got {args.min_valid_svg_rate}")
-    if args.eval_max_tokens < 1:
-        _errors.append(f"--eval-max-tokens must be >= 1, got {args.eval_max_tokens}")
+    if args.eval_max_tokens < 0:
+        _errors.append(f"--eval-max-tokens must be >= 0 (0=auto), got {args.eval_max_tokens}")
+    if float(args.eval_token_budget_multiplier) <= 0.0:
+        _errors.append(
+            f"--eval-token-budget-multiplier must be > 0, got {args.eval_token_budget_multiplier}"
+        )
     if args.eval_sample_limit < 1:
         _errors.append(f"--eval-sample-limit must be >= 1, got {args.eval_sample_limit}")
     if args.eval_temperature < 0.0:
@@ -4339,9 +4524,16 @@ def main() -> int:
     checkpoint_promotion = _promote_latest_checkpoint_for_eval(
         run_dir,
         strict=bool(args.strict_data_gates and args.require_svg_rows),
+        run_id=work_dir.name,
     )
 
-    post_train_eval, eval_model_dir = _run_post_train_svg_eval(args, run_dir)
+    post_train_eval, eval_model_dir = _run_post_train_svg_eval(
+        args,
+        run_dir,
+        dataset_path=dataset_path,
+        pack_report=pack_report,
+        pack_stats=pack_stats,
+    )
     post_train_eval_path: str | None = None
     if isinstance(post_train_eval, dict) and post_train_eval:
         post_eval_doc = dict(post_train_eval)
@@ -4489,12 +4681,24 @@ def main() -> int:
         f" line_rate={tokenizer_roundtrip.get('line_eval', {}).get('exact_match_rate', 0.0):.4f}"
     )
     if post_train_eval_path:
-        print(
-            "  post_eval:"
-            f" valid_svg_rate={float(post_train_eval.get('valid_svg_rate', 0.0)):.4f}"
-            f" closure_rate={float(post_train_eval.get('closure_success_rate', 0.0)):.4f}"
-            f" loop_score={float(post_train_eval.get('repetition_loop_score', 1.0)):.4f}"
-        )
+        post_status = str(post_train_eval.get("status") or "unknown")
+        if post_status == "ok":
+            print(
+                "  post_eval:"
+                f" valid_svg_rate={float(post_train_eval.get('valid_svg_rate', 0.0)):.4f}"
+                f" closure_rate={float(post_train_eval.get('closure_success_rate', 0.0)):.4f}"
+                f" loop_score={float(post_train_eval.get('repetition_loop_score', 1.0)):.4f}"
+                f" max_tokens={int(post_train_eval.get('max_tokens', 0) or 0)}"
+                f" budget_source={post_train_eval.get('token_budget_source', 'n/a')}"
+            )
+        else:
+            print(
+                "  post_eval:"
+                f" status={post_status}"
+                f" reason={post_train_eval.get('reason', 'n/a')}"
+                f" max_tokens={int(post_train_eval.get('max_tokens', 0) or 0)}"
+                f" budget_source={post_train_eval.get('token_budget_source', 'n/a')}"
+            )
         print(f"  post_eval_json: {post_train_eval_path}")
     if report.get("ck_loss"):
         ck = report["ck_loss"]

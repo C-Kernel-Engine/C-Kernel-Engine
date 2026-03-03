@@ -18828,7 +18828,15 @@ function renderDataLabPanel(files) {
     const flowCards = allFlowItems.map((item, idx) => {
         const isPlannedItem = Boolean(item._isPlanned);
         const stage = normStageName(item.stage || item.phase_label || 'pretrain');
-        const phaseLabel = item.phase_label || stage;
+        const rawPhaseLabel = item.phase_label || stage;
+        const phaseLabel = (rawPhaseLabel === stage)
+            ? (() => {
+                const priorCount = allFlowItems.slice(0, idx + 1)
+                    .filter((i) => normStageName(i.stage || i.phase_label || '') === stage)
+                    .length;
+                return priorCount > 1 ? `${stage}_${priorCount}` : stage;
+            })()
+            : rawPhaseLabel;
 
         if (isPlannedItem) {
             // Planned card — status/dataset from pipeline contract
@@ -20131,9 +20139,10 @@ function renderTrainingLogbookPanel(files) {
     }
 
     const postStatus = String(postEval.status || '').toLowerCase();
+    const postEvalSkipped = postStatus === 'skipped';
     const validSvgRate = toNum(postEval.valid_svg_rate, NaN);
     const minValidSvgRate = toNum(postEval.min_valid_svg_rate, 0.70);
-    if (postStatus === 'fail' || (Number.isFinite(validSvgRate) && validSvgRate < minValidSvgRate)) {
+    if (!postEvalSkipped && (postStatus === 'fail' || (Number.isFinite(validSvgRate) && validSvgRate < minValidSvgRate))) {
         failures.push({
             title: 'Output quality/data-fit gate below target',
             why: `valid_svg_rate=${Number.isFinite(validSvgRate) ? validSvgRate.toFixed(4) : '-'} threshold=${minValidSvgRate.toFixed(4)}`,
