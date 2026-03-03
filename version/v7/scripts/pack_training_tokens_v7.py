@@ -20,6 +20,7 @@ import argparse
 import ctypes
 import json
 import struct
+import math
 from pathlib import Path
 from typing import Any
 
@@ -293,6 +294,18 @@ def _pack_rows(
     return packed, stats
 
 
+def _percentile_int(values: list[int], q: float) -> int:
+    if not values:
+        return 0
+    v = sorted(int(x) for x in values)
+    if len(v) == 1:
+        return int(v[0])
+    qq = max(0.0, min(1.0, float(q)))
+    idx = int(math.ceil(qq * len(v)) - 1)
+    idx = max(0, min(idx, len(v) - 1))
+    return int(v[idx])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Pack row-structured samples into fixed token windows")
     ap.add_argument("--dataset", required=True, help="Input UTF-8 dataset text file (one sample per line)")
@@ -332,6 +345,7 @@ def main() -> int:
 
     dropped_rows: list[dict[str, Any]] = []
     row_payloads: list[list[int]] = []
+    kept_row_lengths: list[int] = []
     min_row = None
     max_row = 0
 
@@ -349,6 +363,7 @@ def main() -> int:
                     )
                 continue
             row_payloads.append(full)
+            kept_row_lengths.append(int(n))
 
     if not row_payloads:
         raise SystemExit(
@@ -373,6 +388,10 @@ def main() -> int:
         "rows_dropped_oversize": int(len(rows) - len(row_payloads)),
         "row_tokens_min": int(min_row or 0),
         "row_tokens_max": int(max_row),
+        "row_tokens_p50": int(_percentile_int(kept_row_lengths, 0.50)),
+        "row_tokens_p90": int(_percentile_int(kept_row_lengths, 0.90)),
+        "row_tokens_p95": int(_percentile_int(kept_row_lengths, 0.95)),
+        "row_tokens_p99": int(_percentile_int(kept_row_lengths, 0.99)),
         "stats": stats,
         "dropped_examples": dropped_rows,
         "token_file": str(out_path),

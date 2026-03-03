@@ -601,6 +601,52 @@ def _polyline_sample(rng: random.Random) -> Sample:
     return Sample("polyline", task, _svg_wrap(w, h, body))
 
 
+def _scatter_sample(rng: random.Random) -> Sample:
+    w = rng.choice([200, 220, 240, 260])
+    h = rng.choice([120, 140, 160])
+    n = rng.randint(6, 10)
+    variant = _spec_palette_variant(rng)
+    if variant:
+        dark, mid, light = variant
+    else:
+        dark = _choice(rng, PALETTE)
+        mid = _choice(rng, [c for c in PALETTE if c != dark])
+        light = "none"
+
+    points = []
+    for _ in range(n):
+        x = rng.randint(20, w - 20)
+        y = rng.randint(16, h - 24)
+        r = rng.randint(2, 4)
+        points.append((x, y, r))
+
+    show_axes = rng.random() < 0.7
+    body_parts: list[str] = []
+    if light != "none" and rng.random() < 0.5:
+        body_parts.append(
+            f'<rect x="0" y="0" width="{w}" height="{h}" fill="{light}" opacity="0.08"/>'
+        )
+    if show_axes:
+        body_parts.append(
+            f'<line x1="16" y1="{h - 18}" x2="{w - 14}" y2="{h - 18}" stroke="{dark}" stroke-width="1"/>'
+        )
+        body_parts.append(
+            f'<line x1="16" y1="10" x2="16" y2="{h - 18}" stroke="{dark}" stroke-width="1"/>'
+        )
+    for x, y, r in points:
+        body_parts.append(
+            f'<circle cx="{x}" cy="{y}" r="{r}" fill="{mid}" stroke="{dark}" stroke-width="1"/>'
+        )
+
+    task_templates = [
+        "draw a scatter chart with {n} points",
+        "create an svg scatter plot with clear point markers",
+        "make a scatter diagram with point clusters and simple axes",
+    ]
+    task = _choice(rng, task_templates).format(n=n)
+    return Sample("scatter", task, _svg_wrap(w, h, "".join(body_parts)))
+
+
 def _gradient_square_sample(rng: random.Random) -> Sample:
     w = rng.choice([160, 180, 200, 220])
     h = rng.choice([90, 110, 130])
@@ -683,6 +729,7 @@ def _generator_registry() -> dict[str, Callable[[random.Random], Sample]]:
         "text": _text_sample,
         "rect_circle": _rect_circle_scene_sample,
         "bar_chart": _bar_chart_sample,
+        "scatter": _scatter_sample,
         "comparison_table": _comparison_table_sample,
         "polyline": _polyline_sample,
         "gradient_square": _gradient_square_sample,
