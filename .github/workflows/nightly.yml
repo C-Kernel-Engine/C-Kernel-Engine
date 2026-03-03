@@ -51,10 +51,25 @@ jobs:
         run: |
           make clean || true
           make -j$(nproc)
-          make libck_parity.so || echo "Parity lib build failed (optional)"
+          make libck_parity.so
           echo ""
           echo "=== Built libraries ==="
           ls -la build/*.so 2>/dev/null || echo "No .so files"
+
+      - name: Validate parity library ABI
+        run: |
+          echo "=== Validating libck_parity.so ABI ==="
+          test -f build/libck_parity.so
+          echo "Checking required exports..."
+          nm -D build/libck_parity.so | grep -q ' ck_strict_parity_enabled$'
+          nm -D build/libck_parity.so | grep -q ' ck_threadpool_global_destroy$'
+          echo "Checking unresolved dynamic symbols..."
+          if ldd -r build/libck_parity.so 2>&1 | grep -q "undefined symbol"; then
+            echo "::error::Undefined symbols found in build/libck_parity.so"
+            ldd -r build/libck_parity.so || true
+            exit 1
+          fi
+          echo "libck_parity.so ABI checks passed"
 
       - name: Setup llama.cpp for parity testing
         run: |
@@ -94,9 +109,7 @@ jobs:
         run: |
           echo "=== Running Kernel Parity Tests ==="
           export LD_LIBRARY_PATH="$PWD/llama.cpp/build/bin:$LD_LIBRARY_PATH"
-          ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/parity_test.log || {
-            echo "::warning::Parity tests had issues"
-          }
+          ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/parity_test.log
 
       - name: Run Nightly Test Suite
         run: |

@@ -2399,6 +2399,8 @@ clean:
 
 # Source files for CK parity library
 PARITY_SRCS := src/ck_parity_api.c \
+               src/ckernel_strict.c \
+               src/ck_threadpool.c \
                src/kernels/dequant_kernels.c \
                src/kernels/gemm_kernels_q4k_q8k.c \
                src/kernels/gemm_kernels_q4k_q8k_avx2.c \
@@ -2432,7 +2434,7 @@ PARITY_SRCS := src/ck_parity_api.c \
 
 # Build CK parity testing library
 $(LIB_PARITY): $(BUILD_DIR) $(PARITY_SRCS)
-	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) $(LDFLAGS) -lm -lpthread
 
 libck_parity.so: $(LIB_PARITY)
 	@echo "Built CK parity library: $(LIB_PARITY)"
