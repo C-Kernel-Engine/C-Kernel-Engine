@@ -284,10 +284,39 @@ def _last_error_line(proc: subprocess.CompletedProcess[str]) -> str:
     if not text:
         return "no-output"
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # Prefer explicit exception/root-cause lines over wrapper command-fail lines.
+    priority_tokens = (
+        "Traceback",
+        "RuntimeError",
+        "AssertionError",
+        "FileNotFoundError",
+        "JSONDecodeError",
+        "ValueError",
+        "KeyError",
+        "TypeError",
+        "PermissionError",
+        "Segmentation fault",
+        "Fatal",
+        "ERROR",
+        "Error:",
+    )
+    for ln in reversed(lines):
+        if "Command failed:" in ln:
+            continue
+        if any(tok in ln for tok in priority_tokens):
+            return ln[:300]
+
     for ln in reversed(lines):
         if "Error:" in ln or "failed" in ln.lower() or "FAIL" in ln:
-            return ln[:180]
-    return lines[-1][:180]
+            if "Command failed:" in ln:
+                continue
+            return ln[:300]
+
+    # Fall back to last non-wrapper line if possible.
+    for ln in reversed(lines):
+        if "Command failed:" not in ln:
+            return ln[:300]
+    return lines[-1][:300]
 
 
 def _is_retryable_build_failure(message: str) -> bool:
@@ -381,6 +410,17 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> MatrixRow:
     t0 = time.time()
     proc: subprocess.CompletedProcess[str] | None = None
     attempt = 0
+    recovered = False
+    recovery_failed_hint: str | None = None
+
+    def _recovery_cmd(base_cmd: list[str]) -> list[str]:
+        out = list(base_cmd)
+        if "--force-convert" not in out:
+            out.append("--force-convert")
+        if "--force-compile" not in out:
+            out.append("--force-compile")
+        return out
+
     while True:
         try:
             proc = _run(cmd, timeout=args.timeout_sec)
@@ -407,6 +447,27 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> MatrixRow:
             break
 
         err_hint = _last_error_line(proc)
+        # Local cached GGUF can fail due stale/corrupt manifests from previous runs.
+        # Try one hard rebuild path before marking the row failed.
+        if (
+            not recovered
+            and args.recover_stale_build
+            and local_gguf is not None
+            and local_gguf.suffix.lower() == ".gguf"
+            and "--force-convert" not in cmd
+        ):
+            try:
+                proc = _run(_recovery_cmd(cmd), timeout=args.timeout_sec)
+            except subprocess.TimeoutExpired:
+                proc = None
+            recovered = True
+            if proc is not None and proc.returncode == 0:
+                break
+            if proc is None:
+                recovery_failed_hint = f"recovery-timeout>{args.timeout_sec}s"
+            else:
+                recovery_failed_hint = _last_error_line(proc)
+
         if attempt < args.retries and _is_retryable_build_failure(err_hint):
             attempt += 1
             time.sleep(max(0.0, args.retry_backoff_sec))
@@ -423,6 +484,10 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> MatrixRow:
     note_parts = []
     if run_input != uri:
         note_parts.append("offline-run=local-gguf")
+    if recovered and proc.returncode == 0:
+        note_parts.append("recovery=force-convert+force-compile")
+    elif recovered and recovery_failed_hint:
+        note_parts.append(f"recovery-failed={recovery_failed_hint}")
     if proc.returncode != 0:
         note_parts.append(_last_error_line(proc))
     if attempt > 0:
@@ -493,10 +558,16 @@ def main() -> int:
     ap.add_argument("--timeout-sec", type=int, default=1800, help="Per-model command timeout in seconds")
     ap.add_argument("--retries", type=int, default=1, help="Retry count for transient per-model build failures")
     ap.add_argument("--retry-backoff-sec", type=float, default=2.0, help="Sleep between per-model retries")
+    ap.add_argument(
+        "--no-recover-stale-build",
+        action="store_true",
+        help="Disable one-shot local GGUF recovery (--force-convert --force-compile) on build failure",
+    )
     ap.add_argument("--require-all", action="store_true", help="Fail if any model is skipped")
     ap.add_argument("--strict", action="store_true", help="Fail on WARN statuses as well")
     ap.add_argument("--json-out", type=Path, default=None, help="Optional JSON report path")
     args = ap.parse_args()
+    args.recover_stale_build = not args.no_recover_stale_build
 
     static_status = "N/A"
     static_note = "skipped"
