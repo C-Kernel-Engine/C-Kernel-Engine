@@ -116,7 +116,10 @@ def _extract_embedded_data(report_html: Path) -> dict[str, Any]:
     html = report_html.read_text(encoding="utf-8", errors="replace")
     prefix = "window.EMBEDDED_IR_DATA = "
     suffix = ";window.dispatchEvent(new Event('ckEmbeddedDataLoaded'));"
-    start = html.find(prefix)
+    # Use the last assignment in the document. The visualizer template itself
+    # can contain helper assignments like `window.EMBEDDED_IR_DATA = embedded;`
+    # before the generated embedded payload block.
+    start = html.rfind(prefix)
     if start < 0:
         raise RuntimeError(f"Embedded data prefix not found in {report_html}")
     start += len(prefix)
@@ -124,7 +127,13 @@ def _extract_embedded_data(report_html: Path) -> dict[str, Any]:
     if end < 0:
         raise RuntimeError(f"Embedded data suffix not found in {report_html}")
     payload = html[start:end]
-    return json.loads(payload)
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError as e:
+        snippet = payload[:160].replace("\n", "\\n")
+        raise RuntimeError(
+            f"Embedded payload JSON parse failed in {report_html}: {e}; payload_head={snippet!r}"
+        ) from e
 
 
 def _profile_csv_exists(run_dir: Path) -> bool:

@@ -27,6 +27,7 @@ def compile_optimizer_lib():
     """Compile optimizer kernels into a shared library."""
     root = _root_dir()
     src_dir = os.path.join(root, "src", "kernels")
+    core_src_dir = os.path.join(root, "src")
     include_dir = os.path.join(root, "include")
     build_dir = os.path.join(root, "build")
     lib_path = os.path.join(build_dir, "libckernel_optimizer.so")
@@ -36,6 +37,10 @@ def compile_optimizer_lib():
     sources = [
         os.path.join(src_dir, "optimizer_kernels.c"),
         os.path.join(src_dir, "optimizer_kernels_bf16.c"),
+        # Provides ck_strict_parity_enabled() and ck_get_physical_cores().
+        os.path.join(core_src_dir, "ckernel_strict.c"),
+        # Optimizer kernels call ck_threadpool_global() for large tensors.
+        os.path.join(core_src_dir, "ck_threadpool.c"),
     ]
 
     # Check sources exist
@@ -73,13 +78,13 @@ def compile_optimizer_lib():
     ] + avx_flags + [
         f"-I{include_dir}",
         "-o", lib_path,
-    ] + sources + ["-lm"]
+    ] + sources + ["-lm", "-lpthread"]
 
     print(f"  Compiling optimizer library...")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         # Try without SIMD
-        cmd = ["gcc", "-O3", "-fPIC", "-shared", f"-I{include_dir}", "-o", lib_path] + sources + ["-lm"]
+        cmd = ["gcc", "-O3", "-fPIC", "-shared", f"-I{include_dir}", "-o", lib_path] + sources + ["-lm", "-lpthread"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"Compilation failed:\n{result.stderr}")
@@ -92,7 +97,7 @@ def load_optimizer_lib():
     """Load the optimizer library, compiling if needed."""
     try:
         lib = load_lib("libckernel_optimizer.so")
-    except FileNotFoundError:
+    except (FileNotFoundError, OSError):
         compile_optimizer_lib()
         lib = load_lib("libckernel_optimizer.so")
 

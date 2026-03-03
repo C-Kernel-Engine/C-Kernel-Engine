@@ -290,6 +290,27 @@ def _last_error_line(proc: subprocess.CompletedProcess[str]) -> str:
     return lines[-1][:180]
 
 
+def _is_retryable_build_failure(message: str) -> bool:
+    probe = str(message or "").lower()
+    retry_tokens = (
+        "timeout",
+        "timed out",
+        "429",
+        "503",
+        "502",
+        "connection reset",
+        "connection aborted",
+        "temporary failure",
+        "network is unreachable",
+        "name or service not known",
+        "failed to resolve",
+        "ssl",
+        "download",
+        "huggingface",
+    )
+    return any(tok in probe for tok in retry_tokens)
+
+
 def _run_static_contracts(timeout: int) -> tuple[str, str]:
     proc = _run([sys.executable, str(STATIC_CONTRACTS)], timeout=timeout)
     if proc.returncode != 0:
@@ -358,22 +379,41 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> MatrixRow:
         cmd.append("--reverse-test")
 
     t0 = time.time()
-    try:
-        proc = _run(cmd, timeout=args.timeout_sec)
-    except subprocess.TimeoutExpired:
-        return MatrixRow(
-            model=name,
-            family=family,
-            cached=cached_status,
-            build="FAIL",
-            artifacts="N/A",
-            sliding="N/A",
-            smoke="N/A",
-            overall="FAIL",
-            note=f"timeout>{args.timeout_sec}s",
-            work_dir=str(work_dir),
-            seconds=time.time() - t0,
-        )
+    proc: subprocess.CompletedProcess[str] | None = None
+    attempt = 0
+    while True:
+        try:
+            proc = _run(cmd, timeout=args.timeout_sec)
+        except subprocess.TimeoutExpired:
+            if attempt < args.retries:
+                attempt += 1
+                time.sleep(max(0.0, args.retry_backoff_sec))
+                continue
+            return MatrixRow(
+                model=name,
+                family=family,
+                cached=cached_status,
+                build="FAIL",
+                artifacts="N/A",
+                sliding="N/A",
+                smoke="N/A",
+                overall="FAIL",
+                note=f"timeout>{args.timeout_sec}s (retries={attempt})",
+                work_dir=str(work_dir),
+                seconds=time.time() - t0,
+            )
+
+        if proc.returncode == 0:
+            break
+
+        err_hint = _last_error_line(proc)
+        if attempt < args.retries and _is_retryable_build_failure(err_hint):
+            attempt += 1
+            time.sleep(max(0.0, args.retry_backoff_sec))
+            continue
+        break
+
+    assert proc is not None
 
     build_status = "PASS" if proc.returncode == 0 else "FAIL"
     artifact_status, artifact_note = _artifact_status(work_dir)
@@ -385,6 +425,8 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> MatrixRow:
         note_parts.append("offline-run=local-gguf")
     if proc.returncode != 0:
         note_parts.append(_last_error_line(proc))
+    if attempt > 0:
+        note_parts.append(f"retries={attempt}")
     note_parts.append(artifact_note)
     if family == "gemma":
         note_parts.append(sliding_note)
@@ -449,6 +491,8 @@ def main() -> int:
     ap.add_argument("--context-len", type=int, default=128, help="Context length used during build phase")
     ap.add_argument("--prompt", default="Hello", help="Prompt seed used by ck_run")
     ap.add_argument("--timeout-sec", type=int, default=1800, help="Per-model command timeout in seconds")
+    ap.add_argument("--retries", type=int, default=1, help="Retry count for transient per-model build failures")
+    ap.add_argument("--retry-backoff-sec", type=float, default=2.0, help="Sleep between per-model retries")
     ap.add_argument("--require-all", action="store_true", help="Fail if any model is skipped")
     ap.add_argument("--strict", action="store_true", help="Fail on WARN statuses as well")
     ap.add_argument("--json-out", type=Path, default=None, help="Optional JSON report path")
