@@ -67,6 +67,24 @@ def try_run_cmd(step: str, cmd: list[str], cwd: Path, extra_env: dict | None = N
         return False
 
 
+def collect_profile_tool_status() -> dict[str, object]:
+    flamegraph_dir = PROJECT_ROOT / "FlameGraph"
+    return {
+        "host_platform": sys.platform,
+        "perf": shutil.which("perf") is not None,
+        "valgrind": shutil.which("valgrind") is not None,
+        "cg_annotate": shutil.which("cg_annotate") is not None,
+        "vtune": shutil.which("vtune") is not None,
+        "advisor": shutil.which("advisor") is not None,
+        "xdg_open": shutil.which("xdg-open") is not None,
+        "flamegraph": (
+            (flamegraph_dir / "stackcollapse-perf.pl").exists()
+            and (flamegraph_dir / "flamegraph.pl").exists()
+        ),
+        "flamegraph_dir": str(flamegraph_dir),
+    }
+
+
 def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     """Resolve a model argument to ck_build/model dir and model root directory."""
     candidate = Path(model_arg)
@@ -2957,6 +2975,7 @@ def load_model_data(
             "project_root": str(PROJECT_ROOT),
             "has_train_runtime": bool(train_runtime_available),
             "has_inference_runtime": bool(inference_runtime_available),
+            "profile_tool_status": collect_profile_tool_status(),
             "strict_run_artifacts": strict_run_scope,
             "warnings": [],
         },

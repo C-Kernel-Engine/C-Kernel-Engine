@@ -3558,8 +3558,15 @@ v7-profile-dashboard: v7-init
 	@echo "Capturing v7 profiling dashboard for $(V7_MODEL)"
 	@$(MAKE) --no-print-directory v7-capture-artifacts V7_MODEL="$(V7_MODEL)" V7_AUTO_OPEN=0 V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
 	@$(MAKE) --no-print-directory profile-v7-prepare-runtime V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v7-decode V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=0 V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
 	@$(MAKE) --no-print-directory profile-v7-perf-stat V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=0 V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
 	@$(MAKE) --no-print-directory profile-v7-flamegraph-decode V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=0 V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@if command -v valgrind >/dev/null 2>&1 && command -v cg_annotate >/dev/null 2>&1; then \
+		$(MAKE) --no-print-directory profile-v7-cachegrind V7_MODEL="$(V7_MODEL)" V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"; \
+	else \
+		echo "SKIP: cachegrind capture requires valgrind + cg_annotate"; \
+	fi
+	@$(MAKE) --no-print-directory v7-perf-gate-evaluate V7_MODEL="$(V7_MODEL)"
 	@cache_models="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v7/models}"; \
 		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
 		report_path="$$model_dir/ir_report.html"; \

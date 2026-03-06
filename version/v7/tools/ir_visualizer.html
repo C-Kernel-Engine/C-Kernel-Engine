@@ -11577,6 +11577,55 @@ function renderProfileHowTo() {
                 : 'optional (train-runtime only)',
         });
     }
+    const profileToolStatus = (embeddedMeta && typeof embeddedMeta.profile_tool_status === 'object')
+        ? embeddedMeta.profile_tool_status
+        : {};
+    const hostPlatform = String(profileToolStatus.host_platform || '').toLowerCase();
+    const linuxHost = hostPlatform.startsWith('linux');
+    const perfInstalled = Boolean(profileToolStatus.perf);
+    const flamegraphInstalled = Boolean(profileToolStatus.flamegraph);
+    const cachegrindInstalled = Boolean(profileToolStatus.valgrind) && Boolean(profileToolStatus.cg_annotate);
+    const vtuneInstalled = Boolean(profileToolStatus.vtune);
+    const advisorInstalled = Boolean(profileToolStatus.advisor);
+    const quickPathOutputs = [
+        'Refreshes this run, regenerates <code>ir_report.html</code>, and updates the shared Run Hub.',
+        'Captures decode timing into <code>profile_summary.json</code>.',
+        perfInstalled
+            ? 'Captures <code>perf stat</code> counters into <code>perf_stat_summary.json</code>.'
+            : 'Skips <code>perf stat</code> because <code>perf</code> is not installed on this host.',
+        (perfInstalled && flamegraphInstalled)
+            ? 'Captures decode flamegraph into <code>flamegraph_manifest.json</code>.'
+            : 'Skips flamegraph capture until both <code>perf</code> and <code>./FlameGraph</code> tools are available.',
+        cachegrindInstalled
+            ? 'Captures cache attribution into <code>cachegrind_summary.json</code>.'
+            : 'Skips cachegrind until <code>valgrind</code> and <code>cg_annotate</code> are installed.',
+        'Evaluates the current perf budget gate for this run directory.',
+    ];
+    const hostToolChips = [
+        {
+            name: `platform:${hostPlatform || 'unknown'}`,
+            ok: linuxHost,
+            label: linuxHost ? 'supported' : 'best effort',
+        },
+        { name: 'perf', ok: perfInstalled, label: perfInstalled ? 'installed' : 'missing' },
+        { name: 'FlameGraph', ok: flamegraphInstalled, label: flamegraphInstalled ? 'installed' : 'missing' },
+        { name: 'cachegrind', ok: cachegrindInstalled, label: cachegrindInstalled ? 'installed' : 'missing' },
+        { name: 'VTune', ok: vtuneInstalled, label: vtuneInstalled ? 'installed' : 'optional' },
+        { name: 'Advisor', ok: advisorInstalled, label: advisorInstalled ? 'installed' : 'optional' },
+    ];
+    const hostToolWarnings = [];
+    if (!linuxHost) {
+        hostToolWarnings.push(`Host platform is ${hostPlatform || 'unknown'}; full profiling support is Linux-first.`);
+    }
+    if (!perfInstalled) {
+        hostToolWarnings.push('perf is missing, so perf stat, flamegraph capture, and some budget metrics will stay empty.');
+    }
+    if (perfInstalled && !flamegraphInstalled) {
+        hostToolWarnings.push('FlameGraph scripts are missing under ./FlameGraph, so flamegraph SVGs cannot be generated yet.');
+    }
+    if (!cachegrindInstalled) {
+        hostToolWarnings.push('valgrind/cg_annotate are missing, so cachegrind attribution will be skipped by the one-command flow.');
+    }
 
     const profileIssueHtml = profileDataIssue
         ? `<div style="margin-top:0.65rem;padding:0.55rem 0.7rem;border:1px solid #7a5f1a;border-radius:8px;background:rgba(243,156,18,0.10);color:#f6d48f;font-size:0.84rem;">${escapeHtml(profileDataIssue)}</div>`
@@ -11743,15 +11792,23 @@ function renderProfileHowTo() {
             cmd: profileCompileCheckCmd,
         },
         'perf_stat_summary.json': {
-            why: 'CPU counters (IPC, cache miss, branch miss) parsed from perf stat.',
+            why: perfInstalled
+                ? 'CPU counters (IPC, cache miss, branch miss) parsed from perf stat.'
+                : 'CPU counters require perf. This host does not currently have perf installed.',
             cmd: perfStatCmd,
         },
         'flamegraph_manifest.json': {
-            why: 'Flamegraph index linking folded stacks and SVG hotspot view for decode and prefill (when captured). Includes a perf sysctl fallback if perf record is permission-blocked.',
+            why: (!perfInstalled)
+                ? 'Flamegraph capture requires perf, and perf is missing on this host.'
+                : (!flamegraphInstalled)
+                    ? 'Flamegraph capture also needs ./FlameGraph/stackcollapse-perf.pl and flamegraph.pl, which are missing on this host.'
+                    : 'Flamegraph index linking folded stacks and SVG hotspot view for decode and prefill (when captured). Includes a perf sysctl fallback if perf record is permission-blocked.',
             cmd: flamegraphRecoverCmd,
         },
         'cachegrind_summary.json': {
-            why: 'Cachegrind summary for instruction/data/cache-miss attribution by function.',
+            why: cachegrindInstalled
+                ? 'Cachegrind summary for instruction/data/cache-miss attribution by function.'
+                : 'Cachegrind summary requires valgrind plus cg_annotate, which are missing on this host.',
             cmd: cachegrindNativeCmd,
         },
         'asan_summary.json': {
@@ -11765,11 +11822,15 @@ function renderProfileHowTo() {
             cmd: perfGateEvalCmd,
         },
         'vtune_summary.json': {
-            why: 'VTune hotspot summary and optional media artifacts for advanced profiling.',
+            why: vtuneInstalled
+                ? 'VTune hotspot summary and optional media artifacts for advanced profiling.'
+                : 'VTune summary requires Intel VTune (oneAPI). It is not installed on this host.',
             cmd: vtuneCmd,
         },
         'advisor_summary.json': {
-            why: 'Advisor roofline project pointer and metadata for memory-vs-compute analysis.',
+            why: advisorInstalled
+                ? 'Advisor roofline project pointer and metadata for memory-vs-compute analysis.'
+                : 'Advisor summary requires Intel Advisor (oneAPI). It is not installed on this host.',
             cmd: advisorCmd,
         },
     };
@@ -11832,6 +11893,27 @@ function renderProfileHowTo() {
 
     const loadedCount = depChips.filter(d => d.ok).length;
     const totalCount = depChips.length;
+    const quickPathSummaryHtml = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.75rem;margin-bottom:0.8rem;">
+            <div style="border:1px solid var(--grey);border-radius:12px;padding:0.75rem;background:rgba(255,255,255,0.02);">
+                <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:0.35rem;">What the one-command flow gives you</div>
+                <ul style="margin:0;padding-left:1rem;color:var(--text-muted);font-size:0.84rem;line-height:1.5;">
+                    ${quickPathOutputs.map((item) => `<li>${item}</li>`).join('')}
+                </ul>
+            </div>
+            <div style="border:1px solid var(--grey);border-radius:12px;padding:0.75rem;background:rgba(255,255,255,0.02);">
+                <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:0.35rem;">Host tool status</div>
+                <div class="profile-dep-grid" style="margin-bottom:${hostToolWarnings.length ? '0.45rem' : '0'};">
+                    ${hostToolChips.map((d) => `<div class="profile-dep-chip ${d.ok ? 'ok' : 'missing'}">${escapeHtml(d.name)}: ${escapeHtml(d.label)}</div>`).join('')}
+                </div>
+                ${hostToolWarnings.length
+                    ? `<ul style="margin:0;padding-left:1rem;color:var(--text-muted);font-size:0.82rem;line-height:1.45;">
+                        ${hostToolWarnings.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>`
+                    : `<div style="color:var(--text-muted);font-size:0.82rem;">Core host tools for the quick decode profiling path are available.</div>`}
+            </div>
+        </div>
+    `;
 
     root.innerHTML = `
         <div class="profile-howto-card">
@@ -11864,6 +11946,7 @@ function renderProfileHowTo() {
 
             ${profileIssueHtml}
             ${missingHelpHtml}
+            ${quickPathSummaryHtml}
 
             <details class="profile-phase" open>
                 <summary>
@@ -11875,6 +11958,7 @@ function renderProfileHowTo() {
                     <p class="profile-phase-desc">
                         New operators should start here. These wrappers create the repo-local <code>.venv</code> if needed,
                         refresh the run artifacts, and then rebuild the HTML report surfaces for this exact run directory.
+                        The full profiling wrapper collects the core decode profiling stack and skips unavailable host tools automatically.
                     </p>
                     <div class="profile-howto-grid">
                         ${renderHowToBlock(
@@ -11885,7 +11969,7 @@ function renderProfileHowTo() {
                         ${renderHowToBlock(
                             'Full Profiling Dashboard',
                             quickProfileDashboardCmd,
-                            'Runs the operator flow plus decode profiling, perf stat, and flamegraph refresh for this run directory. Use this before falling back to the per-tool commands below.'
+                            'Runs the operator flow plus decode timing, perf stat, flamegraph, cachegrind (if available), and perf-gate refresh for this run directory. Use this before falling back to the per-tool commands below.'
                         )}
                     </div>
                 </div>
