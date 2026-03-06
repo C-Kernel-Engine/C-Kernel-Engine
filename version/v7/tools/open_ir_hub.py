@@ -1436,6 +1436,12 @@ def render_html(index_payload: dict[str, Any]) -> str:
       gap: 8px;
     }
 
+    .health-note {
+      color: #7d8796;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+
     .health-bar,
     .coverage-bar {
       width: 100%;
@@ -1955,6 +1961,16 @@ def render_html(index_payload: dict[str, Any]) -> str:
       return Math.max(0, Math.min(100, score));
     }
 
+    function describeRunScore(run) {
+      const parts = [];
+      if (run.reportReady) parts.push('report');
+      if (run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED' || run.parityStatus === 'FAIL') parts.push('parity');
+      if (run.checkpointCount > 0) parts.push('checkpoints');
+      if (run.weightsStep !== null) parts.push('weights');
+      if (run.validSvgRate !== null) parts.push('telemetry');
+      return parts.length ? parts.join(' + ') : 'base discovery only';
+    }
+
     function makeSearchBlob(run) {
       return [
         run.name,
@@ -1989,6 +2005,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         updatedLabel: relativeTime(run.updated_epoch),
       };
       normalized.healthScore = scoreRun(normalized);
+      normalized.healthReason = describeRunScore(normalized);
       normalized.searchBlob = makeSearchBlob(normalized);
       return normalized;
     }) : [];
@@ -2125,7 +2142,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 <div class="health-core">
                   <div>
                     <strong>${escapeHtml(String(run.healthScore))}</strong>
-                    <span>Health</span>
+                    <span>Coverage</span>
                   </div>
                 </div>
               </div>
@@ -2300,8 +2317,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
 
               <div class="run-health">
-                <div class="coverage-label"><span>Run health</span><strong>${escapeHtml(String(run.healthScore))}/100</strong></div>
+                <div class="coverage-label"><span title="Artifact completeness score built from report, parity, checkpoints, weights metadata, and telemetry captured for this run.">Inspection coverage</span><strong>${escapeHtml(String(run.healthScore))}/100</strong></div>
                 <div class="health-bar"><span style="width:${Math.max(0, Math.min(100, run.healthScore))}%"></span></div>
+                <div class="health-note">Measures artifact completeness, not model quality.</div>
               </div>
 
               <div class="run-stats">
@@ -2318,6 +2336,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
               <details class="detail-toggle">
                 <summary>Run details</summary>
                 <div class="run-spec">${escapeHtml(run.modelSpec)}${run.shape_signature ? ` | ${escapeHtml(run.shape_signature)}` : ''}</div>
+                <div class="health-note" style="margin-bottom:10px;">Coverage formula: ${escapeHtml(run.healthReason || 'n/a')}</div>
                 <div class="run-stats">
                   <div class="run-stat"><div class="k">SVG Rate</div><div class="v">${escapeHtml(fmtPct(run.validSvgRate))}</div></div>
                   <div class="run-stat"><div class="k">Checkpoints</div><div class="v">${escapeHtml(fmtInt(run.checkpointCount))}</div></div>
