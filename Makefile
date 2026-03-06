@@ -3242,6 +3242,9 @@ V7_MODEL ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 V7_SMOKE_MODEL_GEMMA ?= hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf
 V7_SMOKE_MODEL_QWEN2 ?= hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 V7_SMOKE_MODEL_QWEN3 ?= hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf
+V7_REQUIREMENTS ?= requirements-v7.txt
+V7_VENV_PY ?= .venv/bin/python
+V7_VENV_STAMP ?= .venv/.v7_requirements.stamp
 V7_CHAT_TEMPLATE ?= auto
 V7_WEIGHT_DTYPE ?=
 V7_WEIGHT_DTYPE_ARG := $(if $(strip $(V7_WEIGHT_DTYPE)),--weight-dtype $(V7_WEIGHT_DTYPE),)
@@ -3254,6 +3257,15 @@ V7_VTUNE_DEEP ?= 1
 V7_PREP_WITH_PYTHON ?= 1
 V7_FORCE_COMPILE ?= 1
 V7_FORCE_COMPILE_ARG := $(if $(filter 1,$(V7_FORCE_COMPILE)),--force-compile,)
+V7_FORCE_CONVERT ?= 1
+V7_FORCE_CONVERT_ARG := $(if $(filter 1,$(V7_FORCE_CONVERT)),--force-convert,)
+V7_AUTO_OPEN ?= 1
+V7_DEMO_CONTEXT ?= 1024
+V7_DEMO_PROMPT ?= Hello
+V7_DEMO_MAX_TOKENS ?= 16
+V7_CAPTURE_CONTEXT ?= 1024
+V7_CAPTURE_PROMPT ?= Hello
+V7_CAPTURE_MAX_TOKENS ?= 1
 V7_REPORT_DIR ?= version/v7/.cache/reports
 V7_CLI_TEMPLATE_ARGS = $(if $(filter none,$(V7_CHAT_TEMPLATE)),--no-chat-template,$(if $(findstring --chat-template none,$(V7_RUN_ARGS)),--no-chat-template,))
 V7_TRAIN_MANIFEST ?=
@@ -3399,7 +3411,8 @@ V7_STABILIZATION_JSON ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_lates
 V7_STABILIZATION_MD ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_latest.md
 V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.jsonl
 
-.PHONY: v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict v7-rms-swiglu-backward-parity \
+.PHONY: v7-init v7-demo-runtime v7-capture-artifacts v7-profile-dashboard \
+	v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict v7-rms-swiglu-backward-parity \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
 	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic \
 	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
@@ -3412,6 +3425,10 @@ v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
 	@echo ""
 	@echo "Targets:"
+	@echo "  make v7-init"
+	@echo "  make v7-demo-runtime V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
+	@echo "  make v7-capture-artifacts V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
+	@echo "  make v7-profile-dashboard V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
 	@echo "  make v7-sync-inference"
 	@echo "  make v7-infer-run"
 	@echo "  make v7-infer-gate"
@@ -3488,6 +3505,75 @@ v7-help:
 	@echo "  - runtime parity bitwise diagnostics: set V7_TRAIN_RUNTIME_PARITY_BITWISE=1 (forces --bitwise-parity)"
 	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
 	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
+
+$(V7_VENV_PY):
+	@echo "Creating repo-local v7 virtualenv in .venv"
+	@python3 -m venv .venv
+
+$(V7_VENV_STAMP): $(V7_REQUIREMENTS) | $(V7_VENV_PY)
+	@echo "Installing v7 Python dependencies from $(V7_REQUIREMENTS)"
+	@$(V7_VENV_PY) -m pip install --upgrade pip
+	@$(V7_VENV_PY) -m pip install -r $(V7_REQUIREMENTS)
+	@touch $(V7_VENV_STAMP)
+
+v7-init: $(V7_VENV_STAMP)
+	@echo "v7 env ready: $(V7_VENV_PY)"
+	@echo "Next:"
+	@echo "  make v7-demo-runtime V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
+	@echo "  make v7-capture-artifacts V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
+	@echo "  make v7-profile-dashboard V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
+
+v7-demo-runtime: v7-init
+	@echo "Running v7 runtime demo for $(V7_MODEL)"
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_MODEL)" \
+		$(V7_FORCE_COMPILE_ARG) $(V7_FORCE_CONVERT_ARG) \
+		--context-len $(V7_DEMO_CONTEXT) \
+		--prompt "$(V7_DEMO_PROMPT)" --max-tokens $(V7_DEMO_MAX_TOKENS) \
+		$(V7_RUN_ARGS)
+
+v7-capture-artifacts: v7-init
+	@echo "Capturing v7 operator artifacts for $(V7_MODEL)"
+	@$(PYTHON) version/v7/scripts/ck_run_v7.py run "$(V7_MODEL)" \
+		$(V7_FORCE_COMPILE_ARG) $(V7_FORCE_CONVERT_ARG) \
+		--generate-only --generate-visualizer \
+		--context-len $(V7_CAPTURE_CONTEXT) \
+		--prompt "$(V7_CAPTURE_PROMPT)" --max-tokens $(V7_CAPTURE_MAX_TOKENS) \
+		$(V7_RUN_ARGS)
+	@cache_models="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v7/models}"; \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		report_path="$$model_dir/ir_report.html"; \
+		hub_html="$$cache_models/ir_hub.html"; \
+		hub_index="$$cache_models/runs_hub_index.json"; \
+		$(PYTHON) version/v7/tools/open_ir_visualizer.py --generate --run "$$model_dir" --html-only --strict-run-artifacts --output "$$report_path"; \
+		$(PYTHON) version/v7/tools/open_ir_hub.py --models-root "$$cache_models" --output "$$hub_html" --index-out "$$hub_index"; \
+		echo "[OK] run dir: $$model_dir"; \
+		echo "[OK] report: $$report_path"; \
+		echo "[OK] hub: $$hub_html"; \
+		if [ "$(V7_AUTO_OPEN)" = "1" ] && command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "$$report_path" >/dev/null 2>&1 || true; \
+			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
+		fi
+
+v7-profile-dashboard: v7-init
+	@echo "Capturing v7 profiling dashboard for $(V7_MODEL)"
+	@$(MAKE) --no-print-directory v7-capture-artifacts V7_MODEL="$(V7_MODEL)" V7_AUTO_OPEN=0 V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v7-prepare-runtime V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v7-perf-stat V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=0 V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v7-flamegraph-decode V7_MODEL="$(V7_MODEL)" V7_FORCE_COMPILE=0 V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+	@cache_models="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v7/models}"; \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V7_SCRIPT) --model-input "$(V7_MODEL)" )"; \
+		report_path="$$model_dir/ir_report.html"; \
+		hub_html="$$cache_models/ir_hub.html"; \
+		hub_index="$$cache_models/runs_hub_index.json"; \
+		$(PYTHON) version/v7/tools/open_ir_visualizer.py --generate --run "$$model_dir" --html-only --strict-run-artifacts --output "$$report_path"; \
+		$(PYTHON) version/v7/tools/open_ir_hub.py --models-root "$$cache_models" --output "$$hub_html" --index-out "$$hub_index"; \
+		echo "[OK] profiled run dir: $$model_dir"; \
+		echo "[OK] profiled report: $$report_path"; \
+		echo "[OK] profiled hub: $$hub_html"; \
+		if [ "$(V7_AUTO_OPEN)" = "1" ] && command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "$$report_path" >/dev/null 2>&1 || true; \
+			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
+		fi
 
 v7-ctop:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \

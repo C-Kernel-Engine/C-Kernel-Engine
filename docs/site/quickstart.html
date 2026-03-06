@@ -945,11 +945,24 @@
     </div>
 </div>
 
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Supported Platform</strong><br>
+        Linux is the supported platform for build, parity, and profiling workflows. macOS and Windows/WSL may work for local smoke tests, but they are best-effort only and not part of the supported operator path.
+    </div>
+</div>
+
 <nav class="toc">
     <h3>Contents</h3>
     <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#building">Building</a></li>
+        <li><a href="#v7-runtime-quick">v7 Quick Runtime</a></li>
+        <li><a href="#v7-artifact-capture">v7 Artifact Capture</a></li>
+        <li><a href="#v7-profile-dashboard">v7 Profiling Dashboard</a></li>
         <li><a href="#make-targets">Make Targets Reference</a></li>
         <li><a href="#prefill-decode">Prefill + Decode (KV Cache)</a></li>
         <li><a href="#first-run">Your First Run</a></li>
@@ -963,11 +976,15 @@
 
 <div class="card">
     <h3 style="margin-top: 0;">Required</h3>
-    <pre># C compiler with OpenMP support
-sudo apt install build-essential
+    <pre># Linux toolchain + isolated Python env
+sudo apt install build-essential python3 python3-venv python3-pip
 
-# Python 3 with NumPy and PyTorch (for parity tests)
-pip install numpy torch</pre>
+# Create repo-local virtual environment
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install numpy torch</pre>
+    <p style="margin-bottom: 0;">Use the repo-local <code>.venv</code> for all v7 Python commands. If you do not activate it, invoke scripts explicitly with <code>.venv/bin/python ...</code>.</p>
 </div>
 
 <div class="card">
@@ -1029,6 +1046,38 @@ make AVX_FLAGS="-mavx2"
 
 # Debug build with symbols
 make CFLAGS="-O0 -g -fPIC -fopenmp -Wall"</pre>
+</div>
+
+<h2 id="v7-runtime-quick">v7 Quick Runtime (Linux)</h2>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Plain Runtime Path</h3>
+    <pre>make v7-init
+make v7-demo-runtime \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    <p style="margin-bottom: 0;">This is the shortest supported path to a working v7 runtime. It creates the repo-local virtualenv, installs Python dependencies, downloads/converts/compiles the model, and enters the local chat loop.</p>
+</div>
+
+<h2 id="v7-artifact-capture">v7 Full Artifact Capture (Non-privileged)</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Runtime + Report + Hub</h3>
+    <pre>make v7-init
+make v7-capture-artifacts \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    <p style="margin-bottom: 0.35rem;">This captures the runtime plus the HTML operator artifacts without requiring privileged profiling tools.</p>
+    <p style="margin-bottom: 0;"><strong>Not included:</strong> perf / VTune / Advisor / flamegraph artifacts. Those remain separate Linux-only profiling steps and may require host tooling or elevated permissions.</p>
+</div>
+
+<h2 id="v7-profile-dashboard">v7 Profiling Dashboard (Linux)</h2>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Runtime + Artifacts + Profiling</h3>
+    <pre>make v7-init
+make v7-profile-dashboard \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    <p style="margin-bottom: 0.35rem;">This is the one-command operator path for Linux hosts with profiling tools installed. It captures the runtime artifacts, then refreshes the IR report and Run Hub after perf/flamegraph collection.</p>
+    <p style="margin-bottom: 0;"><strong>Expected tooling:</strong> <code>perf</code> for perf-stat and FlameGraph-compatible decode profiling. If host tools are missing, the underlying profiling targets may skip portions of the capture.</p>
 </div>
 
 <h2 id="make-targets">Make Targets Reference</h2>
@@ -1583,7 +1632,7 @@ firefox build/flamegraph.svg</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-05</p>
             </div>
         </div>
     </footer>

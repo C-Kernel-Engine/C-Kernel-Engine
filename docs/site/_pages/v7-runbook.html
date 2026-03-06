@@ -800,7 +800,7 @@
     <p style="margin-bottom: 0.35rem;">Open the parent dashboard for all runs under <code>$HOME/.cache/ck-engine-v7/models</code>.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>python3 version/v7/tools/open_ir_hub.py --open</pre>
+<pre>.venv/bin/python version/v7/tools/open_ir_hub.py --open</pre>
     </div>
     <p class="mini-note">Your latest run will appear automatically when its run dir is under <code>$HOME/.cache/ck-engine-v7/models/train/...</code> (including <code>svg_l16_d128_h512_v1024_ctx512</code>).</p>
 </div>
@@ -1741,10 +1741,10 @@ fi</pre>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># Generate + open consolidated run dashboard for ~/.cache/ck-engine-v7/models
-python3 version/v7/tools/open_ir_hub.py --open
+.venv/bin/python version/v7/tools/open_ir_hub.py --open
 
 # Optional explicit paths
-# python3 version/v7/tools/open_ir_hub.py \
+# .venv/bin/python version/v7/tools/open_ir_hub.py \
 #   --models-root "$HOME/.cache/ck-engine-v7/models" \
 #   --output "$HOME/.cache/ck-engine-v7/models/ir_hub.html" \
 #   --index-out "$HOME/.cache/ck-engine-v7/models/runs_hub_index.json" \
@@ -1798,8 +1798,8 @@ export SFT_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_instruction_train.txt"
   --json-out "$RUN/train_prepare_stage_a.json"
 
 # 4) Generate initial operator artifacts
-python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts
-python3 version/v7/tools/open_ir_hub.py --open</pre>
+.venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts
+.venv/bin/python version/v7/tools/open_ir_hub.py --open</pre>
     </div>
     <p class="mini-note"><strong>Canonical path:</strong> Step 0A is the real bootstrap path. Use Step 0.7 only as a tiny tokenizer preview smoke-check (it uses stub dims and should not be your production bootstrap).</p>
     <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
@@ -3024,12 +3024,58 @@ xdg-open http://localhost:7700/ir_report.html 2>/dev/null || \
 
 <h2 id="step-8-inference">Step 8: Inference from GGUF (HF URLs)</h2>
 
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div>
+        <strong>Support boundary</strong><br>
+        The GGUF runtime path is documented and supported on Linux. macOS and Windows/WSL may work for local smoke tests, but parity and profiling workflows remain Linux-first and are not the supported operator baseline.
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Step 8A: Plain Runtime Path</h3>
+    <p style="margin-bottom: 0.35rem;">Use this when you only want the compiled runtime and local chat loop.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make v7-init
+make v7-demo-runtime \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    </div>
+    <p class="mini-note"><strong>Scope:</strong> runtime only. This path does not promise a complete operator artifact set.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Step 8B: Full Artifact Capture Path (Non-privileged)</h3>
+    <p style="margin-bottom: 0.35rem;">Use this when you want the run directory, HTML report, and parent Run Hub in one pass.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make v7-init
+make v7-capture-artifacts \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    </div>
+    <p class="mini-note"><strong>Scope:</strong> runtime + report + hub. Deep profiling artifacts (<code>perf</code>, <code>VTune</code>, <code>Advisor</code>, flamegraphs) remain separate Linux-only steps and may require elevated privileges or host tooling.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Step 8C: Full Profiling Dashboard Path</h3>
+    <p style="margin-bottom: 0.35rem;">Use this on Linux when you want runtime, report, hub, and profiling artifacts refreshed together.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make v7-init
+make v7-profile-dashboard \
+  V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
+    </div>
+    <p class="mini-note"><strong>Scope:</strong> runtime + report + hub + profiling refresh. Profiling subtargets rely on Linux host tools; missing tools may cause portions of the capture to skip.</p>
+</div>
+
 <div class="card card-blue">
     <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
     <h3 style="margin-top: 0;">Gemma 3 270M</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>python3 version/v7/scripts/ck_run_v7.py run \
+<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
   hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=none \
   --generate-visualizer</pre>
@@ -3038,7 +3084,7 @@ xdg-open http://localhost:7700/ir_report.html 2>/dev/null || \
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>python3 version/v7/scripts/ck_run_v7.py run \
+<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
   hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
   --context-len 1024 --force-compile --force-convert \
   --generate-visualizer</pre>
@@ -3047,7 +3093,7 @@ xdg-open http://localhost:7700/ir_report.html 2>/dev/null || \
     <h3>Qwen3 0.6B</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>python3 version/v7/scripts/ck_run_v7.py run \
+<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
   hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
   --context-len 1024 --force-compile --force-convert \
   --generate-visualizer</pre>
@@ -3072,7 +3118,7 @@ for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN"; do
     echo "[Missing] $RUN_DIR (run Step 8 command first)"
     continue
   fi
-  python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN_DIR" --html-only
+  .venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$RUN_DIR" --html-only
   echo "[OK] $RUN_DIR/ir_report.html"
 done</pre>
     </div>
