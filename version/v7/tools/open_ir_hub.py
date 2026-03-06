@@ -408,9 +408,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
       color: var(--text);
       font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
       background:
-        radial-gradient(circle at 12% 14%, rgba(7, 173, 248, 0.12), transparent 22%),
-        radial-gradient(circle at 83% 12%, rgba(255, 180, 0, 0.12), transparent 24%),
-        radial-gradient(circle at 76% 82%, rgba(255, 180, 0, 0.06), transparent 20%),
+        radial-gradient(circle at 12% 14%, rgba(7, 173, 248, 0.08), transparent 24%),
+        radial-gradient(circle at 83% 12%, rgba(255, 180, 0, 0.08), transparent 26%),
+        radial-gradient(circle at 76% 82%, rgba(255, 180, 0, 0.035), transparent 22%),
         linear-gradient(180deg, #141414 0%, var(--bg-1) 42%, #111111 100%);
       line-height: 1.45;
       overflow-x: hidden;
@@ -436,9 +436,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     body::after {
       background:
-        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06), transparent 26%),
-        radial-gradient(circle at 50% 100%, rgba(70, 219, 255, 0.04), transparent 28%);
-      opacity: 0.34;
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.035), transparent 28%),
+        radial-gradient(circle at 50% 100%, rgba(70, 219, 255, 0.025), transparent 30%);
+      opacity: 0.22;
     }
 
     body.table-mode {
@@ -499,8 +499,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       position: absolute;
       inset: auto -18% -42% 28%;
       height: 400px;
-      background: radial-gradient(circle, rgba(255, 180, 0, 0.16), transparent 62%);
-      opacity: 0.62;
+      background: radial-gradient(circle, rgba(255, 180, 0, 0.09), transparent 64%);
+      opacity: 0.4;
       z-index: -1;
     }
 
@@ -509,8 +509,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       position: absolute;
       inset: -10% 56% auto -14%;
       height: 420px;
-      background: radial-gradient(circle, rgba(7, 173, 248, 0.14), transparent 60%);
-      opacity: 0.58;
+      background: radial-gradient(circle, rgba(7, 173, 248, 0.08), transparent 62%);
+      opacity: 0.34;
       z-index: -1;
     }
 
@@ -556,7 +556,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .headline .accent {
       display: block;
-      background: linear-gradient(135deg, #f5f5f5 0%, var(--gold) 42%, var(--cyan) 100%);
+      background: linear-gradient(135deg, #e8e8e8 0%, #d2c08f 46%, #86bfd6 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -603,13 +603,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      min-height: 30px;
-      padding: 0 11px;
+      min-height: 28px;
+      padding: 0 10px;
       border-radius: 999px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.032);
+      background: rgba(255, 255, 255, 0.022);
       color: var(--muted);
-      font-size: 0.72rem;
+      font-size: 0.69rem;
       font-weight: 700;
       letter-spacing: 0.03em;
       white-space: nowrap;
@@ -628,7 +628,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       border: 1px solid rgba(255, 255, 255, 0.06);
       background:
         linear-gradient(180deg, rgba(44, 44, 44, 0.88), rgba(24, 24, 24, 0.96)),
-        linear-gradient(135deg, rgba(255,180,0,0.05), rgba(7,173,248,0.06));
+        linear-gradient(135deg, rgba(255,180,0,0.028), rgba(7,173,248,0.032));
       overflow: hidden;
     }
 
@@ -689,12 +689,12 @@ def render_html(index_payload: dict[str, Any]) -> str:
       text-align: center;
       border: 1px solid rgba(255, 255, 255, 0.08);
       background:
-        radial-gradient(circle at 30% 30%, rgba(70, 219, 255, 0.18), transparent 44%),
-        radial-gradient(circle at 70% 70%, rgba(255, 189, 74, 0.18), transparent 40%),
+        radial-gradient(circle at 30% 30%, rgba(70, 219, 255, 0.1), transparent 46%),
+        radial-gradient(circle at 70% 70%, rgba(255, 189, 74, 0.1), transparent 42%),
         rgba(10, 18, 34, 0.94);
       box-shadow:
-        0 0 0 14px rgba(255, 255, 255, 0.02),
-        0 18px 48px rgba(0, 0, 0, 0.42);
+        0 0 0 14px rgba(255, 255, 255, 0.015),
+        0 14px 34px rgba(0, 0, 0, 0.34);
     }
 
     body.table-mode .orbital-core {
@@ -812,8 +812,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       position: absolute;
       inset: 0 auto 0 0;
       width: 3px;
-      background: linear-gradient(180deg, var(--gold), var(--cyan));
-      opacity: 0.95;
+      background: linear-gradient(180deg, rgba(255, 180, 0, 0.78), rgba(7, 173, 248, 0.72));
+      opacity: 0.82;
     }
 
     .metric-label {
@@ -1132,7 +1132,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       border-radius: 20px;
       border: 1px solid rgba(255, 255, 255, 0.05);
       background:
-        linear-gradient(180deg, rgba(14, 24, 44, 0.88), rgba(8, 14, 25, 0.95));
+        linear-gradient(180deg, rgba(14, 21, 36, 0.82), rgba(9, 14, 23, 0.92));
       display: grid;
       gap: 12px;
       align-content: start;
@@ -1146,7 +1146,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       border-radius: 50%;
       background:
         radial-gradient(circle at center, rgba(7, 12, 22, 0.94) 0 55%, transparent 56%),
-        conic-gradient(from -90deg, var(--gold) 0deg, var(--cyan) var(--ring), rgba(255,255,255,0.08) var(--ring), rgba(255,255,255,0.08) 360deg);
+        conic-gradient(from -90deg, rgba(255, 180, 0, 0.82) 0deg, rgba(7, 173, 248, 0.78) var(--ring), rgba(255,255,255,0.07) var(--ring), rgba(255,255,255,0.07) 360deg);
       display: grid;
       place-items: center;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
@@ -1194,29 +1194,29 @@ def render_html(index_payload: dict[str, Any]) -> str:
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 42px;
-      padding: 0 14px;
-      border-radius: 13px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.035);
-      color: var(--text);
+      min-height: 38px;
+      padding: 0 13px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 180, 0, 0.12);
+      background: rgba(255,255,255,0.02);
+      color: #e0e0e0;
       font: inherit;
-      font-size: 0.84rem;
-      font-weight: 700;
+      font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
       transition: 160ms ease;
     }
 
     .btn:hover {
       transform: translateY(-1px);
-      border-color: rgba(255, 189, 74, 0.42);
-      background: rgba(255,255,255,0.055);
+      border-color: rgba(255, 189, 74, 0.24);
+      background: rgba(255,255,255,0.036);
     }
 
     .btn.primary {
-      border-color: rgba(255, 189, 74, 0.34);
-      background: linear-gradient(180deg, rgba(255, 189, 74, 0.17), rgba(255, 189, 74, 0.08));
-      color: #fff3d2;
+      border-color: rgba(255, 189, 74, 0.18);
+      background: linear-gradient(180deg, rgba(255, 189, 74, 0.09), rgba(255, 189, 74, 0.035));
+      color: #eadbbb;
     }
 
     .run-grid {
@@ -1381,7 +1381,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       overflow: hidden;
       border-radius: 24px;
       background:
-        linear-gradient(180deg, rgba(12, 20, 36, 0.96), rgba(7, 13, 24, 0.98));
+        linear-gradient(180deg, rgba(17, 22, 29, 0.97), rgba(11, 15, 20, 0.99));
       transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
     }
 
@@ -1395,9 +1395,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
       content: "";
       position: absolute;
       inset: 0 0 auto 0;
-      height: 4px;
-      background: linear-gradient(90deg, var(--cyan), var(--gold), var(--violet));
-      opacity: 0.98;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(7, 173, 248, 0.5), rgba(255, 180, 0, 0.44), rgba(120, 120, 120, 0.24));
+      opacity: 0.54;
     }
 
     .run-card-body {
@@ -1413,8 +1413,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .run-name {
       margin: 0;
-      font-size: 1.15rem;
-      line-height: 1.06;
+      font-size: 1.08rem;
+      line-height: 1.08;
       letter-spacing: -0.04em;
       word-break: break-word;
     }
@@ -1423,13 +1423,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
       font-size: 1.02rem;
     }
 
-    .badge.pass { color: var(--green); background: var(--green-soft); border-color: rgba(87, 216, 156, 0.22); }
-    .badge.fail { color: var(--red); background: var(--red-soft); border-color: rgba(255, 111, 127, 0.22); }
-    .badge.skip { color: var(--warn); background: rgba(255, 208, 113, 0.14); border-color: rgba(255, 208, 113, 0.22); }
-    .badge.missing { color: #cfbefd; background: var(--violet-soft); border-color: rgba(154, 125, 255, 0.22); }
-    .badge.report { color: var(--cyan); background: var(--cyan-soft); border-color: rgba(70, 219, 255, 0.22); }
-    .badge.train { color: var(--gold); background: var(--gold-soft); border-color: rgba(255, 189, 74, 0.22); }
-    .badge.inference { color: #c6d7fa; background: rgba(149, 176, 227, 0.14); border-color: rgba(149, 176, 227, 0.22); }
+    .badge.pass { color: #8fd1ab; background: rgba(87, 216, 156, 0.08); border-color: rgba(87, 216, 156, 0.12); }
+    .badge.fail { color: #d798a3; background: rgba(255, 111, 127, 0.08); border-color: rgba(255, 111, 127, 0.12); }
+    .badge.skip { color: #d6c191; background: rgba(255, 208, 113, 0.08); border-color: rgba(255, 208, 113, 0.12); }
+    .badge.missing { color: #b8afd1; background: rgba(120, 120, 120, 0.08); border-color: rgba(120, 120, 120, 0.12); }
+    .badge.report { color: #8ebed0; background: rgba(7, 173, 248, 0.08); border-color: rgba(7, 173, 248, 0.12); }
+    .badge.train { color: #d4bb84; background: rgba(255, 180, 0, 0.08); border-color: rgba(255, 180, 0, 0.12); }
+    .badge.inference { color: #adb9cb; background: rgba(149, 176, 227, 0.08); border-color: rgba(149, 176, 227, 0.12); }
 
     .run-health {
       display: grid;
@@ -1439,11 +1439,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .health-bar,
     .coverage-bar {
       width: 100%;
-      height: 10px;
+      height: 8px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.04);
       overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.28);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.22);
     }
 
     .health-bar span,
@@ -1454,11 +1454,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     .health-bar span {
-      background: linear-gradient(90deg, var(--cyan), var(--gold), var(--green));
+      background: linear-gradient(90deg, rgba(68, 128, 150, 0.74), rgba(138, 130, 84, 0.64), rgba(106, 142, 117, 0.64));
     }
 
     .coverage-bar span {
-      background: linear-gradient(90deg, var(--cyan), var(--gold));
+      background: linear-gradient(90deg, rgba(72, 136, 161, 0.76), rgba(155, 135, 82, 0.68));
     }
 
     .run-stats {
@@ -1472,10 +1472,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     .run-stat {
-      padding: 12px 13px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.05);
-      background: rgba(255,255,255,0.028);
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.035);
+      background: rgba(255,255,255,0.014);
     }
 
     body.compact-mode .run-stat {
@@ -1488,7 +1488,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.05);
       background:
-        linear-gradient(135deg, rgba(70, 219, 255, 0.05), rgba(255, 189, 74, 0.05)),
+        linear-gradient(135deg, rgba(70, 219, 255, 0.028), rgba(255, 189, 74, 0.03)),
         rgba(255,255,255,0.02);
       color: var(--muted);
       font-size: 0.86rem;
@@ -1510,6 +1510,28 @@ def render_html(index_payload: dict[str, Any]) -> str:
       white-space: pre-wrap;
       word-break: break-word;
       overflow-x: auto;
+    }
+
+    .run-path {
+      color: var(--dim);
+      font-size: 0.76rem;
+    }
+
+    .run-card .coverage-label {
+      color: #a8afb7;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .run-card .detail-toggle {
+      border-top-color: rgba(255,255,255,0.035);
+      padding-top: 10px;
+    }
+
+    .run-card .detail-toggle summary {
+      color: #91a6b0;
+      font-size: 0.74rem;
+      font-weight: 600;
     }
 
     .rail {
@@ -2288,9 +2310,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
 
               <div class="run-actions">
-                ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Open report</a>` : ''}
-                <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Open run dir</a>
-                <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy cmd</button>
+                ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
+                <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
+                <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy</button>
               </div>
 
               <details class="detail-toggle">
