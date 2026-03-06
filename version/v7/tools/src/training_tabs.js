@@ -227,6 +227,432 @@ function resolveDataLab(files) {
     return dataLab;
 }
 
+function normalizeEvalMetricColumns(matrix) {
+    const cols = Array.isArray(matrix?.metric_columns) ? matrix.metric_columns : [];
+    return cols
+        .filter((c) => c && typeof c === 'object' && String(c.key || '').trim())
+        .map((c) => ({
+            key: String(c.key || '').trim(),
+            label: String(c.label || c.key || '').trim(),
+            format: String(c.format || 'pct').trim().toLowerCase(),
+            higher_is_better: c.higher_is_better !== false,
+        }));
+}
+
+function headlineEvalScore(entry, metricKeys, metricColsByKey) {
+    const metrics = entry && typeof entry.metrics === 'object' ? entry.metrics : {};
+    const values = metricKeys
+        .map((key) => {
+            const raw = toNum(metrics[key], NaN);
+            if (!Number.isFinite(raw)) return NaN;
+            const col = metricColsByKey[key] || {};
+            return col.higher_is_better === false ? (1 - raw) : raw;
+        })
+        .filter((v) => Number.isFinite(v));
+    if (values.length === 0) return NaN;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function formatEvalMetricValue(value, format = 'pct') {
+    const n = toNum(value, NaN);
+    if (!Number.isFinite(n)) return '—';
+    if (format === 'int') return String(Math.round(n));
+    if (format === 'float') return n.toFixed(3);
+    if (format === 'text') return String(value ?? '—');
+    return `${(n * 100).toFixed(0)}%`;
+}
+
+function buildDataPrepDiagnosisSection(files, pipeline) {
+    const runCtx = getRunContext();
+    const runDir = runCtx.runDir || '';
+    const matrix = files.stage_eval_matrix && typeof files.stage_eval_matrix === 'object'
+        ? files.stage_eval_matrix
+        : null;
+    const datasetType = String((matrix && matrix.dataset_type) || 'unknown').trim().toLowerCase() || 'unknown';
+    const provenanceAuditCmd = runDir
+        ? `python3 version/v7/scripts/audit_train_token_provenance_v7.py --run ${quoteShell(runDir)} --preview-lines 2`
+        : 'python3 version/v7/scripts/audit_train_token_provenance_v7.py --run <run_dir> --preview-lines 2';
+    const reportCardPath = runDir ? `${runDir}/svg_training_report_card.html` : '<run_dir>/svg_training_report_card.html';
+    const reportCardCmd = runDir
+        ? `python3 version/v7/scripts/build_svg_training_report_card_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
+        : 'python3 version/v7/scripts/build_svg_training_report_card_v7.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
+    const reportHref = runDir ? encodeURI(`file://${reportCardPath}`) : '';
+    const lossEntries = Array.isArray(pipeline?.stage_loss_history?.entries)
+        ? pipeline.stage_loss_history.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const lossByPhase = Object.fromEntries(lossEntries.map((row) => [String(row.phase_label || ''), row]));
+
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">Prep Check</span> Dataset Audit + Deep Diagnosis</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    Use the provenance audit before long runs, and generate a standalone diagnosis report after stage eval to understand what the model actually learned.
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.6rem;margin-top:0.6rem;">
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                        <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">PRE-RUN PROVENANCE AUDIT</div>
+                        <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.35rem;">Confirms raw dataset path, token file path, and cross-artifact consistency before you trust a run.</div>
+                        <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(provenanceAuditCmd)}</pre>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                        <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">POST-RUN DIAGNOSIS</div>
+                        <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.35rem;">Generates a stage-by-stage report with outputs, metrics, and dataset-vs-target gaps.</div>
+                        <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(reportCardCmd)}</pre>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const entries = [...matrix.entries].sort((a, b) => (toNum(a.run_order, 0) - toNum(b.run_order, 0)));
+    const metricCols = normalizeEvalMetricColumns(matrix);
+    const metricColsByKey = Object.fromEntries(metricCols.map((col) => [col.key, col]));
+    const headlineKeysRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
+    const headlineKeys = headlineKeysRaw
+        .map((key) => String(key || '').trim())
+        .filter((key) => key && metricColsByKey[key]);
+    const primaryKeys = headlineKeys.length > 0
+        ? headlineKeys.slice(0, 3)
+        : metricCols.slice(0, 3).map((col) => col.key);
+    const scored = entries.map((entry) => ({
+        entry,
+        score: headlineEvalScore(entry, primaryKeys, metricColsByKey),
+    }));
+    const bestRow = [...scored]
+        .filter((row) => Number.isFinite(row.score))
+        .sort((a, b) => b.score - a.score)[0] || null;
+    const latestRow = scored[scored.length - 1] || null;
+    const bestEntry = bestRow ? bestRow.entry : null;
+    const latestEntry = latestRow ? latestRow.entry : null;
+    const bestPhase = bestEntry ? String(bestEntry.phase_label || '') : '';
+    const latestPhase = latestEntry ? String(latestEntry.phase_label || '') : '';
+    const bestDataset = bestPhase && lossByPhase[bestPhase] ? String(lossByPhase[bestPhase].dataset_name || '') : '';
+    const latestDataset = latestPhase && lossByPhase[latestPhase] ? String(lossByPhase[latestPhase].dataset_name || '') : '';
+    const delta = bestRow && latestRow && Number.isFinite(bestRow.score) && Number.isFinite(latestRow.score)
+        ? (latestRow.score - bestRow.score)
+        : NaN;
+    const scoreStatus = !Number.isFinite(delta)
+        ? { label: 'unknown', color: '#9ca3af', note: 'Need numeric eval columns to compare best vs latest.' }
+        : (delta >= -0.05
+            ? { label: 'close to best', color: '#4ade80', note: 'Latest run is within 5 points of the best practical checkpoint.' }
+            : { label: 'trailing best', color: '#f87171', note: 'Latest run is materially worse than the best practical checkpoint on headline quality metrics.' });
+    const datasetTypeNote = datasetType === 'svg'
+        ? 'SVG mode: use the standalone report for rendered outputs and target-asset grammar gaps.'
+        : `Dataset type: ${htmlEscape(datasetType)}. The standalone deep diagnosis is still SVG-specific today; eval matrix and provenance audit are generic.`;
+
+    const headlineSummary = primaryKeys.length > 0
+        ? primaryKeys.map((key) => {
+            const col = metricColsByKey[key] || { label: key, format: 'pct' };
+            return `<span style="white-space:nowrap;"><strong>${htmlEscape(col.label)}:</strong> ${formatEvalMetricValue(latestEntry?.metrics?.[key], col.format)}</span>`;
+        }).join(' · ')
+        : '<span style="color:var(--text-muted);">No headline metrics configured.</span>';
+
+    const actionNote = datasetType === 'svg'
+        ? 'Operator use: audit provenance before training, then use the deep diagnosis after eval to decide whether the next iteration needs richer asset pretrain, better spec-to-SVG SFT, or stricter canary gates.'
+        : 'Operator use: audit provenance before training, then rely on the eval matrix plus dataset-type-specific report card once that adapter exists.';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Prep Check</span> Data Planning + Deep Diagnosis</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                This section is the operator bridge from dataset preparation to post-run interpretation.
+                GPT-3-style rigor here means: clean splits, stable formatting, explicit eval contracts, dedupe/contamination discipline, and promotion by task quality rather than loss alone.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.55rem;margin-bottom:0.6rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">BEST PRACTICAL CHECKPOINT</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:#e5e7eb;">${htmlEscape(bestPhase || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;word-break:break-word;">${htmlEscape(bestDataset || 'dataset unknown')}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">LATEST CHECKPOINT</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:#e5e7eb;">${htmlEscape(latestPhase || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;word-break:break-word;">${htmlEscape(latestDataset || 'dataset unknown')}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">HEADLINE QUALITY DELTA</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:${scoreStatus.color};">${Number.isFinite(delta) ? `${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)} pts` : '—'}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(scoreStatus.note)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">LATEST HEADLINE METRICS</div>
+                    <div style="font-size:0.76rem;color:#d1d5db;line-height:1.55;">${headlineSummary}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${datasetTypeNote}</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.6rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7rem 0.8rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">PRE-RUN DATA / TOKEN PROVENANCE AUDIT</div>
+                    <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.55;margin-bottom:0.4rem;">
+                        Confirms the human-readable dataset, token file, and pipeline artifacts all agree before you trust a long run.
+                    </div>
+                    <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(provenanceAuditCmd)}</pre>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7rem 0.8rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">POST-RUN DEEP DIAGNOSIS</div>
+                    <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.55;margin-bottom:0.4rem;">
+                        Generates a standalone report with stage metrics, rendered sample outputs, and dataset-vs-target gaps.
+                    </div>
+                    <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(reportCardCmd)}</pre>
+                    ${reportHref ? `<div style="margin-top:0.35rem;font-size:0.72rem;"><a href="${htmlEscape(reportHref)}" target="_blank" rel="noopener" style="color:#93c5fd;">Open report card if generated</a></div>` : ''}
+                </div>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${actionNote}</div>
+        </div>
+    `;
+}
+
+function buildDataLabParitySection(files) {
+    const runCtx = getRunContext();
+    const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+    const parityCmd = runCtx.runDir
+        ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+        : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+    const rows = parseParityRows(files.training_parity);
+    const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
+    const e2e = trainE2EState(trainE2E);
+    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
+        ? files.training_parity_regimen
+        : {};
+    const regimenStatus = String(regimen.status || '').toLowerCase();
+    const regimenSummary = regimen.summary && typeof regimen.summary === 'object' ? regimen.summary : {};
+    const allCkOnly = rows.length > 0 && rows.every((r) => String(r.worst_param || '').toLowerCase() === 'ck_only');
+    const openTrackerButton = `
+        <button type="button" onclick="showTab('train-parity')" style="margin-top:0.45rem;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);color:#93c5fd;border-radius:6px;padding:0.32rem 0.65rem;font-size:0.72rem;cursor:pointer;">
+            Open Full Parity Tracker
+        </button>
+    `;
+
+    if (allCkOnly) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">PyTorch Parity Gate</span> CK-Only Mode</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    This run has no PyTorch reference process. Downstream loss and quality metrics may still be interesting, but they are not numerically anchored to a reference backend.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(parityCmd)}</pre>
+                ${openTrackerButton}
+            </div>
+        `;
+    }
+
+    if (rows.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-orange">PyTorch Parity Gate</span> Missing training_parity.json</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    If CK vs PyTorch is not checked, treat later training conclusions as provisional. Generate parity telemetry in this run directory and regenerate the report.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(parityCmd)}</pre>
+                ${openTrackerButton}
+            </div>
+        `;
+    }
+
+    const worstParity = rows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
+    const lastRow = rows[rows.length - 1] || {};
+    const parityTone = worstParity > 1e-3 ? 'bad' : (worstParity > 1e-5 ? 'warn' : 'good');
+    const parityColor = parityTone === 'bad' ? '#f87171' : (parityTone === 'warn' ? '#fbbf24' : '#4ade80');
+    const parityState = parityTone === 'bad' ? 'diverged'
+        : (parityTone === 'warn' ? 'drift elevated' : 'stable');
+    const parityWhy = parityTone === 'bad'
+        ? 'Numeric divergence is large enough that downstream quality conclusions are not trustworthy until parity is fixed.'
+        : (parityTone === 'warn'
+            ? 'Parity exists but drift is elevated. This is still usable for iteration, but it should block promotion.'
+            : 'CK vs PyTorch drift is currently low; later failures are more likely data-fit or task-contract issues.');
+    const e2eColor = e2e.pass === true ? '#4ade80' : (e2e.pass === false ? '#f87171' : '#9ca3af');
+    const regimenColor = regimenStatus === 'pass' ? '#4ade80' : (regimenStatus === 'fail' ? '#f87171' : '#9ca3af');
+    const lastStep = Number.isFinite(Number(lastRow.step)) ? Number(lastRow.step).toLocaleString() : '—';
+    const rowCount = rows.length.toLocaleString();
+    const regimenProgress = Number.isFinite(Number(regimenSummary.passed_stages)) && Number.isFinite(Number(regimenSummary.total_stages))
+        ? `${Number(regimenSummary.passed_stages)}/${Number(regimenSummary.total_stages)} stages`
+        : 'stage counts unavailable';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">PyTorch Parity Gate</span> CK vs PyTorch Summary</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                Keep parity visible in Data Lab. If this is broken, later loss, SVG validity, and adherence results are suspect. The full step-by-step breakdown still lives in <strong style="color:#d1d5db;">Does It Match PyTorch?</strong>.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.55rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">WORST PARAM DIFF</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${parityColor};">${fmtExp(worstParity, 2)}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(parityState)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LAST PARITY STEP</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(lastStep)}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">rows logged: ${htmlEscape(rowCount)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TRAIN E2E</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${e2eColor};">${htmlEscape(e2e.label || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">end-to-end training parity gate</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">PARITY REGIMEN</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${regimenColor};">${htmlEscape(regimenStatus ? regimenStatus.toUpperCase() : 'MISSING')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(regimenProgress)}</div>
+                </div>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${htmlEscape(parityWhy)}</div>
+            ${openTrackerButton}
+        </div>
+    `;
+}
+
+function buildDataLabEvalSummarySection(files, pipeline) {
+    const matrix = files.stage_eval_matrix && typeof files.stage_eval_matrix === 'object'
+        ? files.stage_eval_matrix
+        : null;
+    const formatLoss = (value) => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '—';
+        if (Math.abs(n) >= 10) return n.toFixed(2);
+        if (Math.abs(n) >= 1) return n.toFixed(3);
+        return n.toFixed(4);
+    };
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        const runCtx = getRunContext();
+        const evalCmd = runCtx.runDir
+            ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runCtx.runDir)} --all-stages --n-samples 5`
+            : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-green">Eval Matrix</span> Missing stage_eval_matrix.json</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    Stage quality exists only after eval runs. Generate the matrix before trusting stage-by-stage task quality.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(evalCmd)}</pre>
+            </div>
+        `;
+    }
+
+    const entries = [...matrix.entries]
+        .filter((row) => row && typeof row === 'object')
+        .sort((a, b) => {
+            const ao = Number(a.run_order);
+            const bo = Number(b.run_order);
+            if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+            return String(a.phase_label || '').localeCompare(String(b.phase_label || ''));
+        });
+    const metricCols = normalizeEvalMetricColumns(matrix);
+    const metricColsByKey = Object.fromEntries(metricCols.map((col) => [col.key, col]));
+    const headlineKeysRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
+    const primaryKeys = headlineKeysRaw
+        .map((key) => String(key || '').trim())
+        .filter((key) => key && metricColsByKey[key]);
+    const summaryKeys = [];
+    for (const key of primaryKeys) {
+        if (!summaryKeys.includes(key)) summaryKeys.push(key);
+        if (summaryKeys.length >= 3) break;
+    }
+    if (!summaryKeys.includes('prefix_integrity') && metricColsByKey.prefix_integrity) summaryKeys.push('prefix_integrity');
+    while (summaryKeys.length < 4) {
+        const next = metricCols.find((col) => !summaryKeys.includes(col.key));
+        if (!next) break;
+        summaryKeys.push(next.key);
+    }
+
+    const lossEntries = Array.isArray(pipeline?.stage_loss_history?.entries)
+        ? pipeline.stage_loss_history.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const lossByPhase = Object.fromEntries(lossEntries.map((row) => [String(row.phase_label || ''), row]));
+
+    const scored = entries.map((entry) => ({
+        entry,
+        score: headlineEvalScore(entry, primaryKeys.length > 0 ? primaryKeys : summaryKeys, metricColsByKey),
+    }));
+    const best = [...scored]
+        .filter((row) => Number.isFinite(row.score))
+        .sort((a, b) => b.score - a.score)[0] || null;
+    const latest = scored[scored.length - 1] || null;
+    const latestMetrics = latest && latest.entry && latest.entry.metrics && typeof latest.entry.metrics === 'object'
+        ? latest.entry.metrics
+        : {};
+    const latestSamples = Number(latestMetrics.n_samples);
+    const latestValid = toNum(latestMetrics.valid_svg_rate, NaN);
+    const latestAdh = toNum(latestMetrics.adherence, NaN);
+    const latestOod = toNum(latestMetrics.ood_robustness, NaN);
+
+    const rows = entries.map((entry) => {
+        const phase = String(entry.phase_label || '—');
+        const metrics = entry.metrics && typeof entry.metrics === 'object' ? entry.metrics : {};
+        const lossRow = lossByPhase[phase] && typeof lossByPhase[phase] === 'object' ? lossByPhase[phase] : null;
+        const finalLoss = lossRow && Number.isFinite(Number(lossRow.final_loss)) ? formatLoss(lossRow.final_loss) : '—';
+        const nSamples = Number(metrics.n_samples);
+        const sampleLabel = Number.isFinite(nSamples) ? `${Math.round(nSamples)}` : '—';
+        const sampleWarn = Number.isFinite(nSamples) && nSamples === 1
+            ? ' <span title="Single-sample eval — rerun with --n-samples 5 for stronger evidence" style="color:#f59e0b;">⚠</span>'
+            : '';
+        const valueCells = summaryKeys.map((key) => {
+            const col = metricColsByKey[key] || { label: key, format: 'pct', higher_is_better: true };
+            const raw = toNum(metrics[key], NaN);
+            const ok = Number.isFinite(raw)
+                ? (col.higher_is_better === false ? raw <= 0.2 : raw >= 0.7)
+                : null;
+            const color = ok === null ? '#9ca3af' : (ok ? '#4ade80' : '#f87171');
+            return `<td style="color:${color};font-weight:700;">${htmlEscape(formatEvalMetricValue(metrics[key], col.format))}</td>`;
+        }).join('');
+        return `
+            <tr>
+                <td><span class="badge badge-blue">${htmlEscape(phase)}</span></td>
+                <td>${htmlEscape(finalLoss)}</td>
+                ${valueCells}
+                <td>${sampleLabel}${sampleWarn}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const bestPhase = best && best.entry ? String(best.entry.phase_label || '—') : '—';
+    const latestPhase = latest && latest.entry ? String(latest.entry.phase_label || '—') : '—';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Eval Matrix</span> Compact Stage Quality Summary</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                This is the compact operator view of task quality by stage. Use it before the large planning tables.
+                The standalone report card remains the deep proof page with per-prompt outputs.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.55rem;margin-bottom:0.55rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">BEST PRACTICAL</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(bestPhase)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST STAGE</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(latestPhase)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST VALID / OOD</div>
+                    <div style="font-size:0.9rem;font-weight:700;color:#4ade80;">${htmlEscape(formatEvalMetricValue(latestValid, 'pct'))} · ${htmlEscape(formatEvalMetricValue(latestOod, 'pct'))}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">valid SVG · OOD robustness</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST ADHERENCE</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${Number.isFinite(latestAdh) && latestAdh >= 0.7 ? '#4ade80' : '#f87171'};">${htmlEscape(formatEvalMetricValue(latestAdh, 'pct'))}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">samples=${Number.isFinite(latestSamples) ? Math.round(latestSamples) : '—'}</div>
+                </div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="font-size:0.76rem;">
+                    <thead>
+                        <tr>
+                            <th>Phase</th>
+                            <th>Loss</th>
+                            ${summaryKeys.map((key) => `<th>${htmlEscape((metricColsByKey[key] || { label: key }).label)}</th>`).join('')}
+                            <th>Samples</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
 function htmlEscape(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -260,6 +686,9 @@ function renderDataLabPanel(files) {
     const tokenizerPreview = dataLab.tokenizer_preview && typeof dataLab.tokenizer_preview === 'object'
         ? dataLab.tokenizer_preview
         : (files.tokenizer_preview || {});
+    const parityGateSection = buildDataLabParitySection(files);
+    const evalSummarySection = buildDataLabEvalSummarySection(files, pipeline);
+    const prepDiagnosisSection = buildDataPrepDiagnosisSection(files, pipeline);
     const activeStage = typeof pipeline.active_stage === 'string' && pipeline.active_stage.trim()
         ? pipeline.active_stage
         : 'pretrain';
@@ -1316,13 +1745,18 @@ function renderDataLabPanel(files) {
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:0.28rem 0.65rem;">
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Stage Flow</span> — click a card to inspect datasets &amp; artifacts per stage</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#93c5fd;font-weight:600;">PyTorch Parity Gate</span> — keep CK vs reference visible before trusting downstream quality</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#86efac;font-weight:600;">Eval Matrix</span> — compact stage quality summary before the larger planning tables</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#fb923c;font-weight:600;">⚠ tok gap</span> — stage dataset was outside the tokenizer training corpus</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Dataset Catalog</span> — trained (green) · generated (amber) · manifests (collapsed)</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Sample Browser</span> — row-level tokenizer roundtrip and exact-match rate</div>
             </div>
         </div>
         ${stageFlowSection}
+        ${parityGateSection}
+        ${evalSummarySection}
         ${stagePlanSection}
+        ${prepDiagnosisSection}
         ${runLedgerSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>

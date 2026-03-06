@@ -4660,7 +4660,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                         `make v7-gate-train`,
                         `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir "$RUN" --json-out "$RUN/training_parity_regimen_latest.json" --md-out "$RUN/training_parity_regimen_latest.md"`,
                         `python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only`,
-                        `# verify lineage: parent_run_id should match previous completed run_id`,
+                        `# verify lineage: resume_from_run_id / resume_from_checkpoint_id should match the intended source checkpoint`,
                         `tail -n 8 "$RUN/run_ledger.jsonl"`,
                     ]
                     : [
@@ -17678,540 +17678,6 @@ function renderTrainingDataPipelineSection(container, pipeline, dataLab, postEva
     }
 }
 
-// ---------------------------------------------------------------------------
-// Stage Eval Matrix
-// ---------------------------------------------------------------------------
-function renderStageEvalMatrix(container, files) {
-    if (!container) return;
-    const matrix = files && typeof files.stage_eval_matrix === 'object' && files.stage_eval_matrix
-        ? files.stage_eval_matrix
-        : null;
-    const runCtx = (typeof getRunContext === 'function') ? getRunContext() : {};
-    const runDir = runCtx.runDir || '';
-
-    const evalCmd = runDir
-        ? `python3 version/v7/scripts/eval_stage_v7.py --run ${runDir} --all-stages`
-        : 'python3 version/v7/scripts/eval_stage_v7.py --run RUN_DIR --all-stages';
-
-    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
-        container.innerHTML = `
-            <div class="parity-section" style="margin-top:0.8rem;">
-                <h3><span class="badge badge-orange">Eval Matrix</span> Stage Performance</h3>
-                <p style="color:var(--text-muted);margin-bottom:0.5rem;">
-                    No <code>stage_eval_matrix.json</code> found. Run the eval script to generate per-stage quality metrics.
-                </p>
-                <pre style="font-size:0.78rem;white-space:pre-wrap;">${escapeHtml(evalCmd)}</pre>
-            </div>
-        `;
-        return;
-    }
-
-    const entries = [...matrix.entries].sort((a, b) => (a.run_order || 0) - (b.run_order || 0));
-    const matrixDatasetType = String(matrix.dataset_type || '').trim().toLowerCase() || 'svg';
-
-    const defaultMetricColumns = [
-        { key: 'valid_svg_rate', label: 'Valid SVG', description: 'Fraction of probe outputs that parse as valid SVG/XML.', good: 0.75, warn: 0.35, format: 'pct', higher_is_better: true },
-        { key: 'closure_success_rate', label: 'Closure', description: 'Fraction of outputs containing closing </svg> tag.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
-        { key: 'prefix_integrity', label: 'Prefix', description: 'How often output starts at expected boundary (without preamble drift).', good: 0.80, warn: 0.40, format: 'pct', higher_is_better: true },
-        { key: 'ood_robustness', label: 'OOD', description: 'Validity on out-of-distribution probes.', good: 0.50, warn: 0.20, format: 'pct', higher_is_better: true },
-        { key: 'adherence', label: 'Adherence', description: 'Instruction following score for requested controls (shape/palette/style).', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true, regression_watch: true },
-        { key: 'repetition_loop_score', label: 'Loop Score', description: 'Repetition risk (lower is better).', good: 0.10, warn: 0.30, format: 'pct', higher_is_better: false },
-    ];
-    const defaultProbeMetricColumns = [
-        { key: 'valid_svg', label: 'Valid', description: 'This probe output parsed as valid SVG/XML.', good: 0.75, warn: 0.35, format: 'pct', higher_is_better: true },
-        { key: 'closure', label: 'Closure', description: 'This probe output includes closing </svg>.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
-        { key: 'prefix_integrity', label: 'Prefix', description: 'Output starts where expected for this probe.', good: 0.80, warn: 0.40, format: 'pct', higher_is_better: true },
-        { key: 'repetition', label: 'Loop', description: 'Repetition score for this probe output (lower is better).', good: 0.10, warn: 0.30, format: 'pct', higher_is_better: false },
-        { key: 'adherence', label: 'Adh', description: 'Instruction adherence for this probe.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
-        { key: 'tag_adherence', label: 'Tag Adh', description: 'Tag-level adherence for this probe.', good: 0.70, warn: 0.30, format: 'pct', higher_is_better: true },
-    ];
-    function _normalizeColumns(rawCols, fallback) {
-        const cols = Array.isArray(rawCols) ? rawCols : [];
-        const normalized = cols
-            .filter((c) => c && typeof c === 'object' && String(c.key || '').trim())
-            .map((c) => ({
-                key: String(c.key || '').trim(),
-                label: String(c.label || c.key || '').trim(),
-                description: String(c.description || c.tooltip || c.help || '').trim(),
-                good: Number.isFinite(Number(c.good)) ? Number(c.good) : null,
-                warn: Number.isFinite(Number(c.warn)) ? Number(c.warn) : null,
-                format: String(c.format || 'pct').trim().toLowerCase(),
-                higher_is_better: c.higher_is_better !== false,
-                regression_watch: Boolean(c.regression_watch),
-            }));
-        return normalized.length > 0 ? normalized : fallback.map((c) => ({ ...c }));
-    }
-    const metricColumns = _normalizeColumns(matrix.metric_columns, defaultMetricColumns);
-    const probeMetricColumns = _normalizeColumns(matrix.probe_metric_columns, defaultProbeMetricColumns);
-    const colByKey = Object.fromEntries(metricColumns.map((c) => [c.key, c]));
-    const headlineMetricsRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
-    const headlineMetrics = headlineMetricsRaw
-        .map((k) => String(k || '').trim())
-        .filter((k) => k && colByKey[k]);
-    const headlineKeys = headlineMetrics.length > 0 ? headlineMetrics.slice(0, 3) : metricColumns.slice(0, 3).map((c) => c.key);
-    const sparkKey = headlineKeys.length > 0 ? headlineKeys[0] : (metricColumns[0] ? metricColumns[0].key : '');
-
-    function _fmtMetric(value, fmt) {
-        if (fmt === 'text') return String(value ?? '—');
-        const n = Number(value);
-        if (!Number.isFinite(n)) return '—';
-        if (fmt === 'int') return `${Math.round(n)}`;
-        if (fmt === 'float') return n.toFixed(3);
-        return `${(n * 100).toFixed(0)}%`;
-    }
-    function _metricColor(value, col) {
-        const n = Number(value);
-        if (!Number.isFinite(n)) return 'var(--text-muted)';
-        const good = Number.isFinite(Number(col.good)) ? Number(col.good) : 0.75;
-        const warn = Number.isFinite(Number(col.warn)) ? Number(col.warn) : 0.35;
-        const higher = col.higher_is_better !== false;
-        const effective = higher ? n : (1 - n);
-        if (effective >= good) return '#4ade80';
-        if (effective >= warn) return '#fbbf24';
-        return '#f87171';
-    }
-    function _metricSeverity(value, col) {
-        const n = Number(value);
-        if (!Number.isFinite(n)) return 'na';
-        const good = Number.isFinite(Number(col.good)) ? Number(col.good) : 0.75;
-        const warn = Number.isFinite(Number(col.warn)) ? Number(col.warn) : 0.35;
-        const higher = col.higher_is_better !== false;
-        const effective = higher ? n : (1 - n);
-        if (effective >= good) return 'good';
-        if (effective >= warn) return 'warn';
-        return 'bad';
-    }
-    function _metricFailureHint(key, value, col) {
-        if (_metricSeverity(value, col) !== 'bad') return '';
-        const k = String(key || '').trim();
-        const specific = {
-            valid_svg_rate: 'Output is not reliably parseable as valid SVG/XML.',
-            valid_svg: 'This output did not parse as valid SVG/XML.',
-            closure_success_rate: 'Many outputs miss proper closing </svg>.',
-            closure: 'This output is missing proper closing </svg>.',
-            prefix_integrity: 'Output starts with extra preamble/drift before expected content.',
-            ood_robustness: 'Model fails on out-of-distribution prompts (unlabeled/unknown tags).',
-            adherence: 'Model is ignoring requested controls (shape/palette/style).',
-            tag_adherence: 'Model tag block does not match expected control tags.',
-            repetition_loop_score: 'High repetition suggests loop/collapse behavior.',
-            repetition: 'This output shows high repetition/loop behavior.',
-            contains_all: 'Output is missing expected required tokens/fragments.',
-            contains_rate: 'Outputs are not consistently including required tokens/fragments.',
-            forbid_clean: 'Output contains forbidden token(s).',
-            forbid_clean_rate: 'Outputs frequently contain forbidden token(s).',
-            non_empty: 'Model returned empty output for this probe.',
-            non_empty_rate: 'Model is returning empty output too often.',
-            prefix_match: 'Output does not start with required prefix.',
-            exact_match: 'Output does not match exact expected target.',
-            regex_match: 'Output does not satisfy expected regex pattern.'
-        };
-        if (specific[k]) return specific[k];
-        const higher = col.higher_is_better !== false;
-        const warnTxt = Number.isFinite(Number(col.warn)) ? _fmtThreshold(col.warn, col.format) : 'configured warn threshold';
-        return higher
-            ? `Metric is below warning threshold (${warnTxt}).`
-            : `Metric is above warning threshold (${warnTxt}).`;
-    }
-    function _metricCell(value, col) {
-        const label = _fmtMetric(value, col.format);
-        if (label === '—') return `<td style="color:var(--text-muted);">—</td>`;
-        const color = col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col);
-        return `<td style="color:${color};font-weight:600;">${escapeHtml(label)}</td>`;
-    }
-    function _scoreBadge(value, col) {
-        const label = _fmtMetric(value, col && col.format);
-        if (label === '—') return '<span style="color:var(--text-muted);">—</span>';
-        const color = col && col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col || {});
-        return `<span style="color:${color};font-weight:700;">${escapeHtml(label)}</span>`;
-    }
-    function _thWithTip(label, description) {
-        const lab = escapeHtml(String(label || ''));
-        const desc = String(description || '').trim();
-        if (!desc) return `<th>${lab}</th>`;
-        return `<th title="${escapeHtml(desc)}">${lab} <span style="color:#9ca3af;font-size:0.65rem;">[?]</span></th>`;
-    }
-    function _fallbackMetricDescription(key) {
-        const k = String(key || '').trim();
-        const known = {
-            valid_svg_rate: 'Fraction of outputs that parse as valid SVG/XML.',
-            valid_svg: 'This output parsed as valid SVG/XML.',
-            closure_success_rate: 'Fraction of outputs that include closing </svg>.',
-            closure: 'This output includes closing </svg>.',
-            prefix_integrity: 'Checks whether output starts where expected (no extra preamble drift).',
-            ood_robustness: 'Validity on out-of-distribution probes (unlabeled/unknown tags).',
-            adherence: 'Instruction-following score for requested controls (shape/palette/style).',
-            tag_adherence: 'Tag-level match score for control tags.',
-            repetition_loop_score: 'Repetition risk (lower is better). High values suggest loop/collapse.',
-            repetition: 'Per-probe repetition score (lower is better).',
-        };
-        return known[k] || '';
-    }
-    function _fmtThreshold(v, fmt) {
-        const n = Number(v);
-        if (!Number.isFinite(n)) return '—';
-        if (fmt === 'int') return String(Math.round(n));
-        if (fmt === 'float') return n.toFixed(3);
-        return `${(n * 100).toFixed(0)}%`;
-    }
-    function _metricGuideRow(col) {
-        const desc = String(col.description || _fallbackMetricDescription(col.key) || '').trim() || 'No description provided in eval contract.';
-        const higher = col.higher_is_better !== false;
-        const direction = higher ? 'higher is better' : 'lower is better';
-        const goodTxt = Number.isFinite(Number(col.good)) ? _fmtThreshold(col.good, col.format) : '—';
-        const warnTxt = Number.isFinite(Number(col.warn)) ? _fmtThreshold(col.warn, col.format) : '—';
-        const gateHint = higher
-            ? `good ≥ ${goodTxt}, warn ≥ ${warnTxt}`
-            : `good ≤ ${goodTxt}, warn ≤ ${warnTxt}`;
-        return `
-            <tr>
-                <td><code>${escapeHtml(String(col.label || col.key))}</code></td>
-                <td style="color:var(--text-muted);max-width:420px;overflow-wrap:anywhere;">${escapeHtml(desc)}</td>
-                <td style="white-space:nowrap;color:var(--text-muted);">${escapeHtml(direction)}</td>
-                <td style="white-space:nowrap;color:var(--text-muted);">${escapeHtml(gateHint)}</td>
-            </tr>
-        `;
-    }
-    function _metricGuideTable(cols) {
-        const rows = Array.isArray(cols) ? cols.map((col) => _metricGuideRow(col)).join('') : '';
-        if (!rows) {
-            return `<div style="color:var(--text-muted);font-size:0.72rem;">No metric metadata available.</div>`;
-        }
-        return `
-            <div style="overflow-x:auto;margin-top:0.35rem;">
-                <table style="min-width:760px;font-size:0.72rem;">
-                    <thead><tr>
-                        <th>Column</th>
-                        <th>Meaning</th>
-                        <th>Direction</th>
-                        <th>Guide</th>
-                    </tr></thead>
-                    <tbody>
-                        ${rows}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    // ── Sparkline for valid_svg_rate progression ───────────────────────────
-    function _sparkline(values) {
-        if (!values || values.length < 2) return '';
-        const clean = values.map(Number).filter(Number.isFinite);
-        if (clean.length < 2) return '';
-        const minV = Math.min(...clean);
-        const maxV = Math.max(...clean);
-        const span = Math.max(maxV - minV, 0.01);
-        const W = 140, H = 28;
-        const pts = clean.map((v, i) => {
-            const x = (i / (clean.length - 1)) * (W - 4) + 2;
-            const y = ((maxV - v) / span) * (H - 6) + 3;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-        }).join(' ');
-        return `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px;vertical-align:middle;">
-            <polyline points="${pts}" fill="none" stroke="#4ade80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
-    }
-
-    const sparkValues = entries.map((e) => e && e.metrics ? Number(e.metrics[sparkKey]) : NaN);
-    const hasSparkline = sparkValues.filter(Number.isFinite).length >= 2;
-
-    // ── Stage color pill ───────────────────────────────────────────────────
-    const STAGE_COL = { pretrain: '#60a5fa', midtrain: '#a78bfa', sft: '#fbbf24', dpo: '#fb923c', grpo: '#34d399', ppo: '#f472b6' };
-    function _stagePill(stage, label) {
-        const c = STAGE_COL[stage] || '#9ca3af';
-        return `<span style="background:${c}22;border:1px solid ${c};color:${c};padding:0.05rem 0.38rem;border-radius:4px;font-size:0.68rem;font-weight:700;">${escapeHtml(label || stage)}</span>`;
-    }
-    function _clipText(text, maxLen = 220) {
-        const s = String(text || '').replace(/\s+/g, ' ').trim();
-        if (s.length <= maxLen) return s;
-        return `${s.slice(0, Math.max(0, maxLen - 1))}…`;
-    }
-    function _svgDataUri(svgText) {
-        const svg = String(svgText || '').trim();
-        if (!svg) return '';
-        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-    }
-    function _responseParts(rawResponse) {
-        const raw = String(rawResponse || '');
-        const svgStart = raw.indexOf('<svg');
-        const svgEnd = raw.lastIndexOf('</svg>');
-        const hasSvg = svgStart !== -1 && svgEnd > svgStart;
-        const preambleRaw = hasSvg ? raw.slice(0, svgStart).trim() : '';
-        const preamble = preambleRaw.replace(/^\]+/, '').trim();
-        const svg = hasSvg ? raw.slice(svgStart, svgEnd + 6).trim() : '';
-        return { raw, preamble, svg, hasSvg };
-    }
-    function _responsePreview(parts, opts = {}) {
-        const preambleMax = Number.isFinite(Number(opts.preambleMax)) ? Number(opts.preambleMax) : 80;
-        const textMax = Number.isFinite(Number(opts.textMax)) ? Number(opts.textMax) : 120;
-        if (!parts || typeof parts !== 'object') return '-';
-        if (parts.hasSvg) {
-            return `<div style="display:flex;flex-direction:column;gap:0.2rem;">
-                ${parts.preamble ? `<div style="font-size:0.58rem;color:#6b7280;font-family:monospace;max-width:160px;overflow-wrap:anywhere;">${escapeHtml(_clipText(parts.preamble, preambleMax))}</div>` : ''}
-                <div style="width:80px;height:60px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);border-radius:3px;background:#fff;">
-                    <img src="${_svgDataUri(parts.svg)}" alt="svg preview" style="width:100%;height:100%;object-fit:contain;display:block;" />
-                </div>
-            </div>`;
-        }
-        return `<code style="font-size:0.66rem;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(_clipText(parts.raw, textMax) || '-')}</code>`;
-    }
-    function _responseRawDetails(parts, maxLen = 360) {
-        const raw = _clipText(parts && parts.raw ? parts.raw : '', maxLen);
-        if (!raw) return '';
-        return `<details style="margin-top:0.12rem;"><summary style="cursor:pointer;color:#9ca3af;font-size:0.62rem;">view text</summary><code style="display:block;margin-top:0.15rem;font-size:0.62rem;white-space:pre-wrap;overflow-wrap:anywhere;max-width:180px;">${escapeHtml(raw)}</code></details>`;
-    }
-    function _expectedFromProbeRow(p) {
-        if (!p || typeof p !== 'object') return 'none';
-        const baked = String(p.expected || '').trim();
-        if (baked) return baked;
-        const parts = [];
-        if (p.expect_shape) parts.push(`shape=${p.expect_shape}`);
-        if (p.expect_palette) parts.push(`palette=${p.expect_palette}`);
-        if (p.expect_style) parts.push(`style=${p.expect_style}`);
-        const contains = p.expect_contains || p.expect_contains_all;
-        if (Array.isArray(contains) && contains.length) parts.push(`contains=${contains.slice(0, 4).join(',')}`);
-        else if (typeof contains === 'string' && contains.trim()) parts.push(`contains=${contains.trim()}`);
-        const forbid = p.expect_forbid;
-        if (Array.isArray(forbid) && forbid.length) parts.push(`forbid=${forbid.slice(0, 4).join(',')}`);
-        else if (typeof forbid === 'string' && forbid.trim()) parts.push(`forbid=${forbid.trim()}`);
-        return parts.length ? parts.join('; ') : 'none';
-    }
-
-    // ── Build rows ─────────────────────────────────────────────────────────
-    const rowsHtml = entries.map((e, idx) => {
-        const m = e.metrics || {};
-        const prev = idx > 0 ? entries[idx - 1] : null;
-        const prevM = prev && prev.metrics && typeof prev.metrics === 'object' ? prev.metrics : {};
-        const lossStr = Number.isFinite(Number(e.final_loss)) ? Number(e.final_loss).toFixed(4) : '—';
-        const probeCount = Array.isArray(e.probe_results) ? e.probe_results.length : (m.n_probes || '—');
-        const nSamples = Number.isFinite(Number(m.n_samples)) ? Number(m.n_samples) : 1;
-        const sampleWarn = nSamples === 1
-            ? `<span title="Single-sample metrics are noisy; rerun with --n-samples 5"
-                     style="color:#f59e0b;font-size:0.62rem;margin-left:0.28rem;">⚠ n=1</span>`
-            : '';
-        const metricCells = metricColumns.map((col) => {
-            const currentVal = m[col.key];
-            const prevVal = prevM[col.key];
-            const higher = col.higher_is_better !== false;
-            let regressionMarker = '';
-            if (col.regression_watch && Number.isFinite(Number(currentVal)) && Number.isFinite(Number(prevVal)) && Number(prevVal) !== 0) {
-                const regress = higher ? (Number(currentVal) < Number(prevVal) * 0.7) : (Number(currentVal) > Number(prevVal) * 1.3);
-                if (regress) {
-                    regressionMarker = nSamples > 1
-                        ? ` <span title="Regression vs previous run (>30%)" style="color:#ef4444;font-weight:700;">↓</span>`
-                        : ` <span title="Potential regression vs previous run (low confidence at n=1)" style="color:#f59e0b;font-weight:700;">↓?</span>`;
-                }
-            } else if (col.key === 'adherence') {
-                const tagAdh = Number(m.tag_adherence);
-                const prevTagAdh = Number(prevM.tag_adherence);
-                const hasTagRegression = Number.isFinite(tagAdh) && Number.isFinite(prevTagAdh) && prevTagAdh > 0 && tagAdh < prevTagAdh * 0.7;
-                if (hasTagRegression) {
-                    regressionMarker = nSamples > 1
-                        ? ` <span title="Regression vs previous run: tag_adherence dropped >30%" style="color:#ef4444;font-weight:700;">↓</span>`
-                        : ` <span title="Potential tag_adherence regression vs previous run (n=1)" style="color:#f59e0b;font-weight:700;">↓?</span>`;
-                }
-            }
-            const baseCell = _metricCell(currentVal, col);
-            const failHint = _metricFailureHint(col.key, currentVal, col);
-            const hintMarker = failHint
-                ? ` <span title="${escapeHtml(failHint)}" style="color:#f87171;font-weight:700;">!</span>`
-                : '';
-            const suffix = `${regressionMarker}${hintMarker}`;
-            if (!suffix) return baseCell;
-            return baseCell.replace('</td>', `${suffix}</td>`);
-        }).join('');
-        return `<tr>
-            <td style="white-space:nowrap;">${_stagePill(e.stage, e.phase_label || e.stage)}</td>
-            <td style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(lossStr)}</td>
-            ${metricCells}
-            <td style="color:var(--text-muted);font-size:0.70rem;white-space:nowrap;">${escapeHtml(String(probeCount))} probes · ${escapeHtml(String(nSamples))} samples${sampleWarn}</td>
-        </tr>`;
-    }).join('');
-    const probeDetailsHtml = entries.map((e) => {
-        const phaseLabel = String(e.phase_label || e.stage || 'stage');
-        const runId = String(e.run_id || '-');
-        const probes = Array.isArray(e.probe_results) ? e.probe_results : [];
-        if (probes.length === 0) {
-            return `
-                <details style="margin-top:0.55rem;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.25rem 0.45rem;">
-                    <summary style="cursor:pointer;color:var(--text-muted);font-size:0.75rem;">${escapeHtml(phaseLabel)} · <code>${escapeHtml(runId)}</code> · no probe rows</summary>
-                </details>
-            `;
-        }
-        const showModelTagCol = probes.some((p) => {
-            const agg = p && typeof p.agg === 'object' ? p.agg : {};
-            return String(agg.dominant_tag_block || '').trim().length > 0;
-        });
-        const probeRows = probes.map((p) => {
-            const agg = p && typeof p.agg === 'object' ? p.agg : {};
-            const samples = Array.isArray(p.samples) ? p.samples : [];
-            const first = samples.length > 0 && samples[0] && typeof samples[0] === 'object' ? samples[0] : null;
-            const prompt = _clipText(p.prompt || '', 160);
-            const parts = _responseParts(first && first.response);
-            const dominantTag = _clipText(agg.dominant_tag_block || '-', 48);
-            const expected = _clipText(_expectedFromProbeRow(p), 96);
-            const probeDesc = String(
-                p.description
-                || (p.probe_id === 'ood_unlabeled'
-                    ? 'Out-of-distribution unlabeled probe: prompt is only <svg and tests unconditional robustness.'
-                    : '')
-            ).trim();
-            const nSamples = Number.isFinite(Number(samples.length)) ? samples.length : 0;
-            const firstPreview = _responsePreview(parts, { preambleMax: 80, textMax: 120 }) + _responseRawDetails(parts);
-            const responseCell = nSamples > 1
-                ? (() => {
-                    const allSamplesHtml = samples.map((sample, sampleIdx) => {
-                        const sampleParts = _responseParts(sample && sample.response);
-                        return `
-                            <div style="padding:0.25rem 0;border-top:${sampleIdx === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)'};">
-                                <div style="font-size:0.6rem;color:#9ca3af;margin-bottom:0.12rem;">sample ${sampleIdx + 1}/${nSamples}</div>
-                                ${_responsePreview(sampleParts, { preambleMax: 64, textMax: 100 })}${_responseRawDetails(sampleParts, 260)}
-                            </div>
-                        `;
-                    }).join('');
-                    return `
-                        <div style="display:flex;flex-direction:column;gap:0.25rem;">
-                            ${firstPreview}
-                            <details style="margin-top:0.1rem;">
-                                <summary style="cursor:pointer;color:#93c5fd;font-size:0.64rem;">view all ${nSamples} outputs</summary>
-                                <div style="margin-top:0.2rem;max-height:220px;overflow:auto;background:rgba(0,0,0,0.16);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:0.2rem 0.25rem;">
-                                    ${allSamplesHtml}
-                                </div>
-                            </details>
-                        </div>
-                    `;
-                })()
-                : firstPreview;
-            const probeMetricCells = probeMetricColumns.map((col) => {
-                const failHint = _metricFailureHint(col.key, agg[col.key], col);
-                const hintMarker = failHint
-                    ? ` <span title="${escapeHtml(failHint)}" style="color:#f87171;font-weight:700;">!</span>`
-                    : '';
-                return `<td>${_scoreBadge(agg[col.key], col)}${hintMarker}</td>`;
-            }).join('');
-            return `
-                <tr>
-                    <td title="${escapeHtml(probeDesc)}"><code>${escapeHtml(String(p.probe_id || '-'))}</code></td>
-                    <td title="${escapeHtml(probeDesc)}">${escapeHtml(String(p.type || '-'))}</td>
-                    <td title="${escapeHtml(String(p.prompt || ''))}" style="max-width:260px;overflow-wrap:anywhere;">${escapeHtml(prompt)}</td>
-                    <td title="${escapeHtml(_expectedFromProbeRow(p))}" style="max-width:220px;overflow-wrap:anywhere;">${escapeHtml(expected)}</td>
-                    <td style="text-align:right;">${nSamples}</td>
-                    ${probeMetricCells}
-                    ${showModelTagCol ? `<td title="${escapeHtml(String(agg.dominant_tag_block || '-'))}" style="max-width:170px;overflow-wrap:anywhere;">${escapeHtml(dominantTag)}</td>` : ''}
-                    <td title="${escapeHtml(parts.raw)}" style="max-width:160px;">${responseCell}</td>
-                </tr>
-            `;
-        }).join('');
-        const probeMetricHeaders = probeMetricColumns.map((col) => _thWithTip(String(col.label || col.key), col.description || '')).join('');
-        return `
-            <details style="margin-top:0.55rem;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.25rem 0.45rem;">
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.75rem;">
-                    ${escapeHtml(phaseLabel)} · <code>${escapeHtml(runId)}</code> · ${probes.length} probe(s)
-                </summary>
-                <div style="overflow-x:auto;margin-top:0.4rem;">
-                    <table style="min-width:1200px;font-size:0.73rem;">
-                        <thead><tr>
-                            <th title="Probe identifier from eval contract">Probe</th>
-                            <th title="Probe group/type from eval contract (e.g., svg_gen, ood, core)">Type</th>
-                            <th title="Input prompt used for this evaluation probe">Prompt</th>
-                            <th title="Expected behavior/constraints for this probe (from contract)">Expected</th>
-                            <th style="text-align:right;">N</th>
-                            ${probeMetricHeaders}
-                            ${showModelTagCol ? '<th>Model Tags</th>' : ''}
-                            <th title="Actual model output sampled for this stage/probe">Actual Output</th>
-                        </tr></thead>
-                        <tbody>${probeRows}</tbody>
-                    </table>
-                </div>
-            </details>
-        `;
-    }).join('');
-
-    // ── Summary header stats ───────────────────────────────────────────────
-    const latestEntry = entries[entries.length - 1];
-    const latestM = latestEntry && latestEntry.metrics ? latestEntry.metrics : {};
-    const headlineCards = headlineKeys.map((key) => {
-        const col = colByKey[key] || { key, label: key, format: 'pct', higher_is_better: true };
-        const value = latestM[key];
-        const label = _fmtMetric(value, col.format);
-        const color = label === '—' ? 'var(--text-primary)' : (col.format === 'text' ? 'var(--text-primary)' : _metricColor(value, col));
-        return `<div><span style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(String(col.label || key))}</span><br><span style="color:${color};font-size:1.1rem;font-weight:700;">${escapeHtml(label)}</span></div>`;
-    }).join('');
-    const sparkCol = colByKey[sparkKey] || { label: sparkKey, format: 'pct' };
-    const latestSparkLabel = _fmtMetric(latestM[sparkKey], sparkCol.format);
-
-    const sparkHtml = hasSparkline ? `
-        <div style="margin-top:0.6rem;margin-bottom:0.15rem;">
-            <span style="color:var(--text-muted);font-size:0.72rem;margin-right:0.5rem;">${escapeHtml(String(sparkCol.label || sparkKey))} progression →</span>
-            ${_sparkline(sparkValues)}
-            <span style="color:#4ade80;font-size:0.72rem;margin-left:0.5rem;">${escapeHtml(latestSparkLabel)}</span>
-        </div>` : '';
-
-    const genAt = matrix.generated_at ? matrix.generated_at.slice(0, 16).replace('T', ' ') + ' UTC' : '';
-    const stageMetricLegend = metricColumns.length
-        ? metricColumns.map((col) => `<code>${escapeHtml(String(col.label || col.key))}</code>`).join(', ')
-        : '<span style="color:var(--text-muted);">none</span>';
-    const probeMetricLegend = probeMetricColumns.length
-        ? probeMetricColumns.map((col) => `<code>${escapeHtml(String(col.label || col.key))}</code>`).join(', ')
-        : '<span style="color:var(--text-muted);">none</span>';
-
-    container.innerHTML = `
-        <div class="parity-section" style="margin-top:0.8rem;">
-            <h3><span class="badge badge-green">Eval Matrix</span> Stage Performance Progression</h3>
-            <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:0.7rem;">
-                ${headlineCards}
-                <div><span style="color:var(--text-muted);font-size:0.72rem;">Runs evaluated</span><br><span style="color:var(--text-primary);font-size:1.1rem;font-weight:700;">${entries.length}</span></div>
-            </div>
-            ${sparkHtml}
-            <div style="overflow-x:auto;margin-top:0.6rem;">
-                <table style="min-width:700px;">
-                    <thead><tr>
-                        <th>Phase</th>
-                        <th>Loss</th>
-                        ${metricColumns.map((col) => _thWithTip(String(col.label || col.key), col.description || '')).join('')}
-                        <th>Coverage</th>
-                    </tr></thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-            </div>
-            <div style="color:var(--text-muted);font-size:0.72rem;margin-top:0.55rem;">
-                Color: <span style="color:#4ade80;">■ good</span> &nbsp;
-                <span style="color:#fbbf24;">■ marginal</span> &nbsp;
-                <span style="color:#f87171;">■ needs work</span> &nbsp;·&nbsp;
-                Dataset type: ${escapeHtml(matrixDatasetType)} &nbsp;·&nbsp;
-                ${genAt ? `Generated: ${genAt}` : ''}
-            </div>
-            <details style="margin-top:0.6rem;">
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Metric guide (contract-driven columns)</summary>
-                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
-                    Columns, descriptions, and thresholds come from <code>stage_eval_matrix.json</code> (fed by your eval contract). Red <strong>!</strong> markers mean that metric is in a bad range; hover for a failure hint.
-                </div>
-                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
-                    <strong>Stage metrics:</strong> ${stageMetricLegend}
-                </div>
-                ${_metricGuideTable(metricColumns)}
-                <div style="margin-top:0.45rem;color:var(--text-muted);font-size:0.72rem;">
-                    <strong>Probe metrics:</strong> ${probeMetricLegend}
-                </div>
-                ${_metricGuideTable(probeMetricColumns)}
-            </details>
-            <details style="margin-top:0.8rem;">
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Probe details (prompt + sample response + per-probe scores)</summary>
-                <div style="margin-top:0.35rem;color:var(--text-muted);font-size:0.72rem;">
-                    Use this to audit exact prompts and model outputs for each stage. Add/edit probes in <code>RUN_DIR/eval_probes.json</code> (or pass <code>--probe-config</code> to eval runner).
-                </div>
-                <div style="margin-top:0.35rem;">${probeDetailsHtml}</div>
-            </details>
-            <details style="margin-top:0.8rem;">
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:0.76rem;">Regenerate eval matrix</summary>
-                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.4rem;">${escapeHtml(evalCmd)}</pre>
-                <pre style="font-size:0.76rem;white-space:pre-wrap;">${escapeHtml(evalCmd.replace('--all-stages', '--stage sft --stage-pass 4 --n-samples 5'))}</pre>
-            </details>
-        </div>
-    `;
-}
-
-
 function renderTrainingDashboard(files) {
     const panel = document.getElementById('train-dashboard');
     if (!panel) return;
@@ -18389,7 +17855,6 @@ function renderTrainingDashboard(files) {
             <div id="trainSweepTable"></div>
         </div>
         <div id="trainDataPipelineSection"></div>
-        <div id="trainEvalMatrixSection"></div>
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-orange">Runbook</span> Operator Commands (Copy/Paste)</h3>
             <p style="color:var(--text-muted);margin-bottom:0.6rem;">Producer = CLI writes run_dir artifacts, viewer consumes run_dir.</p>
@@ -18460,7 +17925,6 @@ function renderTrainingDashboard(files) {
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
         sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
         renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
-        renderStageEvalMatrix(document.getElementById('trainEvalMatrixSection'), files);
         return;
     }
 
@@ -18496,7 +17960,6 @@ function renderTrainingDashboard(files) {
     `;
 
     renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
-    renderStageEvalMatrix(document.getElementById('trainEvalMatrixSection'), files);
 }
 
 /* ===== training_tabs.js ===== */
@@ -18728,6 +18191,717 @@ function resolveDataLab(files) {
     return dataLab;
 }
 
+function normalizeEvalMetricColumns(matrix) {
+    const cols = Array.isArray(matrix?.metric_columns) ? matrix.metric_columns : [];
+    return cols
+        .filter((c) => c && typeof c === 'object' && String(c.key || '').trim())
+        .map((c) => ({
+            key: String(c.key || '').trim(),
+            label: String(c.label || c.key || '').trim(),
+            format: String(c.format || 'pct').trim().toLowerCase(),
+            higher_is_better: c.higher_is_better !== false,
+        }));
+}
+
+function headlineEvalScore(entry, metricKeys, metricColsByKey) {
+    const metrics = entry && typeof entry.metrics === 'object' ? entry.metrics : {};
+    const values = metricKeys
+        .map((key) => {
+            const raw = toNum(metrics[key], NaN);
+            if (!Number.isFinite(raw)) return NaN;
+            const col = metricColsByKey[key] || {};
+            return col.higher_is_better === false ? (1 - raw) : raw;
+        })
+        .filter((v) => Number.isFinite(v));
+    if (values.length === 0) return NaN;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function formatEvalMetricValue(value, format = 'pct') {
+    const n = toNum(value, NaN);
+    if (!Number.isFinite(n)) return '—';
+    if (format === 'int') return String(Math.round(n));
+    if (format === 'float') return n.toFixed(3);
+    if (format === 'text') return String(value ?? '—');
+    return `${(n * 100).toFixed(0)}%`;
+}
+
+function buildDataPrepDiagnosisSection(files, pipeline) {
+    const runCtx = getRunContext();
+    const runDir = runCtx.runDir || '';
+    const matrix = files.stage_eval_matrix && typeof files.stage_eval_matrix === 'object'
+        ? files.stage_eval_matrix
+        : null;
+    const datasetType = String((matrix && matrix.dataset_type) || 'unknown').trim().toLowerCase() || 'unknown';
+    const provenanceAuditCmd = runDir
+        ? `python3 version/v7/scripts/audit_train_token_provenance_v7.py --run ${quoteShell(runDir)} --preview-lines 2`
+        : 'python3 version/v7/scripts/audit_train_token_provenance_v7.py --run <run_dir> --preview-lines 2';
+    const reportCardPath = runDir ? `${runDir}/svg_training_report_card.html` : '<run_dir>/svg_training_report_card.html';
+    const reportCardCmd = runDir
+        ? `python3 version/v7/scripts/build_svg_training_report_card_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
+        : 'python3 version/v7/scripts/build_svg_training_report_card_v7.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
+    const reportHref = runDir ? encodeURI(`file://${reportCardPath}`) : '';
+    const lossEntries = Array.isArray(pipeline?.stage_loss_history?.entries)
+        ? pipeline.stage_loss_history.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const lossByPhase = Object.fromEntries(lossEntries.map((row) => [String(row.phase_label || ''), row]));
+
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">Prep Check</span> Dataset Audit + Deep Diagnosis</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    Use the provenance audit before long runs, and generate a standalone diagnosis report after stage eval to understand what the model actually learned.
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.6rem;margin-top:0.6rem;">
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                        <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">PRE-RUN PROVENANCE AUDIT</div>
+                        <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.35rem;">Confirms raw dataset path, token file path, and cross-artifact consistency before you trust a run.</div>
+                        <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(provenanceAuditCmd)}</pre>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                        <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">POST-RUN DIAGNOSIS</div>
+                        <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:0.35rem;">Generates a stage-by-stage report with outputs, metrics, and dataset-vs-target gaps.</div>
+                        <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(reportCardCmd)}</pre>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const entries = [...matrix.entries].sort((a, b) => (toNum(a.run_order, 0) - toNum(b.run_order, 0)));
+    const metricCols = normalizeEvalMetricColumns(matrix);
+    const metricColsByKey = Object.fromEntries(metricCols.map((col) => [col.key, col]));
+    const headlineKeysRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
+    const headlineKeys = headlineKeysRaw
+        .map((key) => String(key || '').trim())
+        .filter((key) => key && metricColsByKey[key]);
+    const primaryKeys = headlineKeys.length > 0
+        ? headlineKeys.slice(0, 3)
+        : metricCols.slice(0, 3).map((col) => col.key);
+    const scored = entries.map((entry) => ({
+        entry,
+        score: headlineEvalScore(entry, primaryKeys, metricColsByKey),
+    }));
+    const bestRow = [...scored]
+        .filter((row) => Number.isFinite(row.score))
+        .sort((a, b) => b.score - a.score)[0] || null;
+    const latestRow = scored[scored.length - 1] || null;
+    const bestEntry = bestRow ? bestRow.entry : null;
+    const latestEntry = latestRow ? latestRow.entry : null;
+    const bestPhase = bestEntry ? String(bestEntry.phase_label || '') : '';
+    const latestPhase = latestEntry ? String(latestEntry.phase_label || '') : '';
+    const bestDataset = bestPhase && lossByPhase[bestPhase] ? String(lossByPhase[bestPhase].dataset_name || '') : '';
+    const latestDataset = latestPhase && lossByPhase[latestPhase] ? String(lossByPhase[latestPhase].dataset_name || '') : '';
+    const delta = bestRow && latestRow && Number.isFinite(bestRow.score) && Number.isFinite(latestRow.score)
+        ? (latestRow.score - bestRow.score)
+        : NaN;
+    const scoreStatus = !Number.isFinite(delta)
+        ? { label: 'unknown', color: '#9ca3af', note: 'Need numeric eval columns to compare best vs latest.' }
+        : (delta >= -0.05
+            ? { label: 'close to best', color: '#4ade80', note: 'Latest run is within 5 points of the best practical checkpoint.' }
+            : { label: 'trailing best', color: '#f87171', note: 'Latest run is materially worse than the best practical checkpoint on headline quality metrics.' });
+    const datasetTypeNote = datasetType === 'svg'
+        ? 'SVG mode: use the standalone report for rendered outputs and target-asset grammar gaps.'
+        : `Dataset type: ${htmlEscape(datasetType)}. The standalone deep diagnosis is still SVG-specific today; eval matrix and provenance audit are generic.`;
+
+    const headlineSummary = primaryKeys.length > 0
+        ? primaryKeys.map((key) => {
+            const col = metricColsByKey[key] || { label: key, format: 'pct' };
+            return `<span style="white-space:nowrap;"><strong>${htmlEscape(col.label)}:</strong> ${formatEvalMetricValue(latestEntry?.metrics?.[key], col.format)}</span>`;
+        }).join(' · ')
+        : '<span style="color:var(--text-muted);">No headline metrics configured.</span>';
+
+    const actionNote = datasetType === 'svg'
+        ? 'Operator use: audit provenance before training, then use the deep diagnosis after eval to decide whether the next iteration needs richer asset pretrain, better spec-to-SVG SFT, or stricter canary gates.'
+        : 'Operator use: audit provenance before training, then rely on the eval matrix plus dataset-type-specific report card once that adapter exists.';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">Prep Check</span> Data Planning + Deep Diagnosis</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                This section is the operator bridge from dataset preparation to post-run interpretation.
+                GPT-3-style rigor here means: clean splits, stable formatting, explicit eval contracts, dedupe/contamination discipline, and promotion by task quality rather than loss alone.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.55rem;margin-bottom:0.6rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">BEST PRACTICAL CHECKPOINT</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:#e5e7eb;">${htmlEscape(bestPhase || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;word-break:break-word;">${htmlEscape(bestDataset || 'dataset unknown')}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">LATEST CHECKPOINT</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:#e5e7eb;">${htmlEscape(latestPhase || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;word-break:break-word;">${htmlEscape(latestDataset || 'dataset unknown')}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">HEADLINE QUALITY DELTA</div>
+                    <div style="font-size:0.96rem;font-weight:700;color:${scoreStatus.color};">${Number.isFinite(delta) ? `${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)} pts` : '—'}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(scoreStatus.note)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">LATEST HEADLINE METRICS</div>
+                    <div style="font-size:0.76rem;color:#d1d5db;line-height:1.55;">${headlineSummary}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${datasetTypeNote}</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.6rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7rem 0.8rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">PRE-RUN DATA / TOKEN PROVENANCE AUDIT</div>
+                    <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.55;margin-bottom:0.4rem;">
+                        Confirms the human-readable dataset, token file, and pipeline artifacts all agree before you trust a long run.
+                    </div>
+                    <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(provenanceAuditCmd)}</pre>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7rem 0.8rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">POST-RUN DEEP DIAGNOSIS</div>
+                    <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.55;margin-bottom:0.4rem;">
+                        Generates a standalone report with stage metrics, rendered sample outputs, and dataset-vs-target gaps.
+                    </div>
+                    <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(reportCardCmd)}</pre>
+                    ${reportHref ? `<div style="margin-top:0.35rem;font-size:0.72rem;"><a href="${htmlEscape(reportHref)}" target="_blank" rel="noopener" style="color:#93c5fd;">Open report card if generated</a></div>` : ''}
+                </div>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${actionNote}</div>
+        </div>
+    `;
+}
+
+function buildDataLabParitySection(files) {
+    const runCtx = getRunContext();
+    const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+    const parityCmd = runCtx.runDir
+        ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+        : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+    const rows = parseParityRows(files.training_parity);
+    const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
+    const e2e = trainE2EState(trainE2E);
+    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
+        ? files.training_parity_regimen
+        : {};
+    const regimenStatus = String(regimen.status || '').toLowerCase();
+    const regimenSummary = regimen.summary && typeof regimen.summary === 'object' ? regimen.summary : {};
+    const allCkOnly = rows.length > 0 && rows.every((r) => String(r.worst_param || '').toLowerCase() === 'ck_only');
+    const openTrackerButton = `
+        <button type="button" onclick="showTab('train-parity')" style="margin-top:0.45rem;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);color:#93c5fd;border-radius:6px;padding:0.32rem 0.65rem;font-size:0.72rem;cursor:pointer;">
+            Open Full Parity Tracker
+        </button>
+    `;
+
+    if (allCkOnly) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">PyTorch Parity Gate</span> CK-Only Mode</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    This run has no PyTorch reference process. Downstream loss and quality metrics may still be interesting, but they are not numerically anchored to a reference backend.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(parityCmd)}</pre>
+                ${openTrackerButton}
+            </div>
+        `;
+    }
+
+    if (rows.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-orange">PyTorch Parity Gate</span> Missing training_parity.json</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    If CK vs PyTorch is not checked, treat later training conclusions as provisional. Generate parity telemetry in this run directory and regenerate the report.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(parityCmd)}</pre>
+                ${openTrackerButton}
+            </div>
+        `;
+    }
+
+    const worstParity = rows.reduce((m, row) => Math.max(m, toNum(row.max_param_diff, 0)), 0);
+    const lastRow = rows[rows.length - 1] || {};
+    const parityTone = worstParity > 1e-3 ? 'bad' : (worstParity > 1e-5 ? 'warn' : 'good');
+    const parityColor = parityTone === 'bad' ? '#f87171' : (parityTone === 'warn' ? '#fbbf24' : '#4ade80');
+    const parityState = parityTone === 'bad' ? 'diverged'
+        : (parityTone === 'warn' ? 'drift elevated' : 'stable');
+    const parityWhy = parityTone === 'bad'
+        ? 'Numeric divergence is large enough that downstream quality conclusions are not trustworthy until parity is fixed.'
+        : (parityTone === 'warn'
+            ? 'Parity exists but drift is elevated. This is still usable for iteration, but it should block promotion.'
+            : 'CK vs PyTorch drift is currently low; later failures are more likely data-fit or task-contract issues.');
+    const e2eColor = e2e.pass === true ? '#4ade80' : (e2e.pass === false ? '#f87171' : '#9ca3af');
+    const regimenColor = regimenStatus === 'pass' ? '#4ade80' : (regimenStatus === 'fail' ? '#f87171' : '#9ca3af');
+    const lastStep = Number.isFinite(Number(lastRow.step)) ? Number(lastRow.step).toLocaleString() : '—';
+    const rowCount = rows.length.toLocaleString();
+    const regimenProgress = Number.isFinite(Number(regimenSummary.passed_stages)) && Number.isFinite(Number(regimenSummary.total_stages))
+        ? `${Number(regimenSummary.passed_stages)}/${Number(regimenSummary.total_stages)} stages`
+        : 'stage counts unavailable';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-blue">PyTorch Parity Gate</span> CK vs PyTorch Summary</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                Keep parity visible in Data Lab. If this is broken, later loss, SVG validity, and adherence results are suspect. The full step-by-step breakdown still lives in <strong style="color:#d1d5db;">Does It Match PyTorch?</strong>.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.55rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">WORST PARAM DIFF</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${parityColor};">${fmtExp(worstParity, 2)}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(parityState)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LAST PARITY STEP</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(lastStep)}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">rows logged: ${htmlEscape(rowCount)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TRAIN E2E</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${e2eColor};">${htmlEscape(e2e.label || '—')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">end-to-end training parity gate</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">PARITY REGIMEN</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${regimenColor};">${htmlEscape(regimenStatus ? regimenStatus.toUpperCase() : 'MISSING')}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">${htmlEscape(regimenProgress)}</div>
+                </div>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${htmlEscape(parityWhy)}</div>
+            ${openTrackerButton}
+        </div>
+    `;
+}
+
+function buildDataLabReadinessSection(files) {
+    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
+        ? files.training_parity_regimen
+        : {};
+    const regimenStages = normalizeRegimenStages(regimen);
+    if (regimenStages.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">Training Readiness</span> Parity Gate - Stage-by-Stage</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    No parity regimen stages are loaded. Generate <code>training_parity_regimen_latest.json</code> to restore the A/B/C/D/E/F readiness cards.
+                </div>
+            </div>
+        `;
+    }
+
+    const regimenOverall = regimenState(regimen, regimenStages);
+    const abcGate = regimenGroupState(regimenStages, ['A', 'B', 'C']);
+    const defGate = regimenGroupState(regimenStages, ['D', 'E', 'F']);
+    const criticalFails = ['A1', 'D1', 'E1', 'F1'].filter((id) => {
+        const row = regimenStages.find((stage) => String(stage.id || '').toUpperCase() === id);
+        return row && String(row.status || '').toUpperCase() !== 'PASS';
+    });
+
+    const catalog = {
+        A1: {
+            group: 'A - Baseline Kernels',
+            name: 'Fwd / Bwd / SGD',
+            tests: 'Single micro-step forward+backward+SGD update. Lowest-bar numeric smoke test before spending training budget.',
+            why: 'If A1 fails, basic forward/backward math is broken.',
+        },
+        A3: {
+            group: 'A - Baseline Kernels',
+            name: 'Backend Xray',
+            tests: 'Swap rmsnorm / swiglu / loss backends one at a time on identical weights to isolate drift source.',
+            why: 'This localizes divergence to a specific kernel family quickly.',
+        },
+        A4: {
+            group: 'A - Baseline Kernels',
+            name: 'AdamW Strict Sentinel',
+            tests: 'Fixed strict AdamW sentinel on a tiny immutable model with locked tolerances.',
+            why: 'This is the stable early warning for optimizer regressions.',
+        },
+        D1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Backprop Stitch',
+            tests: 'Generated C forward+backward on a real sequence must match PyTorch gradients.',
+            why: 'This is the first direct gate on the generated runtime that actually trains.',
+        },
+        D2: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Stitch Multi-step',
+            tests: 'Generated C multi-step train loop with grad_accum enabled.',
+            why: 'This checks the real C training loop instead of only the Python harness.',
+        },
+        E1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Replay Determinism',
+            tests: 'Re-running the same generated-C step should be bit-identical.',
+            why: 'Non-determinism silently poisons gradient accumulation and replay.',
+        },
+        F1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Runtime Accum',
+            tests: 'Accumulated generated-C gradients over micro-steps must match a single full-batch gradient.',
+            why: 'If F1 fails, the runtime that actually trains is not trustworthy.',
+        },
+    };
+
+    for (const row of regimenStages) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (/^B\d+$/.test(id) && !catalog[id]) {
+            const g = id.slice(1);
+            catalog[id] = {
+                group: 'B - Grad Accum',
+                name: `AdamW g=${g}`,
+                tests: `AdamW with grad_accum=${g}. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.`,
+                why: `Confirms gradient averaging is correct for ${g}x effective batch size.`,
+            };
+        }
+        if (/^C\d+$/.test(id) && !catalog[id]) {
+            catalog[id] = {
+                group: 'C - Stability',
+                name: String(row.name || id),
+                tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+                why: 'These catch issues that do not show up in the short A/B canaries.',
+            };
+        }
+    }
+
+    const groupOrder = ['D/E/F - Generated C Runtime', 'A - Baseline Kernels', 'B - Grad Accum', 'C - Stability'];
+    const byGroup = {};
+    groupOrder.forEach((group) => { byGroup[group] = []; });
+    regimenStages.forEach((row) => {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (!id) return;
+        const info = catalog[id] || {
+            group: 'Other',
+            name: id,
+            tests: String(row.name || ''),
+            why: '',
+        };
+        if (!byGroup[info.group]) byGroup[info.group] = [];
+        byGroup[info.group].push({ id, row, info });
+    });
+
+    const fmtDur = (seconds) => {
+        const n = Number(seconds);
+        if (!Number.isFinite(n)) return '';
+        return n < 60 ? `${n.toFixed(1)}s` : `${(n / 60).toFixed(1)}m`;
+    };
+    const banner = (() => {
+        if (regimenOverall.pass === true) {
+            return {
+                color: '#6ee7b7',
+                text: 'All gate stages passing - production runtime verified, code is ready to train',
+            };
+        }
+        if (criticalFails.length > 0) {
+            return {
+                color: '#fca5a5',
+                text: `Critical gates failing (${criticalFails.join(', ')}) - do not start a long training run`,
+            };
+        }
+        return {
+            color: '#fbbf24',
+            text: 'Some gates failing - review A/B/C/D/E/F results before committing training budget',
+        };
+    })();
+
+    const groupHtml = groupOrder.map((group) => {
+        const items = byGroup[group] || [];
+        if (items.length === 0) return '';
+        const passCount = items.filter(({ row }) => String(row.status || '').toUpperCase() === 'PASS').length;
+        const groupColor = passCount === items.length ? '#6ee7b7' : (passCount === 0 ? '#fca5a5' : '#fbbf24');
+        const cards = items.map(({ id, row, info }) => {
+            const pass = String(row.status || '').toUpperCase() === 'PASS';
+            const border = pass ? '#47b475' : '#f87171';
+            const bg = pass ? 'rgba(71,180,117,0.07)' : 'rgba(248,113,113,0.07)';
+            const metrics = row && typeof row.metrics === 'object' ? row.metrics : {};
+            const metricBits = [];
+            const lossDiff = Number(metrics.max_loss_abs_diff);
+            const meanParam = Number(metrics.final_param_mean_abs_diff);
+            const maxParam = Number(metrics.final_param_max_abs_diff);
+            const optimizerSteps = Number(metrics.optimizer_steps);
+            if (Number.isFinite(lossDiff)) metricBits.push(`lossΔ=${lossDiff.toExponential(2)}`);
+            if (Number.isFinite(meanParam)) metricBits.push(`mean_paramΔ=${meanParam.toExponential(2)}`);
+            else if (Number.isFinite(maxParam)) metricBits.push(`paramΔ=${maxParam.toExponential(2)}`);
+            if (Number.isFinite(optimizerSteps)) metricBits.push(`${Math.round(optimizerSteps)} opt steps`);
+            const notes = Array.isArray(row.notes) ? row.notes.filter(Boolean) : [];
+            const note = notes.length > 0 ? String(notes[notes.length - 1]) : '';
+            return `
+                <div style="border:1px solid ${border};border-radius:6px;padding:0.5rem 0.65rem;background:${bg};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.03);flex:1 1 215px;min-width:205px;max-width:360px;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.16rem;">
+                        ${statusPill(id, pass ? 'green' : 'red')}
+                        <span style="font-size:0.8rem;font-weight:700;color:#e5e7eb;">${htmlEscape(info.name)}</span>
+                        ${fmtDur(row.duration_s) ? `<span style="color:#6b7280;font-size:0.67rem;margin-left:auto;">${htmlEscape(fmtDur(row.duration_s))}</span>` : ''}
+                    </div>
+                    <div style="font-size:0.71rem;color:#9ca3af;line-height:1.42;">${htmlEscape(info.tests)}</div>
+                    ${metricBits.length > 0 ? `<div style="font-size:0.69rem;color:#60a5fa;margin-top:0.22rem;font-family:monospace;">${htmlEscape(metricBits.join(' · '))}</div>` : ''}
+                    ${note ? `<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">⚠ ${htmlEscape(note)}</div>` : ''}
+                    <div style="font-size:0.67rem;color:#a78bfa;margin-top:0.18rem;line-height:1.35;">↳ ${htmlEscape(info.why)}</div>
+                </div>
+            `;
+        }).join('');
+        return `
+            <div style="margin-bottom:0.9rem;">
+                <div style="font-size:0.72rem;font-weight:700;color:${groupColor};margin-bottom:0.38rem;letter-spacing:0.03em;text-transform:uppercase;">
+                    ${htmlEscape(group)} <span style="opacity:0.6;font-weight:400;text-transform:none;">(${passCount}/${items.length} pass)</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${cards}</div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge ${regimenOverall.pass === true ? 'badge-green' : 'badge-blue'}">Training Readiness</span> Parity Gate - Stage-by-Stage</h3>
+            <div style="border-radius:6px;padding:0.55rem 0.9rem;margin-bottom:0.7rem;font-size:0.84rem;font-weight:700;color:${banner.color};border:1px solid ${banner.color};background:${banner.color}1a;">
+                ${htmlEscape(banner.text)}
+            </div>
+            <div style="font-size:0.71rem;color:#6b7280;margin-bottom:0.7rem;line-height:1.6;">
+                Each card shows <strong style="color:#9ca3af;">what the test verifies</strong> · <span style="color:#60a5fa;font-family:monospace;">key metrics</span> · <span style="color:#a78bfa;">why it matters</span>.
+                <span style="color:#6ee7b7;font-weight:700;">D/E/F = production gate</span><span style="color:#9ca3af;"> — generated C runtime, all must pass before training.</span>
+                <span style="color:#9ca3af;"> A/B/C = kernel isolation (diagnostic); useful for root-cause, but not a substitute for D/E/F.</span>
+                <div style="margin-top:0.2rem;">
+                    • regimen(A/B/C): <strong>${htmlEscape(abcGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(abcGate.detail)}</span><br/>
+                    • generated-runtime(D/E/F): <strong>${htmlEscape(defGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(defGate.detail)}</span>
+                </div>
+            </div>
+            ${groupHtml}
+        </div>
+    `;
+}
+
+function buildDataLabEvalSummarySection(files, pipeline) {
+    const matrix = files.stage_eval_matrix && typeof files.stage_eval_matrix === 'object'
+        ? files.stage_eval_matrix
+        : null;
+    const formatLoss = (value) => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '—';
+        if (Math.abs(n) >= 10) return n.toFixed(2);
+        if (Math.abs(n) >= 1) return n.toFixed(3);
+        return n.toFixed(4);
+    };
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        const runCtx = getRunContext();
+        const evalCmd = runCtx.runDir
+            ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runCtx.runDir)} --all-stages --n-samples 5`
+            : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-green">Eval Matrix</span> Missing stage_eval_matrix.json</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    Stage quality exists only after eval runs. Generate the matrix before trusting stage-by-stage task quality.
+                </div>
+                <pre style="font-size:0.76rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(evalCmd)}</pre>
+            </div>
+        `;
+    }
+
+    const entries = [...matrix.entries]
+        .filter((row) => row && typeof row === 'object')
+        .sort((a, b) => {
+            const ao = Number(a.run_order);
+            const bo = Number(b.run_order);
+            if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+            return String(a.phase_label || '').localeCompare(String(b.phase_label || ''));
+        });
+    const metricCols = normalizeEvalMetricColumns(matrix);
+    const metricColsByKey = Object.fromEntries(metricCols.map((col) => [col.key, col]));
+    const headlineKeysRaw = Array.isArray(matrix.headline_metrics) ? matrix.headline_metrics : [];
+    const primaryKeys = headlineKeysRaw
+        .map((key) => String(key || '').trim())
+        .filter((key) => key && metricColsByKey[key]);
+    const summaryKeys = [];
+    for (const key of primaryKeys) {
+        if (!summaryKeys.includes(key)) summaryKeys.push(key);
+        if (summaryKeys.length >= 3) break;
+    }
+    if (!summaryKeys.includes('prefix_integrity') && metricColsByKey.prefix_integrity) summaryKeys.push('prefix_integrity');
+    while (summaryKeys.length < 4) {
+        const next = metricCols.find((col) => !summaryKeys.includes(col.key));
+        if (!next) break;
+        summaryKeys.push(next.key);
+    }
+
+    const lossEntries = Array.isArray(pipeline?.stage_loss_history?.entries)
+        ? pipeline.stage_loss_history.entries.filter((row) => row && typeof row === 'object')
+        : [];
+    const lossByPhase = Object.fromEntries(lossEntries.map((row) => [String(row.phase_label || ''), row]));
+
+    const scored = entries.map((entry) => ({
+        entry,
+        score: headlineEvalScore(entry, primaryKeys.length > 0 ? primaryKeys : summaryKeys, metricColsByKey),
+    }));
+    const best = [...scored]
+        .filter((row) => Number.isFinite(row.score))
+        .sort((a, b) => b.score - a.score)[0] || null;
+    const latest = scored[scored.length - 1] || null;
+    const latestMetrics = latest && latest.entry && latest.entry.metrics && typeof latest.entry.metrics === 'object'
+        ? latest.entry.metrics
+        : {};
+    const latestSamples = Number(latestMetrics.n_samples);
+    const latestValid = toNum(latestMetrics.valid_svg_rate, NaN);
+    const latestAdh = toNum(latestMetrics.adherence, NaN);
+    const latestOod = toNum(latestMetrics.ood_robustness, NaN);
+    const latestClosure = toNum(latestMetrics.closure_success_rate, NaN);
+    const latestTagAdh = toNum(latestMetrics.tag_adherence, NaN);
+    const bestMetrics = best && best.entry && best.entry.metrics && typeof best.entry.metrics === 'object'
+        ? best.entry.metrics
+        : {};
+    const bestAdh = toNum(bestMetrics.adherence, NaN);
+    const bestTagAdh = toNum(bestMetrics.tag_adherence, NaN);
+
+    const rows = entries.map((entry) => {
+        const phase = String(entry.phase_label || '—');
+        const metrics = entry.metrics && typeof entry.metrics === 'object' ? entry.metrics : {};
+        const lossRow = lossByPhase[phase] && typeof lossByPhase[phase] === 'object' ? lossByPhase[phase] : null;
+        const finalLoss = lossRow && Number.isFinite(Number(lossRow.final_loss)) ? formatLoss(lossRow.final_loss) : '—';
+        const nSamples = Number(metrics.n_samples);
+        const sampleLabel = Number.isFinite(nSamples) ? `${Math.round(nSamples)}` : '—';
+        const sampleWarn = Number.isFinite(nSamples) && nSamples === 1
+            ? ' <span title="Single-sample eval — rerun with --n-samples 5 for stronger evidence" style="color:#f59e0b;">⚠</span>'
+            : '';
+        const valueCells = summaryKeys.map((key) => {
+            const col = metricColsByKey[key] || { label: key, format: 'pct', higher_is_better: true };
+            const raw = toNum(metrics[key], NaN);
+            const ok = Number.isFinite(raw)
+                ? (col.higher_is_better === false ? raw <= 0.2 : raw >= 0.7)
+                : null;
+            const color = ok === null ? '#9ca3af' : (ok ? '#4ade80' : '#f87171');
+            return `<td style="color:${color};font-weight:700;">${htmlEscape(formatEvalMetricValue(metrics[key], col.format))}</td>`;
+        }).join('');
+        return `
+            <tr>
+                <td><span class="badge badge-blue">${htmlEscape(phase)}</span></td>
+                <td>${htmlEscape(finalLoss)}</td>
+                ${valueCells}
+                <td>${sampleLabel}${sampleWarn}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const bestPhase = best && best.entry ? String(best.entry.phase_label || '—') : '—';
+    const latestPhase = latest && latest.entry ? String(latest.entry.phase_label || '—') : '—';
+    const gateRows = [];
+    if (metricColsByKey.adherence || metricColsByKey.valid_svg_rate || metricColsByKey.tag_adherence || metricColsByKey.closure_success_rate) {
+        const hasSamples = Number.isFinite(latestSamples);
+        gateRows.push({
+            gate: 'Canary Adherence',
+            rule: 'adherence >= 70%',
+            current: Number.isFinite(latestAdh) ? `${formatEvalMetricValue(latestAdh, 'pct')} (${htmlEscape(latestPhase)})` : 'missing',
+            status: Number.isFinite(latestAdh) ? (latestAdh >= 0.70 ? 'pass' : 'fail') : 'warn',
+            action: Number.isFinite(latestAdh) && latestAdh >= 0.70 ? 'Control intent is holding.' : 'Do not launch long training until prompt/control adherence is repaired.',
+        });
+        const adhDrop = Number.isFinite(bestAdh) && Number.isFinite(latestAdh) ? (bestAdh - latestAdh) : NaN;
+        gateRows.push({
+            gate: 'Regression Guard (Adh)',
+            rule: 'drop <= 15% vs best stage',
+            current: Number.isFinite(adhDrop) ? `${(adhDrop * 100).toFixed(0)} pts vs ${htmlEscape(bestPhase)}` : 'missing baseline',
+            status: Number.isFinite(adhDrop) ? (adhDrop <= 0.15 ? 'pass' : 'fail') : 'warn',
+            action: Number.isFinite(adhDrop) && adhDrop <= 0.15 ? 'Safe to promote from a control-following standpoint.' : 'Rollback or rebalance the dataset before the next overnight run.',
+        });
+        if (metricColsByKey.tag_adherence) {
+            const tagDrop = Number.isFinite(bestTagAdh) && Number.isFinite(latestTagAdh) ? (bestTagAdh - latestTagAdh) : NaN;
+            gateRows.push({
+                gate: 'Regression Guard (Tag)',
+                rule: 'drop <= 15% vs best stage',
+                current: Number.isFinite(latestTagAdh)
+                    ? `${formatEvalMetricValue(latestTagAdh, 'pct')}${Number.isFinite(tagDrop) ? ` (${tagDrop > 0 ? '-' : '+'}${Math.abs(tagDrop * 100).toFixed(0)} pts vs ${htmlEscape(bestPhase)})` : ''}`
+                    : 'missing',
+                status: Number.isFinite(tagDrop) ? (tagDrop <= 0.15 ? 'pass' : 'fail') : 'warn',
+                action: Number.isFinite(tagDrop) && tagDrop <= 0.15 ? 'Tag-conditioned behavior is stable enough to continue.' : 'Dataset/control tags are drifting; inspect prompt/output contract before continuing.',
+            });
+        }
+        if (metricColsByKey.valid_svg_rate || metricColsByKey.closure_success_rate) {
+            const structurePass = (!Number.isFinite(latestValid) || latestValid >= 0.95) && (!Number.isFinite(latestClosure) || latestClosure >= 0.95);
+            gateRows.push({
+                gate: 'Structure Gate',
+                rule: 'valid_svg >= 95% and closure >= 95%',
+                current: `${Number.isFinite(latestValid) ? `valid=${formatEvalMetricValue(latestValid, 'pct')}` : 'valid=—'} · ${Number.isFinite(latestClosure) ? `closure=${formatEvalMetricValue(latestClosure, 'pct')}` : 'closure=—'}`,
+                status: structurePass ? 'pass' : 'fail',
+                action: structurePass ? 'Output remains structurally valid.' : 'Fix SVG structure before reading deeper quality signals.',
+            });
+        }
+        gateRows.push({
+            gate: 'Sample Strength',
+            rule: 'n >= 5 stage samples',
+            current: hasSamples ? `${Math.round(latestSamples)} samples` : 'missing',
+            status: hasSamples ? (latestSamples >= 5 ? 'pass' : 'warn') : 'warn',
+            action: hasSamples && latestSamples >= 5 ? 'Enough signal for stage-level comparison.' : 'Rerun eval with `--n-samples 5` before making promotion decisions.',
+        });
+    }
+    const statusChip = (status) => {
+        if (status === 'pass') return '<span class="badge badge-green">PASS</span>';
+        if (status === 'fail') return '<span class="badge badge-orange">FAIL</span>';
+        return '<span class="badge">WARN</span>';
+    };
+    const gateTable = gateRows.length > 0
+        ? `<div style="margin-top:0.75rem;">
+                <div style="font-size:0.72rem;color:#9ca3af;margin-bottom:0.35rem;">
+                    Validation gates translate the metric table into operator decisions. They are SVG-aware only when the matching metrics exist; otherwise this block stays hidden.
+                </div>
+                <table style="font-size:0.75rem;">
+                    <thead>
+                        <tr>
+                            <th>Gate</th>
+                            <th>Rule</th>
+                            <th>Current</th>
+                            <th>Status</th>
+                            <th>Operator Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${gateRows.map((row) => `
+                            <tr>
+                                <td>${htmlEscape(row.gate)}</td>
+                                <td>${htmlEscape(row.rule)}</td>
+                                <td>${row.current}</td>
+                                <td>${statusChip(row.status)}</td>
+                                <td style="max-width:320px;overflow-wrap:anywhere;">${htmlEscape(row.action)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`
+        : '';
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge badge-green">Eval Matrix</span> Compact Stage Quality Summary</h3>
+            <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;margin-bottom:0.55rem;">
+                This is the compact operator view of task quality by stage. Use it before the large planning tables.
+                The standalone report card remains the deep proof page with per-prompt outputs.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.55rem;margin-bottom:0.55rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">BEST PRACTICAL</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(bestPhase)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST STAGE</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:#e5e7eb;">${htmlEscape(latestPhase)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST VALID / OOD</div>
+                    <div style="font-size:0.9rem;font-weight:700;color:#4ade80;">${htmlEscape(formatEvalMetricValue(latestValid, 'pct'))} · ${htmlEscape(formatEvalMetricValue(latestOod, 'pct'))}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">valid SVG · OOD robustness</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.75rem;">
+                    <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">LATEST ADHERENCE</div>
+                    <div style="font-size:0.98rem;font-weight:700;color:${Number.isFinite(latestAdh) && latestAdh >= 0.7 ? '#4ade80' : '#f87171'};">${htmlEscape(formatEvalMetricValue(latestAdh, 'pct'))}</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.15rem;">samples=${Number.isFinite(latestSamples) ? Math.round(latestSamples) : '—'}</div>
+                </div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="font-size:0.76rem;">
+                    <thead>
+                        <tr>
+                            <th>Phase</th>
+                            <th>Loss</th>
+                            ${summaryKeys.map((key) => `<th>${htmlEscape((metricColsByKey[key] || { label: key }).label)}</th>`).join('')}
+                            <th>Samples</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            ${gateTable}
+        </div>
+    `;
+}
+
 function htmlEscape(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -18761,6 +18935,10 @@ function renderDataLabPanel(files) {
     const tokenizerPreview = dataLab.tokenizer_preview && typeof dataLab.tokenizer_preview === 'object'
         ? dataLab.tokenizer_preview
         : (files.tokenizer_preview || {});
+    const parityGateSection = buildDataLabParitySection(files);
+    const readinessSection = buildDataLabReadinessSection(files);
+    const evalSummarySection = buildDataLabEvalSummarySection(files, pipeline);
+    const prepDiagnosisSection = buildDataPrepDiagnosisSection(files, pipeline);
     const activeStage = typeof pipeline.active_stage === 'string' && pipeline.active_stage.trim()
         ? pipeline.active_stage
         : 'pretrain';
@@ -18961,8 +19139,6 @@ function renderDataLabPanel(files) {
         if (!s) return '';
         if (s === 'stage_a') return 'pretrain';
         if (s === 'stage_b') return 'midtrain';
-        const m = s.match(/^(pretrain|midtrain|sft|dpo|grpo|ppo)(?:[_-]\d+)?$/);
-        if (m) return m[1];
         return s;
     }
 
@@ -18972,89 +19148,6 @@ function renderDataLabPanel(files) {
     const stageSequenceEntries = Array.isArray(stageSequence.entries)
         ? stageSequence.entries.filter((row) => row && typeof row === 'object')
         : [];
-    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
-        ? files.training_parity_regimen
-        : {};
-    const regimenSummary = regimen.summary && typeof regimen.summary === 'object'
-        ? regimen.summary
-        : {};
-    const regimenStages = Array.isArray(regimen.stages)
-        ? regimen.stages.filter((row) => row && typeof row === 'object')
-        : [];
-    const regimenStageById = {};
-    for (const row of regimenStages) {
-        const id = String(row.id || '').trim().toUpperCase();
-        if (!id) continue;
-        regimenStageById[id] = row;
-    }
-    const stageIsPass = (row) => row && String(row.status || '').toUpperCase() === 'PASS';
-    const stageIsFail = (row) => row && String(row.status || '').toUpperCase() === 'FAIL';
-    const scriptBaseFromStage = (row) => {
-        if (!row || !Array.isArray(row.command) || row.command.length < 2) return '';
-        const p = String(row.command[1] || '');
-        const parts = p.split('/');
-        return parts.length ? parts[parts.length - 1] : p;
-    };
-    const scriptsForStageIds = (ids) => {
-        const out = [];
-        for (const id of ids) {
-            const script = scriptBaseFromStage(regimenStageById[id]);
-            if (script && !out.includes(script)) out.push(script);
-        }
-        return out.join(', ');
-    };
-
-    const abcIds = regimenStages
-        .map((row) => String(row.id || '').trim().toUpperCase())
-        .filter((id) => /^[ABC]/.test(id));
-    const abcLoaded = abcIds.length > 0;
-    const abcFailedIds = abcIds.filter((id) => stageIsFail(regimenStageById[id]));
-    const abcPassed = abcLoaded && abcFailedIds.length === 0;
-    const abcFailed = abcLoaded && abcFailedIds.length > 0;
-    const abcScriptHint = scriptsForStageIds(abcIds) || 'run_training_parity_regimen_v7.py';
-    const regimenGateChip = abcPassed
-        ? statusPill('regimen(A/B/C): pass', 'green')
-        : (abcFailed ? statusPill('regimen(A/B/C): fail', 'red') : statusPill('regimen(A/B/C): missing', 'orange'));
-    const regimenGateTone = abcFailed ? '#fca5a5' : (abcPassed ? '#6ee7b7' : '#fcd34d');
-    const regimenGateDetail = abcPassed
-        ? `Harness parity regimen passed. script=${abcScriptHint}`
-        : (abcFailed
-            ? `Harness parity regimen failed${abcFailedIds.length ? ` (${abcFailedIds.join(', ')})` : ''}. script=${abcScriptHint}`
-            : 'Harness parity regimen not loaded yet.');
-
-    const dRow = regimenStageById.D1 || null;
-    const d2Row = regimenStageById.D2 || null;
-    const eRow = regimenStageById.E1 || null;
-    const fRow = regimenStageById.F1 || null;
-    const dPass = dRow ? stageIsPass(dRow) : ((files.backprop_stitch_runtime && files.backprop_stitch_runtime.passed === true) ? true : (files.backprop_stitch_runtime ? false : null));
-    const d2Pass = d2Row ? stageIsPass(d2Row) : null;
-    const ePass = eRow ? stageIsPass(eRow) : ((files.replay_determinism && files.replay_determinism.passed === true) ? true : (files.replay_determinism ? false : null));
-    const fPass = fRow ? stageIsPass(fRow) : ((files.replay_accum && files.replay_accum.passed === true) ? true : (files.replay_accum ? false : null));
-    const runtimeRows = [
-        { id: 'D1', pass: dPass },
-        ...(d2Row ? [{ id: 'D2', pass: d2Pass }] : []),
-        { id: 'E1', pass: ePass },
-        { id: 'F1', pass: fPass },
-    ];
-    const runtimeStates = runtimeRows.map((row) => row.pass);
-    const runtimeLoadedCount = runtimeStates.filter((x) => x === true || x === false).length;
-    const runtimeFailedIds = runtimeRows.filter((row) => row.pass === false).map((row) => row.id);
-    const runtimeExpectedCount = runtimeRows.length;
-    const runtimePassed = runtimeLoadedCount === runtimeExpectedCount && runtimeFailedIds.length === 0;
-    const runtimeFailed = runtimeFailedIds.length > 0;
-    const runtimeIds = runtimeRows.map((row) => row.id);
-    const runtimeIdLabel = runtimeIds.join('/');
-    const runtimeScriptHint = scriptsForStageIds(runtimeIds) || 'check_backprop_stitch_runtime_v7.py + replay checks';
-    const runtimeGateChip = runtimePassed
-        ? statusPill(`generated-runtime(${runtimeIdLabel}): pass`, 'green')
-        : (runtimeFailed ? statusPill(`generated-runtime(${runtimeIdLabel}): fail`, 'red') : statusPill(`generated-runtime(${runtimeIdLabel}): missing`, 'orange'));
-    const runtimeGateTone = runtimeFailed ? '#fca5a5' : (runtimePassed ? '#6ee7b7' : '#fcd34d');
-    const runtimeGateDetail = runtimePassed
-        ? `Generated-runtime stitch/replay gates passed (${runtimeIdLabel}). scripts=${runtimeScriptHint}`
-        : (runtimeFailed
-            ? `Generated-runtime stitch/replay gates failed (${runtimeFailedIds.join(', ')}). scripts=${runtimeScriptHint}`
-            : `Generated-runtime stitch/replay gates not fully loaded (${runtimeLoadedCount}/${runtimeExpectedCount}).`);
-
     const stageSeqMetaByStage = {};
     const orderedStages = [];
     const addOrderedStage = (rawStage, meta = null) => {
@@ -19173,27 +19266,13 @@ function renderDataLabPanel(files) {
         addOrderedStage('ppo');
     }
 
-    // Expanded flow: one card per completed entry + planned stages not yet run
-    const executedStageSet = new Set(sortedLossEntries.map((e) => normStageName(e.stage)));
+    const executedStageSet = new Set(sortedLossEntries.map((entry) => normStageName(entry.stage)));
     const plannedFlowItems = orderedStages
-        .filter((s) => !executedStageSet.has(normStageName(s)))
-        .map((s) => ({ _isPlanned: true, stage: normStageName(s), phase_label: s }));
-
-    const useExpandedFlow = sortedLossEntries.length > 0;
-    const expandedFlowItems = useExpandedFlow
+        .filter((stage) => !executedStageSet.has(normStageName(stage)))
+        .map((stage) => ({ _isPlanned: true, stage: normStageName(stage), phase_label: stage }));
+    const allFlowItems = sortedLossEntries.length > 0
         ? [...sortedLossEntries, ...plannedFlowItems]
-        : null;
-    const allFlowItems = expandedFlowItems || orderedStages.map((s) => ({ _isPlanned: true, stage: normStageName(s), phase_label: s }));
-    const flowLabelCounts = {};
-    const flowLabelSequence = allFlowItems.map((item) => {
-        const stage = normStageName(item.stage || item.phase_label || 'pretrain');
-        const rawPhaseLabel = item.phase_label || stage;
-        if (rawPhaseLabel === stage) {
-            flowLabelCounts[stage] = (flowLabelCounts[stage] || 0) + 1;
-            return flowLabelCounts[stage] > 1 ? `${stage}_${flowLabelCounts[stage]}` : stage;
-        }
-        return rawPhaseLabel;
-    });
+        : orderedStages.map((stage) => ({ _isPlanned: true, stage: normStageName(stage), phase_label: stage }));
 
     function fmtLoss(value) {
         const n = Number(value);
@@ -19225,105 +19304,122 @@ function renderDataLabPanel(files) {
     }
 
     const stageCardMeta = {};
-    const totalCards = allFlowItems.length;
-    let lastCompletedRunId = null;
+    const flowCardMeta = {};
     const flowCards = allFlowItems.map((item, idx) => {
-        const isPlannedItem = Boolean(item._isPlanned);
-        const stage = normStageName(item.stage || item.phase_label || 'pretrain');
-        const phaseLabel = flowLabelSequence[idx];
-
-        if (isPlannedItem) {
-            // Planned card — status/dataset from pipeline contract
-            const seqMeta = stageSeqMetaByStage[stage] || {};
-            const t = timelineByStage[stage] || {};
-            const status = String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned'));
-            const isActive = stage === activeStageKey;
-            const tone = stageTone(status);
-            const chip = statusPill(status, tone);
-            const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
-            const bg = isActive ? 'rgba(71,180,117,0.09)' : 'rgba(255,255,255,0.03)';
-            const bindDs = primaryBindingDataset(stage) || {};
-            const cat = catalogActiveByStage[stage] || {};
-            const dsName = bindDs.name || cat.name || null;
-            const covered = stageTokCoverage(stage);
-            const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
-            const dsPill = short
-                ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
-                : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">${status === 'planned' ? 'not assigned' : '—'}</div>`;
-            const covBadge = covered === false
-                ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#fb923c;">⚠ tok gap</div>`
-                : (covered === true && dsName ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>` : '');
-            const arts = (artifactByStage[stage] && Array.isArray(artifactByStage[stage].artifacts)) ? artifactByStage[stage].artifacts : [];
-
-            stageCardMeta[phaseLabel] = {
-                status, isActive, dsName, dsRows: bindDs.rows || cat.rows || null,
-                dsTok: bindDs.tokens || null, byteSize: bindDs.bytes || null,
-                sourcePath: bindDs.path || cat.path || null, rawSourcePath: bindDs.path || null,
-                tokenStreamPath: null, covered, artifacts: arts,
-                catNote: cat.note || null, lossRuns: [], latestLossRun: null, seq: idx + 1,
-                runId: null, parentRunId: null, expectedParentRunId: null, lineageStatus: 'unknown',
-            };
-
-            return `
-                <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(stage)}">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
-                        <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(phaseLabel)}</div>
-                        <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${totalCards}</div>
-                    </div>
-                    <div style="margin-top:0.22rem;">${chip}</div>
-                    ${dsPill}${covBadge}
-                    <div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>
-                    <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
-                </div>`;
-        }
-
-        // Completed / running entry card
-        const entry = item;
-        const entryStatus = stage === activeStageKey && idx === sortedLossEntries.length - 1 ? 'active' : 'completed';
-        const isActive = entryStatus === 'active';
-        const tone = stageTone(entryStatus);
-        const chip = statusPill(entryStatus, tone);
+        const isPlanned = Boolean(item && item._isPlanned);
+        const stage = normStageName(item && (item.stage || item.phase_label) || 'pretrain');
+        const rawPhaseLabel = String(item && (item.phase_label || item.stage) || stage || 'stage').trim();
+        const phaseLabel = rawPhaseLabel === stage
+            ? (() => {
+                const priorCount = allFlowItems.slice(0, idx + 1)
+                    .filter((row) => normStageName(row && (row.stage || row.phase_label) || '') === stage)
+                    .length;
+                return priorCount > 1 ? `${stage}_${priorCount}` : stage;
+            })()
+            : rawPhaseLabel;
+        const seqMeta = stageSeqMetaByStage[stage] && typeof stageSeqMetaByStage[stage] === 'object'
+            ? stageSeqMetaByStage[stage]
+            : {};
+        const strictRow = strictManifestMode && strictStageRowByStage[stage] && typeof strictStageRowByStage[stage] === 'object'
+            ? strictStageRowByStage[stage]
+            : null;
+        const t = timelineByStage[stage] || {};
+        const stageLossRuns = stageLossByStage[normStageName(stage)] || [];
+        const latestLossRun = !isPlanned && item && typeof item === 'object'
+            ? item
+            : (stageLossRuns.length > 0 ? stageLossRuns[stageLossRuns.length - 1] : null);
+        const status = isPlanned
+            ? (strictManifestMode
+                ? String((strictRow && strictRow.status) || (stage === activeStageKey ? 'active' : 'planned'))
+                : String(t.status || seqMeta.status || (stage === activeStageKey ? 'active' : 'planned')))
+            : String(stage === activeStageKey && idx === sortedLossEntries.length - 1 ? 'active' : 'completed');
+        const isActive = isPlanned
+            ? (strictManifestMode
+                ? Boolean((strictRow && strictRow.active === true) || stage === activeStageKey || status === 'active')
+                : Boolean(t.active === true || seqMeta.active === true || stage === activeStageKey))
+            : (status === 'active');
+        const tone = stageTone(status);
+        const chip = statusPill(status, tone);
         const border = isActive ? '2px solid rgba(71,180,117,0.6)' : '1px solid rgba(255,255,255,0.10)';
         const bg = isActive ? 'rgba(71,180,117,0.09)' : 'rgba(255,255,255,0.03)';
-        const dsName = entry.dataset_name || null;
+        const data = artifactByStage[stage] && typeof artifactByStage[stage] === 'object' ? artifactByStage[stage] : {};
+        const arts = Array.isArray(data.artifacts) ? data.artifacts : [];
+        const cat = catalogActiveByStage[stage] || {};
+        const prov = provByStage[stage] || {};
+        const bindDs = strictManifestMode
+            ? (() => {
+                const rows = strictRow && Array.isArray(strictRow.datasets)
+                    ? strictRow.datasets.filter((d) => d && typeof d === 'object')
+                    : [];
+                return rows.find((d) => d.status === 'ready') || rows[0] || {};
+            })()
+            : (primaryBindingDataset(stage) || {});
+        const dsName = strictManifestMode
+            ? ((latestLossRun && latestLossRun.dataset_name) || bindDs.name || null)
+            : ((latestLossRun && latestLossRun.dataset_name) || bindDs.name || data.dataset_name || cat.name || prov.dataset_name || null);
+        const covered = stageTokCoverage(stage);
+        const hasLoss = latestLossRun && Number.isFinite(Number(latestLossRun.first_loss)) && Number.isFinite(Number(latestLossRun.final_loss));
+        const dropPct = hasLoss ? Number(latestLossRun.drop_pct) : NaN;
+
+        stageCardMeta[stage] = {
+            status, isActive, dsName,
+            dsRows: strictManifestMode ? (bindDs.rows || null) : (bindDs.rows || cat.rows || null),
+            dsTok: strictManifestMode ? (bindDs.tokens || null) : (bindDs.tokens || data.token_count || prov.token_count || (latestLossRun && latestLossRun.total_tokens) || null),
+            byteSize: strictManifestMode ? (bindDs.bytes || null) : (bindDs.bytes || prov.byte_size || null),
+            sourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.source_path) || null),
+            rawSourcePath: strictManifestMode ? (bindDs.path || null) : (bindDs.path || data.source_path || prov.source_path || cat.path || (latestLossRun && latestLossRun.raw_source_path) || null),
+            tokenStreamPath: (latestLossRun && latestLossRun.token_stream_path) || null,
+            covered, artifacts: arts,
+            catNote: strictManifestMode ? null : (cat.note || null),
+            lossRuns: stageLossRuns,
+            latestLossRun: latestLossRun || null,
+            seq: Number.isFinite(Number(seqMeta.seq)) ? Number(seqMeta.seq) : (idx + 1),
+        };
+        flowCardMeta[phaseLabel] = {
+            status,
+            isActive,
+            dsName,
+            dsRows: strictManifestMode ? (bindDs.rows || null) : (bindDs.rows || cat.rows || null),
+            dsTok: strictManifestMode ? ((latestLossRun && latestLossRun.total_tokens) || bindDs.tokens || null) : ((latestLossRun && latestLossRun.total_tokens) || bindDs.tokens || data.token_count || prov.token_count || null),
+            byteSize: strictManifestMode ? (bindDs.bytes || null) : (bindDs.bytes || prov.byte_size || null),
+            sourcePath: strictManifestMode ? ((latestLossRun && latestLossRun.source_path) || bindDs.path || null) : ((latestLossRun && latestLossRun.source_path) || bindDs.path || data.source_path || prov.source_path || cat.path || null),
+            rawSourcePath: strictManifestMode ? ((latestLossRun && latestLossRun.raw_source_path) || bindDs.path || null) : ((latestLossRun && latestLossRun.raw_source_path) || bindDs.path || data.source_path || prov.source_path || cat.path || null),
+            tokenStreamPath: (latestLossRun && latestLossRun.token_stream_path) || null,
+            covered,
+            artifacts: arts,
+            catNote: strictManifestMode ? null : (cat.note || null),
+            lossRuns: hasLoss ? [latestLossRun] : [],
+            latestLossRun: latestLossRun || null,
+            seq: idx + 1,
+        };
+
         const short = dsName ? (dsName.length > 24 ? dsName.slice(0, 22) + '…' : dsName) : null;
         const dsPill = short
-            ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
-            : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">—</div>`;
-        const hasLoss = Number.isFinite(Number(entry.first_loss)) && Number.isFinite(Number(entry.final_loss));
-        const dropPct = hasLoss ? Number(entry.drop_pct) : NaN;
-        const runId = entry.run_id ? String(entry.run_id) : null;
-        const parentRunId = entry.parent_run_id ? String(entry.parent_run_id) : null;
-        const expectedParentRunId = lastCompletedRunId;
-        const lineageStatus = expectedParentRunId
-            ? (parentRunId ? (parentRunId === expectedParentRunId ? 'ok' : 'mismatch') : 'missing')
-            : 'root';
+            ? `<div title="${htmlEscape(dsName)}" style="margin-top:0.28rem;background:${isActive ? 'rgba(71,180,117,0.12)' : 'rgba(255,255,255,0.05)'};border:1px solid ${isActive ? 'rgba(71,180,117,0.28)' : 'rgba(255,255,255,0.10)'};border-radius:4px;padding:0.12rem 0.38rem;font-size:0.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${htmlEscape(short)}</div>`
+            : `<div style="margin-top:0.28rem;font-size:0.65rem;color:#4b5563;font-style:italic;">${status === 'planned' ? 'not assigned' : '—'}</div>`;
+
+        const covBadge = covered === false
+            ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(234,88,12,0.12);border:1px solid rgba(234,88,12,0.3);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#fb923c;">⚠ tok gap</div>`
+            : (covered === true && dsName
+                ? `<div style="margin-top:0.2rem;display:inline-block;background:rgba(71,180,117,0.08);border:1px solid rgba(71,180,117,0.2);border-radius:3px;padding:0.07rem 0.28rem;font-size:0.62rem;color:#6ee7b7;">✓ tok ok</div>`
+                : '');
         const lossSummary = hasLoss
-            ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(entry.first_loss)} → ${fmtLoss(entry.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(entry)}`
+            ? `<div style="margin-top:0.22rem;font-size:0.64rem;color:#fcd34d;">loss ${fmtLoss(latestLossRun.first_loss)} → ${fmtLoss(latestLossRun.final_loss)}${Number.isFinite(dropPct) ? ` · Δ ${dropPct.toFixed(1)}%` : ''}</div>${stageLossSparkline(latestLossRun)}`
             : `<div style="margin-top:0.22rem;font-size:0.62rem;color:#4b5563;">loss curve not recorded</div>`;
 
-        stageCardMeta[phaseLabel] = {
-            status: entryStatus, isActive, dsName, dsRows: null,
-            dsTok: entry.total_tokens || null, byteSize: null,
-            sourcePath: null, rawSourcePath: null, tokenStreamPath: null,
-            covered: null, artifacts: [], catNote: null,
-            lossRuns: [entry], latestLossRun: entry, seq: idx + 1,
-            runId, parentRunId, expectedParentRunId, lineageStatus,
-        };
-        if (runId) lastCompletedRunId = runId;
-
         return `
-            <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(phaseLabel)} loss &amp; dataset">
+            <div data-dp-stage="${htmlEscape(phaseLabel)}" style="min-width:145px;max-width:190px;flex:0 0 auto;padding:0.5rem 0.6rem;border-radius:10px;border:${border};background:${bg};cursor:pointer;user-select:none;" title="Click to inspect ${htmlEscape(phaseLabel)} datasets &amp; artifacts">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.2rem;">
                     <div style="font-weight:700;font-size:0.88rem;">${htmlEscape(phaseLabel)}</div>
-                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${totalCards}</div>
+                    <div style="font-size:0.62rem;color:#6b7280;white-space:nowrap;">seq ${idx + 1}/${allFlowItems.length}</div>
                 </div>
                 <div style="margin-top:0.22rem;">${chip}</div>
                 ${dsPill}
+                ${covBadge}
                 ${lossSummary}
-                <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">tap ↓</div>
-            </div>`;
-
+                <div style="margin-top:0.25rem;color:#4b5563;font-size:0.61rem;">${arts.length} artifact${arts.length !== 1 ? 's' : ''} · tap ↓</div>
+            </div>
+        `;
     }).join('<div style="align-self:center;color:var(--text-muted);font-size:0.75rem;padding:0 0.05rem;">→</div>');
 
     const trainDims = pipeline.train_dims && typeof pipeline.train_dims === 'object' ? pipeline.train_dims : {};
@@ -19359,7 +19455,7 @@ function renderDataLabPanel(files) {
 
     const stageFlowSection = `
         <div class="parity-section">
-            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(flowLabelSequence.join(' -> '))}</h3>
+            <h3><span class="badge badge-orange">Stage Flow</span> ${htmlEscape(allFlowItems.map((item) => item.phase_label || item.stage).join(' -> '))}</h3>
             ${tokSourcePanel}
             <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:stretch;">${flowCards}</div>
             <div id="dpStageDetail" style="display:none;margin-top:0.55rem;"></div>
@@ -19368,7 +19464,7 @@ function renderDataLabPanel(files) {
             </div>
         </div>
     `;
-    window._ckDpStageCardMeta = stageCardMeta;
+    window._ckDpStageCardMeta = flowCardMeta;
 
     function fmtPlanInt(value) {
         const n = Number(value);
@@ -19381,10 +19477,8 @@ function renderDataLabPanel(files) {
 
     const exec = pipeline.execution && typeof pipeline.execution === 'object' ? pipeline.execution : {};
     const execSeqLen = Number(exec.seq_len);
-    const stagePlanRows = allFlowItems.map((item) => {
-        const phaseLabel = item.phase_label || item.stage;
-        const stage = normStageName(item.stage || phaseLabel);
-        const meta = stageCardMeta[phaseLabel] || {};
+    const stagePlanRows = orderedStages.map((stage) => {
+        const meta = stageCardMeta[stage] || {};
         const latest = meta.latestLossRun && typeof meta.latestLossRun === 'object' ? meta.latestLossRun : null;
         const runs = Array.isArray(meta.lossRuns) ? meta.lossRuns.length : 0;
         const seqLenRaw = latest && Number.isFinite(Number(latest.seq_len))
@@ -19401,7 +19495,7 @@ function renderDataLabPanel(files) {
 
         let trainState = 'planned';
         let stateColor = '#60a5fa';
-        if (stage === 'unassigned' || phaseLabel === 'unassigned') {
+        if (stage === 'unassigned') {
             trainState = 'legacy-unlabeled';
             stateColor = '#fbbf24';
         } else if (meta.isActive || String(meta.status || '').toLowerCase() === 'active') {
@@ -19433,7 +19527,7 @@ function renderDataLabPanel(files) {
 
         return `
             <tr>
-                <td>${htmlEscape(phaseLabel)}</td>
+                <td>${htmlEscape(stage)}</td>
                 <td>${htmlEscape(meta.seq ?? '-')}</td>
                 <td><span style="color:${stateColor};font-weight:700;">${htmlEscape(trainState)}</span></td>
                 <td>${htmlEscape(meta.dsName || 'not assigned')}</td>
@@ -19460,7 +19554,6 @@ function renderDataLabPanel(files) {
         .map((entry) => {
             const stage = normStageName(entry.stage) || 'unassigned';
             const dsName = String(entry.dataset_name || (entry.path ? String(entry.path).split('/').pop() : '') || '-');
-            const parentRunId = String(entry.parent_run_id || '-');
             const srcPath = String(entry.source_path || entry.path || '-');
             const rawPath = String(entry.raw_source_path || (entry.token_stream_path ? '-' : srcPath) || '-');
             const tokPath = String(entry.token_stream_path || '-');
@@ -19475,7 +19568,6 @@ function renderDataLabPanel(files) {
                 <tr>
                     <td>${htmlEscape(stage)}</td>
                     <td>${htmlEscape(String(entry.run_id || '-'))}</td>
-                    <td>${htmlEscape(parentRunId)}</td>
                     <td>${htmlEscape(when)}</td>
                     <td>${htmlEscape(dsName)}</td>
                     <td style="text-align:right;">${seqLen}</td>
@@ -19488,181 +19580,6 @@ function renderDataLabPanel(files) {
             `;
         })
         .join('');
-
-
-    // ── Training Readiness Panel ─────────────────────────────────────────────
-    // Stage hierarchy:
-    //   D / E / F  — PRIMARY PRODUCTION GATE. Tests the *generated C training runtime* — the code
-    //                that actually executes during a training job. ALL must pass before training.
-    //   A / B / C  — KERNEL ISOLATION (diagnostic). Tests the C math primitives via a Python/PyTorch
-    //                harness. If D/E/F fail, A/B/C tell you which kernel is the root cause.
-    //                A/B/C passing does NOT substitute for D/E/F.
-    const _DEF_GROUP = 'D/E/F \u2014 Production Runtime (must all pass)';
-    const _A_GROUP   = 'A \u2014 Kernel Isolation';
-    const _B_GROUP   = 'B \u2014 Kernel Isolation: Grad Accum';
-    const _C_GROUP   = 'C \u2014 Kernel Isolation: Stability';
-    const _rkCatalog = {
-        A1: { group: _A_GROUP, name: 'Fwd / Bwd / SGD', tests: 'Single micro-step forward+backward+SGD update via Python/PyTorch harness. grad_accum=1, max 2 optimizer steps. Kernel isolation — not a generated-runtime test.', why: 'Baseline smoke test for the C kernel math path. If A1 fails, use A3 xray to localize the broken kernel before spending training budget.' },
-        A3: { group: _A_GROUP, name: 'Backend Xray', tests: 'Swaps rmsnorm / swiglu / loss C backends one at a time on identical weights (Python harness) to isolate which C kernel causes numeric drift.', why: 'Diagnostic localizer. Pinpoints the specific broken kernel in minutes. Only needed when A1 fails.' },
-        A4: { group: _A_GROUP, name: 'AdamW Sentinel', tests: 'Fixed toy model (d=64/v=256/l=2) with AdamW, 10 optimizer steps, NO run-dir weights. Strict immutable tol (param=3e-5). Model-independent kernel math regression gate.', why: 'Regression sentinel independent of model scale or policy. If A4 fails while D/E/F still pass, a C-kernel math change is present but not yet surfacing in the generated runtime.' },
-        D1: { group: _DEF_GROUP, name: 'Backprop Stitch', tests: 'Generated C fwd+bwd on a real sequence — gradients must match PyTorch reference. This is the generated C code, not the Python harness.', why: 'PRODUCTION GATE. First end-to-end test of the actual C runtime. A/B/C can pass while D1 fails if the code-generation step introduced a bug.' },
-        D2: { group: _DEF_GROUP, name: 'Stitch Multi-step', tests: 'Generated C multi-step fwd+bwd loop with grad_accum — the ck_train_step loop end-to-end.', why: 'PRODUCTION GATE. ck_train_step runs millions of times in a training job. Every grad_accum iteration must be correct.' },
-        E1: { group: _DEF_GROUP, name: 'Replay Determinism', tests: 'Re-running the same fwd+bwd on generated C produces bit-identical results. Zero tolerance.', why: 'PRODUCTION GATE. Non-determinism in the generated runtime silently corrupts gradient accumulation. Must be exactly zero-diff to guarantee reproducible training.' },
-        F1: { group: _DEF_GROUP, name: 'Runtime Accum', tests: 'Accumulated gradients over N micro-steps in generated C match a single full-batch gradient exactly.', why: 'PRODUCTION GATE \u2014 most critical. Gradient accumulation is the core operation of every training step. If this fails, the model is learning from wrong gradients on every multi-batch step.' },
-    };
-    // B and C stages are dynamic (driven by the regimen config). Fill catalog from actual stage rows.
-    for (const row of regimenStages) {
-        const id = String(row.id || '').trim().toUpperCase();
-        if (/^B\d+$/.test(id) && !_rkCatalog[id]) {
-            const g = id.slice(1);
-            _rkCatalog[id] = { group: _B_GROUP, name: 'AdamW g=' + g, tests: 'Kernel isolation (Python harness). AdamW optimizer with grad_accum=' + g + ' micro-steps. Gates on mean param diff to exclude AdamW epsilon-amplification outliers.', why: 'Diagnostic: confirms the C AdamW kernel handles gradient averaging correctly for ' + g + '\u00d7 batch size. Use A4 as the stricter AdamW math sentinel.' };
-        }
-        if (/^C\d+$/.test(id) && !_rkCatalog[id]) {
-            const nm = String(row.name || id);
-            _rkCatalog[id] = { group: _C_GROUP, name: nm.length > 28 ? id : nm, tests: 'Kernel isolation (Python harness). Multi-epoch stability sweep to catch fp32 optimizer drift and epoch-boundary edge cases that short A/B runs miss.', why: 'Diagnostic: longer-horizon kernel regression gate. Catches drift that only emerges after \u2265 5 optimizer steps across epoch boundaries.' };
-        }
-    }
-    const _rkGroupOrder = [_DEF_GROUP, _A_GROUP, _B_GROUP, _C_GROUP];
-    const _rkByGroup = {};
-    for (const g of _rkGroupOrder) _rkByGroup[g] = [];
-
-    // Merge harness stages + standalone runtime rows into one list.
-    const _rkAllRows = [...regimenStages];
-    for (const [id, passVal] of [['D1', dPass], ['D2', d2Pass], ['E1', ePass], ['F1', fPass]]) {
-        if (!regimenStageById[id] && passVal !== null) {
-            _rkAllRows.push({ id, status: passVal === true ? 'PASS' : 'FAIL', metrics: {}, notes: [] });
-        }
-    }
-    for (const row of _rkAllRows) {
-        const id = String(row.id || '').trim().toUpperCase();
-        if (!id) continue;
-        const info = _rkCatalog[id] || { group: 'Other', name: id, tests: String(row.name || ''), why: '' };
-        if (!_rkByGroup[info.group]) _rkByGroup[info.group] = [];
-        _rkByGroup[info.group].push({ id, row, info });
-    }
-
-    const _rkFmtExp = (v) => { const n = Number(v); return Number.isFinite(n) ? n.toExponential(2) : null; };
-    const _rkFmtDur = (s) => { const n = Number(s); if (!Number.isFinite(n)) return ''; return n < 60 ? n.toFixed(1) + 's' : (n / 60).toFixed(1) + 'm'; };
-
-    // Overall readiness signal.
-    // Production gate = D1, D2, E1, F1 (generated runtime — ALL must pass before training).
-    // Kernel gate = A1, A4 (math isolation — must also pass; A4 is the immutable AdamW sentinel).
-    // B/C stages are diagnostic: their failure means kernel math drift but D/E/F are the final word.
-    const _rkProductionIds = ['D1', 'D2', 'E1', 'F1'];
-    const _rkProductionFails = _rkProductionIds.filter((id) => {
-        const r = regimenStageById[id];
-        if (r) return stageIsFail(r);
-        if (id === 'D1') return dPass === false;
-        if (id === 'D2') return d2Pass === false;
-        if (id === 'E1') return ePass === false;
-        if (id === 'F1') return fPass === false;
-        return false;
-    });
-    const _rkCriticalFails = ['A1', 'A4', 'D1', 'D2', 'E1', 'F1'].filter((id) => {
-        const r = regimenStageById[id];
-        if (r) return stageIsFail(r);
-        if (id === 'D1') return dPass === false;
-        if (id === 'D2') return d2Pass === false;
-        if (id === 'E1') return ePass === false;
-        if (id === 'F1') return fPass === false;
-        return false;
-    });
-    const _rkAnyFail  = regimenStages.some((r) => stageIsFail(r)) || runtimeFailed;
-    const _rkAnyLoaded = regimenStages.length > 0 || runtimeLoadedCount > 0;
-    const _rkAllPass  = _rkAnyLoaded && !_rkAnyFail;
-    const _rkProdAllPass = _rkProductionFails.length === 0 && (_rkByGroup[_DEF_GROUP] || []).length > 0;
-    const _rkBannerColor = !_rkAnyLoaded ? '#fcd34d'
-        : (_rkAllPass ? '#6ee7b7'
-        : (_rkProductionFails.length > 0 ? '#fca5a5' : '#fbbf24'));
-    const _rkBannerMsg = !_rkAnyLoaded
-        ? '\u26a0\ufe0f  No parity data loaded \u2014 run the regimen before training'
-        : (_rkAllPass
-            ? '\u2713  All gates passing \u2014 production runtime verified, code is ready to train'
-            : (_rkProductionFails.length > 0
-                ? '\u2717  Production runtime failing (' + _rkProductionFails.join(', ') + ') \u2014 do NOT start training'
-                : '\u26a0\ufe0f  Production runtime passes \u2014 some kernel isolation stages failing (diagnostic only, check A/B/C)'));
-
-    // Build group + card HTML (string concatenation to avoid nested backtick issues).
-    const _rkGroupHtml = _rkGroupOrder.map((grp) => {
-        const items = _rkByGroup[grp] || [];
-        if (!items.length) return '';
-        const passCount = items.filter(({ row }) => stageIsPass(row)).length;
-        const grpAnyFail = items.some(({ row }) => stageIsFail(row));
-        const grpAllPass = passCount === items.length;
-        const grpLabelColor = grpAllPass ? '#6ee7b7' : (grpAnyFail ? '#fca5a5' : '#9ca3af');
-
-        const cards = items.map(({ id, row, info }) => {
-            const isPass    = stageIsPass(row);
-            const isFail    = stageIsFail(row);
-            const cardBorder = isPass ? '#47b475'               : (isFail ? '#f87171'               : '#4b5563');
-            const cardBg     = isPass ? 'rgba(71,180,117,0.07)' : (isFail ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.02)');
-            const badgeCls   = isPass ? 'badge-green'           : (isFail ? 'badge-orange'           : '');
-            const dur        = _rkFmtDur(row.duration_s);
-            const mx         = (row && typeof row.metrics === 'object') ? row.metrics : {};
-            const metricBits = [];
-            const lD = _rkFmtExp(mx.max_loss_abs_diff);
-            const pD = _rkFmtExp(mx.final_param_mean_abs_diff !== undefined ? mx.final_param_mean_abs_diff : mx.final_param_max_abs_diff);
-            if (lD)  metricBits.push('loss\u0394=' + lD);
-            if (pD)  metricBits.push('param\u0394=' + pD);
-            if (mx.optimizer_steps) metricBits.push(mx.optimizer_steps + ' opt steps');
-            const notes    = Array.isArray(row && row.notes) ? row.notes.filter(Boolean) : [];
-            const lastNote = notes.length ? notes[notes.length - 1] : '';
-            return '<div style="border:1px solid ' + cardBorder + ';border-radius:6px;padding:0.5rem 0.65rem;'
-                +   'background:' + cardBg + ';flex:1 1 200px;min-width:190px;max-width:340px;">'
-                + '<div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.16rem;">'
-                +   '<span class="badge ' + badgeCls + '" style="min-width:2.3rem;text-align:center;font-size:0.72rem;">'
-                +     htmlEscape(id) + '</span>'
-                +   '<span style="font-size:0.8rem;font-weight:700;color:#e5e7eb;">' + htmlEscape(info.name) + '</span>'
-                +   (dur ? '<span style="color:#6b7280;font-size:0.67rem;margin-left:auto;">' + htmlEscape(dur) + '</span>' : '')
-                + '</div>'
-                + '<div style="font-size:0.71rem;color:#9ca3af;line-height:1.4;">' + htmlEscape(info.tests) + '</div>'
-                + (metricBits.length
-                    ? '<div style="font-size:0.69rem;color:#60a5fa;margin-top:0.22rem;font-family:monospace;">'
-                    +   htmlEscape(metricBits.join(' \u00b7 ')) + '</div>'
-                    : '')
-                + (lastNote
-                    ? '<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">\u26a0\ufe0f ' + htmlEscape(lastNote) + '</div>'
-                    : '')
-                + '<div style="font-size:0.67rem;color:#a78bfa;margin-top:0.18rem;line-height:1.35;">'
-                +   '\u21b3 ' + htmlEscape(info.why) + '</div>'
-                + '</div>';
-        }).join('');
-
-        return '<div style="margin-bottom:0.9rem;">'
-            + '<div style="font-size:0.72rem;font-weight:700;color:' + grpLabelColor + ';margin-bottom:0.38rem;'
-            +   'letter-spacing:0.03em;text-transform:uppercase;">'
-            +   htmlEscape(grp) + ' <span style="opacity:0.5;font-weight:400;text-transform:none;">('
-            +   passCount + '/' + items.length + ' pass)</span>'
-            + '</div>'
-            + '<div style="display:flex;flex-wrap:wrap;gap:0.4rem;">' + cards + '</div>'
-            + '</div>';
-    }).join('');
-
-    const trainingReadinessSection = '<div class="parity-section" style="margin-top:0.8rem;">'
-        + '<h3><span class="badge ' + (_rkAllPass ? 'badge-green' : (_rkAnyLoaded ? 'badge-orange' : '')) + '">'
-        +   'Training Readiness</span> Parity Gate \u2014 Stage-by-Stage</h3>'
-        + '<div style="border-radius:6px;padding:0.55rem 0.9rem;margin-bottom:0.7rem;font-size:0.84rem;'
-        +   'font-weight:700;color:' + _rkBannerColor + ';border:1px solid ' + _rkBannerColor + ';'
-        +   'background:' + _rkBannerColor + '1a;">'
-        +   htmlEscape(_rkBannerMsg)
-        + '</div>'
-        + '<div style="font-size:0.71rem;color:#6b7280;margin-bottom:0.7rem;line-height:1.6;">'
-        +   'Each card: <strong style="color:#9ca3af;">what the test verifies</strong> \u00b7 '
-        +   '<span style="color:#60a5fa;font-family:monospace;">key metrics</span> \u00b7 '
-        +   '<span style="color:#a78bfa;">\u21b3 why it matters</span>. '
-        +   '<span style="color:#6ee7b7;">\u2713 green = pass</span> \u00b7 '
-        +   '<span style="color:#f87171;">\u2717 red = fail</span> \u00b7 '
-        +   'grey = not yet run. \u00a0'
-        +   '<span style="color:#6ee7b7;font-weight:700;">D/E/F = production gate</span>'
-        +   '<span style="color:#9ca3af;"> \u2014 generated C runtime, ALL must pass before training. \u00a0</span>'
-        +   '<span style="color:#9ca3af;">A/B/C = kernel isolation (diagnostic) \u2014 A/B/C passing does NOT substitute for D/E/F. '
-        +   'Use them to locate root cause when D/E/F fail. '
-        +   'A4 = immutable AdamW sentinel (strict tol=3e-5) independent of model scale.</span>'
-        + '</div>'
-        + _rkGroupHtml
-        + '</div>';
-    // ── end Training Readiness Panel ─────────────────────────────────────────
-
 
     const stagePlanSection = `
         <div class="parity-section" style="margin-top:0.8rem;">
@@ -19700,7 +19617,6 @@ function renderDataLabPanel(files) {
                                 <tr>
                                     <th>Stage</th>
                                     <th>Run ID</th>
-                                    <th>Parent Run ID</th>
                                     <th>When</th>
                                     <th>Dataset</th>
                                     <th style="text-align:right;">Seq</th>
@@ -20128,16 +20044,19 @@ function renderDataLabPanel(files) {
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:0.28rem 0.65rem;">
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Stage Flow</span> — click a card to inspect datasets &amp; artifacts per stage</div>
-                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Eval Matrix</span> — stage quality trend with probe-level prompt/response details</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#93c5fd;font-weight:600;">PyTorch Parity Gate</span> — keep CK vs reference visible before trusting downstream quality</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#86efac;font-weight:600;">Eval Matrix</span> — compact stage quality summary before the larger planning tables</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#fb923c;font-weight:600;">⚠ tok gap</span> — stage dataset was outside the tokenizer training corpus</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Dataset Catalog</span> — trained (green) · generated (amber) · manifests (collapsed)</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Sample Browser</span> — row-level tokenizer roundtrip and exact-match rate</div>
             </div>
         </div>
         ${stageFlowSection}
-        ${trainingReadinessSection}
-        <div id="trainDataLabEvalMatrixSection"></div>
+        ${parityGateSection}
+        ${readinessSection}
+        ${evalSummarySection}
         ${stagePlanSection}
+        ${prepDiagnosisSection}
         ${runLedgerSection}
         <div class="parity-section">
             <h3><span class="badge badge-blue">Paths</span> Dataset + Tokenizer Sources</h3>
@@ -20175,8 +20094,6 @@ function renderDataLabPanel(files) {
         </div>
         ${tokenizerSection}
     `;
-
-    renderStageEvalMatrix(document.getElementById('trainDataLabEvalMatrixSection'), files);
 
     // --- Stage card click handlers (post-render) ---
     {
@@ -20262,28 +20179,6 @@ function renderDataLabPanel(files) {
             const latestLossLabel = hasLatestLoss
                 ? `${fmtLoss(latestRun.first_loss)} → ${fmtLoss(latestRun.final_loss)}`
                 : 'not recorded';
-            const runId = String(meta.runId || (latestRun && latestRun.run_id) || '').trim();
-            const parentRunId = String(meta.parentRunId || (latestRun && latestRun.parent_run_id) || '').trim();
-            const expectedParentRunId = String(meta.expectedParentRunId || '').trim();
-            const lineageStatus = String(meta.lineageStatus || '').toLowerCase();
-            const lineageBadge = lineageStatus === 'ok'
-                ? '<span class="badge badge-green">lineage: ok</span>'
-                : (lineageStatus === 'mismatch'
-                    ? '<span class="badge badge-orange">lineage: mismatch</span>'
-                    : (lineageStatus === 'missing'
-                        ? '<span class="badge badge-orange">lineage: missing</span>'
-                        : (lineageStatus === 'root'
-                            ? '<span class="badge badge-blue">lineage: root</span>'
-                            : '<span class="badge badge-blue">lineage: unknown</span>')));
-            const lineageNote = lineageStatus === 'ok'
-                ? 'parent_run_id matches expected prior completed run_id.'
-                : (lineageStatus === 'mismatch'
-                    ? 'parent_run_id does not match expected prior completed run_id.'
-                    : (lineageStatus === 'missing'
-                        ? 'parent_run_id missing while a prior completed run exists.'
-                        : (lineageStatus === 'root'
-                            ? 'No prior completed run expected for this entry.'
-                            : 'Lineage not recorded for this entry.')));
 
             const artRows = meta.artifacts.length > 0
                 ? meta.artifacts.map((a) => {
@@ -20367,14 +20262,6 @@ function renderDataLabPanel(files) {
                             <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">TRAINING LOSS</div>
                             <div style="font-size:0.78rem;color:#fcd34d;">${latestLossLabel}</div>
                             <div style="font-size:0.72rem;color:#9ca3af;">runs: ${runCount}</div>
-                        </div>
-                        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:0.45rem 0.6rem;">
-                            <div style="font-size:0.65rem;color:#6b7280;font-weight:700;letter-spacing:0.07em;margin-bottom:0.2rem;">RUN LINEAGE</div>
-                            <div style="font-size:0.75rem;margin-bottom:0.18rem;">${lineageBadge}</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">run_id: ${runId ? `<code>${htmlEscape(runId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">parent_run_id: ${parentRunId ? `<code>${htmlEscape(parentRunId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
-                            <div style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">expected parent: ${expectedParentRunId ? `<code>${htmlEscape(expectedParentRunId)}</code>` : '<span style="color:#4b5563;">—</span>'}</div>
-                            <div style="font-size:0.68rem;color:#9ca3af;margin-top:0.18rem;">${lineageNote}</div>
                         </div>
                     </div>
                     ${latestRun ? `<div style="margin:-0.05rem 0 0.45rem 0;">${stageLossSparkline(latestRun)}</div>` : ''}
@@ -20477,6 +20364,59 @@ function trainE2EState(trainE2E) {
     return { label: 'check', pass: null };
 }
 
+function normalizeRegimenStages(regimen) {
+    const rows = Array.isArray(regimen && regimen.stages) ? regimen.stages
+        : (Array.isArray(regimen && regimen.stage_results) ? regimen.stage_results : []);
+    return rows
+        .filter((row) => row && typeof row === 'object')
+        .map((row) => ({
+            id: String(row.id || row.stage_id || '').trim(),
+            name: String(row.name || row.label || '').trim(),
+            status: String(row.status || row.result || '').trim().toUpperCase(),
+            metrics: row.metrics && typeof row.metrics === 'object' ? row.metrics : {},
+        }))
+        .filter((row) => row.id);
+}
+
+function regimenState(regimen, stages) {
+    const summary = regimen && typeof regimen.summary === 'object' ? regimen.summary : {};
+    const status = String(regimen && regimen.status || '').trim().toLowerCase();
+    const skipped = regimen && regimen.skipped === true;
+    if (skipped) return { label: 'skipped', tone: 'blue', pass: null };
+    if (status === 'pass' || summary.passed === true) return { label: 'pass', tone: 'green', pass: true };
+    if (status === 'fail' || summary.passed === false) return { label: 'fail', tone: 'red', pass: false };
+    if (Array.isArray(summary.failed_stage_ids) && summary.failed_stage_ids.length > 0) {
+        return { label: 'fail', tone: 'red', pass: false };
+    }
+    if (Array.isArray(stages) && stages.length > 0) {
+        const failing = stages.filter((row) => String(row.status || '').toUpperCase() !== 'PASS');
+        return failing.length === 0
+            ? { label: 'pass', tone: 'green', pass: true }
+            : { label: 'fail', tone: 'red', pass: false };
+    }
+    return { label: 'missing', tone: 'orange', pass: null };
+}
+
+function regimenGroupState(stages, prefixes) {
+    const want = Array.isArray(prefixes) ? prefixes.map((v) => String(v || '').toUpperCase()).filter(Boolean) : [];
+    const matched = Array.isArray(stages)
+        ? stages.filter((row) => {
+            const id = String(row && row.id || '').toUpperCase();
+            return want.some((prefix) => id.startsWith(prefix));
+        })
+        : [];
+    if (matched.length === 0) {
+        return { label: 'missing', tone: 'orange', pass: null, detail: 'no stages loaded' };
+    }
+    const failing = matched.filter((row) => String(row.status || '').toUpperCase() !== 'PASS');
+    return {
+        label: failing.length === 0 ? 'pass' : 'fail',
+        tone: failing.length === 0 ? 'green' : 'red',
+        pass: failing.length === 0,
+        detail: matched.map((row) => `${row.id}:${row.status || '?'}`).join(' · '),
+    };
+}
+
 function latestLoss(files) {
     const curve = files.training_loss_curve && Array.isArray(files.training_loss_curve.steps)
         ? files.training_loss_curve.steps
@@ -20518,6 +20458,10 @@ function renderTrainingLogbookPanel(files) {
     const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
         ? files.training_parity_regimen
         : {};
+    const regimenStages = normalizeRegimenStages(regimen);
+    const regimenOverall = regimenState(regimen, regimenStages);
+    const abcGate = regimenGroupState(regimenStages, ['A', 'B', 'C']);
+    const defGate = regimenGroupState(regimenStages, ['D', 'E', 'F']);
     const logbook = files.training_logbook && typeof files.training_logbook === 'object'
         ? files.training_logbook
         : {};
@@ -20568,11 +20512,11 @@ function renderTrainingLogbookPanel(files) {
         nextSteps.push('Track drift trend; rerun parity regimen if this grows across commits.');
     }
 
-    const regimenStatus = String(regimen.status || '').toLowerCase();
-    if (regimenStatus === 'fail') {
+    const regimenStatus = regimenOverall.label;
+    if (regimenOverall.pass === false) {
         failures.push({
             title: 'Parity regimen failed',
-            why: 'training_parity_regimen_latest.json status=fail',
+            why: `training_parity_regimen_latest.json ${abcGate.detail || ''}${abcGate.detail && defGate.detail ? ' · ' : ''}${defGate.detail || ''}`.trim(),
             severity: 'error',
         });
         nextSteps.push('Open training_parity_regimen_latest.md and fix failing gate before full retrain.');
@@ -20656,6 +20600,7 @@ function renderTrainingLogbookPanel(files) {
         ['run_dir', runCtx.runDir || '-'],
         ['stage', activeStage],
         ['train_e2e', e2e.label],
+        ['regimen', regimenStatus],
         ['latest_ck_loss', Number.isFinite(latest) ? latest.toFixed(6) : '-'],
         ['parity_worst_max_param_diff', Number.isFinite(worstParity) && worstParity > 0 ? fmtExp(worstParity, 2) : '-'],
         ['valid_svg_rate', Number.isFinite(validSvgRate) ? validSvgRate.toFixed(4) : '-'],
@@ -20664,8 +20609,74 @@ function renderTrainingLogbookPanel(files) {
     const logMarkdown = typeof logbook.markdown === 'string' ? logbook.markdown.trim() : '';
     const logPath = typeof logbook.path === 'string' && logbook.path.trim() ? logbook.path : '-';
     const logSource = typeof logbook.source === 'string' && logbook.source.trim() ? logbook.source : '-';
+    const checkpoints = Array.isArray(files && files.analysis_checkpoints && files.analysis_checkpoints.checkpoints)
+        ? files.analysis_checkpoints.checkpoints
+        : [];
+    const profilerDoc = files.training_step_profile && typeof files.training_step_profile === 'object'
+        ? files.training_step_profile
+        : {};
+    const profilerLoaded = Object.keys(profilerDoc).length > 0 || checkpoints.length > 0;
+    const profilerState = profilerLoaded
+        ? { label: 'present', tone: 'green', detail: `${checkpoints.length} analysis checkpoint${checkpoints.length === 1 ? '' : 's'}` }
+        : { label: 'missing', tone: 'orange', detail: 'no training_step_profile / analysis checkpoints loaded' };
+    const runbookGatePass = dataPass && roundtripPass && e2e.pass !== false;
+    const runbookGateTone = runbookGatePass ? 'green' : (e2e.pass === false || roundtripPass === false ? 'red' : 'orange');
+    const runbookGateLabel = runbookGatePass ? 'go' : (e2e.pass === false ? 'no-go' : 'check');
+    const strictGatePass = regimenOverall.pass === true && (Number.isFinite(worstParity) ? worstParity <= 1e-3 : true);
+    const strictGateTone = strictGatePass ? 'green' : ((regimenOverall.pass === false || (Number.isFinite(worstParity) && worstParity > 1e-3)) ? 'red' : 'orange');
+    const strictGateLabel = strictGatePass ? 'pass' : ((regimenOverall.pass === false || (Number.isFinite(worstParity) && worstParity > 1e-3)) ? 'fail' : 'check');
+    const decisionStrip = `
+        <div class="parity-section">
+            <h3><span class="badge badge-orange">Decision Strip</span> Operator Verdict</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.65rem;">
+                <div style="border:1px solid rgba(255,255,255,0.10);border-left:3px solid ${runbookGateTone === 'green' ? '#4ade80' : (runbookGateTone === 'red' ? '#f87171' : '#fbbf24')};border-radius:8px;padding:0.7rem 0.8rem;background:rgba(255,255,255,0.03);">
+                    <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:center;">
+                        <div style="font-weight:700;">Runbook Gate</div>
+                        ${statusPill(runbookGateLabel.toUpperCase(), runbookGateTone)}
+                    </div>
+                    <div style="margin-top:0.35rem;font-size:0.74rem;color:var(--text-muted);line-height:1.55;">
+                        Data QC + tokenizer fidelity + train E2E gate. If this card fails, stop before reading downstream charts as model quality.
+                    </div>
+                    <div style="margin-top:0.45rem;font-size:0.74rem;line-height:1.55;">
+                        • dataset QC: <strong>${htmlEscape(dataPass ? 'pass' : 'check')}</strong><br/>
+                        • tokenizer roundtrip: <strong>${htmlEscape(roundtripPass ? 'pass' : 'fail')}</strong><br/>
+                        • train E2E: <strong>${htmlEscape(e2e.label)}</strong>
+                    </div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,0.10);border-left:3px solid ${strictGateTone === 'green' ? '#4ade80' : (strictGateTone === 'red' ? '#f87171' : '#fbbf24')};border-radius:8px;padding:0.7rem 0.8rem;background:rgba(255,255,255,0.03);">
+                    <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:center;">
+                        <div style="font-weight:700;">Strict Parity Signoff</div>
+                        ${statusPill(strictGateLabel.toUpperCase(), strictGateTone)}
+                    </div>
+                    <div style="margin-top:0.35rem;font-size:0.74rem;color:var(--text-muted);line-height:1.55;">
+                        A/B/C isolate kernels; D/E/F validate generated runtime and replay. This panel now reads the newer regimen contract from <code>summary</code> + <code>stages[]</code>.
+                    </div>
+                    <div style="margin-top:0.45rem;font-size:0.74rem;line-height:1.55;">
+                        • regimen(A/B/C): <strong>${htmlEscape(abcGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(abcGate.detail)}</span><br/>
+                        • generated-runtime(D/E/F): <strong>${htmlEscape(defGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(defGate.detail)}</span><br/>
+                        • worst param diff: <strong>${Number.isFinite(worstParity) ? fmtExp(worstParity, 2) : '—'}</strong>
+                    </div>
+                </div>
+                <div style="border:1px solid rgba(255,255,255,0.10);border-left:3px solid ${profilerState.tone === 'green' ? '#4ade80' : '#fbbf24'};border-radius:8px;padding:0.7rem 0.8rem;background:rgba(255,255,255,0.03);">
+                    <div style="display:flex;justify-content:space-between;gap:0.5rem;align-items:center;">
+                        <div style="font-weight:700;">Profiler Evidence</div>
+                        ${statusPill(profilerState.label.toUpperCase(), profilerState.tone)}
+                    </div>
+                    <div style="margin-top:0.35rem;font-size:0.74rem;color:var(--text-muted);line-height:1.55;">
+                        Profiling and analysis checkpoints are secondary evidence. Missing profiler artifacts should not erase parity, but they limit operator diagnosis depth.
+                    </div>
+                    <div style="margin-top:0.45rem;font-size:0.74rem;line-height:1.55;">
+                        • training_step_profile: <strong>${Object.keys(profilerDoc).length > 0 ? 'loaded' : 'missing'}</strong><br/>
+                        • analysis checkpoints: <strong>${checkpoints.length}</strong><br/>
+                        • note: <span style="color:#9ca3af;">${htmlEscape(profilerState.detail)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 
     root.innerHTML = `
+        ${decisionStrip}
         <div class="parity-section">
             <h3><span class="badge badge-blue">State</span> Where We Are</h3>
             <table>
