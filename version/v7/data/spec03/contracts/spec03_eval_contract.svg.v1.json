@@ -1,0 +1,96 @@
+{
+  "schema": "ck.eval_contract.v1",
+  "dataset_type": "svg",
+  "goal": "Render valid SVG that follows the closed-vocabulary specialist tag contract.",
+  "notes": [
+    "spec03 uses tag-prefix prompts only",
+    "all probes should stay within the canonical tag vocabulary",
+    "extend this contract only when a new tag family has generator and scoring support"
+  ],
+  "stage_metrics": [
+    {
+      "key": "valid_svg_rate",
+      "label": "Valid SVG",
+      "source": "valid_svg",
+      "probe_type": "svg_gen",
+      "good": 0.9,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true
+    },
+    {
+      "key": "closure_success_rate",
+      "label": "Closure",
+      "source": "closure",
+      "probe_type": "svg_gen",
+      "good": 0.9,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true
+    },
+    {
+      "key": "prefix_integrity",
+      "label": "Prefix",
+      "source": "prefix_integrity",
+      "probe_type": "all",
+      "good": 0.9,
+      "warn": 0.7,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true
+    },
+    {
+      "key": "adherence",
+      "label": "Adherence",
+      "source": "adherence",
+      "probe_type": "svg_gen",
+      "good": 0.8,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true,
+      "regression_watch": true
+    },
+    {
+      "key": "tag_adherence",
+      "label": "Tag Adh",
+      "source": "tag_adherence",
+      "probe_type": "svg_gen",
+      "good": 0.8,
+      "warn": 0.6,
+      "format": "pct",
+      "higher_is_better": true,
+      "regression_watch": true
+    },
+    {
+      "key": "ood_robustness",
+      "label": "OOD",
+      "source": "valid_svg",
+      "probe_type": "ood",
+      "good": 0.6,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": true,
+      "headline": true
+    },
+    {
+      "key": "repetition_loop_score",
+      "label": "Loop Score",
+      "source": "repetition",
+      "probe_type": "all",
+      "good": 0.1,
+      "warn": 0.3,
+      "format": "pct",
+      "higher_is_better": false
+    }
+  ],
+  "headline_metrics": [
+    "valid_svg_rate",
+    "adherence",
+    "tag_adherence",
+    "ood_robustness",
+    "prefix_integrity"
+  ],
+  "probes": []
+}
