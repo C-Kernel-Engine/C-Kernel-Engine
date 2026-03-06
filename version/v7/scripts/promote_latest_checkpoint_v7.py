@@ -49,8 +49,38 @@ class RunCheckpointRef:
     checkpoint_manifest: str | None
 
 
+def _text_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _phase_label(stage: str | None, stage_pass: int | None) -> str | None:
+    stage_txt = _text_or_none(stage)
+    pass_i = _int_or_none(stage_pass)
+    if not stage_txt or pass_i is None or pass_i <= 0:
+        return None
+    return f"{stage_txt}_{pass_i}"
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_manifest_meta(path: Path) -> dict[str, Any]:
+    try:
+        doc = _load_json(path)
+    except Exception:
+        return {}
+    return doc if isinstance(doc, dict) else {}
 
 
 def _normalize_stage(raw: Any) -> str:
@@ -174,15 +204,15 @@ def _read_stage_history_entries(run_dir: Path) -> list[dict[str, Any]]:
 
 def _build_run_refs(run_dir: Path) -> list[RunCheckpointRef]:
     rows = _read_stage_history_entries(run_dir)
-    if not rows:
-        return []
     ledger_idx = _read_ledger_index(run_dir)
 
     refs: list[RunCheckpointRef] = []
+    seen_run_ids: set[str] = set()
     for i, row in enumerate(rows):
         run_id = str(row.get("run_id") or "").strip()
         if not run_id:
             continue
+        seen_run_ids.add(run_id)
         led = ledger_idx.get(run_id, {})
 
         stage = _normalize_stage(led.get("stage_id") or row.get("stage"))
@@ -248,6 +278,79 @@ def _build_run_refs(run_dir: Path) -> list[RunCheckpointRef]:
                 checkpoint_manifest=str(ck_manifest).strip() if isinstance(ck_manifest, str) and ck_manifest else None,
             )
         )
+
+    # Include completed ledger runs that are not yet reflected in stage_loss_history.
+    # This covers the "just finished run" window where promotion happens before
+    # training_pipeline_latest.json has been rewritten with the new stage entry.
+    fallback_order = len(refs)
+    for run_id, led in ledger_idx.items():
+        if run_id in seen_run_ids:
+            continue
+        status = str(led.get("status") or "").strip().lower()
+        if status != "completed":
+            continue
+        ck_bump = led.get("checkpoint_bump")
+        ck_manifest = led.get("checkpoint_manifest")
+        if not isinstance(ck_bump, str) or not ck_bump.strip():
+            local_bump = run_dir / ".ck_pipeline" / run_id / "weights_final.bump"
+            if local_bump.exists():
+                ck_bump = str(local_bump)
+        if not isinstance(ck_manifest, str) or not ck_manifest.strip():
+            local_manifest = run_dir / ".ck_pipeline" / run_id / "weights_final_manifest.json"
+            if local_manifest.exists():
+                ck_manifest = str(local_manifest)
+
+        run_order_raw = led.get("run_order")
+        try:
+            run_order = int(run_order_raw)
+        except Exception:
+            run_order = fallback_order
+            fallback_order += 1
+
+        steps_raw = led.get("steps")
+        try:
+            steps = int(steps_raw)
+        except Exception:
+            steps = None
+
+        stage_pass_raw = led.get("stage_pass")
+        try:
+            stage_pass = int(stage_pass_raw)
+        except Exception:
+            stage_pass = 0
+
+        final_loss_raw = led.get("loss_final")
+        try:
+            final_loss = float(final_loss_raw)
+        except Exception:
+            final_loss = None
+
+        dataset_name = led.get("dataset_name")
+        if isinstance(dataset_name, str):
+            dataset_name = dataset_name.strip() or None
+        else:
+            dataset_name = None
+
+        ended_at = led.get("ended_at")
+        ended_at = str(ended_at).strip() if isinstance(ended_at, str) and ended_at else None
+
+        refs.append(
+            RunCheckpointRef(
+                run_id=run_id,
+                stage=_normalize_stage(led.get("stage_id") or led.get("stage")),
+                stage_pass=stage_pass,
+                steps=steps,
+                run_order=run_order,
+                ended_at=ended_at,
+                dataset_name=dataset_name,
+                final_loss=final_loss,
+                checkpoint_bump=str(ck_bump).strip() if isinstance(ck_bump, str) and ck_bump else None,
+                checkpoint_manifest=str(ck_manifest).strip() if isinstance(ck_manifest, str) and ck_manifest else None,
+            )
+        )
+
+    if not refs:
+        return []
 
     refs.sort(key=lambda r: r.run_order)
     # Infer stage pass when missing.
@@ -360,6 +463,7 @@ def main() -> int:
     ap.add_argument("--stage-pass", type=int, default=None, help="Promote exact stage pass number when using --stage")
     ap.add_argument("--list-runs", action="store_true", help="List promotable runs from stage_loss_history and exit")
     ap.add_argument("--dry-run", action="store_true", help="Print selected checkpoint without modifying run_dir")
+    ap.add_argument("--print-json", action="store_true", help="Emit machine-readable promotion metadata")
     args = ap.parse_args()
 
     run_dir = Path(args.run).expanduser().resolve()
@@ -384,26 +488,73 @@ def main() -> int:
     dst_bump = run_dir / "weights.bump"
     dst_manifest = run_dir / "weights_manifest.json"
 
-    print(f"[INFO] run_dir={run_dir}")
-    if selected_ref is not None:
-        print(
-            "[INFO] selector="
-            f"run_id={selected_ref.run_id} stage={selected_ref.stage} "
-            f"stage_pass={selected_ref.stage_pass} steps={selected_ref.steps}"
-        )
-    print(f"[INFO] selected_step={pair.step} reason={pair.reason}")
-    print(f"[INFO] source_bump={pair.bump}")
-    print(f"[INFO] source_manifest={pair.manifest}")
-    print(f"[INFO] target_bump={dst_bump}")
-    print(f"[INFO] target_manifest={dst_manifest}")
+    manifest_meta = _load_manifest_meta(pair.manifest)
+    selected_run_id = selected_ref.run_id if selected_ref is not None else _text_or_none(manifest_meta.get("run_id"))
+    manifest_stage_raw = _text_or_none(manifest_meta.get("stage_id") or manifest_meta.get("stage"))
+    selected_stage = selected_ref.stage if selected_ref is not None else (_normalize_stage(manifest_stage_raw) if manifest_stage_raw else None)
+    selected_stage_pass = selected_ref.stage_pass if selected_ref is not None else _int_or_none(manifest_meta.get("stage_pass"))
+    selected_phase_label = _text_or_none(manifest_meta.get("phase_label")) or _phase_label(selected_stage, selected_stage_pass)
+    checkpoint_step = _int_or_none(manifest_meta.get("checkpoint_step"))
+    if checkpoint_step is None and pair.step > 0:
+        checkpoint_step = int(pair.step)
+    checkpoint_id = _text_or_none(manifest_meta.get("checkpoint_id"))
+    if checkpoint_id is None and selected_run_id and checkpoint_step is not None:
+        checkpoint_id = f"{selected_run_id}:{checkpoint_step}"
+
+    promotion_doc: dict[str, Any] = {
+        "status": "ok",
+        "run_dir": str(run_dir),
+        "selector": {
+            "run_id": _text_or_none(args.run_id),
+            "stage": _text_or_none(args.stage),
+            "stage_pass": _int_or_none(args.stage_pass),
+            "step": _int_or_none(args.step),
+        },
+        "selected": {
+            "run_id": selected_run_id,
+            "stage": selected_stage,
+            "stage_pass": selected_stage_pass,
+            "phase_label": selected_phase_label,
+            "checkpoint_step": checkpoint_step,
+            "checkpoint_id": checkpoint_id,
+            "checkpoint_bump": str(pair.bump),
+            "checkpoint_manifest": str(pair.manifest),
+            "reason": pair.reason,
+        },
+        "target": {
+            "bump": str(dst_bump),
+            "manifest": str(dst_manifest),
+        },
+        "dry_run": bool(args.dry_run),
+    }
+
+    if not args.print_json:
+        print(f"[INFO] run_dir={run_dir}")
+        if selected_ref is not None:
+            print(
+                "[INFO] selector="
+                f"run_id={selected_ref.run_id} stage={selected_ref.stage} "
+                f"stage_pass={selected_ref.stage_pass} steps={selected_ref.steps}"
+            )
+        print(f"[INFO] selected_step={pair.step} reason={pair.reason}")
+        print(f"[INFO] source_bump={pair.bump}")
+        print(f"[INFO] source_manifest={pair.manifest}")
+        print(f"[INFO] target_bump={dst_bump}")
+        print(f"[INFO] target_manifest={dst_manifest}")
 
     if args.dry_run:
-        print("[OK] dry-run only; no files changed")
+        if args.print_json:
+            print(json.dumps(promotion_doc, indent=2))
+        else:
+            print("[OK] dry-run only; no files changed")
         return 0
 
     _atomic_copy(pair.bump, dst_bump)
     _atomic_copy(pair.manifest, dst_manifest)
-    print("[OK] promotion complete")
+    if args.print_json:
+        print(json.dumps(promotion_doc, indent=2))
+    else:
+        print("[OK] promotion complete")
     return 0
 
 

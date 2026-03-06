@@ -111,16 +111,34 @@ def _promote_checkpoint(
             cmd.extend(["--run-id", str(run_id)])
         elif step is not None:
             cmd.extend(["--step", str(int(step))])
-        _run(
-            cmd,
-            cwd=ROOT,
-        )
+        cmd.append("--print-json")
+        result = _run_capture(cmd, cwd=ROOT)
+        promotion_doc: dict[str, Any] = {}
+        stdout = (result.stdout or "").strip()
+        if stdout:
+            try:
+                parsed = json.loads(stdout)
+                if isinstance(parsed, dict):
+                    promotion_doc = parsed
+            except Exception:
+                promotion_doc = {}
+        selected = promotion_doc.get("selected") if isinstance(promotion_doc, dict) else None
+        if not isinstance(selected, dict):
+            selected = {}
         return {
             "status": "ok",
             "strategy": "by_run_id" if run_id is not None else ("exact_step" if step is not None else "latest_checkpoint"),
             "run_id": str(run_id) if run_id is not None else None,
             "step": int(step) if step is not None else None,
             "purpose": str(purpose),
+            "selected_run_id": str(selected.get("run_id")) if selected.get("run_id") else None,
+            "selected_stage": str(selected.get("stage")) if selected.get("stage") else None,
+            "selected_stage_pass": int(selected.get("stage_pass")) if isinstance(selected.get("stage_pass"), (int, float)) else None,
+            "selected_phase_label": str(selected.get("phase_label")) if selected.get("phase_label") else None,
+            "checkpoint_step": int(selected.get("checkpoint_step")) if isinstance(selected.get("checkpoint_step"), (int, float)) else None,
+            "checkpoint_id": str(selected.get("checkpoint_id")) if selected.get("checkpoint_id") else None,
+            "checkpoint_bump": str(selected.get("checkpoint_bump")) if selected.get("checkpoint_bump") else None,
+            "checkpoint_manifest": str(selected.get("checkpoint_manifest")) if selected.get("checkpoint_manifest") else None,
         }
     except Exception as exc:
         payload = {"status": "error", "reason": str(exc)}
@@ -418,6 +436,7 @@ def _build_ledger_start_record(
     work_dir: Path,
     args: "argparse.Namespace",
     active_stage: str,
+    resume_checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a status=running ledger record for the current training invocation."""
     existing = _read_ledger(run_dir)
@@ -441,12 +460,18 @@ def _build_ledger_start_record(
         if str(r.get("status") or "") == "completed" and r.get("checkpoint_bump")
     ]
     parent_run_id = str(completed_with_ckpt[-1].get("run_id")) if completed_with_ckpt else None
+    resume_meta = _resume_metadata(resume_checkpoint)
 
     return {
         "schema": "ck.run_ledger.v1",
         "run_order": run_order,
         "run_id": work_dir.name,
         "parent_run_id": parent_run_id,
+        "resume_strategy": resume_meta.get("resume_strategy"),
+        "resume_from_run_id": resume_meta.get("resume_from_run_id"),
+        "resume_from_phase_label": resume_meta.get("resume_from_phase_label"),
+        "resume_from_step": resume_meta.get("resume_from_step"),
+        "resume_from_checkpoint_id": resume_meta.get("resume_from_checkpoint_id"),
         "stage_id": stage_id,
         "stage_pass": stage_pass,
         "phase_label": phase_label,
@@ -465,6 +490,7 @@ def _build_ledger_start_record(
         "loss_min": None,
         "loss_min_step": None,
         "checkpoint_step": None,
+        "checkpoint_id": None,
         "checkpoint_bump": None,
         "checkpoint_manifest": None,
         "work_dir": str(work_dir),
@@ -950,6 +976,111 @@ def _snapshot_run_checkpoint(run_dir: Path, work_dir: Path, steps: Any) -> dict[
         "source_manifest": str(src_manifest),
         "bump": str(dst_bump),
         "manifest": str(dst_manifest),
+    }
+
+
+def _text_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _phase_label_for(stage_id: Any, stage_pass: Any) -> str | None:
+    stage_txt = _text_or_none(stage_id)
+    pass_i = _int_or_none(stage_pass)
+    if not stage_txt or pass_i is None or pass_i <= 0:
+        return None
+    return f"{stage_txt}_{pass_i}"
+
+
+def _checkpoint_id_for(run_id: Any, step: Any) -> str | None:
+    run_txt = _text_or_none(run_id)
+    step_i = _int_or_none(step)
+    if not run_txt or step_i is None or step_i <= 0:
+        return None
+    return f"{run_txt}:{step_i}"
+
+
+def _resume_metadata(resume_checkpoint: dict[str, Any] | None) -> dict[str, Any]:
+    doc = resume_checkpoint if isinstance(resume_checkpoint, dict) else {}
+    status = _text_or_none(doc.get("status")) or "unknown"
+    reason = _text_or_none(doc.get("reason"))
+    strategy = _text_or_none(doc.get("strategy"))
+    if strategy is None and status == "skipped" and reason == "resume_not_requested":
+        strategy = "not_requested"
+    run_id = _text_or_none(doc.get("selected_run_id")) or _text_or_none(doc.get("run_id"))
+    phase_label = _text_or_none(doc.get("selected_phase_label"))
+    stage_id = _text_or_none(doc.get("selected_stage"))
+    stage_pass = _int_or_none(doc.get("selected_stage_pass"))
+    step = _int_or_none(doc.get("checkpoint_step"))
+    if step is None:
+        step = _int_or_none(doc.get("step"))
+    checkpoint_id = _text_or_none(doc.get("checkpoint_id")) or _checkpoint_id_for(run_id, step)
+    return {
+        "resume_strategy": strategy,
+        "resume_from_run_id": run_id,
+        "resume_from_phase_label": phase_label or _phase_label_for(stage_id, stage_pass),
+        "resume_from_step": step,
+        "resume_from_checkpoint_id": checkpoint_id,
+    }
+
+
+def _load_manifest_provenance(manifest_path: Path | None) -> dict[str, Any]:
+    if manifest_path is None or not manifest_path.exists():
+        return {}
+    try:
+        doc = _load_json(manifest_path)
+    except Exception:
+        return {}
+    if not isinstance(doc, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key in (
+        "checkpoint_id",
+        "run_id",
+        "phase_label",
+        "stage_id",
+        "stage_pass",
+        "checkpoint_step",
+        "parent_run_id",
+        "resume_strategy",
+        "resume_from_run_id",
+        "resume_from_phase_label",
+        "resume_from_step",
+        "resume_from_checkpoint_id",
+        "created_at",
+    ):
+        if key in doc:
+            out[key] = doc.get(key)
+    return out
+
+
+def _write_manifest_provenance(manifest_path: Path, provenance: dict[str, Any]) -> dict[str, Any]:
+    try:
+        doc = _load_json(manifest_path)
+    except Exception as exc:
+        return {"status": "error", "manifest": str(manifest_path), "reason": f"load_failed:{exc}"}
+    if not isinstance(doc, dict):
+        return {"status": "error", "manifest": str(manifest_path), "reason": "manifest_not_object"}
+    doc["provenance_schema"] = "ck.checkpoint_provenance.v1"
+    for key, value in provenance.items():
+        doc[key] = value
+    try:
+        _atomic_write_text(manifest_path, json.dumps(doc, indent=2))
+    except Exception as exc:
+        return {"status": "error", "manifest": str(manifest_path), "reason": f"write_failed:{exc}"}
+    return {
+        "status": "ok",
+        "manifest": str(manifest_path),
+        "checkpoint_id": provenance.get("checkpoint_id"),
     }
 
 
@@ -2734,6 +2865,7 @@ def _backfill_run_ledger(run_dir: Path) -> int:
 
         # 1. pipeline_report.json
         report_path = sub / "pipeline_report.json"
+        report_resume_meta: dict[str, Any] = {}
         if report_path.exists():
             try:
                 report = _load_json(report_path)
@@ -2744,6 +2876,7 @@ def _backfill_run_ledger(run_dir: Path) -> int:
                     if isinstance(ds, str) and ds:
                         dataset_path_value = ds
                         dataset_name = Path(ds).name
+                    report_resume_meta = _resume_metadata(report.get("resume_checkpoint"))
             except Exception:
                 pass
 
@@ -2827,11 +2960,18 @@ def _backfill_run_ledger(run_dir: Path) -> int:
         elif global_bump is not None and global_manifest is not None and global_bump.exists() and global_manifest.exists():
             checkpoint_bump = str(global_bump)
             checkpoint_manifest = str(global_manifest)
+        manifest_meta = _load_manifest_provenance(Path(checkpoint_manifest)) if checkpoint_manifest else {}
 
         rec: dict[str, Any] = {
             "schema": "ck.run_ledger.v1",
             "run_order": base_run_order + i,
             "run_id": sub.name,
+            "parent_run_id": _text_or_none(manifest_meta.get("parent_run_id")),
+            "resume_strategy": _text_or_none(manifest_meta.get("resume_strategy")) or report_resume_meta.get("resume_strategy"),
+            "resume_from_run_id": _text_or_none(manifest_meta.get("resume_from_run_id")) or report_resume_meta.get("resume_from_run_id"),
+            "resume_from_phase_label": _text_or_none(manifest_meta.get("resume_from_phase_label")) or report_resume_meta.get("resume_from_phase_label"),
+            "resume_from_step": _int_or_none(manifest_meta.get("resume_from_step")) or report_resume_meta.get("resume_from_step"),
+            "resume_from_checkpoint_id": _text_or_none(manifest_meta.get("resume_from_checkpoint_id")) or report_resume_meta.get("resume_from_checkpoint_id"),
             "stage_id": stage_id,
             "stage_pass": stage_pass,
             "phase_label": phase_label,
@@ -2850,6 +2990,7 @@ def _backfill_run_ledger(run_dir: Path) -> int:
             "loss_min": loss_min,
             "loss_min_step": loss_min_step,
             "checkpoint_step": ck_step_i,
+            "checkpoint_id": _text_or_none(manifest_meta.get("checkpoint_id")) or _checkpoint_id_for(sub.name, ck_step_i),
             "checkpoint_bump": checkpoint_bump,
             "checkpoint_manifest": checkpoint_manifest,
             "work_dir": str(sub),
@@ -2903,6 +3044,13 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
         phase_label: str | None = None
         run_order: int | None = None
         parent_run_id: str | None = None
+        resume_strategy: str | None = None
+        resume_from_run_id: str | None = None
+        resume_from_phase_label: str | None = None
+        resume_from_step: int | None = None
+        resume_from_checkpoint_id: str | None = None
+        checkpoint_id: str | None = None
+        report_resume_meta: dict[str, Any] = {}
 
         # ── 1. run_ledger.jsonl (primary) ──────────────────────────────────
         led = ledger_by_run_id.get(run_id_str)
@@ -2914,6 +3062,12 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
             run_order = led.get("run_order")
             parent_raw = str(led.get("parent_run_id") or "").strip()
             parent_run_id = parent_raw or None
+            resume_strategy = _text_or_none(led.get("resume_strategy"))
+            resume_from_run_id = _text_or_none(led.get("resume_from_run_id"))
+            resume_from_phase_label = _text_or_none(led.get("resume_from_phase_label"))
+            resume_from_step = _int_or_none(led.get("resume_from_step"))
+            resume_from_checkpoint_id = _text_or_none(led.get("resume_from_checkpoint_id"))
+            checkpoint_id = _text_or_none(led.get("checkpoint_id"))
 
         # ── 2. pipeline_report.json (legacy authoritative) ─────────────────
         report_path = run_dir_entry / "pipeline_report.json"
@@ -2928,6 +3082,17 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
                         ds = report.get("dataset")
                         if isinstance(ds, str) and ds:
                             dataset_name = Path(ds).name
+                    report_resume_meta = _resume_metadata(report.get("resume_checkpoint"))
+                    if resume_strategy is None:
+                        resume_strategy = _text_or_none(report_resume_meta.get("resume_strategy"))
+                    if resume_from_run_id is None:
+                        resume_from_run_id = _text_or_none(report_resume_meta.get("resume_from_run_id"))
+                    if resume_from_phase_label is None:
+                        resume_from_phase_label = _text_or_none(report_resume_meta.get("resume_from_phase_label"))
+                    if resume_from_step is None:
+                        resume_from_step = _int_or_none(report_resume_meta.get("resume_from_step"))
+                    if resume_from_checkpoint_id is None:
+                        resume_from_checkpoint_id = _text_or_none(report_resume_meta.get("resume_from_checkpoint_id"))
             except Exception:
                 pass
 
@@ -3018,6 +3183,27 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
             mtime = int(train_ck_path.stat().st_mtime)
             sort_key = mtime
         ended_at = datetime.fromtimestamp(int(train_ck_path.stat().st_mtime), tz=timezone.utc).isoformat()
+        ck_step_i = _int_or_none(train_ck.get("steps"))
+        local_manifest = run_dir_entry / "weights_final_manifest.json"
+        global_manifest = (
+            run_dir / "checkpoints" / f"weights_step_{ck_step_i:08d}_manifest.json"
+        ) if ck_step_i else None
+        checkpoint_manifest = local_manifest if local_manifest.exists() else (global_manifest if global_manifest and global_manifest.exists() else None)
+        manifest_meta = _load_manifest_provenance(checkpoint_manifest)
+        if checkpoint_id is None:
+            checkpoint_id = _text_or_none(manifest_meta.get("checkpoint_id")) or _checkpoint_id_for(run_id_str, ck_step_i)
+        if parent_run_id is None:
+            parent_run_id = _text_or_none(manifest_meta.get("parent_run_id"))
+        if resume_strategy is None:
+            resume_strategy = _text_or_none(manifest_meta.get("resume_strategy"))
+        if resume_from_run_id is None:
+            resume_from_run_id = _text_or_none(manifest_meta.get("resume_from_run_id"))
+        if resume_from_phase_label is None:
+            resume_from_phase_label = _text_or_none(manifest_meta.get("resume_from_phase_label"))
+        if resume_from_step is None:
+            resume_from_step = _int_or_none(manifest_meta.get("resume_from_step"))
+        if resume_from_checkpoint_id is None:
+            resume_from_checkpoint_id = _text_or_none(manifest_meta.get("resume_from_checkpoint_id"))
 
         entry: dict[str, Any] = {
             "stage": stage,
@@ -3041,11 +3227,68 @@ def _collect_stage_loss_history(run_dir: Path) -> dict[str, Any]:
             entry["run_order"] = run_order
         if parent_run_id is not None:
             entry["parent_run_id"] = parent_run_id
+        if resume_strategy is not None:
+            entry["resume_strategy"] = resume_strategy
+        if resume_from_run_id is not None:
+            entry["resume_from_run_id"] = resume_from_run_id
+        if resume_from_phase_label is not None:
+            entry["resume_from_phase_label"] = resume_from_phase_label
+        if resume_from_step is not None:
+            entry["resume_from_step"] = resume_from_step
+        if resume_from_checkpoint_id is not None:
+            entry["resume_from_checkpoint_id"] = resume_from_checkpoint_id
+        if checkpoint_id is not None:
+            entry["checkpoint_id"] = checkpoint_id
         entries.append(entry)
 
     # Sort by ledger run_order when available, then file mtime for legacy runs
     entries.sort(key=lambda e: e.pop("_sort_key", 0))
     return {"entries": entries}
+
+
+def _refresh_stage_history_in_pipeline_latest(
+    run_dir: Path,
+    *,
+    required_run_id: str | None = None,
+) -> dict[str, Any]:
+    """Rewrite stage_loss_history inside training_pipeline_latest.json from ledger/pipeline artifacts.
+
+    Returns summary metadata so callers can verify whether a specific run_id is present.
+    """
+    pipeline_path = run_dir / "training_pipeline_latest.json"
+    if pipeline_path.exists():
+        try:
+            pipeline_doc = _load_json(pipeline_path)
+            if not isinstance(pipeline_doc, dict):
+                pipeline_doc = {}
+        except Exception:
+            pipeline_doc = {}
+    else:
+        pipeline_doc = {}
+
+    stage_loss_history = _collect_stage_loss_history(run_dir)
+    pipeline_doc["stage_loss_history"] = stage_loss_history
+    if isinstance(pipeline_doc.get("pipeline"), dict):
+        pipeline_doc["pipeline"]["stage_loss_history"] = stage_loss_history
+
+    entries = stage_loss_history.get("entries") if isinstance(stage_loss_history, dict) else []
+    if not isinstance(entries, list):
+        entries = []
+    run_ids = {
+        str(e.get("run_id")).strip()
+        for e in entries
+        if isinstance(e, dict) and str(e.get("run_id") or "").strip()
+    }
+
+    _atomic_write_text(pipeline_path, json.dumps(pipeline_doc, indent=2))
+    has_required = True
+    if required_run_id is not None:
+        has_required = str(required_run_id).strip() in run_ids
+    return {
+        "path": str(pipeline_path),
+        "entry_count": len(entries),
+        "has_required_run_id": has_required,
+    }
 
 
 def _normalize_stage_name(raw: Any) -> str | None:
@@ -3998,6 +4241,14 @@ def main() -> int:
         action="store_true",
         help="Backfill run_ledger.jsonl for existing .ck_pipeline runs that lack a ledger entry, then exit.",
     )
+    ap.add_argument(
+        "--rebuild-stage-history",
+        action="store_true",
+        help=(
+            "Refresh training_pipeline_latest.json stage_loss_history from run_ledger/.ck_pipeline "
+            "and exit (recovery utility; no training)."
+        ),
+    )
     args = ap.parse_args()
 
     # ── Validate numeric arguments ──────────────────────────────
@@ -4101,6 +4352,16 @@ def main() -> int:
 
     # ── Auto-backfill: silently migrate legacy runs on every invocation ────
     _backfill_run_ledger(run_dir)
+
+    # ── --rebuild-stage-history: recovery utility mode ─────────────────────
+    if getattr(args, "rebuild_stage_history", False):
+        rebuilt = _refresh_stage_history_in_pipeline_latest(run_dir)
+        print(
+            "[stage-history] "
+            f"rebuilt entries={rebuilt.get('entry_count')} "
+            f"path={rebuilt.get('path')}"
+        )
+        return 0
 
     if args.resume_step is not None:
         args.resume_latest_checkpoint = True
@@ -4482,7 +4743,13 @@ def main() -> int:
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
     _atomic_write_text(work_dir / "pipeline_report.json", json.dumps(_pipeline_stub, indent=2))
-    ledger_rec = _build_ledger_start_record(run_dir, work_dir, args, _active_stage_for_ledger)
+    ledger_rec = _build_ledger_start_record(
+        run_dir,
+        work_dir,
+        args,
+        _active_stage_for_ledger,
+        resume_checkpoint=resume_checkpoint,
+    )
     _append_ledger_entry(run_dir, ledger_rec)
     # ── End ledger start ───────────────────────────────────────────────────
 
@@ -4506,11 +4773,34 @@ def main() -> int:
         _ck_steps_value = int(_ck_json_data.get("steps"))
     except Exception:
         _ck_steps_value = None
+    _completed_at = datetime.now(timezone.utc).isoformat()
     ckpt_snapshot = _snapshot_run_checkpoint(run_dir, work_dir, _ck_steps_value)
+    checkpoint_provenance = {
+        "run_id": work_dir.name,
+        "phase_label": ledger_rec.get("phase_label"),
+        "stage_id": ledger_rec.get("stage_id"),
+        "stage_pass": ledger_rec.get("stage_pass"),
+        "checkpoint_step": _ck_steps_value,
+        "checkpoint_id": _checkpoint_id_for(work_dir.name, _ck_steps_value),
+        "created_at": _completed_at,
+        "parent_run_id": ledger_rec.get("parent_run_id"),
+        **_resume_metadata(resume_checkpoint),
+    }
+    manifest_updates: list[dict[str, Any]] = []
+    for manifest_key in ("source_manifest", "manifest"):
+        manifest_raw = ckpt_snapshot.get(manifest_key)
+        manifest_path = Path(manifest_raw) if isinstance(manifest_raw, str) and manifest_raw else None
+        if manifest_path is None:
+            continue
+        update_res = _write_manifest_provenance(manifest_path, checkpoint_provenance)
+        manifest_updates.append(update_res)
+    if manifest_updates:
+        ckpt_snapshot["manifest_updates"] = manifest_updates
+    ckpt_snapshot["provenance"] = checkpoint_provenance
     _append_ledger_entry(run_dir, {
         **ledger_rec,
         "status": "completed",
-        "ended_at": datetime.now(timezone.utc).isoformat(),
+        "ended_at": _completed_at,
         "steps": _ck_json_data.get("steps"),
         "total_tokens": _ck_json_data.get("total_tokens"),
         "loss_first": _loss_first,
@@ -4518,6 +4808,7 @@ def main() -> int:
         "loss_min": min(_loss_vals) if _loss_vals else None,
         "loss_min_step": int(_loss_min_idx + 1) if _loss_min_idx is not None else None,
         "checkpoint_step": _ck_steps_value,
+        "checkpoint_id": checkpoint_provenance.get("checkpoint_id"),
         "checkpoint_bump": ckpt_snapshot.get("bump"),
         "checkpoint_manifest": ckpt_snapshot.get("manifest"),
     })
@@ -4525,6 +4816,21 @@ def main() -> int:
 
     if args.with_torch_ref:
         _run_torch_ref(args, dataset_path, torch_json, token_file=token_file)
+
+    stage_history_refresh = _refresh_stage_history_in_pipeline_latest(
+        run_dir,
+        required_run_id=work_dir.name,
+    )
+    if not bool(stage_history_refresh.get("has_required_run_id")):
+        raise SystemExit(
+            "ERROR: strict mode failed (stage history refresh).\n"
+            f"  run_dir:  {run_dir}\n"
+            f"  run_id:   {work_dir.name}\n"
+            f"  entries:  {stage_history_refresh.get('entry_count')}\n"
+            f"  artifact: {stage_history_refresh.get('path')}\n"
+            "  reason: current run_id still missing after rebuild.\n"
+            "  next: inspect run_ledger.jsonl and .ck_pipeline/<run_id>/train_ck.json."
+        )
 
     checkpoint_promotion = _promote_latest_checkpoint_for_eval(
         run_dir,
@@ -4609,6 +4915,7 @@ def main() -> int:
         "dataset_profile": dataset_profile,
         "tokenizer_roundtrip": tokenizer_roundtrip,
         "post_train_eval": post_train_eval,
+        "stage_history_refresh": stage_history_refresh,
         "checkpoint_promotion": checkpoint_promotion,
         "resume_checkpoint": resume_checkpoint,
         "ck_loss": {},
