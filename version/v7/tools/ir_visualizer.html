@@ -11654,6 +11654,16 @@ function renderProfileHowTo() {
         `make profile-v7-cachegrind V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         'make v7-perf-gate-evaluate V7_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
+    const quickArtifactCmd = [
+        explicitModelDirCmd,
+        'make v7-init',
+        'make v7-capture-artifacts V7_MODEL="$REPORT_MODEL_DIR"',
+    ].join('\n');
+    const quickProfileDashboardCmd = [
+        explicitModelDirCmd,
+        'make v7-init',
+        'make v7-profile-dashboard V7_MODEL="$REPORT_MODEL_DIR"',
+    ].join('\n');
 
     const profileDecodeForceCompileCmd = [
         explicitModelDirCmd,
@@ -11855,6 +11865,32 @@ function renderProfileHowTo() {
             ${profileIssueHtml}
             ${missingHelpHtml}
 
+            <details class="profile-phase" open>
+                <summary>
+                    <span class="profile-phase-number phase-report">0</span>
+                    <span class="profile-phase-title">Quick Paths</span>
+                    <span class="profile-phase-hint">Use these first if you want one-command capture instead of manual profiling steps</span>
+                </summary>
+                <div class="profile-phase-body">
+                    <p class="profile-phase-desc">
+                        New operators should start here. These wrappers create the repo-local <code>.venv</code> if needed,
+                        refresh the run artifacts, and then rebuild the HTML report surfaces for this exact run directory.
+                    </p>
+                    <div class="profile-howto-grid">
+                        ${renderHowToBlock(
+                            'Runtime + Report + Hub',
+                            quickArtifactCmd,
+                            'Creates the local v7 environment if needed, refreshes this run directory, regenerates ir_report.html, and updates the parent Run Hub.'
+                        )}
+                        ${renderHowToBlock(
+                            'Full Profiling Dashboard',
+                            quickProfileDashboardCmd,
+                            'Runs the operator flow plus decode profiling, perf stat, and flamegraph refresh for this run directory. Use this before falling back to the per-tool commands below.'
+                        )}
+                    </div>
+                </div>
+            </details>
+
             <!-- ═══════ Phase 1: Environment Setup ═══════ -->
             <details class="profile-phase" ${loadedCount === 0 ? 'open' : ''}>
                 <summary>
@@ -11998,8 +12034,8 @@ function renderProfileHowTo() {
                     <div class="profile-howto-grid">
                         ${renderHowToBlock(
                             'One-Shot Full Report',
-                            oneShotCmd,
-                            'Compiles, profiles, generates all artefacts, and bundles everything into a single self-contained ir_report.html with embedded data. The easiest way to get a complete report.'
+                            quickProfileDashboardCmd,
+                            'Preferred one-command operator path. Creates the v7 environment if needed, runs profiling targets, and refreshes the report and Run Hub for this run directory.'
                         )}
                         ${renderHowToBlock(
                             'Force Rebuild (if profile_decode.csv missing)',
