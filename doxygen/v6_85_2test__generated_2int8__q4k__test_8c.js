@@ -2,7 +2,6 @@ var v6_85_2test__generated_2int8__q4k__test_8c =
 [
     [ "_GNU_SOURCE", "v6_85_2test__generated_2int8__q4k__test_8c.html#a369266c24eacffb87046522897a570d5", null ],
     [ "__attribute__", "v6_85_2test__generated_2int8__q4k__test_8c.html#ab898071398b359603a35c202e9c65f3b", null ],
-    [ "_Static_assert", "v6_85_2test__generated_2int8__q4k__test_8c.html#af37f95c2bda9c8a7ff16122a18782d54", null ],
     [ "model_align_elems", "v6_85_2test__generated_2int8__q4k__test_8c.html#ae83bb643d8c0d7ee497b9760e56e6578", null ],
     [ "model_decode", "v6_85_2test__generated_2int8__q4k__test_8c.html#a462a350626f70f9ce0046f7eda07c6a3", null ],
     [ "model_decode_token", "v6_85_2test__generated_2int8__q4k__test_8c.html#aefe572c58f1dd2cbf3cfc0f2c5286b94", null ],
