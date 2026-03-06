@@ -146,6 +146,7 @@
 
 <div class="card">
     <p style="margin-bottom: 0.4rem;">Use one canonical run path and data directory so artifacts and IR visualizer remain aligned.</p>
+    <p class="mini-note"><strong>Spec03 note:</strong> the current staged-dataset workflow uses <code>version/v7/data/spec03</code> as the editable SVG workspace. This page prepares that workspace; the main <a href="v7-runbook.html">v7 Runbook</a> then stages it into <code>$RUN/dataset/</code> with <code>--dataset-workspace version/v7/data/spec03</code>.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>export ROOT=/home/antshiv/Workspace/C-Kernel-Engine
@@ -158,6 +159,14 @@ echo "[OK] RUN=$RUN"
 echo "[OK] DATA_DIR=$DATA_DIR"
 echo "[OK] DATA_TXT=$DATA_TXT"</pre>
     </div>
+</div>
+<div class="card card-blue" style="margin-top:0.7rem;">
+    <p style="margin-bottom:0.4rem;"><strong>Optional one-time workspace scaffold</strong> if <code>spec03</code> does not exist yet:</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type svg</pre>
+    </div>
+    <p class="mini-note">After scaffold + data prep, keep working in <code>version/v7/data/spec03</code> until you are ready to stage a run-local copy into <code>$RUN/dataset/</code>.</p>
 </div>
 <p class="mini-note"><strong>Guardrail:</strong> keep <code>RUN</code> in <code>$HOME/.cache/ck-engine-v7/models/train/...</code> so <code>python3 version/v7/tools/open_ir_hub.py --open</code> can discover the run automatically.</p>
 

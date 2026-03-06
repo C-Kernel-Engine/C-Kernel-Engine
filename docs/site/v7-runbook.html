@@ -2689,6 +2689,7 @@ fi</pre>
 
 <div class="card card-blue">
     <p style="margin-bottom: 0.45rem;">Use this once per new run to make the training pipeline explicit from the start: generate staged datasets, lock tokenizer corpus, seed run artifacts, and generate the first operator view.</p>
+    <p class="mini-note"><strong>Dataset workspace first:</strong> if you are using the newer staged dataset flow, prepare <code>version/v7/data/spec03</code> in <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a> first, then stage that workspace into the run with <code>--dataset-workspace</code>. The repo workspace is the seed template; the run-local copy under <code>$RUN/dataset/</code> is the working dataset for that run.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># 1) Build staged SVG corpora + instruction corpus
@@ -2733,6 +2734,32 @@ export SFT_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_instruction_train.txt"
 .venv/bin/python version/v7/tools/open_ir_hub.py --open</pre>
     </div>
     <p class="mini-note"><strong>Canonical path:</strong> Step 0A is the real bootstrap path. Use Step 0.7 only as a tiny tokenizer preview smoke-check (it uses stub dims and should not be your production bootstrap).</p>
+    <details style="margin-top:0.55rem;">
+        <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.82rem;">Spec03 staged-dataset bootstrap (preferred for current SVG runs)</summary>
+        <div class="cmd-block" style="margin-top:0.45rem;">
+            <button class="copy-btn" type="button">Copy</button>
+<pre># 0) Prepare spec03 once (see v7-svg-dataset-runbook.html for import/normalize/classify/materialize)
+bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type svg
+
+# 1) Bootstrap a run with a staged dataset snapshot under $RUN/dataset
+.venv/bin/python version/v7/scripts/ck_run_v7.py init \
+  --run "$RUN" \
+  --layers 16 --vocab-size 1024 --embed-dim 128 --hidden-dim 512 \
+  --num-heads 8 --num-kv-heads 4 --context-len 512 \
+  --template qwen3 \
+  --dataset-workspace version/v7/data/spec03 \
+  --dataset-stage-mode copy \
+  --dataset-stage-force \
+  --generate-ir --generate-runtime --strict
+
+# 2) Regenerate both operator views after dataset changes
+python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts --output "$RUN/ir_report.html"
+python3 version/v7/scripts/build_svg_dataset_visualizer_v7.py \
+  --workspace "$RUN/dataset" \
+  --output "$RUN/dataset_viewer.html"</pre>
+        </div>
+        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, pretrain text, tokenizer corpus, and holdout set all live under the same run directory.</p>
+    </details>
     <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
     <div class="step-produces">
         <span class="produces-label">Produces:</span>
