@@ -3245,6 +3245,8 @@ V7_SMOKE_MODEL_QWEN3 ?= hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf
 V7_REQUIREMENTS ?= requirements-v7.txt
 V7_VENV_PY ?= .venv/bin/python
 V7_VENV_STAMP ?= .venv/.v7_requirements.stamp
+V7_DOCTOR_SCRIPT ?= version/v7/scripts/v7_doctor.py
+V7_DOCTOR_SH ?= version/v7/scripts/v7_doctor.sh
 V7_CHAT_TEMPLATE ?= auto
 V7_WEIGHT_DTYPE ?=
 V7_WEIGHT_DTYPE_ARG := $(if $(strip $(V7_WEIGHT_DTYPE)),--weight-dtype $(V7_WEIGHT_DTYPE),)
@@ -3411,7 +3413,7 @@ V7_STABILIZATION_JSON ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_lates
 V7_STABILIZATION_MD ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_latest.md
 V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.jsonl
 
-.PHONY: v7-init v7-demo-runtime v7-capture-artifacts v7-profile-dashboard \
+.PHONY: v7-init v7-doctor v7-demo-runtime v7-capture-artifacts v7-profile-dashboard \
 	v7-qk-norm-backward-parity v7-qk-norm-backward-parity-isa v7-qk-norm-backward-parity-isa-strict v7-rms-swiglu-backward-parity \
 	v7-kernel-parity-train v7-init-tiny v7-train-layout-smoke v7-train-memory-audit v7-train-codegen v7-train-compile-smoke v7-train-c-smoke \
 	v7-train-parity-drift-smoke v7-train-parity-drift-localize v7-train-parity-long-horizon v7-train-parity-long-horizon-realistic \
@@ -3426,6 +3428,7 @@ v7-help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  make v7-init"
+	@echo "  make v7-doctor"
 	@echo "  make v7-demo-runtime V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
 	@echo "  make v7-capture-artifacts V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
 	@echo "  make v7-profile-dashboard V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
@@ -3516,9 +3519,14 @@ $(V7_VENV_STAMP): $(V7_REQUIREMENTS) | $(V7_VENV_PY)
 	@$(V7_VENV_PY) -m pip install -r $(V7_REQUIREMENTS)
 	@touch $(V7_VENV_STAMP)
 
+v7-doctor:
+	@bash $(V7_DOCTOR_SH)
+
 v7-init: $(V7_VENV_STAMP)
 	@echo "v7 env ready: $(V7_VENV_PY)"
+	@bash $(V7_DOCTOR_SH) || true
 	@echo "Next:"
+	@echo "  make v7-doctor"
 	@echo "  make v7-demo-runtime V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
 	@echo "  make v7-capture-artifacts V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"
 	@echo "  make v7-profile-dashboard V7_MODEL=$(V7_SMOKE_MODEL_QWEN3)"

@@ -977,14 +977,23 @@
 <div class="card">
     <h3 style="margin-top: 0;">Required</h3>
     <pre># Linux toolchain + isolated Python env
-sudo apt install build-essential python3 python3-venv python3-pip
+sudo apt install build-essential git make python3 python3-venv python3-pip
 
-# Create repo-local virtual environment
-python3 -m venv .venv
+# Supported bootstrap path
+make v7-init
+make v7-doctor</pre>
+    <p style="margin-bottom: 0.5rem;">Use the repo-local <code>.venv</code> for all v7 Python commands. If you do not activate it, invoke scripts explicitly with <code>.venv/bin/python ...</code>.</p>
+    <p style="margin-bottom: 0.5rem;"><strong>Required Python packages (supported v7 workflows):</strong> <code>numpy torch safetensors requests tqdm huggingface_hub gguf tokenizers transformers</code></p>
+    <p style="margin-bottom: 0;">This is the supported <code>v7</code> bundle for run / train / parity workflows. Not every package is used on every execution path. If you prefer <code>uv</code>, <code>conda</code>, or manual <code>pip</code>, install that same package set into the interpreter you plan to use, then run <code>make v7-doctor</code>.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Manual Python Environment (pip example)</h3>
+    <pre>python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install numpy torch</pre>
-    <p style="margin-bottom: 0;">Use the repo-local <code>.venv</code> for all v7 Python commands. If you do not activate it, invoke scripts explicitly with <code>.venv/bin/python ...</code>.</p>
+python -m pip install -r requirements-v7.txt
+make v7-doctor</pre>
 </div>
 
 <div class="card">

@@ -19,6 +19,7 @@ Usage:
 import argparse
 import ctypes
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -47,6 +48,7 @@ BUILD_DIR = PROJECT_ROOT / "build"
 HEADER_SIZE = 128
 KERNEL_MAPS_DIR = V7_ROOT / "kernel_maps"
 KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
+V7_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v7.txt"
 
 def _get_cache_dir() -> Path:
     """Pick a writable cache dir (env override, default ~/.cache, fallback to repo)."""
@@ -122,6 +124,89 @@ def log_error(msg: str):
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_v7_requirement_packages() -> list[str]:
+    packages: list[str] = []
+    if not V7_REQUIREMENTS_PATH.exists():
+        return packages
+    for raw in V7_REQUIREMENTS_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("--"):
+            continue
+        if line.startswith("-e ") or "://" in line:
+            continue
+        pkg = re.split(r"[<>=!~\[\]\s]", line, maxsplit=1)[0].strip()
+        if pkg:
+            packages.append(pkg)
+    return packages
+
+
+def _missing_v7_python_packages() -> list[str]:
+    missing: list[str] = []
+    for pkg in _parse_v7_requirement_packages():
+        module_name = pkg.replace("-", "_")
+        if importlib.util.find_spec(module_name) is None:
+            missing.append(pkg)
+    return missing
+
+
+def _ensure_v7_python_requirements(command: Optional[str]) -> None:
+    commands_requiring_v7_env = {
+        "run",
+        "init",
+        "train-e2e",
+        "train",
+        "sanity",
+        "parity",
+        "profile",
+        "train-suite",
+        "train-observe",
+        "template-audit",
+        "v7-template-audit",
+    }
+    if command not in commands_requiring_v7_env:
+        return
+
+    missing = _missing_v7_python_packages()
+    if not missing:
+        return
+
+    reqs = " ".join(_parse_v7_requirement_packages())
+    log_error(
+        f"Missing v7 Python dependencies for '{command}': {', '.join(missing)}"
+    )
+    print(f"Required Python packages: {reqs}", file=sys.stderr)
+    print("Supported bootstrap:", file=sys.stderr)
+    print("  make v7-init", file=sys.stderr)
+    print("  make v7-doctor", file=sys.stderr)
+    print("Manual environment (pip example):", file=sys.stderr)
+    print("  python3 -m venv .venv", file=sys.stderr)
+    print("  . .venv/bin/activate", file=sys.stderr)
+    print(f"  python -m pip install -r {V7_REQUIREMENTS_PATH.name}", file=sys.stderr)
+    print(
+        "If you prefer uv/conda, install the same package set into the interpreter you plan to use.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+def _print_v7_next_steps(command: Optional[str], exc: Optional[BaseException] = None) -> None:
+    print("\nNext safe steps:", file=sys.stderr)
+    print("  make v7-init", file=sys.stderr)
+    print("  make v7-doctor", file=sys.stderr)
+    if command == "run":
+        print("  version/v7/scripts/cks-v7-run run <model-or-run-dir> [...]", file=sys.stderr)
+        print("  make v7-demo-runtime V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf", file=sys.stderr)
+    elif command in {"train-e2e", "train", "sanity", "parity", "profile", "train-suite", "train-observe", "init"}:
+        print("  Review the runbook bootstrap section and re-run after v7-doctor passes.", file=sys.stderr)
+    else:
+        print("  Re-run after v7-doctor passes.", file=sys.stderr)
+
+    if isinstance(exc, FileNotFoundError):
+        print("  Missing file/tool detected. v7-doctor should tell you exactly what is missing.", file=sys.stderr)
+    elif isinstance(exc, subprocess.CalledProcessError):
+        print("  A subprocess failed. Start with v7-doctor, then retry with the shell wrapper if this is a first run.", file=sys.stderr)
 
 
 def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.CompletedProcess:
@@ -7213,6 +7298,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         },
     }
     (out_dir / "operator_train_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
     log(f"  Run directory: {out_dir}", C_GREEN)
 
 
@@ -10203,60 +10289,68 @@ Examples:
     clean_parser.add_argument('model', nargs='?', help='Model to clean (or all)')
 
     args = parser.parse_args()
+    _ensure_v7_python_requirements(args.command)
 
-    if args.command is None:
-        args.weight_dtype = None
-        args.temperature = 0.7
-        args.max_tokens = 512
-        run_interactive(args)
-    elif args.command == 'run':
-        run_pipeline(args)
-    elif args.command in ('template-audit', 'v7-template-audit'):
-        step_run_template_audit(args)
-    elif args.command in ('interactive', 'i'):
-        run_interactive(args)
-    elif args.command == 'init':
-        step_run_train_init(args)
-    elif args.command in ('train-e2e', 'train'):
-        args.train_e2e = True
-        step_run_train_e2e(args)
-    elif args.command == 'sanity':
-        step_run_train_sanity(args)
-    elif args.command == 'parity':
-        step_run_train_parity(args)
-    elif args.command == 'profile':
-        if not getattr(args, 'profile_train', None):
-            args.profile_train = 'perf'
-        step_run_train_e2e(args)
-    elif args.command in ('train-suite', 'train-observe'):
-        step_run_train_suite(args)
-    elif args.command == 'list':
-        if CACHE_DIR.exists():
-            models = list(CACHE_DIR.iterdir())
-            if models:
-                log(f"Cached models in {CACHE_DIR}:")
-                for m in sorted(models):
-                    if m.is_dir():
-                        size = sum(f.stat().st_size for f in m.rglob('*') if f.is_file())
-                        log(f"  {m.name.replace('--', '/')} ({size / 1e6:.1f} MB)")
+    try:
+        if args.command is None:
+            args.weight_dtype = None
+            args.temperature = 0.7
+            args.max_tokens = 512
+            run_interactive(args)
+        elif args.command == 'run':
+            run_pipeline(args)
+        elif args.command in ('template-audit', 'v7-template-audit'):
+            step_run_template_audit(args)
+        elif args.command in ('interactive', 'i'):
+            run_interactive(args)
+        elif args.command == 'init':
+            step_run_train_init(args)
+        elif args.command in ('train-e2e', 'train'):
+            args.train_e2e = True
+            step_run_train_e2e(args)
+        elif args.command == 'sanity':
+            step_run_train_sanity(args)
+        elif args.command == 'parity':
+            step_run_train_parity(args)
+        elif args.command == 'profile':
+            if not getattr(args, 'profile_train', None):
+                args.profile_train = 'perf'
+            step_run_train_e2e(args)
+        elif args.command in ('train-suite', 'train-observe'):
+            step_run_train_suite(args)
+        elif args.command == 'list':
+            if CACHE_DIR.exists():
+                models = list(CACHE_DIR.iterdir())
+                if models:
+                    log(f"Cached models in {CACHE_DIR}:")
+                    for m in sorted(models):
+                        if m.is_dir():
+                            size = sum(f.stat().st_size for f in m.rglob('*') if f.is_file())
+                            log(f"  {m.name.replace('--', '/')} ({size / 1e6:.1f} MB)")
+                else:
+                    log("No cached models")
             else:
                 log("No cached models")
-        else:
-            log("No cached models")
-    elif args.command == 'clean':
-        if args.model:
-            model_dir = CACHE_DIR / args.model.replace('/', '--')
-            if model_dir.exists():
-                shutil.rmtree(model_dir)
-                log(f"Removed {args.model}")
+        elif args.command == 'clean':
+            if args.model:
+                model_dir = CACHE_DIR / args.model.replace('/', '--')
+                if model_dir.exists():
+                    shutil.rmtree(model_dir)
+                    log(f"Removed {args.model}")
+                else:
+                    log_error(f"Model not found: {args.model}")
             else:
-                log_error(f"Model not found: {args.model}")
+                if CACHE_DIR.exists():
+                    shutil.rmtree(CACHE_DIR)
+                    log("Cleaned all cached models")
         else:
-            if CACHE_DIR.exists():
-                shutil.rmtree(CACHE_DIR)
-                log("Cleaned all cached models")
-    else:
-        parser.print_help()
+            parser.print_help()
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        _print_v7_next_steps(args.command, exc)
+        raise
+    except Exception as exc:
+        _print_v7_next_steps(args.command, exc)
+        raise
 
 
 if __name__ == "__main__":
