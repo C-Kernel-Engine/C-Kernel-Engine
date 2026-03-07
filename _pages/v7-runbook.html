@@ -1712,6 +1712,17 @@ bash version/v7/scripts/v7_train_init_preset.sh \
 
 <h2 id="step-0-prereqs">Step 0: Prereqs + Paths</h2>
 
+<div class="card card-accent">
+    <p style="margin-bottom: 0.45rem;"><strong>Run this once before any raw <code>.venv/bin/python ...</code> commands:</strong></p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make v7-init
+make v7-doctor</pre>
+    </div>
+    <p class="mini-note"><strong>Required Python packages (supported v7 workflows):</strong> <code>numpy torch safetensors requests tqdm huggingface_hub gguf tokenizers transformers</code></p>
+    <p class="mini-note">This is the supported <code>v7</code> bundle for run / train / parity workflows. Not every package is used on every execution path. If you prefer <code>uv</code>, <code>conda</code>, or manual <code>pip</code>, install that same package set into the interpreter you plan to use, then run <code>make v7-doctor</code>. The runbook examples assume that check already passed.</p>
+</div>
+
 <div class="card">
     <p style="margin-bottom: 0.4rem;"><strong>If you used the Config Builder above</strong>, <code>$ROOT</code>, <code>$RUN</code>, and <code>$GEN_DIR</code> are already exported — skip to Step 0A. Use this step when setting paths manually or after opening a new terminal.</p>
     <div class="cmd-block">
@@ -1765,12 +1776,12 @@ fi</pre>
 export GEN_DIR="$RUN/data"
 mkdir -p "$GEN_DIR"
 
-python3 version/v7/scripts/build_svg_pretrain_corpus_v7.py \
+.venv/bin/python version/v7/scripts/build_svg_pretrain_corpus_v7.py \
   --out-dir "$GEN_DIR" \
   --prefix svg_pretrain_pack_l16d128 \
   --assets-glob "$ROOT/docs/site/assets/*.svg"
 
-python3 version/v7/scripts/generate_svg_instruction_dataset_v7.py \
+.venv/bin/python version/v7/scripts/generate_svg_instruction_dataset_v7.py \
   --out-dir "$GEN_DIR" \
   --prefix svg_pretrain_pack_l16d128 \
   --num-samples 1000 --jsonl
@@ -1822,8 +1833,8 @@ bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type s
   --generate-ir --generate-runtime --strict
 
 # 2) Regenerate both operator views after dataset changes
-python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts --output "$RUN/ir_report.html"
-python3 version/v7/scripts/build_svg_dataset_visualizer_v7.py \
+.venv/bin/python version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts --output "$RUN/ir_report.html"
+.venv/bin/python version/v7/scripts/build_svg_dataset_visualizer_v7.py \
   --workspace "$RUN/dataset" \
   --output "$RUN/dataset_viewer.html"</pre>
         </div>
@@ -3099,10 +3110,11 @@ make v7-profile-dashboard \
 
 <div class="card card-blue">
     <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
+    <p class="mini-note">These raw CLI examples use the shell wrapper so a first-time user can be prompted to create <code>.venv</code> and install <code>requirements-v7.txt</code> if the repo-local environment is missing.</p>
     <h3 style="margin-top: 0;">Gemma 3 270M</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
+<pre>version/v7/scripts/cks-v7-run run \
   hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
   --context-len 1024 --force-compile --force-convert --chat-template=none \
   --generate-visualizer</pre>
@@ -3111,7 +3123,7 @@ make v7-profile-dashboard \
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
+<pre>version/v7/scripts/cks-v7-run run \
   hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
   --context-len 1024 --force-compile --force-convert \
   --generate-visualizer</pre>
@@ -3120,7 +3132,7 @@ make v7-profile-dashboard \
     <h3>Qwen3 0.6B</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>.venv/bin/python version/v7/scripts/ck_run_v7.py run \
+<pre>version/v7/scripts/cks-v7-run run \
   hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
   --context-len 1024 --force-compile --force-convert \
   --generate-visualizer</pre>
