@@ -280,6 +280,35 @@ def _resolve_pad_token_id(run_dir: Path, default: int = 0) -> int:
     return int(default)
 
 
+def _iter_true_bpe_special_tokens(tokenizer_json: Path | None) -> list[tuple[str, int]]:
+    if tokenizer_json is None or not tokenizer_json.exists():
+        return []
+    try:
+        doc = _load_json(tokenizer_json)
+    except Exception:
+        return []
+    added = doc.get("added_tokens") if isinstance(doc, dict) else None
+    if not isinstance(added, list):
+        return []
+    out: list[tuple[str, int]] = []
+    seen: set[tuple[str, int]] = set()
+    for row in added:
+        if not isinstance(row, dict):
+            continue
+        if row.get("special") is not True:
+            continue
+        content = str(row.get("content") or "")
+        tid = row.get("id")
+        if not content or not isinstance(tid, int) or tid < 0:
+            continue
+        item = (content, int(tid))
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 def _pack_rows_to_seq_windows(
     row_token_ids: list[list[int]],
     seq_len: int,
@@ -716,6 +745,8 @@ def _load_true_bpe_runtime(lib_path: Path):
         ctypes.c_int,
     ]
     lib.ck_true_bpe_decode.restype = ctypes.c_int
+    lib.ck_true_bpe_add_special_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int32]
+    lib.ck_true_bpe_add_special_token.restype = ctypes.c_int
     return lib
 
 
@@ -767,7 +798,7 @@ def _load_true_bpe_binary_artifacts(bin_dir: Path):
 
 
 class _TrueBPEHandle:
-    def __init__(self, tokenizer_lib: Path, bin_dir: Path):
+    def __init__(self, tokenizer_lib: Path, bin_dir: Path, tokenizer_json: Path | None = None):
         self.lib = _load_true_bpe_runtime(tokenizer_lib)
         self.bpe = self.lib.ck_true_bpe_create()
         if not self.bpe:
@@ -792,6 +823,11 @@ class _TrueBPEHandle:
         if rc != 0:
             self.close()
             raise RuntimeError(f"ck_true_bpe_load_binary failed rc={rc}")
+        for content, tid in _iter_true_bpe_special_tokens(tokenizer_json):
+            rc = int(self.lib.ck_true_bpe_add_special_token(self.bpe, content.encode("utf-8"), tid))
+            if rc != 0:
+                self.close()
+                raise RuntimeError(f"ck_true_bpe_add_special_token failed rc={rc} token={content!r}")
 
     def close(self) -> None:
         if self._closed:
@@ -1804,13 +1840,21 @@ def _emit_data_lab_artifacts(
 def _make_corpus_dir_from_dataset(dataset_path: Path, work_dir: Path) -> Path:
     corpus_dir = work_dir / "corpus"
     corpus_dir.mkdir(parents=True, exist_ok=True)
-    dst = corpus_dir / dataset_path.name
     try:
         raw = dataset_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         print(f"WARNING: {dataset_path} contains non-UTF-8 bytes; they will be dropped.", file=sys.stderr)
         raw = dataset_path.read_text(encoding="utf-8", errors="ignore")
-    dst.write_text(raw, encoding="utf-8")
+    # Write one training row per corpus document so BPE cannot merge across
+    # unrelated dataset rows such as `</svg>\n<svg ...>`.
+    rows = [line.strip() for line in raw.splitlines() if line.strip()]
+    if rows:
+        for idx, row in enumerate(rows, start=1):
+            dst = corpus_dir / f"row_{idx:06d}.txt"
+            dst.write_text(row + "\n", encoding="utf-8")
+    else:
+        dst = corpus_dir / dataset_path.name
+        dst.write_text(raw, encoding="utf-8")
     return corpus_dir
 
 
@@ -4459,7 +4503,7 @@ def main() -> int:
                     "ERROR: --reuse-run-tokenizer requested but run_dir/tokenizer_bin is missing.\n"
                     f"  run_dir: {run_dir}"
                 )
-            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, run_tokenizer_bin)
+            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, run_tokenizer_bin, run_tokenizer_json)
             tokenizer_json = run_tokenizer_json
             bpe_bin_dir = run_tokenizer_bin
             run_bpe_bin_dir = run_tokenizer_bin
@@ -4485,10 +4529,13 @@ def main() -> int:
                 "--threads",
                 str(args.bpe_threads),
             ]
+            special_tokens_file = dataset_path.parent / "spec03_reserved_control_tokens.txt"
+            if special_tokens_file.exists():
+                bpe_cmd.extend(["--special-tokens-file", str(special_tokens_file)])
             if args.tokenizer == "ascii_bpe":
                 bpe_cmd.append("--ascii-only")
             _run(bpe_cmd, cwd=ROOT)
-            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, bpe_bin_dir)
+            bpe_handle = _TrueBPEHandle(TOKENIZER_LIB, bpe_bin_dir, tokenizer_json)
             run_bpe_bin_dir = _sync_bpe_artifacts_to_run(run_dir, tokenizer_json, bpe_bin_dir)
         ids = _encode_large_text_with_bpe_handle(bpe_handle, dataset_text)
         if len(ids) <= 1:

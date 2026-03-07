@@ -109,6 +109,7 @@ typedef struct {
     const char *corpus_dir;
     const char *out_json;
     const char *binary_out_dir;
+    const char *special_tokens_file;
     const char *exts_csv;
     int vocab_size;
     int min_freq;
@@ -138,6 +139,9 @@ typedef struct Trainer {
     int num_symbols;
     int max_symbols;
     int base_symbol_count;
+    int base_byte_id;
+    char **reserved_specials;
+    int num_reserved_specials;
     int32_t byte_to_symbol[256]; /* byte -> token id (or -1 if disallowed in mode) */
 
     MergeRule *merges;
@@ -211,6 +215,13 @@ static void *arena_alloc(Arena *a, size_t bytes, size_t align) {
 static bool path_exists(const char *p) {
     struct stat st;
     return stat(p, &st) == 0;
+}
+
+static char *xstrdup(const char *s) {
+    size_t n = strlen(s) + 1;
+    char *out = (char *)xmalloc(n);
+    memcpy(out, s, n);
+    return out;
 }
 
 static size_t next_pow2_size(size_t v) {
@@ -399,6 +410,51 @@ static void file_list_free(FileList *fl) {
     fl->count = fl->cap = 0;
 }
 
+static bool token_list_contains(char **items, int count, const char *needle) {
+    for (int i = 0; i < count; i++) {
+        if (strcmp(items[i], needle) == 0) return true;
+    }
+    return false;
+}
+
+static void load_special_tokens_file(const char *path, char ***out_tokens, int *out_count) {
+    *out_tokens = NULL;
+    *out_count = 0;
+    if (!path || !*path) return;
+
+    FILE *f = fopen(path, "r");
+    if (!f) fatalf("cannot open special tokens file: %s", path);
+
+    char **tokens = NULL;
+    int count = 0;
+    int cap = 0;
+    char *line = NULL;
+    size_t line_cap = 0;
+
+    while (getline(&line, &line_cap, f) != -1) {
+        size_t n = strlen(line);
+        while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = '\0';
+        if (n == 0) continue;
+        if (!strcmp(line, "<|unk|>") || !strcmp(line, "<|bos|>") ||
+            !strcmp(line, "<|eos|>") || !strcmp(line, "<|pad|>")) {
+            continue;
+        }
+        if (token_list_contains(tokens, count, line)) continue;
+        if (count == cap) {
+            int new_cap = cap ? cap * 2 : 32;
+            tokens = (char **)realloc(tokens, (size_t)new_cap * sizeof(char *));
+            if (!tokens) fatalf("out of memory loading special tokens");
+            cap = new_cap;
+        }
+        tokens[count++] = xstrdup(line);
+    }
+
+    free(line);
+    fclose(f);
+    *out_tokens = tokens;
+    *out_count = count;
+}
+
 /* ------------------------------ Worker Engine ------------------------------ */
 
 static void shard_bounds(int n_items, int n_shards, int shard_id, int *out_start, int *out_end) {
@@ -422,6 +478,7 @@ static void worker_job_count(Worker *w) {
         int off = tr->seq_offsets[s];
         int len = tr->seq_lens[s];
         for (int i = 0; i + 1 < len; i++) {
+            if (src[off + i] < tr->base_byte_id || src[off + i + 1] < tr->base_byte_id) continue;
             uint64_t k = pair_key(src[off + i], src[off + i + 1]);
             pair_table_add(tab, tr->local_cap, key_slot(k), 1);
         }
@@ -528,10 +585,11 @@ static bool select_best_pair(Trainer *tr, int32_t *out_left, int32_t *out_right,
         uint64_t sk = tr->global_table[i].key;
         uint32_t ct = tr->global_table[i].count;
         if (sk == 0 || ct == 0) continue;
+        uint64_t k = slot_key_decode(sk);
+        int32_t L = (int32_t)(k >> 32);
+        int32_t R = (int32_t)(k & 0xFFFFFFFFu);
+        if (L < tr->base_byte_id || R < tr->base_byte_id) continue;
         if (max_piece_bytes > 0) {
-            uint64_t k = slot_key_decode(sk);
-            int32_t L = (int32_t)(k >> 32);
-            int32_t R = (int32_t)(k & 0xFFFFFFFFu);
             if (L < 0 || R < 0 || L >= tr->num_symbols || R >= tr->num_symbols) continue;
             int64_t merged_len = (int64_t)tr->symbol_text_lens[L] + (int64_t)tr->symbol_text_lens[R];
             if (merged_len > (int64_t)max_piece_bytes) continue;
@@ -598,6 +656,15 @@ static void init_symbols(Trainer *tr) {
     tr->symbol_text_lens[ID_PAD] = (int32_t)(sizeof("<|pad|>") - 1);
 
     int next_id = BASE_BYTE_ID;
+    for (int i = 0; i < tr->num_reserved_specials; i++) {
+        int id = next_id++;
+        tr->symbols[id].left = -1;
+        tr->symbols[id].right = -1;
+        tr->symbols[id].is_base = 0;
+        tr->symbol_text_lens[id] = (int32_t)strlen(tr->reserved_specials[i]);
+    }
+
+    tr->base_byte_id = next_id;
     if (tr->opt.ascii_only) {
         for (int b = 0; b < 256; b++) {
             if (!is_ascii_train_byte((uint8_t)b)) continue;
@@ -622,7 +689,7 @@ static void init_symbols(Trainer *tr) {
         }
     }
 
-    tr->base_symbol_count = next_id - BASE_BYTE_ID;
+    tr->base_symbol_count = next_id - tr->base_byte_id;
     tr->num_symbols = next_id;
     tr->num_merges = 0;
 }
@@ -726,13 +793,17 @@ static int byte_to_ascii_piece(uint8_t byte, char out[2]) {
     return 1;
 }
 
-static const char *special_name(int id) {
+static const char *special_name(const Trainer *tr, int id) {
     switch (id) {
         case ID_UNK: return "<|unk|>";
         case ID_BOS: return "<|bos|>";
         case ID_EOS: return "<|eos|>";
         case ID_PAD: return "<|pad|>";
-        default: return NULL;
+        default:
+            if (tr && id >= SPECIAL_COUNT && id < tr->base_byte_id) {
+                return tr->reserved_specials[id - SPECIAL_COUNT];
+            }
+            return NULL;
     }
 }
 
@@ -759,7 +830,7 @@ static int emit_symbol_text_recursive(const Trainer *tr, int32_t id, StrBuilder 
     if (depth > 8192) return -1;
     if (id < 0 || id >= tr->num_symbols) return -1;
 
-    const char *sp = special_name(id);
+    const char *sp = special_name(tr, id);
     if (sp) {
         sb_append(sb, sp);
         return sb->overflow ? -1 : 0;
@@ -847,7 +918,12 @@ static void write_tokenizer_json(const char *path, const Trainer *tr) {
     fprintf(f, "    {\"id\": %d, \"content\": \"<|unk|>\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true},\n", ID_UNK);
     fprintf(f, "    {\"id\": %d, \"content\": \"<|bos|>\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true},\n", ID_BOS);
     fprintf(f, "    {\"id\": %d, \"content\": \"<|eos|>\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true},\n", ID_EOS);
-    fprintf(f, "    {\"id\": %d, \"content\": \"<|pad|>\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true}\n", ID_PAD);
+    fprintf(f, "    {\"id\": %d, \"content\": \"<|pad|>\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true}", ID_PAD);
+    for (int i = 0; i < tr->num_reserved_specials; i++) {
+        json_escape(tr->reserved_specials[i], esc_a, MAX_TOKEN_TEXT * 2);
+        fprintf(f, ",\n    {\"id\": %d, \"content\": \"%s\", \"single_word\": false, \"lstrip\": false, \"rstrip\": false, \"normalized\": false, \"special\": true}", SPECIAL_COUNT + i, esc_a);
+    }
+    fprintf(f, "\n");
     fprintf(f, "  ],\n");
 
     fprintf(f, "  \"normalizer\": null,\n");
@@ -955,6 +1031,7 @@ static void write_binary_exports(const char *out_dir, const Trainer *tr) {
     fprintf(f, "  \"mode\": \"%s\",\n", tr->opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     fprintf(f, "  \"vocab_size\": %d,\n", tr->num_symbols);
     fprintf(f, "  \"num_merges\": %d,\n", tr->num_merges);
+    fprintf(f, "  \"num_reserved_special_tokens\": %d,\n", tr->num_reserved_specials);
     fprintf(f, "  \"max_piece_bytes\": %d,\n", tr->opt.max_piece_bytes);
     fprintf(f, "  \"offsets\": \"%s\",\n", path_offsets);
     fprintf(f, "  \"strings\": \"%s\",\n", path_strings);
@@ -986,6 +1063,7 @@ static void print_help(const char *prog) {
         "  --ext LIST               Comma-separated file extensions (default: %s)\n"
         "                           Use '*' for all regular files\n"
         "  --binary-out-dir DIR     Also write vocab_offsets.bin, vocab_strings.bin, vocab_merges.bin\n"
+        "  --special-tokens-file P  One token per line; reserve these as atomic special tokens\n"
         "  --ascii-only             Train ASCII-identity BPE (no ByteLevel UTF-8 mapping)\n"
         "                           Allowed bytes: \\t, \\n, \\r, and 0x20-0x7E\n"
         "  --verbose                Print training progress\n"
@@ -1012,6 +1090,8 @@ static void parse_args(int argc, char **argv, Options *opt) {
             opt->out_json = argv[++i];
         } else if (!strcmp(a, "--binary-out-dir") && i + 1 < argc) {
             opt->binary_out_dir = argv[++i];
+        } else if (!strcmp(a, "--special-tokens-file") && i + 1 < argc) {
+            opt->special_tokens_file = argv[++i];
         } else if (!strcmp(a, "--vocab-size") && i + 1 < argc) {
             opt->vocab_size = atoi(argv[++i]);
         } else if (!strcmp(a, "--min-freq") && i + 1 < argc) {
@@ -1034,10 +1114,10 @@ static void parse_args(int argc, char **argv, Options *opt) {
     if (!opt->corpus_dir || !*opt->corpus_dir) fatalf("missing --corpus-dir");
     if (!opt->out_json || !*opt->out_json) fatalf("missing --out");
     if (!path_exists(opt->corpus_dir)) fatalf("corpus dir not found: %s", opt->corpus_dir);
-    int base_count = opt->ascii_only ? ASCII_BASE_COUNT : BASE_BYTE_COUNT;
-    if (opt->vocab_size < (SPECIAL_COUNT + base_count)) {
-        fatalf("--vocab-size must be >= %d for selected mode", SPECIAL_COUNT + base_count);
+    if (opt->special_tokens_file && !path_exists(opt->special_tokens_file)) {
+        fatalf("special tokens file not found: %s", opt->special_tokens_file);
     }
+    int base_count = opt->ascii_only ? ASCII_BASE_COUNT : BASE_BYTE_COUNT;
     if (opt->min_freq < 1) opt->min_freq = 1;
     if (opt->max_piece_bytes < 0) fatalf("--max-piece-bytes must be >= 0");
     if (opt->threads <= 0) {
@@ -1049,6 +1129,25 @@ static void parse_args(int argc, char **argv, Options *opt) {
 
 /* ------------------------------- Main Driver ------------------------------- */
 
+static int match_reserved_special(const Trainer *tr, const char *buf, size_t len, size_t pos, int32_t *out_id, size_t *out_advance) {
+    int32_t best_id = -1;
+    size_t best_len = 0;
+    for (int i = 0; i < tr->num_reserved_specials; i++) {
+        const char *tok = tr->reserved_specials[i];
+        size_t tok_len = strlen(tok);
+        if (tok_len == 0 || pos + tok_len > len) continue;
+        if (memcmp(buf + pos, tok, tok_len) != 0) continue;
+        if (tok_len > best_len) {
+            best_len = tok_len;
+            best_id = SPECIAL_COUNT + i;
+        }
+    }
+    if (best_id < 0) return 0;
+    *out_id = best_id;
+    *out_advance = best_len;
+    return 1;
+}
+
 static void load_corpus_into_sequences(const FileList *fl, Trainer *tr) {
     size_t cursor = 0;
     for (int i = 0; i < fl->count; i++) {
@@ -1058,18 +1157,35 @@ static void load_corpus_into_sequences(const FileList *fl, Trainer *tr) {
 
         FILE *f = fopen(fl->items[i].path, "rb");
         if (!f) fatalf("cannot open corpus file: %s", fl->items[i].path);
+        size_t file_bytes = fl->items[i].size;
+        char *buf = (char *)xmalloc(file_bytes);
+        size_t got = fread(buf, 1, file_bytes, f);
+        fclose(f);
+        if (got != file_bytes) {
+            free(buf);
+            fatalf("short read from corpus file: %s", fl->items[i].path);
+        }
 
-        int c;
         int len = 0;
-        while ((c = fgetc(f)) != EOF) {
+        size_t pos = 0;
+        while (pos < file_bytes) {
             if (cursor >= tr->total_tokens) {
-                fclose(f);
+                free(buf);
                 fatalf("corpus grew during read; rerun training");
             }
-            uint8_t b = (uint8_t)c;
+            int32_t special_id = -1;
+            size_t advance = 0;
+            if (tr->num_reserved_specials > 0 &&
+                match_reserved_special(tr, buf, file_bytes, pos, &special_id, &advance)) {
+                tr->seq_a[cursor++] = special_id;
+                len++;
+                pos += advance;
+                continue;
+            }
+            uint8_t b = (uint8_t)buf[pos++];
             int32_t id = tr->byte_to_symbol[b];
             if (id < 0) {
-                fclose(f);
+                free(buf);
                 if (tr->opt.ascii_only) {
                     fatalf("non-ASCII byte in --ascii-only corpus: file=%s byte=0x%02X", fl->items[i].path, (unsigned)b);
                 }
@@ -1078,7 +1194,7 @@ static void load_corpus_into_sequences(const FileList *fl, Trainer *tr) {
             tr->seq_a[cursor++] = id;
             len++;
         }
-        fclose(f);
+        free(buf);
         tr->seq_lens[i] = len;
         if ((size_t)len > tr->max_seq_len) tr->max_seq_len = (size_t)len;
     }
@@ -1090,6 +1206,11 @@ static void load_corpus_into_sequences(const FileList *fl, Trainer *tr) {
 int main(int argc, char **argv) {
     Options opt;
     parse_args(argc, argv, &opt);
+    int base_count = opt.ascii_only ? ASCII_BASE_COUNT : BASE_BYTE_COUNT;
+
+    char **reserved_specials = NULL;
+    int num_reserved_specials = 0;
+    load_special_tokens_file(opt.special_tokens_file, &reserved_specials, &num_reserved_specials);
 
     FileList files = {0};
     collect_files_recursive(opt.corpus_dir, opt.exts_csv, &files);
@@ -1109,6 +1230,11 @@ int main(int argc, char **argv) {
     size_t est_pairs = (total_tokens > 1) ? (total_tokens - 1) : 1;
     size_t global_cap = next_pow2_size(est_pairs * 2 + 1024);
     size_t local_cap = next_pow2_size((est_pairs / (size_t)nthreads) * 4 + 4096);
+
+    int min_vocab_size = SPECIAL_COUNT + num_reserved_specials + base_count;
+    if (opt.vocab_size < min_vocab_size) {
+        fatalf("--vocab-size must be >= %d for selected mode + reserved specials", min_vocab_size);
+    }
 
     size_t arena_bytes = 0;
     arena_bytes += align_up((size_t)files.count * sizeof(int), 64) * 3;           /* offsets/lens/caps */
@@ -1135,6 +1261,8 @@ int main(int argc, char **argv) {
     tr.global_cap = global_cap;
     tr.nthreads = nthreads;
     tr.use_a = 1;
+    tr.reserved_specials = reserved_specials;
+    tr.num_reserved_specials = num_reserved_specials;
 
     tr.seq_offsets = (int *)arena_alloc(&arena, (size_t)files.count * sizeof(int), 64);
     tr.seq_lens = (int *)arena_alloc(&arena, (size_t)files.count * sizeof(int), 64);
@@ -1192,6 +1320,7 @@ int main(int argc, char **argv) {
     printf("  mode:       %s\n", opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     printf("  vocab_size: %d\n", tr.num_symbols);
     printf("  merges:     %d\n", tr.num_merges);
+    printf("  reserved_special_tokens: %d\n", tr.num_reserved_specials);
     printf("  max_piece_bytes: %d\n", opt.max_piece_bytes);
     printf("  out:        %s\n", opt.out_json);
     if (opt.binary_out_dir && *opt.binary_out_dir) {
@@ -1203,6 +1332,8 @@ int main(int argc, char **argv) {
     pthread_mutex_destroy(&tr.mu);
 
     free(arena.base);
+    for (int i = 0; i < num_reserved_specials; i++) free(reserved_specials[i]);
+    free(reserved_specials);
     file_list_free(&files);
     return 0;
 }

@@ -53,12 +53,42 @@ class _SimpleEncoding:
         self.ids = ids
 
 
+def _iter_true_bpe_special_tokens(tokenizer_json: Path | None) -> List[tuple[str, int]]:
+    if tokenizer_json is None or not tokenizer_json.exists():
+        return []
+    try:
+        doc = json.loads(tokenizer_json.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    added = doc.get("added_tokens") if isinstance(doc, dict) else None
+    if not isinstance(added, list):
+        return []
+    out: List[tuple[str, int]] = []
+    seen: set[tuple[str, int]] = set()
+    for row in added:
+        if not isinstance(row, dict):
+            continue
+        if row.get("special") is not True:
+            continue
+        content = str(row.get("content") or "")
+        tid = row.get("id")
+        if not content or not isinstance(tid, int) or tid < 0:
+            continue
+        item = (content, int(tid))
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 class CKTrueBPETokenizer:
     """Python wrapper around CK true_bpe runtime using binary tokenizer artifacts."""
 
-    def __init__(self, lib_path: Path, bin_dir: Path):
+    def __init__(self, lib_path: Path, bin_dir: Path, tokenizer_json: Path | None = None):
         self.lib_path = Path(lib_path)
         self.bin_dir = Path(bin_dir)
+        self.tokenizer_json = Path(tokenizer_json) if tokenizer_json else None
         self._lib = ctypes.CDLL(str(self.lib_path))
         self._bpe = None
         self._vocab_size = 0
@@ -98,6 +128,8 @@ class CKTrueBPETokenizer:
         self._lib.ck_true_bpe_lookup.restype = ctypes.c_int32
         self._lib.ck_true_bpe_id_to_token.argtypes = [ctypes.c_void_p, ctypes.c_int32]
         self._lib.ck_true_bpe_id_to_token.restype = ctypes.c_char_p
+        self._lib.ck_true_bpe_add_special_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int32]
+        self._lib.ck_true_bpe_add_special_token.restype = ctypes.c_int
 
     def _load_from_binary_artifacts(self) -> None:
         meta_path = self.bin_dir / "tokenizer_meta.json"
@@ -150,6 +182,13 @@ class CKTrueBPETokenizer:
             self._bpe = None
             raise RuntimeError(f"ck_true_bpe_load_binary failed rc={rc}")
 
+        for content, tid in _iter_true_bpe_special_tokens(self.tokenizer_json):
+            rc = int(self._lib.ck_true_bpe_add_special_token(self._bpe, content.encode("utf-8"), tid))
+            if rc != 0:
+                self._lib.ck_true_bpe_free(self._bpe)
+                self._bpe = None
+                raise RuntimeError(f"ck_true_bpe_add_special_token failed rc={rc} token={content!r}")
+
         self._vocab_size = vocab_size
         self._num_merges = num_merges
 
@@ -158,7 +197,7 @@ class CKTrueBPETokenizer:
         return self._vocab_size
 
     def encode(self, text: str, add_special_tokens: bool = True) -> _SimpleEncoding:
-        # true_bpe special-token behavior is configured internally from artifacts.
+        # true_bpe special-token behavior is configured from tokenizer artifacts.
         _ = add_special_tokens
         if not self._bpe:
             return _SimpleEncoding([])
@@ -474,7 +513,11 @@ class CKModel:
         true_bpe_lib = _find_true_bpe_lib(self.model_dir)
         if true_bpe_bin and true_bpe_lib:
             try:
-                self.tokenizer = CKTrueBPETokenizer(true_bpe_lib, true_bpe_bin)
+                self.tokenizer = CKTrueBPETokenizer(
+                    true_bpe_lib,
+                    true_bpe_bin,
+                    tokenizer_json if tokenizer_json.exists() else None,
+                )
                 print(f"Loaded CK true_bpe tokenizer from {true_bpe_bin}")
             except Exception as e:
                 print(f"Warning: failed to load CK true_bpe tokenizer ({e})")

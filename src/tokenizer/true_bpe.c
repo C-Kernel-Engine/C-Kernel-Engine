@@ -105,7 +105,7 @@ typedef struct {
     size_t capacity;
 } CKBPETokenList;
 
-#define MAX_SPECIAL_TOKENS 32  /* Maximum number of special tokens */
+#define MAX_SPECIAL_TOKENS 128  /* Maximum number of special tokens */
 
 /* Special token entry for pre-BPE matching */
 typedef struct {

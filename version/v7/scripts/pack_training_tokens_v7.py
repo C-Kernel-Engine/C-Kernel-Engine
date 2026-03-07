@@ -96,6 +96,35 @@ def _resolve_special_ids(
     return bos, eos, pad
 
 
+def _iter_true_bpe_special_tokens(tokenizer_json: Path | None) -> list[tuple[str, int]]:
+    if tokenizer_json is None or not tokenizer_json.exists():
+        return []
+    try:
+        doc = _load_json(tokenizer_json)
+    except Exception:
+        return []
+    added = doc.get("added_tokens") if isinstance(doc, dict) else None
+    if not isinstance(added, list):
+        return []
+    out: list[tuple[str, int]] = []
+    seen: set[tuple[str, int]] = set()
+    for row in added:
+        if not isinstance(row, dict):
+            continue
+        if row.get("special") is not True:
+            continue
+        content = str(row.get("content") or "")
+        tid = row.get("id")
+        if not content or not isinstance(tid, int) or tid < 0:
+            continue
+        item = (content, int(tid))
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 def _load_true_bpe_runtime(lib_path: Path):
     lib = ctypes.CDLL(str(lib_path))
     lib.ck_true_bpe_create.restype = ctypes.c_void_p
@@ -117,6 +146,8 @@ def _load_true_bpe_runtime(lib_path: Path):
         ctypes.c_int,
     ]
     lib.ck_true_bpe_encode.restype = ctypes.c_int
+    lib.ck_true_bpe_add_special_token.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int32]
+    lib.ck_true_bpe_add_special_token.restype = ctypes.c_int
     return lib
 
 
@@ -161,7 +192,7 @@ def _load_true_bpe_binary_artifacts(bin_dir: Path):
 
 
 class _TrueBPEHandle:
-    def __init__(self, tokenizer_lib: Path, bpe_bin_dir: Path):
+    def __init__(self, tokenizer_lib: Path, bpe_bin_dir: Path, tokenizer_json: Path | None = None):
         if not tokenizer_lib.exists():
             raise RuntimeError(f"Tokenizer library not found: {tokenizer_lib}")
         if not bpe_bin_dir.exists():
@@ -187,6 +218,11 @@ class _TrueBPEHandle:
         )
         if rc != 0:
             raise RuntimeError(f"ck_true_bpe_load_binary failed rc={rc}")
+        for content, tid in _iter_true_bpe_special_tokens(tokenizer_json):
+            rc = int(self.lib.ck_true_bpe_add_special_token(self.bpe, content.encode("utf-8"), tid))
+            if rc != 0:
+                self.close()
+                raise RuntimeError(f"ck_true_bpe_add_special_token failed rc={rc} token={content!r}")
 
     def close(self) -> None:
         if getattr(self, "bpe", None):
@@ -349,7 +385,7 @@ def main() -> int:
     min_row = None
     max_row = 0
 
-    with _TrueBPEHandle(tokenizer_lib, tokenizer_bin) as handle:
+    with _TrueBPEHandle(tokenizer_lib, tokenizer_bin, tokenizer_json) as handle:
         for idx, row in enumerate(rows, start=1):
             rid = _encode_row_with_fallback(handle, row)
             full = [int(bos_id), *[int(v) for v in rid], int(eos_id)]
