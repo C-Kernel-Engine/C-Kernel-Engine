@@ -24,6 +24,7 @@ import json
 import base64
 import re
 import shutil
+import platform
 import webbrowser
 import argparse
 import subprocess
@@ -121,6 +122,146 @@ def _profile_install_hints() -> list[str]:
         "# Install perf, valgrind, and FlameGraph for your Linux distribution, then retry.",
         "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
     ]
+
+
+def _format_mem_gib(kb: int | None) -> str | None:
+    if not isinstance(kb, int) or kb <= 0:
+        return None
+    gib = kb / (1024.0 * 1024.0)
+    return f"{gib:.1f} GiB"
+
+
+def collect_host_context() -> dict[str, object]:
+    context: dict[str, object] = {
+        "host_platform": sys.platform,
+        "kernel_release": platform.release(),
+        "machine": platform.machine(),
+        "logical_cpus": os.cpu_count() or 0,
+    }
+
+    os_release = _read_os_release()
+    pretty_name = os_release.get("PRETTY_NAME") or os_release.get("NAME")
+    if pretty_name:
+        context["os_pretty_name"] = pretty_name
+    distro_id = os_release.get("ID")
+    if distro_id:
+        context["os_id"] = distro_id
+
+    try:
+        cpuinfo_text = Path("/proc/cpuinfo").read_text(errors="ignore")
+        processors: list[dict[str, str]] = []
+        current: dict[str, str] = {}
+        for raw in cpuinfo_text.splitlines():
+            line = raw.strip()
+            if not line:
+                if current:
+                    processors.append(current)
+                    current = {}
+                continue
+            if ":" not in line:
+                continue
+            k, _, v = line.partition(":")
+            current[k.strip().lower()] = v.strip()
+        if current:
+            processors.append(current)
+
+        model_names: set[str] = set()
+        physical_ids: set[str] = set()
+        core_ids_per_socket: dict[str, set[str]] = {}
+        flags: set[str] = set()
+
+        for proc in processors:
+            if "model name" in proc:
+                model_names.add(proc["model name"])
+            if "flags" in proc:
+                flags.update(proc["flags"].split())
+            phys_id = proc.get("physical id", "0")
+            core_id = proc.get("core id", proc.get("processor", "0"))
+            physical_ids.add(phys_id)
+            core_ids_per_socket.setdefault(phys_id, set()).add(core_id)
+
+        if model_names:
+            context["cpu_model"] = next(iter(model_names))
+        if processors:
+            context["logical_cpus"] = len(processors)
+        physical_cores = sum(len(v) for v in core_ids_per_socket.values())
+        if physical_cores > 0:
+            context["physical_cores"] = physical_cores
+        if physical_ids:
+            context["sockets"] = len(physical_ids)
+
+        isa_tags: list[str] = []
+        if "avx512f" in flags:
+            isa_tags.append("AVX-512")
+        elif "avx2" in flags:
+            isa_tags.append("AVX2")
+        elif "avx" in flags:
+            isa_tags.append("AVX")
+        if "fma" in flags:
+            isa_tags.append("FMA")
+        if "avx512_vnni" in flags or "avx512vnni" in flags:
+            isa_tags.append("VNNI")
+        if "amx_bf16" in flags:
+            isa_tags.append("AMX-BF16")
+        if isa_tags:
+            context["isa_tags"] = isa_tags
+    except Exception:
+        pass
+
+    if not context.get("cpu_model"):
+        try:
+            out = subprocess.check_output(["lscpu"], text=True, stderr=subprocess.DEVNULL)
+            kv: dict[str, str] = {}
+            for raw in out.splitlines():
+                if ":" not in raw:
+                    continue
+                k, v = raw.split(":", 1)
+                kv[k.strip().lower()] = v.strip()
+            model = kv.get("model name")
+            if model:
+                context["cpu_model"] = model
+            sockets = kv.get("socket(s)")
+            cores_per_socket = kv.get("core(s) per socket")
+            if sockets and cores_per_socket:
+                try:
+                    context["physical_cores"] = int(sockets) * int(cores_per_socket)
+                    context["sockets"] = int(sockets)
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+
+    try:
+        for line in Path("/proc/meminfo").read_text(errors="ignore").splitlines():
+            if line.startswith("MemTotal:"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    mem_total_kb = int(parts[1])
+                    context["mem_total_kb"] = mem_total_kb
+                    human = _format_mem_gib(mem_total_kb)
+                    if human:
+                        context["mem_total_human"] = human
+                break
+    except Exception:
+        pass
+
+    try:
+        nodes = [p for p in Path("/sys/devices/system/node").glob("node[0-9]*") if p.is_dir()]
+        if nodes:
+            context["numa_nodes"] = len(nodes)
+    except Exception:
+        pass
+
+    try:
+        thp_path = Path("/sys/kernel/mm/transparent_hugepage/enabled")
+        if thp_path.exists():
+            content = thp_path.read_text().strip()
+            m = re.search(r"\[(\w+)\]", content)
+            context["thp_status"] = m.group(1) if m else "unknown"
+    except Exception:
+        pass
+
+    return context
 
 
 def run_cmd(cmd: list[str], cwd: Path, extra_env: dict | None = None):
@@ -3051,6 +3192,7 @@ def load_model_data(
             "has_train_runtime": bool(train_runtime_available),
             "has_inference_runtime": bool(inference_runtime_available),
             "profile_tool_status": collect_profile_tool_status(),
+            "host_context": collect_host_context(),
             "strict_run_artifacts": strict_run_scope,
             "warnings": [],
         },

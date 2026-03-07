@@ -3562,6 +3562,13 @@ v7-capture-artifacts: v7-init
 			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
 		fi
 
+v7-capture-artifacts-run: v7-init
+	@if [ -z "$(RUN)" ]; then \
+		echo "Set RUN=/path/to/run"; \
+		exit 2; \
+	fi
+	@$(MAKE) --no-print-directory v7-capture-artifacts V7_MODEL="$(RUN)" V7_AUTO_OPEN=$(V7_AUTO_OPEN) V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
+
 v7-profile-dashboard: v7-init
 	@echo "Capturing v7 profiling dashboard for $(V7_MODEL)"
 	@$(MAKE) --no-print-directory v7-capture-artifacts V7_MODEL="$(V7_MODEL)" V7_AUTO_OPEN=0 V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
@@ -3589,6 +3596,13 @@ v7-profile-dashboard: v7-init
 			xdg-open "$$report_path" >/dev/null 2>&1 || true; \
 			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
 		fi
+
+v7-profile-dashboard-run: v7-init
+	@if [ -z "$(RUN)" ]; then \
+		echo "Set RUN=/path/to/run"; \
+		exit 2; \
+	fi
+	@$(MAKE) --no-print-directory v7-profile-dashboard V7_MODEL="$(RUN)" V7_AUTO_OPEN=$(V7_AUTO_OPEN) V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
 
 v7-ctop:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \
@@ -4171,6 +4185,7 @@ PROFILE_V7_SCRIPT := version/v7/scripts/ck_run_v7.py
 PERF_ARTIFACTS_V7_SCRIPT := version/v7/scripts/perf_artifacts_v7.py
 VTUNE_ARTIFACTS_V7_SCRIPT := version/v7/scripts/vtune_artifacts_v7.py
 ADVISOR_ARTIFACTS_V7_SCRIPT := version/v7/scripts/advisor_artifacts_v7.py
+MEMORY_SIGNOFF_V7_SCRIPT := version/v7/scripts/memory_signoff_v7.py
 PERF_GATE_V7_SCRIPT := version/v7/scripts/perf_gate_v7.py
 RESOLVE_MODEL_DIR_V7_SCRIPT := version/v7/scripts/resolve_model_dir_v7.py
 PROFILE_V7_SUMMARY_SCRIPT := version/v7/scripts/generate_profile_summary_v7.py
@@ -5080,6 +5095,9 @@ v7-perf-gate:
 
 v7-perf-gate-evaluate:
 	@$(PYTHON) $(PERF_GATE_V7_SCRIPT) --model-input "$(V7_MODEL)"
+
+v7-memory-signoff:
+	@$(PYTHON) $(MEMORY_SIGNOFF_V7_SCRIPT) --model-input "$(V7_MODEL)" --gate-profile inference
 
 # =============================================================================
 # Thread Pool Tests

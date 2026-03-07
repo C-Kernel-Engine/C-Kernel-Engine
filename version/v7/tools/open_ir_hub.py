@@ -834,7 +834,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         radial-gradient(circle at 83% 12%, rgba(255, 180, 0, 0.08), transparent 26%),
         radial-gradient(circle at 76% 82%, rgba(255, 180, 0, 0.035), transparent 22%),
         linear-gradient(180deg, #141414 0%, var(--bg-1) 42%, #111111 100%);
-      line-height: 1.45;
+      line-height: 1.5;
       overflow-x: hidden;
     }
 
@@ -887,13 +887,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .page-shell {
       position: relative;
       z-index: 1;
-      width: min(1540px, calc(100vw - 32px));
-      margin: 22px auto 44px auto;
+      width: min(1520px, calc(100vw - 40px));
+      margin: 28px auto 52px auto;
     }
 
     body.table-mode .page-shell {
-      width: min(1760px, calc(100vw - 20px));
-      margin-top: 14px;
+      width: min(1760px, calc(100vw - 24px));
+      margin-top: 16px;
     }
 
     .hero,
@@ -908,7 +908,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .hero {
       position: relative;
       overflow: hidden;
-      padding: 26px;
+      padding: 30px;
       border-radius: var(--radius-xl);
       background:
         linear-gradient(140deg, rgba(40, 40, 40, 0.96) 0%, rgba(29, 29, 29, 0.97) 54%, rgba(22, 22, 22, 0.96) 100%);
@@ -1004,11 +1004,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .spotlight-tags {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .hero-tags { margin-top: 14px; }
-    .hero-meta { margin-top: 14px; }
+    .hero-tags { margin-top: 16px; }
+    .hero-meta { margin-top: 16px; }
 
     body.table-mode .hero-tags {
       display: none;
@@ -1024,15 +1024,15 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .result-pill {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      min-height: 28px;
-      padding: 0 10px;
+      gap: 6px;
+      min-height: 26px;
+      padding: 0 9px;
       border-radius: 999px;
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.022);
       color: var(--muted);
-      font-size: 0.69rem;
-      font-weight: 700;
+      font-size: 0.65rem;
+      font-weight: 600;
       letter-spacing: 0.03em;
       white-space: nowrap;
     }
@@ -1195,24 +1195,24 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .metric-ribbon {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 22px;
+      gap: 14px;
+      margin-top: 24px;
     }
 
     body.compact-mode .metric-ribbon {
-      gap: 9px;
-      margin-top: 16px;
+      gap: 10px;
+      margin-top: 18px;
     }
 
     body.table-mode .metric-ribbon {
-      gap: 10px;
-      margin-top: 16px;
+      gap: 12px;
+      margin-top: 18px;
     }
 
     .metric-card {
       position: relative;
       overflow: hidden;
-      padding: 16px;
+      padding: 18px;
       border-radius: 18px;
       border: 1px solid var(--line);
       background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.014));
@@ -1220,11 +1220,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     body.compact-mode .metric-card {
-      padding: 12px 13px;
+      padding: 13px 14px;
     }
 
     body.table-mode .metric-card {
-      padding: 12px 14px;
+      padding: 14px 16px;
       box-shadow: none;
       background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.01));
     }
@@ -1272,29 +1272,29 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .workspace {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;
-      gap: 18px;
-      margin-top: 22px;
+      gap: 22px;
+      margin-top: 26px;
     }
 
     body.compact-mode .workspace {
-      gap: 14px;
-      margin-top: 16px;
+      gap: 16px;
+      margin-top: 20px;
     }
 
     body.table-mode .workspace {
       grid-template-columns: 1fr;
-      gap: 14px;
-      margin-top: 16px;
+      gap: 16px;
+      margin-top: 18px;
     }
 
     .stack {
       display: grid;
-      gap: 18px;
+      gap: 22px;
       align-content: start;
     }
 
     body.compact-mode .stack {
-      gap: 14px;
+      gap: 16px;
     }
 
     .panel {
@@ -1316,27 +1316,27 @@ def render_html(index_payload: dict[str, Any]) -> str:
       gap: 16px;
       align-items: flex-start;
       flex-wrap: wrap;
-      padding: 18px 20px 0 20px;
+      padding: 20px 22px 0 22px;
     }
 
     .panel-head h2,
     .panel-head h3 {
       margin: 0;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
       text-transform: uppercase;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       color: var(--muted);
     }
 
     .panel-sub {
-      margin: 10px 0 0 0;
-      padding: 0 20px;
+      margin: 8px 0 0 0;
+      padding: 0 22px;
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
     }
 
     body.table-mode .panel-head {
-      padding: 14px 18px 0 18px;
+      padding: 16px 18px 0 18px;
     }
 
     body.table-mode .panel-sub {
@@ -1347,19 +1347,19 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .toolbar-body,
     .spotlight-body,
     .rail-body {
-      padding: 18px 20px 20px 20px;
+      padding: 20px 22px 22px 22px;
     }
 
     body.compact-mode .toolbar-body,
     body.compact-mode .spotlight-body,
     body.compact-mode .rail-body {
-      padding: 14px 16px 16px 16px;
+      padding: 16px 17px 18px 17px;
     }
 
     body.table-mode .toolbar-body,
     body.table-mode .spotlight-body,
     body.table-mode .rail-body {
-      padding: 14px 18px 18px 18px;
+      padding: 16px 18px 18px 18px;
     }
 
     .control-grid {
@@ -1439,17 +1439,24 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     .detail-toggle {
-      border-top: 1px solid rgba(255,255,255,0.05);
-      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      padding-top: 14px;
+      margin-top: 2px;
     }
 
     .detail-toggle summary {
       list-style: none;
       cursor: pointer;
       color: var(--cyan);
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      opacity: 0.8;
+      transition: opacity 160ms;
+    }
+
+    .detail-toggle summary:hover {
+      opacity: 1;
     }
 
     .detail-toggle summary::-webkit-details-marker {
@@ -1508,10 +1515,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .summary-tile,
     .mini-tile {
-      padding: 13px 14px;
-      border-radius: 16px;
+      padding: 14px 15px;
+      border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.05);
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.025);
     }
 
     .summary-tile .k,
@@ -1519,18 +1526,18 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .run-stat .k,
     .kv-row .k {
       color: var(--dim);
-      font-size: 0.66rem;
+      font-size: 0.64rem;
       text-transform: uppercase;
       letter-spacing: 0.14em;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
 
     .summary-tile .v,
     .mini-tile .v,
     .run-stat .v {
-      font-size: 1rem;
-      line-height: 1.15;
+      font-size: 0.96rem;
+      line-height: 1.2;
       font-weight: 700;
       word-break: break-word;
     }
@@ -1643,13 +1650,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .run-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 20px;
     }
 
     body.compact-mode .run-grid {
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
     }
 
     body.table-mode .run-grid {
@@ -1823,26 +1830,28 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     .run-card-body {
-      padding: 18px;
+      padding: 22px 20px;
       display: grid;
-      gap: 14px;
+      gap: 16px;
     }
 
     body.compact-mode .run-card-body {
-      padding: 14px;
-      gap: 10px;
+      padding: 16px 15px;
+      gap: 12px;
     }
 
     .run-name {
       margin: 0;
-      font-size: 1.08rem;
-      line-height: 1.08;
-      letter-spacing: -0.04em;
+      font-size: 1.04rem;
+      line-height: 1.18;
+      letter-spacing: -0.03em;
       word-break: break-word;
+      max-height: 2.6em;
+      overflow: hidden;
     }
 
     body.compact-mode .run-name {
-      font-size: 1.02rem;
+      font-size: 0.98rem;
     }
 
     .badge.pass { color: #8fd1ab; background: rgba(87, 216, 156, 0.08); border-color: rgba(87, 216, 156, 0.12); }
@@ -1855,42 +1864,45 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .run-health {
       display: grid;
-      gap: 8px;
+      gap: 10px;
+      padding-top: 2px;
     }
 
     .health-note {
       color: #7d8796;
       font-size: 0.72rem;
-      line-height: 1.35;
+      line-height: 1.4;
     }
 
     .section-summary {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 4px;
+      gap: 6px;
+      margin-top: 2px;
     }
 
     .action-stack {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 8px;
+      margin-top: 6px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.04);
     }
 
     .action-row-inline {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 10px 12px;
+      gap: 10px;
+      padding: 9px 12px;
       border-radius: 12px;
       background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
     }
 
     .action-label {
       color: #aab4c1;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 600;
       line-height: 1.35;
     }
@@ -1923,23 +1935,23 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .run-stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    body.compact-mode .run-stats {
       gap: 8px;
     }
 
+    body.compact-mode .run-stats {
+      gap: 7px;
+    }
+
     .run-stat {
-      padding: 10px 12px;
+      padding: 11px 13px;
       border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.035);
-      background: rgba(255,255,255,0.014);
+      border: 1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.018);
     }
 
     body.compact-mode .run-stat {
       padding: 10px 11px;
-      border-radius: 14px;
+      border-radius: 12px;
     }
 
     .run-spec {
@@ -1973,29 +1985,33 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .run-path {
       color: var(--dim);
-      font-size: 0.76rem;
+      font-size: 0.72rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }
 
     .run-card .coverage-label {
       color: #a8afb7;
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       font-weight: 600;
     }
 
     .run-card .detail-toggle {
       border-top-color: rgba(255,255,255,0.035);
-      padding-top: 10px;
+      padding-top: 12px;
     }
 
     .run-card .detail-toggle summary {
       color: #91a6b0;
-      font-size: 0.74rem;
+      font-size: 0.72rem;
       font-weight: 600;
     }
 
     .rail {
       display: grid;
-      gap: 18px;
+      gap: 22px;
       align-content: start;
     }
 
@@ -2005,7 +2021,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .rail-card {
       position: sticky;
-      top: 18px;
+      top: 22px;
     }
 
     .rail-card + .rail-card,

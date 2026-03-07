@@ -1626,9 +1626,12 @@
         }
 
         .profile-howto-card {
-            border: 1px solid var(--grey);
+            border: 1px solid rgba(104, 123, 155, 0.28);
             border-radius: 10px;
-            background: linear-gradient(135deg, rgba(255, 180, 0, 0.10), rgba(7, 173, 248, 0.08));
+            background:
+                radial-gradient(circle at top right, rgba(7, 173, 248, 0.09), transparent 38%),
+                radial-gradient(circle at top left, rgba(255, 180, 0, 0.05), transparent 30%),
+                linear-gradient(145deg, rgba(13, 19, 30, 0.96), rgba(10, 15, 24, 0.94));
             padding: 0.9rem;
         }
 
@@ -1669,6 +1672,12 @@
             color: #a7f4cc;
             border-color: rgba(36, 179, 113, 0.45);
             background: rgba(36, 179, 113, 0.2);
+        }
+
+        .profile-dep-chip.info {
+            color: #b8dfff;
+            border-color: rgba(85, 151, 255, 0.34);
+            background: rgba(53, 86, 148, 0.22);
         }
 
         .profile-dep-chip.missing {
@@ -1712,7 +1721,7 @@
             border: 1px solid var(--grey);
             border-radius: 10px;
             margin-bottom: 0.75rem;
-            background: rgba(0,0,0,0.15);
+            background: rgba(8, 14, 24, 0.34);
             overflow: hidden;
         }
         .profile-phase summary {
@@ -11580,6 +11589,12 @@ function renderProfileHowTo() {
     const profileToolStatus = (embeddedMeta && typeof embeddedMeta.profile_tool_status === 'object')
         ? embeddedMeta.profile_tool_status
         : {};
+    const embeddedHostContext = (embeddedMeta && typeof embeddedMeta.host_context === 'object')
+        ? embeddedMeta.host_context
+        : {};
+    const perfCpuTopo = (perfStatData && typeof perfStatData.cpu_topology === 'object')
+        ? perfStatData.cpu_topology
+        : {};
     const hostPlatform = String(profileToolStatus.host_platform || '').toLowerCase();
     const linuxHost = hostPlatform.startsWith('linux');
     const perfInstalled = Boolean(profileToolStatus.perf);
@@ -11588,6 +11603,43 @@ function renderProfileHowTo() {
     const vtuneInstalled = Boolean(profileToolStatus.vtune);
     const advisorInstalled = Boolean(profileToolStatus.advisor);
     const coreHostReady = linuxHost && perfInstalled && flamegraphInstalled && cachegrindInstalled;
+    const hostOsPretty = embeddedHostContext.os_pretty_name || '';
+    const hostKernel = embeddedHostContext.kernel_release || '';
+    const hostMachine = embeddedHostContext.machine || '';
+    const hostCpuModel = embeddedHostContext.cpu_model || perfCpuTopo.model_name || '';
+    const hostPhysicalCores = Number(embeddedHostContext.physical_cores || perfCpuTopo.physical_cores || 0);
+    const hostLogicalCpus = Number(embeddedHostContext.logical_cpus || perfCpuTopo.logical_cpus || 0);
+    const hostSockets = Number(embeddedHostContext.sockets || perfCpuTopo.num_sockets || 0);
+    const hostMemHuman = embeddedHostContext.mem_total_human || '';
+    const hostNumaNodes = Number(embeddedHostContext.numa_nodes || 0);
+    const hostThp = embeddedHostContext.thp_status || perfCpuTopo.thp_status || '';
+    const isaTags = Array.isArray(embeddedHostContext.isa_tags) ? embeddedHostContext.isa_tags : [];
+    const hostContextChips = [];
+    if (hostOsPretty || hostKernel || hostMachine) {
+        const bits = [hostOsPretty, hostKernel].filter(Boolean);
+        if (hostMachine) bits.push(hostMachine);
+        hostContextChips.push({ name: 'host', label: bits.join(' • ') });
+    }
+    if (hostCpuModel) {
+        hostContextChips.push({ name: 'cpu', label: hostCpuModel });
+    }
+    if (hostPhysicalCores || hostLogicalCpus) {
+        const parts = [];
+        if (hostPhysicalCores) parts.push(`${hostPhysicalCores} cores`);
+        if (hostLogicalCpus) parts.push(`${hostLogicalCpus} threads`);
+        if (hostSockets) parts.push(`${hostSockets} socket${hostSockets === 1 ? '' : 's'}`);
+        hostContextChips.push({ name: 'topology', label: parts.join(' • ') });
+    }
+    if (hostMemHuman) {
+        hostContextChips.push({ name: 'memory', label: hostMemHuman });
+    }
+    if (hostNumaNodes) {
+        hostContextChips.push({ name: 'numa', label: `${hostNumaNodes} node${hostNumaNodes === 1 ? '' : 's'}` });
+    }
+    if (hostThp) {
+        hostContextChips.push({ name: 'thp', label: hostThp });
+    }
+    isaTags.forEach((tag) => hostContextChips.push({ name: 'isa', label: String(tag) }));
     const quickPathOutputs = [
         'Refreshes this run, regenerates <code>ir_report.html</code>, and updates the shared Run Hub.',
         'Captures decode timing into <code>profile_summary.json</code>.',
@@ -11892,15 +11944,21 @@ function renderProfileHowTo() {
     const loadedCount = depChips.filter(d => d.ok).length;
     const totalCount = depChips.length;
     const quickPathSummaryHtml = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.75rem;margin-bottom:0.8rem;">
-            <div style="border:1px solid var(--grey);border-radius:12px;padding:0.75rem;background:rgba(255,255,255,0.02);">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.75rem;margin-bottom:0.8rem;">
+            <div style="border:1px solid rgba(104,123,155,0.22);border-radius:12px;padding:0.75rem;background:rgba(10,18,30,0.42);">
                 <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:0.35rem;">What the one-command flow gives you</div>
                 <ul style="margin:0;padding-left:1rem;color:var(--text-muted);font-size:0.84rem;line-height:1.5;">
                     ${quickPathOutputs.map((item) => `<li>${item}</li>`).join('')}
                 </ul>
             </div>
-            <div style="border:1px solid var(--grey);border-radius:12px;padding:0.75rem;background:rgba(255,255,255,0.02);">
-                <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:0.35rem;">Host tool status</div>
+            <div style="border:1px solid rgba(104,123,155,0.22);border-radius:12px;padding:0.75rem;background:rgba(10,18,30,0.42);">
+                <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin-bottom:0.35rem;">Host context</div>
+                <div class="profile-dep-grid" style="margin-bottom:${hostContextChips.length ? '0.45rem' : '0'};">
+                    ${hostContextChips.length
+                        ? hostContextChips.map((d) => `<div class="profile-dep-chip info">${escapeHtml(d.name)}: ${escapeHtml(d.label)}</div>`).join('')
+                        : '<div style="color:var(--text-muted);font-size:0.82rem;">Host metadata not available in this report yet.</div>'}
+                </div>
+                <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);margin:0.25rem 0 0.35rem;">Host tool status</div>
                 <div class="profile-dep-grid" style="margin-bottom:${hostToolWarnings.length ? '0.45rem' : '0'};">
                     ${hostToolChips.map((d) => `<div class="profile-dep-chip ${d.ok ? 'ok' : 'missing'}">${escapeHtml(d.name)}: ${escapeHtml(d.label)}</div>`).join('')}
                 </div>
