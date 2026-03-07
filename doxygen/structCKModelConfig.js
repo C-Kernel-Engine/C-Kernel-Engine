@@ -13,10 +13,7 @@ var structCKModelConfig =
     [ "num_kv_heads", "structCKModelConfig.html#a902b19335449fa61c1e532d9999aa342", null ],
     [ "num_layers", "structCKModelConfig.html#a01453afe2f69986d9ca04a10f7b9d0a4", null ],
     [ "rms_norm_eps", "structCKModelConfig.html#a907585baeae2d601dcbf41a59785852e", null ],
-    [ "rope_scaling_factor", "structCKModelConfig.html#add8cceba6c14fd375e8e6b4320e9df98", null ],
-    [ "rope_scaling_type", "structCKModelConfig.html#ab06cae54dbee02ac43cc9bbf81c5e22f", null ],
     [ "rope_theta", "structCKModelConfig.html#ae7ab37061b5249887af28ef7eb481377", null ],
-    [ "rotary_dim", "structCKModelConfig.html#a4ee532eb7546fdf393220affe68d6e64", null ],
     [ "total_bytes", "structCKModelConfig.html#a8260b38867febb60f03ccad62b6cd7ea", null ],
     [ "vocab_size", "structCKModelConfig.html#ad2b6c5944307859fe26f4d915d089027", null ],
     [ "weight_bytes", "structCKModelConfig.html#ab9893d601d7e6c7b03e255fe83b4dab7", null ]
