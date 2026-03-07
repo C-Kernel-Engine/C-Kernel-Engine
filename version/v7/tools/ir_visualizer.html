@@ -11587,6 +11587,7 @@ function renderProfileHowTo() {
     const cachegrindInstalled = Boolean(profileToolStatus.valgrind) && Boolean(profileToolStatus.cg_annotate);
     const vtuneInstalled = Boolean(profileToolStatus.vtune);
     const advisorInstalled = Boolean(profileToolStatus.advisor);
+    const coreHostReady = linuxHost && perfInstalled && flamegraphInstalled && cachegrindInstalled;
     const quickPathOutputs = [
         'Refreshes this run, regenerates <code>ir_report.html</code>, and updates the shared Run Hub.',
         'Captures decode timing into <code>profile_summary.json</code>.',
@@ -11633,16 +11634,13 @@ function renderProfileHowTo() {
 
     const missingDeps = depChips.filter((d) => !d.ok).map((d) => d.name);
 
-    const depsCmd = [
-        'sudo apt-get update',
-        'sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-$(uname -r) perl git',
-        'git clone https://github.com/brendangregg/FlameGraph.git',
-        'chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl',
-        'printf "kernel.perf_event_paranoid=1\\nkernel.kptr_restrict=0\\n" | sudo tee /etc/sysctl.d/99-perf.conf',
-        'sudo sysctl -p /etc/sysctl.d/99-perf.conf',
-        '# VTune on Linux may require:',
-        'sudo sysctl -w kernel.yama.ptrace_scope=0',
-    ].join('\n');
+    const depsCmdLines = Array.isArray(profileToolStatus.install_hints) && profileToolStatus.install_hints.length
+        ? profileToolStatus.install_hints
+        : [
+            'make v7-doctor',
+            '# Install perf, valgrind, and FlameGraph for this host, then retry.',
+        ];
+    const depsCmd = depsCmdLines.join('\n');
 
     const explicitModelDirCmd = [
         `REPORT_MODEL_DIR=${quoteShell(reportModelDir)}`,
@@ -11980,21 +11978,40 @@ function renderProfileHowTo() {
                 <summary>
                     <span class="profile-phase-number phase-setup">1</span>
                     <span class="profile-phase-title">Environment Setup</span>
-                    <span class="profile-phase-hint">Install perf, FlameGraph, sysctl tunables</span>
+                    <span class="profile-phase-hint">${coreHostReady ? 'Host already ready; install commands available if you need to reprovision another machine' : 'Install perf, FlameGraph, sysctl tunables'}</span>
                 </summary>
                 <div class="profile-phase-body">
-                    <p class="profile-phase-desc">
-                        Before any profiling can happen, you need <code>perf</code> for hardware counters,
-                        Brendan Gregg's <strong>FlameGraph</strong> scripts for stack visualisations, and
-                        kernel tunables relaxed so perf can read symbols. Run this once per machine.
-                    </p>
-                    <div class="profile-howto-grid">
-                        ${renderHowToBlock(
-                            'Install Dependencies',
-                            depsCmd,
-                            'Installs linux-tools (perf), clones FlameGraph repo, and sets kernel.perf_event_paranoid=1 so perf can collect hardware counters from user space.'
-                        )}
-                    </div>
+                    ${coreHostReady
+                        ? `
+                            <div style="padding:0.8rem 0.95rem;border:1px solid rgba(36,179,113,0.28);border-radius:10px;background:rgba(36,179,113,0.08);color:#bfeecd;font-size:0.84rem;line-height:1.5;">
+                                <strong>Core host tools already installed.</strong>
+                                <span style="color:var(--text-muted);"> You can go straight to the quick paths or the per-tool profiling commands below. Expand the install block only if you need to set up another machine.</span>
+                            </div>
+                            <details style="margin-top:0.7rem;">
+                                <summary style="cursor:pointer;font-size:0.8rem;color:var(--text-secondary);font-weight:600;">Show distro-specific install commands</summary>
+                                <div class="profile-howto-grid" style="margin-top:0.65rem;">
+                                    ${renderHowToBlock(
+                                        'Install Dependencies',
+                                        depsCmd,
+                                        'Installs perf, cachegrind, FlameGraph helpers, and the kernel/sysctl settings needed for the Linux profiling path.'
+                                    )}
+                                </div>
+                            </details>
+                        `
+                        : `
+                            <p class="profile-phase-desc">
+                                Before any profiling can happen, you need <code>perf</code> for hardware counters,
+                                Brendan Gregg's <strong>FlameGraph</strong> scripts for stack visualisations, and
+                                kernel tunables relaxed so perf can read symbols. Run this once per machine.
+                            </p>
+                            <div class="profile-howto-grid">
+                                ${renderHowToBlock(
+                                    'Install Dependencies',
+                                    depsCmd,
+                                    'Installs perf, cachegrind, FlameGraph helpers, and the kernel/sysctl settings needed for the Linux profiling path.'
+                                )}
+                            </div>
+                        `}
                 </div>
             </details>
 
