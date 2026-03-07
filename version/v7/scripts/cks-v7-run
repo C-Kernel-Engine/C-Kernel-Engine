@@ -5,6 +5,30 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 VENV_PY="$PROJECT_ROOT/.venv/bin/python"
 REQS="$PROJECT_ROOT/requirements-v7.txt"
 
+print_run_quickstart() {
+  cat <<EOF
+[v7] model argument required for 'run'
+
+Quick start:
+  make v7-init
+  make v7-demo-runtime V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf
+
+Raw CLI examples:
+  version/v7/scripts/cks-v7-run run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \\
+    --context-len 1024 --force-compile --force-convert --generate-visualizer
+
+  version/v7/scripts/cks-v7-run run /path/to/model.gguf \\
+    --context-len 1024 --generate-visualizer
+
+After a run exists:
+  make v7-profile-dashboard-run RUN=~/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF
+
+Advanced options:
+  version/v7/scripts/cks-v7-run run --help
+  make v7-help
+EOF
+}
+
 check_python_reqs() {
   local py="$1"
   "$py" - "$REQS" <<'PY'
@@ -97,6 +121,11 @@ needs_bootstrap() {
 
 if needs_bootstrap "$@"; then
   ensure_bootstrap
+fi
+
+if [ "${1:-}" = "run" ] && [ "$#" -eq 1 ]; then
+  print_run_quickstart
+  exit 2
 fi
 
 if [ -x "$VENV_PY" ]; then
