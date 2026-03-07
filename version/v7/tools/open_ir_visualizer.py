@@ -49,6 +49,80 @@ V7_REPORT_PATH = Path(os.environ.get("CK_V7_REPORT_DIR", str(V7_ROOT / ".cache" 
 V7_REPORT_PATH_LEGACY = V7_ROOT / "reports"
 
 
+def _read_os_release() -> dict[str, str]:
+    path = Path("/etc/os-release")
+    if not path.exists():
+        return {}
+    data: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        data[key.strip()] = value.strip().strip('"')
+    return data
+
+
+def _profile_install_hints() -> list[str]:
+    if not sys.platform.startswith("linux"):
+        return [
+            "# Full profiling workflow is Linux-first.",
+            "# For local smoke tests on macOS/WSL, use the runtime and artifact commands first.",
+            "make v7-doctor",
+        ]
+
+    os_release = _read_os_release()
+    distro_id = (os_release.get("ID") or "").lower()
+    distro_like = (os_release.get("ID_LIKE") or "").lower()
+
+    if distro_id in {"ubuntu", "debian", "linuxmint", "pop"} or any(x in distro_like for x in ("debian", "ubuntu")):
+        return [
+            "sudo apt-get update",
+            "sudo apt-get install -y linux-tools-common linux-tools-generic linux-tools-$(uname -r) perl git valgrind",
+            "git clone https://github.com/brendangregg/FlameGraph.git",
+            "chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl",
+            'printf "kernel.perf_event_paranoid=1\\nkernel.kptr_restrict=0\\n" | sudo tee /etc/sysctl.d/99-perf.conf',
+            "sudo sysctl -p /etc/sysctl.d/99-perf.conf",
+            "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
+            "# VTune on Linux may require:",
+            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+        ]
+    if distro_id in {"arch", "manjaro", "endeavouros"} or "arch" in distro_like:
+        return [
+            "sudo pacman -S base-devel git perf valgrind flamegraph",
+            "# Intel hosts: sudo pacman -S intel-oneapi-basekit",
+            "mkdir -p FlameGraph && ln -sf /usr/bin/flamegraph FlameGraph/flamegraph.pl && ln -sf /usr/bin/stackcollapse-perf FlameGraph/stackcollapse-perf.pl",
+            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0",
+            "# VTune on Linux may require:",
+            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+        ]
+    if distro_id in {"fedora", "rhel", "centos", "rocky", "almalinux"} or any(x in distro_like for x in ("fedora", "rhel")):
+        return [
+            "sudo dnf install -y perf perl git valgrind",
+            "git clone https://github.com/brendangregg/FlameGraph.git",
+            "chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl",
+            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0",
+            "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
+            "# VTune on Linux may require:",
+            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+        ]
+    if distro_id in {"opensuse", "opensuse-tumbleweed", "opensuse-leap"} or "suse" in distro_like:
+        return [
+            "sudo zypper install -y perf perl git valgrind",
+            "git clone https://github.com/brendangregg/FlameGraph.git",
+            "chmod +x FlameGraph/stackcollapse-perf.pl FlameGraph/flamegraph.pl",
+            "sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0",
+            "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
+            "# VTune on Linux may require:",
+            "sudo sysctl -w kernel.yama.ptrace_scope=0",
+        ]
+    return [
+        "make v7-doctor",
+        "# Install perf, valgrind, and FlameGraph for your Linux distribution, then retry.",
+        "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
+    ]
+
+
 def run_cmd(cmd: list[str], cwd: Path, extra_env: dict | None = None):
     print(f"[run] {' '.join(cmd)}")
     env = None
@@ -71,6 +145,7 @@ def collect_profile_tool_status() -> dict[str, object]:
     flamegraph_dir = PROJECT_ROOT / "FlameGraph"
     return {
         "host_platform": sys.platform,
+        "install_hints": _profile_install_hints(),
         "perf": shutil.which("perf") is not None,
         "valgrind": shutil.which("valgrind") is not None,
         "cg_annotate": shutil.which("cg_annotate") is not None,

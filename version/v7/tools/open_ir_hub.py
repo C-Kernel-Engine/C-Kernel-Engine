@@ -26,10 +26,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+V7_ROOT = Path(__file__).resolve().parents[1]
+KERNEL_REGISTRY_PATH = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
 
 MARKER_FILES = {
     "run_index.json",
     "ir_report.html",
+    "dataset_viewer.html",
     "weights_manifest.json",
     "training_pipeline_latest.json",
     "training_parity_regimen_latest.json",
@@ -94,6 +97,16 @@ def _build_generate_report_cmd(run_dir: Path) -> str:
     )
 
 
+def _build_run_make_cmd(target: str, run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"make {target} RUN={run_q}"
+
+
+def _build_model_make_cmd(target: str, run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"make {target} V7_MODEL={run_q}"
+
+
 def _find_report_path(run_dir: Path) -> Path | None:
     direct = run_dir / "ir_report.html"
     if direct.exists():
@@ -102,6 +115,146 @@ def _find_report_path(run_dir: Path) -> Path | None:
     if ck_build.exists():
         return ck_build
     return None
+
+
+def _find_dataset_viewer_path(run_dir: Path) -> Path | None:
+    direct = run_dir / "dataset_viewer.html"
+    if direct.exists():
+        return direct
+    nested = run_dir / "dataset" / "dataset_viewer.html"
+    if nested.exists():
+        return nested
+    return None
+
+
+def _find_gallery_path(run_dir: Path) -> Path | None:
+    direct = run_dir / "svg_gallery.html"
+    if direct.exists():
+        return direct
+    nested = run_dir / "dataset" / "svg_gallery.html"
+    if nested.exists():
+        return nested
+    return None
+
+
+def _find_dataset_snapshot_path(run_dir: Path) -> Path | None:
+    candidate = run_dir / "dataset" / "dataset_snapshot.json"
+    if candidate.exists():
+        return candidate
+    return None
+
+
+def _dir_has_materialized_files(path: Path) -> bool:
+    try:
+        if not path.exists() or not path.is_dir():
+            return False
+        for child in path.rglob("*"):
+            if child.is_file() and child.name != ".gitkeep":
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def _build_dataset_materialize_cmd(dataset_workspace: str | None, dataset_type: str | None) -> str | None:
+    if not dataset_workspace or not dataset_type:
+        return None
+    if dataset_type != "svg":
+        return None
+    ws_q = shlex.quote(str(dataset_workspace))
+    return (
+        "python3 version/v7/scripts/materialize_svg_stage_artifacts_v7.py "
+        f"--workspace {ws_q} --force"
+    )
+
+
+def _build_dataset_viewer_cmd(dataset_workspace: str | None, dataset_type: str | None, run_dir: Path) -> str | None:
+    if not dataset_workspace or not dataset_type:
+        return None
+    if dataset_type != "svg":
+        return None
+    ws_q = shlex.quote(str(dataset_workspace))
+    out_q = shlex.quote(str(run_dir / "dataset_viewer.html"))
+    return (
+        "python3 version/v7/scripts/build_svg_dataset_visualizer_v7.py "
+        f"--workspace {ws_q} --output {out_q}"
+    )
+
+
+def _build_dataset_checklist(run_dir: Path, dataset_snapshot: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(dataset_snapshot, dict):
+        return []
+    dataset_root = run_dir / "dataset"
+    manifests_root = dataset_root / "manifests"
+    checks = [
+        (
+            "raw_import",
+            "Raw asset import",
+            _dir_has_materialized_files(dataset_root / "raw_assets")
+            and (manifests_root / "raw_assets_inventory.json").exists(),
+            "Need source SVG/assets imported into raw_assets and inventoried.",
+        ),
+        (
+            "normalize",
+            "Normalize + placeholders",
+            _dir_has_materialized_files(dataset_root / "normalized")
+            and (manifests_root / "normalized_assets_manifest.json").exists(),
+            "Need normalized SVGs with placeholderized text and normalization manifest.",
+        ),
+        (
+            "classify",
+            "Classification / split planning",
+            (manifests_root / "asset_classification_manifest.json").exists(),
+            "Need SVG family/role classification before deriving stage corpora.",
+        ),
+        (
+            "pretrain",
+            "Pretrain corpus materialized",
+            _dir_has_materialized_files(dataset_root / "pretrain"),
+            "Need actual pretrain text/manifests, not just an empty folder.",
+        ),
+        (
+            "midtrain",
+            "Midtrain transform corpus materialized",
+            _dir_has_materialized_files(dataset_root / "midtrain"),
+            "Need transform/edit pairs for layout/style conditioning.",
+        ),
+        (
+            "sft",
+            "SFT supervision corpus materialized",
+            _dir_has_materialized_files(dataset_root / "sft"),
+            "Need tag/spec -> pure SVG supervision rows.",
+        ),
+        (
+            "tokenizer",
+            "Tokenizer corpus + fit audit",
+            _dir_has_materialized_files(dataset_root / "tokenizer"),
+            "Need tokenizer corpus or fit reports for ctx 512/2048.",
+        ),
+        (
+            "holdout",
+            "Holdout / canary set finalized",
+            _dir_has_materialized_files(dataset_root / "holdout"),
+            "Need held-out canary prompts/assets before overnight training.",
+        ),
+    ]
+    return [
+        {"key": key, "label": label, "ready": ready, "hint": hint}
+        for key, label, ready, hint in checks
+    ]
+
+
+def _find_run_artifact(run_dir: Path, *relative_paths: str) -> Path | None:
+    for rel in relative_paths:
+        for base in (run_dir, run_dir / ".ck_build"):
+            candidate = base / rel
+            if candidate.exists():
+                return candidate
+    return None
+
+
+def _has_run_artifact(run_dir: Path, *relative_paths: str) -> bool:
+    return _find_run_artifact(run_dir, *relative_paths) is not None
 
 
 def _extract_dims(weights_manifest: Path) -> dict[str, Any]:
@@ -226,6 +379,17 @@ class RunRecord:
     name: str
     kind: str
     report_path: Path | None
+    dataset_viewer_path: Path | None
+    gallery_path: Path | None
+    dataset_snapshot_path: Path | None
+    dataset_workspace: str | None
+    dataset_type: str | None
+    dataset_stage_mode: str | None
+    dataset_staged_entries: list[str]
+    dataset_missing_entries: list[str]
+    dataset_refresh_cmd: str | None
+    dataset_rebuild_viewer_cmd: str | None
+    dataset_prep_checklist: list[dict[str, Any]]
     dims: dict[str, Any]
     parity_regimen: dict[str, Any]
     final_loss: float | None
@@ -238,6 +402,9 @@ class RunRecord:
     weights_reason: str | None
     shape_signature: str | None
     generate_report_cmd: str
+    artifact_sections: list[dict[str, Any]]
+    coverage_summary: dict[str, Any]
+    next_actions: list[dict[str, str]]
     updated_epoch: float
     updated_iso: str | None
 
@@ -250,6 +417,20 @@ class RunRecord:
             "kind": self.kind,
             "report_path": str(self.report_path) if self.report_path else None,
             "report_uri": self.report_path.resolve().as_uri() if self.report_path else None,
+            "dataset_viewer_path": str(self.dataset_viewer_path) if self.dataset_viewer_path else None,
+            "dataset_viewer_uri": self.dataset_viewer_path.resolve().as_uri() if self.dataset_viewer_path else None,
+            "gallery_path": str(self.gallery_path) if self.gallery_path else None,
+            "gallery_uri": self.gallery_path.resolve().as_uri() if self.gallery_path else None,
+            "dataset_snapshot_path": str(self.dataset_snapshot_path) if self.dataset_snapshot_path else None,
+            "dataset_snapshot_uri": self.dataset_snapshot_path.resolve().as_uri() if self.dataset_snapshot_path else None,
+            "dataset_workspace": self.dataset_workspace,
+            "dataset_type": self.dataset_type,
+            "dataset_stage_mode": self.dataset_stage_mode,
+            "dataset_staged_entries": self.dataset_staged_entries,
+            "dataset_missing_entries": self.dataset_missing_entries,
+            "dataset_refresh_cmd": self.dataset_refresh_cmd,
+            "dataset_rebuild_viewer_cmd": self.dataset_rebuild_viewer_cmd,
+            "dataset_prep_checklist": self.dataset_prep_checklist,
             "dims": self.dims,
             "parity_regimen": self.parity_regimen,
             "final_loss": self.final_loss,
@@ -264,9 +445,204 @@ class RunRecord:
             "weights_reason": self.weights_reason,
             "shape_signature": self.shape_signature,
             "generate_report_cmd": self.generate_report_cmd,
+            "artifact_sections": self.artifact_sections,
+            "coverage_summary": self.coverage_summary,
+            "next_actions": self.next_actions,
             "updated_epoch": self.updated_epoch,
             "updated_iso": self.updated_iso,
         }
+
+
+def _build_section(
+    key: str,
+    title: str,
+    items: list[tuple[str, bool]],
+    *,
+    core: bool,
+    optional: bool = False,
+) -> dict[str, Any]:
+    payload_items = [{"label": label, "ready": ready} for label, ready in items]
+    present = sum(1 for _, ready in items if ready)
+    total = len(items)
+    return {
+        "key": key,
+        "title": title,
+        "core": core,
+        "optional": optional,
+        "present": present,
+        "total": total,
+        "items": payload_items,
+    }
+
+
+def _coverage_counts(sections: list[dict[str, Any]], *, core: bool) -> tuple[int, int]:
+    target = [section for section in sections if bool(section.get("core")) is core]
+    present = sum(int(section.get("present") or 0) for section in target)
+    total = sum(int(section.get("total") or 0) for section in target)
+    return present, total
+
+
+def _coverage_pct(present: int, total: int) -> int:
+    if total <= 0:
+        return 0
+    return max(0, min(100, round((present / total) * 100)))
+
+
+def _build_run_coverage(
+    run_dir: Path,
+    kind: str,
+    report_ready: bool,
+    dataset_viewer_ready: bool,
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, str]]]:
+    if kind == "train":
+        sections = [
+            _build_section("surface", "Report Surface", [("report", report_ready)], core=True),
+            _build_section(
+                "compile",
+                "Compile-time",
+                [
+                    ("ir1_train", _has_run_artifact(run_dir, "ir1_train_forward.json")),
+                    ("ir2_train", _has_run_artifact(run_dir, "ir2_train_backward.json", "ir2_train_summary.json")),
+                    ("layout_train", _has_run_artifact(run_dir, "layout_train.json")),
+                    ("train_exec_plan", _has_run_artifact(run_dir, "train_exec_plan.json")),
+                    ("gen_runtime", _has_run_artifact(run_dir, "generated_train_runtime_summary.json")),
+                ],
+                core=True,
+            ),
+            _build_section(
+                "data_pipeline",
+                "Data / Pipeline",
+                [
+                    ("training_pipeline", _has_run_artifact(run_dir, "training_pipeline_latest.json")),
+                    ("dataset_qc", _has_run_artifact(run_dir, "dataset_qc.json")),
+                    ("tokenizer_roundtrip", _has_run_artifact(run_dir, "tokenizer_roundtrip.json")),
+                    ("run_ledger", _has_run_artifact(run_dir, "run_ledger.jsonl")),
+                    ("stage_eval_matrix", _has_run_artifact(run_dir, "stage_eval_matrix_latest.json")),
+                    ("analysis_checkpoints", _has_run_artifact(run_dir, "analysis_checkpoints_latest.json")),
+                ],
+                core=True,
+            ),
+            _build_section(
+                "training_runs",
+                "Training Runs",
+                [
+                    ("loss_curve", _has_run_artifact(run_dir, "training_loss_curve_latest.json")),
+                    ("grad_norms", _has_run_artifact(run_dir, "training_grad_norms_latest.json")),
+                    ("parity", _has_run_artifact(run_dir, "training_parity_latest.json")),
+                    ("parity_regimen", _has_run_artifact(run_dir, "training_parity_regimen_latest.json")),
+                    ("post_train_eval", _has_run_artifact(run_dir, "post_train_eval.json")),
+                ],
+                core=True,
+            ),
+            _build_section(
+                "runtime_perf",
+                "Runtime / Perf",
+                [
+                    ("step_profile", _has_run_artifact(run_dir, "training_step_profile.json")),
+                    ("backprop_stitch", _has_run_artifact(run_dir, "backprop_stitch_runtime_latest.json")),
+                    ("replay_determinism", _has_run_artifact(run_dir, "replay_determinism_latest.json")),
+                    ("replay_accum", _has_run_artifact(run_dir, "replay_accum_latest.json")),
+                    ("memory_diag", _has_run_artifact(run_dir, "memory_diagnostic_latest.json")),
+                    ("train_e2e", _has_run_artifact(run_dir, "train_e2e_latest.json")),
+                    ("layout_audit", _has_run_artifact(run_dir, "layout_train_audit.json")),
+                ],
+                core=False,
+            ),
+            _build_section(
+                "dataset_surface",
+                "Dataset Surface",
+                [("dataset_viewer", dataset_viewer_ready)],
+                core=False,
+                optional=True,
+            ),
+        ]
+        next_actions: list[dict[str, str]] = []
+        if not report_ready:
+            next_actions.append({"label": "Generate report", "cmd": _build_generate_report_cmd(run_dir)})
+        if any(section["present"] < section["total"] for section in sections if section["core"]):
+            next_actions.append({"label": "Refresh core training artifacts", "cmd": _build_run_make_cmd("v7-capture-artifacts-run", run_dir)})
+        if any(section["present"] < section["total"] for section in sections if section["key"] == "runtime_perf"):
+            next_actions.append({"label": "Capture training runtime telemetry", "cmd": _build_run_make_cmd("v7-profile-dashboard-run", run_dir)})
+    else:
+        sections = [
+            _build_section("surface", "Report Surface", [("report", report_ready)], core=True),
+            _build_section(
+                "compile",
+                "Compile-time",
+                [
+                    ("ir1", _has_run_artifact(run_dir, "ir1_decode.json", "ir1_prefill.json")),
+                    ("layout", _has_run_artifact(run_dir, "layout_decode.json", "layout_prefill.json")),
+                    ("lowered", _has_run_artifact(run_dir, "lowered_decode_call.json", "lowered_decode.json", "lowered_prefill_call.json", "lowered_prefill.json")),
+                    ("manifest", _has_run_artifact(run_dir, "weights_manifest.json")),
+                    ("kernel_registry", KERNEL_REGISTRY_PATH.exists()),
+                ],
+                core=True,
+            ),
+            _build_section(
+                "basic_profiling",
+                "Basic Profiling",
+                [
+                    ("profile", _has_run_artifact(run_dir, "profile_summary.json")),
+                    ("perf_stat", _has_run_artifact(run_dir, "perf_stat_summary.json")),
+                    ("flamegraph", _has_run_artifact(run_dir, "flamegraph_manifest.json")),
+                ],
+                core=True,
+            ),
+            _build_section(
+                "correctness",
+                "Correctness",
+                [
+                    ("memory_signoff", _has_run_artifact(run_dir, "memory_signoff.json")),
+                    ("perf_gate", _has_run_artifact(run_dir, "perf_gate_report.json")),
+                ],
+                core=False,
+            ),
+            _build_section(
+                "deep_profiling",
+                "Deep Profiling",
+                [
+                    ("cachegrind", _has_run_artifact(run_dir, "cachegrind_summary.json")),
+                    ("vtune", _has_run_artifact(run_dir, "vtune_summary.json")),
+                    ("advisor", _has_run_artifact(run_dir, "advisor_summary.json")),
+                ],
+                core=False,
+            ),
+            _build_section(
+                "optional_train_runtime",
+                "Optional Train-runtime",
+                [("asan", _has_run_artifact(run_dir, "asan_summary.json"))],
+                core=False,
+                optional=True,
+            ),
+        ]
+        next_actions = []
+        if not report_ready:
+            next_actions.append({"label": "Generate report", "cmd": _build_generate_report_cmd(run_dir)})
+        compile_section = next(section for section in sections if section["key"] == "compile")
+        basic_section = next(section for section in sections if section["key"] == "basic_profiling")
+        correctness_section = next(section for section in sections if section["key"] == "correctness")
+        if compile_section["present"] < compile_section["total"]:
+            next_actions.append({"label": "Refresh compile artifacts", "cmd": _build_run_make_cmd("v7-capture-artifacts-run", run_dir)})
+        if basic_section["present"] < basic_section["total"]:
+            next_actions.append({"label": "Capture profiling dashboard", "cmd": _build_run_make_cmd("v7-profile-dashboard-run", run_dir)})
+        if not _has_run_artifact(run_dir, "memory_signoff.json"):
+            next_actions.append({"label": "Run memory signoff", "cmd": _build_model_make_cmd("v7-memory-signoff", run_dir)})
+        if not _has_run_artifact(run_dir, "perf_gate_report.json"):
+            next_actions.append({"label": "Evaluate perf gate", "cmd": _build_model_make_cmd("v7-perf-gate-evaluate", run_dir)})
+
+    core_present, core_total = _coverage_counts(sections, core=True)
+    advanced_present, advanced_total = _coverage_counts(sections, core=False)
+    coverage_summary = {
+        "core_present": core_present,
+        "core_total": core_total,
+        "core_pct": _coverage_pct(core_present, core_total),
+        "advanced_present": advanced_present,
+        "advanced_total": advanced_total,
+        "advanced_pct": _coverage_pct(advanced_present, advanced_total) if advanced_total else None,
+        "core_label": "core dashboard coverage",
+        "advanced_label": "advanced checks",
+    }
+    return sections, coverage_summary, next_actions
 
 
 def discover_run_dirs(models_root: Path) -> list[Path]:
@@ -290,6 +666,10 @@ def discover_run_dirs(models_root: Path) -> list[Path]:
 def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     rel = _to_rel(run_dir, models_root)
     report = _find_report_path(run_dir)
+    dataset_viewer = _find_dataset_viewer_path(run_dir)
+    gallery = _find_gallery_path(run_dir)
+    dataset_snapshot_path = _find_dataset_snapshot_path(run_dir)
+    dataset_snapshot = _safe_read_json(dataset_snapshot_path) if dataset_snapshot_path else None
     wm = run_dir / "weights_manifest.json"
     parity = run_dir / "training_parity_regimen_latest.json"
     loss = run_dir / "training_loss_curve_latest.json"
@@ -310,13 +690,50 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
             mtimes.append(m)
     updated_epoch = max(mtimes) if mtimes else 0.0
     updated_iso = _epoch_to_iso(updated_epoch)
+    kind = _infer_kind(run_dir, models_root)
+    artifact_sections, coverage_summary, next_actions = _build_run_coverage(
+        run_dir,
+        kind,
+        bool(report),
+        bool(dataset_viewer),
+    )
+    dataset_workspace = None
+    if isinstance(dataset_snapshot, dict):
+        for key in ("working_workspace", "snapshot_root", "source_workspace"):
+            value = dataset_snapshot.get(key)
+            if value:
+                dataset_workspace = str(value)
+                break
+    dataset_type = str(dataset_snapshot.get("dataset_type")) if isinstance(dataset_snapshot, dict) and dataset_snapshot.get("dataset_type") else None
+    dataset_stage_mode = str(dataset_snapshot.get("stage_mode")) if isinstance(dataset_snapshot, dict) and dataset_snapshot.get("stage_mode") else None
+    dataset_staged_entries = [str(v) for v in dataset_snapshot.get("staged_entries", [])] if isinstance(dataset_snapshot, dict) else []
+    dataset_missing_entries = [str(v) for v in dataset_snapshot.get("missing_entries", [])] if isinstance(dataset_snapshot, dict) else []
+    dataset_refresh_cmd = _build_dataset_materialize_cmd(dataset_workspace, dataset_type)
+    dataset_rebuild_viewer_cmd = _build_dataset_viewer_cmd(dataset_workspace, dataset_type, run_dir)
+    dataset_prep_checklist = _build_dataset_checklist(run_dir, dataset_snapshot)
+
+    if dataset_refresh_cmd:
+        next_actions.append({"label": "Materialize staged dataset artifacts", "cmd": dataset_refresh_cmd})
+    if dataset_rebuild_viewer_cmd:
+        next_actions.append({"label": "Rebuild dataset viewer", "cmd": dataset_rebuild_viewer_cmd})
 
     return RunRecord(
         run_dir=run_dir,
         rel_path=rel,
         name=run_dir.name,
-        kind=_infer_kind(run_dir, models_root),
+        kind=kind,
         report_path=report,
+        dataset_viewer_path=dataset_viewer,
+        gallery_path=gallery,
+        dataset_snapshot_path=dataset_snapshot_path,
+        dataset_workspace=dataset_workspace,
+        dataset_type=dataset_type,
+        dataset_stage_mode=dataset_stage_mode,
+        dataset_staged_entries=dataset_staged_entries,
+        dataset_missing_entries=dataset_missing_entries,
+        dataset_refresh_cmd=dataset_refresh_cmd,
+        dataset_rebuild_viewer_cmd=dataset_rebuild_viewer_cmd,
+        dataset_prep_checklist=dataset_prep_checklist,
         dims=dims,
         parity_regimen=parity_status,
         final_loss=final_loss,
@@ -329,6 +746,9 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         weights_reason=weights_reason,
         shape_signature=_shape_signature(dims),
         generate_report_cmd=_build_generate_report_cmd(run_dir),
+        artifact_sections=artifact_sections,
+        coverage_summary=coverage_summary,
+        next_actions=next_actions,
         updated_epoch=updated_epoch,
         updated_iso=updated_iso,
     )
@@ -340,6 +760,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
     payload_runs = [r.to_json() for r in runs]
     train_count = sum(1 for r in payload_runs if r.get("kind") == "train")
     report_count = sum(1 for r in payload_runs if r.get("report_path"))
+    dataset_viewer_count = sum(1 for r in payload_runs if r.get("dataset_viewer_path"))
     pass_count = sum(1 for r in payload_runs if (r.get("parity_regimen") or {}).get("status") in ("PASS", "PASS_REUSED"))
     return {
         "schema": "ck.ir.hub.v1",
@@ -349,6 +770,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
             "runs_total": len(payload_runs),
             "runs_train": train_count,
             "runs_with_report": report_count,
+            "runs_with_dataset_viewer": dataset_viewer_count,
             "runs_parity_pass": pass_count,
         },
         "runs": payload_runs,
@@ -1442,6 +1864,37 @@ def render_html(index_payload: dict[str, Any]) -> str:
       line-height: 1.35;
     }
 
+    .section-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .action-stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .action-row-inline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .action-label {
+      color: #aab4c1;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
     .health-bar,
     .coverage-bar {
       width: 100%;
@@ -1944,31 +2397,15 @@ def render_html(index_payload: dict[str, Any]) -> str:
       return 'missing';
     }
 
-    function scoreRun(run) {
-      let score = 18;
-      if (run.reportReady) score += 24;
-      if (run.parityStatus === 'PASS') score += 28;
-      else if (run.parityStatus === 'PASS_REUSED') score += 22;
-      else if (run.parityStatus === 'FAIL') score += 4;
-      if (run.validSvgRate !== null) {
-        if (run.validSvgRate >= 0.9) score += 14;
-        else if (run.validSvgRate >= 0.75) score += 10;
-        else if (run.validSvgRate >= 0.5) score += 6;
-        else score += 3;
-      }
-      if (run.checkpointCount > 0) score += 8;
-      if (run.weightsStep !== null) score += 6;
-      return Math.max(0, Math.min(100, score));
+    function describeCoverageSummary(coverageSummary, sections, core) {
+      const target = Array.isArray(sections) ? sections.filter((section) => Boolean(section.core) === core) : [];
+      if (!target.length) return core ? 'core coverage unavailable' : 'no advanced checks tracked';
+      return target.map((section) => `${section.title.toLowerCase()} ${section.present}/${section.total}`).join(' · ');
     }
 
-    function describeRunScore(run) {
-      const parts = [];
-      if (run.reportReady) parts.push('report');
-      if (run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED' || run.parityStatus === 'FAIL') parts.push('parity');
-      if (run.checkpointCount > 0) parts.push('checkpoints');
-      if (run.weightsStep !== null) parts.push('weights');
-      if (run.validSvgRate !== null) parts.push('telemetry');
-      return parts.length ? parts.join(' + ') : 'base discovery only';
+    function showParityBadge(run) {
+      if (run.kind === 'train') return true;
+      return run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED' || run.parityStatus === 'FAIL';
     }
 
     function makeSearchBlob(run) {
@@ -1996,7 +2433,21 @@ def render_html(index_payload: dict[str, Any]) -> str:
         dims,
         kind: run.kind || 'inference',
         parityStatus,
+        artifactSections: Array.isArray(run.artifact_sections) ? run.artifact_sections : [],
+        coverageSummary: (run.coverage_summary && typeof run.coverage_summary === 'object') ? run.coverage_summary : {},
+        nextActions: Array.isArray(run.next_actions) ? run.next_actions : [],
         reportReady: Boolean(run.report_path),
+        datasetViewerReady: Boolean(run.dataset_viewer_path),
+        galleryReady: Boolean(run.gallery_path),
+        datasetSnapshotReady: Boolean(run.dataset_snapshot_path),
+        datasetWorkspace: run.dataset_workspace || '',
+        datasetType: run.dataset_type || '',
+        datasetStageMode: run.dataset_stage_mode || '',
+        datasetStagedEntries: Array.isArray(run.dataset_staged_entries) ? run.dataset_staged_entries : [],
+        datasetMissingEntries: Array.isArray(run.dataset_missing_entries) ? run.dataset_missing_entries : [],
+        datasetRefreshCmd: run.dataset_refresh_cmd || '',
+        datasetRebuildViewerCmd: run.dataset_rebuild_viewer_cmd || '',
+        datasetPrepChecklist: Array.isArray(run.dataset_prep_checklist) ? run.dataset_prep_checklist : [],
         validSvgRate: typeof run.valid_svg_rate === 'number' ? run.valid_svg_rate : null,
         checkpointCount: typeof run.checkpoint_count === 'number' ? run.checkpoint_count : 0,
         latestCheckpointStep: typeof run.latest_checkpoint_step === 'number' ? run.latest_checkpoint_step : null,
@@ -2004,8 +2455,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
         modelSpec: makeModelSpec(dims),
         updatedLabel: relativeTime(run.updated_epoch),
       };
-      normalized.healthScore = scoreRun(normalized);
-      normalized.healthReason = describeRunScore(normalized);
+      normalized.healthScore = Number.isFinite(Number(normalized.coverageSummary.core_pct))
+        ? Number(normalized.coverageSummary.core_pct)
+        : 0;
+      normalized.healthReason = describeCoverageSummary(normalized.coverageSummary, normalized.artifactSections, true);
+      normalized.advancedReason = describeCoverageSummary(normalized.coverageSummary, normalized.artifactSections, false);
       normalized.searchBlob = makeSearchBlob(normalized);
       return normalized;
     }) : [];
@@ -2042,6 +2496,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const summary = HUB.summary || {};
       const newest = runs[0];
       const reportCount = summary.runs_with_report || runs.filter((run) => run.reportReady).length;
+      const datasetViewerCount = summary.runs_with_dataset_viewer || runs.filter((run) => run.datasetViewerReady).length;
       const parityPass = summary.runs_parity_pass || runs.filter((run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED').length;
       const trainCount = summary.runs_train || runs.filter((run) => run.kind === 'train').length;
       const inferCount = runs.filter((run) => run.kind === 'inference').length;
@@ -2067,6 +2522,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         { label: 'Training Roots', value: fmtInt(trainCount), note: 'Train pipeline directories.' },
         { label: 'Inference Roots', value: fmtInt(inferCount), note: 'Inference and runtime roots.' },
         { label: 'Reports Ready', value: fmtInt(reportCount), note: 'ir_report.html or .ck_build report.' },
+        { label: 'Dataset Viewers', value: fmtInt(datasetViewerCount), note: 'run-local dataset_viewer.html snapshots.' },
         { label: 'Parity Pass', value: fmtInt(parityPass), note: 'PASS plus PASS_REUSED regimen states.' },
         { label: 'Best Loss / Checkpoints', value: `${fmtLoss(bestLoss)} / ${fmtInt(totalCheckpoints)}`, note: 'Lowest loss and total checkpoint volume.' },
       ];
@@ -2078,6 +2534,80 @@ def render_html(index_payload: dict[str, Any]) -> str:
           <div class="metric-note">${escapeHtml(metric.note)}</div>
         </article>
       `).join('');
+    }
+
+    function renderSectionSummary(run, core) {
+      const sections = Array.isArray(run.artifactSections)
+        ? run.artifactSections.filter((section) => Boolean(section.core) === core)
+        : [];
+      if (!sections.length) return '';
+      return `
+        <div class="section-summary">
+          ${sections.map((section) => {
+            const pct = section.total ? Math.round((section.present / section.total) * 100) : 0;
+            const state = section.present === section.total ? 'pass' : (section.present > 0 ? 'skip' : 'missing');
+            return `<span class="badge ${state}">${escapeHtml(section.title)} ${escapeHtml(String(section.present))}/${escapeHtml(String(section.total))}</span>`;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderNextActions(run) {
+      if (!Array.isArray(run.nextActions) || !run.nextActions.length) return '';
+      return `
+        <div class="action-stack">
+          ${run.nextActions.map((action) => `
+            <div class="action-row-inline">
+              <span class="action-label">${escapeHtml(action.label || 'Action')}</span>
+              <button class="btn" data-copy="${encodeURIComponent(action.cmd || '')}">Copy cmd</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderDatasetPrepChecklist(run) {
+      const items = Array.isArray(run.datasetPrepChecklist) ? run.datasetPrepChecklist : [];
+      if (!items.length) return '';
+      const ready = items.filter((item) => item.ready).length;
+      const total = items.length;
+      const rows = items.map((item) => `
+        <tr>
+          <td style="padding:8px 10px;color:#e5e7eb;">${escapeHtml(item.label || item.key || 'step')}</td>
+          <td style="padding:8px 10px;color:${item.ready ? '#4ade80' : '#f59e0b'};font-weight:700;">${item.ready ? 'READY' : 'PENDING'}</td>
+          <td style="padding:8px 10px;color:#9ca3af;">${escapeHtml(item.hint || '')}</td>
+        </tr>
+      `).join('');
+      return `
+        <div style="margin-top:14px;border:1px solid rgba(110,231,183,0.18);background:rgba(6,18,15,0.55);border-radius:14px;padding:14px;">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:0.76rem;color:#6ee7b7;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">Dataset Prep Checklist</div>
+              <div style="font-size:1rem;font-weight:700;color:#f8fafc;margin-top:4px;">${escapeHtml(String(ready))}/${escapeHtml(String(total))} ready before pretraining</div>
+              <div style="font-size:0.86rem;color:#94a3b8;margin-top:4px;">Workspace: <span class="mono">${escapeHtml(run.datasetWorkspace || 'n/a')}</span>${run.datasetType ? ` · type=${escapeHtml(run.datasetType)}` : ''}${run.datasetStageMode ? ` · snapshot=${escapeHtml(run.datasetStageMode)}` : ''}</div>
+            </div>
+            <div class="action-row" style="margin:0;">
+              ${run.datasetRefreshCmd ? `<button class="btn" data-copy="${encodeURIComponent(run.datasetRefreshCmd)}">Copy materialize dataset cmd</button>` : ''}
+              ${run.datasetRebuildViewerCmd ? `<button class="btn" data-copy="${encodeURIComponent(run.datasetRebuildViewerCmd)}">Copy rebuild viewer cmd</button>` : ''}
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            ${items.map((item) => `<span class="badge ${item.ready ? 'pass' : 'skip'}">${escapeHtml(item.label || item.key || 'step')} ${item.ready ? 'ready' : 'pending'}</span>`).join('')}
+          </div>
+          <div style="margin-top:12px;overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
+              <thead>
+                <tr style="text-align:left;border-bottom:1px solid rgba(148,163,184,0.18);">
+                  <th style="padding:8px 10px;color:#fbbf24;">Step</th>
+                  <th style="padding:8px 10px;color:#fbbf24;">Status</th>
+                  <th style="padding:8px 10px;color:#fbbf24;">What remains</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
     }
 
     function renderSpotlight(filteredRuns) {
@@ -2100,8 +2630,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
           </div>
           <div class="spotlight-tags">
             <span class="badge ${run.kind}">${escapeHtml(run.kind)}</span>
-            <span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>
+            ${showParityBadge(run) ? `<span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>` : ''}
             ${run.reportReady ? '<span class="badge report">report ready</span>' : ''}
+            ${run.datasetViewerReady ? '<span class="badge report">dataset viewer</span>' : ''}
           </div>
         </div>
         <div class="spotlight-body">
@@ -2123,18 +2654,30 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
               <div class="action-row">
                 ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Open report</a>` : ''}
+                ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+                ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">SVG Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Open run dir</a>
                 <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy cmd</button>
               </div>
+              ${renderSectionSummary(run, true)}
+              <div class="health-note">Core dashboard coverage. Advanced correctness and deep profiling are tracked separately below.</div>
+              ${renderDatasetPrepChecklist(run)}
               <details class="detail-toggle">
                 <summary>Advanced details</summary>
                 <div class="spotlight-command">${escapeHtml(run.generate_report_cmd || 'No report generation command available')}</div>
+                ${run.datasetRefreshCmd ? `<div class="spotlight-command" style="margin-top:10px;">${escapeHtml(run.datasetRefreshCmd)}</div>` : ''}
+                ${run.datasetRebuildViewerCmd ? `<div class="spotlight-command" style="margin-top:10px;">${escapeHtml(run.datasetRebuildViewerCmd)}</div>` : ''}
                 <div class="spotlight-summary" style="margin-top:12px;">
                   <div class="summary-tile"><div class="k">Shape Signature</div><div class="v">${escapeHtml(run.shape_signature || 'n/a')}</div></div>
                   <div class="summary-tile"><div class="k">Weights Reason</div><div class="v">${escapeHtml(run.weights_reason || 'n/a')}</div></div>
                   <div class="summary-tile"><div class="k">Updated ISO</div><div class="v mono">${escapeHtml(run.updated_iso || 'n/a')}</div></div>
                   <div class="summary-tile"><div class="k">Checkpoint Step</div><div class="v">${escapeHtml(fmtInt(run.latestCheckpointStep))}</div></div>
+                  <div class="summary-tile"><div class="k">Dataset Snapshot</div><div class="v">${run.datasetSnapshotReady ? 'ready' : 'missing'}</div></div>
+                  <div class="summary-tile"><div class="k">Dataset Entries</div><div class="v">${escapeHtml(fmtInt(run.datasetStagedEntries.length))}</div></div>
                 </div>
+                ${renderSectionSummary(run, false)}
+                <div class="health-note" style="margin-top:10px;">Advanced checks: ${escapeHtml(run.advancedReason || 'none tracked')}</div>
+                ${renderNextActions(run)}
               </details>
             </div>
             <aside class="spotlight-side">
@@ -2148,8 +2691,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
               <div class="mini-grid">
                 <div class="mini-tile"><div class="k">Updated</div><div class="v">${escapeHtml(run.updatedLabel)}</div></div>
-                <div class="mini-tile"><div class="k">Parity</div><div class="v">${escapeHtml(run.parityStatus)}</div></div>
+                <div class="mini-tile"><div class="k">Core Coverage</div><div class="v">${escapeHtml(fmtInt(run.coverageSummary.core_present))}/${escapeHtml(fmtInt(run.coverageSummary.core_total))}</div></div>
+                <div class="mini-tile"><div class="k">Advanced Checks</div><div class="v">${escapeHtml(fmtInt(run.coverageSummary.advanced_present))}/${escapeHtml(fmtInt(run.coverageSummary.advanced_total))}</div></div>
                 <div class="mini-tile"><div class="k">Report Surface</div><div class="v">${run.reportReady ? 'Ready for direct entry' : 'Generate report first'}</div></div>
+                <div class="mini-tile"><div class="k">Dataset</div><div class="v">${run.datasetViewerReady ? 'Viewer ready' : 'No dataset snapshot'}</div></div>
               </div>
             </aside>
           </div>
@@ -2162,25 +2707,52 @@ def render_html(index_payload: dict[str, Any]) -> str:
       return Math.round((list.filter(predicate).length / list.length) * 100);
     }
 
+    function sectionCompletePct(list, key) {
+      const relevant = list.filter((run) => Array.isArray(run.artifactSections) && run.artifactSections.some((section) => section.key === key));
+      if (!relevant.length) return null;
+      return Math.round((relevant.filter((run) => {
+        const section = run.artifactSections.find((item) => item.key === key);
+        return section && section.total > 0 && section.present === section.total;
+      }).length / relevant.length) * 100);
+    }
+
     function renderCoverage(filteredRuns) {
       const target = filteredRuns.length ? filteredRuns : runs;
       const reportPct = makeCoveragePct(target, (run) => run.reportReady);
-      const parityPct = makeCoveragePct(target, (run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED');
-      const svgPct = makeCoveragePct(target, (run) => run.validSvgRate !== null);
-      const svgStrongPct = makeCoveragePct(target, (run) => run.validSvgRate !== null && run.validSvgRate >= 0.8);
-      const ckptPct = makeCoveragePct(target, (run) => run.checkpointCount > 0);
+      const avgCorePct = target.length
+        ? Math.round(target.reduce((sum, run) => sum + (run.coverageSummary.core_pct || 0), 0) / target.length)
+        : 0;
+      const avgAdvancedPct = target.length
+        ? Math.round(target.reduce((sum, run) => {
+          const pct = typeof run.coverageSummary.advanced_pct === 'number' ? run.coverageSummary.advanced_pct : 0;
+          return sum + pct;
+        }, 0) / target.length)
+        : 0;
+      const coreCompletePct = makeCoveragePct(target, (run) => (run.coverageSummary.core_pct || 0) === 100);
+      const correctnessPct = sectionCompletePct(target, 'correctness');
+      const profilingPct = sectionCompletePct(target, 'basic_profiling');
+      const datasetPct = makeCoveragePct(target, (run) => run.datasetViewerReady);
+      const trainParityPct = makeCoveragePct(
+        target.filter((run) => run.kind === 'train'),
+        (run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED',
+      );
 
       const items = [
         ['Report surface', reportPct],
-        ['Parity pass', parityPct],
-        ['SVG telemetry', svgPct],
-        ['Strong SVG telemetry', svgStrongPct],
-        ['Checkpointed roots', ckptPct],
+        ['Avg core coverage', avgCorePct],
+        ['Core complete', coreCompletePct],
+        ['Avg advanced checks', avgAdvancedPct],
+        ['Basic profiling complete', profilingPct ?? 0],
+        ['Correctness complete', correctnessPct ?? 0],
+        ['Dataset viewer', datasetPct],
       ];
+      if (target.some((run) => run.kind === 'train')) {
+        items.push(['Training parity pass', trainParityPct]);
+      }
 
       els.coveragePanel.innerHTML = `
         <div class="panel-head"><h3>Coverage Matrix</h3></div>
-        <div class="panel-sub">Coverage is scoped to the visible result set, so the bars move with your filters.</div>
+        <div class="panel-sub">Coverage is scoped to the visible result set. Core coverage tracks dashboard-ready artifacts; advanced checks are shown separately.</div>
         <div class="rail-body">
           <div class="coverage-stack">
             ${items.map(([label, pct]) => `
@@ -2216,10 +2788,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
         <div class="rail-body">
           <div class="kv-stack">
             <div class="kv-row"><span class="k">Hub</span><span class="v mono">python3 version/v7/tools/open_ir_hub.py --open</span></div>
-            <div class="kv-row"><span class="k">Generate Report</span><span class="v mono">python3 version/v7/tools/open_ir_visualizer.py --generate --run /path/to/run --html-only --strict-run-artifacts --output /path/to/run/ir_report.html</span></div>
+            <div class="kv-row"><span class="k">Refresh Report</span><span class="v mono">make v7-capture-artifacts-run RUN=/path/to/run</span></div>
+            <div class="kv-row"><span class="k">Profile Dashboard</span><span class="v mono">make v7-profile-dashboard-run RUN=/path/to/run</span></div>
+            <div class="kv-row"><span class="k">Memory Signoff</span><span class="v mono">make v7-memory-signoff V7_MODEL=/path/to/run</span></div>
+            <div class="kv-row"><span class="k">Perf Gate</span><span class="v mono">make v7-perf-gate-evaluate V7_MODEL=/path/to/run</span></div>
             <div class="kv-row"><span class="k">Checkpoint History</span><span class="v mono">python3 version/v7/scripts/promote_latest_checkpoint_v7.py --run /path/to/run --list-runs</span></div>
           </div>
-          <div class="codebox" style="margin-top:14px;">Use the hub to select the run. Use the terminal to regenerate or promote artifacts.</div>
+          <div class="codebox" style="margin-top:14px;">Use the hub to choose a run. Use the run-dir wrappers to fill missing core artifacts, profiling, and correctness checks without reconstructing the command chain by hand.</div>
         </div>
       `;
     }
@@ -2273,7 +2848,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.kind === 'train').length}</strong> train</span>`,
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.kind === 'inference').length}</strong> inference</span>`,
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.reportReady).length}</strong> reports ready</span>`,
-        `<span class="result-pill"><strong>${avgHealth}</strong> avg health</span>`,
+        `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.datasetViewerReady).length}</strong> dataset viewers</span>`,
+        `<span class="result-pill"><strong>${avgHealth}</strong> avg coverage</span>`,
         `<span class="result-pill"><strong>${escapeHtml(state.view)}</strong> view</span>`,
         `<span class="result-pill"><strong>${escapeHtml(state.density)}</strong> density</span>`,
       ].join('');
@@ -2311,15 +2887,17 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 </div>
                 <div class="run-badges">
                   <span class="badge ${run.kind}">${escapeHtml(run.kind)}</span>
-                  <span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>
+                  ${showParityBadge(run) ? `<span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>` : ''}
                   ${run.reportReady ? '<span class="badge report">report</span>' : ''}
+                  ${run.datasetViewerReady ? '<span class="badge report">dataset</span>' : ''}
                 </div>
               </div>
 
               <div class="run-health">
-                <div class="coverage-label"><span title="Artifact completeness score built from report, parity, checkpoints, weights metadata, and telemetry captured for this run.">Inspection coverage</span><strong>${escapeHtml(String(run.healthScore))}/100</strong></div>
+                <div class="coverage-label"><span title="Core dashboard coverage for this run scope. Training parity/checkpoint metadata no longer penalize inference runs; advanced correctness checks are tracked separately.">Inspection coverage</span><strong>${escapeHtml(String(run.healthScore))}/100</strong></div>
                 <div class="health-bar"><span style="width:${Math.max(0, Math.min(100, run.healthScore))}%"></span></div>
-                <div class="health-note">Measures artifact completeness, not model quality.</div>
+                ${renderSectionSummary(run, true)}
+                <div class="health-note">Measures core dashboard completeness, not model quality.</div>
               </div>
 
               <div class="run-stats">
@@ -2329,6 +2907,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
               <div class="run-actions">
                 ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
+                ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
                 <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy</button>
               </div>
@@ -2336,7 +2916,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
               <details class="detail-toggle">
                 <summary>Run details</summary>
                 <div class="run-spec">${escapeHtml(run.modelSpec)}${run.shape_signature ? ` | ${escapeHtml(run.shape_signature)}` : ''}</div>
-                <div class="health-note" style="margin-bottom:10px;">Coverage formula: ${escapeHtml(run.healthReason || 'n/a')}</div>
+                <div class="health-note" style="margin-bottom:10px;">Core coverage: ${escapeHtml(run.healthReason || 'n/a')}</div>
+                ${renderSectionSummary(run, false)}
+                <div class="health-note" style="margin-top:10px;">Advanced checks: ${escapeHtml(run.advancedReason || 'none tracked')}</div>
                 <div class="run-stats">
                   <div class="run-stat"><div class="k">SVG Rate</div><div class="v">${escapeHtml(fmtPct(run.validSvgRate))}</div></div>
                   <div class="run-stat"><div class="k">Checkpoints</div><div class="v">${escapeHtml(fmtInt(run.checkpointCount))}</div></div>
@@ -2345,6 +2927,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                   <div class="run-stat"><div class="k">Weights Reason</div><div class="v">${escapeHtml(run.weights_reason || 'n/a')}</div></div>
                   <div class="run-stat"><div class="k">Updated ISO</div><div class="v mono">${escapeHtml(run.updated_iso || 'n/a')}</div></div>
                 </div>
+                ${renderNextActions(run)}
                 <div class="codebox" style="margin-top:12px;">${escapeHtml(run.generate_report_cmd || 'No report generation command available')}</div>
               </details>
             </div>
@@ -2391,9 +2974,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
                     <td>
                       <div class="table-badges">
                         <span class="badge ${run.kind}">${escapeHtml(run.kind)}</span>
-                        <span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>
+                        ${showParityBadge(run) ? `<span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>` : ''}
                         ${run.reportReady ? '<span class="badge report">report</span>' : ''}
+                        ${run.datasetViewerReady ? '<span class="badge report">dataset</span>' : ''}
                       </div>
+                      <div class="table-secondary tight">${escapeHtml(run.healthReason || 'coverage unavailable')}</div>
                     </td>
                     <td>
                       <div class="table-metric">
@@ -2415,6 +3000,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
                     <td>
                       <div class="table-actions">
                         ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
+                        ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                        ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                         <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run</a>
                         <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Cmd</button>
                       </div>

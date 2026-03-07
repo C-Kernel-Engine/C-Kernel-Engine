@@ -40,9 +40,9 @@ Rules:
 - `contracts/`
   - tag vocabulary, eval contract, and schema notes
 - `raw_assets/`
-  - source SVG inventories and import manifests
+  - source-of-truth imports with provenance preserved
 - `normalized/`
-  - normalized + placeholderized SVG assets
+  - normalized + placeholderized + dedupe-ready SVG assets
 - `pretrain/`
   - pretrain-ready corpora
 - `midtrain/`
@@ -57,6 +57,38 @@ Rules:
   - derived inventory, dedupe, and coverage summaries
 
 ## Data-family plan
+
+## Raw vs normalized
+
+`raw_assets/` is not split by training stage.
+
+Purpose:
+
+- preserve the original imported files
+- preserve source provenance
+- allow re-normalization if policy changes
+
+Do not copy the same file into separate raw `pretrain/`, `midtrain/`, and `sft/` buckets.
+
+Instead:
+
+1. import into `raw_assets/`
+2. normalize into `normalized/`
+3. derive stage-specific corpora from `normalized/`
+
+`normalized/` is the cleanup layer. It is where we:
+
+- extract the SVG root cleanly
+- strip obvious editor noise/comments
+- replace human prose with placeholders like `TITLE_A`, `PARA_A`, `LABEL_1`
+- compute dedupe identity on the cleaned result
+
+Only after that should we classify rows into:
+
+- `pretrain/`
+- `midtrain/`
+- `sft/`
+- `holdout/`
 
 ### Pretrain
 
