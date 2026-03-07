@@ -191,22 +191,118 @@ def _ensure_v7_python_requirements(command: Optional[str]) -> None:
     sys.exit(2)
 
 
+def _classify_v7_failure(
+    command: Optional[str], exc: Optional[BaseException]
+) -> tuple[str, list[str]]:
+    if exc is None:
+        return ("v7 command failed", ["make v7-doctor"])
+
+    message = str(exc)
+    cmd_text = ""
+    if isinstance(exc, subprocess.CalledProcessError):
+        if isinstance(exc.cmd, (list, tuple)):
+            cmd_text = " ".join(str(part) for part in exc.cmd)
+        elif exc.cmd is not None:
+            cmd_text = str(exc.cmd)
+    haystack = f"{message} {cmd_text}".lower()
+
+    if isinstance(exc, FileNotFoundError):
+        if any(tok in haystack for tok in (".gguf", "config.json", "weights", "token file", "run dir")):
+            return (
+                "model, run directory, or training input path is missing",
+                [
+                    "Check the model/run path you passed in.",
+                    "make v7-doctor",
+                ],
+            )
+        if any(tok in haystack for tok in ("git", "make", "python3", "gcc", "clang", "icx", "perf", "valgrind", "vtune", "advisor")):
+            return (
+                "a required host tool is missing from this machine",
+                [
+                    "make v7-doctor",
+                    "Install the missing host tool, then retry.",
+                ],
+            )
+        return (
+            "a required file or tool was not found",
+            [
+                "make v7-doctor",
+                "Check the path printed above and retry.",
+            ],
+        )
+
+    if isinstance(exc, subprocess.CalledProcessError):
+        if any(tok in haystack for tok in ("profile-v7", "perf ", "flamegraph", "cachegrind", "vtune", "advisor")):
+            return (
+                "profiling tool, permissions, or host profiling setup is incomplete",
+                [
+                    "make v7-doctor",
+                    "make v7-capture-artifacts V7_MODEL=<model>  # skip profiling and verify runtime first",
+                ],
+            )
+        if any(tok in haystack for tok in ("convert_gguf", "huggingface", "hf://", ".gguf")):
+            return (
+                "model download or GGUF conversion failed",
+                [
+                    "version/v7/scripts/cks-v7-run run <hf://...|model.gguf> [...]",
+                    "make v7-doctor",
+                ],
+            )
+        if any(tok in haystack for tok in ("gcc", "clang", "icx", "make ", "codegen", "build_ir", "compile")):
+            return (
+                "compile, codegen, or host toolchain step failed",
+                [
+                    "make v7-doctor",
+                    "make v7-demo-runtime V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf",
+                ],
+            )
+        return (
+            "a subprocess inside the v7 pipeline failed",
+            [
+                "make v7-doctor",
+                "Retry with version/v7/scripts/cks-v7-run ... if this is a first run.",
+            ],
+        )
+
+    if any(tok in haystack for tok in ("hfvalidationerror", "repo id must be in the form", "hf://")):
+        return (
+            "model identifier is invalid or the local GGUF path does not exist",
+            [
+                "Use hf://<repo>/<file>.gguf for Hugging Face models.",
+                "Use an existing local .gguf path for local runs, then retry.",
+            ],
+        )
+
+    if command in {"train-e2e", "train", "sanity", "parity", "profile", "train-suite", "train-observe", "init"}:
+        return (
+            "training setup, staged data, or train runtime configuration is inconsistent",
+            [
+                "make v7-doctor",
+                "Review the runbook bootstrap section, then retry.",
+            ],
+        )
+
+    return (
+        f"unexpected {type(exc).__name__} while running v7",
+        [
+            "make v7-doctor",
+            "Retry with version/v7/scripts/cks-v7-run ... for guided bootstrap.",
+        ],
+    )
+
+
 def _print_v7_next_steps(command: Optional[str], exc: Optional[BaseException] = None) -> None:
-    print("\nNext safe steps:", file=sys.stderr)
+    likely_cause, next_commands = _classify_v7_failure(command, exc)
+    print("\nLikely cause:", file=sys.stderr)
+    print(f"  {likely_cause}", file=sys.stderr)
+    print("Next command:", file=sys.stderr)
+    for item in next_commands:
+        print(f"  {item}", file=sys.stderr)
+    print("Fallbacks:", file=sys.stderr)
     print("  make v7-init", file=sys.stderr)
     print("  make v7-doctor", file=sys.stderr)
     if command == "run":
         print("  version/v7/scripts/cks-v7-run run <model-or-run-dir> [...]", file=sys.stderr)
-        print("  make v7-demo-runtime V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf", file=sys.stderr)
-    elif command in {"train-e2e", "train", "sanity", "parity", "profile", "train-suite", "train-observe", "init"}:
-        print("  Review the runbook bootstrap section and re-run after v7-doctor passes.", file=sys.stderr)
-    else:
-        print("  Re-run after v7-doctor passes.", file=sys.stderr)
-
-    if isinstance(exc, FileNotFoundError):
-        print("  Missing file/tool detected. v7-doctor should tell you exactly what is missing.", file=sys.stderr)
-    elif isinstance(exc, subprocess.CalledProcessError):
-        print("  A subprocess failed. Start with v7-doctor, then retry with the shell wrapper if this is a first run.", file=sys.stderr)
 
 
 def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.CompletedProcess:
@@ -220,7 +316,7 @@ def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.Co
         log_error(f"Command failed: {' '.join(cmd)}")
         if e.stderr:
             print(e.stderr, file=sys.stderr)
-        sys.exit(1)
+        raise
 
 
 def run_cmd_allow_fail(cmd: list, cwd: Path = None) -> subprocess.CompletedProcess:
@@ -7299,6 +7395,25 @@ def step_run_train_init(args: argparse.Namespace) -> None:
     }
     (out_dir / "operator_train_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
+    dataset_workspace = getattr(args, "dataset_workspace", None)
+    if dataset_workspace:
+        stage_script = SCRIPTS_DIR / "dataset" / "stage_dataset_workspace_v7.py"
+        if not stage_script.exists():
+            log_error(f"Dataset staging script not found: {stage_script}")
+            sys.exit(1)
+        dataset_cmd = [
+            python_exec,
+            str(stage_script),
+            "--workspace", str(Path(dataset_workspace)),
+            "--run-dir", str(out_dir),
+            "--mode", str(getattr(args, "dataset_stage_mode", "copy")),
+        ]
+        if getattr(args, "dataset_stage_force", False):
+            dataset_cmd.append("--force")
+        run_cmd(dataset_cmd, cwd=PROJECT_ROOT)
+        log(f"  Dataset snapshot: {out_dir / 'dataset'}", C_GREEN)
+        log(f"  Dataset viewer: {out_dir / 'dataset_viewer.html'}", C_GREEN)
+
     log(f"  Run directory: {out_dir}", C_GREEN)
 
 
@@ -10250,6 +10365,12 @@ Examples:
                              help='With --generate-ir, also emit generated_train_runtime_v7.c')
     init_parser.add_argument('--strict', action='store_true',
                              help='Strict train IR build checks when --generate-ir is used')
+    init_parser.add_argument('--dataset-workspace', default=None,
+                             help='Optional dataset workspace to snapshot into the run dir (e.g. version/v7/data/spec03)')
+    init_parser.add_argument('--dataset-stage-mode', choices=['copy', 'symlink'], default='copy',
+                             help='How to stage the dataset workspace into the run dir when --dataset-workspace is set')
+    init_parser.add_argument('--dataset-stage-force', action='store_true',
+                             help='Replace existing run_dir/dataset snapshot and dataset_viewer.html during init')
 
     # Train command (alias for train-e2e parity harness)
     train_parser = subparsers.add_parser('train-e2e', aliases=['train'],
@@ -10347,10 +10468,13 @@ Examples:
             parser.print_help()
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         _print_v7_next_steps(args.command, exc)
-        raise
+        raise SystemExit(1)
     except Exception as exc:
+        log_error(f"{type(exc).__name__}: {exc}")
         _print_v7_next_steps(args.command, exc)
-        raise
+        if os.environ.get("CK_V7_DEBUG"):
+            raise
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
