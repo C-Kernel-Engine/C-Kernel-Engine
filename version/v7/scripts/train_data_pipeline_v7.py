@@ -4190,7 +4190,12 @@ def main() -> int:
         "--train-driver",
         choices=["ck_run", "ck_cli"],
         default="ck_run",
-        help="Training executor (ck_run=python ctypes runtime, ck_cli=native C CLI runtime)",
+        help=(
+            "Training executor "
+            "(ck_run=python ctypes runtime for prototyping/debug, "
+            "ck_cli=native C CLI runtime for real training with lower overhead "
+            "and live CLI loss/progress logs)"
+        ),
     )
     ap.add_argument(
         "--ck-cli-log-every",
