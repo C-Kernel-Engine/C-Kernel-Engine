@@ -9,7 +9,7 @@ var ckernel__ir__v6_85_8c =
     [ "ck_model_config_from_hf_json", "ckernel__ir__v6_85_8c.html#acd82d4aceebe2b6c8feafb9d1fc9c8db", null ],
     [ "find_object_range", "ckernel__ir__v6_85_8c.html#aeef8b4a2018c1d65c02ba52d6b837523", null ],
     [ "map_forward_to_backward", "ckernel__ir__v6_85_8c.html#ab7340ed7d61056b7ad5ebb1b8a088a65", null ],
-    [ "op_name", "ckernel__ir__v6_85_8c.html#a2b6e6d4584a3004711ed6950fd8e72f4", null ],
+    [ "op_name", "ckernel__ir__v6_85_8c.html#a04d7db4e2bcb4065154316ec01cb0225", null ],
     [ "parse_float_field_any", "ckernel__ir__v6_85_8c.html#a923c9060ebb745215ee92e05985cce07", null ],
     [ "parse_float_field_in_range", "ckernel__ir__v6_85_8c.html#a601cf1d7923b5d7440623b5cfc9ea9a1", null ],
     [ "parse_int_field", "ckernel__ir__v6_85_8c.html#a7b8d0344f72372022fd4c99d5eb54dc5", null ],
