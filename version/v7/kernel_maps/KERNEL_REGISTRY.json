@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v7/kernel_maps",
     "counts": {
-      "total": 76,
+      "total": 77,
       "by_op": {
         "add_backward": 1,
         "attention": 3,
@@ -33,7 +33,7 @@
         "residual_add": 1,
         "residual_save": 1,
         "rmsnorm": 2,
-        "rope": 2,
+        "rope": 3,
         "rope_backward": 1,
         "rope_init": 2,
         "softmax": 1,
@@ -8309,6 +8309,170 @@
       "notes": "Rotary Position Embedding (RoPE) for queries and keys. Applies rotation in complex plane: x_rot = x * cos(theta) + rotate_half(x) * sin(theta). Only rotates first rotary_dim channels; remaining channels pass through unchanged.",
       "name": "rope_forward_qk",
       "_source_file": "rope_forward_qk.json"
+    },
+    {
+      "id": "rope_forward_qk_pairwise",
+      "op": "rope",
+      "variant": "fp32_head_major",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim] to be rotated in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, tokens, head_dim] to be rotated in-place"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "rotary_dim",
+            2
+          ],
+          "desc": "RoPE cos cache [max_seq, rotary_dim/2]"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "rotary_dim",
+            2
+          ],
+          "desc": "RoPE sin cache [max_seq, rotary_dim/2]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor after RoPE application (in-place)"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Key tensor after RoPE application (in-place)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D",
+        "rotary_dim"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Position offset for cos/sin cache lookup"
+        },
+        {
+          "name": "rotary_dim",
+          "dtype": "int32",
+          "desc": "RoPE rotary dimensions (only rotate first rotary_dim channels)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head",
+          "token"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          },
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across tokens; each thread handles one or more tokens."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "Consecutive-pair RoPE used by llama.cpp for Llama-family models."
+      },
+      "impl": {
+        "function": "rope_forward_qk_pairwise_with_rotary_dim",
+        "c_declaration": "void rope_forward_qk_pairwise_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_rope.py"
+        ],
+        "parity": [
+          {
+            "kind": "llama.cpp",
+            "command": "python version/v7/scripts/parity/check_sequence_hidden_state_vs_llama.py",
+            "tolerance": "1e-5",
+            "notes": "Consecutive-pair RoPE should match llama.cpp Llama-family behavior."
+          }
+        ]
+      },
+      "notes": "Rotary Position Embedding for consecutive pairs (0,1), (2,3), ... rather than split-half pairs.",
+      "name": "rope_forward_qk_pairwise",
+      "_source_file": "rope_forward_qk_pairwise.json"
     },
     {
       "id": "rope_forward_qk_split",

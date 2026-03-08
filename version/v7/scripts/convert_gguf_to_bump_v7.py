@@ -88,6 +88,7 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -227,6 +228,28 @@ def load_template_for_arch(arch: str) -> dict:
         )
     with open(template_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def apply_model_contract_overrides(
+    template_data: dict,
+    *,
+    tie_word_embeddings: bool,
+    has_untied_output_weight: bool,
+) -> dict:
+    """Derive embedded template semantics from the actual model contract.
+
+    Architecture templates stay generic. The embedded manifest copy is allowed
+    to carry model-specific runtime semantics such as tied vs untied logits.
+    """
+    patched = copy.deepcopy(template_data)
+    contract = patched.setdefault("contract", {})
+    logits_contract = contract.setdefault("logits_contract", {})
+    untied = (not tie_word_embeddings) or bool(has_untied_output_weight)
+
+    if untied:
+        logits_contract["lm_head"] = "output_weight"
+
+    return patched
 
 
 def _extract_unk_token(data: dict) -> Optional[str]:
@@ -2645,6 +2668,11 @@ def main() -> None:
                 # Template already loaded earlier (for RoPE check)
                 if template_data is None:
                     template_data = load_template_for_arch(arch)
+                template_data = apply_model_contract_overrides(
+                    template_data,
+                    tie_word_embeddings=bool(tie_word_embeddings),
+                    has_untied_output_weight=out_weight is not None,
+                )
 
                 # Extract special tokens from GGUF metadata for propagation to manifest
                 special_tokens = {}

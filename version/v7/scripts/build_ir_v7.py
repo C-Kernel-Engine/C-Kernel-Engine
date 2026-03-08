@@ -45,6 +45,7 @@ OUTPUTS:
 """
 
 import argparse
+import copy
 import json
 import os
 import subprocess
@@ -144,6 +145,39 @@ def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[Dict[st
             return json.load(f)
     except Exception:
         return None
+
+
+def _merge_template_defaults(
+    default_doc: Dict[str, Any],
+    override_doc: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    merged = copy.deepcopy(default_doc)
+    if not isinstance(override_doc, dict):
+        return merged
+    for key, value in override_doc.items():
+        if value is None:
+            continue
+        if isinstance(merged.get(key), dict) and isinstance(value, dict):
+            merged[key] = _merge_template_defaults(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    template_doc = manifest.get("template") if isinstance(manifest.get("template"), dict) else None
+    cfg = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    template_name = ""
+    if isinstance(template_doc, dict):
+        template_name = str(template_doc.get("name", "") or "").strip().lower()
+    if not template_name:
+        template_name = str(cfg.get("model", "") or "").strip().lower()
+    built_in = _load_builtin_template_doc(template_name)
+    if built_in and isinstance(template_doc, dict):
+        manifest["template"] = _merge_template_defaults(built_in, template_doc)
+    elif built_in:
+        manifest["template"] = copy.deepcopy(built_in)
+    return manifest
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1719,6 +1753,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     Raises:
         RuntimeError: If validation fails (missing mappings or kernels)
     """
+    manifest = _hydrate_manifest_template(manifest)
     template = manifest.get("template", {})
     quant_summary = manifest.get("quant_summary", {})
     header_quant = {}
@@ -1755,16 +1790,36 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         if lm_head_entry:
             header_quant["lm_head"] = lm_head_entry
     config = manifest.get("config", {})
+    template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
     logits_weight_source = _resolve_logits_weight_source(config, weight_index)
     print(f"  [contract/logits] source={logits_weight_source}")
-    # Default to Q8 activation preference for v7 baseline parity and stable Qwen behavior.
-    # Model-specific overrides can still force FP32 by setting config["prefer_q8_activation"]=false.
+    model_family = str(config.get("model", "")).strip().lower()
+    # Default to Q8 activation preference for the v7 baseline path.
+    # Model-specific overrides can still force FP32 by setting
+    # config["prefer_q8_activation"]=false.
     prefer_q8_activation = bool(config.get("prefer_q8_activation", True))
+    # Llama/Mistral-family MLP matmuls are more numerically sensitive than the
+    # attention projections on the Q8 activation path. Keep the fast path for
+    # attention/out-proj, but prefer FP32 activation kernels for the MLP linear
+    # ops on these families unless the manifest explicitly disables the override.
+    prefer_fp32_mlp_matmuls = (
+        prefer_q8_activation
+        and model_family in {"llama", "mistral", "mistral3"}
+        and bool(
+            config.get(
+                "prefer_fp32_mlp_matmuls",
+                template_flags.get("prefer_fp32_mlp_matmuls", False),
+            )
+        )
+    )
     registry = load_kernel_registry()
 
     # Validate quant safety before proceeding
     print(f"\n  [Quant Safety Check]")
     validate_quant_safety(manifest, registry, allow_fallback=allow_quant_fallback)
+
+    if prefer_fp32_mlp_matmuls:
+        print("  FP32 MLP matmul override: ON")
 
     num_layers = config.get("num_layers", 0)
 
@@ -2064,9 +2119,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
             # Try fused kernel first (e.g., qkv_projection)
             weight_dtype = layer_quant.get(weight_info[0], "fp32")
+            kernel_prefer_q8_activation = prefer_q8_activation
+            if op in ("mlp_gate_up", "mlp_down") and prefer_fp32_mlp_matmuls:
+                kernel_prefer_q8_activation = False
             kernel_id = find_kernel(
                 registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
-                prefer_q8_activation=prefer_q8_activation,
+                prefer_q8_activation=kernel_prefer_q8_activation,
                 prefer_parallel=use_parallel
             )
             kernel_id = _maybe_apply_q8_contract(kernel_id, weight_dtype)
@@ -2083,9 +2141,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             }
             for w_key in weight_info:
                 w_dtype = layer_quant.get(w_key, "fp32")
+                split_prefer_q8_activation = prefer_q8_activation
+                if op in ("mlp_gate_up", "mlp_down") and prefer_fp32_mlp_matmuls:
+                    split_prefer_q8_activation = False
                 k = find_kernel(
                     registry, op="matmul", quant={"weight": w_dtype}, mode=mode,
-                    prefer_q8_activation=prefer_q8_activation,
+                    prefer_q8_activation=split_prefer_q8_activation,
                     prefer_parallel=use_parallel
                 )
                 if k:
@@ -5994,6 +6055,7 @@ def main(args: List[str]) -> int:
     print(f"Loading manifest: {manifest_path}")
     manifest = load_manifest(manifest_path)
     _merge_external_config(manifest, manifest_path)
+    _hydrate_manifest_template(manifest)
     manifest["config"] = _normalize_manifest_config(manifest.get("config", {}))
     if parsed_args.prefer_q8_activation:
         manifest.setdefault("config", {})["prefer_q8_activation"] = True

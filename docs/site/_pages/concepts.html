@@ -19,6 +19,7 @@
 <ul>
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
+    <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
@@ -171,6 +172,90 @@ Backward:
     Simply rotate by negative angle (transpose of rotation matrix)
     </pre>
     <p><strong>Our implementation:</strong> <code>rope_kernels.c</code> - precomputes cos/sin cache, applies in-place to Q and K</p>
+</div>
+
+<h3 id="rope-layouts">RoPE Layouts: Pairwise vs Split-Half</h3>
+
+<p>One subtle but critical detail: <strong>RoPE is not only about the angle schedule</strong>. You also need the correct <strong>channel pairing layout</strong>. Two models can use the same <code>rope_theta</code>, the same cache, and the same attention code, yet still diverge badly if they pair channels differently.</p>
+
+<div class="img-container svg-viewer" data-title="RoPE Layouts Compared">
+    <img src="assets/rope-layouts-compared.svg" alt="Pairwise versus split-half RoPE layout comparison">
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Pairwise / Consecutive RoPE</h3>
+        <p>This is the layout used by <strong>Llama-family checkpoints</strong>, including Nanbeige in our v7 work.</p>
+        <pre>(0,1), (2,3), (4,5), ...</pre>
+        <p>Each even/odd pair is treated as one 2D rotation plane. That makes the math read exactly like the textbook RoPE formula:</p>
+        <pre>x'[2i]   = x[2i] * cos - x[2i+1] * sin
+x'[2i+1] = x[2i] * sin + x[2i+1] * cos</pre>
+        <p><strong>Practical upside:</strong> the rotation is easy to reason about as adjacent feature pairs. <strong>Practical requirement:</strong> if a Llama checkpoint gets the split-half layout by mistake, parity fails immediately after RoPE.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Split-Half / NEOX RoPE</h3>
+        <p>This layout is common in <strong>GPT-NeoX-style implementations</strong>. In this engine's current templates, Qwen and Gemma follow this family.</p>
+        <pre>(0, d/2), (1, d/2+1), (2, d/2+2), ...</pre>
+        <p>The vector is split into two halves, then each index in the first half rotates against the matching index in the second half.</p>
+        <p><strong>Practical upside:</strong> it fits naturally with split-vector implementations and long-standing NEOX-style kernels. <strong>Practical requirement:</strong> it is only correct for checkpoints trained with that layout.</p>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Important: This is a checkpoint semantic, not a tuning preference</h3>
+    <p>Neither layout is inherently "better" in the abstract. The model family decides which one is correct. The right question is not "which RoPE is stronger?" but <strong>"which RoPE layout was this checkpoint trained with?"</strong></p>
+    <table>
+        <tr><th>Question</th><th>Correct framing</th></tr>
+        <tr><td>Do both use the same angles?</td><td>Yes, both use the same RoPE frequency schedule idea.</td></tr>
+        <tr><td>What changes?</td><td>Which channels are paired into each 2D rotation plane.</td></tr>
+        <tr><td>What breaks if you choose the wrong one?</td><td>Q/K differ right after RoPE, then attention and logits drift downstream.</td></tr>
+        <tr><td>What should parity tooling check?</td><td>Embedding output, then per-layer hidden states, then the first op that diverges.</td></tr>
+    </table>
+</div>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">What is the actual difference?</h3>
+        <p>The frequency schedule is the same idea in both cases. The actual difference is <strong>which channels form each rotation plane</strong>.</p>
+        <pre>Pairwise:
+  x[0] with x[1]
+  x[2] with x[3]
+
+Split-half:
+  x[0] with x[d/2]
+  x[1] with x[d/2+1]</pre>
+        <p>That changes the rotated Q and K values immediately. If you get the layout wrong, attention will diverge even when embedding lookup, RMSNorm, and projection kernels are all correct.</p>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Before training: how would an ML engineer choose?</h3>
+        <p>If you are designing a model family from scratch, this choice is mostly about <strong>ecosystem fit and implementation coherence</strong>, not a proven universal quality advantage.</p>
+        <ul>
+            <li><strong>Choose pairwise</strong> if you want a Llama-style family that should match llama.cpp, common Llama checkpoints, and adjacent even/odd rotation math.</li>
+            <li><strong>Choose split-half</strong> if you are building on a GPT-NeoX-style stack or existing kernels, loaders, and training code that already assume first-half/second-half pairing.</li>
+            <li><strong>Choose the stack you can support end-to-end</strong>: training code, checkpoint export, inference kernels, parity tooling, and debugging all need to agree.</li>
+        </ul>
+        <p>For most teams, the practical decision is: <strong>pick the RoPE layout of the ecosystem you want to join</strong>. Bigger modeling choices usually matter more for quality than pairwise-versus-split-half by itself.</p>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Design-time note for ML engineers</strong><br>
+        If you are still before training, RoPE layout is a <strong>family-level architecture choice</strong>. It should be decided alongside tokenizer, attention variant, GQA/MQA policy, context strategy, and runtime targets. Once you train, the layout becomes part of the checkpoint contract and changing it later is effectively a different model.
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Implementation note in CK right now</strong><br>
+        The older split-half path already has AVX/AVX-512 SIMD specialization. The new pairwise path was added to match Llama-family semantics first; in the current codebase it is the correctness path, and it is not yet vectorized like the split-half kernel.
+    </div>
 </div>
 
 <hr>

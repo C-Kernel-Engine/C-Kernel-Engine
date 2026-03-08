@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import copy
 import ctypes
 import hashlib
 import importlib.util
@@ -803,6 +804,43 @@ def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[dict]:
         return None
 
 
+def _merge_template_defaults(
+    default_doc: dict[str, Any],
+    override_doc: Optional[dict[str, Any]],
+) -> dict[str, Any]:
+    """Merge stale embedded templates onto the latest built-in defaults."""
+    merged = copy.deepcopy(default_doc)
+    if not isinstance(override_doc, dict):
+        return merged
+    for key, value in override_doc.items():
+        if value is None:
+            continue
+        if isinstance(merged.get(key), dict) and isinstance(value, dict):
+            merged[key] = _merge_template_defaults(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _hydrate_manifest_template(
+    template_doc: Optional[dict[str, Any]],
+    cfg: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    template_name = ""
+    if isinstance(template_doc, dict):
+        template_name = str(template_doc.get("name", "") or "").strip().lower()
+    if not template_name:
+        template_name = str(cfg.get("model", "") or "").strip().lower()
+    built_in = _load_builtin_template_doc(template_name)
+    if built_in and isinstance(template_doc, dict):
+        return _merge_template_defaults(built_in, template_doc)
+    if built_in:
+        return copy.deepcopy(built_in)
+    if isinstance(template_doc, dict):
+        return copy.deepcopy(template_doc)
+    return None
+
+
 def _manifest_entry_offset(entry: dict) -> int:
     try:
         return int(entry.get("file_offset", entry.get("offset", 0)) or 0)
@@ -815,6 +853,41 @@ def _manifest_entry_size(entry: dict) -> int:
         return int(entry.get("size", entry.get("size_bytes", 0)) or 0)
     except Exception:
         return 0
+
+
+def _manifest_entry_name_set(entries: Sequence[dict[str, Any]]) -> set[str]:
+    out: set[str] = set()
+    for row in entries:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name", "") or "").strip()
+        if name:
+            out.add(name)
+    return out
+
+
+def _desired_template_lm_head_mode(cfg: dict[str, Any], entry_names: set[str]) -> str:
+    tie_cfg = _coerce_bool(cfg.get("tie_word_embeddings"))
+    has_untied_head = any(
+        name in entry_names for name in ("output.weight", "lm_head.weight", "lm_head_weight", "lm_head")
+    )
+    if tie_cfg is False:
+        return "output_weight"
+    if tie_cfg is None and has_untied_head:
+        return "output_weight"
+    return "weight_tying"
+
+
+def _normalize_manifest_template_contract(
+    template_doc: dict[str, Any],
+    cfg: dict[str, Any],
+    entry_names: set[str],
+) -> dict[str, Any]:
+    patched = copy.deepcopy(template_doc)
+    contract = patched.setdefault("contract", {})
+    logits_contract = contract.setdefault("logits_contract", {})
+    logits_contract["lm_head"] = _desired_template_lm_head_mode(cfg, entry_names)
+    return patched
 
 
 def _normalize_manifest_for_inference(src_manifest: dict) -> dict:
@@ -879,16 +952,16 @@ def _normalize_manifest_for_inference(src_manifest: dict) -> dict:
         entries_out.append(e)
     out["entries"] = entries_out
 
-    template = out.get("template") if isinstance(out.get("template"), dict) else None
-    if not template or "sequence" not in template:
-        template_name = (
-            str(cfg.get("model", "")).strip().lower()
-            if isinstance(cfg, dict)
-            else ""
-        )
-        built_in = _load_builtin_template_doc(template_name)
-        if built_in:
-            out["template"] = built_in
+    entry_names = _manifest_entry_name_set(entries_out)
+
+    template = _hydrate_manifest_template(
+        out.get("template") if isinstance(out.get("template"), dict) else None,
+        cfg,
+    )
+    if isinstance(template, dict):
+        out["template"] = template
+    if isinstance(template, dict):
+        out["template"] = _normalize_manifest_template_contract(template, cfg, entry_names)
 
     quant_summary = out.get("quant_summary")
     if not isinstance(quant_summary, dict) or not quant_summary:
@@ -926,6 +999,19 @@ def _normalize_manifest_for_inference(src_manifest: dict) -> dict:
         out["quant_summary"] = inferred
 
     return out
+
+
+def _normalize_manifest_file_for_inference(manifest_path: Path) -> bool:
+    if not manifest_path.exists():
+        return False
+    raw_doc = _load_json_dict(manifest_path)
+    if not isinstance(raw_doc, dict) or not raw_doc:
+        return False
+    normalized = _normalize_manifest_for_inference(raw_doc)
+    if _canonical_json_bytes(raw_doc) == _canonical_json_bytes(normalized):
+        return False
+    manifest_path.write_text(json.dumps(normalized, indent=2), encoding="utf-8")
+    return True
 
 
 def _link_or_copy_file(src: Path, dst: Path) -> None:
@@ -1127,7 +1213,7 @@ def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[s
 
     This catches silent mismatches that otherwise show up later as gibberish output.
     """
-    manifest_doc = _load_json_dict(manifest_path) or {}
+    manifest_doc = _normalize_manifest_for_inference(_load_json_dict(manifest_path) or {})
     cfg = manifest_doc.get("config") if isinstance(manifest_doc.get("config"), dict) else {}
     template_doc = manifest_doc.get("template") if isinstance(manifest_doc.get("template"), dict) else {}
     contract_doc = template_doc.get("contract") if isinstance(template_doc.get("contract"), dict) else {}
@@ -1159,7 +1245,7 @@ def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[s
     logits_contract = contract_doc.get("logits_contract") if isinstance(contract_doc.get("logits_contract"), dict) else {}
     template_lm_head_mode = str(logits_contract.get("lm_head", "")).strip().lower()
     tied_modes = {"weight_tying", "tied", "token_emb"}
-    strict_untied_modes = {"output_weight", "untied"}
+    strict_untied_modes = {"output_weight", "output.weight", "untied"}
 
     if tie_cfg is False and template_lm_head_mode in tied_modes:
         errors.append(
@@ -1175,9 +1261,9 @@ def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[s
             "Template requires untied logits head, but manifest has no untied lm_head/output.weight entry."
         )
     if tie_cfg is True and has_untied_head and template_lm_head_mode in tied_modes:
-        warnings.append(
+        errors.append(
             "Manifest includes untied lm_head/output.weight while template requests weight tying. "
-            "Verify if this model should be tied or untied."
+            "This would strand the untied head and leave output.weight/lm_head.weight unused at lowering time."
         )
 
     has_qkv_bias = any(name.endswith((".bq", ".bk", ".bv")) for name in entry_names)
@@ -1865,6 +1951,9 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
         log_error("Manifest path required for v7 pipeline")
         sys.exit(1)
 
+    if _normalize_manifest_file_for_inference(manifest_path):
+        log("  Normalized stale manifest/template semantics in weights_manifest.json", C_YELLOW)
+
     # Determine which modes to generate (default: both prefill and decode)
     target_modes = modes if modes else ["prefill", "decode"]
     # Use a shared layout across modes to avoid offset mismatches
@@ -2020,6 +2109,8 @@ def step_build_ir(config_path: Path, output_dir: Path, manifest_path: Path = Non
 
         if profile:
             cmd.append("--profile")
+        if int8_activations:
+            cmd.append("--prefer-q8-activation")
 
         # ADR: OpenMP parallel pass is SUPERSEDED by persistent pthread thread pool.
         #
@@ -2153,6 +2244,29 @@ def step_codegen(
     return model_c_path
 
 
+def _latest_tree_mtime(paths: Sequence[Path]) -> float:
+    latest = 0.0
+    for root in paths:
+        if not root.exists():
+            continue
+        if root.is_file():
+            latest = max(latest, root.stat().st_mtime)
+            continue
+        for path in root.rglob("*"):
+            if path.is_file():
+                latest = max(latest, path.stat().st_mtime)
+    return latest
+
+
+def _runtime_lib_needs_rebuild(lib_path: Path, source_roots: Sequence[Path]) -> bool:
+    if not lib_path.exists():
+        return True
+    try:
+        return _latest_tree_mtime(source_roots) > lib_path.stat().st_mtime
+    except Exception:
+        return True
+
+
 def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> Path:
     """Compile C code to shared library linked against libckernel_engine.so."""
     log_step(5, "Compiling to shared library")
@@ -2165,19 +2279,29 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     log(f"  Source: {model_c_path}", C_DIM)
     log(f"  Lines: {sum(1 for _ in open(model_c_path))}", C_DIM)
 
-    # Ensure runtime libs exist before compile.
-    missing_targets = []
-    if not kernel_lib.exists():
-        missing_targets.append(str(kernel_lib))
-    if not tokenizer_lib.exists():
-        missing_targets.append(str(tokenizer_lib))
-    if missing_targets:
-        log(f"  Building missing runtime libs: {', '.join(Path(t).name for t in missing_targets)}", C_DIM)
-        make_targets = [_path_to_make_target(Path(t)) for t in missing_targets]
+    runtime_targets: list[Path] = []
+    kernel_source_roots = [
+        PROJECT_ROOT / "include",
+        PROJECT_ROOT / "src",
+        V7_ROOT / "include",
+        V7_ROOT / "src",
+    ]
+    tokenizer_source_roots = [
+        PROJECT_ROOT / "include",
+        PROJECT_ROOT / "src" / "ck_tokenizer.c",
+    ]
+    if _runtime_lib_needs_rebuild(kernel_lib, kernel_source_roots):
+        runtime_targets.append(kernel_lib)
+    if _runtime_lib_needs_rebuild(tokenizer_lib, tokenizer_source_roots):
+        runtime_targets.append(tokenizer_lib)
+    if runtime_targets:
+        verb = "missing/stale" if any(not p.exists() for p in runtime_targets) else "stale"
+        log(f"  Building {verb} runtime libs: {', '.join(p.name for p in runtime_targets)}", C_DIM)
+        make_targets = [_path_to_make_target(path) for path in runtime_targets]
         run_cmd(["make"] + make_targets, cwd=PROJECT_ROOT)
-        still_missing = [t for t in missing_targets if not Path(t).exists()]
+        still_missing = [path for path in runtime_targets if not path.exists()]
         if still_missing:
-            log(f"  Missing required runtime libs after build: {', '.join(Path(t).name for t in still_missing)}", C_RED)
+            log(f"  Missing required runtime libs after build: {', '.join(path.name for path in still_missing)}", C_RED)
             return model_c_path
 
     # Skip if already compiled and not forcing
@@ -2185,6 +2309,8 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
         src_mtime = model_c_path.stat().st_mtime
         lib_mtime = lib_path.stat().st_mtime
         if lib_mtime > src_mtime:
+            _sync_runtime_lib(kernel_lib, output_dir / "libckernel_engine.so", "libckernel_engine.so")
+            _sync_runtime_lib(tokenizer_lib, output_dir / "libckernel_tokenizer.so", "libckernel_tokenizer.so")
             log(f"  Using cached: {lib_path}", C_GREEN)
             return lib_path
 
@@ -9436,6 +9562,17 @@ def run_pipeline(args: argparse.Namespace):
 
         # Local CK runtime/train run dir: reuse existing bump+manifest directly.
         if _is_ck_runtime_dir(model_dir):
+            if requested_run_dir is not None:
+                try:
+                    same_dir = work_dir.resolve() == model_dir.resolve()
+                except Exception:
+                    same_dir = str(work_dir) == str(model_dir)
+                if same_dir:
+                    log_error(
+                        "For local CK runtime dirs, --run must not equal the model dir.\n"
+                        "Omit --run to build into <model_dir>/.ck_build, or choose a different output dir."
+                    )
+                    sys.exit(2)
             should_reconvert = bool(args.force_convert)
             if not should_reconvert and local_gguf is not None:
                 coverage_ok, _ = _gguf_manifest_weight_category_check(
@@ -9952,7 +10089,7 @@ Examples:
   ./ck-v7 run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf
 
   # Training run-dir flow
-  ./ck-v7 init --run ~/.cache/ck-engine-v7/models/train/exp1 --init xavier_uniform
+  ./ck-v7 init --run-name exp1 --init xavier_uniform
   ./ck-v7 train --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --train-epochs 3
   ./ck-v7 sanity --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --train-epochs 1
   ./ck-v7 parity --run ~/.cache/ck-engine-v7/models/train/exp1 --data ./train.txt --with-fd --with-replay
@@ -10330,9 +10467,9 @@ Examples:
     # Init command (tiny training run bootstrap)
     init_parser = subparsers.add_parser('init', help='Initialize tiny v7 training run directory')
     init_parser.add_argument('--run', dest='output_dir', default=None,
-                             help='Output run directory (default: ~/.cache/ck-engine-v7/models/train/<run-name>)')
+                             help='Optional explicit run directory. Prefer omitting this and using --run-name so the default ~/.cache/ck-engine-v7/models/train/<run-name> location is used.')
     init_parser.add_argument('--run-name', default='tiny_init',
-                             help='Run name used when --run is not set')
+                             help='Preferred run selector. When --run is omitted, the run is created under ~/.cache/ck-engine-v7/models/train/<run-name>.')
     init_parser.add_argument('--init', choices=['normal_0p02', 'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'zeros'],
                              default='normal_0p02', help='Weight initialization method')
     init_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')

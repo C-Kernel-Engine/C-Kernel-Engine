@@ -287,6 +287,12 @@ TEST_SUITES = {
 
     # Parity tests
     "pytorch_parity": TestSuite("PyTorch Parity", "parity", UNITTEST_DIR / "test_pytorch_parity.py", timeout_sec=300),
+    "rope_pairwise_layout": TestSuite(
+        "RoPE Pairwise Layout (Llama)",
+        "parity",
+        ROOT / "version" / "v7" / "scripts" / "parity" / "test_check_decode_attention_contract.py",
+        timeout_sec=120,
+    ),
 }
 
 # Make targets to run (non-Python tests)
@@ -392,6 +398,95 @@ QUICK_TESTS = [
     "relu_bf16", "rmsnorm_bf16",
     "q4k_kernels",
 ]
+
+MAKE_TARGET_FAILURE_ARTIFACTS = {
+    "v6.6-validate-matrix-nightly": ROOT / "version" / "v6.6" / "tools" / "model_matrix_report_latest.json",
+    "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
+    "v7-stabilization-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "training_stabilization_scorecard_latest.json",
+}
+
+
+def _load_json_if_fresh(path: Path, *, start_ts: float) -> Optional[dict]:
+    try:
+        if not path.exists():
+            return None
+        # Ignore stale artifacts from a previous run.
+        if path.stat().st_mtime < (start_ts - 5.0):
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
+    path = MAKE_TARGET_FAILURE_ARTIFACTS.get(target)
+    if path is None:
+        return ""
+    payload = _load_json_if_fresh(path, start_ts=start_ts)
+    if payload is None:
+        return ""
+
+    prefix = f"artifact={path}"
+    if target == "v6.6-validate-matrix-nightly":
+        rows = payload.get("rows")
+        if not isinstance(rows, list):
+            return prefix
+        failing = [r for r in rows if isinstance(r, dict) and r.get("overall") != "PASS"]
+        if not failing:
+            summary = payload.get("summary")
+            return f"{prefix}; summary={summary}"
+        details = []
+        for row in failing[:3]:
+            details.append(
+                f"{row.get('model')}:{row.get('overall')}:{row.get('note')}"
+            )
+        if len(failing) > 3:
+            details.append(f"+{len(failing) - 3} more")
+        return f"{prefix}; failing_rows={' | '.join(details)}"
+
+    if target == "v7-ir-visualizer-e2e-nightly":
+        checks = payload.get("checks")
+        if not isinstance(checks, list):
+            return prefix
+        failing = [c for c in checks if isinstance(c, dict) and not c.get("passed", False)]
+        if not failing:
+            ok = payload.get("ok")
+            return f"{prefix}; ok={ok}"
+        details = []
+        for chk in failing[:4]:
+            details.append(f"{chk.get('name')}:{chk.get('detail')}")
+        if len(failing) > 4:
+            details.append(f"+{len(failing) - 4} more")
+        return f"{prefix}; failing_checks={' | '.join(details)}"
+
+    if target == "v7-stabilization-nightly":
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        tokenizer = payload.get("tokenizer_gates") if isinstance(payload.get("tokenizer_gates"), list) else []
+        matrix = payload.get("matrix_cases") if isinstance(payload.get("matrix_cases"), list) else []
+        failing_tokenizer = [g for g in tokenizer if isinstance(g, dict) and g.get("status") != "PASS"]
+        failing_matrix = [c for c in matrix if isinstance(c, dict) and c.get("status") != "PASS"]
+        parts = [
+            f"summary=passed:{summary.get('passed')} tokenizer:{summary.get('passed_tokenizer_gates')}/{summary.get('total_tokenizer_gates')} matrix:{summary.get('passed_matrix_cases')}/{summary.get('total_matrix_cases')}"
+        ]
+        if failing_tokenizer:
+            parts.append(
+                "tokenizer_fail="
+                + " | ".join(f"{g.get('mode')}:{g.get('metrics', {})}" for g in failing_tokenizer[:2])
+            )
+        if failing_matrix:
+            details = []
+            for case in failing_matrix[:3]:
+                metrics = case.get("metrics") if isinstance(case.get("metrics"), dict) else {}
+                details.append(
+                    f"{case.get('case_id')}:{metrics.get('failed_stage_ids')}"
+                )
+            if len(failing_matrix) > 3:
+                details.append(f"+{len(failing_matrix) - 3} more")
+            parts.append("matrix_fail=" + " | ".join(details))
+        return f"{prefix}; {'; '.join(parts)}"
+
+    return prefix
 
 
 def run_python_test(suite: TestSuite, verbose: bool = False) -> TestResult:
@@ -514,6 +609,9 @@ def run_make_target(target_info: dict, verbose: bool = False) -> TestResult:
                     if clean_line and clean_line not in error_lines:
                         error_lines.append(clean_line)
             error_msg = "\n".join(error_lines[-10:]) if error_lines else f"Exit code {result.returncode}"
+            artifact_summary = _summarize_make_failure_artifact(target_info["target"], start_ts=start)
+            if artifact_summary:
+                error_msg = f"{error_msg}\n{artifact_summary}" if error_msg else artifact_summary
 
         sub_tests = parse_sub_tests(result.stdout)
         return TestResult(

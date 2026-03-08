@@ -107,7 +107,7 @@ def _last_token_row_offset_expr(func_name: str, embed_dim: int) -> Optional[str]
     return f"(size_t)(num_tokens - 1) * (size_t){row_bytes}"
 
 
-def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False) -> str:
+def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False, dump: bool = False) -> str:
     """Emit a single op call for prefill mode.
 
     The IR already provides:
@@ -309,6 +309,7 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
 
     # Build argument list with substitutions
     args = []
+    arg_expr_by_name: Dict[str, str] = {}
     for arg in args_list:
         expr = arg.get("expr", "0")
         source = arg.get("source", "")
@@ -332,6 +333,9 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
             expr = "num_tokens"
 
         args.append(expr)
+        name_key = str(name).lower()
+        if name_key and expr and name_key not in arg_expr_by_name:
+            arg_expr_by_name[name_key] = expr
 
     # Prefill quantization must preserve token-major row layout exactly for
     # downstream GEMM kernels. Emit explicit per-token row quantization loops
@@ -377,10 +381,86 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False)
     if profile:
         lines.append(f'    CK_PROFILE_END("prefill", "{func}", "{op_type}", {layer});')
 
+    if dump:
+        dump_op_map = {
+            "dense_embedding_lookup": "token_embedding",
+            "attn_norm": "attn_norm",
+            "q_proj": "q_proj",
+            "k_proj": "k_proj",
+            "v_proj": "v_proj",
+            "attn": "attn_output",
+            "attn_sliding": "attn_output",
+            "out_proj": "attn_output",
+            "post_attention_norm": "attn_post_norm",
+            "ffn_norm": "ffn_norm",
+            "mlp_gate_up": "ffn_gate_up",
+            "geglu": "ffn_gate_par",
+            "mlp_down": "down_proj",
+            "post_ffn_norm": "ffn_post_norm",
+            "final_rmsnorm": "final_norm",
+            "logits": "logits",
+        }
+        dump_name = dump_op_map.get(op_type)
+
+        def _get_arg(*names: str) -> Optional[str]:
+            for nm in names:
+                ex = arg_expr_by_name.get(nm.lower())
+                if ex:
+                    return ex
+            return None
+
+        def _mul_expr(*terms: Optional[str]) -> Optional[str]:
+            used = [f"({t})" for t in terms if t]
+            if not used:
+                return None
+            return " * ".join(used)
+
+        def _emit_dump(expr: Optional[str], name: str, size_expr: Optional[str]) -> None:
+            if not expr or not size_expr:
+                return
+            raw_expr = expr.replace("(float*)", "").replace("(void*)", "").strip()
+            lines.append("    #ifdef CK_PARITY_DUMP")
+            lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "{name}", {size_expr});')
+            lines.append("    #endif")
+
+        tokens = "num_tokens"
+        embed_dim_expr = _get_arg("aligned_embed_dim", "d_model", "embed_dim") or str(embed_dim)
+        m_dim = _get_arg("m")
+        n_dim = _get_arg("n")
+        num_heads = _get_arg("num_heads") or "NUM_HEADS"
+        num_kv_heads = _get_arg("num_kv_heads") or "NUM_KV_HEADS"
+        head_dim = _get_arg("aligned_head_dim", "head_dim") or "HEAD_DIM"
+
+        if op_type == "qk_norm":
+            q_expr = _get_arg("q")
+            k_expr = _get_arg("k")
+            q_size = _mul_expr(tokens, num_heads, head_dim)
+            k_size = _mul_expr(tokens, num_kv_heads, head_dim)
+            _emit_dump(q_expr, "qcur_normed", q_size)
+            _emit_dump(k_expr, "kcur_normed", k_size)
+        elif dump_name:
+            out_expr = _get_arg("output", "out", "c", "y", "out_token")
+            size_expr = None
+
+            if op_type in ("dense_embedding_lookup", "attn_norm", "post_attention_norm", "ffn_norm", "post_ffn_norm", "residual_add"):
+                size_expr = _mul_expr(tokens, embed_dim_expr)
+            elif op_type in ("q_proj", "k_proj", "v_proj", "out_proj", "mlp_gate_up", "mlp_down", "logits"):
+                if func.startswith("gemm_") and n_dim:
+                    size_expr = _mul_expr(tokens, n_dim)
+                else:
+                    size_expr = _mul_expr(tokens, n_dim or m_dim)
+            elif op_type in ("attn", "attn_sliding"):
+                size_expr = _mul_expr(tokens, num_heads, head_dim)
+            elif op_type == "geglu":
+                dim = _get_arg("dim")
+                size_expr = _mul_expr(tokens, dim) if dim else None
+
+            _emit_dump(out_expr, dump_name, size_expr)
+
     return "\n".join(lines)
 
 
-def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False) -> str:
+def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False, dump: bool = False) -> str:
     """Emit the prefill function with all ops unrolled."""
     lines = []
     scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
@@ -417,7 +497,7 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
             layer_kv_count[layer] = count + 1
 
     for seq_idx, op in enumerate(ops):
-        lines.append(emit_prefill_op(op, seq_idx, config, profile=profile))
+        lines.append(emit_prefill_op(op, seq_idx, config, profile=profile, dump=dump))
         lines.append(f"    if (stop_seq == {seq_idx}) return;")
         if (scale_embeddings_sqrt_dim
                 and not embed_scale_emitted
@@ -446,7 +526,7 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
     return "\n".join(lines)
 
 
-def generate_prefill(ir_path: Path, layout_path: Path = None, profile: bool = False) -> str:
+def generate_prefill(ir_path: Path, layout_path: Path = None, profile: bool = False, dump: bool = False) -> str:
     """Generate prefill C code from IR.
 
     The IR already contains everything we need - just read and emit.
@@ -470,7 +550,7 @@ def generate_prefill(ir_path: Path, layout_path: Path = None, profile: bool = Fa
  */
 ''')
 
-    parts.append(emit_prefill_function(ops, config, profile=profile))
+    parts.append(emit_prefill_function(ops, config, profile=profile, dump=dump))
 
     return "\n".join(parts)
 

@@ -577,6 +577,76 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: 
 
     lines = []
     lines.append(f"    /* Op {idx}: {function} ({op_name}) layer={layer} section={section} */")
+
+    if op_name == "mlp_gate_up" and function in {"gemv_q4_k", "gemv_q4_k_q8_k", "gemv_q6_k", "gemv_q6_k_q8_k"}:
+        arg_expr_by_name = {}
+        for arg in args:
+            nm = str(arg.get("name", "")).lower()
+            ex = str(arg.get("expr", ""))
+            if nm and ex and nm not in arg_expr_by_name:
+                arg_expr_by_name[nm] = ex
+
+        y_expr = arg_expr_by_name.get("y")
+        w_expr = arg_expr_by_name.get("w")
+        x_expr = arg_expr_by_name.get("x")
+        m_expr = arg_expr_by_name.get("m")
+        k_expr = arg_expr_by_name.get("k")
+
+        row_bytes_expr = None
+        if function in {"gemv_q4_k", "gemv_q4_k_q8_k"}:
+            row_bytes_expr = f"(((size_t)({k_expr}) / 256u) * 144u)"
+        elif function in {"gemv_q6_k", "gemv_q6_k_q8_k"}:
+            row_bytes_expr = f"(((size_t)({k_expr}) / 256u) * 210u)"
+
+        if y_expr and w_expr and x_expr and m_expr and k_expr and row_bytes_expr:
+            half_expr = f"(({m_expr}) / 2)"
+            gate_y_expr = y_expr
+            up_y_expr = f"((float*)({y_expr}) + {half_expr})"
+            gate_w_expr = w_expr
+            up_w_expr = f"((const void*)((const uint8_t*)({w_expr}) + ((size_t)({half_expr}) * {row_bytes_expr})))"
+
+            if profile:
+                lines.append("    CK_PROFILE_BEGIN();")
+            lines.append(f"    {function}(")
+            lines.append(f"        {gate_y_expr},")
+            lines.append(f"        {gate_w_expr},")
+            lines.append(f"        {x_expr},")
+            lines.append(f"        {half_expr},")
+            lines.append(f"        {k_expr}")
+            lines.append("    );")
+            lines.append(f"    {function}(")
+            lines.append(f"        {up_y_expr},")
+            lines.append(f"        {up_w_expr},")
+            lines.append(f"        {x_expr},")
+            lines.append(f"        {half_expr},")
+            lines.append(f"        {k_expr}")
+            lines.append("    );")
+            if profile:
+                lines.append(f'    CK_PROFILE_END("decode", "{function}", "{op_name}", {layer});')
+            if seq_idx is not None:
+                lines.append(f"    if (stop_seq == {seq_idx}) return;")
+
+            if debug:
+                raw_expr = y_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append(f'    {{ float *_dbg = (float*){raw_expr}; '
+                            f'printf("[Op {idx} {op_name} L{layer}] out[0..4]: %f %f %f %f %f\\n", '
+                            f'_dbg[0], _dbg[1], _dbg[2], _dbg[3], _dbg[4]); }}')
+
+            if dump:
+                tokens = "1"
+                embed_dim = "EMBED_DIM"
+                for arg in args:
+                    nm = str(arg.get("name", "")).lower()
+                    ex = str(arg.get("expr", ""))
+                    if nm in {"tokens", "num_tokens", "token_count"} and ex:
+                        tokens = ex
+                    if nm in {"aligned_embed_dim", "d_model", "embed_dim"} and ex:
+                        embed_dim = ex
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(f'    ck_dump_tensor((float*){y_expr.replace("(float*)", "").replace("(void*)", "").strip()}, {layer}, "ffn_gate_up", {m_expr});')
+                lines.append("    #endif")
+            return "\n".join(lines)
+
     if profile:
         lines.append(f"    CK_PROFILE_BEGIN();")
     if not args:
@@ -728,6 +798,9 @@ static void ck_decode(CKModel *model, int32_t token) {
     (void)ACT;
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
+    #ifdef CK_PARITY_DUMP
+    ck_dump_set_token(model->pos);
+    #endif
 """)
     if profile:
         lines.append("    CK_PROFILE_VARS();")
@@ -1607,7 +1680,7 @@ def main():
             if prefill_ir.exists():
                 try:
                     from codegen_prefill_v7 import generate_prefill
-                    prefill_code = generate_prefill(prefill_ir, profile=args.profile)
+                    prefill_code = generate_prefill(prefill_ir, profile=args.profile, dump=args.parity_dump)
                     print(f"  + Prefill code generated")
                 except ImportError as e:
                     print(f"Warning: Could not import prefill codegen: {e}")

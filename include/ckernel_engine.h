@@ -1683,6 +1683,18 @@ void rope_forward_qk_with_rotary_dim(float *q,
                                      int pos_offset,
                                      int rotary_dim);
 
+void rope_forward_qk_pairwise_with_rotary_dim(float *q,
+                                              float *k,
+                                              const float *cos_cache,
+                                              const float *sin_cache,
+                                              int num_heads,
+                                              int num_kv_heads,
+                                              int num_tokens,
+                                              int head_dim,
+                                              int aligned_head_dim,
+                                              int pos_offset,
+                                              int rotary_dim);
+
 void rope_forward_qk_strided(float *q,
                              float *k,
                              const float *cos_cache,

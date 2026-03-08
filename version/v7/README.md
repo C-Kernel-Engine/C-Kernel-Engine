@@ -74,6 +74,13 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 
 - `v7` is intentionally strict and minimal: correctness first, optimization later.
 - `v7-gate` should remain deterministic and reproducible on CPU-only environments.
+- Training runs belong under `~/.cache/ck-engine-v7/models/train/<run-name>`.
+  Do not create ad-hoc run directories under `version/v7/runs/`; that pollutes the source tree and breaks `open_ir_hub.py` discovery.
+- When bootstrapping a new training run, prefer `python3 version/v7/scripts/ck_run_v7.py init --run-name <name> ...`.
+  In general, let the tool choose the default cache location and provide only the run name; use `--run <path>` only when you intentionally need a nonstandard location.
+- `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
+  To refresh `ir_report.html`, use `python3 version/v7/tools/open_ir_visualizer.py --generate --run ~/.cache/ck-engine-v7/models/train/<run-name> --html-only --strict-run-artifacts`
+  or `python3 version/v7/scripts/ck_run_v7.py run ... --run ~/.cache/ck-engine-v7/models/train/<run-name> --generate-visualizer`.
 - SVG training ablation guidance:
   `reports/SVG_ABLATION_PLAN_2026-02-20.md` (canonical matrix) and
   `../../docs/v7-svg-training-ablation.md` (quick decision guide).

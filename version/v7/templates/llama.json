@@ -6,7 +6,8 @@
     "use_qkv_bias": "from_weights",
     "activation": "swiglu",
     "rope": "rope",
-    "tokenizer": "sentencepiece"
+    "tokenizer": "sentencepiece",
+    "prefer_fp32_mlp_matmuls": true
   },
   "contract": {
     "tokenizer_contract": {
@@ -50,6 +51,9 @@
         ]
       }
     }
+  },
+  "kernels": {
+    "rope_qk": "rope_forward_qk_pairwise"
   },
   "sequence": ["decoder"],
   "block_types": {

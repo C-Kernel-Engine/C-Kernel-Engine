@@ -2612,6 +2612,57 @@
         }
       ]
     },
+    "rope_forward_qk_pairwise_with_rotary_dim": {
+      "note": "Pairwise RoPE for Llama-family layouts; input q,k are rotated in-place",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "rotary_dim",
+          "source": "dim:rotary_dim"
+        }
+      ]
+    },
     "rope_forward_qk_split": {
       "note": "Legacy split-cache RoPE (head_dim/2 cache layout)",
       "params": [

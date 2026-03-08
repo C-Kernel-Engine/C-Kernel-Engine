@@ -13,6 +13,7 @@ struct Args {
     std::string model_path;
     std::vector<int32_t> tokens;
     std::string logits_out_path;
+    std::string decode_mode = "batched";
     int ctx_len = 256;
     int top_k = 16;
     int threads = 0;
@@ -107,10 +108,21 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             args.logits_out_path = v;
             continue;
         }
+        if (a == "--decode-mode") {
+            const char * v = need_value("--decode-mode");
+            if (!v) return false;
+            args.decode_mode = v;
+            if (args.decode_mode != "batched" && args.decode_mode != "sequential") {
+                err = "invalid --decode-mode (expected batched or sequential)";
+                return false;
+            }
+            continue;
+        }
         if (a == "-h" || a == "--help") {
             std::cout
                 << "Usage: llama_token_replay --model <path.gguf> --tokens <id,id,...> "
-                << "--logits-out <path.bin> [--ctx N] [--top-k K] [--threads N]\n";
+                << "--logits-out <path.bin> [--ctx N] [--top-k K] [--threads N] "
+                << "[--decode-mode batched|sequential]\n";
             std::exit(0);
         }
         err = "unknown arg: " + a;
@@ -144,6 +156,30 @@ static void print_json_error(const std::string & msg) {
         }
     }
     std::cout << "\"}\n";
+}
+
+static int32_t decode_tokens(
+    llama_context * ctx,
+    const std::vector<llama_token> & tokens,
+    const std::string & decode_mode
+) {
+    if (decode_mode == "sequential") {
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            llama_token tok = tokens[i];
+            llama_batch batch = llama_batch_get_one(&tok, 1);
+            const int32_t rc = llama_decode(ctx, batch);
+            if (rc != 0) {
+                return rc;
+            }
+        }
+        return 0;
+    }
+
+    llama_batch batch = llama_batch_get_one(
+        const_cast<llama_token *>(tokens.data()),
+        static_cast<int32_t>(tokens.size())
+    );
+    return llama_decode(ctx, batch);
 }
 
 int main(int argc, char ** argv) {
@@ -186,11 +222,10 @@ int main(int argc, char ** argv) {
     }
 
     std::vector<llama_token> tokens(args.tokens.begin(), args.tokens.end());
-    llama_batch batch = llama_batch_get_one(tokens.data(), static_cast<int32_t>(tokens.size()));
-    int32_t rc = llama_decode(ctx, batch);
+    int32_t rc = decode_tokens(ctx, tokens, args.decode_mode);
     if (rc != 0) {
         std::ostringstream oss;
-        oss << "llama_decode failed rc=" << rc;
+        oss << "llama_decode failed rc=" << rc << " mode=" << args.decode_mode;
         print_json_error(oss.str());
         llama_free(ctx);
         llama_model_free(model);
@@ -264,6 +299,7 @@ int main(int argc, char ** argv) {
     std::cout << "\"ok\":true,";
     std::cout << "\"n_vocab\":" << n_vocab << ",";
     std::cout << "\"token_count\":" << tokens.size() << ",";
+    std::cout << "\"decode_mode\":\"" << args.decode_mode << "\",";
     std::cout << "\"topk\":[";
     for (int i = 0; i < k; ++i) {
         if (i) std::cout << ",";

@@ -92,3 +92,8 @@ In plan-only mode, the stage report files are not produced.
 - Keep `--reuse-run-tokenizer` behavior for alignment stages (handled by runner).
 - Keep token IDs stable across all stages in one run line.
 - For strict parity gates, run `run_training_parity_regimen_v7.py` before and after alignment stages.
+- Keep the run itself under `~/.cache/ck-engine-v7/models/train/<name>`.
+  Do not stage temporary training runs under `version/v7/runs/`; the cache root is the canonical location for training artifacts and IR hub discovery.
+- If you want a fresh `ir_report.html`, do not call `scripts/ck_chat.py --generate-visualizer`.
+  `ck_chat.py` has no visualizer flag; use `version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts`
+  or `version/v7/scripts/ck_run_v7.py run ... --run "$RUN" --generate-visualizer`.

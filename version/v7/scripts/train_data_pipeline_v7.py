@@ -701,6 +701,50 @@ def _check_coverage_gate(
     }
 
 
+def _resolve_special_tokens_file(dataset_path: Path, explicit: str | None) -> Path | None:
+    if explicit:
+        path = Path(str(explicit)).expanduser().resolve()
+        if not path.exists():
+            raise SystemExit(f"ERROR: --special-tokens-file not found: {path}")
+        return path
+
+    parent = dataset_path.parent
+    if not parent.exists():
+        return None
+
+    candidates: list[Path] = []
+    exact = parent / "spec03_reserved_control_tokens.txt"
+    if exact.exists():
+        candidates.append(exact)
+
+    stem = dataset_path.stem.lower()
+    prefix = stem.split("_instruction_", 1)[0]
+    prefix = prefix.split("_svg_", 1)[0]
+    prefix = prefix.split("_tokenizer_corpus", 1)[0]
+    if prefix:
+        prefixed = parent / f"{prefix}_reserved_control_tokens.txt"
+        if prefixed.exists() and prefixed not in candidates:
+            candidates.append(prefixed)
+
+    for path in sorted(parent.glob("*_reserved_control_tokens.txt")):
+        if path not in candidates:
+            candidates.append(path)
+    fallback = parent / "reserved_control_tokens.txt"
+    if fallback.exists() and fallback not in candidates:
+        candidates.append(fallback)
+
+    if not candidates:
+        return None
+
+    if prefix:
+        prefix_matches = [p for p in candidates if p.name.lower().startswith(prefix)]
+        if prefix_matches:
+            candidates = prefix_matches
+
+    candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0, reverse=True)
+    return candidates[0]
+
+
 def _read_run_vocab_size(run_dir: Path) -> int | None:
     manifest = run_dir / "weights_manifest.json"
     if not manifest.exists():
@@ -4125,6 +4169,11 @@ def main() -> int:
         help="Optional spec catalog JSON associated with this dataset generation run.",
     )
     ap.add_argument(
+        "--special-tokens-file",
+        default=None,
+        help="Optional reserved control tokens file for BPE/ascii_bpe tokenizer training.",
+    )
+    ap.add_argument(
         "--strict-coverage-gate",
         action="store_true",
         help="Fail fast if coverage manifest gate reports missing spec/tag coverage.",
@@ -4517,6 +4566,7 @@ def main() -> int:
             tokenizer_json = work_dir / "tokenizer.json"
             bpe_bin_dir = work_dir / "bpe_bin"
             bpe_bin_dir.mkdir(parents=True, exist_ok=True)
+            special_tokens_file = _resolve_special_tokens_file(dataset_path, args.special_tokens_file)
             bpe_cmd = [
                 str(BPE_BIN),
                 "--corpus-dir",
@@ -4534,8 +4584,7 @@ def main() -> int:
                 "--threads",
                 str(args.bpe_threads),
             ]
-            special_tokens_file = dataset_path.parent / "spec03_reserved_control_tokens.txt"
-            if special_tokens_file.exists():
+            if special_tokens_file is not None:
                 bpe_cmd.extend(["--special-tokens-file", str(special_tokens_file)])
             if args.tokenizer == "ascii_bpe":
                 bpe_cmd.append("--ascii-only")

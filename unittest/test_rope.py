@@ -60,6 +60,36 @@ lib.rope_backward.argtypes = [
 ]
 lib.rope_backward.restype = None
 
+lib.rope_forward_qk_with_rotary_dim.argtypes = [
+    ctypes.POINTER(ctypes.c_float),  # q (in-place)
+    ctypes.POINTER(ctypes.c_float),  # k (in-place)
+    ctypes.POINTER(ctypes.c_float),  # cos_cache
+    ctypes.POINTER(ctypes.c_float),  # sin_cache
+    ctypes.c_int,                    # num_heads
+    ctypes.c_int,                    # num_kv_heads
+    ctypes.c_int,                    # num_tokens
+    ctypes.c_int,                    # head_dim
+    ctypes.c_int,                    # aligned_head_dim
+    ctypes.c_int,                    # pos_offset
+    ctypes.c_int,                    # rotary_dim
+]
+lib.rope_forward_qk_with_rotary_dim.restype = None
+
+lib.rope_forward_qk_pairwise_with_rotary_dim.argtypes = [
+    ctypes.POINTER(ctypes.c_float),  # q (in-place)
+    ctypes.POINTER(ctypes.c_float),  # k (in-place)
+    ctypes.POINTER(ctypes.c_float),  # cos_cache
+    ctypes.POINTER(ctypes.c_float),  # sin_cache
+    ctypes.c_int,                    # num_heads
+    ctypes.c_int,                    # num_kv_heads
+    ctypes.c_int,                    # num_tokens
+    ctypes.c_int,                    # head_dim
+    ctypes.c_int,                    # aligned_head_dim
+    ctypes.c_int,                    # pos_offset
+    ctypes.c_int,                    # rotary_dim
+]
+lib.rope_forward_qk_pairwise_with_rotary_dim.restype = None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reference implementations
@@ -140,6 +170,52 @@ def rope_backward_pytorch(d_out: torch.Tensor, cos_cache: torch.Tensor, sin_cach
                 d_x[h, t, i + half_dim] = -d0 * s + d1 * c
 
     return d_x
+
+
+def rope_forward_pytorch_pairwise_vectorized(
+    x: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    pos_offset: int = 0,
+    rotary_dim: int | None = None,
+):
+    """Vectorized PyTorch reference for Llama-style even/odd RoPE."""
+    H, T, D = x.shape
+    rotary = D if rotary_dim is None else min(int(rotary_dim), D)
+    rotary -= rotary % 2
+    if rotary <= 0:
+        return x.clone()
+
+    half_dim = rotary // 2
+    cos = cos_cache[pos_offset:pos_offset + T, :half_dim]
+    sin = sin_cache[pos_offset:pos_offset + T, :half_dim]
+
+    out = x.clone()
+    even = x[..., 0:rotary:2]
+    odd = x[..., 1:rotary:2]
+    out[..., 0:rotary:2] = even * cos - odd * sin
+    out[..., 1:rotary:2] = even * sin + odd * cos
+    return out
+
+
+def rope_forward_pairwise_numpy(
+    x_np: np.ndarray,
+    cos_np: np.ndarray,
+    sin_np: np.ndarray,
+    *,
+    pos_offset: int = 0,
+    rotary_dim: int | None = None,
+) -> np.ndarray:
+    x = torch.from_numpy(x_np.copy())
+    cos_cache = torch.from_numpy(cos_np.copy())
+    sin_cache = torch.from_numpy(sin_np.copy())
+    return rope_forward_pytorch_pairwise_vectorized(
+        x,
+        cos_cache,
+        sin_cache,
+        pos_offset=pos_offset,
+        rotary_dim=rotary_dim,
+    ).numpy()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -612,6 +688,196 @@ def run_accuracy_tests():
     return report
 
 
+def run_rope_pairwise_multi_theta():
+    """
+    Test Llama-style pairwise RoPE forward across model-specific theta values.
+
+    This covers the layout used by Llama-family checkpoints, where pairs are
+    consecutive channels: (0,1), (2,3), ...
+    """
+    report = TestReport(
+        test_name="RoPE Pairwise Forward Multi-Theta",
+        dtype="fp32",
+        shape="Various theta values / Llama-family",
+        cpu_info=get_cpu_info()
+    )
+
+    test_configs = [
+        (10000.0, "Llama2", 8, 4, 16, 64),
+        (500000.0, "Llama3", 8, 4, 16, 64),
+        (70000000.0, "Nanbeige", 20, 4, 8, 128),
+    ]
+
+    for theta, model_name, q_heads, kv_heads, tokens, head_dim in test_configs:
+        np.random.seed(int(theta) % 100000)
+        half_dim = head_dim // 2
+        q_np = np.random.randn(q_heads, tokens, head_dim).astype(np.float32)
+        k_np = np.random.randn(kv_heads, tokens, head_dim).astype(np.float32)
+        cos_np = np.zeros((tokens, half_dim), dtype=np.float32)
+        sin_np = np.zeros((tokens, half_dim), dtype=np.float32)
+
+        lib.rope_precompute_cache(
+            numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(tokens), ctypes.c_int(head_dim), ctypes.c_float(theta),
+            ctypes.c_int(head_dim), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
+        )
+
+        q_ref = rope_forward_pairwise_numpy(q_np, cos_np, sin_np)
+        k_ref = rope_forward_pairwise_numpy(k_np, cos_np, sin_np)
+
+        q_out = q_np.copy()
+        k_out = k_np.copy()
+        lib.rope_forward_qk_pairwise_with_rotary_dim(
+            numpy_to_ptr(q_out), numpy_to_ptr(k_out),
+            numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(q_heads), ctypes.c_int(kv_heads), ctypes.c_int(tokens),
+            ctypes.c_int(head_dim), ctypes.c_int(head_dim), ctypes.c_int(0), ctypes.c_int(head_dim),
+        )
+
+        q_diff = max_diff(torch.from_numpy(q_out), torch.from_numpy(q_ref))
+        k_diff = max_diff(torch.from_numpy(k_out), torch.from_numpy(k_ref))
+
+        report.add_result(TestResult(
+            name=f"{model_name} pairwise-q (θ={theta:.0f})",
+            passed=q_diff <= 1e-5,
+            max_diff=q_diff,
+            tolerance=1e-5,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+        report.add_result(TestResult(
+            name=f"{model_name} pairwise-k (θ={theta:.0f})",
+            passed=k_diff <= 1e-5,
+            max_diff=k_diff,
+            tolerance=1e-5,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+
+    return report
+
+
+def run_rope_pairwise_decode_positions_test():
+    """Verify pairwise RoPE uses decode position offsets correctly."""
+    report = TestReport(
+        test_name="RoPE Pairwise Decode Positions",
+        dtype="fp32",
+        shape="Various positions / Llama-family",
+        cpu_info=get_cpu_info()
+    )
+
+    q_heads, kv_heads, tokens, head_dim = 20, 4, 1, 128
+    max_cache_len = 2048
+    half_dim = head_dim // 2
+
+    cos_np = np.zeros((max_cache_len, half_dim), dtype=np.float32)
+    sin_np = np.zeros((max_cache_len, half_dim), dtype=np.float32)
+    lib.rope_precompute_cache(
+        numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+        ctypes.c_int(max_cache_len), ctypes.c_int(head_dim), ctypes.c_float(70000000.0),
+        ctypes.c_int(head_dim), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
+    )
+
+    for pos in [0, 1, 10, 100, 500, 1000]:
+        np.random.seed(pos + 7)
+        q_np = np.random.randn(q_heads, tokens, head_dim).astype(np.float32)
+        k_np = np.random.randn(kv_heads, tokens, head_dim).astype(np.float32)
+
+        q_ref = rope_forward_pairwise_numpy(q_np, cos_np, sin_np, pos_offset=pos)
+        k_ref = rope_forward_pairwise_numpy(k_np, cos_np, sin_np, pos_offset=pos)
+
+        q_out = q_np.copy()
+        k_out = k_np.copy()
+        lib.rope_forward_qk_pairwise_with_rotary_dim(
+            numpy_to_ptr(q_out), numpy_to_ptr(k_out),
+            numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+            ctypes.c_int(q_heads), ctypes.c_int(kv_heads), ctypes.c_int(tokens),
+            ctypes.c_int(head_dim), ctypes.c_int(head_dim), ctypes.c_int(pos), ctypes.c_int(head_dim),
+        )
+
+        q_diff = max_diff(torch.from_numpy(q_out), torch.from_numpy(q_ref))
+        k_diff = max_diff(torch.from_numpy(k_out), torch.from_numpy(k_ref))
+        diff = max(q_diff, k_diff)
+        report.add_result(TestResult(
+            name=f"pairwise-pos={pos}",
+            passed=diff <= 1e-5,
+            max_diff=diff,
+            tolerance=1e-5,
+            pytorch_time=None,
+            kernel_time=None
+        ))
+
+    return report
+
+
+def run_pairwise_forward_tests(q_heads=20, kv_heads=4, T=16, D=128, warmup=5, iterations=100):
+    """Run pairwise forward pass tests with accuracy and timing."""
+    np.random.seed(123)
+    half_dim = D // 2
+
+    q_np = np.random.randn(q_heads, T, D).astype(np.float32)
+    k_np = np.random.randn(kv_heads, T, D).astype(np.float32)
+    cos_np = np.zeros((T, half_dim), dtype=np.float32)
+    sin_np = np.zeros((T, half_dim), dtype=np.float32)
+
+    lib.rope_precompute_cache(
+        numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(70000000.0),
+        ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
+    )
+
+    q = torch.from_numpy(q_np.copy())
+    k = torch.from_numpy(k_np.copy())
+    cos_cache = torch.from_numpy(cos_np.copy())
+    sin_cache = torch.from_numpy(sin_np.copy())
+
+    report = TestReport(
+        test_name="RoPE Pairwise Forward",
+        dtype="fp32",
+        shape=f"QH={q_heads}, KVH={kv_heads}, T={T}, D={D}",
+        cpu_info=get_cpu_info()
+    )
+
+    def pytorch_pairwise():
+        q_ref = rope_forward_pytorch_pairwise_vectorized(q, cos_cache, sin_cache)
+        k_ref = rope_forward_pytorch_pairwise_vectorized(k, cos_cache, sin_cache)
+        return torch.cat([q_ref.reshape(-1), k_ref.reshape(-1)], dim=0)
+
+    q_out = q_np.copy()
+    k_out = k_np.copy()
+    q_ptr = numpy_to_ptr(q_out)
+    k_ptr = numpy_to_ptr(k_out)
+    cos_ptr = numpy_to_ptr(cos_np)
+    sin_ptr = numpy_to_ptr(sin_np)
+
+    def c_pairwise():
+        np.copyto(q_out, q_np)
+        np.copyto(k_out, k_np)
+        lib.rope_forward_qk_pairwise_with_rotary_dim(
+            q_ptr, k_ptr, cos_ptr, sin_ptr,
+            ctypes.c_int(q_heads), ctypes.c_int(kv_heads), ctypes.c_int(T),
+            ctypes.c_int(D), ctypes.c_int(D), ctypes.c_int(0), ctypes.c_int(D),
+        )
+        return torch.cat([torch.from_numpy(q_out.reshape(-1).copy()), torch.from_numpy(k_out.reshape(-1).copy())], dim=0)
+
+    ref = pytorch_pairwise()
+    out = c_pairwise()
+    diff = max_diff(out, ref)
+    pytorch_time = time_function(pytorch_pairwise, warmup=warmup, iterations=iterations, name="PyTorch Pairwise")
+    kernel_time = time_function(c_pairwise, warmup=warmup, iterations=iterations, name="C RoPE Pairwise")
+
+    report.add_result(TestResult(
+        name="RoPE Pairwise QK",
+        passed=diff <= 1e-5,
+        max_diff=diff,
+        tolerance=1e-5,
+        pytorch_time=pytorch_time,
+        kernel_time=kernel_time
+    ))
+
+    return report
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -643,6 +909,15 @@ if __name__ == "__main__":
     decode_pos_report.print_report()
     all_reports.append(decode_pos_report)
 
+    # Pairwise Llama-family tests
+    pairwise_multi_theta_report = run_rope_pairwise_multi_theta()
+    pairwise_multi_theta_report.print_report()
+    all_reports.append(pairwise_multi_theta_report)
+
+    pairwise_decode_pos_report = run_rope_pairwise_decode_positions_test()
+    pairwise_decode_pos_report.print_report()
+    all_reports.append(pairwise_decode_pos_report)
+
     # Accuracy tests
     acc_report = run_accuracy_tests()
     acc_report.print_report()
@@ -652,6 +927,10 @@ if __name__ == "__main__":
     fwd_report = run_forward_tests(H=8, T=64, D=64, warmup=10, iterations=500)
     fwd_report.print_report()
     all_reports.append(fwd_report)
+
+    pairwise_fwd_report = run_pairwise_forward_tests()
+    pairwise_fwd_report.print_report()
+    all_reports.append(pairwise_fwd_report)
 
     # Backward tests
     bwd_report = run_backward_tests(H=8, T=64, D=64, warmup=10, iterations=500)
