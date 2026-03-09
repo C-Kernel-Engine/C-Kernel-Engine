@@ -154,7 +154,7 @@ def stage_workspace(workspace: Path, run_dir: Path, *, mode: str, force: bool) -
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Stage a dataset workspace into a run dir and generate dataset_viewer.html")
-    ap.add_argument("--workspace", required=True, type=Path, help="Source dataset workspace (e.g. version/v7/data/spec03)")
+    ap.add_argument("--workspace", required=True, type=Path, help="Source dataset workspace (e.g. version/v7/data/spec04)")
     ap.add_argument("--run-dir", required=True, type=Path, help="Run directory to receive the dataset snapshot")
     ap.add_argument("--mode", choices=("copy", "symlink"), default="copy", help="How to stage workspace entries into the run dir")
     ap.add_argument("--force", action="store_true", help="Replace existing run_dir/dataset snapshot and dataset_viewer.html")

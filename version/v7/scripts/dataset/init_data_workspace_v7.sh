@@ -9,12 +9,12 @@ Usage:
 Create a new v7 data workspace scaffold for a dataset family/spec iteration.
 
 Examples:
-  bash version/v7/scripts/dataset/init_data_workspace_v7.sh --spec spec03 --dataset-type svg
+  bash version/v7/scripts/dataset/init_data_workspace_v7.sh --spec spec04 --dataset-type svg
   bash version/v7/scripts/dataset/init_data_workspace_v7.sh --workspace version/v7/data/c_spec01 --dataset-type c
   bash version/v7/scripts/dataset/init_data_workspace_v7.sh --spec spec04 --dataset-type svg --force
 
 Options:
-  --spec NAME           Workspace name under version/v7/data (e.g. spec03)
+  --spec NAME           Workspace name under version/v7/data (e.g. spec04)
   --workspace PATH      Explicit workspace path (overrides --spec)
   --dataset-type TYPE   Dataset type: svg, c, python, sql, json, bash, html, css, js
   --goal TEXT           Short end-goal description
@@ -124,9 +124,15 @@ mkdir -p \
   "$workspace/contracts" \
   "$workspace/raw_assets" \
   "$workspace/normalized" \
-  "$workspace/pretrain" \
-  "$workspace/midtrain" \
-  "$workspace/sft" \
+  "$workspace/pretrain/train" \
+  "$workspace/pretrain/dev" \
+  "$workspace/pretrain/test" \
+  "$workspace/midtrain/train" \
+  "$workspace/midtrain/dev" \
+  "$workspace/midtrain/test" \
+  "$workspace/sft/train" \
+  "$workspace/sft/dev" \
+  "$workspace/sft/test" \
   "$workspace/holdout" \
   "$workspace/tokenizer" \
   "$workspace/manifests"
@@ -145,10 +151,10 @@ $goal
 - \`contracts/\`
 - \`raw_assets/\`
 - \`normalized/\`
-- \`pretrain/\`
-- \`midtrain/\`
-- \`sft/\`
-- \`holdout/\`
+- \`pretrain/train\`, \`pretrain/dev\`, \`pretrain/test\`
+- \`midtrain/train\`, \`midtrain/dev\`, \`midtrain/test\`
+- \`sft/train\`, \`sft/dev\`, \`sft/test\`
+- \`holdout/\` (optional canary / OOD / reserved eval bucket)
 - \`tokenizer/\`
 - \`manifests/\`
 
@@ -156,9 +162,9 @@ $goal
 
 1. import and inventory source data into \`raw_assets/\`
 2. normalize and placeholderize into \`normalized/\`
-3. derive \`pretrain/\`, \`midtrain/\`, and \`sft/\`
+3. derive stage corpora into explicit \`train/dev/test\` splits
 4. build tokenizer corpus in \`tokenizer/\`
-5. keep fixed evaluation assets/prompts in \`holdout/\`
+5. keep optional canary / OOD / frozen prompts in \`holdout/\`
 6. store inventory, dedupe, coverage, and fit reports in \`manifests/\`
 
 ## Contract rule
@@ -169,6 +175,7 @@ Keep:
 - one canonical input/output contract
 - one tokenizer corpus policy
 - one eval contract
+- explicit split intent per stage, even if some splits are empty today
 
 Split experimental format changes into a new workspace instead of mutating history in place.
 EOF
@@ -188,13 +195,14 @@ $goal
 - Define one canonical row format for this workspace.
 - Do not mix legacy and new conditioning styles.
 - Keep eval probes aligned with the same contract used in training.
-- Track normalization, dedupe, and holdout policy in \`manifests/\`.
+- Track normalization, dedupe, split policy, and optional holdout/canary policy in \`manifests/\`.
 
 ## TODO
 
 - write the canonical row format
 - define placeholder policy
 - define dedupe policy
+- define train/dev/test split policy
 - define holdout/canary policy
 - define promotion gates
 EOF
@@ -220,7 +228,21 @@ write_file "$workspace/README.md" "$readme_content"
 write_file "$workspace/contracts/WORKSPACE_CONTRACT.md" "$contract_content"
 write_file "$workspace/contracts/eval_contract.$dataset_type.v1.json" "$eval_stub"
 
-for d in raw_assets normalized pretrain midtrain sft holdout tokenizer manifests; do
+for d in \
+  raw_assets \
+  normalized \
+  pretrain/train \
+  pretrain/dev \
+  pretrain/test \
+  midtrain/train \
+  midtrain/dev \
+  midtrain/test \
+  sft/train \
+  sft/dev \
+  sft/test \
+  holdout \
+  tokenizer \
+  manifests; do
   if [[ ! -f "$workspace/$d/.gitkeep" ]]; then
     : > "$workspace/$d/.gitkeep"
   fi
