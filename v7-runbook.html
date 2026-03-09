@@ -1920,7 +1920,7 @@
     <div class="pg-header">
         <span class="badge badge-orange" style="font-size:0.7rem;">Visual</span>
         <h3>Training Pipeline Graph</h3>
-        <p>Paste a <code>training_plan.json</code> to visualize compute stages + data flow. Share as a clean public diagram — no internals exposed.</p>
+        <p>Paste a <code>training_plan.json</code> to visualize compute stages + split-aware data flow. Default layout is <code>stage + train/dev/test</code>, with optional <code>holdout</code> when you need a canary or OOD bucket.</p>
     </div>
     <div class="pg-controls">
         <button class="pg-btn pg-btn-primary" onclick="pgRender()">Render Graph</button>
@@ -1963,11 +1963,24 @@ const EXAMPLE_PLAN = {
     active_stage: "sft",
     stage_order: ["pretrain","midtrain","sft","dpo","grpo"],
     stages: [
-        { stage:"pretrain",  status:"completed", datasets:[{name:"stage_a_plus_bridge.txt", rows:10014}],
+        { stage:"pretrain",  status:"completed", datasets:[
+            {name:"stage_a_train.txt", split:"train", rows:9012},
+            {name:"stage_a_dev.txt", split:"dev", rows:501},
+            {name:"stage_a_test.txt", split:"test", rows:501}
+          ],
           runs:[{run_id:"181208",first_loss:6.97,final_loss:1.17,lr:3e-4,steps:2048}] },
-        { stage:"midtrain",  status:"completed", datasets:[{name:"stage_b.txt", rows:23228}],
+        { stage:"midtrain",  status:"completed", datasets:[
+            {name:"stage_b_train.txt", split:"train", rows:20828},
+            {name:"stage_b_dev.txt", split:"dev", rows:1200},
+            {name:"stage_b_test.txt", split:"test", rows:1200}
+          ],
           runs:[{run_id:"210719",first_loss:3.35,final_loss:1.12,lr:3e-4,steps:2048}] },
-        { stage:"sft",       status:"active",    datasets:[{name:"sft_mix_overnight_v1.txt", rows:88000}],
+        { stage:"sft",       status:"active",    datasets:[
+            {name:"sft_train.jsonl", split:"train", rows:82000},
+            {name:"sft_dev.jsonl", split:"dev", rows:3000},
+            {name:"sft_test.jsonl", split:"test", rows:3000},
+            {name:"svg_holdout_prompts.jsonl", split:"holdout", rows:240}
+          ],
           runs:[
               {run_id:"220504",first_loss:0.96,final_loss:0.79,lr:1e-4,steps:2048},
               {run_id:"022100",first_loss:0.82,final_loss:0.73,lr:1e-4,steps:2048},
@@ -1999,6 +2012,25 @@ function _pgFmtLR(v) {
     const n = Number(v);
     if (n >= 1e-2) return n.toFixed(4);
     return n.toExponential(0).replace('e-0','e-').replace('e+0','').replace('e0','');
+}
+function _pgDatasets(st) {
+    return Array.isArray(st && st.datasets) ? st.datasets.filter(Boolean) : [];
+}
+function _pgDatasetSplit(ds) {
+    return String((ds && ds.split) || 'unspecified');
+}
+function _pgDatasetRowsTotal(datasets) {
+    return datasets.reduce((sum, ds) => sum + (Number(ds && ds.rows) || 0), 0);
+}
+function _pgDatasetTokensTotal(datasets) {
+    return datasets.reduce((sum, ds) => sum + (Number(ds && ds.tokens) || 0), 0);
+}
+function _pgDatasetNodeSummary(datasets) {
+    if (!datasets.length) return { line1:'', line2:'' };
+    const splits = _pgTrunc(datasets.map(_pgDatasetSplit).join('/'), 22);
+    const rows = _pgDatasetRowsTotal(datasets);
+    const rowText = rows ? Number(rows).toLocaleString() + ' rows' : (datasets.length + ' file' + (datasets.length === 1 ? '' : 's'));
+    return { line1:splits, line2:rowText };
 }
 function pgSetStatus(msg, err) {
     const el = document.getElementById('pg-status');
@@ -2065,7 +2097,21 @@ function _pgPopupShowStage(st, idx) {
     const runs = Array.isArray(st.runs) ? st.runs : [];
     const statusOpts = ['planned','active','completed','deferred','blocked']
         .map(s => `<option value="${s}"${s===st.status?' selected':''}>${s}</option>`).join('');
-    const ds = Array.isArray(st.datasets) && st.datasets[0] ? st.datasets[0] : {};
+    const datasets = _pgDatasets(st);
+    const ds = datasets[0] || {};
+    const datasetSummary = datasets.length
+        ? datasets.map(ds => {
+            const parts = [
+                `<strong>${_pgEsc(_pgDatasetSplit(ds))}</strong>`,
+                _pgEsc(ds.name || '—'),
+                ds.rows != null ? Number(ds.rows).toLocaleString() + ' rows' : ''
+            ].filter(Boolean);
+            return `<div class="pg-run-row">${parts.join(' &nbsp;·&nbsp; ')}</div>`;
+          }).join('')
+        : '<div style="color:#475569;font-size:0.78rem;padding:0.2rem 0;">No datasets recorded.</div>';
+    const datasetNote = datasets.length > 1
+        ? '<p style="font-size:0.75rem;color:#64748b;margin:0.35rem 0 0;">This stage has multiple split datasets. Saving below edits the primary dataset only.</p>'
+        : '';
     const runsHtml = runs.length
         ? runs.map(r =>
             `<div class="pg-run-row"><span class="run-id">${_pgEsc(r.run_id||'?')}</span>`
@@ -2081,13 +2127,18 @@ function _pgPopupShowStage(st, idx) {
             <select class="pg-popup-select" id="pg-edit-status">${statusOpts}</select>
         </div>
         <div class="pg-popup-row">
-            <div class="pg-popup-label">Dataset name</div>
+            <div class="pg-popup-label">Primary dataset name</div>
             <input class="pg-popup-input" id="pg-edit-ds-name" value="${_pgEsc(ds.name||'')}" placeholder="e.g. sft_mix_v2.txt"/>
         </div>
         <div class="pg-popup-row">
-            <div class="pg-popup-label">Dataset rows</div>
+            <div class="pg-popup-label">Primary dataset rows</div>
             <input class="pg-popup-input" type="number" id="pg-edit-ds-rows" value="${ds.rows||''}" placeholder="e.g. 13200"/>
         </div>
+        <div class="pg-popup-row">
+            <div class="pg-popup-label">Dataset splits (${datasets.length})</div>
+            <div>${datasetSummary}</div>
+        </div>
+        ${datasetNote}
         <div class="pg-popup-row">
             <div class="pg-popup-label">Gate / detail note</div>
             <input class="pg-popup-input" id="pg-edit-detail" value="${_pgEsc(st.detail||'')}" placeholder="e.g. Only if valid_svg_rate &lt; 0.85"/>
@@ -2105,18 +2156,26 @@ function _pgPopupShowStage(st, idx) {
 
 // ── Dataset popup (info only, hints to edit via stage) ────────────────────────
 function _pgPopupShowDataset(st, idx) {
-    const ds = Array.isArray(st.datasets) && st.datasets[0] ? st.datasets[0] : {};
-    const packRow = ds.pack_mode
-        ? `<div class="pg-popup-row"><div class="pg-popup-label">Pack mode</div><div class="pg-popup-val">${_pgEsc(ds.pack_mode)}</div></div>` : '';
-    const tokRow = ds.tokens != null
-        ? `<div class="pg-popup-row"><div class="pg-popup-label">Tokens</div><div class="pg-popup-val">${(ds.tokens/1e6).toFixed(2)}M</div></div>` : '';
+    const datasets = _pgDatasets(st);
+    const rowsTotal = _pgDatasetRowsTotal(datasets);
+    const tokensTotal = _pgDatasetTokensTotal(datasets);
+    const datasetRows = datasets.length
+        ? datasets.map(ds => {
+            const extra = [];
+            if (ds.rows != null) extra.push(Number(ds.rows).toLocaleString() + ' rows');
+            if (ds.tokens != null) extra.push((Number(ds.tokens)/1e6).toFixed(2) + 'M tok');
+            if (ds.kind) extra.push(ds.kind);
+            return `<div class="pg-run-row"><strong>${_pgEsc(_pgDatasetSplit(ds))}</strong> &nbsp;·&nbsp; ${_pgEsc(ds.name||'—')}${extra.length ? ' &nbsp;·&nbsp; ' + _pgEsc(extra.join(' · ')) : ''}</div>`;
+          }).join('')
+        : '<div style="color:#475569;font-size:0.78rem;padding:0.2rem 0;">No datasets recorded.</div>';
     _pgPopupShow(`
-        <h4>Dataset</h4>
-        <div class="pg-popup-row"><div class="pg-popup-label">Name</div><div class="pg-popup-val">${_pgEsc(ds.name||'—')}</div></div>
-        <div class="pg-popup-row"><div class="pg-popup-label">Rows</div><div class="pg-popup-val">${ds.rows!=null?Number(ds.rows).toLocaleString():'—'}</div></div>
-        ${tokRow}${packRow}
+        <h4>Datasets</h4>
+        <div class="pg-popup-row"><div class="pg-popup-label">Split sets</div><div class="pg-popup-val">${datasets.length || 0}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">Rows total</div><div class="pg-popup-val">${rowsTotal ? Number(rowsTotal).toLocaleString() : '—'}</div></div>
+        <div class="pg-popup-row"><div class="pg-popup-label">Tokens total</div><div class="pg-popup-val">${tokensTotal ? (tokensTotal/1e6).toFixed(2) + 'M' : '—'}</div></div>
         <div class="pg-popup-row"><div class="pg-popup-label">Stage</div><div class="pg-popup-val">${_pgEsc(st.stage)}</div></div>
-        <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 0;">To edit dataset details, click the stage node above it.</p>
+        <div class="pg-popup-row"><div class="pg-popup-label">Entries</div><div>${datasetRows}</div></div>
+        <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 0;">Split-aware stages should default to train/dev/test. Use holdout only when you want an explicit canary or OOD bucket.</p>
         <div class="pg-popup-actions"><button class="pg-btn" onclick="pgPopupClose()">Close</button></div>`);
 }
 
@@ -2280,17 +2339,15 @@ function _pgDraw(plan) {
         stageXC.push(cx);
 
         // ── Dataset node ──────────────────────────────────────────────────────
-        const ds = Array.isArray(st.datasets) ? st.datasets[0] : null;
-        if (ds && (ds.name || ds.rows)) {
-            const dsName   = _pgTrunc(ds.name||'', 22);
-            const dsRows   = ds.rows != null ? Number(ds.rows).toLocaleString() + ' rows' : '';
-            const dsTokens = ds.tokens != null ? ' · ' + (ds.tokens/1e6).toFixed(1) + 'M tok' : '';
+        const datasets = _pgDatasets(st);
+        if (datasets.length) {
+            const dsSummary = _pgDatasetNodeSummary(datasets);
             const dsX = cx - DW/2;
             html += `<g onclick="pgNodeClick('dataset',${i})" style="cursor:pointer;">
                 <rect x="${dsX}" y="${ROW_DS}" width="${DW}" height="${DH}" rx="7" fill="#0a1628" stroke="#1e4d7b" stroke-width="1.2"/>
                 <text x="${cx}" y="${ROW_DS+14}" text-anchor="middle" fill="#60a5fa" font-size="9.5" font-weight="700" font-family="Inter,system-ui,sans-serif">dataset</text>
-                <text x="${cx}" y="${ROW_DS+27}" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-family="monospace">${_pgEsc(dsName)}</text>
-                <text x="${cx}" y="${ROW_DS+42}" text-anchor="middle" fill="#4b6a8a" font-size="8" font-family="Inter,system-ui,sans-serif">${_pgEsc(dsRows+dsTokens)}</text>
+                <text x="${cx}" y="${ROW_DS+27}" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-family="monospace">${_pgEsc(dsSummary.line1)}</text>
+                <text x="${cx}" y="${ROW_DS+42}" text-anchor="middle" fill="#4b6a8a" font-size="8" font-family="Inter,system-ui,sans-serif">${_pgEsc(dsSummary.line2)}</text>
             </g>`;
             html += `<line x1="${cx}" y1="${ROW_DS+DH}" x2="${cx}" y2="${ROW_ST-3}" stroke="#1e4d7b" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#${uid}_arr)"/>`;
         }
@@ -2431,7 +2488,7 @@ window.pgDeleteStage      = pgDeleteStage;
 
         <details style="margin:0.35rem 0 0.6rem;" id="pipeline-designer-details">
             <summary style="cursor:pointer;color:var(--orange);font-size:0.85rem;font-weight:600;">Pipeline Designer — Define Stages &amp; Generate training_plan.json</summary>
-            <p class="mini-note" style="margin:0.4rem 0 0.5rem;">Define which training stages to run, assign datasets and LR per stage. Click <strong>Generate Plan</strong> to produce a <code>training_plan.json</code> you can commit alongside your run dir and load into the IR Visualizer.</p>
+            <p class="mini-note" style="margin:0.4rem 0 0.5rem;">Define which training stages to run, assign the primary <code>train</code> dataset and LR per stage, then append <code>dev/test/holdout</code> datasets as needed in JSON. Click <strong>Generate Plan</strong> to produce a <code>training_plan.json</code> you can commit alongside your run dir and load into the IR Visualizer.</p>
 
             <div class="pipeline-track" id="pipeline-track">
 
@@ -2442,8 +2499,8 @@ window.pgDeleteStage      = pgDeleteStage;
                     </div>
                     <div class="pipeline-stage-body" id="pstage-pretrain-body">
                         <div class="pipeline-stage-field">
-                            <label for="pstage-pretrain-dataset">Dataset path</label>
-                            <input id="pstage-pretrain-dataset" type="text" placeholder="$GEN_DIR/stage_a_train.txt" />
+                            <label for="pstage-pretrain-dataset">Primary train dataset path</label>
+                            <input id="pstage-pretrain-dataset" type="text" placeholder="$RUN/dataset/pretrain/train/pretrain_train.txt" />
                         </div>
                         <div class="pipeline-stage-field">
                             <label for="pstage-pretrain-lr">Learning rate</label>
@@ -2467,8 +2524,8 @@ window.pgDeleteStage      = pgDeleteStage;
                     </div>
                     <div class="pipeline-stage-body" id="pstage-midtrain-body">
                         <div class="pipeline-stage-field">
-                            <label for="pstage-midtrain-dataset">Dataset path</label>
-                            <input id="pstage-midtrain-dataset" type="text" placeholder="$GEN_DIR/stage_b_train.txt" />
+                            <label for="pstage-midtrain-dataset">Primary train dataset path</label>
+                            <input id="pstage-midtrain-dataset" type="text" placeholder="$RUN/dataset/midtrain/train/midtrain_train.txt" />
                         </div>
                         <div class="pipeline-stage-field">
                             <label for="pstage-midtrain-lr">Learning rate</label>
@@ -2492,8 +2549,8 @@ window.pgDeleteStage      = pgDeleteStage;
                     </div>
                     <div class="pipeline-stage-body" id="pstage-sft-body">
                         <div class="pipeline-stage-field">
-                            <label for="pstage-sft-dataset">Dataset path</label>
-                            <input id="pstage-sft-dataset" type="text" placeholder="$GEN_DIR/sft_instruction_train.txt" />
+                            <label for="pstage-sft-dataset">Primary train dataset path</label>
+                            <input id="pstage-sft-dataset" type="text" placeholder="$RUN/dataset/sft/train/sft_train.jsonl" />
                         </div>
                         <div class="pipeline-stage-field">
                             <label for="pstage-sft-lr">Learning rate</label>
@@ -2584,7 +2641,7 @@ window.pgDeleteStage      = pgDeleteStage;
                 <button class="copy-btn" type="button" id="pd-copy-btn">Copy</button>
                 <pre class="pipeline-json-out" id="pd-json-out"># Click "Generate training_plan.json" to produce the plan.</pre>
             </div>
-            <p class="mini-note">Save this JSON as <code>$RUN/training_plan.json</code>. The IR Visualizer reads it to render the pipeline timeline. Toggle stages on/off to define exactly what you intend to run — this becomes your commit-alongside-code pipeline contract. For repeated SFT passes, keep the current dataset in <code>stages[].datasets</code> and append each run record to <code>stages[].runs</code> (do not overwrite history).</p>
+            <p class="mini-note">Save this JSON as <code>$RUN/training_plan.json</code>. The IR Visualizer reads it to render the pipeline timeline. Toggle stages on/off to define exactly what you intend to run. The builder seeds one <code>train</code> dataset per stage; append <code>dev/test/holdout</code> entries under <code>stages[].datasets</code> as you formalize evaluation, and append each completed run under <code>stages[].runs</code> without overwriting history.</p>
         </details>
 
         <div class="preset-actions">
@@ -2700,7 +2757,7 @@ fi</pre>
 
 <div class="card card-blue">
     <p style="margin-bottom: 0.45rem;">Use this once per new run to make the training pipeline explicit from the start: generate staged datasets, lock tokenizer corpus, seed run artifacts, and generate the first operator view.</p>
-    <p class="mini-note"><strong>Dataset workspace first:</strong> if you are using the newer staged dataset flow, prepare <code>version/v7/data/spec03</code> in <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a> first, then stage that workspace into the run with <code>--dataset-workspace</code>. The repo workspace is the seed template; the run-local copy under <code>$RUN/dataset/</code> is the working dataset for that run.</p>
+    <p class="mini-note"><strong>Dataset workspace first:</strong> if you are using the staged dataset flow, prepare a split-aware workspace such as <code>version/v7/data/spec04</code> in <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a> first, then stage that workspace into the run with <code>--dataset-workspace</code>. The repo workspace is the seed template; the run-local copy under <code>$RUN/dataset/</code> is the working dataset for that run.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># 1) Build staged SVG corpora + instruction corpus
@@ -2746,11 +2803,11 @@ export SFT_DATA="$GEN_DIR/svg_pretrain_pack_l16d128_instruction_train.txt"
     </div>
     <p class="mini-note"><strong>Canonical path:</strong> Step 0A is the real bootstrap path. Use Step 0.7 only as a tiny tokenizer preview smoke-check (it uses stub dims and should not be your production bootstrap).</p>
     <details style="margin-top:0.55rem;">
-        <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.82rem;">Spec03 staged-dataset bootstrap (preferred for current SVG runs)</summary>
+        <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.82rem;">Split-aware staged-dataset bootstrap (spec04 default)</summary>
         <div class="cmd-block" style="margin-top:0.45rem;">
             <button class="copy-btn" type="button">Copy</button>
-<pre># 0) Prepare spec03 once (see v7-svg-dataset-runbook.html for import/normalize/classify/materialize)
-bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type svg
+<pre># 0) Prepare a split-aware workspace once (see v7-svg-dataset-runbook.html for import/normalize/classify/materialize)
+bash version/v7/scripts/init_data_workspace_v7.sh --spec spec04 --dataset-type svg
 
 # 1) Bootstrap a run with a staged dataset snapshot under $RUN/dataset
 .venv/bin/python version/v7/scripts/ck_run_v7.py init \
@@ -2758,7 +2815,7 @@ bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type s
   --layers 16 --vocab-size 1024 --embed-dim 128 --hidden-dim 512 \
   --num-heads 8 --num-kv-heads 4 --context-len 512 \
   --template qwen3 \
-  --dataset-workspace version/v7/data/spec03 \
+  --dataset-workspace version/v7/data/spec04 \
   --dataset-stage-mode copy \
   --dataset-stage-force \
   --generate-ir --generate-runtime --strict
@@ -2769,7 +2826,7 @@ bash version/v7/scripts/init_data_workspace_v7.sh --spec spec03 --dataset-type s
   --workspace "$RUN/dataset" \
   --output "$RUN/dataset_viewer.html"</pre>
         </div>
-        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, pretrain text, tokenizer corpus, and holdout set all live under the same run directory.</p>
+        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, stage split corpora (<code>train/dev/test</code> by default), tokenizer corpus, and optional <code>holdout</code> all live under the same run directory.</p>
     </details>
     <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
     <div class="step-produces">
@@ -4583,9 +4640,9 @@ python3 scripts/ck_chat.py --help</pre>
         var statusDpo = runDpo ? (initialActiveStage === 'dpo' ? 'active' : 'planned') : 'planned';
         var statusGrpo = runGrpo ? (initialActiveStage === 'grpo' ? 'active' : 'planned') : 'planned';
         var statusPpo = runPpo ? (initialActiveStage === 'ppo' ? 'active' : 'planned') : 'planned';
-        var dpoDatasets = runDpo ? '[{"name":"${CK_NAME}_dpo_pairs.jsonl","path":"$GEN_DIR/${CK_NAME}_dpo_pairs.jsonl","kind":"alignment_dataset"}]' : '[]';
-        var grpoDatasets = runGrpo ? '[{"name":"${CK_NAME}_grpo_rollouts.jsonl","path":"$GEN_DIR/${CK_NAME}_grpo_rollouts.jsonl","kind":"alignment_dataset"}]' : '[]';
-        var ppoDatasets = runPpo ? '[{"name":"${CK_NAME}_rlhf_preferences.jsonl","path":"$GEN_DIR/${CK_NAME}_rlhf_preferences.jsonl","kind":"alignment_dataset"}]' : '[]';
+        var dpoDatasets = runDpo ? '[{"name":"${CK_NAME}_dpo_pairs.jsonl","path":"$GEN_DIR/${CK_NAME}_dpo_pairs.jsonl","kind":"alignment_dataset","split":"train"}]' : '[]';
+        var grpoDatasets = runGrpo ? '[{"name":"${CK_NAME}_grpo_rollouts.jsonl","path":"$GEN_DIR/${CK_NAME}_grpo_rollouts.jsonl","kind":"alignment_dataset","split":"train"}]' : '[]';
+        var ppoDatasets = runPpo ? '[{"name":"${CK_NAME}_rlhf_preferences.jsonl","path":"$GEN_DIR/${CK_NAME}_rlhf_preferences.jsonl","kind":"alignment_dataset","split":"train"}]' : '[]';
         var bpeArgs = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' \\\n  --vocab-size ' + vocab + ' --bpe-vocab-size ' + vocab : '';
         var reuseTok = (tokenizer === 'ascii_bpe' || tokenizer === 'bpe') ? ' --reuse-run-tokenizer' : '';
 
@@ -4631,9 +4688,9 @@ python3 scripts/ck_chat.py --help</pre>
             '  "stage_order": ["pretrain","midtrain","sft","dpo","grpo","ppo"],',
             '  "tokenizer": {"type":"' + tokenizer + '","vocab_size":' + vocab + ',"tokenizer_corpora":[{"name":"${CK_NAME}_tokenizer_corpus.txt","path":"$TOKENIZER_CORPUS"}]},',
             '  "stages": [',
-            '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset"}],"runs":[]},',
-            '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset"}],"runs":[]},',
-            '    {"stage":"sft","seq":3,"status":"' + statusSft + '","enabled":' + (runSft ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_instruction_train.txt","path":"$SFT_DATA","kind":"instruction_dataset"}],"runs":[]},',
+            '    {"stage":"pretrain","seq":1,"status":"' + statusPretrain + '","enabled":' + (runPretrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_a_plus_bridge.txt","path":"$PRETRAIN_DATA","kind":"generated_dataset","split":"train"}],"runs":[]},',
+            '    {"stage":"midtrain","seq":2,"status":"' + statusMidtrain + '","enabled":' + (runMidtrain ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_stage_b.txt","path":"$MIDTRAIN_DATA","kind":"generated_dataset","split":"train"}],"runs":[]},',
+            '    {"stage":"sft","seq":3,"status":"' + statusSft + '","enabled":' + (runSft ? 'true' : 'false') + ',"datasets":[{"name":"${CK_NAME}_instruction_train.txt","path":"$SFT_DATA","kind":"instruction_dataset","split":"train"}],"runs":[]},',
             '    {"stage":"dpo","seq":4,"status":"' + statusDpo + '","enabled":' + (runDpo ? 'true' : 'false') + ',"datasets":' + dpoDatasets + ',"runs":[]},',
             '    {"stage":"grpo","seq":5,"status":"' + statusGrpo + '","enabled":' + (runGrpo ? 'true' : 'false') + ',"datasets":' + grpoDatasets + ',"runs":[]},',
             '    {"stage":"ppo","seq":6,"status":"' + statusPpo + '","enabled":' + (runPpo ? 'true' : 'false') + ',"datasets":' + ppoDatasets + ',"runs":[]}',
@@ -4882,7 +4939,8 @@ python3 scripts/ck_chat.py --help</pre>
                 var ds = {
                     name: _pdBasename(dsPath),
                     path: dsPath,
-                    kind: _pdStageKind(s)
+                    kind: _pdStageKind(s),
+                    split: 'train'
                 };
                 if (dsSamples) ds.target_samples = dsSamples;
                 datasets.push(ds);
@@ -4919,7 +4977,7 @@ python3 scripts/ck_chat.py --help</pre>
                 num_kv_heads: parseInt(kvHeads, 10)
             },
             stages: stages,
-            notes: 'Generated by v7-runbook Pipeline Designer; append stage runs under stages[].runs after each completed run.'
+            notes: 'Generated by v7-runbook Pipeline Designer; builder seeds train datasets only, then append dev/test/holdout entries under stages[].datasets and add completed runs under stages[].runs.'
         };
         return JSON.stringify(plan, null, 2);
     }
@@ -5274,7 +5332,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-09</p>
             </div>
         </div>
     </footer>
