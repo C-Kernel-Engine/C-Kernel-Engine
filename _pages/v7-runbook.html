@@ -1827,6 +1827,7 @@ fi</pre>
 <div class="card card-blue">
     <p style="margin-bottom: 0.45rem;">Use this once per new run to make the training pipeline explicit from the start: generate staged datasets, lock tokenizer corpus, seed run artifacts, and generate the first operator view.</p>
     <p class="mini-note"><strong>Dataset workspace first:</strong> if you are using the staged dataset flow, prepare a split-aware workspace such as <code>version/v7/data/spec04</code> in <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a> first, then stage that workspace into the run with <code>--dataset-workspace</code>. The repo workspace is the seed template; the run-local copy under <code>$RUN/dataset/</code> is the working dataset for that run.</p>
+    <p class="mini-note"><strong>Operator rule:</strong> do not split generated artifacts between the repo and cache. Keep the staged dataset, <code>dataset_viewer.html</code>, <code>ir_report.html</code>, checkpoints, parity JSON, and perf outputs together under one cache run directory so the run can be inspected, tarred, shared, and discovered by <code>python3 version/v7/tools/open_ir_hub.py --open</code> without hidden side locations.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># 1) Build staged SVG corpora + instruction corpus
@@ -1895,7 +1896,7 @@ bash version/v7/scripts/init_data_workspace_v7.sh --spec spec04 --dataset-type s
   --workspace "$RUN/dataset" \
   --output "$RUN/dataset_viewer.html"</pre>
         </div>
-        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, stage split corpora (<code>train/dev/test</code> by default), tokenizer corpus, and optional <code>holdout</code> all live under the same run directory.</p>
+        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, stage split corpora (<code>train/dev/test</code> by default), tokenizer corpus, optional <code>holdout</code>, parity JSON, and perf artifacts all live under the same run directory.</p>
     </details>
     <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
     <div class="step-produces">
