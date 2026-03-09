@@ -1263,28 +1263,11 @@ def main() -> int:
     output = Path(args.output).expanduser().resolve()
     stage_eval_path = run_dir / "stage_eval_matrix.json"
     if not stage_eval_path.exists():
-        run_name = run_dir.name
         hint = (
             "This report builder expects a stage-evaluated SVG run with stage_eval_matrix.json.\n"
             f"Missing: {stage_eval_path}\n"
+            "Run stage eval first, or use a report builder registered for that run family.\n"
         )
-        if "toy_svg_atoms" in run_name:
-            hint += (
-                "For the original toy atoms run, use:\n"
-                f"  python3 version/v7/scripts/build_toy_svg_atoms_report_v7.py --run-dir {run_dir}\n"
-            )
-        elif "toy_svg_structured_atoms" in run_name:
-            hint += (
-                "For the structured toy run, use:\n"
-                f"  python3 version/v7/scripts/build_toy_svg_structured_report_v7.py --run-dir {run_dir}\n"
-            )
-        elif "toy_svg_semantic_shapes" in run_name:
-            hint += (
-                "For the semantic toy run, use:\n"
-                f"  python3 version/v7/scripts/build_toy_svg_semantic_report_v7.py --run-dir {run_dir}\n"
-            )
-        else:
-            hint += "Run stage eval first, or use a report builder specific to that run family.\n"
         raise SystemExit(hint)
     output.parent.mkdir(parents=True, exist_ok=True)
     html_text = build_html(run_dir, output, str((ROOT / args.assets_glob).resolve()) if not Path(args.assets_glob).is_absolute() else args.assets_glob)

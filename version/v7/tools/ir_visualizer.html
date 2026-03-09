@@ -18428,77 +18428,33 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
         ? files.stage_eval_matrix
         : null;
     const datasetType = String((matrix && matrix.dataset_type) || 'unknown').trim().toLowerCase() || 'unknown';
-    const isToyAtomsRun = Boolean(
-        files.train_toy_svg_atoms_stage_a
-        || files.train_toy_svg_atoms_stage_a_continue
-        || files.train_toy_svg_atoms_stage_a_overfit
-        || (runDir && runDir.includes('toy_svg_atoms'))
-    );
-    const isToyStructuredRun = Boolean(
-        files.train_structured_svg_atoms_stage_a
-        || (runDir && runDir.includes('toy_svg_structured_atoms'))
-    );
-    const isToySemanticRun = Boolean(
-        files.train_semantic_shapes_stage_a
-        || (runDir && runDir.includes('toy_svg_semantic_shapes'))
-    );
     const provenanceAuditCmd = runDir
         ? `python3 version/v7/scripts/audit_train_token_provenance_v7.py --run ${quoteShell(runDir)} --preview-lines 2`
         : 'python3 version/v7/scripts/audit_train_token_provenance_v7.py --run <run_dir> --preview-lines 2';
+    const evalCmd = runDir
+        ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runDir)} --all-stages --n-samples 5`
+        : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
     const reportCardPath = runDir ? `${runDir}/svg_training_report_card.html` : '<run_dir>/svg_training_report_card.html';
     const reportCardCmd = runDir
         ? `python3 version/v7/scripts/build_svg_training_report_card_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
         : 'python3 version/v7/scripts/build_svg_training_report_card_v7.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
     const reportHref = runDir ? encodeURI(`file://${reportCardPath}`) : '';
-    const toyReportPath = runDir ? `${runDir}/toy_svg_semantic_probe_report.html` : '<run_dir>/toy_svg_semantic_probe_report.html';
-    const toyReportCmd = runDir
-        ? `python3 version/v7/scripts/build_toy_svg_semantic_report_v7.py --run-dir ${quoteShell(runDir)}`
-        : 'python3 version/v7/scripts/build_toy_svg_semantic_report_v7.py --run-dir <run_dir>';
-    const toyReportHref = runDir ? encodeURI(`file://${toyReportPath}`) : '';
-    const toyAtomsReportPath = runDir ? `${runDir}/toy_svg_atoms_probe_report.html` : '<run_dir>/toy_svg_atoms_probe_report.html';
-    const toyAtomsReportCmd = runDir
-        ? `python3 version/v7/scripts/build_toy_svg_atoms_report_v7.py --run-dir ${quoteShell(runDir)}`
-        : 'python3 version/v7/scripts/build_toy_svg_atoms_report_v7.py --run-dir <run_dir>';
-    const toyAtomsReportHref = runDir ? encodeURI(`file://${toyAtomsReportPath}`) : '';
-    const toyStructuredReportPath = runDir ? `${runDir}/toy_svg_structured_probe_report.html` : '<run_dir>/toy_svg_structured_probe_report.html';
-    const toyStructuredReportCmd = runDir
-        ? `python3 version/v7/scripts/build_toy_svg_structured_report_v7.py --run-dir ${quoteShell(runDir)}`
-        : 'python3 version/v7/scripts/build_toy_svg_structured_report_v7.py --run-dir <run_dir>';
-    const toyStructuredReportHref = runDir ? encodeURI(`file://${toyStructuredReportPath}`) : '';
-    const diagnosisCards = [
-        {
+    const diagnosisCards = [];
+    if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
+        diagnosisCards.push({
+            title: 'STAGE EVAL',
+            description: 'Generates the stage eval matrix used by the generic training surfaces and compare pages.',
+            cmd: evalCmd,
+            href: '',
+            linkLabel: '',
+        });
+    } else if (datasetType === 'svg') {
+        diagnosisCards.push({
             title: 'POST-RUN DEEP DIAGNOSIS',
             description: 'Generates a standalone report with stage metrics, rendered sample outputs, and dataset-vs-target gaps.',
             cmd: reportCardCmd,
             href: reportHref,
             linkLabel: 'Open report card if generated',
-        },
-    ];
-    if (isToyAtomsRun) {
-        diagnosisCards.push({
-            title: 'TOY ATOMS REPORT',
-            description: 'Runs seen and holdout prompts for the original raw-SVG toy run, extracts the first SVG, and compares it against expected targets.',
-            cmd: toyAtomsReportCmd,
-            href: toyAtomsReportHref,
-            linkLabel: 'Open toy atoms report if generated',
-        });
-    }
-    if (isToyStructuredRun) {
-        diagnosisCards.push({
-            title: 'TOY STRUCTURED REPORT',
-            description: 'Runs seen and holdout probes for the structured SVG IR toy, renders the generated atoms, and compares them against expected targets.',
-            cmd: toyStructuredReportCmd,
-            href: toyStructuredReportHref,
-            linkLabel: 'Open toy structured report if generated',
-        });
-    }
-    if (isToySemanticRun) {
-        diagnosisCards.push({
-            title: 'TOY PROBE REPORT',
-            description: 'Runs seen, holdout, and future-stage prompts, renders the first valid SVG IR, and compares it to expected targets.',
-            cmd: toyReportCmd,
-            href: toyReportHref,
-            linkLabel: 'Open toy probe report if generated',
         });
     }
     const diagnosisCardsHtml = diagnosisCards.map((card) => `
@@ -18510,7 +18466,14 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
             <pre style="font-size:0.76rem;white-space:pre-wrap;margin:0;">${htmlEscape(card.cmd)}</pre>
             ${card.href ? `<div style="margin-top:0.35rem;font-size:0.72rem;"><a href="${htmlEscape(card.href)}" target="_blank" rel="noopener" style="color:#93c5fd;">${htmlEscape(card.linkLabel)}</a></div>` : ''}
         </div>
-    `).join('');
+    `).join('') || `
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.7rem 0.8rem;">
+            <div style="font-size:0.68rem;color:#9ca3af;font-weight:700;letter-spacing:0.07em;margin-bottom:0.25rem;">GENERIC DIAGNOSIS SURFACE</div>
+            <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.55;">
+                No reusable post-run report adapter is registered for dataset type ${htmlEscape(datasetType)} yet. Keep the eval matrix and provenance audit generic until that adapter exists at the family level.
+            </div>
+        </div>
+    `;
     const lossEntries = Array.isArray(pipeline?.stage_loss_history?.entries)
         ? pipeline.stage_loss_history.entries.filter((row) => row && typeof row === 'object')
         : [];
@@ -18569,7 +18532,7 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
             : { label: 'trailing best', color: '#f87171', note: 'Latest run is materially worse than the best practical checkpoint on headline quality metrics.' });
     const datasetTypeNote = datasetType === 'svg'
         ? 'SVG mode: use the standalone report for rendered outputs and target-asset grammar gaps.'
-        : `Dataset type: ${htmlEscape(datasetType)}. The standalone deep diagnosis is still SVG-specific today; eval matrix and provenance audit are generic.`;
+        : `Dataset type: ${htmlEscape(datasetType)}. This surface stays generic until a family-level diagnosis adapter is registered.`;
 
     const headlineSummary = primaryKeys.length > 0
         ? primaryKeys.map((key) => {
@@ -18580,7 +18543,7 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
 
     const actionNote = datasetType === 'svg'
         ? 'Operator use: audit provenance before training, then use the deep diagnosis after eval to decide whether the next iteration needs richer asset pretrain, better spec-to-SVG SFT, or stricter canary gates.'
-        : 'Operator use: audit provenance before training, then rely on the eval matrix plus dataset-type-specific report card once that adapter exists.';
+        : 'Operator use: audit provenance before training, promote from the eval matrix, and only add a report adapter when it is reusable across a model family rather than tied to one run.';
 
     return `
         <div class="parity-section" style="margin-top:0.8rem;">

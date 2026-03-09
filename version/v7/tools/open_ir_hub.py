@@ -460,25 +460,24 @@ def _extract_stage_eval_summary(run_dir: Path) -> dict[str, Any]:
 
 
 def _extract_probe_summary(run_dir: Path) -> dict[str, Any]:
-    for rel in (
-        "toy_svg_structured_probe_report.json",
-        "toy_svg_probe_report.json",
-        "toy_svg_semantic_probe_report.json",
-    ):
-        path = _find_run_artifact(run_dir, rel)
-        if path is None:
-            continue
+    candidates = sorted(run_dir.glob("*probe_report.json"))
+    best: dict[str, Any] | None = None
+    best_score: tuple[int, int, int] | None = None
+    for path in candidates:
         obj = _safe_read_json(path)
         if not isinstance(obj, dict):
             continue
         rows = obj.get("results")
         if not isinstance(rows, list) or not rows:
             continue
-        holdouts = [row for row in rows if row.get("split") == "holdout"]
-        exact = sum(1 for row in rows if row.get("exact_match"))
-        renderable = sum(1 for row in rows if row.get("rendered_svg"))
+        typed_rows = [row for row in rows if isinstance(row, dict)]
+        if not typed_rows:
+            continue
+        holdouts = [row for row in typed_rows if row.get("split") == "holdout"]
+        exact = sum(1 for row in typed_rows if row.get("exact_match"))
+        renderable = sum(1 for row in typed_rows if row.get("rendered_svg"))
         holdout_exact = sum(1 for row in holdouts if row.get("exact_match"))
-        probe_count = len(rows)
+        probe_count = len(typed_rows)
         holdout_count = len(holdouts)
         metrics: dict[str, float] = {
             "exact_rate": exact / probe_count if probe_count else 0.0,
@@ -486,13 +485,19 @@ def _extract_probe_summary(run_dir: Path) -> dict[str, Any]:
         }
         if holdout_count:
             metrics["holdout_exact_rate"] = holdout_exact / holdout_count
-        return {
+        summary = {
             "path": str(path),
             "kind": path.stem,
             "probe_count": probe_count,
             "holdout_count": holdout_count,
             "metrics": metrics,
         }
+        score = (probe_count, holdout_count, len(metrics))
+        if best_score is None or score > best_score:
+            best = summary
+            best_score = score
+    if best is not None:
+        return best
     return {}
 
 
