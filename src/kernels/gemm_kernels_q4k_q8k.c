@@ -103,9 +103,15 @@ void quantize_row_q8_k_ref(const float *x, void *vy, int k) {
 }
 
 void quantize_row_q8_k_sse(const float *x, void *vy, int k);
+void quantize_row_q8_k_avx(const float *x, void *vy, int k);
+void quantize_row_q8_k_avx2(const float *x, void *vy, int k);
 
 void quantize_row_q8_k(const float *x, void *vy, int k) {
-#if defined(__SSE4_1__)
+#if defined(__AVX2__)
+    quantize_row_q8_k_avx2(x, vy, k);
+#elif defined(__AVX__)
+    quantize_row_q8_k_avx(x, vy, k);
+#elif defined(__SSE4_1__)
     quantize_row_q8_k_sse(x, vy, k);
 #else
     quantize_row_q8_k_ref(x, vy, k);

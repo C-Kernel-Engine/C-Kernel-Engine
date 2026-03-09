@@ -50,6 +50,8 @@ HEADER_SIZE = 128
 KERNEL_MAPS_DIR = V7_ROOT / "kernel_maps"
 KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
 V7_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v7.txt"
+LLAMA_HELPER_SRC = SCRIPTS_DIR / "parity" / "llama_token_replay.cpp"
+LLAMA_HELPER_BIN = Path("/tmp/ckv7_llama_token_replay")
 
 def _get_cache_dir() -> Path:
     """Pick the canonical writable cache dir for all generated v7 artifacts."""
@@ -196,6 +198,69 @@ def _ensure_v7_python_requirements(command: Optional[str]) -> None:
         f"Missing v7 Python dependencies for '{command}': {', '.join(missing)}"
     )
     print(f"Required Python packages: {reqs}", file=sys.stderr)
+
+
+def _ensure_llama_token_replay_helper() -> Path:
+    if not LLAMA_HELPER_SRC.exists():
+        raise FileNotFoundError(f"Missing helper source: {LLAMA_HELPER_SRC}")
+
+    rebuild = True
+    if LLAMA_HELPER_BIN.exists():
+        try:
+            rebuild = LLAMA_HELPER_BIN.stat().st_mtime < LLAMA_HELPER_SRC.stat().st_mtime
+        except OSError:
+            rebuild = True
+    if not rebuild:
+        return LLAMA_HELPER_BIN
+
+    include_dir = PROJECT_ROOT / "llama.cpp" / "include"
+    ggml_include_dir = PROJECT_ROOT / "llama.cpp" / "ggml" / "include"
+    lib_dir = PROJECT_ROOT / "llama.cpp" / "build" / "bin"
+    if not include_dir.exists():
+        raise FileNotFoundError(f"llama include dir missing: {include_dir}")
+    if not ggml_include_dir.exists():
+        raise FileNotFoundError(f"ggml include dir missing: {ggml_include_dir}")
+    if not lib_dir.exists():
+        raise FileNotFoundError(f"llama lib dir missing: {lib_dir}")
+
+    cmd = [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        str(LLAMA_HELPER_SRC),
+        "-I",
+        str(include_dir),
+        "-I",
+        str(ggml_include_dir),
+        "-L",
+        str(lib_dir),
+        f"-Wl,-rpath,{lib_dir}",
+        "-lllama",
+        "-lggml",
+        "-lggml-cpu",
+        "-lggml-base",
+        "-pthread",
+        "-ldl",
+        "-o",
+        str(LLAMA_HELPER_BIN),
+    ]
+    result = subprocess.run(
+        cmd,
+        cwd=PROJECT_ROOT,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Failed to compile llama_token_replay helper\n"
+            f"cmd: {' '.join(cmd)}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}\n"
+        )
+    LLAMA_HELPER_BIN.chmod(0o755)
+    return LLAMA_HELPER_BIN
     print("Supported bootstrap:", file=sys.stderr)
     print("  make v7-init", file=sys.stderr)
     print("  make v7-doctor", file=sys.stderr)
@@ -2307,6 +2372,8 @@ def step_compile(model_c_path: Path, output_dir: Path, force: bool = False) -> P
     tokenizer_source_roots = [
         PROJECT_ROOT / "include",
         PROJECT_ROOT / "src" / "ck_tokenizer.c",
+        PROJECT_ROOT / "src" / "tokenizer",
+        PROJECT_ROOT / "src" / "data_structures" / "tries",
     ]
     if _runtime_lib_needs_rebuild(kernel_lib, kernel_source_roots):
         runtime_targets.append(kernel_lib)
@@ -7953,6 +8020,8 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
         cmd.extend(["--chat-template", args.chat_template])
     if getattr(args, "python_tokenizer", False):
         cmd.append("--python-tokenizer")
+    if getattr(args, "memory", False):
+        cmd.append("--memory")
     if getattr(args, 'parity', False):
         cmd.append("--parity")
 
@@ -8404,12 +8473,14 @@ def _run_llamacpp_parity(
                 log(f"  CKDMP token audit: {token_msg}", C_DIM)
             return True
 
-    # Fallback for local llama.cpp builds that expose LLAMA_DUMP_LAYER0 raw dumps
-    # but are not instrumented with CKDMP output.
+    # Fallback for local llama.cpp builds without CKDMP instrumentation:
+    # replay the prompt through a small llama.cpp helper in sequential mode so
+    # raw dump token IDs reflect true prompt positions.
     raw_converter = SCRIPTS_DIR / "parity" / "llama_to_ckdmp_converter.py"
     if allow_raw_fallback and raw_converter.exists():
         env_raw = os.environ.copy()
-        env_raw["LLAMA_DUMP_LAYER0"] = "1"
+        env_raw.pop("LLAMA_DUMP_LAYER0", None)
+        env_raw["LLAMA_DUMP_LAYERS"] = "all"
         for key in (
             "CKDMP_DIR",
             "CKDMP_ALL_LAYERS",
@@ -8471,13 +8542,41 @@ def _run_llamacpp_parity(
                 pass
 
             raw_started = time.time()
-            raw_res, raw_err = _run_once(cmd, run_env=env_raw, run_cwd=raw_parent, timeout_sec=timeout_sec)
+            try:
+                helper = _ensure_llama_token_replay_helper()
+            except Exception as e:
+                attempt_diag.append(
+                    {
+                        "phase": "raw",
+                        "cwd": str(raw_parent),
+                        "cmd": "<build llama_token_replay>",
+                        "rc": None,
+                        "stderr_tail": f"helper build failed: {e}",
+                    }
+                )
+                continue
+            raw_cmd = [
+                str(helper),
+                "--model",
+                str(gguf_path),
+                "--prompt",
+                prompt,
+                "--ctx",
+                str(ctx_arg if ctx_arg > 0 else max(256, len(prompt) + 8)),
+                "--top-k",
+                "16",
+                "--decode-mode",
+                "sequential",
+                "--logits-out",
+                str(raw_parent / "llama_raw_logits.f32"),
+            ]
+            raw_res, raw_err = _run_once(raw_cmd, run_env=env_raw, run_cwd=raw_parent, timeout_sec=timeout_sec)
             if raw_err is not None:
                 attempt_diag.append(
                     {
                         "phase": "raw",
                         "cwd": str(raw_parent),
-                        "cmd": " ".join(shlex.quote(x) for x in cmd),
+                        "cmd": " ".join(shlex.quote(x) for x in raw_cmd),
                         "rc": None,
                         "stderr_tail": f"runner error: {raw_err}",
                     }
@@ -8493,7 +8592,7 @@ def _run_llamacpp_parity(
                 {
                     "phase": "raw",
                     "cwd": str(raw_parent),
-                    "cmd": " ".join(shlex.quote(x) for x in cmd),
+                    "cmd": " ".join(shlex.quote(x) for x in raw_cmd),
                     "rc": int(raw_res.returncode),
                     "stderr_tail": _short_tail(raw_res.stderr, 260),
                     "raw_bins": int(len(raw_bins)),
@@ -8522,12 +8621,27 @@ def _run_llamacpp_parity(
                 check=False,
             )
             if conv_res.returncode == 0 and ref_dump.exists() and ref_dump.stat().st_size > 0:
+                ok_tokens, token_msg = _token_audit(ref_index)
+                if require_token_aware_dumps and not ok_tokens:
+                    attempt_diag.append(
+                        {
+                            "phase": "raw-convert",
+                            "cwd": str(raw_parent),
+                            "cmd": " ".join(shlex.quote(x) for x in conv_cmd),
+                            "rc": int(conv_res.returncode),
+                            "stderr_tail": f"converted dump failed token audit: {token_msg}",
+                        }
+                    )
+                    _purge_ref_dump()
+                    continue
                 if raw_res.returncode != 0:
                     log(
                         f"  llama.cpp raw dump run exited with {raw_res.returncode}; converted raw dumps anyway",
                         C_ORANGE,
                     )
                 log(f"  Converted raw llama_dump ({raw_dump_dir}) -> {ref_dump}", C_GREEN)
+                if ok_tokens:
+                    log(f"  CKDMP token audit: {token_msg}", C_DIM)
                 return True
 
     if require_token_aware_dumps and not allow_raw_fallback:
@@ -10369,7 +10483,9 @@ Examples:
     run_parser.add_argument('--no-chat-template', action='store_true',
                            help='Disable chat template formatting (same as --chat-template=none)')
     run_parser.add_argument('--python-tokenizer', action='store_true',
-                           help='Force Python tokenizer in ck_chat.py (skip C tokenizer)')
+                           help='Explicitly force the Python/HF tokenizer path in ck_chat.py (default uses built-in C tokenizer when available)')
+    run_parser.add_argument('--memory', action='store_true',
+                           help='Keep previous prompts/responses in interactive chat (default: stateless turns)')
     run_parser.add_argument('--force-download', action='store_true',
                            help='Re-download model files')
     run_parser.add_argument('--force-convert', action='store_true',
@@ -10523,7 +10639,7 @@ Examples:
     init_parser.add_argument('--strict', action='store_true',
                              help='Strict train IR build checks when --generate-ir is used')
     init_parser.add_argument('--dataset-workspace', default=None,
-                             help='Optional dataset workspace to snapshot into the run dir (e.g. version/v7/data/spec03)')
+                             help='Optional split-aware dataset workspace to snapshot into the run dir (e.g. version/v7/data/spec04)')
     init_parser.add_argument('--dataset-stage-mode', choices=['copy', 'symlink'], default='copy',
                              help='How to stage the dataset workspace into the run dir when --dataset-workspace is set')
     init_parser.add_argument('--dataset-stage-force', action='store_true',

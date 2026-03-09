@@ -515,6 +515,17 @@ int ck_tokenizer_decode(const CKTokenizer *tok, const int32_t *ids, int num_ids,
             token += 3; token_len -= 3;
         }
 
+        /* SentencePiece byte tokens should decode back to the raw byte rather
+         * than printing the literal vocabulary piece "<0xXX>". */
+        if (token_len == 6 && token[0] == '<' && token[1] == '0' &&
+            token[2] == 'x' && token[5] == '>') {
+            unsigned int byte_val = 0;
+            if (sscanf(token, "<0x%02X>", &byte_val) == 1 && byte_val < 256) {
+                if (len < max_len - 1) text[len++] = (char)byte_val;
+                continue;
+            }
+        }
+
         for (int j = 0; j < token_len && len < max_len - 1; j++) text[len++] = token[j];
     }
     text[len] = '\0';

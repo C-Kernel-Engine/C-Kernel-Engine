@@ -31,6 +31,8 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
 CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
 PARITY_TEST = SCRIPT_DIR / "parity_test.py"
+LLAMA_HELPER_SRC = SCRIPT_DIR / "parity" / "llama_token_replay.cpp"
+LLAMA_HELPER_BIN = Path("/tmp/ckv7_llama_token_replay")
 
 PARITY_MODEL_MAP = {
     "gemma": "gemma",
@@ -133,6 +135,62 @@ def find_llama_binary() -> Path | None:
     if p.exists():
         return p
     return None
+
+
+def ensure_llama_helper() -> Path:
+    if not LLAMA_HELPER_SRC.exists():
+        raise FileNotFoundError(f"Missing helper source: {LLAMA_HELPER_SRC}")
+
+    rebuild = True
+    if LLAMA_HELPER_BIN.exists():
+        try:
+            rebuild = LLAMA_HELPER_BIN.stat().st_mtime < LLAMA_HELPER_SRC.stat().st_mtime
+        except OSError:
+            rebuild = True
+    if not rebuild:
+        return LLAMA_HELPER_BIN
+
+    include_dir = ROOT / "llama.cpp" / "include"
+    ggml_include_dir = ROOT / "llama.cpp" / "ggml" / "include"
+    lib_dir = ROOT / "llama.cpp" / "build" / "bin"
+    if not include_dir.exists():
+        raise FileNotFoundError(f"llama include dir missing: {include_dir}")
+    if not ggml_include_dir.exists():
+        raise FileNotFoundError(f"ggml include dir missing: {ggml_include_dir}")
+    if not lib_dir.exists():
+        raise FileNotFoundError(f"llama lib dir missing: {lib_dir}")
+
+    cmd = [
+        "g++",
+        "-std=c++17",
+        "-O2",
+        str(LLAMA_HELPER_SRC),
+        "-I",
+        str(include_dir),
+        "-I",
+        str(ggml_include_dir),
+        "-L",
+        str(lib_dir),
+        f"-Wl,-rpath,{lib_dir}",
+        "-lllama",
+        "-lggml",
+        "-lggml-cpu",
+        "-lggml-base",
+        "-pthread",
+        "-ldl",
+        "-o",
+        str(LLAMA_HELPER_BIN),
+    ]
+    proc = run_cmd(cmd)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "Failed to compile llama_token_replay helper\n"
+            f"cmd: {' '.join(cmd)}\n"
+            f"stdout:\n{proc.stdout}\n"
+            f"stderr:\n{proc.stderr}\n"
+        )
+    LLAMA_HELPER_BIN.chmod(0o755)
+    return LLAMA_HELPER_BIN
 
 
 def token_audit_from_index(index_path: Path) -> tuple[bool, str]:
@@ -622,19 +680,49 @@ def main() -> int:
                     "Token-aware llama CKDMP dump required and raw fallback disabled."
                 )
             elif needs_fallback and args.llama_allow_raw_fallback:
-                # Optional fallback for local llama.cpp builds with LLAMA_DUMP_LAYER0 raw dumps.
+                # Token-aware raw fallback: tokenize prompt through llama.cpp and
+                # replay it sequentially so dump token IDs reflect real positions.
                 raw_dir = model_dir / "llama_dump"
                 for stale in raw_dir.glob("*.bin"):
                     try:
                         stale.unlink()
                     except OSError:
                         pass
+                for stale in (raw_dir / "index.json", ref_dir / "dump.bin", ref_dir / "index.json"):
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass
+
+                helper = ensure_llama_helper()
+                raw_logits_path = model_dir / "llama_raw_logits.f32"
                 env_raw = os.environ.copy()
-                env_raw["LLAMA_DUMP_LAYER0"] = "1"
-                llama_raw_proc = run_cmd(llama_cmd, cwd=model_dir, env=env_raw, timeout=timeout)
+                env_raw.pop("LLAMA_DUMP_LAYER0", None)
+                env_raw["LLAMA_DUMP_LAYERS"] = "all"
+                llama_raw_cmd = [
+                    str(helper),
+                    "--model",
+                    str(gguf),
+                    "--prompt",
+                    args.prompt,
+                    "--ctx",
+                    str(args.context_len),
+                    "--top-k",
+                    "16",
+                    "--decode-mode",
+                    "sequential",
+                    "--logits-out",
+                    str(raw_logits_path),
+                ]
+                llama_raw_proc = run_cmd(llama_raw_cmd, cwd=model_dir, env=env_raw, timeout=timeout)
+                report["commands"]["llama_raw_cmd"] = llama_raw_cmd
                 report["commands"]["llama_raw_rc"] = llama_raw_proc.returncode
                 report["commands"]["llama_raw_stdout_tail"] = llama_raw_proc.stdout[-3000:]
                 report["commands"]["llama_raw_stderr_tail"] = llama_raw_proc.stderr[-5000:]
+                try:
+                    report["commands"]["llama_raw_meta"] = json.loads(llama_raw_proc.stdout.strip() or "{}")
+                except Exception:
+                    pass
 
                 raw_bins = sorted(raw_dir.glob("*.bin"))
                 converter = SCRIPT_DIR / "parity" / "llama_to_ckdmp_converter.py"

@@ -6,8 +6,7 @@
     "use_qkv_bias": "from_weights",
     "activation": "swiglu",
     "rope": "rope",
-    "tokenizer": "sentencepiece",
-    "prefer_fp32_mlp_matmuls": true
+    "tokenizer": "sentencepiece"
   },
   "contract": {
     "tokenizer_contract": {
@@ -53,7 +52,9 @@
     }
   },
   "kernels": {
-    "rope_qk": "rope_forward_qk_pairwise"
+    "rope_qk": "rope_forward_qk_pairwise",
+    "attn_prefill": "attention_forward_causal_head_major_gqa_flash_strided_f16kv",
+    "attn_decode": "attention_forward_decode_head_major_gqa_flash_f16kv"
   },
   "sequence": ["decoder"],
   "block_types": {

@@ -1,0 +1,68 @@
+{
+  "id": "attention_forward_causal_head_major_gqa_flash_strided_f16kv",
+  "op": "attention",
+  "variant": "causal_flash_fp32_f16kv",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Query tensor [heads, tokens, head_dim]"}
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "S", "D"], "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout (KV cache)"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["H", "T", "D"], "desc": "Attention output [heads, tokens, head_dim]"}
+  ],
+  "scratch": [
+    {"name": "qkv_scratch", "dtype": "fp32", "size_bytes": "H * T * D * 4", "desc": "QKV tiles for flash attention"},
+    {"name": "attn_scratch", "dtype": "fp32", "size_bytes": "H * T * T * 4", "desc": "Attention scores [heads, T, T]"}
+  ],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32", "desc": "Stride in tokens for KV cache layout"},
+    {"name": "head_dim", "dtype": "int32", "desc": "Head dimension (unpadded)"},
+    {"name": "aligned_head_dim", "dtype": "int32", "desc": "Aligned head dimension for SIMD"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across heads; each thread handles one or more heads."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"D": 64, "T": 32},
+    "notes": "Flash attention variant that rounds K/V through FP16 to match llama.cpp flash-attn input handling."
+  },
+  "impl": {
+    "function": "attention_forward_causal_head_major_gqa_flash_strided_f16kv",
+    "c_declaration": "void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+    "sources": ["src/kernels/attention_kernels.c", "src/kernels/softmax_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attention.py"],
+    "parity": [
+      {
+        "kind": "llamacpp",
+        "command": "python version/v7/scripts/parity/check_sequence_hidden_state_vs_llama.py",
+        "tolerance": "1e-4",
+        "notes": "Compare against llama.cpp ggml_flash_attn_ext with F16-rounded K/V inputs."
+      }
+    ]
+  },
+  "notes": "Causal multi-head attention with GQA support. Uses FP16-rounded K/V inputs to emulate llama.cpp flash-attn numerics for Llama-family models."
+}

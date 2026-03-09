@@ -544,6 +544,7 @@ def _run_ck_compare(
         "results": [],
         "all_ok": True,
         "first_failure": None,
+        "first_stable_failure": None,
     }
 
     try:
@@ -552,12 +553,15 @@ def _run_ck_compare(
             raw_by_name = dump_map.get(token_idx, {})
             for probe in probes:
                 raw_entry = resolve_raw_dump(raw_by_name, probe)
+                dup_key = (int(token_idx), str(probe.raw_base_name))
+                ambiguous_raw_name = int(duplicates.get(dup_key, 0)) > 1
                 row: dict[str, Any] = {
                     "token_step": int(token_idx),
                     "probe": probe.probe_name,
                     "stop_idx": int(probe.stop_idx),
                     "raw_file": str(raw_entry.path) if raw_entry else None,
                     "raw_occurrence": int(probe.raw_occurrence),
+                    "ambiguous_raw_name": bool(ambiguous_raw_name),
                 }
                 if raw_entry is None:
                     row["status"] = "MISSING"
@@ -565,6 +569,12 @@ def _run_ck_compare(
                     report["all_ok"] = False
                     if report["first_failure"] is None:
                         report["first_failure"] = {
+                            "token_step": int(token_idx),
+                            "probe": probe.probe_name,
+                            "reason": "missing raw dump",
+                        }
+                    if (not ambiguous_raw_name) and report["first_stable_failure"] is None:
+                        report["first_stable_failure"] = {
                             "token_step": int(token_idx),
                             "probe": probe.probe_name,
                             "reason": "missing raw dump",
@@ -582,6 +592,14 @@ def _run_ck_compare(
                     report["all_ok"] = False
                     if report["first_failure"] is None:
                         report["first_failure"] = {
+                            "token_step": int(token_idx),
+                            "probe": probe.probe_name,
+                            "max_diff": cmp.get("max_diff"),
+                            "mean_diff": cmp.get("mean_diff"),
+                            "cosine": cmp.get("cosine"),
+                        }
+                    if (not ambiguous_raw_name) and report["first_stable_failure"] is None:
+                        report["first_stable_failure"] = {
                             "token_step": int(token_idx),
                             "probe": probe.probe_name,
                             "max_diff": cmp.get("max_diff"),
@@ -629,6 +647,7 @@ def _run_ck_compare(
     print("")
     print(f"all_ok          : {report['all_ok']}")
     print(f"first_failure   : {json.dumps(report['first_failure'])}")
+    print(f"first_stable    : {json.dumps(report['first_stable_failure'])}")
     print("=" * 96)
 
     if report_json is not None:

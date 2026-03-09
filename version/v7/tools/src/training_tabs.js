@@ -275,12 +275,24 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
     const evalCmd = runDir
         ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runDir)} --all-stages --n-samples 5`
         : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
+    const probeReportPath = runDir ? `${runDir}/probe_report.html` : '<run_dir>/probe_report.html';
+    const probeReportCmd = runDir
+        ? `python3 version/v7/scripts/build_probe_report_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(probeReportPath)}`
+        : 'python3 version/v7/scripts/build_probe_report_v7.py --run <run_dir> --output <run_dir>/probe_report.html';
+    const probeReportHref = runDir ? encodeURI(`file://${probeReportPath}`) : '';
     const reportCardPath = runDir ? `${runDir}/svg_training_report_card.html` : '<run_dir>/svg_training_report_card.html';
     const reportCardCmd = runDir
         ? `python3 version/v7/scripts/build_svg_training_report_card_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
         : 'python3 version/v7/scripts/build_svg_training_report_card_v7.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
     const reportHref = runDir ? encodeURI(`file://${reportCardPath}`) : '';
     const diagnosisCards = [];
+    diagnosisCards.push({
+        title: 'SPLIT PROBE REPORT',
+        description: 'Runs split-aware prompts from the registered probe-report contract, scores outputs, and renders previews when the adapter supports it.',
+        cmd: probeReportCmd,
+        href: probeReportHref,
+        linkLabel: 'Open probe report if generated',
+    });
     if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
         diagnosisCards.push({
             title: 'STAGE EVAL',

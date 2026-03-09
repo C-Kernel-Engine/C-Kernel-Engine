@@ -63,6 +63,75 @@ def zero_activations(base_ptr: int, lowered: dict[str, Any]) -> None:
     ctypes.memset(base_ptr + act_base, 0, act_size)
 
 
+def zero_activations_preserve_rope(base_ptr: int, lowered: dict[str, Any]) -> None:
+    memory = lowered.get("memory", {})
+    arena = memory.get("arena", {})
+    act = memory.get("activations", {})
+    act_size = int(act.get("size", 0))
+    if act_size <= 0:
+        return
+
+    act_base = int(arena.get("activations_base", 0))
+
+    def abs_offset(buf: dict[str, Any]) -> int:
+        if "abs_offset" in buf:
+            return int(buf["abs_offset"])
+        return act_base + int(buf.get("offset", 0))
+
+    protected: list[tuple[int, int]] = []
+    for buf in act.get("buffers", []):
+        if buf.get("name") not in {"rope_cache", "kv_cache"}:
+            continue
+        size = int(buf.get("size", 0))
+        if size > 0:
+            protected.append((abs_offset(buf), size))
+
+    if not protected:
+        ctypes.memset(base_ptr + act_base, 0, act_size)
+        return
+
+    end = act_base + act_size
+    cursor = act_base
+    for off, size in sorted(protected):
+        if off > cursor:
+            ctypes.memset(base_ptr + cursor, 0, off - cursor)
+        cursor = max(cursor, off + size)
+    if cursor < end:
+        ctypes.memset(base_ptr + cursor, 0, end - cursor)
+
+
+def parse_tokens_csv(text: str) -> list[int]:
+    out: list[int] = []
+    for part in str(text or "").split(","):
+        part = part.strip()
+        if part:
+            out.append(int(part))
+    return out
+
+
+def run_decode_tokens_until(
+    lib: ctypes.CDLL,
+    base_ptr: int,
+    lowered: dict[str, Any],
+    tokens: list[int],
+    stop_idx: int,
+) -> None:
+    if not tokens:
+        raise RuntimeError("token list is empty")
+    os.environ["CK_STOP_OP"] = str(stop_idx)
+    if hasattr(lib, "ck_model_kv_cache_reset"):
+        lib.ck_model_kv_cache_reset()
+    for tok in tokens[:-1]:
+        zero_activations_preserve_rope(base_ptr, lowered)
+        os.environ.pop("CK_STOP_OP", None)
+        if lib.ck_model_decode(ctypes.c_int32(int(tok)), None) != 0:
+            raise RuntimeError(f"history decode failed for token {tok}")
+    zero_activations_preserve_rope(base_ptr, lowered)
+    os.environ["CK_STOP_OP"] = str(stop_idx)
+    if lib.ck_model_decode(ctypes.c_int32(int(tokens[-1])), None) != 0:
+        raise RuntimeError(f"decode failed at stop idx {stop_idx}")
+
+
 def rmsnorm_ref(x: np.ndarray, gamma: np.ndarray, eps: float) -> np.ndarray:
     mean_sq = np.mean(x * x, dtype=np.float32)
     rstd = 1.0 / np.sqrt(mean_sq + np.float32(eps))
@@ -95,6 +164,8 @@ def main() -> int:
     ap.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     ap.add_argument("--layer", type=int, default=0)
     ap.add_argument("--token", type=int, default=5)
+    ap.add_argument("--prefill-tokens", default="", help="optional comma-separated history token ids")
+    ap.add_argument("--decode-token", type=int, default=None, help="final decode token id when using history")
     args = ap.parse_args()
 
     model_dir = args.model_dir.expanduser().resolve()
@@ -163,20 +234,13 @@ def main() -> int:
         raise RuntimeError("base_ptr null")
 
     try:
-        os.environ["CK_STOP_OP"] = str(res_stop_idx)
-        if hasattr(lib, "ck_model_kv_cache_reset"):
-            lib.ck_model_kv_cache_reset()
-        zero_activations(base_ptr, lowered)
-        if lib.ck_model_decode(ctypes.c_int32(args.token), None) != 0:
-            raise RuntimeError("decode failed at residual_add stop")
+        history = parse_tokens_csv(args.prefill_tokens)
+        tokens = history + [int(args.decode_token if args.decode_token is not None else args.token)]
+
+        run_decode_tokens_until(lib, base_ptr, lowered, tokens, int(res_stop_idx))
         x_pre = read_f32(base_ptr, res_out_abs, embed_dim)
 
-        os.environ["CK_STOP_OP"] = str(ffn_stop_idx)
-        if hasattr(lib, "ck_model_kv_cache_reset"):
-            lib.ck_model_kv_cache_reset()
-        zero_activations(base_ptr, lowered)
-        if lib.ck_model_decode(ctypes.c_int32(args.token), None) != 0:
-            raise RuntimeError("decode failed at ffn_norm stop")
+        run_decode_tokens_until(lib, base_ptr, lowered, tokens, int(ffn_stop_idx))
         y_runtime = read_f32(base_ptr, ffn_out_abs, embed_dim)
     finally:
         os.environ.pop("CK_STOP_OP", None)

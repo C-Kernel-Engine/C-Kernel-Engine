@@ -43,6 +43,11 @@ static inline size_t qkv_index(int h,
          + (size_t)d;
 }
 
+// Match llama.cpp flash-attention input handling where F32 K/V are rounded through F16.
+static inline float ck_round_fp16_scalar(float x) {
+    return CK_FP16_TO_FP32(CK_FP32_TO_FP16(x));
+}
+
 // Scores layout matches causal_softmax_head_major:
 // [head][query_token][key_token] with stride aligned_context_window.
 static inline size_t score_index(int h,
@@ -853,6 +858,80 @@ static void attention_flash_query_causal_exact(const float *q_vec,
     }
 }
 
+// Llama-parity attention reference: K/V are rounded through F16 before use.
+static void attention_flash_query_causal_exact_f16kv(const float *q_vec,
+                                                     const float *k_head,
+                                                     const float *v_head,
+                                                     int kv_tokens,
+                                                     int head_dim,
+                                                     int aligned_head_dim,
+                                                     float scale,
+                                                     float *out_vec)
+{
+    if (kv_tokens <= 0) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int d = 0; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+
+    // Mirror llama.cpp GGML flash-attention more closely:
+    // - Q is converted through FP16 before the KQ dot
+    // - V accumulation is rounded through FP16 at each update
+    // - the softmax accumulator uses the online max/sum form
+    float sum = 0.0f;
+    float max_score = -INFINITY;
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t)j * (size_t)aligned_head_dim;
+        const float *v_vec = v_head + (size_t)j * (size_t)aligned_head_dim;
+        float dot = 0.0f;
+        for (int d = 0; d < head_dim; ++d) {
+            dot += ck_round_fp16_scalar(q_vec[d]) * ck_round_fp16_scalar(k_vec[d]);
+        }
+        float score = dot * scale;
+
+        const float prev_max = max_score;
+        float max_scale = 1.0f;
+        float value_scale = 1.0f;
+
+        if (score > max_score) {
+            max_score = score;
+            max_scale = isfinite(prev_max) ? expf(prev_max - max_score) : 0.0f;
+            for (int d = 0; d < head_dim; ++d) {
+                out_vec[d] = ck_round_fp16_scalar(out_vec[d] * max_scale);
+            }
+        } else {
+            value_scale = expf(score - max_score);
+        }
+
+        for (int d = 0; d < head_dim; ++d) {
+            const float v_rounded = ck_round_fp16_scalar(v_vec[d]);
+            const float updated = out_vec[d] + value_scale * v_rounded;
+            out_vec[d] = ck_round_fp16_scalar(updated);
+        }
+
+        sum = sum * max_scale + value_scale;
+    }
+
+    if (sum > 0.0f) {
+        float inv_sum = 1.0f / sum;
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] *= inv_sum;
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+}
+
 /**
  * Flash attention forward for GQA (prefill, no score materialization)
  * @test test_flash_attention.py::TestFlashAttention::test_flash_forward
@@ -1014,6 +1093,47 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
 #undef FLASH_QUERY_IMPL
 }
 
+void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,
+                                                                 const float *k,
+                                                                 const float *v,
+                                                                 float *output,
+                                                                 int num_heads,
+                                                                 int num_kv_heads,
+                                                                 int num_tokens,
+                                                                 int head_dim,
+                                                                 int aligned_head_dim,
+                                                                 int kv_stride_tokens)
+{
+    if (!q || !k || !v || !output) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+    if (kv_stride_tokens < num_tokens) {
+        return;
+    }
+
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    const int T = num_tokens;
+    const size_t kv_head_stride = (size_t)kv_stride_tokens * (size_t)aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+        const float *k_head = k + (size_t)kv_head * kv_head_stride;
+        const float *v_head = v + (size_t)kv_head * kv_head_stride;
+
+        for (int i = 0; i < T; ++i) {
+            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            attention_flash_query_causal_exact_f16kv(q_vec, k_head, v_head,
+                                                     /*kv_tokens=*/i + 1,
+                                                     head_dim, aligned_head_dim,
+                                                     scale, out_vec);
+        }
+    }
+}
+
 /**
  * Flash attention decode (single token attends to KV cache)
  * @test test_flash_attention.py::TestFlashAttention::test_flash_decode
@@ -1066,6 +1186,48 @@ void attention_forward_decode_head_major_gqa_flash(const float *q_token,
                                1,
                                aligned_head_dim,
                                scale);
+    }
+}
+
+void attention_forward_decode_head_major_gqa_flash_f16kv(const float *q_token,
+                                                         const float *k_cache,
+                                                         const float *v_cache,
+                                                         float *out_token,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int kv_tokens,
+                                                         int cache_capacity,
+                                                         int head_dim,
+                                                         int aligned_head_dim)
+{
+    if (!q_token || !k_cache || !v_cache || !out_token) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || kv_tokens <= 0 || cache_capacity <= 0) {
+        return;
+    }
+    if (kv_tokens > cache_capacity || head_dim <= 0 || aligned_head_dim <= 0) {
+        return;
+    }
+
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    const size_t head_stride = (size_t)cache_capacity * (size_t)aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+        const float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;
+        const float *k_head = k_cache + (size_t)kv_head * head_stride;
+        const float *v_head = v_cache + (size_t)kv_head * head_stride;
+        float *out_head = out_token + (size_t)h * (size_t)aligned_head_dim;
+
+        attention_flash_query_causal_exact_f16kv(q_head,
+                                                 k_head,
+                                                 v_head,
+                                                 kv_tokens,
+                                                 head_dim,
+                                                 aligned_head_dim,
+                                                 scale,
+                                                 out_head);
     }
 }
 

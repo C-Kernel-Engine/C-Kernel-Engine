@@ -473,9 +473,14 @@ def _extract_probe_summary(run_dir: Path) -> dict[str, Any]:
         typed_rows = [row for row in rows if isinstance(row, dict)]
         if not typed_rows:
             continue
-        holdouts = [row for row in typed_rows if row.get("split") == "holdout"]
+        holdout_splits = {"holdout", "test", "dev", "val", "validation"}
+        holdouts = [row for row in typed_rows if str(row.get("split") or "").strip().lower() in holdout_splits]
         exact = sum(1 for row in typed_rows if row.get("exact_match"))
-        renderable = sum(1 for row in typed_rows if row.get("rendered_svg"))
+        renderable = sum(
+            1
+            for row in typed_rows
+            if row.get("renderable") or row.get("materialized_output") or row.get("rendered_svg")
+        )
         holdout_exact = sum(1 for row in holdouts if row.get("exact_match"))
         probe_count = len(typed_rows)
         holdout_count = len(holdouts)

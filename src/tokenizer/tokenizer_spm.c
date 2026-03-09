@@ -41,6 +41,55 @@ static int32_t ck_tokenizer_lookup_exact_n(const CKTokenizer *tok, const char *t
     return id;
 }
 
+/* Find the longest registered special token starting at a byte offset. */
+static int32_t spm_find_special_token_at_pos(const CKTokenizer *tok,
+                                             const char *text,
+                                             int text_len,
+                                             size_t pos,
+                                             size_t *match_len) {
+    if (match_len) *match_len = 0;
+    if (!tok || !text || text_len <= 0 || pos >= (size_t)text_len) return -1;
+
+    if (tok->vocab_trie && tok->vocab_trie->root) {
+        CKTrieNode *node = tok->vocab_trie->root;
+        CKTrieNode *best_node = NULL;
+        size_t best_len = 0;
+        size_t cur = pos;
+
+        while (cur < (size_t)text_len && node) {
+            unsigned char c = (unsigned char)text[cur];
+            if (!node->children[c]) break;
+            node = node->children[c];
+            cur++;
+            if (node->token_id >= 0 && node->is_special) {
+                best_node = node;
+                best_len = cur - pos;
+            }
+        }
+
+        if (best_node) {
+            if (match_len) *match_len = best_len;
+            return best_node->token_id;
+        }
+    }
+
+    int max_len = CK_TOKENIZER_MAX_TOKEN_LEN;
+    if (pos + (size_t)max_len > (size_t)text_len) {
+        max_len = (int)((size_t)text_len - pos);
+    }
+    char tmp[CK_TOKENIZER_MAX_TOKEN_LEN + 1];
+    for (int len = max_len; len >= 1; len--) {
+        memcpy(tmp, text + pos, (size_t)len);
+        tmp[len] = '\0';
+        TokenInfo *info = (TokenInfo *)ck_tokenizer_hash_table_lookup(tok->vocab, tmp);
+        if (info && info->id >= 0 && info->is_special) {
+            if (match_len) *match_len = (size_t)len;
+            return info->id;
+        }
+    }
+    return -1;
+}
+
 /* ============================================================================
  * SPM (SentencePiece) Tokenization with Viterbi/DP
  * ============================================================================ */
@@ -618,6 +667,18 @@ static int ck_tokenizer_encode_spm_impl(const CKTokenizer *tok,
     return out_idx;
 }
 
+static int ck_tokenizer_encode_spm_plain_segment(const CKTokenizer *tok,
+                                                 const char *text,
+                                                 int text_len,
+                                                 int32_t *ids,
+                                                 int max_ids) {
+    if (!tok || !text || text_len <= 0 || !ids || max_ids <= 0) return 0;
+    if (tok->config.spm_mode == CK_SPM_MODE_LLAMA) {
+        return ck_tokenizer_encode_spm_llama_impl(tok, text, text_len, ids, max_ids);
+    }
+    return ck_tokenizer_encode_spm_impl(tok, text, text_len, ids, max_ids);
+}
+
 /* Fallback: encode using byte tokens for any unmatched content.
  * Uses the ORIGINAL text (not preprocessed), mapping each byte to a byte token. */
 static int spm_encode_byte_fallback(const CKTokenizer *tok,
@@ -747,14 +808,44 @@ int ck_tokenizer_encode_spm_dispatch(const CKTokenizer *tok,
         return out_idx;
     }
 
-    int n = 0;
-    if (tok->config.spm_mode == CK_SPM_MODE_LLAMA) {
-        n = ck_tokenizer_encode_spm_llama_impl(tok, text, text_len, ids + out_idx, max_ids - out_idx);
-    } else {
-        n = ck_tokenizer_encode_spm_impl(tok, text, text_len, ids + out_idx, max_ids - out_idx);
+    int segment_start = 0;
+    for (int pos = 0; pos < text_len && out_idx < max_ids;) {
+        size_t special_len = 0;
+        int32_t special_id = spm_find_special_token_at_pos(tok, text, text_len, (size_t)pos, &special_len);
+        if (special_id < 0 || special_len == 0) {
+            pos++;
+            continue;
+        }
+
+        if (segment_start < pos) {
+            int n = ck_tokenizer_encode_spm_plain_segment(
+                tok,
+                text + segment_start,
+                pos - segment_start,
+                ids + out_idx,
+                max_ids - out_idx
+            );
+            if (n <= 0) return n;
+            out_idx += n;
+            if (out_idx >= max_ids) break;
+        }
+
+        ids[out_idx++] = special_id;
+        pos += (int)special_len;
+        segment_start = pos;
     }
-    if (n <= 0) return n;
-    out_idx += n;
+
+    if (segment_start < text_len && out_idx < max_ids) {
+        int n = ck_tokenizer_encode_spm_plain_segment(
+            tok,
+            text + segment_start,
+            text_len - segment_start,
+            ids + out_idx,
+            max_ids - out_idx
+        );
+        if (n <= 0) return n;
+        out_idx += n;
+    }
 
     if (tok->config.add_eos && tok->eos_id >= 0 && out_idx < max_ids) {
         ids[out_idx++] = tok->eos_id;

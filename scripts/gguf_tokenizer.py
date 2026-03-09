@@ -139,6 +139,7 @@ def extract_tokenizer_from_gguf(gguf_path: str) -> Dict[str, Any]:
         "tokenizer.ggml.padding_token_id",
         "tokenizer.ggml.add_bos_token",
         "tokenizer.ggml.add_eos_token",
+        "tokenizer.ggml.add_space_prefix",
         "tokenizer.chat_template",
     }
 
@@ -186,6 +187,7 @@ class GGUFTokenizer:
         self.pad_id: int = 0
         self.add_bos: bool = True
         self.add_eos: bool = False
+        self.add_space_prefix: bool = False
         self.model_type: str = "unknown"
 
         if vocab_data:
@@ -207,6 +209,7 @@ class GGUFTokenizer:
         self.pad_id = data.get("tokenizer.ggml.padding_token_id", 0)
         self.add_bos = data.get("tokenizer.ggml.add_bos_token", True)
         self.add_eos = data.get("tokenizer.ggml.add_eos_token", False)
+        self.add_space_prefix = bool(data.get("tokenizer.ggml.add_space_prefix", False))
         extra_special = data.get("tokenizer.ggml.special_token_ids", [])
         if isinstance(extra_special, list):
             self.special_ids = {int(x) for x in extra_special if isinstance(x, int)}
@@ -244,6 +247,7 @@ class GGUFTokenizer:
                 "tokenizer.ggml.padding_token_id": data.get("special_tokens", {}).get("pad", 0),
                 "tokenizer.ggml.add_bos_token": data.get("add_special", {}).get("bos", True),
                 "tokenizer.ggml.add_eos_token": data.get("add_special", {}).get("eos", False),
+                "tokenizer.ggml.add_space_prefix": data.get("add_space_prefix", False),
             }
             return cls(vocab_data)
 
@@ -330,6 +334,7 @@ class GGUFTokenizer:
                 "tokenizer.ggml.padding_token_id": pad_id,
                 "tokenizer.ggml.add_bos_token": add_bos,
                 "tokenizer.ggml.add_eos_token": add_eos,
+                "tokenizer.ggml.add_space_prefix": False,
                 "tokenizer.ggml.special_token_ids": sorted(special_ids),
             }
             return cls(vocab_data)
@@ -372,7 +377,12 @@ class GGUFTokenizer:
             best_id = self.unk_id
 
             # Determine if this position should have a space prefix
-            need_space_prefix = (i > 0 and text[i] != ' ' and text[i-1] == ' ')
+            need_space_prefix = (
+                text[i] != ' ' and (
+                    (i == 0 and self.add_space_prefix) or
+                    (i > 0 and text[i - 1] == ' ')
+                )
+            )
 
             # Try different lengths, longest first
             for length in range(min(len(text) - i, 32), 0, -1):
@@ -393,16 +403,10 @@ class GGUFTokenizer:
                         best_id = self.token_to_id[prefixed]
                         break
 
-                # Try direct match
-                if chunk in self.token_to_id:
-                    best_len = length
-                    best_id = self.token_to_id[chunk]
-                    break
-
-                # Try with space prefix if needed (for tokens after space)
-                if need_space_prefix and length == len(text) - i:
-                    continue  # Skip - we'll try shorter
-                elif need_space_prefix:
+                # SentencePiece / llama models use a dummy space prefix at BOS
+                # and after literal spaces. Prefer the prefixed piece before a
+                # bare token so "Hello" becomes "▁Hello" when required.
+                if need_space_prefix:
                     if is_gpt2:
                         prefixed = "\u0120" + chunk
                     else:
@@ -411,6 +415,12 @@ class GGUFTokenizer:
                         best_len = length
                         best_id = self.token_to_id[prefixed]
                         break
+
+                # Try direct match
+                if chunk in self.token_to_id:
+                    best_len = length
+                    best_id = self.token_to_id[chunk]
+                    break
 
             if best_len == 0:
                 # Fall back to single character/byte
@@ -500,6 +510,7 @@ class GGUFTokenizer:
                 "bos": self.add_bos,
                 "eos": self.add_eos,
             },
+            "add_space_prefix": self.add_space_prefix,
             "tokens": self.tokens,
             "scores": self.scores,
         }

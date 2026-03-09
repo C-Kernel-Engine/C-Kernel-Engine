@@ -624,6 +624,9 @@ CK_EXPORT int32_t ck_model_lookup_token(const char *text) {
             if (!getenv("CK_SKIP_SPM_SPECIALS")) {{
                 static const char *special_tokens[] = {{
                     "<unk>", "<s>", "</s>", "<bos>", "<eos>", "<pad>", "<mask>",
+                    "<start_of_turn>", "<end_of_turn>",
+                    "<|im_start|>", "<|im_end|>", "<|eot_id|>", "<|endoftext|>",
+                    "<think>", "</think>", "<tool_call>", "</tool_call>",
                     NULL
                 }};
                 for (int i = 0; special_tokens[i] != NULL; i++) {{
@@ -1798,19 +1801,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Model-specific overrides can still force FP32 by setting
     # config["prefer_q8_activation"]=false.
     prefer_q8_activation = bool(config.get("prefer_q8_activation", True))
-    # Llama/Mistral-family MLP matmuls are more numerically sensitive than the
-    # attention projections on the Q8 activation path. Keep the fast path for
-    # attention/out-proj, but prefer FP32 activation kernels for the MLP linear
-    # ops on these families unless the manifest explicitly disables the override.
+    # A temporary Llama/Mistral FP32-MLP override used to force MLP matmuls off
+    # the Q8_K activation path. That turned out to be the wrong default for
+    # llama.cpp parity on Q4_K/Q6_K models: the MLP linear ops should follow the
+    # same Q8_K activation contract as ggml's mul_mat path. Keep the override as
+    # an explicit config opt-in only.
     prefer_fp32_mlp_matmuls = (
         prefer_q8_activation
         and model_family in {"llama", "mistral", "mistral3"}
-        and bool(
-            config.get(
-                "prefer_fp32_mlp_matmuls",
-                template_flags.get("prefer_fp32_mlp_matmuls", False),
-            )
-        )
+        and bool(config.get("prefer_fp32_mlp_matmuls", False))
     )
     registry = load_kernel_registry()
 
@@ -2089,11 +2088,17 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # so thread management overhead dominates. Needs persistent thread pool.
         use_parallel = False  # Was: prefer_parallel and op in PARALLEL_OPS
 
-        # Template-specified kernel override (keeps IR dumb and data-driven)
+        # Template-specified kernel overrides (keeps IR dumb and data-driven)
         if op == "rope_qk":
             rope_kernel = template_kernels.get("rope_qk")
             if rope_kernel:
                 return [rope_kernel]
+
+        if op in ("attn", "attn_sliding"):
+            mode_key = f"{op}_{mode}"
+            attn_kernel = template_kernels.get(mode_key) or template_kernels.get(op)
+            if attn_kernel:
+                return [attn_kernel]
 
         kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
         if not kernel_op:
@@ -3083,6 +3088,8 @@ def generate_ir_lower_1(
 
     config = manifest.get("config", {})
     logits_layout = _resolve_logits_layout(config, mode)
+    template = manifest.get("template", {}) if isinstance(manifest.get("template"), dict) else {}
+    template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
 
     # Build kernel map index by loading individual kernel map files
     # KERNEL_REGISTRY.json is only used for validation, not as source of truth
@@ -3282,12 +3289,12 @@ def generate_ir_lower_1(
             if op["op"] in ("attn", "attn_sliding") and "attention" in op["kernel"]:
                 # Switch to decode attention kernel (sliding vs non-sliding)
                 if op["op"] == "attn_sliding":
-                    decode_kernel = "attention_forward_decode_head_major_gqa_flash_sliding"
+                    decode_kernel = template_kernels.get("attn_sliding_decode") or "attention_forward_decode_head_major_gqa_flash_sliding"
                 else:
                     if force_decode_attn_regular:
                         decode_kernel = "attention_forward_decode_head_major_gqa_regular"
                     else:
-                        decode_kernel = "attention_forward_decode_head_major_gqa_flash"
+                        decode_kernel = template_kernels.get("attn_decode") or "attention_forward_decode_head_major_gqa_flash"
                 op["kernel"] = decode_kernel
                 op["function"] = decode_kernel
                 # Update inputs to use KV cache instead of scratch

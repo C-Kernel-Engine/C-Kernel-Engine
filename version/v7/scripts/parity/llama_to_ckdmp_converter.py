@@ -226,10 +226,10 @@ def infer_dtype_from_name(filename: str) -> int:
 
 
 TOKEN_SUFFIX_PATTERNS = (
-    re.compile(r"^(?P<base>.+?)-token-(?P<tok>\d+)$"),
-    re.compile(r"^(?P<base>.+?)_token_(?P<tok>\d+)$"),
-    re.compile(r"^(?P<base>.+?)-tok-(?P<tok>\d+)$"),
-    re.compile(r"^(?P<base>.+?)_tok_(?P<tok>\d+)$"),
+    re.compile(r"^(?P<base>.+?)-token-(?P<tok>\d+)(?:-occ-\d+)?$"),
+    re.compile(r"^(?P<base>.+?)_token_(?P<tok>\d+)(?:_occ_\d+)?$"),
+    re.compile(r"^(?P<base>.+?)-tok-(?P<tok>\d+)(?:-occ-\d+)?$"),
+    re.compile(r"^(?P<base>.+?)_tok_(?P<tok>\d+)(?:_occ_\d+)?$"),
 )
 
 
@@ -370,6 +370,10 @@ def convert_raw_to_ckdmp(
                 metadata = index_metadata.get(op_name, {})
                 if not metadata:
                     metadata = index_metadata.get(base_op_name, {})
+
+                raw_base_name = str(metadata.get("base_name") or base_op_name)
+                if raw_base_name:
+                    base_op_name = raw_base_name
 
                 # Determine dtype
                 if dtype_hint is not None:

@@ -578,6 +578,90 @@ def emit_op(op: Dict, seq_idx: int | None = None, debug: bool = False, profile: 
     lines = []
     lines.append(f"    /* Op {idx}: {function} ({op_name}) layer={layer} section={section} */")
 
+    if op_name == "quantize_out_proj_input" and function == "quantize_row_q8_k":
+        arg_expr_by_name = {}
+        for arg in args:
+            nm = str(arg.get("name", "")).lower()
+            ex = str(arg.get("expr", ""))
+            if nm and ex and nm not in arg_expr_by_name:
+                arg_expr_by_name[nm] = ex
+
+        x_expr = arg_expr_by_name.get("x")
+        y_expr = arg_expr_by_name.get("y")
+        k_expr = arg_expr_by_name.get("k")
+        if x_expr and y_expr and k_expr:
+            lines.append(f"    ck_debug_outproj_fp32_input = {x_expr};")
+            lines.append("    if (!debug_outproj_fp32) {")
+            if profile:
+                lines.append("        CK_PROFILE_BEGIN();")
+            lines.append("        quantize_row_q8_k(")
+            lines.append(f"            {x_expr},")
+            lines.append(f"            {y_expr},")
+            lines.append(f"            {k_expr}")
+            lines.append("        );")
+            if profile:
+                lines.append(f'        CK_PROFILE_END("decode", "{function}", "{op_name}", {layer});')
+            lines.append("    }")
+            if seq_idx is not None:
+                lines.append(f"    if (stop_seq == {seq_idx}) return;")
+            return "\n".join(lines)
+
+    if op_name == "out_proj" and function in {"gemv_q4_k_q8_k", "gemv_q6_k_q8_k"}:
+        arg_expr_by_name = {}
+        for arg in args:
+            nm = str(arg.get("name", "")).lower()
+            ex = str(arg.get("expr", ""))
+            if nm and ex and nm not in arg_expr_by_name:
+                arg_expr_by_name[nm] = ex
+
+        y_expr = arg_expr_by_name.get("y")
+        w_expr = arg_expr_by_name.get("w")
+        x_expr = arg_expr_by_name.get("x_q8")
+        m_expr = arg_expr_by_name.get("m")
+        k_expr = arg_expr_by_name.get("k")
+        fp32_function = "gemv_q4_k" if function == "gemv_q4_k_q8_k" else "gemv_q6_k"
+        if y_expr and w_expr and x_expr and m_expr and k_expr:
+            lines.append("    if (debug_outproj_fp32 && ck_debug_outproj_fp32_input != NULL) {")
+            if profile:
+                lines.append("        CK_PROFILE_BEGIN();")
+            lines.append(f"        {fp32_function}(")
+            lines.append(f"            {y_expr},")
+            lines.append(f"            {w_expr},")
+            lines.append("            ck_debug_outproj_fp32_input,")
+            lines.append(f"            {m_expr},")
+            lines.append(f"            {k_expr}")
+            lines.append("        );")
+            if profile:
+                lines.append(f'        CK_PROFILE_END("decode", "{fp32_function}", "{op_name}", {layer});')
+            lines.append("    } else {")
+            if profile:
+                lines.append("        CK_PROFILE_BEGIN();")
+            lines.append(f"        {function}(")
+            lines.append(f"            {y_expr},")
+            lines.append(f"            {w_expr},")
+            lines.append(f"            {x_expr},")
+            lines.append(f"            {m_expr},")
+            lines.append(f"            {k_expr}")
+            lines.append("        );")
+            if profile:
+                lines.append(f'        CK_PROFILE_END("decode", "{function}", "{op_name}", {layer});')
+            lines.append("    }")
+            if seq_idx is not None:
+                lines.append(f"    if (stop_seq == {seq_idx}) return;")
+
+            if debug:
+                raw_expr = y_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append(f'    {{ float *_dbg = (float*){raw_expr}; '
+                            f'printf("[Op {idx} {op_name} L{layer}] out[0..4]: %f %f %f %f %f\\n", '
+                            f'_dbg[0], _dbg[1], _dbg[2], _dbg[3], _dbg[4]); }}')
+
+            if dump:
+                raw_expr = y_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "attn_output", {m_expr});')
+                lines.append("    #endif")
+            return "\n".join(lines)
+
     if op_name == "mlp_gate_up" and function in {"gemv_q4_k", "gemv_q4_k_q8_k", "gemv_q6_k", "gemv_q6_k_q8_k"}:
         arg_expr_by_name = {}
         for arg in args:
@@ -798,6 +882,9 @@ static void ck_decode(CKModel *model, int32_t token) {
     (void)ACT;
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
+    const char *debug_outproj_env = getenv("CK_V7_DEBUG_OUTPROJ_FP32");
+    int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;
+    const float *ck_debug_outproj_fp32_input = NULL;
     #ifdef CK_PARITY_DUMP
     ck_dump_set_token(model->pos);
     #endif

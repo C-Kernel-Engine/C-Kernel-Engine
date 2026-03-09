@@ -344,6 +344,48 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
     if func in ("quantize_row_q8_0", "quantize_row_q8_k"):
         batch_quant_kind = func
 
+    if op_type == "out_proj" and func in ("gemm_nt_q4_k_q8_k", "gemm_nt_q6_k_q8_k"):
+        a_expr = arg_expr_by_name.get("a")
+        b_expr = arg_expr_by_name.get("b")
+        bias_expr = arg_expr_by_name.get("bias", "NULL")
+        c_expr = arg_expr_by_name.get("c")
+        m_expr = arg_expr_by_name.get("m", "num_tokens")
+        n_expr = arg_expr_by_name.get("n")
+        k_expr = arg_expr_by_name.get("k")
+        fp32_func = "gemm_nt_q4_k" if func == "gemm_nt_q4_k_q8_k" else "gemm_nt_q6_k"
+        if a_expr and b_expr and c_expr and n_expr and k_expr:
+            lines.append("    if (debug_outproj_fp32 && ck_debug_outproj_fp32_input != NULL) {")
+            lines.append(f"        {fp32_func}(")
+            lines.append("            ck_debug_outproj_fp32_input,")
+            lines.append(f"            {b_expr},")
+            lines.append(f"            {bias_expr},")
+            lines.append(f"            {c_expr},")
+            lines.append(f"            {m_expr},")
+            lines.append(f"            {n_expr},")
+            lines.append(f"            {k_expr}")
+            lines.append("        );")
+            lines.append("    } else {")
+            lines.append(f"        {func}(")
+            lines.append(f"            {a_expr},")
+            lines.append(f"            {b_expr},")
+            lines.append(f"            {bias_expr},")
+            lines.append(f"            {c_expr},")
+            lines.append(f"            {m_expr},")
+            lines.append(f"            {n_expr},")
+            lines.append(f"            {k_expr}")
+            lines.append("        );")
+            lines.append("    }")
+            if profile:
+                lines.append(f'    CK_PROFILE_END("prefill", "{func}", "{op_type}", {layer});')
+
+            if dump:
+                raw_expr = c_expr.replace("(float*)", "").replace("(void*)", "").strip()
+                size_expr = f"({m_expr}) * ({n_expr})"
+                lines.append("    #ifdef CK_PARITY_DUMP")
+                lines.append(f'    ck_dump_tensor((float*){raw_expr}, {layer}, "attn_output", {size_expr});')
+                lines.append("    #endif")
+            return "\n".join(lines)
+
     # Format the function call / quantization loop
     if batch_quant_kind and len(args) >= 3:
         x_expr = args[0]
@@ -353,20 +395,37 @@ def emit_prefill_op(op: Dict, seq_idx: int, config: Dict, profile: bool = False,
             row_bytes_expr = "(size_t)(_k / QK_K) * sizeof(block_q8_K)"
         else:
             row_bytes_expr = "(size_t)(_k / QK8_0) * sizeof(block_q8_0)"
-        lines.append("    {")
-        lines.append(f"        const float *_x_base = (const float*)({x_expr});")
-        lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
-        lines.append(f"        const int _k = (int)({k_expr});")
-        lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
-        lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
-        lines.append(
-            f"            {batch_quant_kind}("
-            "_x_base + (size_t)_t * (size_t)_k, "
-            "(void*)(_y_base + (size_t)_t * _row_bytes), "
-            "_k);"
-        )
-        lines.append("        }")
-        lines.append("    }")
+        if op_type == "quantize_out_proj_input":
+            lines.append(f"    ck_debug_outproj_fp32_input = (const float*)({x_expr});")
+            lines.append("    if (!debug_outproj_fp32) {")
+            lines.append(f"        const float *_x_base = (const float*)({x_expr});")
+            lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
+            lines.append(f"        const int _k = (int)({k_expr});")
+            lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
+            lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
+            lines.append(
+                f"            {batch_quant_kind}("
+                "_x_base + (size_t)_t * (size_t)_k, "
+                "(void*)(_y_base + (size_t)_t * _row_bytes), "
+                "_k);"
+            )
+            lines.append("        }")
+            lines.append("    }")
+        else:
+            lines.append("    {")
+            lines.append(f"        const float *_x_base = (const float*)({x_expr});")
+            lines.append(f"        uint8_t *_y_base = (uint8_t*)({y_expr});")
+            lines.append(f"        const int _k = (int)({k_expr});")
+            lines.append(f"        const size_t _row_bytes = {row_bytes_expr};")
+            lines.append("        for (int _t = 0; _t < num_tokens; ++_t) {")
+            lines.append(
+                f"            {batch_quant_kind}("
+                "_x_base + (size_t)_t * (size_t)_k, "
+                "(void*)(_y_base + (size_t)_t * _row_bytes), "
+                "_k);"
+            )
+            lines.append("        }")
+            lines.append("    }")
     else:
         if len(args) <= 3:
             # Short call on one line
@@ -477,6 +536,9 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
 
     const char *stop_env = getenv("CK_STOP_OP");
     int stop_seq = stop_env ? atoi(stop_env) : -1;
+    const char *debug_outproj_env = getenv("CK_V7_DEBUG_OUTPROJ_FP32");
+    int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;
+    const float *ck_debug_outproj_fp32_input = NULL;
 
     /* Copy input tokens to activation buffer (follow same pattern as decode) */
     memcpy((void*)(model->bump + A_TOKEN_IDS), tokens, (size_t)num_tokens * sizeof(int32_t));

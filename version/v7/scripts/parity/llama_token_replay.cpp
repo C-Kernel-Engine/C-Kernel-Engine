@@ -12,6 +12,7 @@
 struct Args {
     std::string model_path;
     std::vector<int32_t> tokens;
+    std::string prompt;
     std::string logits_out_path;
     std::string decode_mode = "batched";
     int ctx_len = 256;
@@ -84,6 +85,12 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             if (!parse_tokens(v, args.tokens, err)) return false;
             continue;
         }
+        if (a == "--prompt") {
+            const char * v = need_value("--prompt");
+            if (!v) return false;
+            args.prompt = v;
+            continue;
+        }
         if (a == "--ctx") {
             const char * v = need_value("--ctx");
             if (!v) return false;
@@ -120,7 +127,8 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
         }
         if (a == "-h" || a == "--help") {
             std::cout
-                << "Usage: llama_token_replay --model <path.gguf> --tokens <id,id,...> "
+                << "Usage: llama_token_replay --model <path.gguf> "
+                << "(--tokens <id,id,...> | --prompt <text>) "
                 << "--logits-out <path.bin> [--ctx N] [--top-k K] [--threads N] "
                 << "[--decode-mode batched|sequential]\n";
             std::exit(0);
@@ -133,8 +141,8 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
         err = "missing --model";
         return false;
     }
-    if (args.tokens.empty()) {
-        err = "missing/invalid --tokens";
+    if (args.tokens.empty() == args.prompt.empty()) {
+        err = "pass exactly one of --tokens or --prompt";
         return false;
     }
     if (args.logits_out_path.empty()) {
@@ -156,6 +164,49 @@ static void print_json_error(const std::string & msg) {
         }
     }
     std::cout << "\"}\n";
+}
+
+static bool tokenize_prompt(
+    const llama_vocab * vocab,
+    const std::string & prompt,
+    std::vector<int32_t> & out_tokens,
+    std::string & err
+) {
+    out_tokens.clear();
+    int32_t cap = std::max<int32_t>(32, static_cast<int32_t>(prompt.size()) + 8);
+    out_tokens.resize(static_cast<size_t>(cap));
+    int32_t n = llama_tokenize(
+        vocab,
+        prompt.c_str(),
+        static_cast<int32_t>(prompt.size()),
+        out_tokens.data(),
+        static_cast<int32_t>(out_tokens.size()),
+        true,
+        true
+    );
+    if (n < 0) {
+        cap = -n;
+        out_tokens.resize(static_cast<size_t>(cap));
+        n = llama_tokenize(
+            vocab,
+            prompt.c_str(),
+            static_cast<int32_t>(prompt.size()),
+            out_tokens.data(),
+            static_cast<int32_t>(out_tokens.size()),
+            true,
+            true
+        );
+    }
+    if (n < 0) {
+        err = "llama_tokenize failed";
+        return false;
+    }
+    out_tokens.resize(static_cast<size_t>(n));
+    if (out_tokens.empty()) {
+        err = "tokenized prompt is empty";
+        return false;
+    }
+    return true;
 }
 
 static int32_t decode_tokens(
@@ -204,6 +255,23 @@ int main(int argc, char ** argv) {
         return 3;
     }
 
+    const llama_vocab * vocab = llama_model_get_vocab(model);
+    if (!vocab) {
+        print_json_error("llama_model_get_vocab returned null");
+        llama_model_free(model);
+        llama_backend_free();
+        return 6;
+    }
+
+    if (args.tokens.empty()) {
+        if (!tokenize_prompt(vocab, args.prompt, args.tokens, err)) {
+            print_json_error(err);
+            llama_model_free(model);
+            llama_backend_free();
+            return 11;
+        }
+    }
+
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx = static_cast<uint32_t>(std::max(args.ctx_len, static_cast<int>(args.tokens.size()) + 8));
     cparams.n_batch = static_cast<uint32_t>(std::max<int>(32, static_cast<int>(args.tokens.size())));
@@ -233,14 +301,6 @@ int main(int argc, char ** argv) {
         return 5;
     }
 
-    const llama_vocab * vocab = llama_model_get_vocab(model);
-    if (!vocab) {
-        print_json_error("llama_model_get_vocab returned null");
-        llama_free(ctx);
-        llama_model_free(model);
-        llama_backend_free();
-        return 6;
-    }
     int32_t n_vocab = llama_vocab_n_tokens(vocab);
     if (n_vocab <= 0) {
         print_json_error("invalid vocab size");
@@ -299,6 +359,12 @@ int main(int argc, char ** argv) {
     std::cout << "\"ok\":true,";
     std::cout << "\"n_vocab\":" << n_vocab << ",";
     std::cout << "\"token_count\":" << tokens.size() << ",";
+    std::cout << "\"tokens\":[";
+    for (size_t i = 0; i < args.tokens.size(); ++i) {
+        if (i) std::cout << ",";
+        std::cout << args.tokens[i];
+    }
+    std::cout << "],";
     std::cout << "\"decode_mode\":\"" << args.decode_mode << "\",";
     std::cout << "\"topk\":[";
     for (int i = 0; i < k; ++i) {

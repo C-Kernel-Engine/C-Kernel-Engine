@@ -1100,6 +1100,18 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
                                                            int aligned_head_dim,
                                                            int kv_stride_tokens);
 
+// Llama-parity flash attention variant that rounds K/V through FP16 before use.
+void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,
+                                                                 const float *k,
+                                                                 const float *v,
+                                                                 float *output,
+                                                                 int num_heads,
+                                                                 int num_kv_heads,
+                                                                 int num_tokens,
+                                                                 int head_dim,
+                                                                 int aligned_head_dim,
+                                                                 int kv_stride_tokens);
+
 // Decode attention for a single token using a KV cache (flash-style).
 //   q_token: [num_heads, aligned_head_dim]
 //   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]
@@ -1114,6 +1126,18 @@ void attention_forward_decode_head_major_gqa_flash(const float *q_token,
                                                   int cache_capacity,
                                                   int head_dim,
                                                   int aligned_head_dim);
+
+// Llama-parity decode flash attention variant that rounds K/V through FP16 before use.
+void attention_forward_decode_head_major_gqa_flash_f16kv(const float *q_token,
+                                                         const float *k_cache,
+                                                         const float *v_cache,
+                                                         float *out_token,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int kv_tokens,
+                                                         int cache_capacity,
+                                                         int head_dim,
+                                                         int aligned_head_dim);
 
 // Decode attention for a single token using a KV cache (REGULAR - NOT flash).
 //   q_token: [num_heads, aligned_head_dim]

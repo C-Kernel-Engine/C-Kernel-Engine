@@ -57,6 +57,7 @@ class DecodeAttentionBindings:
     rope_theta: float
     rope_layout: str
     kv_cache_abs: int
+    attn_fn_name: str
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -354,6 +355,10 @@ def _softmax_rows(x: np.ndarray) -> np.ndarray:
     return ex / np.maximum(denom, 1e-30)
 
 
+def _round_fp16_scalar(x: float) -> float:
+    return float(np.float16(np.float32(x)))
+
+
 def _decode_attention_ref(
     q_post: np.ndarray,
     k_cache: np.ndarray,
@@ -374,6 +379,57 @@ def _decode_attention_ref(
     scores = np.einsum("hd,htd->ht", q, k, optimize=True) * (1.0 / math.sqrt(float(head_dim)))
     probs = _softmax_rows(scores.astype(np.float64)).astype(np.float32)
     return np.einsum("ht,htd->hd", probs, v, optimize=True).astype(np.float32)
+
+
+def _decode_attention_ref_f16kv(
+    q_post: np.ndarray,
+    k_cache: np.ndarray,
+    v_cache: np.ndarray,
+    *,
+    num_heads: int,
+    num_kv_heads: int,
+    head_dim: int,
+) -> np.ndarray:
+    if num_heads % num_kv_heads != 0:
+        raise RuntimeError(f"Unsupported GQA ratio: q_heads={num_heads}, kv_heads={num_kv_heads}")
+    rep = num_heads // num_kv_heads
+    q = np.asarray(q_post, dtype=np.float32)
+    k = np.repeat(np.asarray(k_cache, dtype=np.float32), rep, axis=0)
+    v = np.repeat(np.asarray(v_cache, dtype=np.float32), rep, axis=0)
+    scale = 1.0 / math.sqrt(float(head_dim))
+    out = np.zeros((num_heads, head_dim), dtype=np.float32)
+
+    for h in range(num_heads):
+        max_score = -math.inf
+        sum_exp = 0.0
+        acc = np.zeros((head_dim,), dtype=np.float32)
+        for t in range(k.shape[1]):
+            dot = 0.0
+            for d in range(head_dim):
+                dot += _round_fp16_scalar(float(q[h, d])) * _round_fp16_scalar(float(k[h, t, d]))
+            score = dot * scale
+
+            prev_max = max_score
+            max_scale = 1.0
+            value_scale = 1.0
+            if score > max_score:
+                max_score = score
+                max_scale = math.exp(prev_max - max_score) if math.isfinite(prev_max) else 0.0
+                for d in range(head_dim):
+                    acc[d] = _round_fp16_scalar(float(acc[d] * max_scale))
+            else:
+                value_scale = math.exp(score - max_score)
+
+            for d in range(head_dim):
+                updated = float(acc[d]) + value_scale * _round_fp16_scalar(float(v[h, t, d]))
+                acc[d] = _round_fp16_scalar(updated)
+
+            sum_exp = sum_exp * max_scale + value_scale
+
+        if sum_exp > 0.0:
+            out[h, :] = acc / np.float32(sum_exp)
+
+    return out
 
 
 def _infer_bindings(model_dir: Path, layer: int) -> tuple[dict[str, Any], DecodeAttentionBindings]:
@@ -456,6 +512,7 @@ def _infer_bindings(model_dir: Path, layer: int) -> tuple[dict[str, Any], Decode
         rope_theta=float(rope_theta),
         rope_layout=str(rope_layout),
         kv_cache_abs=int(kv_cache_abs),
+        attn_fn_name=str(attn_call.get("function", "")),
     )
 
 
@@ -631,14 +688,24 @@ def main() -> int:
                 f"checker currently expects q_dim == head_dim for attention reference (got {q_dim} vs {b.head_dim})"
             )
 
-        attn_ref = _decode_attention_ref(
-            q_post_ref,
-            k_cache_rt,
-            v_cache_rt,
-            num_heads=b.num_heads,
-            num_kv_heads=b.num_kv_heads,
-            head_dim=b.head_dim,
-        )
+        if "f16kv" in b.attn_fn_name:
+            attn_ref = _decode_attention_ref_f16kv(
+                q_post_ref,
+                k_cache_rt,
+                v_cache_rt,
+                num_heads=b.num_heads,
+                num_kv_heads=b.num_kv_heads,
+                head_dim=b.head_dim,
+            )
+        else:
+            attn_ref = _decode_attention_ref(
+                q_post_ref,
+                k_cache_rt,
+                v_cache_rt,
+                num_heads=b.num_heads,
+                num_kv_heads=b.num_kv_heads,
+                head_dim=b.head_dim,
+            )
         ok, msg = _compare_pair("attention output vs local reference", attn_ref, attn_rt, args.attn_tol)
         print(msg)
         if not ok:
