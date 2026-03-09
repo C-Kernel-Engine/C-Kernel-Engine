@@ -167,6 +167,17 @@ $goal
 5. keep optional canary / OOD / frozen prompts in \`holdout/\`
 6. store inventory, dedupe, coverage, and fit reports in \`manifests/\`
 
+## Operator note
+
+This repo workspace is a seed template only.
+
+Do not keep generated run artifacts split between the repo and cache.
+
+Once staged into a run with \`ck_run_v7.py init --dataset-workspace ...\`, the working
+dataset copy, \`dataset_viewer.html\`, \`ir_report.html\`, checkpoints, parity/perf JSON,
+and other training artifacts should all live together under one cache run directory such as
+\`~/.cache/ck-engine-v7/models/train/<run-name>\`.
+
 ## Contract rule
 
 Do not mix incompatible row formats inside one workspace.

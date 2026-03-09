@@ -76,6 +76,8 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `v7-gate` should remain deterministic and reproducible on CPU-only environments.
 - Training runs belong under `~/.cache/ck-engine-v7/models/train/<run-name>`.
   Do not create ad-hoc run directories under `version/v7/runs/`; that pollutes the source tree and breaks `open_ir_hub.py` discovery.
+- Repo data workspaces such as `version/v7/data/spec04` are seed templates only.
+  Generated datasets, `dataset_viewer.html`, `ir_report.html`, checkpoints, parity JSON, and perf artifacts should live together under one cache run directory so operators can inspect, tar, and share a single folder and `open_ir_hub.py --open` can see the whole run cleanly.
 - When bootstrapping a new training run, prefer `python3 version/v7/scripts/ck_run_v7.py init --run-name <name> ...`.
   In general, let the tool choose the default cache location and provide only the run name; use `--run <path>` only when you intentionally need a nonstandard location.
 - `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
@@ -101,8 +103,8 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   Codegen now materializes attention weights when `save_for_backward.attn_weights` is present, and only uses flash
   forward when weights are not required by backward. See:
   `version/v7/scripts/codegen_train_runtime_v7.py`,
-  `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json`,
-  `version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json`.
+  `~/.cache/ck-engine-v7/models/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json`,
+  `~/.cache/ck-engine-v7/models/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json`.
 - `v7-parity-1tok` now includes `qk_norm_backward` parity in addition to RMSNorm, SwiGLU, and CE.
 - Canonical regression ledger (bugs -> gate -> artifact proof):
   `version/v7/reports/REGRESSION_LEDGER.md` and

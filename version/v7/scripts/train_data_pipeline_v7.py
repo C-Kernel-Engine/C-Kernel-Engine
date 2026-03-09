@@ -46,6 +46,24 @@ SVG_LINE = (
 )
 
 
+def _cache_models_root() -> Path:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        return Path(env).expanduser().resolve()
+    return (Path.home() / ".cache" / "ck-engine-v7" / "models").resolve()
+
+
+def _cache_train_root() -> Path:
+    return (_cache_models_root() / "train").resolve()
+
+
+def _cache_train_root_hint() -> str:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        return str(Path(env).expanduser() / "train")
+    return "~/.cache/ck-engine-v7/models/train"
+
+
 def _is_bpe_tokenizer_mode(tokenizer: str) -> bool:
     return tokenizer in {"bpe", "ascii_bpe"}
 
@@ -4092,7 +4110,11 @@ def main() -> int:
     ap.add_argument(
         "--run",
         required=True,
-        help="Existing v7 run-dir (created by ck_run_v7.py init). Recommended: ~/.cache/ck-engine-v7/models/train/<run-name> for ir_hub discovery.",
+        help=(
+            "Existing v7 run-dir (created by ck_run_v7.py init). "
+            f"Recommended: {_cache_train_root_hint()}/<run-name> so IR, dataset viewer, "
+            "training telemetry, and parity/perf artifacts stay in one operator-visible folder."
+        ),
     )
     ap.add_argument(
         "--init-if-missing",
@@ -4405,16 +4427,17 @@ def main() -> int:
         args.require_ascii_data = args.tokenizer == "ascii_bpe"
 
     run_dir = Path(args.run).expanduser().resolve()
-    cache_train_root = (Path.home() / ".cache" / "ck-engine-v7" / "models" / "train").resolve()
+    cache_train_root = _cache_train_root()
     try:
         in_cache_train_root = run_dir.is_relative_to(cache_train_root)
     except AttributeError:
         in_cache_train_root = str(run_dir).startswith(str(cache_train_root))
     if not in_cache_train_root:
         print(
-            "[WARN] --run is outside ~/.cache/ck-engine-v7/models/train.\n"
+            f"[WARN] --run is outside {_cache_train_root_hint()}.\n"
             f"       run_dir={run_dir}\n"
-            "       open_ir_hub.py may not auto-discover this run unless you move it later."
+            "       Keep IR, dataset, checkpoints, and training JSON under one cache run-dir\n"
+            "       so open_ir_hub.py can discover and share the full operator view cleanly."
         )
     manifest = run_dir / "weights_manifest.json"
     weights_bump = run_dir / "weights.bump"

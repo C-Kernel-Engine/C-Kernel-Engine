@@ -52,33 +52,51 @@ KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
 V7_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v7.txt"
 
 def _get_cache_dir() -> Path:
-    """Pick a writable cache dir (env override, default ~/.cache, fallback to repo)."""
+    """Pick the canonical writable cache dir for all generated v7 artifacts."""
     env = os.environ.get("CK_CACHE_DIR")
-    if env:
-        path = Path(env).expanduser()
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    default = Path.home() / ".cache/ck-engine-v7/models"
+    path = Path(env).expanduser() if env else (Path.home() / ".cache" / "ck-engine-v7" / "models")
     try:
-        default.mkdir(parents=True, exist_ok=True)
-        probe = default / ".ck_write_probe"
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".ck_write_probe"
         with open(probe, "w") as f:
             f.write("ok")
         probe.unlink()
-        return default
-    except Exception:
-        fallback = PROJECT_ROOT / ".ck_cache"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+        return path
+    except Exception as e:
+        location = str(path)
+        raise RuntimeError(
+            "v7 cache root must be writable so all generated artifacts stay under one "
+            f"operator-visible tree.\n  cache_root={location}\n"
+            "Set CK_CACHE_DIR to a writable cache path if you need an override.\n"
+            "Repo-local .ck_cache fallback is disabled for v7 training workflows."
+        ) from e
 
 CACHE_DIR = _get_cache_dir()
 
 
+def _get_default_train_root() -> Path:
+    """Canonical run root for operator-visible training artifacts."""
+    return CACHE_DIR / "train"
+
+
+DEFAULT_TRAIN_ROOT = _get_default_train_root()
+
+
+def _cache_root_hint() -> str:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        return str(Path(env).expanduser())
+    return "~/.cache/ck-engine-v7/models"
+
+
+def _cache_train_root_hint() -> str:
+    return f"{_cache_root_hint()}/train"
+
+
 def _get_default_report_dir() -> Path:
-    """Resolve writable v7 report directory (env override + ignored cache default)."""
+    """Resolve writable v7 report directory under the operator-visible cache tree."""
     env = os.environ.get("CK_V7_REPORT_DIR")
-    report_dir = Path(env).expanduser() if env else (V7_ROOT / ".cache" / "reports")
+    report_dir = Path(env).expanduser() if env else (CACHE_DIR / "reports")
     report_dir.mkdir(parents=True, exist_ok=True)
     return report_dir
 
@@ -7351,8 +7369,8 @@ def step_run_train_init(args: argparse.Namespace) -> None:
 
     run_name = str(getattr(args, "run_name", "tiny_init") or "tiny_init").strip()
     out_dir_arg = getattr(args, "output_dir", None)
-    # Keep default run dirs under cache so open_ir_hub.py can discover them automatically.
-    default_train_root = Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
+    # Keep default run dirs under the cache tree so IR + dataset + train artifacts stay together.
+    default_train_root = DEFAULT_TRAIN_ROOT
     out_dir = Path(out_dir_arg) if out_dir_arg else (default_train_root / run_name)
 
     cmd = [
@@ -7527,6 +7545,8 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         if not stage_script.exists():
             log_error(f"Dataset staging script not found: {stage_script}")
             sys.exit(1)
+        # Repo workspaces are seed templates only. The operator-facing working copy must
+        # live under the same cache run-dir as IR, checkpoints, and training telemetry.
         dataset_cmd = [
             python_exec,
             str(stage_script),
@@ -7690,7 +7710,7 @@ def step_run_train_suite(args: argparse.Namespace) -> None:
     """Run stability sweep epochs (1,3,5,10 by default) + optional spot profiling.
 
     Outputs:
-      - <run_dir>/train_e{E}.json for each sweep epoch (or version/v7/.cache/reports if --run not set)
+      - <run_dir>/train_e{E}.json for each sweep epoch (or <cache>/reports if --run not set)
       - <run_dir>/training_epoch_sweep_latest.json consolidated table source
       - training_* telemetry materialized from final sweep epoch
     """
@@ -10214,7 +10234,7 @@ Examples:
                         help='Parity tolerance for max param abs diff')
 
         sp.add_argument('--train-json-out', default=None,
-                        help='Optional JSON output path (default: run_dir/train_e2e_latest.json or v7/.cache/reports)')
+                        help='Optional JSON output path (default: run_dir/train_e2e_latest.json or <cache>/reports/train_e2e_latest.json)')
 
         if include_profile:
             sp.add_argument('--profile-train', choices=['none', 'perf', 'vtune', 'advisor'], default='none',
@@ -10339,7 +10359,7 @@ Examples:
     run_parser.add_argument('--train-loss-tol', type=float, default=2e-5)
     run_parser.add_argument('--train-param-tol', type=float, default=3e-5)
     run_parser.add_argument('--train-json-out', default=None,
-                           help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or version/v7/.cache/reports/train_e2e_latest.json)')
+                           help='Optional JSON output path for --train-e2e (default: run_dir/train_e2e_latest.json or <cache>/reports/train_e2e_latest.json)')
     run_parser.add_argument('--profile-train', choices=['none', 'perf', 'vtune', 'advisor'], default='none',
                            help='Optional external profiler for --train-e2e (none, perf, vtune, advisor)')
     run_parser.add_argument('--train-profile-dir', default=None,
@@ -10467,9 +10487,9 @@ Examples:
     # Init command (tiny training run bootstrap)
     init_parser = subparsers.add_parser('init', help='Initialize tiny v7 training run directory')
     init_parser.add_argument('--run', dest='output_dir', default=None,
-                             help='Optional explicit run directory. Prefer omitting this and using --run-name so the default ~/.cache/ck-engine-v7/models/train/<run-name> location is used.')
+                             help=f'Optional explicit run directory. Prefer omitting this and using --run-name so the default {_cache_train_root_hint()}/<run-name> location is used.')
     init_parser.add_argument('--run-name', default='tiny_init',
-                             help='Preferred run selector. When --run is omitted, the run is created under ~/.cache/ck-engine-v7/models/train/<run-name>.')
+                             help=f'Preferred run selector. When --run is omitted, the run is created under {_cache_train_root_hint()}/<run-name>.')
     init_parser.add_argument('--init', choices=['normal_0p02', 'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'zeros'],
                              default='normal_0p02', help='Weight initialization method')
     init_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')

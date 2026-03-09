@@ -41,12 +41,12 @@ PROJECT_ROOT = V7_ROOT.parent.parent           # .../Workspace/C-Kernel-Engine
 sys.path.insert(0, str(V7_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-CACHE_PATH = Path.home() / ".cache" / "ck-engine-v7" / "models"
+CACHE_PATH = Path(os.environ.get("CK_CACHE_DIR", str(Path.home() / ".cache" / "ck-engine-v7" / "models"))).expanduser()
 CACHE_PATH_FALLBACK = Path.home() / ".cache" / "ck-engine-v6.6" / "models"
 VISUALIZER = SCRIPT_DIR / "ir_visualizer.html"
 CK_RUN_SCRIPT = V7_ROOT / "scripts" / "ck_run_v7.py"
 MEMORY_SIGNOFF_SCRIPT = V7_ROOT / "scripts" / "memory_signoff_v7.py"
-V7_REPORT_PATH = Path(os.environ.get("CK_V7_REPORT_DIR", str(V7_ROOT / ".cache" / "reports"))).expanduser()
+V7_REPORT_PATH = Path(os.environ.get("CK_V7_REPORT_DIR", str(CACHE_PATH / "reports"))).expanduser()
 V7_REPORT_PATH_LEGACY = V7_ROOT / "reports"
 
 

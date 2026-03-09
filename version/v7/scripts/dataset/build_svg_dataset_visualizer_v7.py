@@ -2315,9 +2315,9 @@ def main() -> int:
 
     workspace = Path(args.workspace).expanduser().resolve()
     output = Path(args.output).expanduser().resolve()
-    raw_inventory = _load_json(workspace / "manifests" / "raw_assets_inventory.json")
-    normalized = _load_json(workspace / "manifests" / "normalized_assets_manifest.json")
-    classified = _load_json(workspace / "manifests" / "asset_classification_manifest.json")
+    raw_inventory = _load_json_if_exists(workspace / "manifests" / "raw_assets_inventory.json") or {}
+    normalized = _load_json_if_exists(workspace / "manifests" / "normalized_assets_manifest.json") or {}
+    classified = _load_json_if_exists(workspace / "manifests" / "asset_classification_manifest.json") or {}
 
     html_doc = build_html(workspace, raw_inventory, normalized, classified)
     output.parent.mkdir(parents=True, exist_ok=True)

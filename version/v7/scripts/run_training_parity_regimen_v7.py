@@ -47,6 +47,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import subprocess
 import sys
 import time
@@ -64,7 +65,25 @@ CHECK_REPLAY = SCRIPT_DIR / "check_replay_determinism_v7.py"
 CHECK_STITCH = SCRIPT_DIR / "check_backprop_stitch_runtime_v7.py"
 CHECK_REPLAY_ACCUM = SCRIPT_DIR / "check_runtime_replay_accum_v7.py"
 
-DEFAULT_REPORT_DIR = ROOT / "version" / "v7" / ".cache" / "reports"
+
+def _default_report_dir() -> Path:
+    """Keep global fallback artifacts in the same cache tree used by runs and IR hub."""
+    first = None
+    for raw in (os.environ.get("CK_V7_REPORT_DIR"), os.environ.get("CK_CACHE_DIR")):
+        if raw:
+            first = Path(raw).expanduser()
+            break
+    if first is not None:
+        base = first
+        if base.name != "reports" and base.name != "train":
+            return base / "reports"
+        if base.name == "train":
+            return base.parent / "reports"
+        return base
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "reports"
+
+
+DEFAULT_REPORT_DIR = _default_report_dir()
 
 # Strict sentinel tolerance for A4 (AdamW toy-model regression gate).
 # This is intentionally NOT derived from --param-tol so it stays fixed regardless of
