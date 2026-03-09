@@ -57,6 +57,12 @@ def _safe_read_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def _safe_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _to_rel(path: Path, root: Path) -> str:
     try:
         return str(path.relative_to(root))
@@ -259,6 +265,8 @@ def _has_run_artifact(run_dir: Path, *relative_paths: str) -> bool:
 
 def _extract_dims(weights_manifest: Path) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    if weights_manifest is None:
+        return out
     obj = _safe_read_json(weights_manifest)
     if not isinstance(obj, dict):
         return out
@@ -280,7 +288,9 @@ def _extract_dims(weights_manifest: Path) -> dict[str, Any]:
     return out
 
 
-def _extract_manifest_info(weights_manifest: Path) -> tuple[int | None, str | None]:
+def _extract_manifest_info(weights_manifest: Path | None) -> tuple[int | None, str | None]:
+    if weights_manifest is None:
+        return None, None
     obj = _safe_read_json(weights_manifest)
     if not isinstance(obj, dict):
         return None, None
@@ -325,7 +335,9 @@ def _latest_checkpoint(run_dir: Path) -> tuple[int | None, Path | None, Path | N
     return latest_step, latest_bump, latest_manifest, count
 
 
-def _extract_final_loss(path: Path) -> float | None:
+def _extract_final_loss(path: Path | None) -> float | None:
+    if path is None:
+        return None
     obj = _safe_read_json(path)
     if not isinstance(obj, dict):
         return None
@@ -342,7 +354,9 @@ def _extract_final_loss(path: Path) -> float | None:
     return None
 
 
-def _extract_valid_svg_rate(path: Path) -> float | None:
+def _extract_valid_svg_rate(path: Path | None) -> float | None:
+    if path is None:
+        return None
     obj = _safe_read_json(path)
     if not isinstance(obj, dict):
         return None
@@ -352,8 +366,10 @@ def _extract_valid_svg_rate(path: Path) -> float | None:
     return None
 
 
-def _extract_parity_regimen(path: Path) -> dict[str, Any]:
+def _extract_parity_regimen(path: Path | None) -> dict[str, Any]:
     status = {"status": "MISSING", "passed": None, "generated_at": None}
+    if path is None:
+        return status
     obj = _safe_read_json(path)
     if not isinstance(obj, dict):
         return status
@@ -372,12 +388,147 @@ def _extract_parity_regimen(path: Path) -> dict[str, Any]:
     return status
 
 
+def _best_eval_entry(entries: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not entries:
+        return None
+
+    def _score(entry: dict[str, Any]) -> tuple[float, float, float]:
+        metrics = entry.get("metrics") if isinstance(entry.get("metrics"), dict) else {}
+        return (
+            _safe_float(metrics.get("adherence")) or 0.0,
+            _safe_float(metrics.get("tag_adherence")) or 0.0,
+            _safe_float(metrics.get("valid_svg_rate")) or 0.0,
+        )
+
+    return max(entries, key=_score)
+
+
+def _extract_tokenizer_summary(run_dir: Path) -> dict[str, Any]:
+    path = _find_run_artifact(run_dir, "tokenizer_roundtrip.json")
+    if path is None:
+        return {}
+    obj = _safe_read_json(path)
+    if not isinstance(obj, dict):
+        return {}
+    line_eval = obj.get("line_eval") if isinstance(obj.get("line_eval"), dict) else {}
+    return {
+        "path": str(path),
+        "tokenizer_mode": obj.get("tokenizer_mode"),
+        "status": obj.get("status"),
+        "exact_match": obj.get("exact_match"),
+        "byte_match_rate": _safe_float(obj.get("byte_match_rate")),
+        "line_match_rate": _safe_float(obj.get("line_match_rate")),
+        "token_count": int(obj["token_count"]) if isinstance(obj.get("token_count"), (int, float)) else None,
+        "input_lines": int(obj["input_lines"]) if isinstance(obj.get("input_lines"), (int, float)) else None,
+        "input_bytes": int(obj["input_bytes"]) if isinstance(obj.get("input_bytes"), (int, float)) else None,
+        "coverage_rate": _safe_float(line_eval.get("coverage_rate")),
+        "exact_match_rate": _safe_float(line_eval.get("exact_match_rate")),
+    }
+
+
+def _extract_stage_eval_summary(run_dir: Path) -> dict[str, Any]:
+    path = _find_run_artifact(run_dir, "stage_eval_matrix.json", "stage_eval_matrix_latest.json")
+    if path is None:
+        return {}
+    obj = _safe_read_json(path)
+    if not isinstance(obj, dict):
+        return {}
+    entries = obj.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return {}
+    sorted_entries = sorted(entries, key=lambda item: int(item.get("run_order") or 0))
+    latest = sorted_entries[-1]
+    best = _best_eval_entry(sorted_entries)
+
+    def _numeric_metrics(entry: dict[str, Any] | None) -> dict[str, float]:
+        metrics = entry.get("metrics") if isinstance(entry, dict) and isinstance(entry.get("metrics"), dict) else {}
+        out: dict[str, float] = {}
+        for key, value in metrics.items():
+            numeric = _safe_float(value)
+            if numeric is not None:
+                out[key] = numeric
+        return out
+
+    return {
+        "path": str(path),
+        "entry_count": len(sorted_entries),
+        "latest_phase": latest.get("phase_label"),
+        "best_phase": best.get("phase_label") if isinstance(best, dict) else None,
+        "latest_metrics": _numeric_metrics(latest),
+        "best_metrics": _numeric_metrics(best),
+    }
+
+
+def _extract_probe_summary(run_dir: Path) -> dict[str, Any]:
+    for rel in (
+        "toy_svg_structured_probe_report.json",
+        "toy_svg_probe_report.json",
+        "toy_svg_semantic_probe_report.json",
+    ):
+        path = _find_run_artifact(run_dir, rel)
+        if path is None:
+            continue
+        obj = _safe_read_json(path)
+        if not isinstance(obj, dict):
+            continue
+        rows = obj.get("results")
+        if not isinstance(rows, list) or not rows:
+            continue
+        holdouts = [row for row in rows if row.get("split") == "holdout"]
+        exact = sum(1 for row in rows if row.get("exact_match"))
+        renderable = sum(1 for row in rows if row.get("rendered_svg"))
+        holdout_exact = sum(1 for row in holdouts if row.get("exact_match"))
+        probe_count = len(rows)
+        holdout_count = len(holdouts)
+        metrics: dict[str, float] = {
+            "exact_rate": exact / probe_count if probe_count else 0.0,
+            "renderable_rate": renderable / probe_count if probe_count else 0.0,
+        }
+        if holdout_count:
+            metrics["holdout_exact_rate"] = holdout_exact / holdout_count
+        return {
+            "path": str(path),
+            "kind": path.stem,
+            "probe_count": probe_count,
+            "holdout_count": holdout_count,
+            "metrics": metrics,
+        }
+    return {}
+
+
+def _infer_compare_family(run_dir: Path, dataset_type: str | None, kind: str) -> str:
+    if dataset_type:
+        return str(dataset_type).lower()
+    name = run_dir.name.lower()
+    hints = [
+        ("toy_svg", "svg"),
+        ("svg", "svg"),
+        ("sql", "sql"),
+        ("sqlite", "sql"),
+        ("bash", "bash"),
+        ("shell", "bash"),
+        ("python", "python"),
+        ("py_", "python"),
+        ("_py", "python"),
+        ("c_lang", "c"),
+        ("c_code", "c"),
+        ("clang", "c"),
+        ("llama", "llm"),
+        ("qwen", "llm"),
+    ]
+    for needle, label in hints:
+        if needle in name:
+            return label
+    return kind
+
+
 @dataclass
 class RunRecord:
     run_dir: Path
     rel_path: str
     name: str
     kind: str
+    compare_family: str
     report_path: Path | None
     dataset_viewer_path: Path | None
     gallery_path: Path | None
@@ -390,6 +541,9 @@ class RunRecord:
     dataset_refresh_cmd: str | None
     dataset_rebuild_viewer_cmd: str | None
     dataset_prep_checklist: list[dict[str, Any]]
+    tokenizer_summary: dict[str, Any]
+    eval_summary: dict[str, Any]
+    probe_summary: dict[str, Any]
     dims: dict[str, Any]
     parity_regimen: dict[str, Any]
     final_loss: float | None
@@ -415,6 +569,7 @@ class RunRecord:
             "rel_path": self.rel_path,
             "name": self.name,
             "kind": self.kind,
+            "compare_family": self.compare_family,
             "report_path": str(self.report_path) if self.report_path else None,
             "report_uri": self.report_path.resolve().as_uri() if self.report_path else None,
             "dataset_viewer_path": str(self.dataset_viewer_path) if self.dataset_viewer_path else None,
@@ -431,6 +586,9 @@ class RunRecord:
             "dataset_refresh_cmd": self.dataset_refresh_cmd,
             "dataset_rebuild_viewer_cmd": self.dataset_rebuild_viewer_cmd,
             "dataset_prep_checklist": self.dataset_prep_checklist,
+            "tokenizer_summary": self.tokenizer_summary,
+            "eval_summary": self.eval_summary,
+            "probe_summary": self.probe_summary,
             "dims": self.dims,
             "parity_regimen": self.parity_regimen,
             "final_loss": self.final_loss,
@@ -517,7 +675,7 @@ def _build_run_coverage(
                     ("dataset_qc", _has_run_artifact(run_dir, "dataset_qc.json")),
                     ("tokenizer_roundtrip", _has_run_artifact(run_dir, "tokenizer_roundtrip.json")),
                     ("run_ledger", _has_run_artifact(run_dir, "run_ledger.jsonl")),
-                    ("stage_eval_matrix", _has_run_artifact(run_dir, "stage_eval_matrix_latest.json")),
+                    ("stage_eval_matrix", _has_run_artifact(run_dir, "stage_eval_matrix_latest.json", "stage_eval_matrix.json")),
                     ("analysis_checkpoints", _has_run_artifact(run_dir, "analysis_checkpoints_latest.json")),
                 ],
                 core=True,
@@ -670,10 +828,10 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     gallery = _find_gallery_path(run_dir)
     dataset_snapshot_path = _find_dataset_snapshot_path(run_dir)
     dataset_snapshot = _safe_read_json(dataset_snapshot_path) if dataset_snapshot_path else None
-    wm = run_dir / "weights_manifest.json"
-    parity = run_dir / "training_parity_regimen_latest.json"
-    loss = run_dir / "training_loss_curve_latest.json"
-    post_eval = run_dir / "post_train_eval.json"
+    wm = _find_run_artifact(run_dir, "weights_manifest.json")
+    parity = _find_run_artifact(run_dir, "training_parity_regimen_latest.json")
+    loss = _find_run_artifact(run_dir, "training_loss_curve_latest.json", "training_loss_curve.json")
+    post_eval = _find_run_artifact(run_dir, "post_train_eval.json")
     run_index = run_dir / "run_index.json"
 
     dims = _extract_dims(wm)
@@ -711,6 +869,10 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     dataset_refresh_cmd = _build_dataset_materialize_cmd(dataset_workspace, dataset_type)
     dataset_rebuild_viewer_cmd = _build_dataset_viewer_cmd(dataset_workspace, dataset_type, run_dir)
     dataset_prep_checklist = _build_dataset_checklist(run_dir, dataset_snapshot)
+    compare_family = _infer_compare_family(run_dir, dataset_type, kind)
+    tokenizer_summary = _extract_tokenizer_summary(run_dir)
+    eval_summary = _extract_stage_eval_summary(run_dir)
+    probe_summary = _extract_probe_summary(run_dir)
 
     if dataset_refresh_cmd:
         next_actions.append({"label": "Materialize staged dataset artifacts", "cmd": dataset_refresh_cmd})
@@ -722,6 +884,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         rel_path=rel,
         name=run_dir.name,
         kind=kind,
+        compare_family=compare_family,
         report_path=report,
         dataset_viewer_path=dataset_viewer,
         gallery_path=gallery,
@@ -734,6 +897,9 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         dataset_refresh_cmd=dataset_refresh_cmd,
         dataset_rebuild_viewer_cmd=dataset_rebuild_viewer_cmd,
         dataset_prep_checklist=dataset_prep_checklist,
+        tokenizer_summary=tokenizer_summary,
+        eval_summary=eval_summary,
+        probe_summary=probe_summary,
         dims=dims,
         parity_regimen=parity_status,
         final_loss=final_loss,
@@ -763,7 +929,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
     dataset_viewer_count = sum(1 for r in payload_runs if r.get("dataset_viewer_path"))
     pass_count = sum(1 for r in payload_runs if (r.get("parity_regimen") or {}).get("status") in ("PASS", "PASS_REUSED"))
     return {
-        "schema": "ck.ir.hub.v1",
+        "schema": "ck.ir.hub.v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "models_root": str(models_root),
         "summary": {
@@ -1648,6 +1814,108 @@ def render_html(index_payload: dict[str, Any]) -> str:
       color: #eadbbb;
     }
 
+    .btn.compare-on {
+      border-color: rgba(7, 173, 248, 0.34);
+      background: linear-gradient(180deg, rgba(7, 173, 248, 0.14), rgba(7, 173, 248, 0.05));
+      color: #cfefff;
+    }
+
+    .compare-layout {
+      display: grid;
+      gap: 16px;
+    }
+
+    .compare-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .compare-toolbar .meta-block {
+      display: grid;
+      gap: 8px;
+    }
+
+    .compare-hints,
+    .compare-actions,
+    .compare-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .compare-section {
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.02);
+      padding: 16px;
+    }
+
+    .compare-section h3 {
+      margin: 0 0 10px 0;
+      font-size: 1rem;
+    }
+
+    .compare-table-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      background: rgba(12, 12, 12, 0.48);
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    .compare-table th,
+    .compare-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.82rem;
+    }
+
+    .compare-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: rgba(20, 20, 20, 0.96);
+      color: #f5f5f5;
+    }
+
+    .compare-table tbody th {
+      min-width: 210px;
+      color: var(--muted);
+      font-weight: 600;
+      background: rgba(255,255,255,0.015);
+    }
+
+    .compare-group-row td {
+      background: rgba(255, 180, 0, 0.06);
+      color: #f8e8ba;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-top: 1px solid rgba(255, 180, 0, 0.12);
+    }
+
+    .compare-mini {
+      color: var(--dim);
+      font-size: 0.74rem;
+    }
+
     .run-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -2308,6 +2576,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         </section>
 
         <section class="panel" id="spotlightPanel"></section>
+        <section class="panel" id="comparePanel"></section>
 
         <section id="runGrid" class="run-grid"></section>
         <section id="emptyState" class="panel empty" hidden>
@@ -2344,6 +2613,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       resultSummary: document.getElementById('resultSummary'),
       resultPills: document.getElementById('resultPills'),
       spotlightPanel: document.getElementById('spotlightPanel'),
+      comparePanel: document.getElementById('comparePanel'),
       runGrid: document.getElementById('runGrid'),
       emptyState: document.getElementById('emptyState'),
       coveragePanel: document.getElementById('coveragePanel'),
@@ -2429,6 +2699,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
         run.name,
         run.rel_path,
         run.kind,
+        run.compare_family,
+        run.datasetType,
         run.shape_signature,
         run.modelSpec,
         run.parityStatus,
@@ -2464,6 +2736,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
         datasetRefreshCmd: run.dataset_refresh_cmd || '',
         datasetRebuildViewerCmd: run.dataset_rebuild_viewer_cmd || '',
         datasetPrepChecklist: Array.isArray(run.dataset_prep_checklist) ? run.dataset_prep_checklist : [],
+        compareFamily: run.compare_family || '',
+        tokenizerSummary: (run.tokenizer_summary && typeof run.tokenizer_summary === 'object') ? run.tokenizer_summary : {},
+        evalSummary: (run.eval_summary && typeof run.eval_summary === 'object') ? run.eval_summary : {},
+        probeSummary: (run.probe_summary && typeof run.probe_summary === 'object') ? run.probe_summary : {},
         validSvgRate: typeof run.valid_svg_rate === 'number' ? run.valid_svg_rate : null,
         checkpointCount: typeof run.checkpoint_count === 'number' ? run.checkpoint_count : 0,
         latestCheckpointStep: typeof run.latest_checkpoint_step === 'number' ? run.latest_checkpoint_step : null,
@@ -2506,7 +2782,608 @@ def render_html(index_payload: dict[str, Any]) -> str:
       sort: 'updated_desc',
       view: loadPreference('ck_v7_run_hub_view', 'cards'),
       density: loadPreference('ck_v7_run_hub_density', 'comfortable'),
+      selected: new Set(),
     };
+
+    function uniqueNonEmpty(values) {
+      return [...new Set((Array.isArray(values) ? values : []).filter((value) => value !== null && value !== undefined && String(value) !== ''))];
+    }
+
+    function isSelected(run) {
+      return Boolean(run && state.selected.has(run.rel_path));
+    }
+
+    function selectedRuns() {
+      return runs.filter((run) => state.selected.has(run.rel_path));
+    }
+
+    function toggleSelection(relPath) {
+      if (!relPath) return;
+      if (state.selected.has(relPath)) {
+        state.selected.delete(relPath);
+      } else {
+        state.selected.add(relPath);
+      }
+    }
+
+    function clearSelection() {
+      state.selected.clear();
+    }
+
+    function selectionButton(run, idleLabel = 'Select', activeLabel = 'Selected') {
+      const active = isSelected(run);
+      return `<button class="btn ${active ? 'compare-on' : ''}" data-toggle-select="${encodeURIComponent(run.rel_path)}">${active ? escapeHtml(activeLabel) : escapeHtml(idleLabel)}</button>`;
+    }
+
+    function metricLabel(key) {
+      return String(key || '')
+        .replace(/_/g, ' ')
+        .replace(/\b[a-z]/g, (match) => match.toUpperCase());
+    }
+
+    function fmtCompareValue(value, key = '') {
+      if (value === null || value === undefined || value === '') return 'n/a';
+      if (typeof value === 'boolean') return value ? 'yes' : 'no';
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        const lowerKey = String(key || '').toLowerCase();
+        if (
+          lowerKey.includes('rate')
+          || lowerKey.includes('pct')
+          || lowerKey.includes('adherence')
+          || lowerKey.includes('robustness')
+          || lowerKey.includes('match')
+          || lowerKey.includes('coverage')
+          || lowerKey.includes('integrity')
+        ) {
+          return fmtPct(value);
+        }
+        if (lowerKey.includes('loss')) return fmtLoss(value);
+        if (
+          lowerKey.includes('count')
+          || lowerKey.includes('step')
+          || lowerKey.includes('lines')
+          || lowerKey.includes('bytes')
+          || lowerKey.includes('tokens')
+        ) {
+          return fmtInt(value);
+        }
+        return Math.abs(value) >= 10 ? value.toFixed(2) : value.toFixed(4);
+      }
+      return String(value);
+    }
+
+    function collectRowsFromDefs(selected, defs) {
+      return defs
+        .map((def) => {
+          const values = selected.map((run) => def.get(run));
+          const hasSignal = values.some((value) => value !== null && value !== undefined && value !== '');
+          return hasSignal ? { label: def.label, values } : null;
+        })
+        .filter(Boolean);
+    }
+
+    function orderedMetricKeys(metricObjects) {
+      const preferred = [
+        'valid_svg_rate',
+        'closure_success_rate',
+        'prefix_integrity',
+        'ood_robustness',
+        'adherence',
+        'tag_adherence',
+        'repetition_loop_score',
+        'exact_rate',
+        'renderable_rate',
+        'holdout_exact_rate',
+        'coverage_rate',
+        'exact_match_rate',
+        'byte_match_rate',
+        'line_match_rate',
+        'token_count',
+        'input_lines',
+        'input_bytes',
+      ];
+      const seen = new Set();
+      const discovered = [];
+      (metricObjects || []).forEach((obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.keys(obj).forEach((key) => {
+          if (!seen.has(key)) {
+            seen.add(key);
+            discovered.push(key);
+          }
+        });
+      });
+      const front = preferred.filter((key) => seen.has(key));
+      const rest = discovered.filter((key) => !front.includes(key)).sort();
+      return [...front, ...rest];
+    }
+
+    function buildCompareSections(selected) {
+      const sections = [];
+      const identity = collectRowsFromDefs(selected, [
+        { label: 'Run Kind', get: (run) => run.kind },
+        { label: 'Compare Family', get: (run) => run.compareFamily || null },
+        { label: 'Dataset Type', get: (run) => run.datasetType || null },
+        { label: 'Model Spec', get: (run) => run.modelSpec || null },
+        { label: 'Shape Signature', get: (run) => run.shape_signature || null },
+      ]);
+      if (identity.length) sections.push({ title: 'Identity', rows: identity });
+
+      const tokenizerRows = collectRowsFromDefs(selected, [
+        { label: 'Tokenizer Mode', get: (run) => run.tokenizerSummary.tokenizer_mode || null },
+        { label: 'Tokenizer Status', get: (run) => run.tokenizerSummary.status || null },
+        { label: 'Roundtrip Exact', get: (run) => run.tokenizerSummary.exact_match },
+      ]);
+      const tokenizerMetricKeys = orderedMetricKeys(selected.map((run) => run.tokenizerSummary || {}).map((obj) => {
+        const copy = { ...obj };
+        delete copy.path;
+        delete copy.tokenizer_mode;
+        delete copy.status;
+        delete copy.exact_match;
+        return copy;
+      }));
+      tokenizerMetricKeys.forEach((key) => {
+        tokenizerRows.push({
+          label: metricLabel(key),
+          values: selected.map((run) => run.tokenizerSummary ? run.tokenizerSummary[key] : null),
+        });
+      });
+      if (tokenizerRows.some((row) => row.values.some((value) => value !== null && value !== undefined && value !== ''))) {
+        sections.push({ title: 'Tokenizer', rows: tokenizerRows });
+      }
+
+      const trainRows = collectRowsFromDefs(selected, [
+        { label: 'Final Loss', get: (run) => run.final_loss },
+        { label: 'Valid SVG Rate', get: (run) => run.validSvgRate },
+        { label: 'Parity', get: (run) => run.parityStatus },
+        { label: 'Weights Step', get: (run) => run.weightsStep },
+        { label: 'Checkpoint Count', get: (run) => run.checkpointCount },
+        { label: 'Updated', get: (run) => run.updated_iso || run.updatedLabel },
+      ]);
+      if (trainRows.length) sections.push({ title: 'Training Surface', rows: trainRows });
+
+      const latestEvalKeys = orderedMetricKeys(selected.map((run) => (run.evalSummary && run.evalSummary.latest_metrics) || {}));
+      const latestEvalRows = collectRowsFromDefs(selected, [
+        { label: 'Latest Eval Phase', get: (run) => run.evalSummary.latest_phase || null },
+      ]);
+      latestEvalKeys.forEach((key) => {
+        latestEvalRows.push({
+          label: metricLabel(key),
+          values: selected.map((run) => run.evalSummary && run.evalSummary.latest_metrics ? run.evalSummary.latest_metrics[key] : null),
+        });
+      });
+      if (latestEvalRows.some((row) => row.values.some((value) => value !== null && value !== undefined && value !== ''))) {
+        sections.push({ title: 'Eval Latest', rows: latestEvalRows });
+      }
+
+      const bestEvalKeys = orderedMetricKeys(selected.map((run) => (run.evalSummary && run.evalSummary.best_metrics) || {}));
+      const bestEvalRows = collectRowsFromDefs(selected, [
+        { label: 'Best Eval Phase', get: (run) => run.evalSummary.best_phase || null },
+      ]);
+      bestEvalKeys.forEach((key) => {
+        bestEvalRows.push({
+          label: metricLabel(key),
+          values: selected.map((run) => run.evalSummary && run.evalSummary.best_metrics ? run.evalSummary.best_metrics[key] : null),
+        });
+      });
+      if (bestEvalRows.some((row) => row.values.some((value) => value !== null && value !== undefined && value !== ''))) {
+        sections.push({ title: 'Eval Best', rows: bestEvalRows });
+      }
+
+      const probeKeys = orderedMetricKeys(selected.map((run) => (run.probeSummary && run.probeSummary.metrics) || {}));
+      const probeRows = collectRowsFromDefs(selected, [
+        { label: 'Probe Summary Kind', get: (run) => run.probeSummary.kind || null },
+        { label: 'Probe Count', get: (run) => run.probeSummary.probe_count || null },
+        { label: 'Holdout Count', get: (run) => run.probeSummary.holdout_count || null },
+      ]);
+      probeKeys.forEach((key) => {
+        probeRows.push({
+          label: metricLabel(key),
+          values: selected.map((run) => run.probeSummary && run.probeSummary.metrics ? run.probeSummary.metrics[key] : null),
+        });
+      });
+      if (probeRows.some((row) => row.values.some((value) => value !== null && value !== undefined && value !== ''))) {
+        sections.push({ title: 'Probe Summary', rows: probeRows });
+      }
+
+      return sections;
+    }
+
+    function buildCompatibility(selected) {
+      const families = uniqueNonEmpty(selected.map((run) => run.compareFamily));
+      const kinds = uniqueNonEmpty(selected.map((run) => run.kind));
+      const datasetTypes = uniqueNonEmpty(selected.map((run) => run.datasetType));
+      const shapes = uniqueNonEmpty(selected.map((run) => run.shape_signature));
+      const tokenModes = uniqueNonEmpty(selected.map((run) => run.tokenizerSummary && run.tokenizerSummary.tokenizer_mode));
+      const signals = [
+        { label: families.length === 1 && families[0] ? `family ${families[0]}` : 'mixed family', good: families.length === 1 && families[0] },
+        { label: kinds.length === 1 ? `kind ${kinds[0]}` : 'mixed kind', good: kinds.length === 1 },
+        { label: datasetTypes.length === 1 && datasetTypes[0] ? `dataset ${datasetTypes[0]}` : 'mixed dataset', good: datasetTypes.length === 1 && datasetTypes[0] },
+        { label: shapes.length === 1 && shapes[0] ? 'same shape signature' : 'shape varies', good: shapes.length === 1 && shapes[0] },
+        { label: tokenModes.length === 1 && tokenModes[0] ? `tokenizer ${tokenModes[0]}` : 'tokenizer varies', good: tokenModes.length === 1 && tokenModes[0] },
+      ];
+      const score = signals.reduce((sum, signal) => sum + (signal.good ? 1 : 0), 0);
+      const tone = score >= 4 ? 'pass' : (score >= 2 ? 'skip' : 'missing');
+      const note = score >= 4
+        ? 'Strong compare set: same family/model shape or tokenizer contract.'
+        : (score >= 2 ? 'Usable compare set: some shared structure, but not perfectly aligned.' : 'Loose compare set: table is still useful, but treat differences as cross-family.');
+      return { score, tone, note, signals };
+    }
+
+    function autoSelectSimilar(seedRelPath, limit = 4) {
+      const seed = runs.find((run) => run.rel_path === seedRelPath) || runs[0];
+      if (!seed) return;
+      const peers = runs
+        .filter((run) => run.rel_path !== seed.rel_path)
+        .map((run) => {
+          let score = 0;
+          if (run.kind === seed.kind) score += 2;
+          if (run.compareFamily && run.compareFamily === seed.compareFamily) score += 3;
+          if (run.datasetType && run.datasetType === seed.datasetType) score += 2;
+          if (run.shape_signature && run.shape_signature === seed.shape_signature) score += 4;
+          if ((run.tokenizerSummary && run.tokenizerSummary.tokenizer_mode) && run.tokenizerSummary.tokenizer_mode === (seed.tokenizerSummary && seed.tokenizerSummary.tokenizer_mode)) score += 1;
+          return { run, score };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => (b.score - a.score) || ((b.run.updated_epoch || 0) - (a.run.updated_epoch || 0)))
+        .slice(0, Math.max(1, limit - 1));
+      state.selected = new Set([seed.rel_path, ...peers.map((item) => item.run.rel_path)]);
+    }
+
+    function renderStandaloneCompareHtml(selected) {
+      const compatibility = buildCompatibility(selected);
+      const sections = buildCompareSections(selected);
+      const families = uniqueNonEmpty(selected.map((run) => run.compareFamily || run.kind));
+      const tokenModes = uniqueNonEmpty(selected.map((run) => run.tokenizerSummary && run.tokenizerSummary.tokenizer_mode));
+      const headerCells = selected.map((run) => `<th>${escapeHtml(run.name)}<div class="compare-mini">${escapeHtml(run.rel_path)}</div></th>`).join('');
+      const bodyRows = sections.map((section) => {
+        const rows = section.rows.map((row) => `
+          <tr>
+            <th>${escapeHtml(row.label)}</th>
+            ${row.values.map((value, idx) => `<td>${escapeHtml(fmtCompareValue(value, row.label || String(idx)))}</td>`).join('')}
+          </tr>
+        `).join('');
+        return `<tr class="compare-group-row"><td colspan="${selected.length + 1}">${escapeHtml(section.title)}</td></tr>${rows}`;
+      }).join('');
+      const signalBadges = compatibility.signals.map((signal) => `<span class="badge ${signal.good ? 'pass' : compatibility.tone}">${escapeHtml(signal.label)}</span>`).join('');
+      const summaryCards = [
+        { label: 'Selected Runs', value: String(selected.length), note: 'Runs in this compare set.' },
+        { label: 'Families', value: families.length === 1 ? families[0] : `${families.length} mixed`, note: families.length === 1 ? 'Single inferred family.' : 'Multiple families are present.' },
+        { label: 'Tokenizer', value: tokenModes.length === 1 ? tokenModes[0] : (tokenModes.length ? 'mixed' : 'n/a'), note: tokenModes.length === 1 ? 'Shared tokenizer mode.' : 'Tokenizer contract differs.' },
+        { label: 'Compatibility', value: `${compatibility.score}/5`, note: compatibility.note },
+      ].map((card) => `
+        <article class="summary-card">
+          <div class="k">${escapeHtml(card.label)}</div>
+          <div class="v">${escapeHtml(card.value)}</div>
+          <div class="n">${escapeHtml(card.note)}</div>
+        </article>
+      `).join('');
+      const runCards = selected.map((run) => {
+        const compareLabel = run.compareFamily || run.kind || 'run';
+        const tokenizerLabel = run.tokenizerSummary && run.tokenizerSummary.tokenizer_mode ? run.tokenizerSummary.tokenizer_mode : 'n/a';
+        const evalLabel = (run.evalSummary && (run.evalSummary.best_phase || run.evalSummary.latest_phase)) || (run.probeSummary && run.probeSummary.kind) || 'n/a';
+        return `
+          <article class="run-card">
+            <div class="eyebrow">${escapeHtml(compareLabel)}</div>
+            <h2>${escapeHtml(run.name)}</h2>
+            <div class="path">${escapeHtml(run.rel_path)}</div>
+            <div class="metric-grid">
+              <div class="metric">
+                <div class="k">Loss</div>
+                <div class="v">${escapeHtml(fmtLoss(run.final_loss))}</div>
+              </div>
+              <div class="metric">
+                <div class="k">SVG</div>
+                <div class="v">${escapeHtml(fmtPct(run.validSvgRate))}</div>
+              </div>
+              <div class="metric">
+                <div class="k">Tokenizer</div>
+                <div class="v small">${escapeHtml(tokenizerLabel)}</div>
+              </div>
+              <div class="metric">
+                <div class="k">Best Signal</div>
+                <div class="v small">${escapeHtml(evalLabel)}</div>
+              </div>
+            </div>
+            <div class="badges" style="margin-top:12px;">
+              <span class="badge">${escapeHtml(run.kind)}</span>
+              ${run.compareFamily ? `<span class="badge">${escapeHtml(run.compareFamily)}</span>` : ''}
+              ${run.shape_signature ? `<span class="badge mono">${escapeHtml(run.shape_signature)}</span>` : ''}
+            </div>
+            <div class="actions" style="margin-top:14px;">
+              ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Open report</a>` : ''}
+              ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+              <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
+            </div>
+          </article>
+        `;
+      }).join('');
+      return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CK Run Compare</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.12);
+      --text: #edf2f7;
+      --muted: #98a2b3;
+      --good: #39d98a;
+      --mid: #ffb020;
+      --bad: #ff7b72;
+      --accent: #7aa2ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(122,162,255,0.15), transparent 30%),
+        radial-gradient(circle at top right, rgba(57,217,138,0.10), transparent 24%),
+        linear-gradient(180deg, #12151c 0%, #090b10 100%);
+    }
+    .page { width: min(1480px, calc(100vw - 32px)); margin: 20px auto 40px; }
+    .hero,
+    .panel,
+    .run-card,
+    .summary-card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 22px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+      backdrop-filter: blur(10px);
+    }
+    .hero { padding: 28px 30px; margin-bottom: 20px; }
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(122,162,255,0.16);
+      color: #bfd1ff;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    h1 { margin: 12px 0 8px; font-size: 38px; line-height: 1.05; }
+    h2 { margin: 10px 0 8px; font-size: 22px; }
+    h3 { margin: 0 0 8px; font-size: 20px; }
+    p { color: var(--muted); line-height: 1.6; }
+    .summary-strip,
+    .run-grid,
+    .metric-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .summary-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
+    .summary-card { padding: 16px; }
+    .summary-card .k,
+    .metric .k {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .summary-card .v,
+    .metric .v {
+      margin-top: 8px;
+      font-size: 28px;
+      font-weight: 800;
+    }
+    .summary-card .n { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .panel { padding: 24px 26px; margin-top: 20px; }
+    .run-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .run-card { padding: 20px; }
+    .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+    .metric {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+    .metric .v.small { font-size: 16px; line-height: 1.3; }
+    .path,
+    .compare-mini { color: var(--muted); font-size: 13px; word-break: break-word; margin-top: 4px; }
+    .badges,
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      color: #ddd;
+      font-size: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .badge.pass { color: var(--good); border-color: rgba(57,217,138,0.3); }
+    .badge.skip { color: var(--mid); border-color: rgba(255,176,32,0.3); }
+    .badge.missing { color: #aaa; border-color: rgba(170,170,170,0.2); }
+    .badge.mono { font-family: "JetBrains Mono", monospace; font-size: 11px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 13px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 180, 0, 0.12);
+      background: rgba(255,255,255,0.02);
+      color: #e0e0e0;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .btn.primary {
+      border-color: rgba(255, 189, 74, 0.18);
+      background: linear-gradient(180deg, rgba(255, 189, 74, 0.09), rgba(255, 189, 74, 0.035));
+      color: #eadbbb;
+    }
+    .compare-table-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      background: rgba(10,10,10,0.38);
+    }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    .compare-table th,
+    .compare-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+      vertical-align: top;
+    }
+    .compare-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: rgba(16,16,16,0.94);
+    }
+    .compare-table tbody th {
+      min-width: 210px;
+      color: var(--muted);
+      font-weight: 600;
+      background: rgba(255,255,255,0.015);
+    }
+    .compare-group-row td {
+      background: rgba(255,180,0,0.08);
+      color: #f8e8ba;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    @media (max-width: 1100px) {
+      .summary-strip,
+      .run-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Dynamic Compare</div>
+      <h1>Model Family Comparison</h1>
+      <p>This page is generated from the IR hub selection. It compares shared metadata automatically, so the same layout can work for SVG today and SQL or other structured domains later.</p>
+      <div class="badges">${signalBadges}</div>
+      <div class="summary-strip">${summaryCards}</div>
+    </section>
+
+    <section class="panel">
+      <h3>Selected Runs</h3>
+      <div class="run-grid">
+        ${runCards}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>Comparison Matrix</h3>
+      <p>${escapeHtml(compatibility.note)}</p>
+      <div class="compare-table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</body>
+</html>`;
+    }
+
+    function renderComparePanel(filteredRuns) {
+      const selected = selectedRuns();
+      const seed = filteredRuns[0] || runs[0] || null;
+      const compatibility = selected.length >= 2 ? buildCompatibility(selected) : null;
+      const selectedTags = selected.length
+        ? selected.map((run) => `<span class="tag"><strong>${escapeHtml(run.name)}</strong>${run.compareFamily ? ` · ${escapeHtml(run.compareFamily)}` : ''}</span>`).join('')
+        : '<span class="compare-mini">No runs selected yet.</span>';
+
+      let tableHtml = '<div class="compare-mini">Select at least two runs. The hub will build a comparison table from shared identity, tokenizer, eval, and probe summaries.</div>';
+      if (selected.length >= 2) {
+        const sections = buildCompareSections(selected);
+        const headerCells = selected.map((run) => `<th>${escapeHtml(run.name)}<div class="compare-mini">${escapeHtml(run.rel_path)}</div></th>`).join('');
+        const bodyRows = sections.map((section) => {
+          const rows = section.rows.map((row) => `
+            <tr>
+              <th>${escapeHtml(row.label)}</th>
+              ${row.values.map((value, idx) => `<td>${escapeHtml(fmtCompareValue(value, row.label || String(idx)))}</td>`).join('')}
+            </tr>
+          `).join('');
+          return `<tr class="compare-group-row"><td colspan="${selected.length + 1}">${escapeHtml(section.title)}</td></tr>${rows}`;
+        }).join('');
+        tableHtml = `
+          <div class="compare-table-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  ${headerCells}
+                </tr>
+              </thead>
+              <tbody>${bodyRows}</tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      els.comparePanel.innerHTML = `
+        <div class="panel-head">
+          <div>
+            <h2>Dynamic Compare</h2>
+            <p class="panel-sub">Pick a few trained runs or model families. The hub will compare shared metadata automatically, so the same workflow can work for SVG today and SQL later.</p>
+          </div>
+          <div class="muted">${selected.length} selected</div>
+        </div>
+        <div class="compare-layout">
+          <div class="compare-toolbar">
+            <div class="meta-block">
+              <div class="compare-hints">${selectedTags}</div>
+              ${compatibility ? `<div class="compare-badges">${compatibility.signals.map((signal) => `<span class="badge ${signal.good ? 'pass' : compatibility.tone}">${escapeHtml(signal.label)}</span>`).join('')}</div><div class="compare-mini">${escapeHtml(compatibility.note)}</div>` : '<div class="compare-mini">Best signal comes from runs that share kind, family, tokenizer mode, or shape signature.</div>'}
+            </div>
+            <div class="compare-actions">
+              ${seed ? `<button class="btn" data-compare-auto="${encodeURIComponent(seed.rel_path)}">Auto similar to spotlight</button>` : ''}
+              <button class="btn" data-clear-compare="1">Clear</button>
+              ${selected.length >= 2 ? '<button class="btn primary" data-open-compare="1">Open compare page</button>' : ''}
+            </div>
+          </div>
+          <div class="compare-grid">
+            <div class="compare-section">
+              <h3>Comparison Table</h3>
+              ${tableHtml}
+            </div>
+            <div class="compare-section">
+              <h3>Quick Links</h3>
+              <div class="compare-actions">
+                ${selected.map((run) => run.report_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">${escapeHtml(run.name)} report</a>` : `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">${escapeHtml(run.name)} run</a>`).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     function renderHero() {
       const summary = HUB.summary || {};
@@ -2673,6 +3550,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">SVG Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Open run dir</a>
+                ${selectionButton(run, 'Select for compare', 'Selected for compare')}
+                <button class="btn" data-compare-auto="${encodeURIComponent(run.rel_path)}">Auto similar</button>
                 <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy cmd</button>
               </div>
               ${renderSectionSummary(run, true)}
@@ -2865,6 +3744,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.kind === 'inference').length}</strong> inference</span>`,
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.reportReady).length}</strong> reports ready</span>`,
         `<span class="result-pill"><strong>${filteredRuns.filter((run) => run.datasetViewerReady).length}</strong> dataset viewers</span>`,
+        `<span class="result-pill"><strong>${selectedRuns().length}</strong> compare selected</span>`,
         `<span class="result-pill"><strong>${avgHealth}</strong> avg coverage</span>`,
         `<span class="result-pill"><strong>${escapeHtml(state.view)}</strong> view</span>`,
         `<span class="result-pill"><strong>${escapeHtml(state.density)}</strong> density</span>`,
@@ -2926,6 +3806,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
+                ${selectionButton(run)}
                 <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Copy</button>
               </div>
 
@@ -3019,6 +3900,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                         ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
                         ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                         <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run</a>
+                        ${selectionButton(run)}
                         <button class="btn" data-copy="${encodeURIComponent(run.generate_report_cmd || '')}">Cmd</button>
                       </div>
                     </td>
@@ -3035,6 +3917,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const filteredRuns = applyFilters();
       syncPresentationMode();
       renderResultsSummary(filteredRuns);
+      renderComparePanel(filteredRuns);
       renderCoverage(filteredRuns);
       if (state.view !== 'table') {
         renderSpotlight(filteredRuns);
@@ -3083,6 +3966,45 @@ def render_html(index_payload: dict[str, Any]) -> str:
       });
 
       document.addEventListener('click', async (event) => {
+        const toggle = event.target.closest('[data-toggle-select]');
+        if (toggle) {
+          const relPath = decodeURIComponent(toggle.getAttribute('data-toggle-select') || '');
+          toggleSelection(relPath);
+          refresh();
+          return;
+        }
+
+        const auto = event.target.closest('[data-compare-auto]');
+        if (auto) {
+          const relPath = decodeURIComponent(auto.getAttribute('data-compare-auto') || '');
+          autoSelectSimilar(relPath);
+          refresh();
+          return;
+        }
+
+        const clear = event.target.closest('[data-clear-compare]');
+        if (clear) {
+          clearSelection();
+          refresh();
+          return;
+        }
+
+        const openCompare = event.target.closest('[data-open-compare]');
+        if (openCompare) {
+          const selected = selectedRuns();
+          if (selected.length >= 2) {
+            const popup = window.open('', '_blank', 'noopener');
+            if (popup) {
+              popup.document.open();
+              popup.document.write(renderStandaloneCompareHtml(selected));
+              popup.document.close();
+            } else {
+              window.alert('Popup blocked. Allow popups for the hub to open the compare page.');
+            }
+          }
+          return;
+        }
+
         const button = event.target.closest('[data-copy]');
         if (!button) return;
         const raw = button.getAttribute('data-copy') || '';

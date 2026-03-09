@@ -365,7 +365,10 @@ def _build_stage_table(entries: list[dict[str, Any]], loss_entries: dict[str, di
 def _diagnosis_points(entries: list[dict[str, Any]], profiles: dict[str, dict[str, Any]], asset_tags: Counter[str]) -> list[str]:
     best = max(entries, key=_phase_score)
     latest = entries[-1]
-    worst = min((e for e in entries if e["stage"] == "sft"), key=lambda e: _metric_value(e, "adherence") or 0.0)
+    sft_entries = [e for e in entries if e.get("stage") == "sft"]
+    worst_pool = sft_entries or entries
+    worst = min(worst_pool, key=lambda e: _metric_value(e, "adherence") or 0.0)
+    has_sft = bool(sft_entries)
     latest_profile = profiles.get("latest_sft") or {}
     latest_svg_tags = latest_profile.get("svg_tags", Counter())
     missing = [tag for tag, count in asset_tags.most_common() if count >= 20 and latest_svg_tags.get(tag, 0) == 0][:6]
@@ -377,7 +380,7 @@ def _diagnosis_points(entries: list[dict[str, Any]], profiles: dict[str, dict[st
             f"tag adherence {_pct(_metric_value(best, 'tag_adherence'))}."
         ),
         (
-            f"Worst control regression was {_html(worst['phase_label'])}: "
+            f"{'Worst control regression' if has_sft else 'Weakest evaluated phase'} was {_html(worst['phase_label'])}: "
             f"valid SVG stayed {_pct(_metric_value(worst, 'valid_svg_rate'))}, "
             f"but adherence fell to {_pct(_metric_value(worst, 'adherence'))}."
         ),
@@ -388,7 +391,7 @@ def _diagnosis_points(entries: list[dict[str, Any]], profiles: dict[str, dict[st
     ]
     if missing:
         points.append(
-            "Latest SFT data still lacks major production-SVG building blocks seen in `docs/site/assets`: "
+            f"{'Latest SFT data' if has_sft else 'Latest evaluated data'} still lacks major production-SVG building blocks seen in `docs/site/assets`: "
             + ", ".join(f"`{tag}`" for tag in missing) + "."
         )
     return points
@@ -442,7 +445,28 @@ def _build_data_flaw_table(profiles: dict[str, dict[str, Any]], asset_tags: Coun
     return "".join(rows)
 
 
-def _narrative_section(best_phase: str, latest_phase: str) -> str:
+def _narrative_section(best_phase: str, latest_phase: str, has_midtrain: bool, has_sft: bool) -> str:
+    if not has_midtrain and not has_sft:
+        return (
+            "<div class=\"narrative-grid\">"
+            "<div class=\"narrative-card\">"
+            "<h3>Pretrain Result</h3>"
+            "<p>This run only measured pretrain. The question here is not instruction following yet; it is whether the model learned valid SVG closure, primitive structure, and enough visual grammar to serve as a useful base.</p>"
+            "</div>"
+            "<div class=\"narrative-card\">"
+            "<h3>Why It Failed</h3>"
+            "<p>Pretrain alone can teach syntax and recurring structure, but it does not reliably teach prompt control. If validity is low here, the issue is still representation, tokenizer shape, or raw pretrain corpus fit.</p>"
+            "</div>"
+            "<div class=\"narrative-card\">"
+            "<h3>What To Compare</h3>"
+            f"<p>Use this run as the pretrain baseline, then compare it against a stronger staged line. `{_html(best_phase)}` vs `{_html(latest_phase)}` only tells you how far pretrain got before any midtrain or SFT control data existed.</p>"
+            "</div>"
+            "<div class=\"narrative-card\">"
+            "<h3>Next Clean Run</h3>"
+            "<p>Keep the tokenizer fixed, improve the representation contract, and then add a staged control curriculum. That is the right comparison against spec02 and the pure DSL toy line.</p>"
+            "</div>"
+            "</div>"
+        )
     return (
         "<div class=\"narrative-grid\">"
         "<div class=\"narrative-card\">"
@@ -529,6 +553,26 @@ def _trust_verdict(trust: dict[str, Any], latest: dict[str, Any]) -> tuple[str, 
     )
 
 
+def _validity_note(valid_svg_rate: float | None) -> str:
+    if valid_svg_rate is None:
+        return "Validity was not recorded for this stage."
+    if valid_svg_rate >= 0.99:
+        return "Syntax and closure are solved. The remaining problem is whether the model obeys the requested prompt and visual intent."
+    if valid_svg_rate >= 0.5:
+        return "Some valid SVGs are emerging, but closure and structure are still unstable enough that control scores are hard to trust."
+    return "SVG validity is still broken. The model is failing before higher-level composition or control really matters."
+
+
+def _adherence_note(adherence: float | None) -> str:
+    if adherence is None:
+        return "Task adherence was not recorded for this stage."
+    if adherence >= 0.75:
+        return "Prompt control is already usable. The next work is broadening coverage, not rescuing basic obedience."
+    if adherence >= 0.4:
+        return "The model sometimes follows the requested visual intent, but control is still inconsistent across probes."
+    return "This is the real bottleneck: even when the model emits something structured, it is usually not the requested chart, palette, or composition."
+
+
 def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
     matrix = _load_json(run_dir / "stage_eval_matrix.json")
     pipeline = _load_json(run_dir / "training_pipeline_latest.json")
@@ -542,23 +586,36 @@ def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
     probes = matrix.get("probes") or []
     best = max(entries, key=_phase_score)
     latest = entries[-1]
-    worst_sft = min((e for e in entries if e.get("stage") == "sft"), key=lambda e: _metric_value(e, "adherence") or 0.0)
+    sft_entries = [e for e in entries if e.get("stage") == "sft"]
+    has_sft = bool(sft_entries)
+    has_midtrain = any(e.get("stage") == "midtrain" for e in entries)
+    worst_sft = min((sft_entries or entries), key=lambda e: _metric_value(e, "adherence") or 0.0)
 
     loss_values = [float(loss_entries[e["phase_label"]]["final_loss"]) for e in entries if e["phase_label"] in loss_entries and loss_entries[e["phase_label"]].get("final_loss") is not None]
     adherence_values = [_metric_value(e, "adherence") or 0.0 for e in entries]
     ood_values = [_metric_value(e, "ood_robustness") or 0.0 for e in entries]
 
     midtrain_entry = next((e for e in entries if e.get("stage") == "midtrain"), None)
-    latest_sft_entry = next((e for e in reversed(entries) if e.get("stage") == "sft"), None)
-    best_sft_entry = max((e for e in entries if e.get("stage") == "sft"), key=_phase_score)
+    latest_sft_entry = next((e for e in reversed(entries) if e.get("stage") == "sft"), None) or latest
+    best_sft_entry = max(sft_entries, key=_phase_score) if sft_entries else best
     worst_sft_entry = worst_sft
 
     profiles = {
         "midtrain": _dataset_profile(_resolve_dataset(loss_entries.get(midtrain_entry["phase_label"], {}).get("dataset_name", "") if midtrain_entry else "", run_dir), "Midtrain dataset"),
-        "best_sft": _dataset_profile(_resolve_dataset(loss_entries.get(best_sft_entry["phase_label"], {}).get("dataset_name", ""), run_dir), f"Best SFT dataset ({best_sft_entry['phase_label']})"),
-        "worst_sft": _dataset_profile(_resolve_dataset(loss_entries.get(worst_sft_entry["phase_label"], {}).get("dataset_name", ""), run_dir), f"Worst-control SFT dataset ({worst_sft_entry['phase_label']})"),
-        "latest_sft": _dataset_profile(_resolve_dataset(loss_entries.get(latest_sft_entry["phase_label"], {}).get("dataset_name", "") if latest_sft_entry else "", run_dir), f"Latest SFT dataset ({latest_sft_entry['phase_label']})"),
+        "best_sft": _dataset_profile(
+            _resolve_dataset(loss_entries.get(best_sft_entry["phase_label"], {}).get("dataset_name", ""), run_dir),
+            f"{'Best SFT dataset' if has_sft else 'Best evaluated dataset'} ({best_sft_entry['phase_label']})",
+        ),
+        "worst_sft": _dataset_profile(
+            _resolve_dataset(loss_entries.get(worst_sft_entry["phase_label"], {}).get("dataset_name", ""), run_dir),
+            f"{'Worst-control SFT dataset' if has_sft else 'Weakest evaluated dataset'} ({worst_sft_entry['phase_label']})",
+        ),
+        "latest_sft": _dataset_profile(
+            _resolve_dataset(loss_entries.get(latest_sft_entry["phase_label"], {}).get("dataset_name", ""), run_dir),
+            f"{'Latest SFT dataset' if has_sft else 'Latest evaluated dataset'} ({latest_sft_entry['phase_label']})",
+        ),
     }
+    latest_profile = profiles.get("latest_sft") or {}
     asset_tags = _count_svg_tags_in_assets(assets_glob)
     diagnosis_points = _diagnosis_points(entries, profiles, asset_tags)
     data_flaw_rows = _build_data_flaw_table(profiles, asset_tags)
@@ -569,8 +626,33 @@ def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
     stage_table = _build_stage_table(entries, loss_entries)
     output_matrix = _build_output_matrix(entries, probes)
     gap_cards = _build_gap_cards(profiles, asset_tags)
-    narrative = _narrative_section(best["phase_label"], latest["phase_label"])
+    narrative = _narrative_section(best["phase_label"], latest["phase_label"], has_midtrain, has_sft)
     generated_at = matrix.get("generated_at") or "-"
+    headline_title = (
+        f"What `{run_dir.name}` learned from pure pretrain"
+        if not has_midtrain and not has_sft
+        else f"Why `{run_dir.name}` plateaued before it became a beautiful infographic model"
+    )
+    headline_subhead = (
+        "This report synthesizes stage loss, per-stage eval, real prompt outputs, and a direct comparison "
+        "between the training corpora and your shipped SVG assets in <code>docs/site/assets/</code>. "
+        "It is designed to separate <strong>numeric trust</strong> from <strong>data-fit failure</strong>, "
+        "explain what the model learned, show where control regressed, and make the next clean run concrete."
+    )
+    worst_label = "Worst control regression" if has_sft else "Weakest evaluated phase"
+    scoreboard_intro = (
+        "All phases kept SVG validity. The movement was in adherence and task control."
+        if all((_metric_value(entry, "valid_svg_rate") or 0.0) >= 0.99 for entry in entries)
+        else "Stage-by-stage validity, adherence, and grammar coverage for this run."
+    )
+    latest_valid = _metric_value(latest, "valid_svg_rate")
+    latest_adh = _metric_value(latest, "adherence")
+    latest_gap_count = len([tag for tag, count in asset_tags.items() if count >= 20 and latest_profile.get("svg_tags", Counter()).get(tag, 0) == 0])
+    gap_note = (
+        "High-frequency SVG tags from shipped assets that are still absent from the latest SFT dataset."
+        if has_sft
+        else "High-frequency SVG tags from shipped assets that are still absent from the latest evaluated dataset."
+    )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -997,13 +1079,8 @@ def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
     <section class="hero">
       <div>
         <div class="eyebrow">SVG Training Report Card</div>
-        <h1>Why `spec02` plateaued before it became a beautiful infographic model</h1>
-        <div class="subhead">
-          This report synthesizes stage loss, per-stage eval, real prompt outputs, and a direct comparison
-          between the training corpora and your shipped SVG assets in <code>docs/site/assets/</code>.
-          It is designed to separate <strong>numeric trust</strong> from <strong>data-fit failure</strong>,
-          explain what the model learned, show where control regressed, and make the next clean run concrete.
-        </div>
+        <h1>{headline_title}</h1>
+        <div class="subhead">{headline_subhead}</div>
         <ul class="findings">
           {"".join(f"<li>{point}</li>" for point in diagnosis_points)}
         </ul>
@@ -1020,7 +1097,7 @@ def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
           <div class="muted">adherence {_pct(_metric_value(latest, 'adherence'))} · tag {_pct(_metric_value(latest, 'tag_adherence'))}</div>
         </div>
         <div class="hero-card">
-          <div class="k">Worst control regression</div>
+          <div class="k">{worst_label}</div>
           <div class="v">{_html(worst_sft['phase_label'])}</div>
           <div class="muted">syntax held, control dropped to {_pct(_metric_value(worst_sft, 'adherence'))}</div>
         </div>
@@ -1065,22 +1142,22 @@ def build_html(run_dir: Path, output_path: Path, assets_glob: str) -> str:
 
     <section class="panel" style="margin-top:22px;">
       <h2>Stage Scoreboard</h2>
-      <div class="muted">All phases kept SVG validity. The movement was in adherence and task control.</div>
+      <div class="muted">{scoreboard_intro}</div>
       <div class="summary-strip">
         <div class="summary-cell">
           <h3>Latest valid SVG</h3>
-          <div class="main">{_pct(_metric_value(latest, 'valid_svg_rate'))}</div>
-          <div class="small">Syntax and closure are solved. The remaining problem is whether the model obeys the requested prompt and visual intent.</div>
+          <div class="main">{_pct(latest_valid)}</div>
+          <div class="small">{_validity_note(latest_valid)}</div>
         </div>
         <div class="summary-cell">
           <h3>Latest adherence</h3>
-          <div class="main">{_pct(_metric_value(latest, 'adherence'))}</div>
-          <div class="small">This is the real bottleneck: the model often emits a valid SVG for the wrong requested chart, palette, or style.</div>
+          <div class="main">{_pct(latest_adh)}</div>
+          <div class="small">{_adherence_note(latest_adh)}</div>
         </div>
         <div class="summary-cell">
           <h3>Target grammar gap</h3>
-          <div class="main">{len([tag for tag, count in asset_tags.items() if count >= 20 and profiles['latest_sft']['svg_tags'].get(tag, 0) == 0])}</div>
-          <div class="small">High-frequency SVG tags from shipped assets that are still absent from the latest SFT dataset.</div>
+          <div class="main">{latest_gap_count}</div>
+          <div class="small">{gap_note}</div>
         </div>
       </div>
       <div class="chart-row">
@@ -1184,6 +1261,31 @@ def main() -> int:
 
     run_dir = Path(args.run).expanduser().resolve()
     output = Path(args.output).expanduser().resolve()
+    stage_eval_path = run_dir / "stage_eval_matrix.json"
+    if not stage_eval_path.exists():
+        run_name = run_dir.name
+        hint = (
+            "This report builder expects a stage-evaluated SVG run with stage_eval_matrix.json.\n"
+            f"Missing: {stage_eval_path}\n"
+        )
+        if "toy_svg_atoms" in run_name:
+            hint += (
+                "For the original toy atoms run, use:\n"
+                f"  python3 version/v7/scripts/build_toy_svg_atoms_report_v7.py --run-dir {run_dir}\n"
+            )
+        elif "toy_svg_structured_atoms" in run_name:
+            hint += (
+                "For the structured toy run, use:\n"
+                f"  python3 version/v7/scripts/build_toy_svg_structured_report_v7.py --run-dir {run_dir}\n"
+            )
+        elif "toy_svg_semantic_shapes" in run_name:
+            hint += (
+                "For the semantic toy run, use:\n"
+                f"  python3 version/v7/scripts/build_toy_svg_semantic_report_v7.py --run-dir {run_dir}\n"
+            )
+        else:
+            hint += "Run stage eval first, or use a report builder specific to that run family.\n"
+        raise SystemExit(hint)
     output.parent.mkdir(parents=True, exist_ok=True)
     html_text = build_html(run_dir, output, str((ROOT / args.assets_glob).resolve()) if not Path(args.assets_glob).is_absolute() else args.assets_glob)
     output.write_text(html_text)
