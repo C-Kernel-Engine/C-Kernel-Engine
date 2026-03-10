@@ -18607,6 +18607,9 @@ function buildDataLabParitySection(files) {
     const parityCmd = runCtx.runDir
         ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
         : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+    const regimenCmd = runCtx.runDir
+        ? `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
+        : 'python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
     const rows = parseParityRows(files.training_parity);
     const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
     const e2e = trainE2EState(trainE2E);
@@ -18700,6 +18703,12 @@ function buildDataLabParitySection(files) {
                 </div>
             </div>
             <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${htmlEscape(parityWhy)}</div>
+            ${regimenStages.length === 0 ? `
+                <div style="margin-top:0.6rem;background:rgba(59,130,246,0.08);border:1px solid rgba(96,165,250,0.35);border-radius:6px;padding:0.55rem 0.75rem;font-size:0.73rem;color:#cbd5e1;line-height:1.6;">
+                    A/B/C/D/E/F parity is missing for this run. <code>eval_stage_v7.py</code> does not create the parity regimen report. Run:
+                    <pre style="font-size:0.74rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(regimenCmd)}</pre>
+                </div>
+            ` : ''}
             ${openTrackerButton}
         </div>
     `;
@@ -18709,21 +18718,17 @@ function buildDataLabParitySection(files) {
 // Keep the A/B/C/D/E/F readiness surface in Data Lab. If this disappears,
 // downstream loss / SVG quality conclusions are no longer anchored to visible parity.
 function buildDataLabReadinessSection(files) {
+    const runCtx = getRunContext();
+    const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
+    const regimenCmd = runCtx.runDir
+        ? `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
+        : 'python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
     const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
         ? files.training_parity_regimen
         : {};
     const regimenStages = normalizeRegimenStages(regimen);
-    if (regimenStages.length === 0) {
-        return `
-            <div class="parity-section" style="margin-top:0.8rem;">
-                <h3><span class="badge badge-blue">Training Readiness</span> Parity Gate - Stage-by-Stage</h3>
-                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
-                    No parity regimen stages are loaded. Generate <code>training_parity_regimen_latest.json</code> to restore the A/B/C/D/E/F readiness cards.
-                </div>
-            </div>
-        `;
-    }
-
+    const catalog = parityStageCatalog(regimenStages);
+    const displayStages = regimenDisplayStages(regimenStages, catalog);
     const regimenOverall = regimenState(regimen, regimenStages);
     const abcGate = regimenGroupState(regimenStages, ['A', 'B', 'C']);
     const defGate = regimenGroupState(regimenStages, ['D', 'E', 'F']);
@@ -18732,76 +18737,10 @@ function buildDataLabReadinessSection(files) {
         return row && String(row.status || '').toUpperCase() !== 'PASS';
     });
 
-    const catalog = {
-        A1: {
-            group: 'A - Baseline Kernels',
-            name: 'Fwd / Bwd / SGD',
-            tests: 'Single micro-step forward+backward+SGD update. Lowest-bar numeric smoke test before spending training budget.',
-            why: 'If A1 fails, basic forward/backward math is broken.',
-        },
-        A3: {
-            group: 'A - Baseline Kernels',
-            name: 'Backend Xray',
-            tests: 'Swap rmsnorm / swiglu / loss backends one at a time on identical weights to isolate drift source.',
-            why: 'This localizes divergence to a specific kernel family quickly.',
-        },
-        A4: {
-            group: 'A - Baseline Kernels',
-            name: 'AdamW Strict Sentinel',
-            tests: 'Fixed strict AdamW sentinel on a tiny immutable model with locked tolerances.',
-            why: 'This is the stable early warning for optimizer regressions.',
-        },
-        D1: {
-            group: 'D/E/F - Generated C Runtime',
-            name: 'Backprop Stitch',
-            tests: 'Generated C forward+backward on a real sequence must match PyTorch gradients.',
-            why: 'This is the first direct gate on the generated runtime that actually trains.',
-        },
-        D2: {
-            group: 'D/E/F - Generated C Runtime',
-            name: 'Stitch Multi-step',
-            tests: 'Generated C multi-step train loop with grad_accum enabled.',
-            why: 'This checks the real C training loop instead of only the Python harness.',
-        },
-        E1: {
-            group: 'D/E/F - Generated C Runtime',
-            name: 'Replay Determinism',
-            tests: 'Re-running the same generated-C step should be bit-identical.',
-            why: 'Non-determinism silently poisons gradient accumulation and replay.',
-        },
-        F1: {
-            group: 'D/E/F - Generated C Runtime',
-            name: 'Runtime Accum',
-            tests: 'Accumulated generated-C gradients over micro-steps must match a single full-batch gradient.',
-            why: 'If F1 fails, the runtime that actually trains is not trustworthy.',
-        },
-    };
-
-    for (const row of regimenStages) {
-        const id = String(row.id || '').trim().toUpperCase();
-        if (/^B\d+$/.test(id) && !catalog[id]) {
-            const g = id.slice(1);
-            catalog[id] = {
-                group: 'B - Grad Accum',
-                name: `AdamW g=${g}`,
-                tests: `AdamW with grad_accum=${g}. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.`,
-                why: `Confirms gradient averaging is correct for ${g}x effective batch size.`,
-            };
-        }
-        if (/^C\d+$/.test(id) && !catalog[id]) {
-            catalog[id] = {
-                group: 'C - Stability',
-                name: String(row.name || id),
-                tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
-                why: 'These catch issues that do not show up in the short A/B canaries.',
-            };
-        }
-    }
-
     const groupOrder = ['D/E/F - Generated C Runtime', 'A - Baseline Kernels', 'B - Grad Accum', 'C - Stability'];
     const byGroup = {};
     groupOrder.forEach((group) => { byGroup[group] = []; });
-    regimenStages.forEach((row) => {
+    displayStages.forEach((row) => {
         const id = String(row.id || '').trim().toUpperCase();
         if (!id) return;
         const info = catalog[id] || {
@@ -18820,6 +18759,12 @@ function buildDataLabReadinessSection(files) {
         return n < 60 ? `${n.toFixed(1)}s` : `${(n / 60).toFixed(1)}m`;
     };
     const banner = (() => {
+        if (regimenStages.length === 0) {
+            return {
+                color: '#93c5fd',
+                text: 'Parity regimen not loaded - A/B/C/D/E/F cards are shown as required gates, but readiness is unknown until the regimen is generated.',
+            };
+        }
         if (regimenOverall.pass === true) {
             return {
                 color: '#6ee7b7',
@@ -18842,11 +18787,17 @@ function buildDataLabReadinessSection(files) {
         const items = byGroup[group] || [];
         if (items.length === 0) return '';
         const passCount = items.filter(({ row }) => String(row.status || '').toUpperCase() === 'PASS').length;
-        const groupColor = passCount === items.length ? '#6ee7b7' : (passCount === 0 ? '#fca5a5' : '#fbbf24');
+        const missingCount = items.filter(({ row }) => String(row.status || '').toUpperCase() === 'MISSING').length;
+        const groupColor = missingCount === items.length
+            ? '#93c5fd'
+            : (passCount === items.length ? '#6ee7b7' : (passCount === 0 ? '#fca5a5' : '#fbbf24'));
         const cards = items.map(({ id, row, info }) => {
-            const pass = String(row.status || '').toUpperCase() === 'PASS';
-            const border = pass ? '#47b475' : '#f87171';
-            const bg = pass ? 'rgba(71,180,117,0.07)' : 'rgba(248,113,113,0.07)';
+            const status = String(row.status || '').toUpperCase() || 'MISSING';
+            const pass = status === 'PASS';
+            const missing = status === 'MISSING';
+            const border = missing ? '#60a5fa' : (pass ? '#47b475' : '#f87171');
+            const bg = missing ? 'rgba(96,165,250,0.07)' : (pass ? 'rgba(71,180,117,0.07)' : 'rgba(248,113,113,0.07)');
+            const tone = missing ? 'blue' : (pass ? 'green' : 'red');
             const metrics = row && typeof row.metrics === 'object' ? row.metrics : {};
             const metricBits = [];
             const lossDiff = Number(metrics.max_loss_abs_diff);
@@ -18862,21 +18813,25 @@ function buildDataLabReadinessSection(files) {
             return `
                 <div style="border:1px solid ${border};border-radius:6px;padding:0.5rem 0.65rem;background:${bg};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.03);flex:1 1 215px;min-width:205px;max-width:360px;">
                     <div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.16rem;">
-                        ${statusPill(id, pass ? 'green' : 'red')}
+                        ${statusPill(id, tone)}
+                        ${statusPill(status, tone)}
                         <span style="font-size:0.8rem;font-weight:700;color:#e5e7eb;">${htmlEscape(info.name)}</span>
                         ${fmtDur(row.duration_s) ? `<span style="color:#6b7280;font-size:0.67rem;margin-left:auto;">${htmlEscape(fmtDur(row.duration_s))}</span>` : ''}
                     </div>
                     <div style="font-size:0.71rem;color:#9ca3af;line-height:1.42;">${htmlEscape(info.tests)}</div>
                     ${metricBits.length > 0 ? `<div style="font-size:0.69rem;color:#60a5fa;margin-top:0.22rem;font-family:monospace;">${htmlEscape(metricBits.join(' · '))}</div>` : ''}
-                    ${note ? `<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">⚠ ${htmlEscape(note)}</div>` : ''}
+                    ${note ? `<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">${htmlEscape(note)}</div>` : ''}
                     <div style="font-size:0.67rem;color:#a78bfa;margin-top:0.18rem;line-height:1.35;">↳ ${htmlEscape(info.why)}</div>
                 </div>
             `;
         }).join('');
+        const groupSummary = missingCount === items.length
+            ? `${missingCount}/${items.length} missing`
+            : `${passCount}/${items.length} pass${missingCount > 0 ? ` · ${missingCount} missing` : ''}`;
         return `
             <div style="margin-bottom:0.9rem;">
                 <div style="font-size:0.72rem;font-weight:700;color:${groupColor};margin-bottom:0.38rem;letter-spacing:0.03em;text-transform:uppercase;">
-                    ${htmlEscape(group)} <span style="opacity:0.6;font-weight:400;text-transform:none;">(${passCount}/${items.length} pass)</span>
+                    ${htmlEscape(group)} <span style="opacity:0.6;font-weight:400;text-transform:none;">(${htmlEscape(groupSummary)})</span>
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${cards}</div>
             </div>
@@ -18898,6 +18853,12 @@ function buildDataLabReadinessSection(files) {
                     • generated-runtime(D/E/F): <strong>${htmlEscape(defGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(defGate.detail)}</span>
                 </div>
             </div>
+            ${regimenStages.length === 0 ? `
+                <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(96,165,250,0.35);border-radius:6px;padding:0.55rem 0.75rem;margin-bottom:0.75rem;font-size:0.73rem;color:#cbd5e1;line-height:1.6;">
+                    A/B/C/D/E/F readiness does <strong>not</strong> come from <code>eval_stage_v7.py</code>. Generate <code>training_parity_regimen_latest.json</code> for this run, then regenerate <code>ir_report.html</code>.
+                    <pre style="font-size:0.74rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(regimenCmd)}</pre>
+                </div>
+            ` : ''}
             ${groupHtml}
         </div>
     `;
@@ -20481,6 +20442,137 @@ function normalizeRegimenStages(regimen) {
             duration_s: row.duration_s,
         }))
         .filter((row) => row.id);
+}
+
+function parityStageCatalog(regimenStages = []) {
+    const catalog = {
+        A1: {
+            group: 'A - Baseline Kernels',
+            name: 'Fwd / Bwd / SGD',
+            tests: 'Single micro-step forward+backward+SGD update. Lowest-bar numeric smoke test before spending training budget.',
+            why: 'If A1 fails, basic forward/backward math is broken.',
+        },
+        A3: {
+            group: 'A - Baseline Kernels',
+            name: 'Backend Xray',
+            tests: 'Swap rmsnorm / swiglu / loss backends one at a time on identical weights to isolate drift source.',
+            why: 'This localizes divergence to a specific kernel family quickly.',
+        },
+        A4: {
+            group: 'A - Baseline Kernels',
+            name: 'AdamW Strict Sentinel',
+            tests: 'Fixed strict AdamW sentinel on a tiny immutable model with locked tolerances.',
+            why: 'This is the stable early warning for optimizer regressions.',
+        },
+        B2: {
+            group: 'B - Grad Accum',
+            name: 'AdamW g=2',
+            tests: 'AdamW with grad_accum=2. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.',
+            why: 'Confirms gradient averaging is correct for 2x effective batch size.',
+        },
+        B4: {
+            group: 'B - Grad Accum',
+            name: 'AdamW g=4',
+            tests: 'AdamW with grad_accum=4. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.',
+            why: 'Confirms gradient averaging is correct for 4x effective batch size.',
+        },
+        B8: {
+            group: 'B - Grad Accum',
+            name: 'AdamW g=8',
+            tests: 'AdamW with grad_accum=8. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.',
+            why: 'Confirms gradient averaging is correct for 8x effective batch size.',
+        },
+        C1: {
+            group: 'C - Stability',
+            name: 'Stability Sweep C1',
+            tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+            why: 'These catch issues that do not show up in the short A/B canaries.',
+        },
+        C2: {
+            group: 'C - Stability',
+            name: 'Stability Sweep C2',
+            tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+            why: 'These catch issues that do not show up in the short A/B canaries.',
+        },
+        C3: {
+            group: 'C - Stability',
+            name: 'Stability Sweep C3',
+            tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+            why: 'These catch issues that do not show up in the short A/B canaries.',
+        },
+        D1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Backprop Stitch',
+            tests: 'Generated C forward+backward on a real sequence must match PyTorch gradients.',
+            why: 'This is the first direct gate on the generated runtime that actually trains.',
+        },
+        D2: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Stitch Multi-step',
+            tests: 'Generated C multi-step train loop with grad_accum enabled.',
+            why: 'This checks the real C training loop instead of only the Python harness.',
+        },
+        E1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Replay Determinism',
+            tests: 'Re-running the same generated-C step should be bit-identical.',
+            why: 'Non-determinism silently poisons gradient accumulation and replay.',
+        },
+        F1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Runtime Accum',
+            tests: 'Accumulated generated-C gradients over micro-steps must match a single full-batch gradient.',
+            why: 'If F1 fails, the runtime that actually trains is not trustworthy.',
+        },
+    };
+    for (const row of regimenStages) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (/^B\d+$/.test(id) && !catalog[id]) {
+            const g = id.slice(1);
+            catalog[id] = {
+                group: 'B - Grad Accum',
+                name: `AdamW g=${g}`,
+                tests: `AdamW with grad_accum=${g}. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.`,
+                why: `Confirms gradient averaging is correct for ${g}x effective batch size.`,
+            };
+        }
+        if (/^C\d+$/.test(id) && !catalog[id]) {
+            catalog[id] = {
+                group: 'C - Stability',
+                name: String(row.name || id),
+                tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+                why: 'These catch issues that do not show up in the short A/B canaries.',
+            };
+        }
+    }
+    return catalog;
+}
+
+function regimenDisplayStages(regimenStages, catalog) {
+    const byId = new Map(Array.isArray(regimenStages)
+        ? regimenStages.map((row) => [String(row.id || '').trim().toUpperCase(), row])
+        : []);
+    const rows = [];
+    const seen = new Set();
+    for (const id of Object.keys(catalog)) {
+        const actual = byId.get(id);
+        rows.push(actual || {
+            id,
+            name: catalog[id]?.name || id,
+            status: 'MISSING',
+            metrics: {},
+            notes: ['training_parity_regimen_latest.json missing for this run'],
+            duration_s: null,
+        });
+        seen.add(id);
+    }
+    for (const row of Array.isArray(regimenStages) ? regimenStages : []) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (!id || seen.has(id)) continue;
+        rows.push(row);
+        seen.add(id);
+    }
+    return rows;
 }
 
 function regimenState(regimen, stages) {

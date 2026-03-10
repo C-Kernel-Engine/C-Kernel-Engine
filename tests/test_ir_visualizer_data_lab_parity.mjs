@@ -85,6 +85,12 @@ function sampleFiles() {
     };
 }
 
+function sampleFilesMissingRegimen() {
+    const files = sampleFiles();
+    delete files.training_parity_regimen;
+    return files;
+}
+
 test('Data Lab keeps parity summary and A/B/C/D/E/F readiness visible', async () => {
     const root = fakeRoot();
     global.window = {
@@ -109,4 +115,30 @@ test('Data Lab keeps parity summary and A/B/C/D/E/F readiness visible', async ()
     for (const stageId of ['A1', 'B2', 'C1', 'D1', 'E1', 'F1']) {
         assert.match(html, new RegExp(`>${stageId}<`));
     }
+});
+
+test('Data Lab keeps A/B/C/D/E/F cards visible when regimen json is missing', async () => {
+    const root = fakeRoot();
+    global.window = {
+        EMBEDDED_IR_DATA: {
+            meta: {
+                run_dir: '/tmp/legacy-run',
+            },
+        },
+        location: { protocol: 'file:' },
+    };
+    global.document = fakeDocument(root);
+
+    const { renderTrainingExtensionTab } = await importTrainingTabsModule();
+    renderTrainingExtensionTab('train-data-lab', sampleFilesMissingRegimen());
+
+    const html = root.innerHTML;
+    assert.match(html, /Parity regimen not loaded/);
+    assert.match(html, /eval_stage_v7\.py/);
+    assert.match(html, /run_training_parity_regimen_v7\.py --run-dir \/tmp\/legacy-run/);
+    assert.match(html, /training_parity_regimen_latest\.json/);
+    for (const stageId of ['A1', 'A3', 'A4', 'B2', 'B4', 'B8', 'C1', 'C2', 'C3', 'D1', 'D2', 'E1', 'F1']) {
+        assert.match(html, new RegExp(`>${stageId}<`));
+    }
+    assert.match(html, />MISSING</);
 });
