@@ -1,8 +1,66 @@
 #!/usr/bin/env python3
-"""Build a self-contained interactive SVG dataset viewer from spec03 manifests.
+"""Build a self-contained interactive SVG dataset viewer from split-aware workspaces.
 
 Uses the Antsand/IR-Visualizer brand system. All data is embedded as JSON so the
 viewer works offline with full search, sort, gallery, quality checks, and provenance.
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  FEATURE MANIFEST — DO NOT DELETE OR REGRESS ANY OF THESE FEATURES  ⚠️   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  This file generates the run-local Dataset Viewer HTML. Every feature below  │
+│  is operator-critical and was deliberately built for sprint demos + ongoing   │
+│  research. Future agents: you may ENHANCE any of these, but NEVER remove     │
+│  or break them. If you must refactor, ensure every feature still works.      │
+│                                                                              │
+│  TABS (12 tabs, each with its own panel and renderer):                       │
+│   1. Overview        — renderOverview()       — run summary, split stats     │
+│   2. Preflight       — renderPreflight()      — data quality checks          │
+│   3. SVG Gallery     — renderGallery()        — visual grid of SVG assets    │
+│   4. Text Samples    — renderTextSamples()    — sortable per-row text view   │
+│   5. Tokenizer       — renderTokenizer()      — corpus stats, prompt atoms,  │
+│                        renderTokenizerVocabOnly() (fallback when no corpus)   │
+│                        NEVER delete the tokenizer table — it shows the        │
+│                        operator what tokens the model was trained on.         │
+│   6. Vocabulary      — renderVocabulary()     — vocab frequency analysis     │
+│   7. Classification  — renderClassification() — asset family breakdown       │
+│   8. Browse          — renderBrowse()         — paginated raw data browser   │
+│   9. Candidates      — renderCandidates()     — training candidate review    │
+│  10. Quality         — renderQuality()        — data quality audit           │
+│  11. 🧬 Embeddings   — renderEmbeddings()     — dense embedding heatmap,     │
+│                        cosine similarity, group legend, sort/norm controls    │
+│  12. 🔭 Attention    — renderAttention()      — per-head/per-layer attention │
+│                        matrices, sequence picker, entropy analysis            │
+│                                                                              │
+│  CROSS-CUTTING FEATURES:                                                     │
+│   • CKTable reusable ES6 class (sort, search, pagination, column resize)     │
+│   • Search/filter bar with family + role dropdowns                           │
+│   • Column resize (initColumnResize) on data tables                          │
+│   • Collapsible section-cards with badges                                    │
+│   • Distribution bar charts (distBarsHtml)                                   │
+│   • Pagination (renderPagination)                                            │
+│   • Dark theme with CSS variables (--bg, --surface, --border, etc.)          │
+│   • Gallery overlay with SVG preview                                         │
+│   • Text Samples DataTable with resize + sort                                │
+│   • Tokenizer fallback: reads vocab from run-level tokenizer.json            │
+│     when the corpus isn't staged (vocab_source='run_tokenizer_json')         │
+│   • Embeddings: auto-embeds if ≤1MB, file picker fallback if larger          │
+│   • Attention: auto-embeds if ≤1MB, file picker fallback if larger           │
+│                                                                              │
+│  PYTHON DATA BUILDERS:                                                       │
+│   • _build_text_rows()       — per-split structured row data                 │
+│   • _build_tokenizer_info()  — corpus + vocab + protected tokens + drift     │
+│   • _parse_svg_row_meta()    — extracts prompt tags, EOS, coords from rows   │
+│   • _iter_workspace_text_files() — recursive split-aware file discovery      │
+│   • _prompt_tag_family()     — classifies prompt tags into families           │
+│                                                                              │
+│  If you're adding a new tab or feature, follow the existing pattern:         │
+│   1. Add a <button class="tab"> and <div class="panel"> in _HTML_SUFFIX      │
+│   2. Write a renderXxx() function                                            │
+│   3. Call it from renderAll()                                                │
+│   4. Update this manifest                                                    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 """
 from __future__ import annotations
 
@@ -132,21 +190,27 @@ def _parse_svg_row_meta(text: str) -> dict[str, Any]:
     }
 
 
+def _iter_workspace_text_files(stage_dir: Path) -> list[tuple[str, Path]]:
+    files: list[tuple[str, Path]] = []
+    seen: set[Path] = set()
+    for txt_file in sorted(stage_dir.rglob("*.txt")):
+        if not txt_file.is_file() or txt_file in seen:
+            continue
+        seen.add(txt_file)
+        rel_parent = txt_file.parent.relative_to(stage_dir)
+        split_label = stage_dir.name if str(rel_parent) == "." else f"{stage_dir.name}/{rel_parent.as_posix()}"
+        files.append((split_label, txt_file))
+    return files
+
+
 def _build_text_rows(workspace: Path) -> dict[str, Any]:
     """Build per-row structured data for each split, HuggingFace-style."""
     splits: dict[str, Any] = {}
-    scan = [
-        ("pretrain", "pretrain", "*full_pretrain*.txt"),
-        ("structural", "pretrain", "*structural*.txt"),
-        ("sft", "sft", "*.txt"),
-        ("holdout", "holdout", "*.txt"),
-        ("tokenizer", "tokenizer", "*.txt"),
-    ]
-    for split_name, subdir, glob_pat in scan:
-        split_dir = workspace / subdir
+    for stage_name in ("pretrain", "midtrain", "sft", "holdout", "tokenizer"):
+        split_dir = workspace / stage_name
         if not split_dir.exists():
             continue
-        for txt_file in sorted(split_dir.glob(glob_pat)):
+        for split_name, txt_file in _iter_workspace_text_files(split_dir):
             if "manifest" in txt_file.name:
                 continue
             try:
@@ -171,7 +235,8 @@ def _build_text_rows(workspace: Path) -> dict[str, Any]:
                     "eos": meta["eos_token"],
                     "text": line[:400],  # truncated preview
                 })
-            splits[f"{split_name}/{txt_file.name}"] = {
+            rel_path = txt_file.relative_to(split_dir)
+            splits[f"{stage_name}/{rel_path.as_posix()}"] = {
                 "split": split_name,
                 "file": txt_file.name,
                 "total_rows": total,
@@ -224,7 +289,7 @@ def _build_tokenizer_info(workspace: Path) -> dict[str, Any]:
                 info["corpus_samples"] = [line[:500] for line in lines[:10]]
                 corpus_lines = lines
                 corpus_content_chars = content_chars
-            if "tag_seed" in cf.name:
+            if any(token in cf.name for token in ("tag_seed", "seen_prompts", "holdout_prompts", "canary_prompts")):
                 info["tag_seed_file"] = cf.name
                 info["tag_seed_rows"] = len(lines)
                 info["tag_seed_chars"] = len(text)
@@ -237,11 +302,52 @@ def _build_tokenizer_info(workspace: Path) -> dict[str, Any]:
     if text_files:
         info["files"] = text_files
 
+    # ── Fallback: read run-level tokenizer.json vocab when corpus isn't staged ──
+    # IMPORTANT: The tokenizer table is critical for operators to understand what
+    # tokens the model was trained on. Never remove this fallback — only enhance it.
+    # Even when the full corpus isn't available, showing the vocabulary gives the
+    # operator visibility into tokenization.
     snapshot = _load_json_if_exists(workspace / "dataset_snapshot.json") or {}
     run_dir_text = snapshot.get("run_dir")
     run_dir = Path(str(run_dir_text)).expanduser() if run_dir_text else None
+
+    # Also try workspace parent as run_dir (workspace is often run_dir/dataset)
+    if not run_dir or not run_dir.exists():
+        candidate = workspace.parent
+        if (candidate / "tokenizer.json").exists() or (candidate / "weights_manifest.json").exists():
+            run_dir = candidate
+
     if run_dir and run_dir.exists():
         tokenizer_json = _load_json_if_exists(run_dir / "tokenizer.json") or {}
+
+        # Extract vocab from the tokenizer file when we don't already have corpus data
+        if isinstance(tokenizer_json, dict) and not info.get("available"):
+            model_block = tokenizer_json.get("model", {})
+            vocab = model_block.get("vocab") if isinstance(model_block, dict) else None
+            if not vocab and isinstance(tokenizer_json.get("vocab"), dict):
+                vocab = tokenizer_json["vocab"]
+            if isinstance(vocab, dict) and vocab:
+                info["available"] = True
+                info["vocab_source"] = "run_tokenizer_json"
+                info["vocab_size"] = len(vocab)
+                info["ck_mode"] = tokenizer_json.get("ck_mode", "unknown")
+                # Build a compact vocab table: [{token, id, length, family}]
+                vocab_table = []
+                for token_str, token_id in sorted(vocab.items(), key=lambda x: x[1]):
+                    vocab_table.append({
+                        "token": token_str,
+                        "id": token_id,
+                        "len": len(token_str),
+                        "family": _prompt_tag_family(token_str),
+                    })
+                info["vocab_table"] = vocab_table
+                # Count by family
+                family_counts: dict[str, int] = {}
+                for row in vocab_table:
+                    fam = row["family"]
+                    family_counts[fam] = family_counts.get(fam, 0) + 1
+                info["vocab_family_counts"] = family_counts
+
         added_tokens = tokenizer_json.get("added_tokens") if isinstance(tokenizer_json, dict) else None
         protected_lookup: dict[str, dict[str, Any]] = {}
         if isinstance(added_tokens, list):
@@ -256,9 +362,12 @@ def _build_tokenizer_info(workspace: Path) -> dict[str, Any]:
                     "content": content,
                     "special": bool(row.get("special")),
                 }
-        reserved_tokens_path = manifest_path / "spec03_reserved_control_tokens.txt"
+        reserved_tokens_path = None
+        for candidate in sorted(manifest_path.glob("*reserved_control_tokens*.txt")):
+            reserved_tokens_path = candidate
+            break
         protected_tokens: list[dict[str, Any]] = []
-        if reserved_tokens_path.exists():
+        if reserved_tokens_path and reserved_tokens_path.exists():
             reserved_tokens = [
                 line.strip()
                 for line in reserved_tokens_path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -570,12 +679,63 @@ def _build_preflight_info(workspace: Path, raw_inventory: dict[str, Any],
     }
 
 
+def _load_embeddings_data(run_dir: Path) -> dict[str, Any] | None:
+    """Load embeddings.json if it exists and is ≤ 1MB, otherwise return None."""
+    if not run_dir or not run_dir.exists():
+        return None
+    
+    emb_path = run_dir / "embeddings.json"
+    if not emb_path.exists():
+        return None
+        
+    # Check file size (≤ 1MB)
+    try:
+        if emb_path.stat().st_size > 1024 * 1024:
+            return None
+        return _load_json_if_exists(emb_path)
+    except Exception:
+        return None
+
+
+def _load_attention_data(run_dir: Path) -> dict[str, Any] | None:
+    """Load attention.json if it exists and is ≤ 1MB, otherwise return None."""
+    if not run_dir or not run_dir.exists():
+        return None
+    
+    attn_path = run_dir / "attention.json"
+    if not attn_path.exists():
+        return None
+        
+    # Check file size (≤ 1MB)
+    try:
+        if attn_path.stat().st_size > 1024 * 1024:
+            return None
+        return _load_json_if_exists(attn_path)
+    except Exception:
+        return None
+
+
 def build_html(workspace: Path, raw_inventory: dict[str, Any],
                normalized: dict[str, Any], classified: dict[str, Any]) -> str:
     gallery_items = _build_gallery_items(classified, workspace)
     text_rows = _build_text_rows(workspace)
     tokenizer_info = _build_tokenizer_info(workspace)
     preflight_info = _build_preflight_info(workspace, raw_inventory, normalized, classified, tokenizer_info)
+    
+    # Load embeddings and attention data if available
+    run_dir = _resolve_run_dir(workspace)
+    # Fallback: workspace parent is often the run dir (workspace = run_dir/dataset)
+    if not run_dir:
+        candidate = workspace.parent
+        if (candidate / "embeddings.json").exists() or (candidate / "attention.json").exists() or (candidate / "weights_manifest.json").exists():
+            run_dir = candidate
+    # Last resort: workspace itself might be the run dir (toy_svg runs)
+    if not run_dir:
+        if (workspace / "embeddings.json").exists() or (workspace / "attention.json").exists():
+            run_dir = workspace
+    emb_data = _load_embeddings_data(run_dir) if run_dir else None
+    attn_data = _load_attention_data(run_dir) if run_dir else None
+    
     return (
         _HTML_PREFIX
         + "\n<script>\n"
@@ -586,6 +746,8 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
         + f"const CK_GALLERY = {_json_for_embed(gallery_items)};\n"
         + f"const CK_TEXT_ROWS = {_json_for_embed(text_rows)};\n"
         + f"const CK_TOKENIZER = {_json_for_embed(tokenizer_info)};\n"
+        + f"const CK_EMBEDDINGS = {_json_for_embed(emb_data)};\n"
+        + f"const CK_ATTENTION = {_json_for_embed(attn_data)};\n"
         + f"const CK_PREFLIGHT = {_json_for_embed(preflight_info)};\n"
         + "</script>\n"
         + _HTML_SUFFIX
@@ -1174,6 +1336,62 @@ body.dt-resizing, body.dt-resizing * { cursor: col-resize !important; user-selec
 .tok-metric .mval {
     color: var(--text-primary); font-size: 0.86rem; font-family: 'JetBrains Mono', monospace;
 }
+.ck-sort-icon { font-size: 0.65em; margin-left: 4px; opacity: 0.5; }
+th.sort-active .ck-sort-icon { opacity: 1; }
+th .ck-col-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; user-select: none; }
+th { position: relative; }
+.ck-table-search { width: 100%; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; background: var(--dark-card); border: 1px solid var(--grey); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; }
+.ck-table-pager { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; font-size: 0.78rem; color: var(--text-muted); }
+.ck-table-pager button { background: var(--dark-card); border: 1px solid var(--grey); color: var(--text-primary); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; }
+.ck-table-pager button:disabled { opacity: 0.3; cursor: default; }
+/* ─── Embedding Heatmap tab ── */
+.emb-load-bar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;background:var(--dark-card);border-radius:10px;border:1px solid var(--grey);margin-bottom:18px; }
+.emb-stats-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px; }
+.emb-controls { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
+.emb-controls select { padding:4px 10px; }
+.emb-legend { display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;align-items:center; }
+.emb-legend-item { display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer; }
+.emb-legend-dot { width:11px;height:11px;border-radius:3px;flex-shrink:0; }
+.emb-scroll-wrap { overflow:auto;max-height:65vh;border:1px solid var(--grey);border-radius:8px;background:#111; }
+#embCanvas { display:block;image-rendering:pixelated;cursor:crosshair; }
+.emb-colorbar-row { display:flex;align-items:center;gap:10px;margin-top:10px; }
+.emb-cb-label { font-size:11px;color:var(--text-muted);min-width:52px; }
+#embColorbar { flex:1;max-width:400px;height:14px;border-radius:4px; }
+.emb-tooltip { position:fixed;pointer-events:none;z-index:2000;background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:9px 13px;font-size:12px;line-height:1.6;max-width:300px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.emb-sim-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px;padding:12px; }
+.emb-sim-item { display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--dark-card);border-radius:6px; }
+.emb-sim-bar-track { width:56px;height:4px;background:var(--grey);border-radius:2px;flex-shrink:0; }
+.emb-sim-bar-fill { height:100%;border-radius:2px;background:var(--orange); }
+/* ─── Attention Viewer tab ── */
+.attn-load-bar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;background:var(--dark-card);border-radius:10px;border:1px solid var(--grey);margin-bottom:18px; }
+.attn-seq-list { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px; }
+.attn-seq-btn { padding:5px 12px;border-radius:20px;border:1px solid var(--grey);background:var(--dark-card);color:var(--text-secondary);cursor:pointer;font-size:12px;transition:all 0.2s; }
+.attn-seq-btn:hover { border-color:var(--orange);color:var(--orange); }
+.attn-seq-btn.active { background:var(--orange);color:var(--bg-dark);border-color:var(--orange);font-weight:700; }
+.attn-split-seen { border-left:3px solid var(--green); }
+.attn-split-holdout { border-left:3px solid var(--orange); }
+.attn-split-canary { border-left:3px solid var(--red); }
+.attn-split-custom { border-left:3px solid var(--blue); }
+.attn-controls { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px; }
+.attn-controls select { padding:4px 10px; }
+.attn-grid { display:grid;gap:10px;margin-bottom:18px; }
+.attn-head-card { background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;overflow:hidden;cursor:pointer;transition:all 0.2s; }
+.attn-head-card:hover { border-color:var(--orange); }
+.attn-head-card.active { border-color:var(--orange);box-shadow:0 0 0 2px rgba(255,180,0,0.3); }
+.attn-head-label { font-size:10px;font-weight:700;text-align:center;padding:3px 6px;background:rgba(0,0,0,0.4);color:var(--text-muted);letter-spacing:0.05em; }
+.attn-head-label.l0 { color:#07adf8; } .attn-head-label.l1 { color:#47b475; }
+.attn-head-label.l2 { color:#9b59b6; } .attn-head-label.l3 { color:#e74c3c; }
+.attn-mini-wrap { display:flex;justify-content:center;padding:4px; }
+.attn-detail-panel { background:var(--dark-card);border:1px solid var(--orange);border-radius:10px;padding:16px;margin-bottom:18px;display:none; }
+.attn-detail-title { font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px;display:flex;align-items:center;gap:10px; }
+.attn-canvas-scroll { overflow:auto; }
+#attnDetailCanvas { display:block;image-rendering:pixelated; }
+.attn-avg-row { display:grid;gap:10px;margin-bottom:18px; }
+.attn-avg-card { background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;overflow:hidden; }
+.attn-entropy-bar { height:6px;background:var(--grey);border-radius:3px;margin-top:4px; }
+.attn-entropy-fill { height:100%;border-radius:3px;background:var(--blue); }
+.attn-tok-chip { display:inline-block;padding:2px 7px;border-radius:4px;font-family:monospace;font-size:11px;background:rgba(255,255,255,0.06);color:var(--text-secondary);margin:2px; }
+.attn-tooltip { position:fixed;pointer-events:none;z-index:2001;background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.6;max-width:320px;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.4); }
 </style>
 </head>
 <body>
@@ -1212,6 +1430,8 @@ _HTML_SUFFIX = r"""
     <button class="tab" data-tab="browse">Browse</button>
     <button class="tab" data-tab="candidates">Candidates</button>
     <button class="tab" data-tab="quality">Quality</button>
+    <button class="tab" data-tab="embeddings">🧬 Embeddings</button>
+    <button class="tab" data-tab="attention">🔭 Attention</button>
 </nav>
 
 <main>
@@ -1225,6 +1445,8 @@ _HTML_SUFFIX = r"""
     <div class="panel" id="panel-browse"></div>
     <div class="panel" id="panel-candidates"></div>
     <div class="panel" id="panel-quality"></div>
+    <div class="panel" id="panel-embeddings"></div>
+    <div class="panel" id="panel-attention"></div>
 </main>
 
 <!-- ═══ Gallery Full-Screen Overlay ══════════════════════════════ -->
@@ -1265,6 +1487,34 @@ _HTML_SUFFIX = r"""
 /* ════════════════════════════════════════════════════════════════════
    Dataset Viewer — C-Kernel-Engine (Antsand brand)
    All data pre-embedded by build_svg_dataset_visualizer_v7.py
+   ════════════════════════════════════════════════════════════════════
+
+   ⚠️  DO NOT DELETE OR REGRESS ANY FEATURES IN THIS VIEWER  ⚠️
+
+   This viewer contains 12 tabs, each operator-critical:
+     Overview, Preflight, SVG Gallery, Text Samples, Tokenizer,
+     Vocabulary, Classification, Browse, Candidates, Quality,
+     🧬 Embeddings, 🔭 Attention
+
+   Key JS functions (all must be preserved):
+     CKTable (reusable sort/search/pagination/resize table class),
+     renderHeader, renderOverview, renderPreflight, renderGallery,
+     renderTextSamples, renderTokenizer, renderTokenizerVocabOnly,
+     renderVocabulary, renderClassification, renderBrowse,
+     renderCandidates, renderQuality, populateFilters,
+     renderEmbeddings, renderAttention, loadEmbData, loadAttnData,
+     drawEmbHeatmap, renderSimPanel, cosineSim, embColor, embNormalise,
+     renderAttnMain, renderAttnSeqList, renderAttnTokenChips,
+     renderPagination, renderGalleryGrid, distBarsHtml,
+     dtGetSplits, dtInitResize, dtRenderRows
+
+   The tokenizer table must ALWAYS be present — it is essential for
+   operators to see what tokens the model was trained on. When the
+   full corpus isn't staged, renderTokenizerVocabOnly() shows the
+   vocabulary from the run-level tokenizer.json as a fallback.
+
+   You may ENHANCE any feature. You may NOT remove any feature.
+   If refactoring, ensure every tab and function still works.
    ════════════════════════════════════════════════════════════════════ */
 
 const PAL = ['#ffb400','#07adf8','#47b475','#e74c3c','#9b59b6','#1abc9c',
@@ -1331,6 +1581,193 @@ function candidateListHtml(paths, limit) {
     if (paths.length > (limit || 15)) html += `<li style="color:var(--text-muted)">… and ${paths.length-(limit||15)} more</li>`;
     html += '</ul>';
     return html;
+}
+
+/* ── CKTable: Reusable table component with search, sort, pagination ── */
+class CKTable {
+    constructor(config) {
+        this.config = {
+            containerId: '',
+            columns: [], // [{key, label, width?, sortable?, mono?}]
+            data: [],
+            pageSize: 50,
+            searchKeys: [],
+            ...config
+        };
+        this.state = {
+            sortColumn: null,
+            sortDir: 'asc',
+            currentPage: 0,
+            filteredData: [...this.config.data],
+            searchQuery: ''
+        };
+        this.render();
+    }
+
+    render() {
+        const container = document.getElementById(this.config.containerId);
+        if (!container) return;
+
+        // Build search input
+        let html = `<input type="text" class="ck-table-search" placeholder="Search..." value="${esc(this.state.searchQuery)}">`;
+        
+        // Build table
+        html += '<div style="overflow-x:auto;border:1px solid var(--grey);border-radius:6px;"><table class="table"><thead><tr>';
+        
+        this.config.columns.forEach(col => {
+            const sortable = col.sortable !== false;
+            const sortIcon = this.state.sortColumn === col.key ? 
+                (this.state.sortDir === 'asc' ? '▲' : '▼') : '';
+            const activeClass = this.state.sortColumn === col.key ? 'sort-active' : '';
+            
+            html += `<th class="${activeClass}" style="${col.width ? 'width:' + col.width + ';' : ''}">`;
+            html += col.label;
+            if (sortable) {
+                html += `<span class="ck-sort-icon">${sortIcon}</span>`;
+            }
+            html += '<div class="ck-col-grip"></div></th>';
+        });
+        html += '</tr></thead><tbody>';
+
+        // Build table rows
+        const startIdx = this.state.currentPage * this.config.pageSize;
+        const endIdx = startIdx + this.config.pageSize;
+        const pageData = this.state.filteredData.slice(startIdx, endIdx);
+
+        pageData.forEach(row => {
+            html += '<tr>';
+            this.config.columns.forEach(col => {
+                const value = row[col.key] != null ? row[col.key] : '—';
+                const className = col.mono ? 'mono' : '';
+                html += `<td class="${className}">${esc(String(value))}</td>`;
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div>';
+
+        // Build pagination
+        const totalPages = Math.ceil(this.state.filteredData.length / this.config.pageSize);
+        const start = startIdx + 1;
+        const end = Math.min(endIdx, this.state.filteredData.length);
+        
+        html += `<div class="ck-table-pager">`;
+        html += `<span>${start}-${end} of ${this.state.filteredData.length}</span>`;
+        html += '<div>';
+        html += `<button ${this.state.currentPage === 0 ? 'disabled' : ''}>‹ Prev</button>`;
+        html += `<button ${this.state.currentPage >= totalPages - 1 ? 'disabled' : ''}>Next ›</button>`;
+        html += '</div></div>';
+
+        container.innerHTML = html;
+        this.attachEvents();
+    }
+
+    attachEvents() {
+        const container = document.getElementById(this.config.containerId);
+        
+        // Search input
+        const searchInput = container.querySelector('.ck-table-search');
+        searchInput.addEventListener('input', (e) => {
+            this.state.searchQuery = e.target.value.toLowerCase();
+            this.filter();
+        });
+
+        // Column sorting
+        const ths = container.querySelectorAll('th');
+        ths.forEach((th, i) => {
+            const col = this.config.columns[i];
+            if (col.sortable !== false) {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('ck-col-grip')) return;
+                    this.sort(col.key);
+                });
+            }
+        });
+
+        // Column resize
+        const grips = container.querySelectorAll('.ck-col-grip');
+        grips.forEach((grip, i) => {
+            let startX, startW;
+            grip.addEventListener('mousedown', (e) => {
+                startX = e.pageX;
+                startW = grip.parentElement.offsetWidth;
+                const onMove = (ev) => {
+                    grip.parentElement.style.width = Math.max(30, startW + ev.pageX - startX) + 'px';
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+                e.preventDefault();
+            });
+        });
+
+        // Pagination
+        const prevBtn = container.querySelector('.ck-table-pager button');
+        const nextBtn = container.querySelector('.ck-table-pager button:last-child');
+        
+        prevBtn.addEventListener('click', () => {
+            if (this.state.currentPage > 0) {
+                this.state.currentPage--;
+                this.render();
+            }
+        });
+        
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(this.state.filteredData.length / this.config.pageSize);
+            if (this.state.currentPage < totalPages - 1) {
+                this.state.currentPage++;
+                this.render();
+            }
+        });
+    }
+
+    filter() {
+        if (!this.state.searchQuery) {
+            this.state.filteredData = [...this.config.data];
+        } else {
+            this.state.filteredData = this.config.data.filter(row => {
+                const searchKeys = this.config.searchKeys.length ? this.config.searchKeys : 
+                    this.config.columns.map(col => col.key);
+                return searchKeys.some(key => {
+                    const val = String(row[key] || '').toLowerCase();
+                    return val.includes(this.state.searchQuery);
+                });
+            });
+        }
+        this.state.currentPage = 0;
+        this.sort(this.state.sortColumn, true);
+    }
+
+    sort(column, skipRender = false) {
+        if (!column) return;
+        
+        if (this.state.sortColumn === column) {
+            this.state.sortDir = this.state.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.state.sortColumn = column;
+            this.state.sortDir = 'asc';
+        }
+
+        this.state.filteredData.sort((a, b) => {
+            const aVal = a[column];
+            const bVal = b[column];
+            let result = 0;
+            
+            if (typeof aVal === 'number' && typeof bVal === 'number') {
+                result = aVal - bVal;
+            } else {
+                result = String(aVal || '').localeCompare(String(bVal || ''));
+            }
+            
+            return this.state.sortDir === 'desc' ? -result : result;
+        });
+
+        if (!skipRender) this.render();
+    }
 }
 
 /* ── Data extraction ───────────────────────────────────────────── */
@@ -2132,12 +2569,109 @@ function dtRenderRows() {
 }
 
 // ── Tokenizer tab ─────────────────────────────────────────────────
+/* ── Vocab-only fallback renderer for runs without staged corpus ── */
+function renderTokenizerVocabOnly(panel, tok) {
+    const vocabTable = tok.vocab_table || [];
+    const familyCounts = tok.vocab_family_counts || {};
+    const vocabSize = tok.vocab_size || vocabTable.length;
+    const ckMode = tok.ck_mode || 'unknown';
+    const protTokens = tok.protected_tokens || [];
+
+    let html = '<div class="subhead">Tokenizer Vocabulary</div>';
+    html += '<div class="subnote">Vocabulary extracted from the run-level <code>tokenizer.json</code>. Full corpus staging was not found — showing the learned vocabulary directly.</div>';
+
+    /* ── Summary metrics ── */
+    html += '<div class="tok-stat-grid">';
+    html += `<div class="tok-stat"><div class="tok-stat-val">${fmt(vocabSize)}</div><div class="tok-stat-lbl">Vocab Size</div></div>`;
+    html += `<div class="tok-stat"><div class="tok-stat-val">${esc(ckMode)}</div><div class="tok-stat-lbl">Mode</div></div>`;
+    html += `<div class="tok-stat"><div class="tok-stat-val">${Object.keys(familyCounts).length}</div><div class="tok-stat-lbl">Token Families</div></div>`;
+    html += `<div class="tok-stat"><div class="tok-stat-val">${protTokens.length}</div><div class="tok-stat-lbl">Protected Tokens</div></div>`;
+    html += '</div>';
+
+    /* ── Family distribution bar ── */
+    if (Object.keys(familyCounts).length > 0) {
+        html += '<div class="section-card"><div class="section-header" onclick="this.parentElement.classList.toggle(\'collapsed\')"><span>📊 Token Family Distribution</span><span class="badge badge-blue">' + Object.keys(familyCounts).length + ' families</span><span class="caret">▼</span></div><div class="section-body">';
+        html += '<div class="subnote">Distribution of tokens across structural families.</div>';
+        html += distBarsHtml(familyCounts, vocabSize, '#9b59b6');
+        html += '</div></div>';
+    }
+
+    /* ── Protected tokens ── */
+    if (protTokens.length) {
+        html += '<div class="section-card"><div class="section-header" onclick="this.parentElement.classList.toggle(\'collapsed\')"><span>🛡️ Protected DSL Tokens</span><span class="badge badge-green">' + protTokens.filter(r=>r.present).length + '/' + protTokens.length + '</span><span class="caret">▼</span></div><div class="section-body">';
+        html += '<table><thead><tr><th>Token</th><th>ID</th><th>Family</th><th>Protected</th><th>Present</th></tr></thead><tbody>';
+        protTokens.forEach(r => {
+            html += `<tr><td class="mono">${esc(r.token)}</td><td class="mono">${r.id != null ? r.id : '—'}</td><td>${esc(r.family||'—')}</td><td>${r.protected ? '✅' : '—'}</td><td style="color:${r.present?'var(--green)':'var(--red)'}">${r.present?'yes':'missing'}</td></tr>`;
+        });
+        html += '</tbody></table></div></div>';
+    }
+
+    /* ── Full vocab table (searchable, sortable, resizable columns) ── */
+    html += '<div class="section-card"><div class="section-header" onclick="this.parentElement.classList.toggle(\'collapsed\')"><span>📖 Full Vocabulary</span><span class="badge badge-purple">' + fmt(vocabSize) + ' tokens</span><span class="caret">▼</span></div><div class="section-body">';
+    html += '<div class="subnote">Complete vocabulary sorted by token ID. Use the search box to filter. Drag column borders to resize.</div>';
+    html += '<div id="vocabTableContainer"></div>';
+    html += '</div></div>';
+
+    panel.innerHTML = html;
+
+    // Create CKTable for vocabulary
+    new CKTable({
+        containerId: 'vocabTableContainer',
+        columns: [
+            {key: 'id', label: 'ID', width: '60px', sortable: true, mono: true},
+            {key: 'token', label: 'Token', sortable: true, mono: true},
+            {key: 'len', label: 'Len', width: '50px', sortable: true, mono: true},
+            {key: 'family', label: 'Family', width: '120px', sortable: true}
+        ],
+        data: vocabTable.map(r => ({
+            ...r,
+            token: r.token.replace(/ /g, '·').replace(/\\n/g, '↵')
+        })),
+        pageSize: 50,
+        searchKeys: ['token', 'family']
+    });
+}
+
+/* ── Column resize helper: drag column borders to resize (DEPRECATED: use CKTable instead) ── */
+function initColumnResize(tableId) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const ths = table.querySelectorAll('thead th');
+    ths.forEach(th => {
+        const grip = document.createElement('div');
+        grip.style.cssText = 'position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;user-select:none;';
+        th.style.position = 'relative';
+        th.appendChild(grip);
+        let startX, startW;
+        grip.addEventListener('mousedown', function(e) {
+            startX = e.pageX;
+            startW = th.offsetWidth;
+            const onMove = ev => { th.style.width = Math.max(30, startW + ev.pageX - startX) + 'px'; };
+            const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            e.preventDefault();
+        });
+    });
+}
+
+/*
+ * IMPORTANT: Never remove the tokenizer table. It is essential for operators
+ * to understand what tokens the model was trained on. Only enhance this tab
+ * — never delete it. When the full corpus isn't staged, we fall back to
+ * displaying the vocabulary from the run-level tokenizer.json.
+ */
 function renderTokenizer() {
     const panel = document.getElementById('panel-tokenizer');
     const tok = CK_TOKENIZER;
     const pre = CK_PREFLIGHT || {};
     if (!tok.available) {
-        panel.innerHTML = '<div class="subnote" style="padding:2rem;text-align:center;">No tokenizer data found in this dataset.</div>';
+        panel.innerHTML = '<div class="subnote" style="padding:2rem;text-align:center;">No tokenizer data found in this dataset. To populate this tab, stage the tokenizer corpus or ensure a <code>tokenizer.json</code> exists in the run directory.</div>';
+        return;
+    }
+    /* ── Fallback: vocab-only mode from run tokenizer.json ── */
+    if (tok.vocab_source === 'run_tokenizer_json') {
+        renderTokenizerVocabOnly(panel, tok);
         return;
     }
     const manifest = tok.manifest || {};
@@ -2255,6 +2789,938 @@ function renderTokenizer() {
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   🧬 Embeddings Viewer — ported from repo-root dataset_viewer.html
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const EMB_GROUP_COLORS = {
+    system:        '#e74c3c',
+    prompt:        '#07adf8',
+    svg_structure: '#47b475',
+    svg_style:     '#9b59b6',
+    svg_attr:      '#ffb400',
+    dsl_other:     '#1abc9c',
+    ascii:         '#555555',
+};
+
+/* Diverging colormap: blue (#07adf8) → near-white → orange (#ffb400) */
+function embColor(t) {
+    const blue   = [7, 173, 248];
+    const mid    = [195, 200, 208];
+    const orange = [255, 180, 0];
+    let r, g, b;
+    if (t < 0.5) {
+        const s = t * 2;
+        r = blue[0] + (mid[0] - blue[0]) * s;
+        g = blue[1] + (mid[1] - blue[1]) * s;
+        b = blue[2] + (mid[2] - blue[2]) * s;
+    } else {
+        const s = (t - 0.5) * 2;
+        r = mid[0] + (orange[0] - mid[0]) * s;
+        g = mid[1] + (orange[1] - mid[1]) * s;
+        b = mid[2] + (orange[2] - mid[2]) * s;
+    }
+    return [Math.round(r), Math.round(g), Math.round(b)];
+}
+
+function embNormalise(matrix, mode) {
+    const V = matrix.length, D = matrix[0].length;
+    const out = matrix.map(r => Float32Array.from(r));
+    if (mode === 'global') {
+        let mn = Infinity, mx = -Infinity;
+        for (const r of matrix) for (const v of r) { if (v < mn) mn = v; if (v > mx) mx = v; }
+        const rng = (mx - mn) || 1;
+        for (let i = 0; i < V; i++) for (let j = 0; j < D; j++) out[i][j] = (matrix[i][j] - mn) / rng;
+        return { norm: out, vmin: mn, vmax: mx, note: '' };
+    } else if (mode === 'col') {
+        for (let j = 0; j < D; j++) {
+            let s = 0, s2 = 0;
+            for (let i = 0; i < V; i++) { s += matrix[i][j]; s2 += matrix[i][j] ** 2; }
+            const mean = s / V, std = Math.sqrt(s2 / V - mean * mean) || 1;
+            for (let i = 0; i < V; i++) out[i][j] = Math.max(0, Math.min(1, (matrix[i][j] - mean) / (3 * std) * 0.5 + 0.5));
+        }
+        return { norm: out, vmin: -3, vmax: 3, note: 'per-column z (±3σ)' };
+    } else {
+        for (let i = 0; i < V; i++) {
+            let s = 0, s2 = 0;
+            for (const v of matrix[i]) { s += v; s2 += v ** 2; }
+            const mean = s / D, std = Math.sqrt(s2 / D - mean * mean) || 1;
+            for (let j = 0; j < D; j++) out[i][j] = Math.max(0, Math.min(1, (matrix[i][j] - mean) / (3 * std) * 0.5 + 0.5));
+        }
+        return { norm: out, vmin: -3, vmax: 3, note: 'per-row z (±3σ)' };
+    }
+}
+
+function cosineSim(a, b) {
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] ** 2; nb += b[i] ** 2; }
+    return dot / (Math.sqrt(na * nb) || 1);
+}
+
+/* State */
+const embSt = { data: null, selectedOrig: -1, sortedIndices: [], rowPx: 14, colPx: 9, labelW: 180 };
+
+function embSortedIndices() {
+    if (!embSt.data) return [];
+    const mode = document.getElementById('embSort') ? document.getElementById('embSort').value : 'id';
+    const V = embSt.data.vocab.length;
+    let idx = Array.from({ length: V }, (_, i) => i);
+    const groupOrder = ['system', 'prompt', 'svg_structure', 'svg_style', 'svg_attr', 'dsl_other', 'ascii'];
+    if (mode === 'group') {
+        idx.sort((a, b) => {
+            const ga = groupOrder.indexOf(embSt.data.vocab[a].group);
+            const gb = groupOrder.indexOf(embSt.data.vocab[b].group);
+            return ga !== gb ? ga - gb : a - b;
+        });
+    } else if (mode === 'norm') {
+        idx.sort((a, b) => {
+            const na = embSt.data.matrix[a].reduce((s, v) => s + v * v, 0);
+            const nb = embSt.data.matrix[b].reduce((s, v) => s + v * v, 0);
+            return nb - na;
+        });
+    } else if (mode === 'sim' && embSt.selectedOrig >= 0) {
+        const ref = embSt.data.matrix[embSt.selectedOrig];
+        idx.sort((a, b) => cosineSim(embSt.data.matrix[b], ref) - cosineSim(embSt.data.matrix[a], ref));
+    }
+    return idx;
+}
+
+function drawEmbColorbar(vmin, vmax, note) {
+    const cb = document.getElementById('embColorbar');
+    if (!cb) return;
+    const W = Math.max(cb.offsetWidth, 200);
+    cb.width = W; cb.height = 14;
+    const ctx = cb.getContext('2d');
+    for (let x = 0; x < W; x++) {
+        const [r, g, b] = embColor(x / W);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, 0, 1, 14);
+    }
+    if (document.getElementById('embCbMin')) document.getElementById('embCbMin').textContent = vmin.toFixed(4);
+    if (document.getElementById('embCbMax')) document.getElementById('embCbMax').textContent = vmax.toFixed(4);
+    if (document.getElementById('embCbNote')) document.getElementById('embCbNote').textContent = note;
+}
+
+function drawEmbHeatmap() {
+    if (!embSt.data) return;
+    const rowPx = document.getElementById('embRowPx') ? parseInt(document.getElementById('embRowPx').value) : embSt.rowPx;
+    const colPx = embSt.colPx;
+    const labelW = embSt.labelW;
+    const normMode = document.getElementById('embNorm') ? document.getElementById('embNorm').value : 'global';
+
+    const indices = embSortedIndices();
+    embSt.sortedIndices = indices;
+    embSt.rowPx = rowPx;
+
+    const V = indices.length;
+    const D = embSt.data.matrix[0].length;
+
+    const orderedMatrix = indices.map(i => embSt.data.matrix[i]);
+    const { norm, vmin, vmax, note } = embNormalise(orderedMatrix, normMode);
+
+    const W = labelW + D * colPx;
+    const H = V * rowPx;
+
+    const canvas = document.getElementById('embCanvas');
+    if (!canvas) return;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    /* Fill heatmap pixels via ImageData for speed */
+    const img = ctx.createImageData(W, H);
+    const px = img.data;
+
+    for (let vi = 0; vi < V; vi++) {
+        const row = norm[vi];
+        const y0 = vi * rowPx;
+        for (let di = 0; di < D; di++) {
+            const [r, g, b] = embColor(row[di]);
+            const x0 = labelW + di * colPx;
+            for (let py = y0; py < y0 + rowPx; py++) {
+                for (let px_ = x0; px_ < x0 + colPx; px_++) {
+                    const i4 = (py * W + px_) * 4;
+                    px[i4] = r; px[i4 + 1] = g; px[i4 + 2] = b; px[i4 + 3] = 255;
+                }
+            }
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    /* Draw label column on top */
+    const fontSize = Math.min(rowPx - 3, 11);
+    ctx.font = `${fontSize}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.textBaseline = 'middle';
+    for (let vi = 0; vi < V; vi++) {
+        const tok = embSt.data.vocab[indices[vi]];
+        const gc  = EMB_GROUP_COLORS[tok.group] || '#808080';
+        const y0  = vi * rowPx;
+        const yMid = y0 + rowPx / 2;
+
+        /* dark label background */
+        ctx.fillStyle = '#0e0e0e';
+        ctx.fillRect(0, y0, labelW - 1, rowPx);
+
+        /* group colour bar (4px strip) */
+        ctx.fillStyle = gc;
+        ctx.fillRect(0, y0, 4, rowPx);
+
+        /* row highlight if this is the selected token */
+        if (indices[vi] === embSt.selectedOrig) {
+            ctx.fillStyle = 'rgba(255,180,0,0.12)';
+            ctx.fillRect(0, y0, W, rowPx);
+            ctx.strokeStyle = 'rgba(255,180,0,0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, y0, W, rowPx);
+        }
+
+        /* token label text */
+        ctx.fillStyle = gc;
+        const maxW = labelW - 14;
+        let label = tok.token;
+        /* rough character truncation (monospace ~6.5px/char at 10px) */
+        const maxChars = Math.floor(maxW / (fontSize * 0.65));
+        if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '…';
+        ctx.fillText(label, 8, yMid);
+    }
+
+    drawEmbColorbar(vmin, vmax, note);
+}
+
+/* Tooltip */
+const embTip = (() => {
+    const el = document.createElement('div');
+    el.className = 'emb-tooltip';
+    document.body.appendChild(el);
+    return el;
+})();
+
+function renderSimPanel(origIdx) {
+    const tok = embSt.data.vocab[origIdx];
+    const ref = embSt.data.matrix[origIdx];
+    if (document.getElementById('simTargetLabel')) {
+        document.getElementById('simTargetLabel').textContent = tok.token;
+    }
+    if (document.getElementById('simPanel')) {
+        document.getElementById('simPanel').style.display = '';
+    }
+
+    const sims = embSt.data.vocab.map((t, i) => ({
+        i, tok: t, sim: cosineSim(embSt.data.matrix[i], ref)
+    }));
+    sims.sort((a, b) => b.sim - a.sim);
+    const top = sims.slice(0, 24);
+
+    const html = '<div class="emb-sim-grid">' + top.map(s => {
+        const gc  = EMB_GROUP_COLORS[s.tok.group] || '#808080';
+        const pct = Math.round(((s.sim + 1) / 2) * 100);
+        const valColor = s.sim > 0.85 ? 'var(--green)' : s.sim > 0.5 ? 'var(--orange)' : 'var(--text-secondary)';
+        return `<div class="emb-sim-item">
+            <div class="emb-legend-dot" style="background:${gc}"></div>
+            <span style="font-family:monospace;font-size:11px;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--text-primary)">${escHtml(s.tok.token)}</span>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+                <span style="font-size:12px;font-weight:700;color:${valColor}">${s.sim.toFixed(3)}</span>
+                <div class="emb-sim-bar-track"><div class="emb-sim-bar-fill" style="width:${pct}%"></div></div>
+            </div>
+        </div>`;
+    }).join('') + '</div>';
+    if (document.getElementById('simBody')) {
+        document.getElementById('simBody').innerHTML = html;
+    }
+}
+
+/* Create alias for escHtml to match repo-root viewer */
+const escHtml = esc;
+
+function loadEmbData(data) {
+    embSt.data = data;
+    embSt.selectedOrig = -1;
+    if (document.getElementById('embEmpty')) document.getElementById('embEmpty').style.display = 'none';
+    if (document.getElementById('embContent')) document.getElementById('embContent').style.display = '';
+    if (document.getElementById('simPanel')) document.getElementById('simPanel').style.display = 'none';
+
+    const s = data.stats;
+    if (document.getElementById('embStats')) {
+        document.getElementById('embStats').innerHTML =
+            statCardHtml(escHtml(data.run_id || '—'), 'Run', '') +
+            statCardHtml(data.step != null ? data.step : '—', 'Step', '') +
+            statCardHtml(s.vocab_size, 'Vocab', '') +
+            statCardHtml(s.embed_dim, 'Dim', '') +
+            statCardHtml(s.nonzero_rows != null ? s.nonzero_rows : '—', 'Non-zero', '') +
+            statCardHtml(s.min.toFixed(4), 'Min', '') +
+            statCardHtml(s.max.toFixed(4), 'Max', '') +
+            statCardHtml(s.std.toFixed(4), 'Std', '');
+    }
+
+    const groups = [...new Set(data.vocab.map(v => v.group))];
+    if (document.getElementById('embLegend')) {
+        document.getElementById('embLegend').innerHTML =
+            '<span style="font-size:12px;color:var(--text-muted)">Groups:</span>' +
+            groups.map(g => {
+                const cnt = data.vocab.filter(v => v.group === g).length;
+                return `<div class="emb-legend-item">
+                    <div class="emb-legend-dot" style="background:${EMB_GROUP_COLORS[g] || '#808080'}"></div>
+                    <span>${g}</span>
+                    <span style="color:var(--text-muted)">(${cnt})</span>
+                </div>`;
+            }).join('');
+    }
+
+    drawEmbHeatmap();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   🔭 Attention Viewer — ported from repo-root dataset_viewer.html
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const ATTN_LAYER_COLORS = ['#07adf8', '#47b475', '#9b59b6', '#e74c3c', '#ffb400', '#1abc9c'];
+
+const attnSt = {
+    data: null,         // loaded attention.json
+    seqIdx: 0,          // selected sequence index
+    activeCard: null,   // currently expanded layer+head key
+};
+
+function loadAttnData(data) {
+    attnSt.data = data;
+    attnSt.seqIdx = 0;
+    attnSt.activeCard = null;
+
+    if (document.getElementById('attnEmpty')) document.getElementById('attnEmpty').style.display = 'none';
+    if (document.getElementById('attnContent')) document.getElementById('attnContent').style.display = '';
+
+    const cfg = data.config || {};
+    if (document.getElementById('attnMeta')) {
+        document.getElementById('attnMeta').innerHTML =
+            statCardHtml(esc(data.run_id || '—'), 'Run', '') +
+            statCardHtml(data.step != null ? data.step : '—', 'Step', '') +
+            statCardHtml(cfg.num_layers || data.sequences[0].layers.length, 'Layers', '') +
+            statCardHtml(cfg.num_heads || data.sequences[0].layers[0].heads.length, 'Heads', '') +
+            statCardHtml(cfg.num_kv_heads || '—', 'KV Heads', '') +
+            statCardHtml(cfg.head_dim || '—', 'Head Dim', '') +
+            statCardHtml(data.sequences.length, 'Sequences', '');
+    }
+    renderAttnSeqList();
+    renderAttnTokenChips();
+    renderAttnMain();
+}
+
+function renderAttnSeqList() {
+    if (!attnSt.data) return;
+    const el = document.getElementById('attnSeqList');
+    if (!el) return;
+    const seqs = attnSt.data.sequences;
+    el.innerHTML = seqs.map((s, i) => {
+        const cls = 'attn-seq-btn' + (s.split ? ' attn-split-' + s.split : '') + (i === attnSt.seqIdx ? ' active' : '');
+        const label = (s.label || s.id || 'Seq ' + (i+1));
+        return '<button class="' + cls + '" data-idx="' + i + '"><strong>' + esc(s.split || '') + '</strong> · ' + esc(label.slice(0,40)) + ' <span style="color:var(--text-muted)">(L=' + s.tokens.length + ')</span></button>';
+    }).join('');
+    el.querySelectorAll('.attn-seq-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            attnSt.seqIdx = parseInt(btn.dataset.idx);
+            attnSt.activeCard = null;
+            document.getElementById('attnDetailPanel').style.display = 'none';
+            renderAttnSeqList();
+            renderAttnTokenChips();
+            renderAttnMain();
+        });
+    });
+}
+
+function renderAttnTokenChips() {
+    const el = document.getElementById('attnTokenChips');
+    if (!el || !attnSt.data) return;
+    const seq = attnSt.data.sequences[attnSt.seqIdx];
+    const chips = seq.tokens.map((t, i) => {
+        const isPred = seq.top_preds && i > 0 && seq.top_preds[i-1] === seq.token_ids[i];
+        const dot = isPred ? '<span style="color:var(--green);margin-right:3px" title="next-tok correct">✓</span>' : '';
+        return '<span class="attn-tok-chip" title="id=' + (seq.token_ids ? seq.token_ids[i] : i) + '">' + dot + esc(t) + '</span>';
+    }).join('');
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Tokens (L=' + seq.tokens.length + '):</div>' + chips;
+}
+
+/* ── Draw a single attention matrix onto a canvas ── */
+function drawAttnMatrix(canvas, matrix, tokens, opts) {
+    opts = opts || {};
+    const cmap = opts.cmap || 'orange';
+    const showBos = opts.showBos !== false;
+    const labels = opts.labels !== false;
+    const labelPx = opts.labelPx || 12;
+    const maxSize = opts.maxSize || 600;
+
+    const startTok = showBos ? 0 : 1;
+    const toks = tokens.slice(startTok);
+    const L = toks.length;
+    const matSlice = matrix.slice(startTok).map(r => r.slice(startTok));
+
+    const labelW = labels ? Math.min(labelPx * 7, 140) : 0;
+    const labelH = labels ? labelPx + 4 : 0;
+    const cellPx = opts.cellPx || Math.max(4, Math.min(24, Math.floor((maxSize - labelW) / L)));
+    const W = labelW + L * cellPx;
+    const H = labelH + L * cellPx;
+
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H);
+
+    const img = ctx.createImageData(W, H);
+    const d = img.data;
+    for (let qi = 0; qi < L; qi++) {
+        for (let ki = 0; ki < L; ki++) {
+            const v = matSlice[qi] && matSlice[qi][ki] || 0;
+            const [r, g, b] = attnColor(v, cmap);
+            const x0 = labelW + ki * cellPx;
+            const y0 = labelH + qi * cellPx;
+            for (let py = y0; py < y0 + cellPx; py++) {
+                for (let px = x0; px < x0 + cellPx; px++) {
+                    const i4 = (py * W + px) * 4;
+                    d[i4] = r; d[i4+1] = g; d[i4+2] = b; d[i4+3] = 255;
+                }
+            }
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    if (labels && labelPx >= 8) {
+        const fs = Math.min(labelPx - 1, 11);
+        ctx.font = fs + 'px "JetBrains Mono", ui-monospace, monospace';
+        for (let i = 0; i < L; i++) {
+            const y = labelH + i * cellPx + cellPx / 2;
+            const maxCh = Math.floor((labelW - 6) / (fs * 0.62));
+            const label = toks[i].length > maxCh ? toks[i].slice(0, maxCh - 1) + '…' : toks[i];
+            ctx.fillStyle = '#444'; ctx.fillRect(0, labelH + i * cellPx, labelW - 1, cellPx);
+            ctx.fillStyle = '#c0c8d0'; ctx.textBaseline = 'middle'; ctx.fillText(label, 3, y);
+        }
+        ctx.save();
+        for (let i = 0; i < L; i++) {
+            const x = labelW + i * cellPx + cellPx / 2;
+            const maxCh = Math.floor((labelH - 3) / (fs * 0.62));
+            const label = toks[i].length > maxCh ? toks[i].slice(0, maxCh - 1) + '…' : toks[i];
+            ctx.save(); ctx.translate(x, labelH - 2); ctx.rotate(-Math.PI / 2);
+            ctx.fillStyle = '#c0c8d0'; ctx.textBaseline = 'bottom'; ctx.fillText(label, 0, 0);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+    return { L, cellPx, labelW, labelH };
+}
+
+function drawAttnThumb(canvas, matrix, tokens, cmap, thumbPx) {
+    const L = matrix.length;
+    const px = Math.max(1, Math.floor(thumbPx / L));
+    const side = L * px;
+    canvas.width = side; canvas.height = side;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(side, side);
+    const d = img.data;
+    for (let qi = 0; qi < L; qi++) {
+        for (let ki = 0; ki < L; ki++) {
+            const v = matrix[qi] && matrix[qi][ki] || 0;
+            const [r, g, b] = attnColor(v, cmap);
+            const x0 = ki * px, y0 = qi * px;
+            for (let py = y0; py < y0 + px; py++) {
+                for (let px_ = x0; px_ < x0 + px; px_++) {
+                    const i4 = (py * side + px_) * 4;
+                    d[i4] = r; d[i4+1] = g; d[i4+2] = b; d[i4+3] = 255;
+                }
+            }
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+}
+
+function attnEntropy(row) {
+    let h = 0;
+    for (const v of row) { if (v > 1e-9) h -= v * Math.log2(v); }
+    return h;
+}
+
+function avgMatrices(matrices) {
+    const L = matrices[0].length;
+    const out = Array.from({length:L}, () => new Float32Array(L));
+    for (const m of matrices)
+        for (let i = 0; i < L; i++)
+            for (let j = 0; j < L; j++)
+                out[i][j] += m[i][j] / matrices.length;
+    return out.map(r => Array.from(r));
+}
+
+function attnGetMatrix(layerData, headIdx, showBos) {
+    let mat = layerData.heads[headIdx].attn;
+    if (!showBos) { mat = mat.slice(1).map(r => r.slice(1)); }
+    return mat;
+}
+
+function renderAttnMain() {
+    if (!attnSt.data) return;
+    const seq = attnSt.data.sequences[attnSt.seqIdx];
+    if (!seq || !seq.layers || !seq.layers.length) return;
+    const view = document.getElementById('attnView') ? document.getElementById('attnView').value : 'grid';
+    const cmap = document.getElementById('attnCmap') ? document.getElementById('attnCmap').value : 'orange';
+    const thumbPx = document.getElementById('attnThumbPx') ? parseInt(document.getElementById('attnThumbPx').value) : 100;
+    const showBos = document.getElementById('attnShowBos') ? document.getElementById('attnShowBos').checked : true;
+    const tokens = showBos ? seq.tokens : seq.tokens.slice(1);
+    const numL = seq.layers.length;
+    const numH = seq.layers[0].heads.length;
+    const wrap = document.getElementById('attnMainView');
+    if (!wrap) return;
+
+    if (view === 'grid') {
+        wrap.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'attn-grid';
+        grid.style.gridTemplateColumns = 'repeat(' + numH + ', 1fr)';
+        wrap.appendChild(grid);
+        for (let li = 0; li < numL; li++) {
+            for (let hi = 0; hi < numH; hi++) {
+                const key = li + '-' + hi;
+                const card = document.createElement('div');
+                card.className = 'attn-head-card' + (attnSt.activeCard === key ? ' active' : '');
+                card.innerHTML = '<div class="attn-head-label l' + li + '">L' + li + ' · H' + hi + '</div><div class="attn-mini-wrap"><canvas></canvas></div>';
+                const cv = card.querySelector('canvas');
+                const mat = attnGetMatrix(seq.layers[li], hi, showBos);
+                drawAttnThumb(cv, mat, tokens, cmap, thumbPx);
+                card.addEventListener('click', () => {
+                    attnSt.activeCard = (attnSt.activeCard === key) ? null : key;
+                    if (attnSt.activeCard) openAttnDetail(seq, li, hi, tokens, cmap, showBos);
+                    else document.getElementById('attnDetailPanel').style.display = 'none';
+                    renderAttnMain();
+                });
+                grid.appendChild(card);
+            }
+        }
+        return;
+    }
+
+    if (view === 'avg') {
+        wrap.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'attn-avg-row';
+        row.style.gridTemplateColumns = 'repeat(' + numL + ', 1fr)';
+        wrap.appendChild(row);
+        for (let li = 0; li < numL; li++) {
+            const matrices = seq.layers[li].heads.map((_, hi) => attnGetMatrix(seq.layers[li], hi, showBos));
+            const avg = avgMatrices(matrices);
+            const lc = ATTN_LAYER_COLORS[li % ATTN_LAYER_COLORS.length];
+            const card = document.createElement('div');
+            card.className = 'attn-avg-card';
+            card.innerHTML = '<div class="attn-head-label" style="color:' + lc + '">Layer ' + li + ' — avg ' + numH + ' heads</div><div class="attn-mini-wrap"><canvas></canvas></div>';
+            const cv = card.querySelector('canvas');
+            drawAttnThumb(cv, avg, tokens, cmap, 200);
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', () => openAttnDetailMatrix(avg, tokens, 'Layer ' + li + ' — averaged', cmap));
+            row.appendChild(card);
+        }
+        return;
+    }
+
+    if (view === 'entropy') {
+        let html = '<div style="display:grid;gap:10px">';
+        const maxLogL = Math.log2(tokens.length || 1);
+        for (let li = 0; li < numL; li++) {
+            const lc = ATTN_LAYER_COLORS[li % ATTN_LAYER_COLORS.length];
+            html += '<div style="background:var(--surface);border-radius:8px;padding:14px;border:1px solid var(--border)"><div style="font-size:12px;font-weight:700;color:' + lc + ';margin-bottom:10px">Layer ' + li + '</div><div style="display:grid;grid-template-columns:repeat(' + numH + ',1fr);gap:8px">';
+            for (let hi = 0; hi < numH; hi++) {
+                const mat = attnGetMatrix(seq.layers[li], hi, showBos);
+                const entropies = mat.map(row => attnEntropy(row));
+                const avgEnt = entropies.reduce((a, b) => a + b, 0) / entropies.length;
+                const pct = Math.min(100, (avgEnt / maxLogL) * 100);
+                html += '<div style="background:var(--bg);border-radius:6px;padding:10px"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">H' + hi + '</div><div style="font-size:16px;font-weight:800;color:' + (pct > 70 ? 'var(--blue)' : pct > 40 ? 'var(--orange)' : 'var(--green)') + '">' + avgEnt.toFixed(2) + '</div><div style="font-size:10px;color:var(--text-muted)">bits / max ' + maxLogL.toFixed(1) + '</div><div class="attn-entropy-bar"><div class="attn-entropy-fill" style="width:' + pct + '%;background:' + (pct > 70 ? 'var(--blue)' : 'var(--orange)') + '"></div></div><div style="margin-top:6px">';
+                for (let ti = 0; ti < tokens.length; ti++) {
+                    const ep = Math.min(1, entropies[ti] / maxLogL);
+                    const c = attnColor(1 - ep, 'orange');
+                    html += '<div title="' + esc(tokens[ti]) + ': ' + entropies[ti].toFixed(3) + ' bits" style="display:inline-block;width:10px;height:10px;margin:1px;border-radius:2px;background:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')"></div>';
+                }
+                html += '</div></div>';
+            }
+            html += '</div></div>';
+        }
+        html += '</div>';
+        wrap.innerHTML = html;
+    }
+}
+
+function openAttnDetail(seq, li, hi, tokens, cmap, showBos) {
+    const mat = attnGetMatrix(seq.layers[li], hi, showBos);
+    openAttnDetailMatrix(mat, tokens, 'Layer ' + li + ' · Head ' + hi, cmap);
+}
+
+function openAttnDetailMatrix(mat, tokens, label, cmap) {
+    const panel = document.getElementById('attnDetailPanel');
+    if (!panel) return;
+    document.getElementById('attnDetailLabel').textContent = label;
+    const cv = document.getElementById('attnDetailCanvas');
+    const L = mat.length;
+    const cellPx = L <= 8 ? 48 : L <= 16 ? 32 : L <= 32 ? 18 : L <= 64 ? 12 : 8;
+    const labelPx = cellPx >= 14 ? 12 : 9;
+    drawAttnMatrix(cv, mat, tokens, { cmap: cmap, cellPx: cellPx, labels: true, labelPx: labelPx });
+
+    cv.onmousemove = function(e) {
+        const rect = cv.getBoundingClientRect();
+        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+        const lw = Math.min(labelPx * 7, 140), lh = labelPx + 4;
+        if (x < lw || y < lh) { attnTip.style.display = 'none'; return; }
+        const ki = Math.floor((x - lw) / cellPx), qi = Math.floor((y - lh) / cellPx);
+        if (qi >= 0 && qi < L && ki >= 0 && ki < L) {
+            attnTip.innerHTML = '<span style="color:var(--orange)">from</span> <strong>' + esc(tokens[qi]) + '</strong><br><span style="color:var(--orange)">to</span> <strong>' + esc(tokens[ki]) + '</strong><br><span style="color:var(--text-muted)">weight:</span> <strong>' + mat[qi][ki].toFixed(5) + '</strong>';
+            attnTip.style.display = 'block';
+            attnTip.style.left = (e.clientX + 14) + 'px';
+            attnTip.style.top = (e.clientY - 20) + 'px';
+        }
+    };
+    cv.onmouseleave = function() { attnTip.style.display = 'none'; };
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+const attnTip = (function() {
+    const el = document.createElement('div');
+    el.className = 'attn-tooltip';
+    document.body.appendChild(el);
+    return el;
+})();
+
+function renderEmbeddings() {
+    const panel = document.getElementById('panel-embeddings');
+    let html = `
+        <div class="subhead">🧬 Token Embeddings</div>
+        <div class="subnote">Interactive embedding heatmaps with similarity search and clustering analysis.</div>
+        
+        <div class="emb-load-bar">
+            <span>📁 Load embeddings.json:</span>
+            <input type="file" id="embFileInput" accept=".json" style="font-size:0.8rem">
+            <button id="btnEmbDemo" style="padding:4px 12px;font-size:0.8rem">Demo</button>
+            <button id="btnEmbClear" style="padding:4px 12px;font-size:0.8rem">Clear</button>
+        </div>
+        
+        <div id="embEmpty">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted)">
+                <div style="font-size:2rem;margin-bottom:1rem">📊</div>
+                <div>No embeddings loaded</div>
+                <div style="font-size:0.8rem;margin-top:0.5rem">Load embeddings.json or try the demo</div>
+            </div>
+        </div>
+        
+        <div id="embContent" style="display:none">
+            <div class="emb-stats-grid" id="embStats"></div>
+            
+            <div class="emb-controls">
+                <label>Sort: <select id="embSort"><option value="id">ID</option><option value="group">Group</option><option value="norm">L2 Norm</option><option value="sim">Similarity</option></select></label>
+                <label>Norm: <select id="embNorm"><option value="global">Global</option><option value="col">Column</option><option value="row">Row</option></select></label>
+                <label>Row px: <input type="range" id="embRowPx" min="8" max="32" value="14" style="width:80px"></label>
+            </div>
+            
+            <div class="emb-legend" id="embLegend"></div>
+            
+            <div class="emb-scroll-wrap">
+                <canvas id="embCanvas"></canvas>
+            </div>
+            
+            <div class="emb-colorbar-row">
+                <span class="emb-cb-label" id="embCbMin">0</span>
+                <canvas id="embColorbar"></canvas>
+                <span class="emb-cb-label" id="embCbMax">1</span>
+                <span class="emb-cb-label" id="embCbNote" style="margin-left:10px;flex:1"></span>
+            </div>
+            
+            <div id="simPanel" style="display:none;margin-top:1rem;padding:1rem;background:var(--dark-card);border-radius:8px">
+                <div style="font-weight:700;margin-bottom:0.5rem">Most similar to: <span id="simTargetLabel" style="color:var(--orange)">—</span></div>
+                <div id="simBody"></div>
+            </div>
+        </div>
+    `;
+    
+    panel.innerHTML = html;
+    
+    // Wire up events
+    if (document.getElementById('embFileInput')) {
+        document.getElementById('embFileInput').addEventListener('change', async e => {
+            const f = e.target.files[0]; if (!f) return;
+            try {
+                const text = await f.text();
+                const data = JSON.parse(text);
+                if (!data.matrix || !data.vocab) throw new Error('Not a valid embeddings.json');
+                loadEmbData(data);
+                document.querySelector('.tab[data-tab="embeddings"]').click();
+            } catch (err) {
+                alert('Failed to load embeddings.json:\\n' + err.message);
+            }
+            e.target.value = '';
+        });
+    }
+    
+    if (document.getElementById('btnEmbDemo')) {
+        document.getElementById('btnEmbDemo').addEventListener('click', () => {
+            loadEmbData(generateEmbDemo());
+        });
+    }
+    
+    if (document.getElementById('btnEmbClear')) {
+        document.getElementById('btnEmbClear').addEventListener('click', () => {
+            embSt.data = null; embSt.selectedOrig = -1;
+            if (document.getElementById('embEmpty')) document.getElementById('embEmpty').style.display = '';
+            if (document.getElementById('embContent')) document.getElementById('embContent').style.display = 'none';
+        });
+    }
+    
+    // Wire up controls
+    ['embSort', 'embNorm', 'embRowPx'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', drawEmbHeatmap);
+            el.addEventListener('input', drawEmbHeatmap);
+        }
+    });
+    
+    // Auto-load if data is embedded
+    if (window.CK_EMBEDDINGS && CK_EMBEDDINGS !== null) {
+        loadEmbData(CK_EMBEDDINGS);
+    }
+
+    // Wire up canvas events after rendering
+    setTimeout(() => {
+        const canvas = document.getElementById('embCanvas');
+        if (!canvas) return;
+
+        canvas.addEventListener('mousemove', e => {
+            if (!embSt.data || !embSt.sortedIndices.length) return;
+            const rect = e.target.getBoundingClientRect();
+            const cx = e.clientX - rect.left;
+            const cy = e.clientY - rect.top;
+            const vi = Math.floor(cy / embSt.rowPx);
+            if (vi < 0 || vi >= embSt.sortedIndices.length) { embTip.style.display = 'none'; return; }
+            const origIdx = embSt.sortedIndices[vi];
+            const tok = embSt.data.vocab[origIdx];
+            const gc  = EMB_GROUP_COLORS[tok.group] || '#808080';
+            const row = embSt.data.matrix[origIdx];
+            const l2  = Math.sqrt(row.reduce((s, v) => s + v * v, 0));
+            let dimInfo = '';
+            if (cx >= embSt.labelW) {
+                const di = Math.floor((cx - embSt.labelW) / embSt.colPx);
+                if (di >= 0 && di < row.length) {
+                    dimInfo = `<br><span style="color:var(--text-muted)">dim[${di}]:</span> <strong>${row[di].toFixed(5)}</strong>`;
+                }
+            }
+            embTip.innerHTML =
+                `<span style="color:${gc};font-weight:700;font-family:monospace">${escHtml(tok.token)}</span><br>` +
+                `<span style="color:var(--text-muted)">id:</span> ${tok.id} &nbsp; <span style="color:var(--text-muted)">group:</span> ${tok.group}<br>` +
+                `<span style="color:var(--text-muted)">L2 norm:</span> ${l2.toFixed(4)}` + dimInfo;
+            embTip.style.display = 'block';
+            embTip.style.left = (e.clientX + 14) + 'px';
+            embTip.style.top  = (e.clientY - 20) + 'px';
+        });
+
+        canvas.addEventListener('mouseleave', () => { embTip.style.display = 'none'; });
+
+        canvas.addEventListener('click', e => {
+            if (!embSt.data || !embSt.sortedIndices.length) return;
+            const rect = e.target.getBoundingClientRect();
+            const vi = Math.floor((e.clientY - rect.top) / embSt.rowPx);
+            if (vi < 0 || vi >= embSt.sortedIndices.length) return;
+            const origIdx = embSt.sortedIndices[vi];
+            embSt.selectedOrig = origIdx;
+            renderSimPanel(origIdx);
+            drawEmbHeatmap();
+        });
+    }, 100);
+}
+
+function renderAttention() {
+    const panel = document.getElementById('panel-attention');
+    let html = `
+        <div class="subhead">🔭 Attention Patterns</div>
+        <div class="subnote">Visualize attention heads across layers with per-sequence analysis and entropy metrics.</div>
+        <div class="attn-load-bar">
+            <span>📁 Load attention.json:</span>
+            <input type="file" id="attnFileInput" accept=".json" style="font-size:0.8rem">
+            <button id="btnAttnDemo" style="padding:4px 12px;font-size:0.8rem">Demo</button>
+            <button id="btnAttnClear" style="padding:4px 12px;font-size:0.8rem">Clear</button>
+        </div>
+        <div id="attnEmpty">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted)">
+                <div style="font-size:2rem;margin-bottom:1rem">🔭</div>
+                <div>No attention data loaded</div>
+                <div style="font-size:0.8rem;margin-top:0.5rem">Load attention.json or click Demo</div>
+            </div>
+        </div>
+        <div id="attnContent" style="display:none">
+            <div class="emb-stats-grid" id="attnMeta"></div>
+            <div style="margin-bottom:6px;font-size:12px;color:var(--text-muted)">Sequences — click to select:</div>
+            <div class="attn-seq-list" id="attnSeqList"></div>
+            <div class="attn-controls">
+                <span style="color:var(--text-secondary);font-size:12px">View:</span>
+                <select id="attnView" class="search-box"><option value="grid">All heads (grid)</option><option value="avg">Average per layer</option><option value="entropy">Attention entropy</option></select>
+                <span style="color:var(--text-secondary);font-size:12px">Colour:</span>
+                <select id="attnCmap" class="search-box"><option value="orange">Dark → Orange</option><option value="blue">Dark → Blue</option><option value="green">Dark → Green</option><option value="heatmap">Blue → White → Orange</option></select>
+                <span style="color:var(--text-secondary);font-size:12px">Thumb px:</span>
+                <select id="attnThumbPx" class="search-box"><option value="80">80</option><option value="100" selected>100</option><option value="130">130</option><option value="160">160</option></select>
+                <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="attnShowBos" checked> show BOS</label>
+            </div>
+            <div id="attnTokenChips" style="margin-bottom:14px"></div>
+            <div class="attn-detail-panel" id="attnDetailPanel">
+                <div class="attn-detail-title"><span id="attnDetailLabel"></span>
+                    <button id="btnAttnDetailClose" style="margin-left:auto;padding:2px 10px;font-size:11px;background:var(--surface);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;cursor:pointer">✕</button>
+                </div>
+                <div class="attn-canvas-scroll"><canvas id="attnDetailCanvas"></canvas></div>
+                <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">Rows = query (from) · Columns = key (to) · Upper triangle is masked (causal)</div>
+            </div>
+            <div id="attnMainView"></div>
+        </div>`;
+    panel.innerHTML = html;
+
+    // Wire up view/cmap/thumb controls to re-render
+    ['attnView','attnCmap','attnThumbPx'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', function() { renderAttnMain(); });
+    });
+    var bosEl = document.getElementById('attnShowBos');
+    if (bosEl) bosEl.addEventListener('change', function() { renderAttnMain(); });
+
+    var closeBtn = document.getElementById('btnAttnDetailClose');
+    if (closeBtn) closeBtn.addEventListener('click', function() {
+        document.getElementById('attnDetailPanel').style.display = 'none';
+        attnSt.activeCard = null;
+        renderAttnMain();
+    });
+    
+    // Wire up events
+    if (document.getElementById('attnFileInput')) {
+        document.getElementById('attnFileInput').addEventListener('change', async e => {
+            const f = e.target.files[0]; if (!f) return;
+            try {
+                const text = await f.text();
+                const data = JSON.parse(text);
+                if (!data.sequences) throw new Error('Not a valid attention.json');
+                loadAttnData(data);
+                document.querySelector('.tab[data-tab="attention"]').click();
+            } catch (err) {
+                alert('Failed to load attention.json:\\n' + err.message);
+            }
+            e.target.value = '';
+        });
+    }
+    
+    if (document.getElementById('btnAttnDemo')) {
+        document.getElementById('btnAttnDemo').addEventListener('click', () => {
+            loadAttnData(generateAttnDemo());
+        });
+    }
+    
+    if (document.getElementById('btnAttnClear')) {
+        document.getElementById('btnAttnClear').addEventListener('click', () => {
+            attnSt.data = null;
+            if (document.getElementById('attnEmpty')) document.getElementById('attnEmpty').style.display = '';
+            if (document.getElementById('attnContent')) document.getElementById('attnContent').style.display = 'none';
+        });
+    }
+    
+    // Auto-load if data is embedded
+    if (window.CK_ATTENTION && CK_ATTENTION !== null) {
+        loadAttnData(CK_ATTENTION);
+    }
+}
+
+/* Demo data generators */
+function generateEmbDemo() {
+    const vocab = [
+        {id:0,token:'<|unk|>',   group:'system'},
+        {id:1,token:'<|bos|>',   group:'system'},
+        {id:2,token:'<|eos|>',   group:'system'},
+        {id:3,token:'<|pad|>',   group:'system'},
+        {id:4,token:'[shape:circle]',   group:'prompt'},
+        {id:5,token:'[shape:rect]',     group:'prompt'},
+        {id:6,token:'[shape:triangle]', group:'prompt'},
+        {id:7,token:'[color:red]',      group:'prompt'},
+        {id:8,token:'[color:blue]',     group:'prompt'},
+        {id:9,token:'[color:green]',    group:'prompt'},
+        {id:10,token:'[size:small]',    group:'prompt'},
+        {id:11,token:'[size:big]',      group:'prompt'},
+        {id:12,token:'[OUT]',           group:'prompt'},
+        {id:13,token:'[svg]',           group:'svg_structure'},
+        {id:14,token:'[/svg]',          group:'svg_structure'},
+        {id:15,token:'[circle]',        group:'svg_structure'},
+        {id:16,token:'[rect]',          group:'svg_structure'},
+        {id:17,token:'[polygon]',       group:'svg_structure'},
+        {id:18,token:'[fill:red]',      group:'svg_style'},
+        {id:19,token:'[fill:blue]',     group:'svg_style'},
+        {id:20,token:'[fill:green]',    group:'svg_style'},
+        {id:21,token:'[stroke:black]',  group:'svg_style'},
+        {id:22,token:'[sw:2]',          group:'svg_style'},
+        {id:23,token:'[cx:64]',         group:'svg_attr'},
+        {id:24,token:'[cy:64]',         group:'svg_attr'},
+        {id:25,token:'[r:18]',          group:'svg_attr'},
+        {id:26,token:'[r:36]',          group:'svg_attr'},
+        {id:27,token:'[x:42]',          group:'svg_attr'},
+        {id:28,token:'[y:48]',          group:'svg_attr'},
+        {id:29,token:'[width:44]',      group:'svg_attr'},
+        {id:30,token:'[height:32]',     group:'svg_attr'},
+        {id:31,token:'[points:64,34|36,86|92,86]', group:'svg_attr'},
+    ];
+    const D = 32;
+    const V = vocab.length;
+    /* Each group occupies a subspace; noise added for realism */
+    const groupDims = {
+        system:        [0,1,2,3],
+        prompt:        [4,5,6,7,8,9],
+        svg_structure: [10,11,12,13,14,15],
+        svg_style:     [16,17,18,19,20,21],
+        svg_attr:      [22,23,24,25,26,27,28,29],
+    };
+    function randn() {
+        return Math.sqrt(-2*Math.log(Math.random()+1e-9)) * Math.cos(2*Math.PI*Math.random());
+    }
+    const matrix = vocab.map(tok => {
+        const dims = groupDims[tok.group] || [];
+        return Array.from({length:D}, (_,j) =>
+            (dims.includes(j) ? randn() * 0.45 + 0.3 : randn() * 0.08) * 0.6
+        );
+    });
+    const flat = matrix.flat();
+    return {
+        format: 'ck-embeddings.v1', run_id: 'demo', step: null,
+        tensor: 'token_emb', shape: [V, D],
+        vocab, matrix,
+        stats: {
+            min: Math.min(...flat), max: Math.max(...flat),
+            mean: flat.reduce((a,b)=>a+b,0)/flat.length,
+            std: Math.sqrt(flat.reduce((a,b)=>a+b*b,0)/flat.length - (flat.reduce((a,b)=>a+b,0)/flat.length)**2),
+            vocab_size: V, embed_dim: D, nonzero_rows: V,
+        },
+    };
+}
+
+function generateAttnDemo() {
+    function softmax(arr) { const m = Math.max(...arr); const e = arr.map(x => Math.exp(x-m)); const s = e.reduce((a,b)=>a+b,0); return e.map(x => x/s); }
+    function randn() { return Math.sqrt(-2*Math.log(Math.random()+1e-9)) * Math.cos(2*Math.PI*Math.random()); }
+    const tokens = ['<|bos|>', '[shape:circle]', '[color:red]', '[OUT]', '[svg]', '[circle]', '[/svg]', '<|eos|>'];
+    const L = tokens.length;
+    const layers = [];
+    for (let li = 0; li < 2; li++) {
+        const heads = [];
+        for (let hi = 0; hi < 4; hi++) {
+            const attn = [];
+            for (let qi = 0; qi < L; qi++) {
+                const logits = [];
+                for (let ki = 0; ki < L; ki++) {
+                    logits.push(ki <= qi ? randn() * (li === 0 ? 1.5 : 2.0) + (ki === qi ? 1.0 : 0) + (ki === 0 ? 0.5 : 0) : -1e9);
+                }
+                attn.push(softmax(logits));
+            }
+            heads.push({head: hi, attn: attn});
+        }
+        layers.push({layer: li, heads: heads});
+    }
+    return {
+        format: 'ck-attention.v1', run_id: 'demo', step: null,
+        config: {num_layers: 2, num_heads: 4, num_kv_heads: 2, head_dim: 16},
+        sequences: [{
+            id: 'demo_seq_1', label: 'circle red small', split: 'seen',
+            tokens: tokens, token_ids: [1,4,7,12,13,15,14,2], top_preds: null,
+            layers: layers
+        }]
+    };
+}
+
 function renderAll() {
     renderHeader();
     renderOverview();
@@ -2267,6 +3733,8 @@ function renderAll() {
     renderBrowse();
     renderCandidates();
     renderQuality();
+    renderEmbeddings();
+    renderAttention();
     populateFilters();
 }
 
@@ -2308,8 +3776,8 @@ renderAll();
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Build a standalone SVG dataset visualizer from spec03 manifests")
-    ap.add_argument("--workspace", required=True, help="Spec workspace root, e.g. version/v7/data/spec03")
+    ap = argparse.ArgumentParser(description="Build a standalone SVG dataset visualizer from a split-aware workspace")
+    ap.add_argument("--workspace", required=True, help="Workspace root, e.g. version/v7/data/spec04 or RUN/dataset")
     ap.add_argument("--output", required=True, help="Output HTML file")
     args = ap.parse_args()
 

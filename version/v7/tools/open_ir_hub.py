@@ -11,6 +11,42 @@ Usage:
   python3 version/v7/tools/open_ir_hub.py --models-root ~/.cache/ck-engine-v7/models
   python3 version/v7/tools/open_ir_hub.py --output /tmp/ir_hub.html --index-out /tmp/runs_index.json
   python3 version/v7/tools/open_ir_hub.py --open
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  FEATURE MANIFEST — DO NOT DELETE OR REGRESS ANY OF THESE FEATURES  ⚠️   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  This file generates the IR Run Hub HTML. Every feature below is             │
+│  operator-critical. Future agents: you may ENHANCE, but NEVER remove.        │
+│                                                                              │
+│  PYTHON FEATURES:                                                            │
+│   • RunRecord dataclass — all run metadata, artifact paths, commands         │
+│   • Artifact discovery: IR report, dataset viewer, embeddings, attention     │
+│   • Command builders: dataset viewer, export embeddings, export attention    │
+│   • _find_embeddings_path / _find_attention_path — artifact finders          │
+│   • _build_dataset_viewer_cmd — always returns a command (never None)        │
+│   • build_index() — aggregates all runs into hub payload JSON                │
+│                                                                              │
+│  HTML/JS FEATURES:                                                           │
+│   • Antsand brand badge (CK logo + "C-Kernel-Engine v7")                     │
+│   • Spotlight card for latest run with full details                          │
+│   • Run cards grid with kind badges (train/inference/eval)                   │
+│   • Table view toggle for dense listing                                      │
+│   • Hero metric ribbon (runs, specs, embeddings, attention counts)           │
+│   • Button variants: .btn.dataset (cyan), .btn.emb (purple), .btn.attn      │
+│   • ⚡ Operator Commands panel (renderCommandsPanel) with 5 commands:        │
+│     - 📦 Build Dataset Viewer                                                │
+│     - 🧬 Export Embeddings                                                   │
+│     - 🔭 Export Attention Matrices                                           │
+│     - 🔍 Open IR Visualizer                                                  │
+│     - 📊 Open Dataset Viewer                                                 │
+│   • Deep-links: embViewerLink() / attnViewerLink() → repo-root viewer       │
+│   • cmdBlock(cmd, label, desc) — copyable command blocks with descriptions   │
+│   • Search/filter by run name                                                │
+│   • CSS dark theme with orange/cyan/purple/teal accents                      │
+│                                                                              │
+│  If adding features, follow the existing patterns and update this manifest.  │
+└──────────────────────────────────────────────────────────────────────────────┘
 """
 
 from __future__ import annotations
@@ -27,6 +63,7 @@ from pathlib import Path
 from typing import Any
 
 V7_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = V7_ROOT.parent.parent
 KERNEL_REGISTRY_PATH = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
 
 MARKER_FILES = {
@@ -103,6 +140,16 @@ def _build_generate_report_cmd(run_dir: Path) -> str:
     )
 
 
+def _build_export_embeddings_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"python3 version/v7/tools/export_embeddings.py {run_q}"
+
+
+def _build_export_attention_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"python3 version/v7/tools/export_attention.py {run_q} --probe"
+
+
 def _build_run_make_cmd(target: str, run_dir: Path) -> str:
     run_q = shlex.quote(str(run_dir))
     return f"make {target} RUN={run_q}"
@@ -130,6 +177,20 @@ def _find_dataset_viewer_path(run_dir: Path) -> Path | None:
     nested = run_dir / "dataset" / "dataset_viewer.html"
     if nested.exists():
         return nested
+    return None
+
+
+def _find_embeddings_path(run_dir: Path) -> Path | None:
+    for candidate in [run_dir / "embeddings.json", run_dir / "dataset" / "embeddings.json"]:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _find_attention_path(run_dir: Path) -> Path | None:
+    for candidate in [run_dir / "attention.json", run_dir / "dataset" / "attention.json"]:
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -174,12 +235,13 @@ def _build_dataset_materialize_cmd(dataset_workspace: str | None, dataset_type: 
     )
 
 
-def _build_dataset_viewer_cmd(dataset_workspace: str | None, dataset_type: str | None, run_dir: Path) -> str | None:
-    if not dataset_workspace or not dataset_type:
-        return None
-    if dataset_type != "svg":
-        return None
-    ws_q = shlex.quote(str(dataset_workspace))
+def _build_dataset_viewer_cmd(dataset_workspace: str | None, dataset_type: str | None, run_dir: Path) -> str:
+    """Always returns a build command. Uses the detected workspace when available,
+    falls back to run_dir/dataset so the operator always has something to copy."""
+    if dataset_workspace and dataset_type == "svg":
+        ws_q = shlex.quote(str(dataset_workspace))
+    else:
+        ws_q = shlex.quote(str(run_dir / "dataset"))
     out_q = shlex.quote(str(run_dir / "dataset_viewer.html"))
     return (
         "python3 version/v7/scripts/build_svg_dataset_visualizer_v7.py "
@@ -541,6 +603,8 @@ class RunRecord:
     compare_family: str
     report_path: Path | None
     dataset_viewer_path: Path | None
+    embeddings_path: Path | None
+    attention_path: Path | None
     gallery_path: Path | None
     dataset_snapshot_path: Path | None
     dataset_workspace: str | None
@@ -549,7 +613,7 @@ class RunRecord:
     dataset_staged_entries: list[str]
     dataset_missing_entries: list[str]
     dataset_refresh_cmd: str | None
-    dataset_rebuild_viewer_cmd: str | None
+    dataset_rebuild_viewer_cmd: str
     dataset_prep_checklist: list[dict[str, Any]]
     tokenizer_summary: dict[str, Any]
     eval_summary: dict[str, Any]
@@ -566,6 +630,8 @@ class RunRecord:
     weights_reason: str | None
     shape_signature: str | None
     generate_report_cmd: str
+    export_embeddings_cmd: str
+    export_attention_cmd: str
     artifact_sections: list[dict[str, Any]]
     coverage_summary: dict[str, Any]
     next_actions: list[dict[str, str]]
@@ -584,6 +650,10 @@ class RunRecord:
             "report_uri": self.report_path.resolve().as_uri() if self.report_path else None,
             "dataset_viewer_path": str(self.dataset_viewer_path) if self.dataset_viewer_path else None,
             "dataset_viewer_uri": self.dataset_viewer_path.resolve().as_uri() if self.dataset_viewer_path else None,
+            "embeddings_path": str(self.embeddings_path) if self.embeddings_path else None,
+            "embeddings_uri": self.embeddings_path.resolve().as_uri() if self.embeddings_path else None,
+            "attention_path": str(self.attention_path) if self.attention_path else None,
+            "attention_uri": self.attention_path.resolve().as_uri() if self.attention_path else None,
             "gallery_path": str(self.gallery_path) if self.gallery_path else None,
             "gallery_uri": self.gallery_path.resolve().as_uri() if self.gallery_path else None,
             "dataset_snapshot_path": str(self.dataset_snapshot_path) if self.dataset_snapshot_path else None,
@@ -613,6 +683,8 @@ class RunRecord:
             "weights_reason": self.weights_reason,
             "shape_signature": self.shape_signature,
             "generate_report_cmd": self.generate_report_cmd,
+            "export_embeddings_cmd": self.export_embeddings_cmd,
+            "export_attention_cmd": self.export_attention_cmd,
             "artifact_sections": self.artifact_sections,
             "coverage_summary": self.coverage_summary,
             "next_actions": self.next_actions,
@@ -835,6 +907,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     rel = _to_rel(run_dir, models_root)
     report = _find_report_path(run_dir)
     dataset_viewer = _find_dataset_viewer_path(run_dir)
+    embeddings = _find_embeddings_path(run_dir)
+    attention = _find_attention_path(run_dir)
     gallery = _find_gallery_path(run_dir)
     dataset_snapshot_path = _find_dataset_snapshot_path(run_dir)
     dataset_snapshot = _safe_read_json(dataset_snapshot_path) if dataset_snapshot_path else None
@@ -897,6 +971,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         compare_family=compare_family,
         report_path=report,
         dataset_viewer_path=dataset_viewer,
+        embeddings_path=embeddings,
+        attention_path=attention,
         gallery_path=gallery,
         dataset_snapshot_path=dataset_snapshot_path,
         dataset_workspace=dataset_workspace,
@@ -922,6 +998,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         weights_reason=weights_reason,
         shape_signature=_shape_signature(dims),
         generate_report_cmd=_build_generate_report_cmd(run_dir),
+        export_embeddings_cmd=_build_export_embeddings_cmd(run_dir),
+        export_attention_cmd=_build_export_attention_cmd(run_dir),
         artifact_sections=artifact_sections,
         coverage_summary=coverage_summary,
         next_actions=next_actions,
@@ -937,16 +1015,25 @@ def build_index(models_root: Path) -> dict[str, Any]:
     train_count = sum(1 for r in payload_runs if r.get("kind") == "train")
     report_count = sum(1 for r in payload_runs if r.get("report_path"))
     dataset_viewer_count = sum(1 for r in payload_runs if r.get("dataset_viewer_path"))
+    embeddings_count = sum(1 for r in payload_runs if r.get("embeddings_path"))
+    attention_count = sum(1 for r in payload_runs if r.get("attention_path"))
     pass_count = sum(1 for r in payload_runs if (r.get("parity_regimen") or {}).get("status") in ("PASS", "PASS_REUSED"))
+
+    global_viewer = REPO_ROOT / "dataset_viewer.html"
+    global_viewer_uri = global_viewer.resolve().as_uri() if global_viewer.exists() else None
+
     return {
         "schema": "ck.ir.hub.v2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "models_root": str(models_root),
+        "global_viewer_uri": global_viewer_uri,
         "summary": {
             "runs_total": len(payload_runs),
             "runs_train": train_count,
             "runs_with_report": report_count,
             "runs_with_dataset_viewer": dataset_viewer_count,
+            "runs_with_embeddings": embeddings_count,
+            "runs_with_attention": attention_count,
             "runs_parity_pass": pass_count,
         },
         "runs": payload_runs,
@@ -1122,6 +1209,34 @@ def render_html(index_payload: dict[str, Any]) -> str:
     body.table-mode .hero::after {
       opacity: 0.22;
     }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--gold);
+      color: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      font-family: 'Space Grotesk', sans-serif;
+      flex-shrink: 0;
+    }
+    .brand-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .brand-label span { color: var(--gold); }
 
     .hero-grid {
       display: grid;
@@ -1823,6 +1938,24 @@ def render_html(index_payload: dict[str, Any]) -> str:
       background: linear-gradient(180deg, rgba(255, 189, 74, 0.09), rgba(255, 189, 74, 0.035));
       color: #eadbbb;
     }
+    .btn.dataset {
+      border-color: rgba(7, 173, 248, 0.36);
+      background: linear-gradient(180deg, rgba(7, 173, 248, 0.11), rgba(7, 173, 248, 0.04));
+      color: #a8dff7;
+    }
+    .btn.dataset:hover { background: rgba(7, 173, 248, 0.18); border-color: var(--cyan); }
+    .btn.emb {
+      border-color: rgba(179, 136, 255, 0.36);
+      background: linear-gradient(180deg, rgba(179, 136, 255, 0.11), rgba(179, 136, 255, 0.04));
+      color: #d4bbff;
+    }
+    .btn.emb:hover { background: rgba(179, 136, 255, 0.2); border-color: #b388ff; }
+    .btn.attn {
+      border-color: rgba(77, 208, 225, 0.36);
+      background: linear-gradient(180deg, rgba(77, 208, 225, 0.11), rgba(77, 208, 225, 0.04));
+      color: #a5eaf2;
+    }
+    .btn.attn:hover { background: rgba(77, 208, 225, 0.2); border-color: #4dd0e1; }
 
     .btn.compare-on {
       border-color: rgba(7, 173, 248, 0.34);
@@ -2471,7 +2604,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
     <section class="hero">
       <div class="hero-grid">
         <div>
-          <p class="eyebrow">C-Kernel-Engine / Version 7</p>
+          <div class="brand-badge">
+            <div class="brand-mark">C</div>
+            <span class="brand-label">C-Kernel-Engine <span>v7</span></span>
+          </div>
+          <p class="eyebrow">Research Run Hub</p>
           <h1 class="headline">Run Hub<span class="accent">Operations Deck</span></h1>
           <p class="lede">Scan every v7 run, spot weak artifacts fast, and jump straight into the right report or terminal action.</p>
           <div class="hero-tags">
@@ -2638,6 +2775,47 @@ def render_html(index_payload: dict[str, Any]) -> str:
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function embViewerLink(run, label) {
+      if (!run.embeddings_uri) return '';
+      const href = HUB.global_viewer_uri
+        ? `${HUB.global_viewer_uri}?tab=embeddings&embUrl=${encodeURIComponent(run.embeddings_uri)}`
+        : run.embeddings_uri;
+      return `<a class="btn emb" target="_blank" rel="noopener" href="${escapeHtml(href)}">${label}</a>`;
+    }
+
+    function attnViewerLink(run, label) {
+      if (!run.attention_uri) return '';
+      const href = HUB.global_viewer_uri
+        ? `${HUB.global_viewer_uri}?tab=attention&attnUrl=${encodeURIComponent(run.attention_uri)}`
+        : run.attention_uri;
+      return `<a class="btn attn" target="_blank" rel="noopener" href="${escapeHtml(href)}">${label}</a>`;
+    }
+
+    function cmdBlock(cmd, label, desc) {
+      if (!cmd) return '';
+      return `<div style="margin-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">${label}</div>
+        ${desc ? `<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${desc}</div>` : ''}
+        <div class="spotlight-command" style="display:flex;align-items:center;gap:8px;">
+          <code style="flex:1;overflow:auto">${escapeHtml(cmd)}</code>
+          <button class="btn" style="flex-shrink:0" data-copy="${encodeURIComponent(cmd)}">Copy</button>
+        </div>
+      </div>`;
+    }
+
+    function renderCommandsPanel(run) {
+      return `
+        <div style="margin-top:14px;border:1px solid rgba(255,180,0,0.14);border-radius:12px;padding:14px 16px;background:rgba(20,20,20,0.6);">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">⚡ Operator Commands</div>
+          ${cmdBlock(run.generate_report_cmd, '📊 Generate IR Report', 'Runs the full IR visualizer pipeline and writes ir_report.html into the run directory.')}
+          ${cmdBlock(run.datasetRebuildViewerCmd, '📦 Build Dataset Viewer', 'Reads workspace manifests (raw inventory, normalized, classified) and generates a standalone dataset_viewer.html for this run.')}
+          ${run.datasetRefreshCmd ? cmdBlock(run.datasetRefreshCmd, '🔄 Materialize Dataset', 'Stages raw SVG assets, normalizes them, and writes split manifests into the workspace.') : ''}
+          ${cmdBlock(run.export_embeddings_cmd, '🧬 Export Embeddings', 'Extracts the token embedding matrix from the latest checkpoint into embeddings.json — view in the Dataset Viewer Embeddings tab.')}
+          ${cmdBlock(run.export_attention_cmd, '🔭 Export Attention', 'Runs a full forward pass on probe sequences and saves per-layer/per-head attention matrices to attention.json.')}
+        </div>
+      `;
     }
 
     function fmtInt(value) {
@@ -3102,7 +3280,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
             </div>
             <div class="actions" style="margin-top:14px;">
               ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Open report</a>` : ''}
-              ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+              ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+              ${embViewerLink(run, '🧬 Embeddings')}
+              ${attnViewerLink(run, '🔭 Attention')}
               <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
             </div>
           </article>
@@ -3240,6 +3420,24 @@ def render_html(index_payload: dict[str, Any]) -> str:
       background: linear-gradient(180deg, rgba(255, 189, 74, 0.09), rgba(255, 189, 74, 0.035));
       color: #eadbbb;
     }
+    .btn.dataset {
+      border-color: rgba(7, 173, 248, 0.36);
+      background: linear-gradient(180deg, rgba(7, 173, 248, 0.11), rgba(7, 173, 248, 0.04));
+      color: #a8dff7;
+    }
+    .btn.dataset:hover { background: rgba(7, 173, 248, 0.18); border-color: var(--cyan); }
+    .btn.emb {
+      border-color: rgba(179, 136, 255, 0.36);
+      background: linear-gradient(180deg, rgba(179, 136, 255, 0.11), rgba(179, 136, 255, 0.04));
+      color: #d4bbff;
+    }
+    .btn.emb:hover { background: rgba(179, 136, 255, 0.2); border-color: #b388ff; }
+    .btn.attn {
+      border-color: rgba(77, 208, 225, 0.36);
+      background: linear-gradient(180deg, rgba(77, 208, 225, 0.11), rgba(77, 208, 225, 0.04));
+      color: #a5eaf2;
+    }
+    .btn.attn:hover { background: rgba(77, 208, 225, 0.2); border-color: #4dd0e1; }
     .compare-table-wrap {
       overflow-x: auto;
       border: 1px solid rgba(255,255,255,0.08);
@@ -3400,6 +3598,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const newest = runs[0];
       const reportCount = summary.runs_with_report || runs.filter((run) => run.reportReady).length;
       const datasetViewerCount = summary.runs_with_dataset_viewer || runs.filter((run) => run.datasetViewerReady).length;
+      const embeddingsCount = summary.runs_with_embeddings || runs.filter((run) => run.embeddings_uri).length;
+      const attentionCount = summary.runs_with_attention || runs.filter((run) => run.attention_uri).length;
       const parityPass = summary.runs_parity_pass || runs.filter((run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED').length;
       const trainCount = summary.runs_train || runs.filter((run) => run.kind === 'train').length;
       const inferCount = runs.filter((run) => run.kind === 'inference').length;
@@ -3426,6 +3626,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
         { label: 'Inference Roots', value: fmtInt(inferCount), note: 'Inference and runtime roots.' },
         { label: 'Reports Ready', value: fmtInt(reportCount), note: 'ir_report.html or .ck_build report.' },
         { label: 'Dataset Viewers', value: fmtInt(datasetViewerCount), note: 'run-local dataset_viewer.html snapshots.' },
+        { label: '🧬 Embeddings', value: fmtInt(embeddingsCount), note: 'Runs with exported embeddings.json.' },
+        { label: '🔭 Attention', value: fmtInt(attentionCount), note: 'Runs with exported attention.json.' },
         { label: 'Parity Pass', value: fmtInt(parityPass), note: 'PASS plus PASS_REUSED regimen states.' },
         { label: 'Best Loss / Checkpoints', value: `${fmtLoss(bestLoss)} / ${fmtInt(totalCheckpoints)}`, note: 'Lowest loss and total checkpoint volume.' },
       ];
@@ -3557,7 +3759,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
               </div>
               <div class="action-row">
                 ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Open report</a>` : ''}
-                ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+                ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
+                ${embViewerLink(run, '🧬 Embeddings')}
+                ${attnViewerLink(run, '🔭 Attention')}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">SVG Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Open run dir</a>
                 ${selectionButton(run, 'Select for compare', 'Selected for compare')}
@@ -3567,11 +3771,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
               ${renderSectionSummary(run, true)}
               <div class="health-note">Core dashboard coverage. Advanced correctness and deep profiling are tracked separately below.</div>
               ${renderDatasetPrepChecklist(run)}
+              ${renderCommandsPanel(run)}
               <details class="detail-toggle">
                 <summary>Advanced details</summary>
-                <div class="spotlight-command">${escapeHtml(run.generate_report_cmd || 'No report generation command available')}</div>
-                ${run.datasetRefreshCmd ? `<div class="spotlight-command" style="margin-top:10px;">${escapeHtml(run.datasetRefreshCmd)}</div>` : ''}
-                ${run.datasetRebuildViewerCmd ? `<div class="spotlight-command" style="margin-top:10px;">${escapeHtml(run.datasetRebuildViewerCmd)}</div>` : ''}
                 <div class="spotlight-summary" style="margin-top:12px;">
                   <div class="summary-tile"><div class="k">Shape Signature</div><div class="v">${escapeHtml(run.shape_signature || 'n/a')}</div></div>
                   <div class="summary-tile"><div class="k">Weights Reason</div><div class="v">${escapeHtml(run.weights_reason || 'n/a')}</div></div>
@@ -3813,7 +4015,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
               <div class="run-actions">
                 ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
-                ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                ${embViewerLink(run, '🧬 Emb')}
+                ${attnViewerLink(run, '🔭 Attn')}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                 <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
                 ${selectionButton(run)}
@@ -3835,7 +4039,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                   <div class="run-stat"><div class="k">Updated ISO</div><div class="v mono">${escapeHtml(run.updated_iso || 'n/a')}</div></div>
                 </div>
                 ${renderNextActions(run)}
-                <div class="codebox" style="margin-top:12px;">${escapeHtml(run.generate_report_cmd || 'No report generation command available')}</div>
+                ${renderCommandsPanel(run)}
               </details>
             </div>
           </article>
@@ -3907,7 +4111,9 @@ def render_html(index_payload: dict[str, Any]) -> str:
                     <td>
                       <div class="table-actions">
                         ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
-                        ${run.dataset_viewer_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                        ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                        ${embViewerLink(run, '🧬')}
+                        ${attnViewerLink(run, '🔭')}
                         ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
                         <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run</a>
                         ${selectionButton(run)}
