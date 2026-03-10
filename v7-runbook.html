@@ -2758,7 +2758,6 @@ fi</pre>
 <div class="card card-blue">
     <p style="margin-bottom: 0.45rem;">Use this once per new run to make the training pipeline explicit from the start: generate staged datasets, lock tokenizer corpus, seed run artifacts, and generate the first operator view.</p>
     <p class="mini-note"><strong>Dataset workspace first:</strong> if you are using the staged dataset flow, prepare a split-aware workspace such as <code>version/v7/data/spec04</code> in <a href="v7-svg-dataset-runbook.html">v7-svg-dataset-runbook.html</a> first, then stage that workspace into the run with <code>--dataset-workspace</code>. The repo workspace is the seed template; the run-local copy under <code>$RUN/dataset/</code> is the working dataset for that run.</p>
-    <p class="mini-note"><strong>Operator rule:</strong> do not split generated artifacts between the repo and cache. Keep the staged dataset, <code>dataset_viewer.html</code>, <code>ir_report.html</code>, checkpoints, parity JSON, and perf outputs together under one cache run directory so the run can be inspected, tarred, shared, and discovered by <code>python3 version/v7/tools/open_ir_hub.py --open</code> without hidden side locations.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre># 1) Build staged SVG corpora + instruction corpus
@@ -2827,7 +2826,7 @@ bash version/v7/scripts/init_data_workspace_v7.sh --spec spec04 --dataset-type s
   --workspace "$RUN/dataset" \
   --output "$RUN/dataset_viewer.html"</pre>
         </div>
-        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, stage split corpora (<code>train/dev/test</code> by default), tokenizer corpus, optional <code>holdout</code>, parity JSON, and perf artifacts all live under the same run directory.</p>
+        <p class="mini-note">Use this flow when you want the whole run to be self-contained under <code>$RUN</code>: IR viewer, Dataset Viewer, manifests, stage split corpora (<code>train/dev/test</code> by default), tokenizer corpus, and optional <code>holdout</code> all live under the same run directory.</p>
     </details>
     <p class="mini-note"><strong>Rule:</strong> after this bootstrap, keep tokenizer fixed and run later stages with <code>--reuse-run-tokenizer</code> to avoid vocabulary drift.</p>
     <div class="step-produces">
@@ -4127,27 +4126,6 @@ make v7-profile-dashboard \
   --generate-visualizer</pre>
     </div>
 
-    <div class="alert alert-warning" style="margin-top: 1rem;">
-        <div class="alert-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </div>
-        <div>
-            <strong>NaanBeige / Llama-family template symptom</strong><br>
-            If the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, the prompt is being fed with the wrong chat wrapper or stop markers. For NaanBeige, keep the default <code>--chat-template auto</code>, prefer <code>--python-tokenizer</code> on first bring-up, and do not force <code>--chat-template none</code> unless you are testing raw logits on purpose.
-        </div>
-    </div>
-
-    <h3>NaanBeige 4.1 3B</h3>
-    <div class="cmd-block">
-        <button class="copy-btn" type="button">Copy</button>
-<pre>version/v7/scripts/cks-v7-run run \
-  hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
-  --context-len 1024 --force-compile --force-convert \
-  --python-tokenizer --chat-template auto \
-  --generate-visualizer</pre>
-    </div>
-    <p class="mini-note">Current scope: documented inference/parity bring-up. The v7 training preset list still centers on Qwen2/Qwen3/Gemma3 templates.</p>
-
     <h3 id="step-8-visualize-hf">Step 8.1: Generate IR Visualizer for these HF GGUF runs</h3>
     <p style="margin-bottom: 0.4rem;">
         <code>ck_run_v7.py run hf://...</code> stores each model under
@@ -4161,9 +4139,8 @@ make v7-profile-dashboard \
 GEMMA_RUN="$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF"
 QWEN2_RUN="$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF"
 QWEN3_RUN="$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF"
-NANBEIGE_RUN="$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF"
 
-for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN" "$NANBEIGE_RUN"; do
+for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN"; do
   if [ ! -d "$RUN_DIR" ]; then
     echo "[Missing] $RUN_DIR (run Step 8 command first)"
     continue
@@ -4178,8 +4155,7 @@ done</pre>
 CACHE_MODELS="${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}"
 xdg-open "$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF/ir_report.html" >/dev/null 2>&1 || true
-xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 || true
-xdg-open "$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF/ir_report.html" >/dev/null 2>&1 || true</pre>
+xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">
         Report files are written to each run root as <code>ir_report.html</code> (not inside <code>.ck_build</code>).
@@ -5356,7 +5332,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-09</p>
             </div>
         </div>
     </footer>

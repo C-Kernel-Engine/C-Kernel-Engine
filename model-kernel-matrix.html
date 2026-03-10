@@ -964,7 +964,6 @@
     .model-card.mc-qwen2::before  { background: var(--orange); }
     .model-card.mc-qwen3::before  { background: var(--green); }
     .model-card.mc-gemma3::before { background: var(--blue); }
-    .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
 
     .model-badge {
@@ -1194,7 +1193,7 @@
     <div class="model-card mc-qwen2">
       <span class="model-badge">template: qwen2.json</span>
       <div class="model-title">Qwen2</div>
-      <div class="model-arch">RMSNorm · RoPE split-half · SwiGLU · GQA<br>QKV bias from weights · BPE tokenizer</div>
+      <div class="model-arch">RMSNorm · RoPE · SwiGLU · GQA<br>QKV bias from weights · BPE tokenizer</div>
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
@@ -1212,7 +1211,7 @@
     <div class="model-card mc-qwen3">
       <span class="model-badge">template: qwen3.json</span>
       <div class="model-title">Qwen3</div>
-      <div class="model-arch">RMSNorm · RoPE split-half · QK‑Norm · SwiGLU<br>No QKV bias · BPE tokenizer · learned QK‑Norm</div>
+      <div class="model-arch">RMSNorm · RoPE · QK‑Norm · SwiGLU<br>No QKV bias · BPE tokenizer · learned QK‑Norm</div>
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, GEMM/GEMV dispatch</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
@@ -1239,27 +1238,6 @@
         <span class="mq-chip preferred">Q8_0 ★</span>
         <span class="mq-chip">Q4_K</span>
         <span class="mq-chip">BF16</span>
-        <span class="mq-chip">FP32</span>
-      </div>
-    </div>
-
-    <!-- Llama / Nanbeige -->
-    <div class="model-card mc-llama">
-      <span class="model-badge">template: llama.json</span>
-      <div class="model-title">Llama / Nanbeige</div>
-      <div class="model-arch">RMSNorm · RoPE pairwise · SwiGLU · GQA<br>Untied LM head supported · SentencePiece · ChatML markers via GGUF</div>
-      <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — active GGUF bring-up lane on Nanbeige 4.1 3B</span></div>
-        <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">v7 training — not yet a documented preset; use template-audit + parity gates first</span></div>
-      </div>
-      <div class="model-tags">
-        <span class="tag learned">untied output.weight</span>
-        <span class="tag learned">ChatML auto template</span>
-        <span class="tag fixed">template-audit first</span>
-      </div>
-      <div class="model-quant">
-        <span class="mq-chip">Q4_K_M</span>
-        <span class="mq-chip">Q8_0</span>
         <span class="mq-chip">FP32</span>
       </div>
     </div>
@@ -1311,7 +1289,7 @@
       <div class="cell ok">BPE</div>
       <div class="cell ok">From weights</div>
       <div class="cell dim">No</div>
-      <div class="cell ok">RoPE split-half</div>
+      <div class="cell ok">RoPE</div>
       <div class="cell ok">Causal</div>
       <div class="cell ok">SwiGLU</div>
       <div class="cell dim">No</div>
@@ -1321,7 +1299,7 @@
       <div class="cell ok">BPE</div>
       <div class="cell dim">No</div>
       <div class="cell ok">Yes</div>
-      <div class="cell ok">RoPE split-half</div>
+      <div class="cell ok">RoPE</div>
       <div class="cell ok">Causal</div>
       <div class="cell ok">SwiGLU</div>
       <div class="cell dim">No</div>
@@ -1336,16 +1314,6 @@
       <div class="cell ok">GeGLU</div>
       <div class="cell ok">Yes</div>
       <div class="cell ok">Tied</div>
-
-      <div class="cell row-head">Llama / Nanbeige</div>
-      <div class="cell ok">SentencePiece</div>
-      <div class="cell ok">From weights</div>
-      <div class="cell dim">No</div>
-      <div class="cell ok">RoPE pairwise</div>
-      <div class="cell ok">Causal GQA</div>
-      <div class="cell ok">SwiGLU</div>
-      <div class="cell dim">No</div>
-      <div class="cell ok">Untied head</div>
     </div>
   </div>
 
@@ -1401,16 +1369,6 @@
       <div class="cell ok">geglu</div>
       <div class="cell ok">Yes</div>
       <div class="cell ok">Yes</div>
-
-      <div class="cell row-head">Llama / Nanbeige</div>
-      <div class="cell dim">No</div>
-      <div class="cell dim">No</div>
-      <div class="cell dim">No</div>
-      <div class="cell ok">SentencePiece + ChatML</div>
-      <div class="cell ok">attn</div>
-      <div class="cell ok">silu_mul</div>
-      <div class="cell ok">Yes</div>
-      <div class="cell dim">No</div>
     </div>
   </div>
 
@@ -1473,37 +1431,31 @@
       <div class="test-item">Qwen--Qwen2-0.5B-Instruct-GGUF</div>
       <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
       <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
-      <div class="test-item">mradermacher--Nanbeige4.1-3B-GGUF</div>
     </div>
-    <p class="source-note" style="margin-top: 0.75rem;">
-      Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
-      <code>&lt;|im_start|&gt;assistant</code>, the runtime is using the wrong chat wrapper or stop policy.
-      Preserve GGUF-exported ChatML markers and keep <code>output.weight</code> untied.
-    </p>
   </div>
 
   <div class="matrix-section">
-    <h2 style="margin: 0; color: var(--orange);">Validation Commands (v7 inference matrix)</h2>
+    <h2 style="margin: 0; color: var(--orange);">Validation Commands (v6.6)</h2>
     <p style="margin-top: 0.6rem; color: var(--text-secondary);">
-      These commands are the current inference readiness gates for Qwen2, Qwen3, Gemma3, and the active Nanbeige bring-up lane.
+      These commands are the current inference readiness gates for Qwen2/Qwen3/Gemma3.
     </p>
-    <pre style="margin-top: 0.8rem;"><code>python3 version/v7/scripts/validate_model_matrix_v7.py
-python3 version/v7/scripts/validate_parity_matrix_v7.py
-python3 version/v7/scripts/validate_long_decode_stability_v7.py
+    <pre style="margin-top: 0.8rem;"><code>make v6.6-validate-contracts
+make v6.6-validate-matrix
+make v6.6-validate-matrix-smoke
 
-# Nanbeige-specific stitched call-IR regression
-python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
-  --run-dir ~/.cache/ck-engine-v7/models/mradermacher--Nanbeige4.1-3B-GGUF
+# Sliding-window kernel contract (also in make test / nightly)
+make test-attention-sliding
 </code></pre>
     <p class="source-note" style="margin-top: 0.6rem;">
-      Matrix validators honor cached GGUFs by default; add <code>--allow-download</code> when you want them to fetch missing models.
+      Nightly visibility: <code>scripts/nightly_runner.py</code> and
+      <code>.github/workflows/nightly.yml</code> (includes llama.cpp parity + kernel suite).
     </p>
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Gemma3 plus the active Llama/Nanbeige bring-up lane.
-    v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
-    This page will keep evolving into a single matrix that shows inference + training coverage per model family.
+    <strong>Growth path:</strong> v6.6 locks inference parity and kernel coverage (Qwen2/Qwen3/Gemma3). v7 targets full training:
+    backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules. This page will evolve into a
+    single matrix that shows inference + training coverage per model family.
   </div>
 
   <div class="source-note">
@@ -1742,7 +1694,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-09</p>
             </div>
         </div>
     </footer>
