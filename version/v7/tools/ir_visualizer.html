@@ -18613,7 +18613,9 @@ function buildDataLabParitySection(files) {
     const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
         ? files.training_parity_regimen
         : {};
-    const regimenStatus = String(regimen.status || '').toLowerCase();
+    const regimenStages = normalizeRegimenStages(regimen);
+    const regimenOverall = regimenState(regimen, regimenStages);
+    const regimenStatus = String(regimenOverall.label || '').toLowerCase();
     const regimenSummary = regimen.summary && typeof regimen.summary === 'object' ? regimen.summary : {};
     const allCkOnly = rows.length > 0 && rows.every((r) => String(r.worst_param || '').toLowerCase() === 'ck_only');
     const openTrackerButton = `
@@ -18665,7 +18667,9 @@ function buildDataLabParitySection(files) {
     const rowCount = rows.length.toLocaleString();
     const regimenProgress = Number.isFinite(Number(regimenSummary.passed_stages)) && Number.isFinite(Number(regimenSummary.total_stages))
         ? `${Number(regimenSummary.passed_stages)}/${Number(regimenSummary.total_stages)} stages`
-        : 'stage counts unavailable';
+        : (regimenStages.length > 0
+            ? `${regimenStages.filter((row) => String(row.status || '').toUpperCase() === 'PASS').length}/${regimenStages.length} stages`
+            : 'stage counts unavailable');
 
     return `
         <div class="parity-section" style="margin-top:0.8rem;">
@@ -18697,6 +18701,204 @@ function buildDataLabParitySection(files) {
             </div>
             <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${htmlEscape(parityWhy)}</div>
             ${openTrackerButton}
+        </div>
+    `;
+}
+
+// Operator-required guardrail:
+// Keep the A/B/C/D/E/F readiness surface in Data Lab. If this disappears,
+// downstream loss / SVG quality conclusions are no longer anchored to visible parity.
+function buildDataLabReadinessSection(files) {
+    const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
+        ? files.training_parity_regimen
+        : {};
+    const regimenStages = normalizeRegimenStages(regimen);
+    if (regimenStages.length === 0) {
+        return `
+            <div class="parity-section" style="margin-top:0.8rem;">
+                <h3><span class="badge badge-blue">Training Readiness</span> Parity Gate - Stage-by-Stage</h3>
+                <div style="color:var(--text-muted);font-size:0.74rem;line-height:1.6;">
+                    No parity regimen stages are loaded. Generate <code>training_parity_regimen_latest.json</code> to restore the A/B/C/D/E/F readiness cards.
+                </div>
+            </div>
+        `;
+    }
+
+    const regimenOverall = regimenState(regimen, regimenStages);
+    const abcGate = regimenGroupState(regimenStages, ['A', 'B', 'C']);
+    const defGate = regimenGroupState(regimenStages, ['D', 'E', 'F']);
+    const criticalFails = ['A1', 'D1', 'E1', 'F1'].filter((id) => {
+        const row = regimenStages.find((stage) => String(stage.id || '').toUpperCase() === id);
+        return row && String(row.status || '').toUpperCase() !== 'PASS';
+    });
+
+    const catalog = {
+        A1: {
+            group: 'A - Baseline Kernels',
+            name: 'Fwd / Bwd / SGD',
+            tests: 'Single micro-step forward+backward+SGD update. Lowest-bar numeric smoke test before spending training budget.',
+            why: 'If A1 fails, basic forward/backward math is broken.',
+        },
+        A3: {
+            group: 'A - Baseline Kernels',
+            name: 'Backend Xray',
+            tests: 'Swap rmsnorm / swiglu / loss backends one at a time on identical weights to isolate drift source.',
+            why: 'This localizes divergence to a specific kernel family quickly.',
+        },
+        A4: {
+            group: 'A - Baseline Kernels',
+            name: 'AdamW Strict Sentinel',
+            tests: 'Fixed strict AdamW sentinel on a tiny immutable model with locked tolerances.',
+            why: 'This is the stable early warning for optimizer regressions.',
+        },
+        D1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Backprop Stitch',
+            tests: 'Generated C forward+backward on a real sequence must match PyTorch gradients.',
+            why: 'This is the first direct gate on the generated runtime that actually trains.',
+        },
+        D2: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Stitch Multi-step',
+            tests: 'Generated C multi-step train loop with grad_accum enabled.',
+            why: 'This checks the real C training loop instead of only the Python harness.',
+        },
+        E1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Replay Determinism',
+            tests: 'Re-running the same generated-C step should be bit-identical.',
+            why: 'Non-determinism silently poisons gradient accumulation and replay.',
+        },
+        F1: {
+            group: 'D/E/F - Generated C Runtime',
+            name: 'Runtime Accum',
+            tests: 'Accumulated generated-C gradients over micro-steps must match a single full-batch gradient.',
+            why: 'If F1 fails, the runtime that actually trains is not trustworthy.',
+        },
+    };
+
+    for (const row of regimenStages) {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (/^B\d+$/.test(id) && !catalog[id]) {
+            const g = id.slice(1);
+            catalog[id] = {
+                group: 'B - Grad Accum',
+                name: `AdamW g=${g}`,
+                tests: `AdamW with grad_accum=${g}. Binding gate is mean parameter drift, not max, to avoid expected AdamW epsilon outliers.`,
+                why: `Confirms gradient averaging is correct for ${g}x effective batch size.`,
+            };
+        }
+        if (/^C\d+$/.test(id) && !catalog[id]) {
+            catalog[id] = {
+                group: 'C - Stability',
+                name: String(row.name || id),
+                tests: 'Multi-epoch stability sweep looking for longer-horizon optimizer drift.',
+                why: 'These catch issues that do not show up in the short A/B canaries.',
+            };
+        }
+    }
+
+    const groupOrder = ['D/E/F - Generated C Runtime', 'A - Baseline Kernels', 'B - Grad Accum', 'C - Stability'];
+    const byGroup = {};
+    groupOrder.forEach((group) => { byGroup[group] = []; });
+    regimenStages.forEach((row) => {
+        const id = String(row.id || '').trim().toUpperCase();
+        if (!id) return;
+        const info = catalog[id] || {
+            group: 'Other',
+            name: id,
+            tests: String(row.name || ''),
+            why: '',
+        };
+        if (!byGroup[info.group]) byGroup[info.group] = [];
+        byGroup[info.group].push({ id, row, info });
+    });
+
+    const fmtDur = (seconds) => {
+        const n = Number(seconds);
+        if (!Number.isFinite(n)) return '';
+        return n < 60 ? `${n.toFixed(1)}s` : `${(n / 60).toFixed(1)}m`;
+    };
+    const banner = (() => {
+        if (regimenOverall.pass === true) {
+            return {
+                color: '#6ee7b7',
+                text: 'All gate stages passing - production runtime verified, code is ready to train',
+            };
+        }
+        if (criticalFails.length > 0) {
+            return {
+                color: '#fca5a5',
+                text: `Critical gates failing (${criticalFails.join(', ')}) - do not start a long training run`,
+            };
+        }
+        return {
+            color: '#fbbf24',
+            text: 'Some gates failing - review A/B/C/D/E/F results before committing training budget',
+        };
+    })();
+
+    const groupHtml = groupOrder.map((group) => {
+        const items = byGroup[group] || [];
+        if (items.length === 0) return '';
+        const passCount = items.filter(({ row }) => String(row.status || '').toUpperCase() === 'PASS').length;
+        const groupColor = passCount === items.length ? '#6ee7b7' : (passCount === 0 ? '#fca5a5' : '#fbbf24');
+        const cards = items.map(({ id, row, info }) => {
+            const pass = String(row.status || '').toUpperCase() === 'PASS';
+            const border = pass ? '#47b475' : '#f87171';
+            const bg = pass ? 'rgba(71,180,117,0.07)' : 'rgba(248,113,113,0.07)';
+            const metrics = row && typeof row.metrics === 'object' ? row.metrics : {};
+            const metricBits = [];
+            const lossDiff = Number(metrics.max_loss_abs_diff);
+            const meanParam = Number(metrics.final_param_mean_abs_diff);
+            const maxParam = Number(metrics.final_param_max_abs_diff);
+            const optimizerSteps = Number(metrics.optimizer_steps);
+            if (Number.isFinite(lossDiff)) metricBits.push(`lossΔ=${lossDiff.toExponential(2)}`);
+            if (Number.isFinite(meanParam)) metricBits.push(`mean_paramΔ=${meanParam.toExponential(2)}`);
+            else if (Number.isFinite(maxParam)) metricBits.push(`paramΔ=${maxParam.toExponential(2)}`);
+            if (Number.isFinite(optimizerSteps)) metricBits.push(`${Math.round(optimizerSteps)} opt steps`);
+            const notes = Array.isArray(row.notes) ? row.notes.filter(Boolean) : [];
+            const note = notes.length > 0 ? String(notes[notes.length - 1]) : '';
+            return `
+                <div style="border:1px solid ${border};border-radius:6px;padding:0.5rem 0.65rem;background:${bg};box-shadow:inset 0 0 0 1px rgba(255,255,255,0.03);flex:1 1 215px;min-width:205px;max-width:360px;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.16rem;">
+                        ${statusPill(id, pass ? 'green' : 'red')}
+                        <span style="font-size:0.8rem;font-weight:700;color:#e5e7eb;">${htmlEscape(info.name)}</span>
+                        ${fmtDur(row.duration_s) ? `<span style="color:#6b7280;font-size:0.67rem;margin-left:auto;">${htmlEscape(fmtDur(row.duration_s))}</span>` : ''}
+                    </div>
+                    <div style="font-size:0.71rem;color:#9ca3af;line-height:1.42;">${htmlEscape(info.tests)}</div>
+                    ${metricBits.length > 0 ? `<div style="font-size:0.69rem;color:#60a5fa;margin-top:0.22rem;font-family:monospace;">${htmlEscape(metricBits.join(' · '))}</div>` : ''}
+                    ${note ? `<div style="font-size:0.67rem;color:#fbbf24;margin-top:0.14rem;">⚠ ${htmlEscape(note)}</div>` : ''}
+                    <div style="font-size:0.67rem;color:#a78bfa;margin-top:0.18rem;line-height:1.35;">↳ ${htmlEscape(info.why)}</div>
+                </div>
+            `;
+        }).join('');
+        return `
+            <div style="margin-bottom:0.9rem;">
+                <div style="font-size:0.72rem;font-weight:700;color:${groupColor};margin-bottom:0.38rem;letter-spacing:0.03em;text-transform:uppercase;">
+                    ${htmlEscape(group)} <span style="opacity:0.6;font-weight:400;text-transform:none;">(${passCount}/${items.length} pass)</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">${cards}</div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="parity-section" style="margin-top:0.8rem;">
+            <h3><span class="badge ${regimenOverall.pass === true ? 'badge-green' : 'badge-blue'}">Training Readiness</span> Parity Gate - Stage-by-Stage</h3>
+            <div style="border-radius:6px;padding:0.55rem 0.9rem;margin-bottom:0.7rem;font-size:0.84rem;font-weight:700;color:${banner.color};border:1px solid ${banner.color};background:${banner.color}1a;">
+                ${htmlEscape(banner.text)}
+            </div>
+            <div style="font-size:0.71rem;color:#6b7280;margin-bottom:0.7rem;line-height:1.6;">
+                Each card shows <strong style="color:#9ca3af;">what the test verifies</strong> · <span style="color:#60a5fa;font-family:monospace;">key metrics</span> · <span style="color:#a78bfa;">why it matters</span>.
+                <span style="color:#6ee7b7;font-weight:700;">D/E/F = production gate</span><span style="color:#9ca3af;"> — generated C runtime, all must pass before training.</span>
+                <span style="color:#9ca3af;"> A/B/C = kernel isolation (diagnostic); useful for root-cause, but not a substitute for D/E/F.</span>
+                <div style="margin-top:0.2rem;">
+                    • regimen(A/B/C): <strong>${htmlEscape(abcGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(abcGate.detail)}</span><br/>
+                    • generated-runtime(D/E/F): <strong>${htmlEscape(defGate.label)}</strong> <span style="color:#9ca3af;">${htmlEscape(defGate.detail)}</span>
+                </div>
+            </div>
+            ${groupHtml}
         </div>
     `;
 }
@@ -18885,6 +19087,7 @@ function renderDataLabPanel(files) {
         ? dataLab.tokenizer_preview
         : (files.tokenizer_preview || {});
     const parityGateSection = buildDataLabParitySection(files);
+    const readinessSection = buildDataLabReadinessSection(files);
     const evalSummarySection = buildDataLabEvalSummarySection(files, pipeline);
     const prepDiagnosisSection = buildDataPrepDiagnosisSection(files, pipeline);
     const activeStage = typeof pipeline.active_stage === 'string' && pipeline.active_stage.trim()
@@ -19944,6 +20147,7 @@ function renderDataLabPanel(files) {
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:0.28rem 0.65rem;">
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Stage Flow</span> — click a card to inspect datasets &amp; artifacts per stage</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#93c5fd;font-weight:600;">PyTorch Parity Gate</span> — keep CK vs reference visible before trusting downstream quality</div>
+                <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#f0abfc;font-weight:600;">Training Readiness</span> — A/B/C/D/E/F gates with D/E/F as the real generated-runtime signoff</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#86efac;font-weight:600;">Eval Matrix</span> — compact stage quality summary before the larger planning tables</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#fb923c;font-weight:600;">⚠ tok gap</span> — stage dataset was outside the tokenizer training corpus</div>
                 <div style="font-size:0.71rem;color:#9ca3af;"><span style="color:#6ee7b7;font-weight:600;">Dataset Catalog</span> — trained (green) · generated (amber) · manifests (collapsed)</div>
@@ -19952,6 +20156,7 @@ function renderDataLabPanel(files) {
         </div>
         ${stageFlowSection}
         ${parityGateSection}
+        ${readinessSection}
         ${evalSummarySection}
         ${stagePlanSection}
         ${prepDiagnosisSection}
@@ -20262,6 +20467,61 @@ function trainE2EState(trainE2E) {
     return { label: 'check', pass: null };
 }
 
+function normalizeRegimenStages(regimen) {
+    const rows = Array.isArray(regimen && regimen.stages) ? regimen.stages
+        : (Array.isArray(regimen && regimen.stage_results) ? regimen.stage_results : []);
+    return rows
+        .filter((row) => row && typeof row === 'object')
+        .map((row) => ({
+            id: String(row.id || row.stage_id || '').trim(),
+            name: String(row.name || row.label || '').trim(),
+            status: String(row.status || row.result || '').trim().toUpperCase(),
+            metrics: row.metrics && typeof row.metrics === 'object' ? row.metrics : {},
+            notes: Array.isArray(row.notes) ? row.notes : [],
+            duration_s: row.duration_s,
+        }))
+        .filter((row) => row.id);
+}
+
+function regimenState(regimen, stages) {
+    const summary = regimen && typeof regimen.summary === 'object' ? regimen.summary : {};
+    const status = String(regimen && regimen.status || '').trim().toLowerCase();
+    const skipped = regimen && regimen.skipped === true;
+    if (skipped) return { label: 'skipped', tone: 'blue', pass: null };
+    if (status === 'pass' || summary.passed === true) return { label: 'pass', tone: 'green', pass: true };
+    if (status === 'fail' || summary.passed === false) return { label: 'fail', tone: 'red', pass: false };
+    if (Array.isArray(summary.failed_stage_ids) && summary.failed_stage_ids.length > 0) {
+        return { label: 'fail', tone: 'red', pass: false };
+    }
+    if (Array.isArray(stages) && stages.length > 0) {
+        const failing = stages.filter((row) => String(row.status || '').toUpperCase() !== 'PASS');
+        return failing.length === 0
+            ? { label: 'pass', tone: 'green', pass: true }
+            : { label: 'fail', tone: 'red', pass: false };
+    }
+    return { label: 'missing', tone: 'orange', pass: null };
+}
+
+function regimenGroupState(stages, prefixes) {
+    const want = Array.isArray(prefixes) ? prefixes.map((v) => String(v || '').toUpperCase()).filter(Boolean) : [];
+    const matched = Array.isArray(stages)
+        ? stages.filter((row) => {
+            const id = String(row && row.id || '').toUpperCase();
+            return want.some((prefix) => id.startsWith(prefix));
+        })
+        : [];
+    if (matched.length === 0) {
+        return { label: 'missing', tone: 'orange', pass: null, detail: 'no stages loaded' };
+    }
+    const failing = matched.filter((row) => String(row.status || '').toUpperCase() !== 'PASS');
+    return {
+        label: failing.length === 0 ? 'pass' : 'fail',
+        tone: failing.length === 0 ? 'green' : 'red',
+        pass: failing.length === 0,
+        detail: matched.map((row) => `${row.id}:${row.status || '?'}`).join(' · '),
+    };
+}
+
 function latestLoss(files) {
     const curve = files.training_loss_curve && Array.isArray(files.training_loss_curve.steps)
         ? files.training_loss_curve.steps
@@ -20353,11 +20613,11 @@ function renderTrainingLogbookPanel(files) {
         nextSteps.push('Track drift trend; rerun parity regimen if this grows across commits.');
     }
 
-    const regimenStatus = String(regimen.status || '').toLowerCase();
-    if (regimenStatus === 'fail') {
+    const regimenOverall = regimenState(regimen, normalizeRegimenStages(regimen));
+    if (regimenOverall.pass === false) {
         failures.push({
             title: 'Parity regimen failed',
-            why: 'training_parity_regimen_latest.json status=fail',
+            why: 'training_parity_regimen_latest.json indicates a failed gate',
             severity: 'error',
         });
         nextSteps.push('Open training_parity_regimen_latest.md and fix failing gate before full retrain.');
