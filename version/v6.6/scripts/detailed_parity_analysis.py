@@ -4,9 +4,9 @@ Standalone detailed parity analysis for v6.6.
 
 This script does NOT patch ck_run_v6_6.py. Instead, it:
 1) Optionally calls ck_run_v6_6.py with --detailed-llamacpp-parity
-2) Runs an exhaustive llama.cpp CKDMP pass (all layers, no default filter cap)
+2) Runs an exhaustive llama.cpp parity pass and converts raw llama_dump bins when needed
 3) Audits dump coverage, weight coverage, and first divergence
-4) Writes JSON + Markdown reports to ck_build/
+4) Writes JSON + Markdown reports to the selected output directory
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
 CK_RUN = SCRIPT_DIR / "ck_run_v6_6.py"
 PARITY_TEST = SCRIPT_DIR / "parity_test.py"
+LLAMA_RAW_CONVERTER = SCRIPT_DIR / "parity" / "llama_to_ckdmp_converter.py"
 
 PARITY_MODEL_MAP = {
     "gemma": "gemma",
@@ -40,6 +41,10 @@ PARITY_MODEL_MAP = {
     "qwen3": "qwen3",
     "mistral": "mistral",
 }
+
+
+def _cache_dir() -> Path:
+    return Path.home() / ".cache" / "ck-engine-v6.6" / "models"
 
 
 def run_cmd(
@@ -67,11 +72,19 @@ def infer_model_dir(model_uri: str, output_dir: Path | None) -> Path:
     if model_uri.startswith("hf://"):
         repo = model_uri[len("hf://") :].rsplit("/", 1)[0]
         key = repo.replace("/", "--")
-        return Path.home() / ".cache" / "ck-engine-v6.6" / "models" / key / "ck_build"
+        return _cache_dir() / key
     p = Path(model_uri).expanduser().resolve()
     if p.is_dir():
-        return p
-    return p.parent / "ck_build"
+        return p / ".ck_build"
+    if p.is_file() and p.suffix.lower() == ".gguf":
+        if p.parent.parent == _cache_dir():
+            return p.parent
+        if (p.parent / "weights_manifest.json").exists() or (p.parent / "model_v6_6.c").exists():
+            return p.parent
+        return _cache_dir() / p.stem
+    if p.is_file() and p.name == "config.json":
+        return p.parent / ".ck_build"
+    return p.parent
 
 
 def resolve_hf_gguf(model_uri: str) -> Path | None:
@@ -104,11 +117,30 @@ def find_gguf(model_dir: Path, model_uri: str) -> Path | None:
     return None
 
 
+def infer_run_dir_from_output_dir(output_dir: Path | None) -> Path | None:
+    """Map a report output dir to the ck_run_v6_6 runtime artifact dir."""
+    if output_dir is None:
+        return None
+    p = output_dir.expanduser().resolve()
+    if p.name in {"ck_build", ".ck_build"}:
+        return p.parent
+    return p
+
+
 def find_llama_binary() -> Path | None:
     p = ROOT / "build" / "llama-parity"
     if p.exists():
         return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "llama-completion"
+    if p.exists():
+        return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "llama-cli"
+    if p.exists():
+        return p
     p = ROOT / "llama.cpp" / "main"
+    if p.exists():
+        return p
+    p = ROOT / "llama.cpp" / "build" / "bin" / "main"
     if p.exists():
         return p
     return None
@@ -315,8 +347,18 @@ def check_weights(model_dir: Path, family: str) -> dict[str, Any]:
 def llama_mapping_gaps(parity_mod: Any, ref_dumps: list[Any], family: str) -> dict[str, Any]:
     unknown = Counter()
     mapped = Counter()
+    mapper = getattr(parity_mod, "map_llama_to_ck_name", None)
+    normalizer = getattr(parity_mod, "_normalize_layer_and_op", None)
     for d in ref_dumps:
-        mapped_name = parity_mod.map_llama_to_ck_name(d.op_name, family)
+        if callable(mapper):
+            mapped_name = mapper(d.op_name, family)
+        elif callable(normalizer):
+            try:
+                _layer, mapped_name = normalizer(int(getattr(d, "layer_id", -1)), str(d.op_name))
+            except Exception:
+                mapped_name = str(d.op_name)
+        else:
+            mapped_name = str(d.op_name)
         base = d.op_name.split(" (", 1)[0]
         if mapped_name == d.op_name:
             unknown[base] += 1
@@ -336,7 +378,9 @@ def build_markdown(report: dict[str, Any]) -> str:
     lines.append(f"- Timestamp: {report['timestamp']}")
     lines.append(f"- Model: `{report['model_uri']}`")
     lines.append(f"- Family: `{report['family']}`")
-    lines.append(f"- ck_build: `{report['model_dir']}`")
+    lines.append(f"- run_dir: `{report['model_dir']}`")
+    if report.get("report_dir") and report.get("report_dir") != report["model_dir"]:
+        lines.append(f"- report_dir: `{report['report_dir']}`")
     lines.append("")
     lines.append("## Command Status")
     lines.append(f"- ck_run rc: {report['commands'].get('ck_run_rc')}")
@@ -413,7 +457,11 @@ def main() -> int:
     if passthrough_args and passthrough_args[0] == "--":
         passthrough_args = passthrough_args[1:]
 
-    model_dir = infer_model_dir(args.model_uri, args.output_dir)
+    report_dir = infer_model_dir(args.model_uri, args.output_dir)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = infer_run_dir_from_output_dir(args.output_dir)
+    if model_dir is None:
+        model_dir = infer_model_dir(args.model_uri, None)
     model_dir.mkdir(parents=True, exist_ok=True)
     parity_family = PARITY_MODEL_MAP[args.family]
 
@@ -422,6 +470,7 @@ def main() -> int:
         "model_uri": args.model_uri,
         "family": args.family,
         "model_dir": str(model_dir),
+        "report_dir": str(report_dir),
         "commands": {},
         "notes": [],
     }
@@ -442,8 +491,6 @@ def main() -> int:
         ]
         if args.force_compile:
             ck_cmd.append("--force-compile")
-        if args.output_dir is not None:
-            ck_cmd.extend(["--output-dir", str(args.output_dir)])
         for x in args.ck_run_arg:
             ck_cmd.append(x)
         for x in passthrough_args:
@@ -455,8 +502,8 @@ def main() -> int:
         report["commands"]["ck_run_stderr_tail"] = ck_proc.stderr[-3000:]
         if ck_proc.returncode != 0:
             report["notes"].append("ck_run failed")
-            out_json = model_dir / f"{args.report_prefix}.json"
-            out_md = model_dir / f"{args.report_prefix}.md"
+            out_json = report_dir / f"{args.report_prefix}.json"
+            out_md = report_dir / f"{args.report_prefix}.md"
             out_json.write_text(json.dumps(jsonable(report), indent=2), encoding="utf-8")
             out_md.write_text(build_markdown(report), encoding="utf-8")
             print(f"[analysis] wrote {out_json}")
@@ -475,9 +522,22 @@ def main() -> int:
         else:
             ref_dir = model_dir / "llama_parity_dumps"
             ref_dir.mkdir(parents=True, exist_ok=True)
+            raw_dir = model_dir / "llama_dump"
+            raw_dir.mkdir(parents=True, exist_ok=True)
             for f in (ref_dir / "dump.bin", ref_dir / "index.json"):
                 if f.exists():
                     f.unlink()
+            for f in raw_dir.glob("*.bin"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+            for f in (raw_dir / "index.json", raw_dir / "prompt_tokens.json"):
+                if f.exists():
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
             env = os.environ.copy()
             env["CKDMP_DIR"] = str(ref_dir)
             env["CKDMP_ALL_LAYERS"] = "1"
@@ -495,27 +555,59 @@ def main() -> int:
             else:
                 env["CKDMP_STOP_AFTER"] = str(args.llama_stop_after)
 
+            exe_name = llama_bin.name.lower()
             llama_cmd = [
                 str(llama_bin),
                 "-m",
                 str(gguf),
                 "-p",
                 args.prompt,
-                "-no-cnv",
-                "--no-warmup",
-                "--temp",
-                "0",
-                "-n",
-                str(args.max_tokens),
             ]
+            if "llama-cli" in exe_name:
+                llama_cmd.extend(["-no-cnv", "--single-turn", "--simple-io"])
+            elif ("llama-completion" in exe_name) or (exe_name == "main") or ("llama-parity" in exe_name):
+                llama_cmd.extend(["-no-cnv", "--simple-io"])
+            else:
+                llama_cmd.extend(["--simple-io"])
+            llama_cmd.extend(
+                [
+                    "--no-warmup",
+                    "--temp",
+                    "0",
+                    "-n",
+                    str(args.max_tokens),
+                ]
+            )
             if args.context_len > 0:
-                llama_cmd.extend(["--ctx-size", str(args.context_len)])
+                llama_cmd.extend(["-c", str(args.context_len)])
             timeout = None if args.llama_timeout <= 0 else args.llama_timeout
             report["commands"]["llama_exhaustive_cmd"] = llama_cmd
             llama_proc = run_cmd(llama_cmd, cwd=model_dir, env=env, timeout=timeout)
             report["commands"]["llama_exhaustive_rc"] = llama_proc.returncode
             report["commands"]["llama_exhaustive_stdout_tail"] = llama_proc.stdout[-3000:]
             report["commands"]["llama_exhaustive_stderr_tail"] = llama_proc.stderr[-5000:]
+            ref_dump = ref_dir / "dump.bin"
+            if not (ref_dump.exists() and ref_dump.stat().st_size > 0):
+                raw_bins = sorted(raw_dir.glob("*.bin"))
+                if raw_bins and LLAMA_RAW_CONVERTER.exists():
+                    conv_cmd = [
+                        sys.executable,
+                        str(LLAMA_RAW_CONVERTER),
+                        "-i",
+                        str(raw_dir),
+                        "-o",
+                        str(ref_dump),
+                        "--model",
+                        parity_family,
+                        "--index",
+                    ]
+                    conv_proc = run_cmd(conv_cmd, cwd=ROOT)
+                    report["commands"]["llama_raw_convert_cmd"] = conv_cmd
+                    report["commands"]["llama_raw_convert_rc"] = conv_proc.returncode
+                    report["commands"]["llama_raw_convert_stdout_tail"] = conv_proc.stdout[-2000:]
+                    report["commands"]["llama_raw_convert_stderr_tail"] = conv_proc.stderr[-2000:]
+                    if conv_proc.returncode == 0 and ref_dump.exists() and ref_dump.stat().st_size > 0:
+                        report["notes"].append("Converted raw llama_dump bins to CKDMP reference dump.")
             if llama_proc.returncode != 0:
                 report["notes"].append("Exhaustive llama pass failed.")
     else:
@@ -579,8 +671,8 @@ def main() -> int:
         "decode_fail_examples": [r for r in decode_results if r.get("status") in ("FAIL", "ERROR")][:40],
     }
 
-    out_json = model_dir / f"{args.report_prefix}.json"
-    out_md = model_dir / f"{args.report_prefix}.md"
+    out_json = report_dir / f"{args.report_prefix}.json"
+    out_md = report_dir / f"{args.report_prefix}.md"
     out_json.write_text(json.dumps(jsonable(report), indent=2), encoding="utf-8")
     out_md.write_text(build_markdown(report), encoding="utf-8")
 

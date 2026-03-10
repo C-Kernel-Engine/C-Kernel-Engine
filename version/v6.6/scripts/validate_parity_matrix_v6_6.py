@@ -122,8 +122,19 @@ def _work_dir_for_uri(uri: str) -> Path:
     return _cache_dir() / "unknown" / "ck_build"
 
 
+def _find_llama_runtime() -> Path | None:
+    candidates = [
+        ROOT / "build" / "llama-parity",
+        ROOT / "llama.cpp" / "build" / "bin" / "llama-completion",
+        ROOT / "llama.cpp" / "build" / "bin" / "llama-cli",
+        ROOT / "llama.cpp" / "main",
+        ROOT / "llama.cpp" / "build" / "bin" / "main",
+    ]
+    return next((p for p in candidates if p.exists()), None)
+
+
 def _have_llama_runtime() -> bool:
-    return (ROOT / "build" / "llama-parity").exists() or (ROOT / "llama.cpp" / "main").exists()
+    return _find_llama_runtime() is not None
 
 
 def _status_order(status: str) -> int:
@@ -185,7 +196,7 @@ def _run_model(model: dict[str, str], args: argparse.Namespace, runtime_ok: bool
             parity="SKIP",
             coverage="SKIP",
             overall="SKIP",
-            note="llama runtime missing (build/llama-parity or llama.cpp/main)",
+            note="llama runtime missing (build/llama-parity, llama.cpp/build/bin/llama-cli, llama.cpp/build/bin/llama-completion, or llama.cpp/main)",
             work_dir=str(work_dir),
             seconds=0.0,
         )
@@ -389,7 +400,11 @@ def main() -> int:
 
     runtime_ok = _have_llama_runtime()
     if args.require_runtime and not runtime_ok:
-        print("ERROR: llama runtime missing (need build/llama-parity or llama.cpp/main)")
+        print(
+            "ERROR: llama runtime missing "
+            "(need build/llama-parity, llama.cpp/build/bin/llama-cli, "
+            "llama.cpp/build/bin/llama-completion, or llama.cpp/main)"
+        )
         return 1
 
     rows = [_run_model(m, args, runtime_ok) for m in DEFAULT_MODELS]
@@ -444,4 +459,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

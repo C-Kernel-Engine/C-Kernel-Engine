@@ -1113,13 +1113,16 @@ CK_EXPORT int ck_model_embed_tokens(const int32_t *tokens, int count) {{
     if (!g_model || !tokens || count <= 0) return -1;
 
 #ifdef CK_HAS_PREFILL
+#ifndef CK_PARITY_DUMP
     /* Use batched prefill for multiple tokens */
     if (count > 1) {{
         ck_prefill(g_model, tokens, count);{profile_dump_after_prefill}
         return 0;
     }}
 #endif
+#endif
 
+    /* Dump-enabled parity builds need token-by-token decode instrumentation. */
     /* Single token or no prefill: process one by one via decode */
     for (int i = 0; i < count; i++) {{
         ck_decode(g_model, tokens[i]);

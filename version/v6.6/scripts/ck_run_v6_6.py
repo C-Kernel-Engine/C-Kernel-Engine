@@ -25,7 +25,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Configuration
@@ -92,6 +92,24 @@ def log_step(step: int, msg: str):
 def log_error(msg: str):
     """Print error message."""
     print(f"{C_RED}Error:{C_RESET} {msg}", file=sys.stderr)
+
+
+def _canonical_json_bytes(payload: Any) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def _write_json_if_changed(path: Path, payload: Any) -> bool:
+    """Write JSON only when semantic content changed to avoid false stale mtimes."""
+    encoded = json.dumps(payload, indent=2, ensure_ascii=True) + "\n"
+    try:
+        if path.exists():
+            existing = path.read_text(encoding="utf-8")
+            if _canonical_json_bytes(json.loads(existing)) == _canonical_json_bytes(payload):
+                return False
+    except Exception:
+        pass
+    path.write_text(encoded, encoding="utf-8")
+    return True
 
 
 def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.CompletedProcess:
@@ -1489,12 +1507,21 @@ def _run_llamacpp_parity(
     """Run llama.cpp parity binary to generate reference dumps."""
     log(f"\n{C_ORANGE}[llamacpp-parity]{C_RESET} Running llama.cpp for reference dumps")
 
-    # Prefer patched parity binary; fallback to local llama.cpp main.
-    llm_path = PROJECT_ROOT / "build" / "llama-parity"
-    if not llm_path.exists():
-        llm_path = PROJECT_ROOT / "llama.cpp" / "main"
-    if not llm_path.exists():
-        log_error("llama.cpp parity binary not found (expected build/llama-parity or llama.cpp/main)")
+    # Prefer patched parity binary; then common llama.cpp executable locations.
+    llm_candidates = [
+        PROJECT_ROOT / "build" / "llama-parity",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "llama-completion",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "llama-cli",
+        PROJECT_ROOT / "llama.cpp" / "main",
+        PROJECT_ROOT / "llama.cpp" / "build" / "bin" / "main",
+    ]
+    llm_path = next((p for p in llm_candidates if p.exists()), None)
+    if llm_path is None:
+        log_error(
+            "llama.cpp parity binary not found "
+            "(expected build/llama-parity, llama.cpp/build/bin/llama-cli, "
+            "llama.cpp/build/bin/llama-completion, or llama.cpp/main)"
+        )
         return False
 
     gguf_path = gguf_path_hint if gguf_path_hint and gguf_path_hint.exists() else None
@@ -1527,22 +1554,31 @@ def _run_llamacpp_parity(
         env["CKDMP_INCLUDE_GLOBAL"] = "1"
 
     temp = 0.0 if temperature is None else float(temperature)
+    exe_name = llm_path.name.lower()
     cmd = [
         str(llm_path),
         "-m",
         str(gguf_path),
         "-p",
         prompt,
-        "-no-cnv",
-        "--simple-io",
-        "--no-warmup",
-        "--temp",
-        f"{temp}",
-        "-n",
-        str(max_tokens),
     ]
+    if "llama-cli" in exe_name:
+        cmd.extend(["-no-cnv", "--single-turn", "--simple-io"])
+    elif ("llama-completion" in exe_name) or (exe_name == "main") or ("llama-parity" in exe_name):
+        cmd.extend(["-no-cnv", "--simple-io"])
+    else:
+        cmd.extend(["--simple-io"])
+    cmd.extend(
+        [
+            "--no-warmup",
+            "--temp",
+            f"{temp}",
+            "-n",
+            str(max_tokens),
+        ]
+    )
     if ctx_size and ctx_size > 0:
-        cmd.extend(["--ctx-size", str(ctx_size)])
+        cmd.extend(["-c", str(ctx_size)])
 
     try:
         timeout_sec = 600 if llama_timeout is None else int(llama_timeout)
@@ -1892,8 +1928,7 @@ def run_pipeline(args: argparse.Namespace):
                 cfg_data = json.load(f)
             cfg_data["num_merges"] = num_merges
             cfg_data["total_vocab_bytes"] = total_vocab_bytes
-            with open(config_path, "w") as f:
-                json.dump(cfg_data, f, indent=2)
+            _write_json_if_changed(config_path, cfg_data)
         except Exception:
             pass
 
