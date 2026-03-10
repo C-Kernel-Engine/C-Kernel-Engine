@@ -35,6 +35,41 @@ fi
 cd "$ROOT_DIR"
 
 failed=0
+declare -A CK_PUSH_SHA_SEEN=()
+PUSH_TARGETS=()
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ -z "${local_sha:-}" ] || [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+    if [ -n "${CK_PUSH_SHA_SEEN[$local_sha]:-}" ]; then
+        continue
+    fi
+    CK_PUSH_SHA_SEEN[$local_sha]=1
+    PUSH_TARGETS+=("$local_sha")
+done
+if [ ${#PUSH_TARGETS[@]} -eq 0 ]; then
+    PUSH_TARGETS=("HEAD")
+fi
+
+# =============================================================================
+# Test 0: Submodule pin sanity (prevents CI checkout breakage)
+# =============================================================================
+echo -e "${YELLOW}[0/6]${NC} Validating submodule pins..."
+printf '' > /tmp/ck_submodule_pins.log
+submodule_pin_ok=1
+for push_target in "${PUSH_TARGETS[@]}"; do
+    if ! python3 scripts/validate_submodule_pins.py --treeish "$push_target" >> /tmp/ck_submodule_pins.log 2>&1; then
+        submodule_pin_ok=0
+        break
+    fi
+done
+if [ "$submodule_pin_ok" = "1" ]; then
+    echo -e "${GREEN}  ✓ Submodule pins reachable on configured remotes${NC}"
+else
+    echo -e "${RED}  ✗ Submodule pin validation failed${NC}"
+    tail -20 /tmp/ck_submodule_pins.log
+    exit 1
+fi
 
 # Toolchain policy:
 # - Prefer Intel path when available (icx/icpx + oneAPI runtime) for parity with perf builds.
@@ -80,7 +115,7 @@ fi
 # =============================================================================
 # Test 1: Compilation
 # =============================================================================
-echo -e "${YELLOW}[1/5]${NC} Building CK-Engine..."
+echo -e "${YELLOW}[1/6]${NC} Building CK-Engine..."
 if make -j$(nproc) > /tmp/ck_build.log 2>&1; then
     echo -e "${GREEN}  ✓ Build successful${NC}"
 else
@@ -92,7 +127,7 @@ fi
 # =============================================================================
 # Test 2: Quick kernel tests (if parity lib exists)
 # =============================================================================
-echo -e "${YELLOW}[2/5]${NC} Running kernel parity tests..."
+echo -e "${YELLOW}[2/6]${NC} Running kernel parity tests..."
 if [ -f "build/libck_parity.so" ] || [ -f "libck_parity.so" ]; then
     # Ensure llama.cpp kernel test library exists (auto-build if missing)
     if [ ! -f "llama.cpp/libggml_kernel_test.so" ]; then
@@ -125,7 +160,7 @@ fi
 # =============================================================================
 # Test 3: E2E inference test
 # =============================================================================
-echo -e "${YELLOW}[3/5]${NC} Running E2E inference test..."
+echo -e "${YELLOW}[3/6]${NC} Running E2E inference test..."
 
 # Candidate models for E2E smoke:
 # 1) explicit override, 2) local cache, 3) HF GGUF URL fallback.
@@ -281,7 +316,7 @@ fi
 # =============================================================================
 # Test 4: v6.6 required release gate
 # =============================================================================
-echo -e "${YELLOW}[4/5]${NC} Running v6.6 release gate..."
+echo -e "${YELLOW}[4/6]${NC} Running v6.6 release gate..."
 V66_PREPUSH_CACHE="${CK_V66_PREPUSH_CACHE_DIR:-$HOME/.cache/ck-engine-v6.6/models_prepush}"
 V66_PREPUSH_CLEAN="${CK_V66_PREPUSH_CLEAN:-1}"
 V66_PREPUSH_FULL_GATE="${CK_PREPUSH_V66_FULL_GATE:-0}"
@@ -325,7 +360,7 @@ fi
 # =============================================================================
 # Test 5: v7 inference gate (generate/compile smoke)
 # =============================================================================
-echo -e "${YELLOW}[5/5]${NC} Running v7 inference gate..."
+echo -e "${YELLOW}[5/6]${NC} Running v7 inference gate..."
 V7_MODEL_PREPUSH="${CK_V7_MODEL:-Qwen/Qwen3-0.6B}"
 if make --no-print-directory v7-infer-gate V7_MODEL="$V7_MODEL_PREPUSH" > /tmp/ck_v7_infer_gate.log 2>&1; then
     echo -e "${GREEN}  ✓ v7 inference gate passed (${V7_MODEL_PREPUSH})${NC}"
@@ -344,7 +379,7 @@ fi
 # v7 training-kernel parity gate (default on)
 # =============================================================================
 if [ "${CK_V7_KERNEL_PARITY_TRAIN:-1}" = "1" ]; then
-    echo -e "${YELLOW}[v7]${NC} Running training-kernel parity gate..."
+    echo -e "${YELLOW}[6/6]${NC} Running training-kernel parity gate..."
     if make --no-print-directory v7-kernel-parity-train > /tmp/ck_v7_kernel_parity_train.log 2>&1; then
         echo -e "${GREEN}  ✓ v7 training-kernel parity passed${NC}"
     else

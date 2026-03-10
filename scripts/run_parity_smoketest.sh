@@ -80,7 +80,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --help          Show this help"
             echo ""
             echo "Environment variables:"
-            echo "  LLAMA_CPP_COMMIT  Pin to specific llama.cpp commit (default: b4876)"
+            echo "  LLAMA_CPP_COMMIT  Pin to specific llama.cpp commit (default: repo llama.cpp gitlink)"
             echo ""
             echo "CI Usage:"
             echo "  # Fresh clone, checkout, patch, build, and test:"
@@ -140,7 +140,11 @@ incr_skipped() { TESTS_SKIPPED=$((TESTS_SKIPPED + 1)); }
 
 # Pinned llama.cpp commit for reproducible parity testing
 # Update this when upgrading llama.cpp version
-LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
+DEFAULT_LLAMA_CPP_COMMIT="$(git ls-tree HEAD llama.cpp 2>/dev/null | awk '{print $3}')"
+if [ -z "$DEFAULT_LLAMA_CPP_COMMIT" ]; then
+    DEFAULT_LLAMA_CPP_COMMIT="07fbe19f1fbcfa09abca7cccc62eaf82c1567b7e"
+fi
+LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-$DEFAULT_LLAMA_CPP_COMMIT}"
 LLAMA_CPP_REPO="https://github.com/ggerganov/llama.cpp.git"
 
 # Auto-detect CPU capabilities (needed for compiler flags)

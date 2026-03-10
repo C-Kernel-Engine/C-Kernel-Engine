@@ -27,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: false
 
       - name: Check CPU features
         run: |
@@ -74,21 +74,30 @@ jobs:
 
       - name: Setup llama.cpp for parity testing
         run: |
-          LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-b4876}"
-
-          if [ ! -d "llama.cpp" ]; then
-            git clone --depth 100 https://github.com/ggerganov/llama.cpp.git
+          LLAMA_CPP_COMMIT="${LLAMA_CPP_COMMIT:-$(git ls-tree HEAD llama.cpp | awk '{print $3}')}"
+          if [ -z "$LLAMA_CPP_COMMIT" ]; then
+            echo "::error::Could not resolve llama.cpp gitlink from HEAD"
+            exit 1
           fi
 
+          rm -rf llama.cpp
+          git clone --depth 200 https://github.com/ggerganov/llama.cpp.git llama.cpp
+
           cd llama.cpp
-          git fetch --depth 100 origin "$LLAMA_CPP_COMMIT" 2>/dev/null || true
-          git checkout "$LLAMA_CPP_COMMIT" 2>/dev/null || echo "Using current HEAD"
+          git fetch origin "$LLAMA_CPP_COMMIT"
+          git checkout --detach "$LLAMA_CPP_COMMIT"
           echo "llama.cpp at: $(git rev-parse --short HEAD)"
 
           # Apply patches
+          if [ -f "../patches/llama.patch" ]; then
+            git apply ../patches/llama.patch || echo "llama.patch already applied or not needed"
+          fi
           if [ -f "../patches/test-kernel-parity.cpp" ]; then
             mkdir -p tests
             cp ../patches/test-kernel-parity.cpp tests/
+          fi
+          if [ -f "../patches/ck-engine-parity-bench.patch" ]; then
+            git apply ../patches/ck-engine-parity-bench.patch || echo "ck-engine-parity-bench.patch already applied or not needed"
           fi
 
           # Build

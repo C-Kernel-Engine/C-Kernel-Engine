@@ -16,7 +16,7 @@ This directory contains patches and files to apply to the llama.cpp submodule fo
 ```bash
 git submodule add https://github.com/ggerganov/llama.cpp.git llama.cpp
 git submodule update --init
-cd llama.cpp && git checkout b4876  # Pin to known-good version
+cd llama.cpp && git checkout 07fbe19f1fbcfa09abca7cccc62eaf82c1567b7e
 cd ..
 ```
 
@@ -69,7 +69,7 @@ git diff > ../patches/llama_tensor_dump.patch
 
 The parity smoketest script (`scripts/run_parity_smoketest.sh`) will automatically:
 1. Clone llama.cpp if not present (or init submodule)
-2. Checkout a pinned commit for reproducibility (default: `b4876`)
+2. Checkout the repo's pinned `llama.cpp` gitlink for reproducibility by default
 3. Apply patches from this directory
 4. Build llama.cpp with CPU support
 5. Build the kernel test library
@@ -106,12 +106,12 @@ make llamacpp-parity-full
 
 ### Pinned Version
 
-The script pins llama.cpp to a known-good commit for reproducible testing.
+The script defaults to the current `llama.cpp` gitlink in the superproject for reproducible testing.
 To update the pinned version:
 
 1. Test with new commit: `LLAMA_CPP_COMMIT=<new_commit> ./scripts/run_parity_smoketest.sh`
-2. If tests pass, update `LLAMA_CPP_COMMIT` in `scripts/run_parity_smoketest.sh`
-3. Update submodule: `cd llama.cpp && git checkout <new_commit> && cd .. && git add llama.cpp`
+2. If tests pass, update the submodule gitlink: `cd llama.cpp && git checkout <new_commit> && cd .. && git add llama.cpp`
+3. Commit the gitlink update together with any patch/workflow changes that depend on it
 
 ### Manual Trigger
 
