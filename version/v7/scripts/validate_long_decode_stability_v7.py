@@ -43,6 +43,13 @@ DEFAULT_MODELS = [
         "family": "gemma",
         "uri": "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf",
     },
+    {
+        "name": "nanbeige4.1-3b",
+        "family": "llama",
+        "uri": "hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf",
+        "chat_template": "auto",
+        "extra_args": ["--python-tokenizer"],
+    },
 ]
 
 
@@ -152,8 +159,8 @@ def _has_fatal_output(text: str) -> str | None:
     return None
 
 
-def _run_model(model: dict[str, str], args: argparse.Namespace) -> StabilityRow:
-    uri = model["uri"]
+def _run_model(model: dict[str, object], args: argparse.Namespace) -> StabilityRow:
+    uri = str(model["uri"])
     run_input = uri
     cached = _is_cached(uri)
     cached_status = "YES" if cached else "NO"
@@ -184,8 +191,15 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> StabilityRow:
         str(args.max_tokens),
         "--temperature",
         str(args.temperature),
-        "--no-chat-template",
     ]
+    chat_template = str(model.get("chat_template", "none") or "none")
+    if chat_template == "none":
+        cmd.append("--no-chat-template")
+    else:
+        cmd.extend(["--chat-template", chat_template])
+    extra_args = model.get("extra_args")
+    if isinstance(extra_args, list):
+        cmd.extend(str(arg) for arg in extra_args)
     if args.force_compile:
         cmd.append("--force-compile")
 
@@ -332,4 +346,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

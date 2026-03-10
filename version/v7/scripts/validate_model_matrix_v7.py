@@ -2,7 +2,7 @@
 """
 Dynamic v7 model-matrix validator.
 
-Runs build-phase validation across Gemma/Qwen2/Qwen3:
+Runs build-phase validation across Gemma/Qwen2/Qwen3/Nanbeige:
 1) optional static tooling-contract preflight
 2) per-model generate+compile (ck_run_v7.py --generate-only)
 3) generated artifact presence checks
@@ -44,6 +44,11 @@ DEFAULT_MODELS = [
         "name": "gemma3-270m",
         "family": "gemma",
         "uri": "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf",
+    },
+    {
+        "name": "nanbeige4.1-3b",
+        "family": "llama",
+        "uri": "hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf",
     },
 ]
 

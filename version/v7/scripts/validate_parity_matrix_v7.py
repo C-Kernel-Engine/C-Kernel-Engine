@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Strict v7 parity matrix validator (Gemma/Qwen2/Qwen3).
+Strict v7 parity matrix validator (Gemma/Qwen2/Qwen3/Nanbeige).
 
 This validator enforces all-layer parity by running detailed parity analysis
 per model and then applying strict criteria:
@@ -42,6 +42,11 @@ DEFAULT_MODELS = [
         "name": "gemma3-270m",
         "family": "gemma",
         "uri": "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf",
+    },
+    {
+        "name": "nanbeige4.1-3b",
+        "family": "llama",
+        "uri": "hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf",
     },
 ]
 
