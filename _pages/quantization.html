@@ -373,6 +373,28 @@ Bits per weight: 34 * 8 / 32 = 8.5 bits
     <p>Often used for activations or when accuracy is critical.</p>
 </div>
 
+<h3>Q8_K: 8-bit K-Quant Activation Format</h3>
+
+<div class="card card-green">
+    <h4 style="margin-top: 0;">Structure (Superblock of 256 values)</h4>
+    <pre>
+typedef struct {
+    float d;                  // 4 bytes: FP32 scale
+    int8_t qs[256];           // 256 bytes: 256 x 8-bit signed values
+    int16_t bsums[16];        // 32 bytes: sums of each 16-value chunk
+} block_q8_K;                 // Total: 292 bytes per 256 values
+
+Bits per value: 292 * 8 / 256 = 9.125 bits
+    </pre>
+
+    <h4>Why This Exists</h4>
+    <p><code>Q8_K</code> is the activation-side companion for mixed K-quant kernels like <code>gemv_q4_k_q8_k</code>, <code>gemv_q6_k_q8_k</code>, and <code>gemm_nt_q4_k_q8_k</code>. In the current v7 runtime, the relevant path is often <code>FP32 hidden -&gt; quantize_row_q8_k -&gt; Q4_K/Q6_K matvec</code>.</p>
+
+    <h4>Recent Bug Fix (2026-03-09)</h4>
+    <p>We fixed a subtle parity bug in the SSE implementation of <code>quantize_row_q8_k</code>. The fix restored the exact signed-max selection and <code>bsums</code> contract expected by llama.cpp/ref. See <a href="https://github.com/antshiv/C-Kernel-Engine/commit/224a4d30e0309ee7a1a9d4f3ca46bcedf0ced905" style="color: #00c7fd;">commit 224a4d30</a>.</p>
+    <p>This kind of bug is easy to miss because outputs can remain plausible while parity drift grows at mixed-quant boundaries. It often only shows up under stricter per-op or model-family bring-up checks.</p>
+</div>
+
 <h3>Q4_K: K-Quant with Nested Scales</h3>
 
 <div class="card card-purple">
@@ -522,8 +544,13 @@ typedef enum {
     DTYPE_FP16,
     DTYPE_BF16,
     DTYPE_Q4_0,
+    DTYPE_Q4_1,
+    DTYPE_Q5_0,
+    DTYPE_Q5_1,
     DTYPE_Q4_K,
-    DTYPE_Q8_0
+    DTYPE_Q6_K,
+    DTYPE_Q8_0,
+    DTYPE_Q8_K
 } DType;
 
 typedef struct {
@@ -538,36 +565,26 @@ typedef struct {
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Dispatch at Operation Level</h3>
     <pre>
-void matmul(Tensor* out, const Tensor* A, const Tensor* B) {
-    // Type check ONCE at operation start
-    if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_FP32) {
-        matmul_fp32(out->data, A->data, B->data, ...);
-    }
-    else if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_Q4_0) {
-        matmul_fp32_q4_0(out->data, A->data, B->data, ...);
-    }
-    else if (A->dtype == DTYPE_FP32 && B->dtype == DTYPE_Q4_K) {
-        matmul_fp32_q4_k(out->data, A->data, B->data, ...);
-    }
-    // ... other combinations
+const char *select_linear_kernel(DType weight, DType activation, bool prefill) {
+    if (!prefill && weight == DTYPE_Q4_K && activation == DTYPE_Q8_K) return "gemv_q4_k_q8_k";
+    if (!prefill && weight == DTYPE_Q6_K && activation == DTYPE_Q8_K) return "gemv_q6_k_q8_k";
+    if (prefill && weight == DTYPE_Q4_K && activation == DTYPE_Q8_K) return "gemm_nt_q4_k_q8_k";
+    if (prefill && weight == DTYPE_Q4_K && activation == DTYPE_FP32) return "gemm_nt_q4_k";
+    if (!prefill && weight == DTYPE_Q8_0 && activation == DTYPE_FP32) return "gemv_q8_0";
+    return "fallback_or_error";
 }
 
-// Hot path: no type checks, pure computation
-static void matmul_fp32_q4_0(float* out, const float* A,
-                              const block_q4_0* B, ...) {
-    // Direct memory access, no branches
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            float sum = 0.0f;
-            for (int k = 0; k < K; k += 32) {
-                // Dequantize block and compute
-                sum += dot_product_q4_0(&A[i*K + k], &B[j*K/32 + k/32]);
-            }
-            out[i*N + j] = sum;
-        }
-    }
+void lower_mixed_quant_linear(...) {
+    quantize_row_q8_k(hidden_fp32, hidden_q8k, K);
+    gemv_q4_k_q8_k(out_fp32, weight_q4k, hidden_q8k, K);
 }
     </pre>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">Why This Bug Was Hard To Notice</h3>
+    <p>The March 9 fix was not a flashy crash bug. The runtime could still generate text, and some top-1 logits remained unchanged. But the wrong signed-max choice or incorrect <code>bsums</code> bookkeeping perturbs internal mixed-quant math just enough to accumulate drift later.</p>
+    <p>That is why quantization bugs like this often survive casual manual testing and only show up in strict parity tooling or in model families that stress a specific kernel path.</p>
 </div>
 
 <hr>
@@ -1189,6 +1206,8 @@ void matmul_q4(float* out, const float* x, const tensor* W) {
         <tr><td>Q4_0</td><td>18</td><td>scale + 32x4bit</td><td>General use, fastest</td></tr>
         <tr><td>Q4_1</td><td>20</td><td>scale + min + 32x4bit</td><td>Asymmetric distributions</td></tr>
         <tr><td>Q8_0</td><td>34</td><td>scale + 32x8bit</td><td>High quality requirements</td></tr>
+        <tr><td>Q6_K</td><td>210/256</td><td>K-quant with int8 sub-scales</td><td>Sensitive MLP / output weights</td></tr>
+        <tr><td>Q8_K</td><td>292/256</td><td>FP32 scale + 256x8bit + bsums</td><td>Mixed K-quant activation path</td></tr>
         <tr><td>Q4_K</td><td>144/256</td><td>Nested superblock</td><td>Best quality/size ratio</td></tr>
     </table>
 </div>
