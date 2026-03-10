@@ -1194,14 +1194,19 @@
             <h3>Q8_K: FP32 Scale + bsums</h3>
             <p>Q8_K uses FP32 scale (not FP16!) for higher precision. The <code>bsums</code> field contains precomputed sums of 16 consecutive int8s for VNNI/AVX-512 dot product optimization.</p>
         </div>
+        <div class="concept" style="border-color: #47b475;">
+            <h3 style="color: #47b475;">Recent Fix: Q8_K SSE Parity</h3>
+            <p>On 2026-03-09 we fixed a subtle <code>Q8_K</code> parity bug in <code>quantize_row_q8_k_sse.c</code>. The SSE path now preserves the same signed-max selection and <code>bsums</code> contract as llama.cpp/ref. See <a href="https://github.com/antshiv/C-Kernel-Engine/commit/224a4d30e0309ee7a1a9d4f3ca46bcedf0ced905" style="color: #00c7fd;">commit 224a4d30</a>.</p>
+            <p>This class of bug is easy to miss: text generation can still look mostly normal, but mixed-quant boundaries like <code>quantize_row_q8_k -&gt; gemv_q4_k_q8_k</code> accumulate small parity drift until a model family like Nanbeige exposes it.</p>
+        </div>
     </div>
 </div>
 
 <div class="container" style="margin-top: 2.5rem;">
-    <h2 style="color: var(--orange); margin-bottom: 0.75rem;">Quant Summary (v6.6+)</h2>
+    <h2 style="color: var(--orange); margin-bottom: 0.75rem;">Quant Summary (current v7 mixed-quant path)</h2>
     <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
-        These are the formats we actively use across Qwen, Gemma, and the v6.6 kernel registry.
-        The goal is practical: pick the smallest dtype that preserves accuracy for the specific projection or MLP path.
+        These are the formats that matter in the current v7 inference path across Qwen, Gemma, and recent Llama/Nanbeige parity work.
+        The practical rule is not just "pick a small dtype", but "pick the weight format and activation contract that match the runtime kernel actually used."
     </p>
 
     <style>
@@ -1305,11 +1310,18 @@
 
     <div class="quant-summary">
         <div class="quant-card">
+            <div class="quant-title">Q8_K <span class="quant-tag">256-block</span></div>
+            <div class="quant-row"><span>Use</span><span>Activation-side K-quant path</span></div>
+            <div class="quant-row"><span>Strength</span><span>Matches ggml mixed-quant kernels</span></div>
+            <div class="bitbar"><span style="width: 78%;"></span></div>
+            <div class="quant-note">Current v7 path for <code>quantize_row_q8_k -&gt; gemv_q4_k_q8_k</code> and <code>gemv_q6_k_q8_k</code>.</div>
+        </div>
+        <div class="quant-card">
             <div class="quant-title">Q8_0 <span class="quant-tag">32‑block</span></div>
-            <div class="quant-row"><span>Use</span><span>Activations, V‑proj</span></div>
-            <div class="quant-row"><span>Strength</span><span>Stable, fast GEMV</span></div>
+            <div class="quant-row"><span>Use</span><span>Legacy/simple high-quality paths</span></div>
+            <div class="quant-row"><span>Strength</span><span>Simple block format</span></div>
             <div class="bitbar"><span style="width: 80%;"></span></div>
-            <div class="quant-note">Best default for activation quantization and high‑sensitivity paths.</div>
+            <div class="quant-note">Still useful, but it is no longer the whole story for modern K-quant inference.</div>
         </div>
         <div class="quant-card">
             <div class="quant-title">Q5_0 / Q5_1 <span class="quant-tag">32‑block</span></div>
@@ -1327,14 +1339,14 @@
         </div>
         <div class="quant-card">
             <div class="quant-title">Q6_K <span class="quant-tag">256‑block</span></div>
-            <div class="quant-row"><span>Use</span><span>Down proj / MLP</span></div>
+            <div class="quant-row"><span>Use</span><span>Sensitive MLP / output weights</span></div>
             <div class="quant-row"><span>Strength</span><span>Higher fidelity</span></div>
             <div class="bitbar"><span style="width: 70%;"></span></div>
             <div class="quant-note">Often selected for sensitive MLP paths where Q5_K is too lossy.</div>
         </div>
         <div class="quant-card">
             <div class="quant-title">Q4_K <span class="quant-tag">256‑block</span></div>
-            <div class="quant-row"><span>Use</span><span>Max compression</span></div>
+            <div class="quant-row"><span>Use</span><span>Compression-first K-quant weights</span></div>
             <div class="quant-row"><span>Strength</span><span>Smallest footprint</span></div>
             <div class="bitbar"><span style="width: 45%;"></span></div>
             <div class="quant-note">Great for footprint, but easiest to destabilize if overused.</div>
@@ -1343,16 +1355,16 @@
 
     <div class="quant-flow">
         <div class="flow-row">
-            <div class="flow-box">Token Embedding<br><span style="color: var(--text-muted);">Q8_0</span></div>
+            <div class="flow-box">Hidden State<br><span style="color: var(--text-muted);">FP32</span></div>
             <div class="flow-arrow">→</div>
-            <div class="flow-box">Attention Proj<br><span style="color: var(--text-muted);">Q5_0 / Q5_1</span></div>
+            <div class="flow-box">Activation Quantize<br><span style="color: var(--text-muted);">quantize_row_q8_k</span></div>
             <div class="flow-arrow">→</div>
-            <div class="flow-box">MLP (Gate/Down)<br><span style="color: var(--text-muted);">Q5_K / Q6_K</span></div>
+            <div class="flow-box">Mixed K-Quant Matvec<br><span style="color: var(--text-muted);">Q4_K / Q6_K × Q8_K</span></div>
         </div>
         <div class="quant-legend">
-            <div><span class="legend-chip">Q8_0</span> Stable activation path, safest for logits and V‑proj.</div>
-            <div><span class="legend-chip">Q5_K</span> Compression‑first MLP blocks (Gemma‑friendly).</div>
-            <div><span class="legend-chip">Q6_K</span> Higher‑fidelity MLP when accuracy is tight.</div>
+            <div><span class="legend-chip">Q8_K</span> Activation-side block format for the current mixed K-quant runtime path.</div>
+            <div><span class="legend-chip">Q4_K</span> Compression-first weight blocks that rely on the correct <code>q8_k</code> activation contract.</div>
+            <div><span class="legend-chip">Q6_K</span> Higher-fidelity weight blocks for sensitive MLP/output paths.</div>
         </div>
     </div>
 </div>
@@ -1594,7 +1606,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-09</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-10</p>
             </div>
         </div>
     </footer>
