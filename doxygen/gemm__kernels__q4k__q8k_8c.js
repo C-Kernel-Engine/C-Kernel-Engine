@@ -13,8 +13,6 @@ var gemm__kernels__q4k__q8k_8c =
     [ "gemv_q4_k_q8_k_sse", "gemm__kernels__q4k__q8k_8c.html#afae7b0ff0904761e59897e996ddd862f", null ],
     [ "gemv_q4_k_q8_k_vnni", "gemm__kernels__q4k__q8k_8c.html#a53c1355c32a77df5522e2b8eff8fc3f5", null ],
     [ "quantize_row_q8_k", "gemm__kernels__q4k__q8k_8c.html#a64b28ca8a25883986a0d22e39a574a32", null ],
-    [ "quantize_row_q8_k_avx", "gemm__kernels__q4k__q8k_8c.html#ab9e702b60341c1566dff759f806faaa9", null ],
-    [ "quantize_row_q8_k_avx2", "gemm__kernels__q4k__q8k_8c.html#a4dcada19df0f80a18a9c5ebd2c4b9a35", null ],
     [ "quantize_row_q8_k_ref", "gemm__kernels__q4k__q8k_8c.html#ae72e9986548705a72b1891fe7ffe00e5", null ],
     [ "quantize_row_q8_k_sse", "gemm__kernels__q4k__q8k_8c.html#ad7fa7d735b58b52c90cbd6160676e86f", null ]
 ];
