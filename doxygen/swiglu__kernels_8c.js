@@ -1,6 +1,5 @@
 var swiglu__kernels_8c =
 [
-    [ "sigmoid_scalar_parity", "swiglu__kernels_8c.html#acb190f66cb5c281730a5137b2c9a729c", null ],
     [ "swiglu_backward", "swiglu__kernels_8c.html#a2d1ada314dda9d7788371a08067917d6", null ],
     [ "swiglu_backward_exact", "swiglu__kernels_8c.html#a771ec9e8b054416576cf1788ea8d3747", null ],
     [ "swiglu_forward", "swiglu__kernels_8c.html#a26369aa07808fb6aae4502d54a1ba650", null ],
