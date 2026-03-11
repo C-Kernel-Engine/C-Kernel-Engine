@@ -425,6 +425,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_mlp.py \
             unittest/test_rmsnorm.py \
             unittest/test_qk_norm.py \
+            unittest/test_deltanet.py \
             unittest/test_swiglu.py \
             unittest/test_fused_swiglu_decode.py \
             unittest/test_fused_attention_decode.py \
@@ -992,6 +993,9 @@ test-relu: $(LIB_RELU)
 test-vision: $(LIB_VISION)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
 
+test-deltanet: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_deltanet.py $(ARGS)
+
 libckernel_rope.so: $(LIB_ROPE)
 	@true
 
@@ -1234,6 +1238,7 @@ unittest:
 	@echo "  unittest/test_gemm.py                  - GEMM variants vs PyTorch"
 	@echo "  unittest/test_mlp.py                   - MLP block forward/backward"
 	@echo "  unittest/test_swiglu.py                - SwiGLU activation"
+	@echo "  unittest/test_deltanet.py              - Gated DeltaNet forward/backward"
 	@echo "  unittest/test_relu.py                  - ReLU activation"
 	@echo "  unittest/test_attention.py             - Attention forward/backward"
 	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
@@ -1603,6 +1608,7 @@ tests-list:
 	@echo "  unittest/test_gemm_microkernel.py  - GEMM 8x8 microkernel with register blocking"
 	@echo "  unittest/test_mlp.py               - MLP block forward/backward vs PyTorch"
 	@echo "  unittest/test_swiglu.py            - SwiGLU activation forward/backward"
+	@echo "  unittest/test_deltanet.py          - Gated DeltaNet forward/backward vs PyTorch"
 	@echo "  unittest/test_attention.py         - Multi-head attention forward vs PyTorch"
 	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
 	@echo "  unittest/test_attention_backward.py - Attention backward (MHA/GQA)"

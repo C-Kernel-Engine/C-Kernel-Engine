@@ -1189,6 +1189,34 @@ void gated_deltanet_autoregressive_forward(const float *q,
                                            int state_dim,
                                            float norm_eps);
 
+// Gated DeltaNet recurrent backward used by qwen3next/Qwen3.5 linear attention.
+// Layout:
+//   d_out         : [num_heads, state_dim]
+//   d_state_out   : [num_heads, state_dim, state_dim] row-major per head
+//   q, k, v       : [num_heads, state_dim]
+//   g, beta       : [num_heads]
+//   state_*       : [num_heads, state_dim, state_dim] row-major per head
+//   d_q/d_k/d_v   : [num_heads, state_dim]
+//   d_g/d_beta    : [num_heads]
+void gated_deltanet_autoregressive_backward(const float *d_out,
+                                            const float *d_state_out,
+                                            const float *q,
+                                            const float *k,
+                                            const float *v,
+                                            const float *g,
+                                            const float *beta,
+                                            const float *state_in,
+                                            const float *state_out,
+                                            float *d_q,
+                                            float *d_k,
+                                            float *d_v,
+                                            float *d_g,
+                                            float *d_beta,
+                                            float *d_state_in,
+                                            int num_heads,
+                                            int state_dim,
+                                            float norm_eps);
+
 // Sliding-window attention forward (decode, flash-style)
 // Single query token attends to the last `sliding_window` tokens in KV cache.
 void attention_forward_decode_head_major_gqa_flash_sliding(
