@@ -248,6 +248,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/attention_kernels.c \
 	           src/kernels/attention_kernels_sliding.c \
 	           src/kernels/attention_flash_true.c \
+	           src/kernels/deltanet_kernels.c \
 	           src/kernels/attention_decode_fused.c \
 	           src/kernels/embedding_kernels.c \
 	           src/kernels/embedding_kernels_bf16.c \
@@ -1775,6 +1776,9 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running GEMM AVX vs scalar benchmark..."
 	@$(MAKE) --no-print-directory test-gemm-avx-bench
+	@echo ""
+	@echo "Running DeltaNet ISA benchmark..."
+	@$(MAKE) --no-print-directory test-deltanet-avx-bench
 
 # Full parity + ISA variant sweep for GEMM AVX benchmarks
 llamacpp-parity-full-all-isa-variants:
@@ -2048,6 +2052,63 @@ test-gemm-avx-bench-quick: $(GEMM_AVX_BENCH_BIN)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMM_AVX_BENCH_BIN) --quick
 
 .PHONY: test-gemm-avx-bench test-gemm-avx-bench-quick
+
+# =============================================================================
+# Gated DeltaNet ISA benchmark
+# =============================================================================
+# Targets:
+#   make test-deltanet-avx-bench       Full benchmark (4 configs, 15 iters each)
+#   make test-deltanet-avx-bench-quick Quick parity + benchmark (3 configs, 5 iters)
+
+DELTANET_AVX_BENCH_BIN := $(BUILD_DIR)/test_deltanet_avx_bench
+
+$(DELTANET_AVX_BENCH_BIN): $(LIB) tests/test_deltanet_avx_bench.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -march=native -Iinclude \
+		tests/test_deltanet_avx_bench.c \
+		-L$(BUILD_DIR) -lckernel_engine -lm \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-o $(DELTANET_AVX_BENCH_BIN)
+
+test-deltanet-avx-bench: $(DELTANET_AVX_BENCH_BIN)
+	@echo "Running Gated DeltaNet ISA benchmark (full)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(DELTANET_AVX_BENCH_BIN)
+
+test-deltanet-avx-bench-quick: $(DELTANET_AVX_BENCH_BIN)
+	@echo "Running Gated DeltaNet ISA benchmark (quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(DELTANET_AVX_BENCH_BIN) --quick
+
+.PHONY: test-deltanet-avx-bench test-deltanet-avx-bench-quick
+
+# =============================================================================
+# Gated DeltaNet benchmark: CK vs llama.cpp
+# =============================================================================
+# Targets:
+#   make test-deltanet-vs-llamacpp-bench       Full benchmark (4 configs)
+#   make test-deltanet-vs-llamacpp-bench-quick Quick benchmark (3 configs)
+
+DELTANET_LLAMA_BENCH_BIN := $(BUILD_DIR)/test_deltanet_vs_llamacpp_bench
+
+$(DELTANET_LLAMA_BENCH_BIN): $(LIB) $(LLAMA_KERNEL_TEST) tests/test_deltanet_vs_llamacpp_bench.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -O3 -march=native -Iinclude \
+		tests/test_deltanet_vs_llamacpp_bench.c \
+		-L$(BUILD_DIR) -lckernel_engine \
+		-L$(LLAMA_CPP_DIR) -lggml_kernel_test \
+		-lm -lpthread \
+		-Wl,-rpath,$(PWD)/$(BUILD_DIR) \
+		-Wl,-rpath,$(PWD)/$(LLAMA_CPP_DIR) \
+		-o $(DELTANET_LLAMA_BENCH_BIN)
+
+test-deltanet-vs-llamacpp-bench: $(DELTANET_LLAMA_BENCH_BIN)
+	@echo "Running Gated DeltaNet benchmark (CK vs llama.cpp)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$(LLAMA_CPP_DIR):$$LD_LIBRARY_PATH $(DELTANET_LLAMA_BENCH_BIN)
+
+test-deltanet-vs-llamacpp-bench-quick: $(DELTANET_LLAMA_BENCH_BIN)
+	@echo "Running Gated DeltaNet benchmark (CK vs llama.cpp, quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):$(LLAMA_CPP_DIR):$$LD_LIBRARY_PATH $(DELTANET_LLAMA_BENCH_BIN) --quick
+
+.PHONY: test-deltanet-vs-llamacpp-bench test-deltanet-vs-llamacpp-bench-quick
 
 # =============================================================================
 # OpenMP GEMV Profiling (serial vs parallel)
@@ -2432,6 +2493,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/attention_kernels.c \
                src/kernels/attention_kernels_sliding.c \
                src/kernels/attention_flash_true.c \
+               src/kernels/deltanet_kernels.c \
                src/kernels/fused/prefill_fused_gemm.c \
                src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
                src/kernels/fused/gemv_fused_quant_bias.c \
@@ -2460,6 +2522,8 @@ $(LLAMA_KERNEL_TEST):
 		echo "Building llama.cpp..."; \
 		cd $(LLAMA_CPP_DIR) && mkdir -p build && cd build && cmake .. && make -j$$(nproc); \
 	fi
+	@mkdir -p "$(LLAMA_CPP_DIR)/tests"
+	@cp patches/test-kernel-parity.cpp "$(LLAMA_CPP_DIR)/tests/test-kernel-parity.cpp"
 	@# Detect library location (build/bin or build/lib)
 	cd $(LLAMA_CPP_DIR) && \
 	GGML_LIB_DIR=$$(if [ -f build/bin/libggml.so ]; then echo build/bin; else echo build/lib; fi) && \

@@ -53,6 +53,18 @@ extern "C" {
                                 const void * vy, size_t by, int nrc);
 }
 
+static float deltanet_sigmoid(float x) {
+    return 1.0f / (1.0f + std::exp(-x));
+}
+
+static float deltanet_l2_inv_norm(const float *x, int dim, float eps) {
+    float sum_sq = 0.0f;
+    for (int i = 0; i < dim; ++i) {
+        sum_sq += x[i] * x[i];
+    }
+    return 1.0f / std::sqrt(sum_sq + eps);
+}
+
 extern "C" {
 
 // ============================================================================
@@ -637,6 +649,82 @@ void test_softmax(const float * input, float * output, int n) {
     // Normalize
     for (int i = 0; i < n; i++) {
         output[i] /= sum;
+    }
+}
+
+/**
+ * Test Gated DeltaNet autoregressive update.
+ *
+ * Layout:
+ *   q, k, v   [num_heads, state_dim]
+ *   g, beta   [num_heads]
+ *   state_*   [num_heads, state_dim, state_dim] row-major per head
+ *   out       [num_heads, state_dim]
+ */
+void test_gated_deltanet_autoregressive(const float * q,
+                                        const float * k,
+                                        const float * v,
+                                        const float * g,
+                                        const float * beta,
+                                        const float * state_in,
+                                        float * state_out,
+                                        float * out,
+                                        int num_heads,
+                                        int state_dim,
+                                        float norm_eps) {
+    if (!q || !k || !v || !g || !beta || !state_in || !state_out || !out) {
+        return;
+    }
+    if (num_heads <= 0 || state_dim <= 0) {
+        return;
+    }
+
+    const float q_scale = 1.0f / std::sqrt((float) state_dim);
+    const size_t vec_stride = (size_t) state_dim;
+    const size_t state_stride = (size_t) state_dim * (size_t) state_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        const float * q_head = q + (size_t) h * vec_stride;
+        const float * k_head = k + (size_t) h * vec_stride;
+        const float * v_head = v + (size_t) h * vec_stride;
+        const float * state_prev = state_in + (size_t) h * state_stride;
+        float * state_cur = state_out + (size_t) h * state_stride;
+        float * out_head = out + (size_t) h * vec_stride;
+
+        const float q_inv_norm = deltanet_l2_inv_norm(q_head, state_dim, norm_eps);
+        const float k_inv_norm = deltanet_l2_inv_norm(k_head, state_dim, norm_eps);
+        const float beta_s = deltanet_sigmoid(beta[h]);
+        const float gate = std::exp(g[h]);
+
+        for (int row = 0; row < state_dim; ++row) {
+            const size_t row_off = (size_t) row * (size_t) state_dim;
+            for (int col = 0; col < state_dim; ++col) {
+                state_cur[row_off + (size_t) col] = state_prev[row_off + (size_t) col] * gate;
+            }
+        }
+
+        for (int col = 0; col < state_dim; ++col) {
+            float kv_mem = 0.0f;
+            for (int row = 0; row < state_dim; ++row) {
+                const float k_hat = k_head[row] * k_inv_norm;
+                kv_mem += state_cur[(size_t) row * (size_t) state_dim + (size_t) col] * k_hat;
+            }
+
+            const float delta = (v_head[col] - kv_mem) * beta_s;
+            for (int row = 0; row < state_dim; ++row) {
+                const float k_hat = k_head[row] * k_inv_norm;
+                state_cur[(size_t) row * (size_t) state_dim + (size_t) col] += k_hat * delta;
+            }
+        }
+
+        for (int col = 0; col < state_dim; ++col) {
+            float acc = 0.0f;
+            for (int row = 0; row < state_dim; ++row) {
+                const float q_hat = q_head[row] * q_inv_norm * q_scale;
+                acc += state_cur[(size_t) row * (size_t) state_dim + (size_t) col] * q_hat;
+            }
+            out_head[col] = acc;
+        }
     }
 }
 

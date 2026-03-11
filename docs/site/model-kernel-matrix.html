@@ -1439,7 +1439,25 @@
       <div class="kernel-chip"><strong>GEMM:</strong> q4_k, q5_0, q5_k, q6_k, q8_0, fp32</div>
       <div class="kernel-chip"><strong>Activations:</strong> fp32, bf16, q8_0, q8_k</div>
       <div class="kernel-chip"><strong>Fused:</strong> attention + outproj + MLP (prefill) variants</div>
+      <div class="kernel-chip"><strong>Recurrent:</strong> <code>src/kernels/deltanet_kernels.c</code> for FP32 Gated DeltaNet parity</div>
     </div>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Experimental Architecture Probes</h2>
+    <div class="test-grid">
+      <div class="test-item">
+        <strong>Qwen3.5 / qwen3next</strong><br>
+        Kernel foothold exists in <code>src/kernels/deltanet_kernels.c</code>: FP32 single-token Gated DeltaNet parity against llama.cpp. Block flow: <code>x -&gt; [q,k,v,z] + [beta,alpha] -&gt; conv(q/k/v) -&gt; DeltaNet state update S_t -&gt; RMSNorm(h) * SiLU(z) -&gt; outproj</code>. This is kernel-level parity, not yet a full template/runtime lane.
+      </div>
+      <div class="test-item">
+        <strong>Gated attention</strong><br>
+        Treat it as a composed graph: causal attention + sigmoid gate multiply + output projection. Keep it stitched in CK unless profiling proves a fused epilogue is worth the extra maintenance.
+      </div>
+    </div>
+    <p class="source-note" style="margin-top: 0.75rem;">
+      Interpretation: DeltaNet earns a dedicated kernel because it mutates recurrent state; gated attention usually does not, because the gate is just an elementwise epilogue on top of otherwise standard attention.
+    </p>
   </div>
 
   <div class="matrix-section">
@@ -1742,7 +1760,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-11</p>
             </div>
         </div>
     </footer>

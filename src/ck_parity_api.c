@@ -78,6 +78,20 @@ extern void attention_forward_causal_head_major_gqa_flash_strided(
     int num_heads, int num_kv_heads, int num_tokens,
     int head_dim, int aligned_head_dim, int kv_stride_tokens);
 
+/* Gated DeltaNet kernel (from deltanet_kernels.c) */
+extern void gated_deltanet_autoregressive_forward(
+    const float *q,
+    const float *k,
+    const float *v,
+    const float *g,
+    const float *beta,
+    const float *state_in,
+    float *state_out,
+    float *out,
+    int num_heads,
+    int state_dim,
+    float norm_eps);
+
 /* ============================================================================
  * Dequantization Tests
  * ============================================================================ */
@@ -609,6 +623,32 @@ void ck_test_softmax(const float *input, float *output, int n)
     for (int i = 0; i < n; i++) {
         output[i] *= inv_sum;
     }
+}
+
+void ck_test_gated_deltanet_autoregressive(const float *q,
+                                           const float *k,
+                                           const float *v,
+                                           const float *g,
+                                           const float *beta,
+                                           const float *state_in,
+                                           float *state_out,
+                                           float *out,
+                                           int num_heads,
+                                           int state_dim,
+                                           float norm_eps)
+{
+    gated_deltanet_autoregressive_forward(
+        q,
+        k,
+        v,
+        g,
+        beta,
+        state_in,
+        state_out,
+        out,
+        num_heads,
+        state_dim,
+        norm_eps);
 }
 
 /* ============================================================================

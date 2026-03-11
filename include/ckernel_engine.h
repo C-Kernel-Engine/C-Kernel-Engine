@@ -1171,6 +1171,24 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
     int kv_stride_tokens,
     int sliding_window);
 
+// Gated DeltaNet recurrent update used by qwen3next/Qwen3.5 linear attention.
+// Layout:
+//   q, k, v   : [num_heads, state_dim]
+//   g, beta   : [num_heads]
+//   state_*   : [num_heads, state_dim, state_dim] row-major per head
+//   out       : [num_heads, state_dim]
+void gated_deltanet_autoregressive_forward(const float *q,
+                                           const float *k,
+                                           const float *v,
+                                           const float *g,
+                                           const float *beta,
+                                           const float *state_in,
+                                           float *state_out,
+                                           float *out,
+                                           int num_heads,
+                                           int state_dim,
+                                           float norm_eps);
+
 // Sliding-window attention forward (decode, flash-style)
 // Single query token attends to the last `sliding_window` tokens in KV cache.
 void attention_forward_decode_head_major_gqa_flash_sliding(

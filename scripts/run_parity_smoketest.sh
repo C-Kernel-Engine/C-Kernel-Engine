@@ -385,6 +385,57 @@ else
     log_step "[1/5] Skipping llama.cpp build (--skip-build)"
 fi
 
+# Keep the patched kernel parity helper in sync even when --skip-build is used.
+if [ -d "$LLAMA_DIR" ] && [ -f "$PATCHES_DIR/test-kernel-parity.cpp" ]; then
+    mkdir -p "$LLAMA_DIR/tests"
+    if [ ! -f "$LLAMA_DIR/tests/test-kernel-parity.cpp" ] || \
+       ! cmp -s "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp"; then
+        log_step "Syncing patched kernel parity source into llama.cpp/tests..."
+        cp "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp"
+    fi
+
+    if [ -f "$LLAMA_DIR/build/bin/libggml.so" ] || [ -f "$LLAMA_DIR/build/lib/libggml.so" ]; then
+        if [ ! -f "$LLAMA_DIR/libggml_kernel_test.so" ] || \
+           [ "$LLAMA_DIR/tests/test-kernel-parity.cpp" -nt "$LLAMA_DIR/libggml_kernel_test.so" ] || \
+           [ "$PATCHES_DIR/test-kernel-parity.cpp" -nt "$LLAMA_DIR/libggml_kernel_test.so" ]; then
+            log_step "Refreshing ggml kernel test library..."
+            cd "$LLAMA_DIR"
+
+            export LD_LIBRARY_PATH="$PWD/build/bin:$PWD/build/lib:$LD_LIBRARY_PATH"
+
+            if command -v icpx &> /dev/null; then
+                CXX_COMPILER="icpx"
+                CXX_FLAGS="$INTEL_ARCH"
+            elif command -v icx &> /dev/null; then
+                CXX_COMPILER="icx"
+                CXX_FLAGS="$INTEL_ARCH"
+            else
+                CXX_COMPILER="g++"
+                CXX_FLAGS="${GCC_ARCH:--march=native}"
+            fi
+
+            GGML_LIB_DIR="build/bin"
+            if [ ! -f "$GGML_LIB_DIR/libggml.so" ]; then
+                GGML_LIB_DIR="build/lib"
+            fi
+
+            log_step "Using $CXX_COMPILER with flags: $CXX_FLAGS"
+            if $CXX_COMPILER -shared -fPIC $CXX_FLAGS -o libggml_kernel_test.so \
+                tests/test-kernel-parity.cpp \
+                -I ggml/include -I ggml/src \
+                -L "$GGML_LIB_DIR" -lggml -lggml-cpu -lggml-base -lm -lpthread \
+                -Wl,-rpath,'$ORIGIN/build/bin' 2>&1; then
+                log_step "ggml kernel test library refreshed"
+            else
+                log_warn "Could not refresh kernel test library"
+            fi
+            cd "$ROOT_DIR"
+        fi
+    else
+        log_warn "llama.cpp core libs missing; cannot refresh kernel parity helper"
+    fi
+fi
+
 # Step 2: Build CK parity library
 log_step "[2/5] Building CK parity library..."
 cd "$ROOT_DIR"
@@ -686,7 +737,10 @@ if [ "$KERNELS_ONLY" = false ]; then
     export LD_LIBRARY_PATH="$ROOT_DIR/build:$LD_LIBRARY_PATH"
 
     PYTORCH_TEST="$ROOT_DIR/unittest/test_pytorch_parity.py"
-    if [ -f "$PYTORCH_TEST" ]; then
+    if ! "$PYTHON_BIN" -c "import torch" >/dev/null 2>&1; then
+        log_warn "PyTorch not installed, skipping reference tests"
+        incr_skipped
+    elif [ -f "$PYTORCH_TEST" ]; then
         set +e
         if [ "$QUICK_MODE" = true ]; then
             # Quick mode: run subset

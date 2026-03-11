@@ -157,6 +157,8 @@ class KernelTester:
         self.libck = libck
         self.tol = tol
         self.results = []
+        self.ggml_has_deltanet = False
+        self.ck_has_deltanet = False
 
         # Set up function signatures for llama.cpp library
         if libggml:
@@ -218,6 +220,23 @@ class KernelTester:
         lib.test_softmax.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int]
         lib.test_softmax.restype = None
 
+        if hasattr(lib, "test_gated_deltanet_autoregressive"):
+            lib.test_gated_deltanet_autoregressive.argtypes = [
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_float,
+            ]
+            lib.test_gated_deltanet_autoregressive.restype = None
+            self.ggml_has_deltanet = True
+
     def _setup_ck_signatures(self):
         """Set up ctypes signatures for CK functions."""
         lib = self.libck
@@ -264,6 +283,23 @@ class KernelTester:
         # Softmax
         lib.ck_test_softmax.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_int]
         lib.ck_test_softmax.restype = None
+
+        if hasattr(lib, "ck_test_gated_deltanet_autoregressive"):
+            lib.ck_test_gated_deltanet_autoregressive.argtypes = [
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_float,
+            ]
+            lib.ck_test_gated_deltanet_autoregressive.restype = None
+            self.ck_has_deltanet = True
 
     def compare(self, name: str, ggml_out: np.ndarray, ck_out: np.ndarray) -> bool:
         """Compare two outputs and record result."""
@@ -493,6 +529,63 @@ class KernelTester:
 
         return self.compare("softmax", ggml_out, ck_out)
 
+    def test_gated_deltanet_autoregressive(self, num_heads: int = 4, state_dim: int = 16):
+        """Test Qwen3.5-style single-token Gated DeltaNet state update."""
+        print(f"\n--- test_gated_deltanet_autoregressive (heads={num_heads}, dim={state_dim}) ---")
+
+        if not self.libggml or not self.libck:
+            print(f"{YELLOW}[SKIP] Libraries not available{RESET}")
+            return False
+        if not self.ggml_has_deltanet or not self.ck_has_deltanet:
+            print(f"{RED}[FAIL]{RESET} Missing Gated DeltaNet parity symbol in helper library")
+            self.results.append(("gated_deltanet_symbol", False, float("inf"), float("inf")))
+            return False
+
+        q = (0.25 * np.random.randn(num_heads, state_dim)).astype(np.float32)
+        k = (0.25 * np.random.randn(num_heads, state_dim)).astype(np.float32)
+        v = (0.25 * np.random.randn(num_heads, state_dim)).astype(np.float32)
+        g = (0.1 * np.random.randn(num_heads)).astype(np.float32)
+        beta = (0.5 * np.random.randn(num_heads)).astype(np.float32)
+        state_in = (0.2 * np.random.randn(num_heads, state_dim, state_dim)).astype(np.float32)
+        norm_eps = 1e-6
+
+        ggml_state = np.zeros_like(state_in)
+        ggml_out = np.zeros((num_heads, state_dim), dtype=np.float32)
+        ck_state = np.zeros_like(state_in)
+        ck_out = np.zeros((num_heads, state_dim), dtype=np.float32)
+
+        self.libggml.test_gated_deltanet_autoregressive(
+            q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            k.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            v.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            g.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            beta.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            state_in.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ggml_state.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ggml_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            num_heads,
+            state_dim,
+            ctypes.c_float(norm_eps),
+        )
+
+        self.libck.ck_test_gated_deltanet_autoregressive(
+            q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            k.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            v.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            g.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            beta.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            state_in.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ck_state.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ck_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            num_heads,
+            state_dim,
+            ctypes.c_float(norm_eps),
+        )
+
+        out_ok = self.compare("gated_deltanet_out", ggml_out, ck_out)
+        state_ok = self.compare("gated_deltanet_state", ggml_state, ck_state)
+        return out_ok and state_ok
+
     def run_all(self, quick=False):
         """Run all kernel tests."""
         print("=" * 80)
@@ -508,6 +601,7 @@ class KernelTester:
   - GEMV:          Q4_K matrix-vector multiply (decode path)
   - GEMM:          Q4_K matrix-matrix multiply (prefill path)
   - Activations:   RMSNorm, RoPE, SwiGLU, Softmax
+  - Recurrent:     Gated DeltaNet autoregressive state update
 """)
 
         # Dequantization kernels
@@ -542,6 +636,11 @@ class KernelTester:
         self.test_softmax(128)
         if not quick:
             self.test_softmax(512)
+
+        self.test_gated_deltanet_autoregressive(4, 16)
+        if not quick:
+            self.test_gated_deltanet_autoregressive(8, 32)
+            self.test_gated_deltanet_autoregressive(16, 64)
 
         # Summary
         return self.print_summary()

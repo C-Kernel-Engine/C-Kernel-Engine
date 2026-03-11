@@ -343,6 +343,30 @@ void ck_test_swiglu(const float *gate_up,
  */
 void ck_test_softmax(const float *input, float *output, int n);
 
+/**
+ * @brief Gated DeltaNet autoregressive update.
+ *
+ * Layout:
+ *   q, k, v   [num_heads, state_dim]
+ *   g, beta   [num_heads]
+ *   state_*   [num_heads, state_dim, state_dim] row-major per head
+ *   out       [num_heads, state_dim]
+ *
+ * This mirrors the single-token recurrent update used by qwen3next in
+ * llama.cpp after projections/convolution but before output projection.
+ */
+void ck_test_gated_deltanet_autoregressive(const float *q,
+                                           const float *k,
+                                           const float *v,
+                                           const float *g,
+                                           const float *beta,
+                                           const float *state_in,
+                                           float *state_out,
+                                           float *out,
+                                           int num_heads,
+                                           int state_dim,
+                                           float norm_eps);
+
 /* ============================================================================
  * Attention Kernels
  * ============================================================================ */
