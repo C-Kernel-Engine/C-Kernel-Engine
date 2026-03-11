@@ -327,19 +327,22 @@ class CKModel:
     def _runtime_artifact_staleness_errors(self, lib_path: Path) -> List[str]:
         """Return fatal staleness diagnostics for an out-of-date compiled runtime."""
         model_c_path = self.model_dir / "model_v7.c"
-        freshness_targets = [
+        fatal_targets = [
             self.model_dir / "weights.bump",
             self.model_dir / "weights_manifest.json",
-            self.model_dir / "config.json",
             self.model_dir / "lowered_decode_call.json",
             self.model_dir / "lowered_prefill_call.json",
         ]
-        existing_targets = [p for p in freshness_targets if p.exists()]
-        if not existing_targets:
-            return []
         errors: List[str] = []
         try:
             runtime_mtime = lib_path.stat().st_mtime
+            config_path = self.model_dir / "config.json"
+            if config_path.exists() and config_path.stat().st_mtime > runtime_mtime:
+                print(
+                    "Warning: config.json is newer than the compiled runtime. "
+                    "Prompt-format metadata may have changed; rerun the matching ck_run pipeline if this run dir was regenerated."
+                )
+            existing_targets = [p for p in fatal_targets if p.exists()]
             stale_inputs = [p for p in existing_targets if p.stat().st_mtime > runtime_mtime]
             if stale_inputs:
                 newest = max(stale_inputs, key=lambda p: p.stat().st_mtime)
