@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v7Profiling | C-Kernel-Engine</title>
+    <title>GatedDeltaNetDeepDive | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -933,278 +933,529 @@
     </header>
     <main>
 
-<h1>v7 Profiling and Performance Runbook</h1>
-
-<p>This page documents the actual profiling workflow we use for v7 training kernels: <code>perf</code>, flamegraphs, Intel VTune, and Intel Advisor.</p>
+<h1>Gated DeltaNet: Recurrent Attention Deep Dive</h1>
 
 <div class="alert alert-info">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-  </div>
-  <div>
-    <strong>Scope</strong><br>
-    This is the v7 training-focused profiling page. For generic memory/debug profiling (<code>valgrind</code>, cachegrind basics), see <a href="profiling.html"><code>profiling.html</code></a>.
-  </div>
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Kernel Source</strong><br>
+        <code>src/kernels/deltanet_kernels.c</code> &mdash; FP32 Gated DeltaNet with REF, AVX, AVX2, and AVX-512 implementations.
+        Matches the single-token recurrent path used by Qwen3.5 / qwen3next in llama.cpp.
+    </div>
 </div>
 
-<nav class="toc">
-  <h3>Contents</h3>
-  <ul>
-    <li><a href="#why-performance-matters">Why Performance Matters</a></li>
-    <li><a href="#tool-map">Tool Map</a></li>
-    <li><a href="#direct-training-capture">Direct Training Capture</a></li>
-    <li><a href="#makefile-workflow">Makefile Workflow (Repeatable)</a></li>
-    <li><a href="#native-cli-workflow">Native C-First Workflow</a></li>
-    <li><a href="#artifact-contract">Artifact Contract</a></li>
-    <li><a href="#how-we-analyze-results">How We Analyze Results</a></li>
-    <li><a href="#regression-loop">Regression Loop</a></li>
-  </ul>
-</nav>
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1: OVERVIEW SVG INFOGRAPHIC
+     ═══════════════════════════════════════════════════════════════════ -->
 
-<h2 id="why-performance-matters">Why Performance Matters</h2>
+<h2>How One DeltaNet Step Works</h2>
 
-<p>Kernel performance is not a cosmetic metric in v7. It directly controls:</p>
-<ul>
-  <li><strong>Training throughput</strong>: tokens/second and wall-clock to convergence.</li>
-  <li><strong>Hardware efficiency</strong>: IPC, cache behavior, and branch quality.</li>
-  <li><strong>Scalability</strong>: thread utilization and memory-bandwidth headroom.</li>
-  <li><strong>Optimization priority</strong>: where to spend kernel engineering time first.</li>
-</ul>
+<p>The diagram below shows the complete per-head recurrent update that runs at every single-token decode step. Unlike standard attention (which recomputes over the full KV-cache), DeltaNet maintains a <strong>fixed-size state matrix S</strong> that gets updated in-place.</p>
 
-<div class="card card-accent">
-  <h3 style="margin-top: 0;">Rule of Operation</h3>
-  <p style="margin: 0;">We optimize only after parity/memory correctness is green. Performance work without correctness gates is treated as invalid.</p>
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 920" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="gInputGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gStateGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="gOpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="gOutGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gGateGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <!-- Arrow marker -->
+    <marker id="arrowDark" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="920" rx="16" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="1098" height="918" rx="15" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="1100" height="56" rx="16" fill="#262637"/>
+  <rect x="0" y="40" width="1100" height="16" fill="#262637"/>
+  <line x1="0" y1="56" x2="1100" y2="56" stroke="#f59e0b" stroke-width="2" opacity="0.6"/>
+  <text x="550" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#f5f5f5" letter-spacing="1">GATED DELTANET &mdash; SINGLE-TOKEN RECURRENT UPDATE</text>
+
+  <!-- ─── ROW 1: INPUT VECTORS ─── -->
+  <text x="30" y="94" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">INPUTS (per head)</text>
+
+  <!-- q -->
+  <rect x="30" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="100" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">q</text>
+  <text x="100" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- k -->
+  <rect x="190" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="260" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">k</text>
+  <text x="260" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- v -->
+  <rect x="350" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="420" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">v</text>
+  <text x="420" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- beta (scalar) -->
+  <rect x="510" y="108" width="110" height="54" rx="10" fill="url(#gGateGrad)" filter="url(#shadow)"/>
+  <text x="565" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">β</text>
+  <text x="565" y="151" text-anchor="middle" font-size="10" fill="#fecaca">scalar</text>
+
+  <!-- g (scalar) -->
+  <rect x="640" y="108" width="110" height="54" rx="10" fill="url(#gGateGrad)" filter="url(#shadow)"/>
+  <text x="695" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">g</text>
+  <text x="695" y="151" text-anchor="middle" font-size="10" fill="#fecaca">scalar</text>
+
+  <!-- S_prev (state matrix) -->
+  <rect x="800" y="88" width="270" height="86" rx="12" fill="url(#gStateGrad)" filter="url(#shadow)"/>
+  <text x="935" y="120" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">S_prev</text>
+  <text x="935" y="140" text-anchor="middle" font-size="11" fill="#fef3c7">[state_dim × state_dim]</text>
+  <text x="935" y="160" text-anchor="middle" font-size="10" fill="#fef3c7" opacity="0.8">recurrent memory matrix</text>
+
+  <!-- ─── ROW 2: STEP 1 & 2 — NORMALIZE + GATE ─── -->
+  <text x="30" y="210" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 1 &amp; 2: NORMALIZE &amp; GATE</text>
+
+  <!-- Arrows from q,k down -->
+  <line x1="100" y1="162" x2="100" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <line x1="260" y1="162" x2="260" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+
+  <!-- q_hat box -->
+  <rect x="30" y="226" width="140" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="100" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">q̂ = L2norm(q)</text>
+  <text x="100" y="270" text-anchor="middle" font-size="11" fill="#c7d2fe">/ √state_dim</text>
+
+  <!-- k_hat box -->
+  <rect x="190" y="226" width="140" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="260" y="254" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">k̂ = L2norm(k)</text>
+
+  <!-- beta_s box -->
+  <line x1="565" y1="162" x2="565" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="500" y="226" width="130" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="565" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">β_s = σ(β)</text>
+  <text x="565" y="270" text-anchor="middle" font-size="10" fill="#c7d2fe">sigmoid gate</text>
+
+  <!-- gate box -->
+  <line x1="695" y1="162" x2="695" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="650" y="226" width="130" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="715" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">gate = exp(g)</text>
+  <text x="715" y="270" text-anchor="middle" font-size="10" fill="#c7d2fe">decay factor</text>
+
+  <!-- ─── ROW 3: STEP 3 — STATE DECAY ─── -->
+  <text x="30" y="330" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 3: STATE DECAY</text>
+
+  <!-- Arrow from gate down -->
+  <line x1="715" y1="284" x2="715" y2="336" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowOrange)" opacity="0.8"/>
+  <!-- Arrow from S_prev down -->
+  <path d="M 935 174 L 935 300 Q 935 320 915 320 L 790 336" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="540" y="340" width="350" height="60" rx="12" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="715" y="369" text-anchor="middle" font-size="16" font-weight="700" fill="#f59e0b">S_decay = gate × S_prev</text>
+  <text x="715" y="389" text-anchor="middle" font-size="11" fill="#94a3b8">element-wise multiply every cell by exp(g)</text>
+
+  <!-- ─── ROW 4: STEP 4 — RETRIEVAL + DELTA COMPUTE ─── -->
+  <text x="30" y="440" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 4: RETRIEVE &amp; COMPUTE DELTA</text>
+
+  <!-- Arrow from k_hat to kv_mem -->
+  <path d="M 260 284 L 260 420 Q 260 440 280 440 L 330 456" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_decay to kv_mem -->
+  <line x1="640" y1="400" x2="540" y2="456" stroke="#f59e0b" stroke-width="1.5" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <!-- kv_mem box -->
+  <rect x="330" y="454" width="220" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="440" y="479" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">kv_mem = Sᵀ_decay · k̂</text>
+  <text x="440" y="498" text-anchor="middle" font-size="10" fill="#c7d2fe">what the state remembers for k̂</text>
+
+  <!-- Arrow from kv_mem + v to delta -->
+  <line x1="440" y1="512" x2="440" y2="540" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from v to delta -->
+  <path d="M 420 162 L 420 530 Q 420 545 430 545 L 370 556" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from beta_s to delta -->
+  <path d="M 565 284 L 565 530 Q 565 545 555 545 L 510 556" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+
+  <!-- delta box -->
+  <rect x="330" y="544" width="220" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="440" y="570" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">δ = β_s · (v − kv_mem)</text>
+  <text x="440" y="590" text-anchor="middle" font-size="10" fill="#c7d2fe">scaled correction vector</text>
+
+  <!-- ─── ROW 5: STEP 5 — STATE UPDATE ─── -->
+  <text x="30" y="645" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 5: STATE UPDATE</text>
+
+  <!-- Arrow from k_hat to outer -->
+  <path d="M 260 284 L 260 630 Q 260 650 280 650 L 470 668" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from delta to outer -->
+  <line x1="440" y1="602" x2="530" y2="658" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_decay to S_new -->
+  <path d="M 715 400 L 715 630 Q 715 650 730 650 L 760 668" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="470" y="656" width="380" height="60" rx="12" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="660" y="684" text-anchor="middle" font-size="15" font-weight="700" fill="#f59e0b">S_new = S_decay + outer(k̂, δ)</text>
+  <text x="660" y="702" text-anchor="middle" font-size="11" fill="#94a3b8">rank-1 update adds new information to memory</text>
+
+  <!-- ─── ROW 6: STEP 6 — OUTPUT ─── -->
+  <text x="30" y="756" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 6: READOUT</text>
+
+  <!-- Arrow from q_hat to output -->
+  <path d="M 100 284 L 100 750 Q 100 770 120 770 L 350 778" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_new to output -->
+  <line x1="660" y1="716" x2="580" y2="768" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="350" y="766" width="260" height="58" rx="12" fill="url(#gOutGrad)" filter="url(#shadow)"/>
+  <text x="480" y="792" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">out = S_newᵀ · q̂</text>
+  <text x="480" y="812" text-anchor="middle" font-size="11" fill="#a7f3d0">[state_dim] output vector</text>
+
+  <!-- ─── S_new feeds back ─── -->
+  <path d="M 850 716 Q 1040 716 1040 500 Q 1040 200 935 174" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="8 4" fill="none" marker-end="url(#arrowOrange)" opacity="0.5"/>
+  <text x="1055" y="460" font-size="11" fill="#f59e0b" opacity="0.7" transform="rotate(-90,1055,460)">S_new → S_prev (next step)</text>
+
+  <!-- ─── Legend ─── -->
+  <rect x="30" y="856" width="1040" height="50" rx="10" fill="#262637" stroke="#334155" stroke-width="1"/>
+  <circle cx="60" cy="881" r="8" fill="url(#gInputGrad)"/>
+  <text x="76" y="886" font-size="11" fill="#94a3b8">Input vectors</text>
+  <circle cx="190" cy="881" r="8" fill="url(#gGateGrad)"/>
+  <text x="206" y="886" font-size="11" fill="#94a3b8">Scalar gates</text>
+  <circle cx="320" cy="881" r="8" fill="url(#gOpGrad)"/>
+  <text x="336" y="886" font-size="11" fill="#94a3b8">Compute ops</text>
+  <circle cx="450" cy="881" r="8" fill="url(#gStateGrad)"/>
+  <text x="466" y="886" font-size="11" fill="#94a3b8">State matrix</text>
+  <circle cx="580" cy="881" r="8" fill="url(#gOutGrad)"/>
+  <text x="596" y="886" font-size="11" fill="#94a3b8">Output</text>
+  <line x1="700" y1="881" x2="730" y2="881" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 3"/>
+  <text x="740" y="886" font-size="11" fill="#94a3b8">Recurrent feedback</text>
+  <line x1="870" y1="881" x2="900" y2="881" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="910" y="886" font-size="11" fill="#94a3b8">Data flow</text>
+</svg>
 </div>
 
-<h2 id="tool-map">Tool Map</h2>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2: EQUATIONS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Mathematical Equations</h2>
+
+<div class="card">
+<pre><code>Per head (h = 0 … num_heads-1):
+
+  q̂   = L2_norm(q) / √state_dim      ← scaled unit query
+  k̂   = L2_norm(k)                    ← unit key
+  β_s = σ(β)        = 1/(1+e^(-β))    ← write gate  (0,1)
+  gate = exp(g)                        ← decay gate  (0,∞)
+
+  S_decay = gate · S_prev              ← element-wise forget
+  kv_mem  = S_decayᵀ · k̂              ← what memory recalls for k̂
+  δ       = β_s · (v − kv_mem)         ← correction: new info minus old
+  S_new   = S_decay + outer(k̂, δ)     ← rank-1 write to memory
+  out     = S_newᵀ  · q̂               ← read from updated memory</code></pre>
+</div>
+
+<p><strong>Key insight:</strong> The delta rule computes the <em>error</em> between what the model wants to store (<code>v</code>) and what the state already recalls (<code>kv_mem</code>). Only the correction is written, gated by <code>β_s</code>. This makes DeltaNet a learned associative memory with selective forgetting.</p>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3: MEMORY LAYOUT SVG
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Memory Layout</h2>
+
+<p>All arrays are flat row-major FP32 buffers. The head dimension is outermost for cache-friendly per-head iteration.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 310" style="max-width:900px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <rect width="900" height="310" rx="12" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="898" height="308" rx="11" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Vectors: q, k, v, out  [num_heads × state_dim] -->
+  <text x="30" y="30" font-size="13" fill="#94a3b8" font-weight="600">VECTORS: q, k, v, out</text>
+  <text x="30" y="50" font-size="11" fill="#64748b">[num_heads × state_dim]  — stride = state_dim</text>
+
+  <!-- Draw H heads as colored blocks -->
+  <g transform="translate(30,60)">
+    <!-- Head 0 -->
+    <rect x="0" y="0" width="200" height="36" rx="6" fill="#3b82f6" opacity="0.8"/>
+    <text x="100" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head 0: [d₀ d₁ … d_{D-1}]</text>
+    <!-- Head 1 -->
+    <rect x="210" y="0" width="200" height="36" rx="6" fill="#6366f1" opacity="0.8"/>
+    <text x="310" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head 1: [d₀ d₁ … d_{D-1}]</text>
+    <!-- ... -->
+    <text x="440" y="23" font-size="16" fill="#64748b">…</text>
+    <!-- Head H-1 -->
+    <rect x="480" y="0" width="200" height="36" rx="6" fill="#8b5cf6" opacity="0.8"/>
+    <text x="580" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head H-1: [d₀ … d_{D-1}]</text>
+  </g>
+
+  <!-- Scalars: g, beta  [num_heads] -->
+  <text x="30" y="130" font-size="13" fill="#94a3b8" font-weight="600">SCALARS: g, β</text>
+  <text x="30" y="150" font-size="11" fill="#64748b">[num_heads]  — one value per head</text>
+  <g transform="translate(30,158)">
+    <rect x="0" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.8"/>
+    <text x="30" y="20" text-anchor="middle" font-size="11" fill="#fff">h₀</text>
+    <rect x="70" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.7"/>
+    <text x="100" y="20" text-anchor="middle" font-size="11" fill="#fff">h₁</text>
+    <text x="155" y="20" font-size="16" fill="#64748b">…</text>
+    <rect x="180" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.6"/>
+    <text x="210" y="20" text-anchor="middle" font-size="11" fill="#fff">h_{H-1}</text>
+  </g>
+
+  <!-- State: state_in/out  [num_heads × state_dim × state_dim] -->
+  <text x="30" y="226" font-size="13" fill="#94a3b8" font-weight="600">STATE: state_in, state_out</text>
+  <text x="30" y="246" font-size="11" fill="#64748b">[num_heads × state_dim × state_dim]  — stride = state_dim²</text>
+
+  <g transform="translate(30,255)">
+    <!-- Head 0 state as small grid icon -->
+    <rect x="0" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.9"/>
+    <line x1="15" y1="0" x2="15" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="30" y1="0" x2="30" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="0" y1="15" x2="44" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="0" y1="30" x2="44" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="22" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H0</text>
+
+    <rect x="54" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.7"/>
+    <line x1="69" y1="0" x2="69" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="84" y1="0" x2="84" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="54" y1="15" x2="98" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="54" y1="30" x2="98" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="76" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H1</text>
+
+    <text x="120" y="26" font-size="16" fill="#64748b">…</text>
+
+    <rect x="150" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.5"/>
+    <line x1="165" y1="0" x2="165" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="180" y1="0" x2="180" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="150" y1="15" x2="194" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="150" y1="30" x2="194" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="172" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H-1</text>
+
+    <text x="260" y="28" font-size="11" fill="#64748b">Each: D×D floats  (row-major)</text>
+  </g>
+</svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4: ISA DISPATCH
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>ISA Dispatch &amp; SIMD Tiers</h2>
+
+<p>The public entry point <code>gated_deltanet_autoregressive_forward()</code> selects the best compiled implementation at link time. When strict parity is enabled (via <code>ck_strict_parity_enabled()</code>), it always falls back to the scalar reference.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" style="max-width:900px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <rect width="900" height="340" rx="12" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="898" height="338" rx="11" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <text x="450" y="35" text-anchor="middle" font-size="15" font-weight="700" fill="#f5f5f5">gated_deltanet_autoregressive_forward()</text>
+
+  <!-- Decision diamond -->
+  <polygon points="450,55 530,90 450,125 370,90" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="450" y="94" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">strict parity?</text>
+
+  <!-- YES → REF -->
+  <line x1="370" y1="90" x2="140" y2="90" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="255" y="84" text-anchor="middle" font-size="10" fill="#ef4444">YES</text>
+  <rect x="30" y="70" width="110" height="40" rx="8" fill="#262637" stroke="#64748b" stroke-width="1"/>
+  <text x="85" y="95" text-anchor="middle" font-size="12" font-weight="600" fill="#94a3b8">_ref (scalar)</text>
+
+  <!-- NO → ISA checks -->
+  <line x1="450" y1="125" x2="450" y2="155" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="465" y="143" font-size="10" fill="#10b981">NO</text>
+
+  <!-- AVX-512 check -->
+  <polygon points="450,160 540,195 450,230 360,195" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="199" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">AVX-512?</text>
+
+  <line x1="540" y1="195" x2="700" y2="195" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="615" y="189" text-anchor="middle" font-size="10" fill="#10b981">YES</text>
+  <rect x="700" y="175" width="170" height="42" rx="8" fill="#262637" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="785" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#a78bfa">_avx512</text>
+  <text x="785" y="208" text-anchor="middle" font-size="10" fill="#64748b">16 floats/iter · FMA</text>
+
+  <!-- AVX2 check -->
+  <line x1="450" y1="230" x2="450" y2="247" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="465" y="241" font-size="10" fill="#ef4444">NO</text>
+  <polygon points="450,250 530,278 450,306 370,278" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="282" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">AVX2?</text>
+
+  <line x1="530" y1="278" x2="700" y2="278" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="615" y="272" text-anchor="middle" font-size="10" fill="#10b981">YES</text>
+  <rect x="700" y="258" width="170" height="42" rx="8" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="785" y="275" text-anchor="middle" font-size="12" font-weight="700" fill="#818cf8">_avx2</text>
+  <text x="785" y="291" text-anchor="middle" font-size="10" fill="#64748b">8 floats/iter · 2-row unroll</text>
+
+  <!-- AVX fallback -->
+  <line x1="370" y1="278" x2="240" y2="278" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="305" y="272" text-anchor="middle" font-size="10" fill="#ef4444">NO</text>
+
+  <polygon points="170,258 240,278 170,298 100,278" fill="#262637" stroke="#6366f1" stroke-width="1"/>
+  <text x="170" y="282" text-anchor="middle" font-size="10" fill="#f5f5f5">AVX?</text>
+
+  <line x1="170" y1="298" x2="170" y2="322" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="115" y="318" width="110" height="20" rx="6" fill="#262637" stroke="#64748b" stroke-width="1"/>
+  <text x="170" y="332" text-anchor="middle" font-size="10" fill="#94a3b8">_ref (fallback)</text>
+
+  <line x1="100" y1="278" x2="30" y2="278" stroke="#10b981" stroke-width="1.5"/>
+  <rect x="30" y="260" width="70" height="36" rx="8" fill="#262637" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="65" y="282" text-anchor="middle" font-size="12" font-weight="700" fill="#60a5fa">_avx</text>
+</svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 5: SIMD OPTIMIZATION DETAILS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>SIMD Optimization Strategy</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Reference (<code>_ref</code>)</h3>
+        <ul>
+            <li>Pure scalar C — no intrinsics</li>
+            <li>Triple-nested loops: head → row → col</li>
+            <li>Used for parity testing against llama.cpp</li>
+            <li>Bit-exact reference for correctness</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX (<code>_avx</code>)</h3>
+        <ul>
+            <li>256-bit SIMD — 8 floats per instruction</li>
+            <li>Pre-normalizes q̂ / k̂ before the state sweep</li>
+            <li>Single row walk per state-matrix pass</li>
+            <li>Scalar tail loop for non-multiple-of-8 dims</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX2 + FMA (<code>_avx2</code>)</h3>
+        <ul>
+            <li>Same 256-bit width, adds FMA: <code>a×b+c</code> in 1 cycle</li>
+            <li><strong>2-row unroll</strong>: processes rows in pairs to halve loop overhead</li>
+            <li>Uses <code>_mm256_fmadd_ps</code> where available</li>
+            <li>Falls back to mul+add without FMA flag</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX-512 (<code>_avx512</code>)</h3>
+        <ul>
+            <li>512-bit SIMD — 16 floats per instruction</li>
+            <li>Native FMA via <code>_mm512_fmadd_ps</code></li>
+            <li>Uses <code>_mm512_reduce_add_ps</code> for hsum</li>
+            <li>Largest vector width = fewest iterations</li>
+        </ul>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 6: DeltaNet vs Standard Attention
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>DeltaNet vs Standard Attention</h2>
 
 <table>
-  <tr>
-    <th>Tool</th>
-    <th>Primary Question</th>
-    <th>Typical Outputs</th>
-  </tr>
-  <tr>
-    <td><code>perf stat</code></td>
-    <td>Are we using CPU efficiently (IPC, miss rates)?</td>
-    <td><code>perf_stat_summary.txt</code>, <code>perf_stat_summary.json</code></td>
-  </tr>
-  <tr>
-    <td><code>perf record</code> + FlameGraph</td>
-    <td>Which functions dominate runtime?</td>
-    <td><code>*.data</code>, <code>*.folded</code>, <code>*.svg</code>, <code>flamegraph_manifest.json</code></td>
-  </tr>
-  <tr>
-    <td>VTune (<code>hotspots</code>, <code>memory-access</code>, <code>uarch-exploration</code>)</td>
-    <td>Where are microarchitectural and memory bottlenecks?</td>
-    <td><code>vtune_summary.json</code> + result directories</td>
-  </tr>
-  <tr>
-    <td>Advisor (roofline)</td>
-    <td>Are kernels compute-bound or memory-bound by roofline model?</td>
-    <td><code>advisor_summary.json</code> + Advisor project dir</td>
-  </tr>
+    <thead>
+        <tr>
+            <th>Property</th>
+            <th>Standard Attention</th>
+            <th>Gated DeltaNet</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Memory per head</strong></td>
+            <td>O(T × d) — grows with context</td>
+            <td>O(d²) — <em>fixed</em></td>
+        </tr>
+        <tr>
+            <td><strong>Per-token cost</strong></td>
+            <td>O(T × d) — scans full KV-cache</td>
+            <td>O(d²) — constant</td>
+        </tr>
+        <tr>
+            <td><strong>State</strong></td>
+            <td>KV-cache (append-only)</td>
+            <td>Matrix S (overwrite via delta rule)</td>
+        </tr>
+        <tr>
+            <td><strong>Forgetting</strong></td>
+            <td>None (or windowed)</td>
+            <td>Exponential decay via <code>exp(g)</code></td>
+        </tr>
+        <tr>
+            <td><strong>Write mechanism</strong></td>
+            <td>Append new K,V rows</td>
+            <td>Rank-1 correction: <code>outer(k̂, δ)</code></td>
+        </tr>
+        <tr>
+            <td><strong>Best for</strong></td>
+            <td>Precise long-range recall</td>
+            <td>Streaming / very long contexts</td>
+        </tr>
+    </tbody>
 </table>
 
-<h2 id="direct-training-capture">Direct Training Capture</h2>
 
-<p>This is the direct style you are already using around <code>ck_run_v7.py train</code>.</p>
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 7: CK ENGINE RULES
+     ═══════════════════════════════════════════════════════════════════ -->
 
-<div class="card">
-  <h3 style="margin-top: 0;">VTune memory-access on train loop</h3>
-  <pre>CK_NUM_THREADS=8 vtune -collect memory-access -result-dir /tmp/v7_vtune_mem -quiet -- \
-  python3 version/v7/scripts/ck_run_v7.py train \
-    --run /tmp/v7_ht_threads --backend ck \
-    --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 \
-    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none \
-    --train-json-out /tmp/v7_vtune_mem_train.json</pre>
+<h2>CK-Engine Kernel Rules</h2>
+
+<p>Like all CK kernels, the DeltaNet implementation follows strict rules:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>🚫 No malloc / free</h3>
+        <p>Memory comes via bump allocator. All pointers are passed in. Stack arrays (<code>CK_DELTANET_MAX_STACK_DIM = 4096</code>) are used for temporaries.</p>
+    </div>
+    <div class="card">
+        <h3>🚫 No OpenMP</h3>
+        <p>Parallelization happens at the orchestrator/codegen layer. Kernels are single-threaded, deterministic units.</p>
+    </div>
+    <div class="card">
+        <h3>✅ Pure computation</h3>
+        <p>No side effects, no global state. Given the same inputs, produces identical outputs. Essential for parity testing.</p>
+    </div>
+    <div class="card">
+        <h3>✅ Defined API contract</h3>
+        <p>Every kernel declares: inputs, outputs, workspace requirements, and memory layouts. The dispatcher selects ISA at compile time.</p>
+    </div>
 </div>
 
-<div class="card">
-  <h3 style="margin-top: 0;">perf record + folded stacks for flamegraph</h3>
-  <pre>CK_NUM_THREADS=8 perf record --all-user -F 999 --call-graph dwarf -o /tmp/v7_train_perf.data -- \
-  python3 version/v7/scripts/ck_run_v7.py train \
-    --run /tmp/v7_ht_threads --backend ck \
-    --train-epochs 3 --train-seq-len 8 --train-total-tokens 4096 --train-grad-accum 8 \
-    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none \
-    --train-json-out /tmp/v7_perf_train.json
-
-perf script -i /tmp/v7_train_perf.data | ./FlameGraph/stackcollapse-perf.pl > /tmp/v7_train_flame.folded
-./FlameGraph/flamegraph.pl /tmp/v7_train_flame.folded > /tmp/v7_train_flame.svg</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">VTune GUI</h3>
-  <pre>vtune-gui /tmp/v7_vtune_mem
-# Example historical runs:
-# vtune-gui /tmp/v7_gui/vtune_hotspots
-# vtune-gui /tmp/v7_gui/vtune_memory</pre>
-</div>
-
-<div class="card card-accent">
-  <h3 style="margin-top: 0;">Advisor Roofline</h3>
-  <pre>CK_NUM_THREADS=8 advisor --collect=roofline --project-dir /tmp/v7_advisor_roofline -- \
-  python3 version/v7/scripts/ck_run_v7.py train \
-    --run /tmp/v7_ht_threads --backend ck \
-    --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 \
-    --train-vocab 1024 --train-d-model 256 --train-hidden 1024 --profile-train none
-
-# Some installs expose "advixe-cl" instead of "advisor".</pre>
-</div>
-
-<h2 id="makefile-workflow">Makefile Workflow (Repeatable)</h2>
-
-<p>For CI-like reproducibility and normalized artifacts, use the built-in v7 profiling targets.</p>
-
-<div class="card">
-  <pre># Decode/prefill profile + perf counters + flamegraph + VTune (+ deep analyses)
-make --no-print-directory profile-v7-full
-
-# Or run the perf gate sequence (perf stat + flamegraph + VTune + budget evaluation)
-make --no-print-directory v7-perf-gate</pre>
-</div>
-
-<div class="card">
-  <h3 style="margin-top: 0;">Important knobs</h3>
-  <pre># Runtime mode for profile targets
-V7_PERF_RUNTIME=cli|python      # default: cli
-
-# VTune controls
-V7_WITH_VTUNE=1|0               # default: 1
-V7_VTUNE_DEEP=1|0               # default: 1 (hotspots + memory-access + uarch-exploration)</pre>
-</div>
-
-<h2 id="native-cli-workflow">Native C-First Workflow</h2>
-
-<p><code>ck-cli-v7</code> also exposes direct profile capture for <code>perf</code>, <code>vtune</code>, and <code>advisor</code>.</p>
-
-<div class="card">
-  <pre># Build native CLI
-make --no-print-directory ck-cli-v7
-
-# Example token file (space-separated ints)
-printf '1 2 3 4 5 6 7 8 9 10 11 12\n' > /tmp/v7_tokens.txt
-
-# perf / vtune / advisor capture from native train subcommand
-./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool perf \
-  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
-  --train-total-tokens 2048 --train-grad-accum 8 --threads 8
-
-./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool vtune \
-  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
-  --train-total-tokens 2048 --train-grad-accum 8 --threads 8
-
-./build/ck-cli-v7 profile --run /tmp/v7_ht_threads --tool advisor \
-  --train-token-file /tmp/v7_tokens.txt --train-epochs 1 --train-seq-len 8 \
-  --train-total-tokens 2048 --train-grad-accum 8 --threads 8</pre>
-</div>
-
-<p>This path updates <code>run_index.json</code> and the canonical profiling artifacts in the run directory.</p>
-
-<h2 id="artifact-contract">Artifact Contract</h2>
-
-<table>
-  <tr>
-    <th>Artifact</th>
-    <th>What It Represents</th>
-    <th>Produced By</th>
-  </tr>
-  <tr>
-    <td><code>profile_summary.json</code></td>
-    <td>Top-level profile metadata / decode throughput context</td>
-    <td><code>ck_run_v7.py --profile</code>, <code>ck-cli-v7 profile</code></td>
-  </tr>
-  <tr>
-    <td><code>perf_stat_summary.json</code></td>
-    <td>Parsed counters and derived metrics (<code>ipc</code>, miss rates)</td>
-    <td><code>version/v7/scripts/perf_artifacts_v7.py</code></td>
-  </tr>
-  <tr>
-    <td><code>flamegraph_manifest.json</code></td>
-    <td>Links to <code>perf.data</code>, folded stacks, flamegraph SVG, top symbols</td>
-    <td><code>version/v7/scripts/perf_artifacts_v7.py</code></td>
-  </tr>
-  <tr>
-    <td><code>vtune_summary.json</code></td>
-    <td>VTune reports (hotspots + optional memory/uarch summaries)</td>
-    <td><code>version/v7/scripts/vtune_artifacts_v7.py</code></td>
-  </tr>
-  <tr>
-    <td><code>advisor_summary.json</code></td>
-    <td>Advisor project pointer for roofline analysis</td>
-    <td><code>ck-cli-v7 profile --tool advisor</code></td>
-  </tr>
-  <tr>
-    <td><code>perf_gate_report.json</code></td>
-    <td>Budget pass/fail status for throughput + hardware metrics</td>
-    <td><code>version/v7/scripts/perf_gate_v7.py</code></td>
-  </tr>
-</table>
-
-<div class="card card-green">
-  <h3 style="margin-top: 0;">Viewer Integration</h3>
-  <pre># Render existing artifacts
-python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_ht_threads --html-only
-
-# Active probe flow (perf + VTune + native run-dir Advisor when available)
-python3 version/v7/tools/open_ir_visualizer.py --generate --run /tmp/v7_ht_threads --with-probes --advisor --vtune</pre>
-  <p style="margin: 0;"><code>open_ir_visualizer.py</code> consumes <code>profile_summary.json</code>, <code>perf_stat_summary.json</code>, <code>flamegraph_manifest.json</code>, <code>vtune_summary.json</code>, <code>advisor_summary.json</code>, and <code>perf_gate_report.json</code> when present.</p>
-</div>
-
-<h2 id="how-we-analyze-results">How We Analyze Results</h2>
-
-<table>
-  <tr>
-    <th>Signal</th>
-    <th>What It Means</th>
-    <th>Typical Action</th>
-  </tr>
-  <tr>
-    <td><code>train_tok_s</code> drop</td>
-    <td>Regression in end-to-end train step throughput</td>
-    <td>Open flamegraph + VTune hotspots and isolate new wide stacks</td>
-  </tr>
-  <tr>
-    <td>Low IPC</td>
-    <td>Poor retirement efficiency (stalls/speculation/memory)</td>
-    <td>Use VTune uarch summary to split frontend/backend/speculation issues</td>
-  </tr>
-  <tr>
-    <td>High cache miss rate</td>
-    <td>Bandwidth/locality pressure in hot kernels</td>
-    <td>Improve layout blocking, prepack strategy, and memory reuse</td>
-  </tr>
-  <tr>
-    <td>Memory Bound high in VTune</td>
-    <td>Kernel limited by memory subsystem, not arithmetic</td>
-    <td>Target data movement reduction before instruction-level tuning</td>
-  </tr>
-  <tr>
-    <td>Hotspots outside expected GEMM/attention path</td>
-    <td>Unexpected overhead in runtime glue or copies</td>
-    <td>Inspect call chains and remove avoidable copies/dispatch overhead</td>
-  </tr>
-</table>
-
-<h2 id="regression-loop">Regression Loop</h2>
-
-<ol>
-  <li>Pin workload and thread count (<code>CK_NUM_THREADS</code>, same run config).</li>
-  <li>Capture baseline artifacts (<code>perf</code> + flamegraph + VTune + optional Advisor).</li>
-  <li>Make one kernel/runtime change.</li>
-  <li>Re-capture with same command line.</li>
-  <li>Compare: throughput, IPC/miss rates, and hotspot width changes.</li>
-  <li>Update notes and keep artifacts linked in run dir for reproducibility.</li>
-</ol>
-
-<div class="alert alert-warning">
-  <div class="alert-icon">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  </div>
-  <div>
-    <strong>Prerequisites</strong><br>
-    VTune/Advisor need oneAPI tooling installed (often via <code>source /opt/intel/oneapi/setvars.sh</code>). Non-root <code>perf</code> may also require kernel <code>perf_event_paranoid</code> tuning.
-  </div>
+<div class="card card-accent" style="margin-top:2rem;">
+    <h3>📊 Back to Kernel Catalog</h3>
+    <p>For the full list of CK-Engine kernels (GEMM, RoPE, Softmax, Loss, etc.), see:</p>
+    <p><a href="kernels.html"><strong>Kernel Catalog</strong></a></p>
 </div>
     </main>
 

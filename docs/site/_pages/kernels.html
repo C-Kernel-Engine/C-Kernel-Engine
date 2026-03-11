@@ -103,11 +103,19 @@ out     = S_new^T * q_hat</code></pre>
 
 <p>This is why Qwen3.5 feels Mamba-like without being "just Mamba": it has a short convolution path and a recurrent cache, but the core memory update is a DeltaNet matrix-state rule, and Qwen3.5 alternates these DeltaNet blocks with separate full Gated Attention blocks.</p>
 
-<div class="card card-accent">
-    <h3>📊 Flash Attention Analysis</h3>
-    <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
-    <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
-    <p><small>This analysis covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads.</small></p>
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3>📊 Flash Attention Analysis</h3>
+        <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
+        <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
+        <p><small>SIMD optimizations, threading strategies, and performance trade-offs.</small></p>
+    </div>
+    <div class="card card-accent">
+        <h3>🔁 Gated DeltaNet Deep Dive</h3>
+        <p>Visual infographic of the single-token recurrent update, memory layout, ISA dispatch, and how DeltaNet compares to standard attention:</p>
+        <p><a href="deltanet-deep-dive.html"><strong>Gated DeltaNet: Recurrent Attention Deep Dive</strong></a></p>
+        <p><small>SVG diagrams, SIMD tier breakdown, and CK-Engine kernel rules.</small></p>
+    </div>
 </div>
 
 <h2>2. Elementwise & Activation</h2>
