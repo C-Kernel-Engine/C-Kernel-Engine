@@ -7,6 +7,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "attention_kernels.c", "attention__kernels_8c.html", "attention__kernels_8c" ],
     [ "attention_kernels_sliding.c", "attention__kernels__sliding_8c.html", "attention__kernels__sliding_8c" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
+    [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],
     [ "embedding_kernels.c", "embedding__kernels_8c.html", "embedding__kernels_8c" ],
     [ "embedding_kernels_bf16.c", "embedding__kernels__bf16_8c.html", "embedding__kernels__bf16_8c" ],

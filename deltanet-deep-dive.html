@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GatedDeltaNetDeepDive | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<h1>Gated DeltaNet: Recurrent Attention Deep Dive</h1>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Kernel Source</strong><br>
+        <code>src/kernels/deltanet_kernels.c</code> &mdash; FP32 Gated DeltaNet with REF, AVX, AVX2, and AVX-512 implementations.
+        Matches the single-token recurrent path used by Qwen3.5 / qwen3next in llama.cpp.
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1: OVERVIEW SVG INFOGRAPHIC
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>How One DeltaNet Step Works</h2>
+
+<p>The diagram below shows the complete per-head recurrent update that runs at every single-token decode step. Unlike standard attention (which recomputes over the full KV-cache), DeltaNet maintains a <strong>fixed-size state matrix S</strong> that gets updated in-place.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 920" style="max-width:1100px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="gInputGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="gStateGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="gOpGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="gOutGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="gGateGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <!-- Arrow marker -->
+    <marker id="arrowDark" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="920" rx="16" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="1098" height="918" rx="15" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="1100" height="56" rx="16" fill="#262637"/>
+  <rect x="0" y="40" width="1100" height="16" fill="#262637"/>
+  <line x1="0" y1="56" x2="1100" y2="56" stroke="#f59e0b" stroke-width="2" opacity="0.6"/>
+  <text x="550" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#f5f5f5" letter-spacing="1">GATED DELTANET &mdash; SINGLE-TOKEN RECURRENT UPDATE</text>
+
+  <!-- ─── ROW 1: INPUT VECTORS ─── -->
+  <text x="30" y="94" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">INPUTS (per head)</text>
+
+  <!-- q -->
+  <rect x="30" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="100" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">q</text>
+  <text x="100" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- k -->
+  <rect x="190" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="260" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">k</text>
+  <text x="260" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- v -->
+  <rect x="350" y="108" width="140" height="54" rx="10" fill="url(#gInputGrad)" filter="url(#shadow)"/>
+  <text x="420" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">v</text>
+  <text x="420" y="151" text-anchor="middle" font-size="10" fill="#bfdbfe">[state_dim]</text>
+
+  <!-- beta (scalar) -->
+  <rect x="510" y="108" width="110" height="54" rx="10" fill="url(#gGateGrad)" filter="url(#shadow)"/>
+  <text x="565" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">β</text>
+  <text x="565" y="151" text-anchor="middle" font-size="10" fill="#fecaca">scalar</text>
+
+  <!-- g (scalar) -->
+  <rect x="640" y="108" width="110" height="54" rx="10" fill="url(#gGateGrad)" filter="url(#shadow)"/>
+  <text x="695" y="133" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">g</text>
+  <text x="695" y="151" text-anchor="middle" font-size="10" fill="#fecaca">scalar</text>
+
+  <!-- S_prev (state matrix) -->
+  <rect x="800" y="88" width="270" height="86" rx="12" fill="url(#gStateGrad)" filter="url(#shadow)"/>
+  <text x="935" y="120" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">S_prev</text>
+  <text x="935" y="140" text-anchor="middle" font-size="11" fill="#fef3c7">[state_dim × state_dim]</text>
+  <text x="935" y="160" text-anchor="middle" font-size="10" fill="#fef3c7" opacity="0.8">recurrent memory matrix</text>
+
+  <!-- ─── ROW 2: STEP 1 & 2 — NORMALIZE + GATE ─── -->
+  <text x="30" y="210" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 1 &amp; 2: NORMALIZE &amp; GATE</text>
+
+  <!-- Arrows from q,k down -->
+  <line x1="100" y1="162" x2="100" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <line x1="260" y1="162" x2="260" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+
+  <!-- q_hat box -->
+  <rect x="30" y="226" width="140" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="100" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">q̂ = L2norm(q)</text>
+  <text x="100" y="270" text-anchor="middle" font-size="11" fill="#c7d2fe">/ √state_dim</text>
+
+  <!-- k_hat box -->
+  <rect x="190" y="226" width="140" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="260" y="254" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">k̂ = L2norm(k)</text>
+
+  <!-- beta_s box -->
+  <line x1="565" y1="162" x2="565" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="500" y="226" width="130" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="565" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">β_s = σ(β)</text>
+  <text x="565" y="270" text-anchor="middle" font-size="10" fill="#c7d2fe">sigmoid gate</text>
+
+  <!-- gate box -->
+  <line x1="695" y1="162" x2="695" y2="224" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="650" y="226" width="130" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="715" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">gate = exp(g)</text>
+  <text x="715" y="270" text-anchor="middle" font-size="10" fill="#c7d2fe">decay factor</text>
+
+  <!-- ─── ROW 3: STEP 3 — STATE DECAY ─── -->
+  <text x="30" y="330" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 3: STATE DECAY</text>
+
+  <!-- Arrow from gate down -->
+  <line x1="715" y1="284" x2="715" y2="336" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowOrange)" opacity="0.8"/>
+  <!-- Arrow from S_prev down -->
+  <path d="M 935 174 L 935 300 Q 935 320 915 320 L 790 336" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="540" y="340" width="350" height="60" rx="12" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="715" y="369" text-anchor="middle" font-size="16" font-weight="700" fill="#f59e0b">S_decay = gate × S_prev</text>
+  <text x="715" y="389" text-anchor="middle" font-size="11" fill="#94a3b8">element-wise multiply every cell by exp(g)</text>
+
+  <!-- ─── ROW 4: STEP 4 — RETRIEVAL + DELTA COMPUTE ─── -->
+  <text x="30" y="440" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 4: RETRIEVE &amp; COMPUTE DELTA</text>
+
+  <!-- Arrow from k_hat to kv_mem -->
+  <path d="M 260 284 L 260 420 Q 260 440 280 440 L 330 456" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_decay to kv_mem -->
+  <line x1="640" y1="400" x2="540" y2="456" stroke="#f59e0b" stroke-width="1.5" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <!-- kv_mem box -->
+  <rect x="330" y="454" width="220" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="440" y="479" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">kv_mem = Sᵀ_decay · k̂</text>
+  <text x="440" y="498" text-anchor="middle" font-size="10" fill="#c7d2fe">what the state remembers for k̂</text>
+
+  <!-- Arrow from kv_mem + v to delta -->
+  <line x1="440" y1="512" x2="440" y2="540" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from v to delta -->
+  <path d="M 420 162 L 420 530 Q 420 545 430 545 L 370 556" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from beta_s to delta -->
+  <path d="M 565 284 L 565 530 Q 565 545 555 545 L 510 556" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+
+  <!-- delta box -->
+  <rect x="330" y="544" width="220" height="58" rx="10" fill="url(#gOpGrad)" filter="url(#shadow)"/>
+  <text x="440" y="570" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">δ = β_s · (v − kv_mem)</text>
+  <text x="440" y="590" text-anchor="middle" font-size="10" fill="#c7d2fe">scaled correction vector</text>
+
+  <!-- ─── ROW 5: STEP 5 — STATE UPDATE ─── -->
+  <text x="30" y="645" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 5: STATE UPDATE</text>
+
+  <!-- Arrow from k_hat to outer -->
+  <path d="M 260 284 L 260 630 Q 260 650 280 650 L 470 668" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from delta to outer -->
+  <line x1="440" y1="602" x2="530" y2="658" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_decay to S_new -->
+  <path d="M 715 400 L 715 630 Q 715 650 730 650 L 760 668" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="470" y="656" width="380" height="60" rx="12" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="660" y="684" text-anchor="middle" font-size="15" font-weight="700" fill="#f59e0b">S_new = S_decay + outer(k̂, δ)</text>
+  <text x="660" y="702" text-anchor="middle" font-size="11" fill="#94a3b8">rank-1 update adds new information to memory</text>
+
+  <!-- ─── ROW 6: STEP 6 — OUTPUT ─── -->
+  <text x="30" y="756" font-size="13" fill="#94a3b8" font-weight="600" letter-spacing="2">STEP 6: READOUT</text>
+
+  <!-- Arrow from q_hat to output -->
+  <path d="M 100 284 L 100 750 Q 100 770 120 770 L 350 778" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Arrow from S_new to output -->
+  <line x1="660" y1="716" x2="580" y2="768" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#arrowOrange)" opacity="0.8"/>
+
+  <rect x="350" y="766" width="260" height="58" rx="12" fill="url(#gOutGrad)" filter="url(#shadow)"/>
+  <text x="480" y="792" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">out = S_newᵀ · q̂</text>
+  <text x="480" y="812" text-anchor="middle" font-size="11" fill="#a7f3d0">[state_dim] output vector</text>
+
+  <!-- ─── S_new feeds back ─── -->
+  <path d="M 850 716 Q 1040 716 1040 500 Q 1040 200 935 174" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="8 4" fill="none" marker-end="url(#arrowOrange)" opacity="0.5"/>
+  <text x="1055" y="460" font-size="11" fill="#f59e0b" opacity="0.7" transform="rotate(-90,1055,460)">S_new → S_prev (next step)</text>
+
+  <!-- ─── Legend ─── -->
+  <rect x="30" y="856" width="1040" height="50" rx="10" fill="#262637" stroke="#334155" stroke-width="1"/>
+  <circle cx="60" cy="881" r="8" fill="url(#gInputGrad)"/>
+  <text x="76" y="886" font-size="11" fill="#94a3b8">Input vectors</text>
+  <circle cx="190" cy="881" r="8" fill="url(#gGateGrad)"/>
+  <text x="206" y="886" font-size="11" fill="#94a3b8">Scalar gates</text>
+  <circle cx="320" cy="881" r="8" fill="url(#gOpGrad)"/>
+  <text x="336" y="886" font-size="11" fill="#94a3b8">Compute ops</text>
+  <circle cx="450" cy="881" r="8" fill="url(#gStateGrad)"/>
+  <text x="466" y="886" font-size="11" fill="#94a3b8">State matrix</text>
+  <circle cx="580" cy="881" r="8" fill="url(#gOutGrad)"/>
+  <text x="596" y="886" font-size="11" fill="#94a3b8">Output</text>
+  <line x1="700" y1="881" x2="730" y2="881" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 3"/>
+  <text x="740" y="886" font-size="11" fill="#94a3b8">Recurrent feedback</text>
+  <line x1="870" y1="881" x2="900" y2="881" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="910" y="886" font-size="11" fill="#94a3b8">Data flow</text>
+</svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2: EQUATIONS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Mathematical Equations</h2>
+
+<div class="card">
+<pre><code>Per head (h = 0 … num_heads-1):
+
+  q̂   = L2_norm(q) / √state_dim      ← scaled unit query
+  k̂   = L2_norm(k)                    ← unit key
+  β_s = σ(β)        = 1/(1+e^(-β))    ← write gate  (0,1)
+  gate = exp(g)                        ← decay gate  (0,∞)
+
+  S_decay = gate · S_prev              ← element-wise forget
+  kv_mem  = S_decayᵀ · k̂              ← what memory recalls for k̂
+  δ       = β_s · (v − kv_mem)         ← correction: new info minus old
+  S_new   = S_decay + outer(k̂, δ)     ← rank-1 write to memory
+  out     = S_newᵀ  · q̂               ← read from updated memory</code></pre>
+</div>
+
+<p><strong>Key insight:</strong> The delta rule computes the <em>error</em> between what the model wants to store (<code>v</code>) and what the state already recalls (<code>kv_mem</code>). Only the correction is written, gated by <code>β_s</code>. This makes DeltaNet a learned associative memory with selective forgetting.</p>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3: MEMORY LAYOUT SVG
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Memory Layout</h2>
+
+<p>All arrays are flat row-major FP32 buffers. The head dimension is outermost for cache-friendly per-head iteration.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 310" style="max-width:900px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <rect width="900" height="310" rx="12" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="898" height="308" rx="11" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Vectors: q, k, v, out  [num_heads × state_dim] -->
+  <text x="30" y="30" font-size="13" fill="#94a3b8" font-weight="600">VECTORS: q, k, v, out</text>
+  <text x="30" y="50" font-size="11" fill="#64748b">[num_heads × state_dim]  — stride = state_dim</text>
+
+  <!-- Draw H heads as colored blocks -->
+  <g transform="translate(30,60)">
+    <!-- Head 0 -->
+    <rect x="0" y="0" width="200" height="36" rx="6" fill="#3b82f6" opacity="0.8"/>
+    <text x="100" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head 0: [d₀ d₁ … d_{D-1}]</text>
+    <!-- Head 1 -->
+    <rect x="210" y="0" width="200" height="36" rx="6" fill="#6366f1" opacity="0.8"/>
+    <text x="310" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head 1: [d₀ d₁ … d_{D-1}]</text>
+    <!-- ... -->
+    <text x="440" y="23" font-size="16" fill="#64748b">…</text>
+    <!-- Head H-1 -->
+    <rect x="480" y="0" width="200" height="36" rx="6" fill="#8b5cf6" opacity="0.8"/>
+    <text x="580" y="23" text-anchor="middle" font-size="12" fill="#fff" font-weight="600">Head H-1: [d₀ … d_{D-1}]</text>
+  </g>
+
+  <!-- Scalars: g, beta  [num_heads] -->
+  <text x="30" y="130" font-size="13" fill="#94a3b8" font-weight="600">SCALARS: g, β</text>
+  <text x="30" y="150" font-size="11" fill="#64748b">[num_heads]  — one value per head</text>
+  <g transform="translate(30,158)">
+    <rect x="0" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.8"/>
+    <text x="30" y="20" text-anchor="middle" font-size="11" fill="#fff">h₀</text>
+    <rect x="70" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.7"/>
+    <text x="100" y="20" text-anchor="middle" font-size="11" fill="#fff">h₁</text>
+    <text x="155" y="20" font-size="16" fill="#64748b">…</text>
+    <rect x="180" y="0" width="60" height="30" rx="6" fill="#ef4444" opacity="0.6"/>
+    <text x="210" y="20" text-anchor="middle" font-size="11" fill="#fff">h_{H-1}</text>
+  </g>
+
+  <!-- State: state_in/out  [num_heads × state_dim × state_dim] -->
+  <text x="30" y="226" font-size="13" fill="#94a3b8" font-weight="600">STATE: state_in, state_out</text>
+  <text x="30" y="246" font-size="11" fill="#64748b">[num_heads × state_dim × state_dim]  — stride = state_dim²</text>
+
+  <g transform="translate(30,255)">
+    <!-- Head 0 state as small grid icon -->
+    <rect x="0" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.9"/>
+    <line x1="15" y1="0" x2="15" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="30" y1="0" x2="30" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="0" y1="15" x2="44" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="0" y1="30" x2="44" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="22" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H0</text>
+
+    <rect x="54" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.7"/>
+    <line x1="69" y1="0" x2="69" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="84" y1="0" x2="84" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="54" y1="15" x2="98" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="54" y1="30" x2="98" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="76" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H1</text>
+
+    <text x="120" y="26" font-size="16" fill="#64748b">…</text>
+
+    <rect x="150" y="0" width="44" height="44" rx="4" fill="#f59e0b" opacity="0.5"/>
+    <line x1="165" y1="0" x2="165" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="180" y1="0" x2="180" y2="44" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="150" y1="15" x2="194" y2="15" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <line x1="150" y1="30" x2="194" y2="30" stroke="#1e1e2e" stroke-width="0.5" opacity="0.4"/>
+    <text x="172" y="-5" text-anchor="middle" font-size="9" fill="#f59e0b">H-1</text>
+
+    <text x="260" y="28" font-size="11" fill="#64748b">Each: D×D floats  (row-major)</text>
+  </g>
+</svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4: ISA DISPATCH
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>ISA Dispatch &amp; SIMD Tiers</h2>
+
+<p>The public entry point <code>gated_deltanet_autoregressive_forward()</code> selects the best compiled implementation at link time. When strict parity is enabled (via <code>ck_strict_parity_enabled()</code>), it always falls back to the scalar reference.</p>
+
+<div style="overflow-x:auto; margin:2rem 0;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" style="max-width:900px; width:100%; height:auto; font-family:'Inter',system-ui,sans-serif;">
+  <rect width="900" height="340" rx="12" fill="#1e1e2e"/>
+  <rect x="1" y="1" width="898" height="338" rx="11" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <text x="450" y="35" text-anchor="middle" font-size="15" font-weight="700" fill="#f5f5f5">gated_deltanet_autoregressive_forward()</text>
+
+  <!-- Decision diamond -->
+  <polygon points="450,55 530,90 450,125 370,90" fill="#262637" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="450" y="94" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">strict parity?</text>
+
+  <!-- YES → REF -->
+  <line x1="370" y1="90" x2="140" y2="90" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="255" y="84" text-anchor="middle" font-size="10" fill="#ef4444">YES</text>
+  <rect x="30" y="70" width="110" height="40" rx="8" fill="#262637" stroke="#64748b" stroke-width="1"/>
+  <text x="85" y="95" text-anchor="middle" font-size="12" font-weight="600" fill="#94a3b8">_ref (scalar)</text>
+
+  <!-- NO → ISA checks -->
+  <line x1="450" y1="125" x2="450" y2="155" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="465" y="143" font-size="10" fill="#10b981">NO</text>
+
+  <!-- AVX-512 check -->
+  <polygon points="450,160 540,195 450,230 360,195" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="199" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">AVX-512?</text>
+
+  <line x1="540" y1="195" x2="700" y2="195" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="615" y="189" text-anchor="middle" font-size="10" fill="#10b981">YES</text>
+  <rect x="700" y="175" width="170" height="42" rx="8" fill="#262637" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="785" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#a78bfa">_avx512</text>
+  <text x="785" y="208" text-anchor="middle" font-size="10" fill="#64748b">16 floats/iter · FMA</text>
+
+  <!-- AVX2 check -->
+  <line x1="450" y1="230" x2="450" y2="247" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="465" y="241" font-size="10" fill="#ef4444">NO</text>
+  <polygon points="450,250 530,278 450,306 370,278" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="282" text-anchor="middle" font-size="10" fill="#f5f5f5" font-weight="600">AVX2?</text>
+
+  <line x1="530" y1="278" x2="700" y2="278" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="615" y="272" text-anchor="middle" font-size="10" fill="#10b981">YES</text>
+  <rect x="700" y="258" width="170" height="42" rx="8" fill="#262637" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="785" y="275" text-anchor="middle" font-size="12" font-weight="700" fill="#818cf8">_avx2</text>
+  <text x="785" y="291" text-anchor="middle" font-size="10" fill="#64748b">8 floats/iter · 2-row unroll</text>
+
+  <!-- AVX fallback -->
+  <line x1="370" y1="278" x2="240" y2="278" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <text x="305" y="272" text-anchor="middle" font-size="10" fill="#ef4444">NO</text>
+
+  <polygon points="170,258 240,278 170,298 100,278" fill="#262637" stroke="#6366f1" stroke-width="1"/>
+  <text x="170" y="282" text-anchor="middle" font-size="10" fill="#f5f5f5">AVX?</text>
+
+  <line x1="170" y1="298" x2="170" y2="322" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowDark)"/>
+  <rect x="115" y="318" width="110" height="20" rx="6" fill="#262637" stroke="#64748b" stroke-width="1"/>
+  <text x="170" y="332" text-anchor="middle" font-size="10" fill="#94a3b8">_ref (fallback)</text>
+
+  <line x1="100" y1="278" x2="30" y2="278" stroke="#10b981" stroke-width="1.5"/>
+  <rect x="30" y="260" width="70" height="36" rx="8" fill="#262637" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="65" y="282" text-anchor="middle" font-size="12" font-weight="700" fill="#60a5fa">_avx</text>
+</svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 5: SIMD OPTIMIZATION DETAILS
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>SIMD Optimization Strategy</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Reference (<code>_ref</code>)</h3>
+        <ul>
+            <li>Pure scalar C — no intrinsics</li>
+            <li>Triple-nested loops: head → row → col</li>
+            <li>Used for parity testing against llama.cpp</li>
+            <li>Bit-exact reference for correctness</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX (<code>_avx</code>)</h3>
+        <ul>
+            <li>256-bit SIMD — 8 floats per instruction</li>
+            <li>Pre-normalizes q̂ / k̂ before the state sweep</li>
+            <li>Single row walk per state-matrix pass</li>
+            <li>Scalar tail loop for non-multiple-of-8 dims</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX2 + FMA (<code>_avx2</code>)</h3>
+        <ul>
+            <li>Same 256-bit width, adds FMA: <code>a×b+c</code> in 1 cycle</li>
+            <li><strong>2-row unroll</strong>: processes rows in pairs to halve loop overhead</li>
+            <li>Uses <code>_mm256_fmadd_ps</code> where available</li>
+            <li>Falls back to mul+add without FMA flag</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>AVX-512 (<code>_avx512</code>)</h3>
+        <ul>
+            <li>512-bit SIMD — 16 floats per instruction</li>
+            <li>Native FMA via <code>_mm512_fmadd_ps</code></li>
+            <li>Uses <code>_mm512_reduce_add_ps</code> for hsum</li>
+            <li>Largest vector width = fewest iterations</li>
+        </ul>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 6: DeltaNet vs Standard Attention
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>DeltaNet vs Standard Attention</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Property</th>
+            <th>Standard Attention</th>
+            <th>Gated DeltaNet</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Memory per head</strong></td>
+            <td>O(T × d) — grows with context</td>
+            <td>O(d²) — <em>fixed</em></td>
+        </tr>
+        <tr>
+            <td><strong>Per-token cost</strong></td>
+            <td>O(T × d) — scans full KV-cache</td>
+            <td>O(d²) — constant</td>
+        </tr>
+        <tr>
+            <td><strong>State</strong></td>
+            <td>KV-cache (append-only)</td>
+            <td>Matrix S (overwrite via delta rule)</td>
+        </tr>
+        <tr>
+            <td><strong>Forgetting</strong></td>
+            <td>None (or windowed)</td>
+            <td>Exponential decay via <code>exp(g)</code></td>
+        </tr>
+        <tr>
+            <td><strong>Write mechanism</strong></td>
+            <td>Append new K,V rows</td>
+            <td>Rank-1 correction: <code>outer(k̂, δ)</code></td>
+        </tr>
+        <tr>
+            <td><strong>Best for</strong></td>
+            <td>Precise long-range recall</td>
+            <td>Streaming / very long contexts</td>
+        </tr>
+    </tbody>
+</table>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 7: CK ENGINE RULES
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>CK-Engine Kernel Rules</h2>
+
+<p>Like all CK kernels, the DeltaNet implementation follows strict rules:</p>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>🚫 No malloc / free</h3>
+        <p>Memory comes via bump allocator. All pointers are passed in. Stack arrays (<code>CK_DELTANET_MAX_STACK_DIM = 4096</code>) are used for temporaries.</p>
+    </div>
+    <div class="card">
+        <h3>🚫 No OpenMP</h3>
+        <p>Parallelization happens at the orchestrator/codegen layer. Kernels are single-threaded, deterministic units.</p>
+    </div>
+    <div class="card">
+        <h3>✅ Pure computation</h3>
+        <p>No side effects, no global state. Given the same inputs, produces identical outputs. Essential for parity testing.</p>
+    </div>
+    <div class="card">
+        <h3>✅ Defined API contract</h3>
+        <p>Every kernel declares: inputs, outputs, workspace requirements, and memory layouts. The dispatcher selects ISA at compile time.</p>
+    </div>
+</div>
+
+<div class="card card-accent" style="margin-top:2rem;">
+    <h3>📊 Back to Kernel Catalog</h3>
+    <p>For the full list of CK-Engine kernels (GEMM, RoPE, Softmax, Loss, etc.), see:</p>
+    <p><a href="kernels.html"><strong>Kernel Catalog</strong></a></p>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-11</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

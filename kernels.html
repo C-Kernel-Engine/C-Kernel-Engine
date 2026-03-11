@@ -954,7 +954,7 @@
     </div>
 </div>
 
-<h2>1. Attention & RoPE</h2>
+<h2>1. Attention, RoPE & Recurrent State</h2>
 
 <table>
     <thead>
@@ -980,14 +980,74 @@
             <td><code>softmax_kernels.c</code></td>
             <td>Softmax applied to attention scores, masking out future tokens (causal mask).</td>
         </tr>
+        <tr>
+            <td><code>gated_deltanet_autoregressive_forward</code></td>
+            <td><code>deltanet_kernels.c</code></td>
+            <td>Single-token Gated DeltaNet recurrent update for Qwen3.5/qwen3next parity. Updates per-head state matrices <code>[Head, Dim, Dim]</code> and emits <code>[Head, Dim]</code> output.</td>
+        </tr>
     </tbody>
 </table>
 
-<div class="card card-accent">
-    <h3>📊 Flash Attention Analysis</h3>
-    <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
-    <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
-    <p><small>This analysis covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads.</small></p>
+<h2>Composed vs Fused Gates</h2>
+
+<p>Not every gated block needs its own standalone kernel file.</p>
+
+<ul>
+    <li><strong>Gated attention</strong> is still normal causal attention plus a gate epilogue: <code>attention -&gt; sigmoid -&gt; mul -&gt; outproj</code>. CK can express that as stitched kernels without inventing a dedicated <code>gated_attention_kernels.c</code>.</li>
+    <li><strong>SwiGLU / GeGLU</strong> follow the same rule. We keep the atomic activation kernels and only use fused decode helpers where profiling justifies the extra complexity.</li>
+    <li><strong>Gated DeltaNet</strong> is different because the gate participates inside the recurrent state update itself. That makes <code>src/kernels/deltanet_kernels.c</code> a real kernel family, not just a wrapper around GEMM/GEMV.</li>
+</ul>
+
+<p>Rule of thumb: keep CK graph-first and stitch atomic kernels by default; add fused wrappers only when measurements show the gate epilogue is a real hotspot.</p>
+
+<h2>Qwen3.5 DeltaNet Block Flow</h2>
+
+<p>The Qwen3.5 / qwen3next linear-attention block is easier to reason about if you separate the three different gating roles instead of collapsing them into one "state-space" idea.</p>
+
+<ol>
+    <li><strong>Project from the token input <code>x</code>.</strong> The block produces <code>[q, k, v, z]</code> from <code>ssm_in(x)</code> and <code>[beta, alpha]</code> from <code>ssm_beta_alpha(x)</code>.</li>
+    <li><strong>Run the short convolution path.</strong> The local conv cache mixes the projected <code>q/k/v</code> lanes before the recurrent update. The <code>z</code>, <code>beta</code>, and <code>alpha</code> lanes do not go through that conv kernel.</li>
+    <li><strong>Turn <code>alpha</code> into the recurrent decay gate.</strong> In llama.cpp this becomes a decay control <code>g</code> via <code>softplus(alpha + dt)</code> followed by a learned scale. That gate controls how much of the old recurrent state survives.</li>
+    <li><strong>Update the per-head memory matrix <code>S_t</code>.</strong> DeltaNet keeps a recurrent state matrix <code>[Head, Dim, Dim]</code>, not just a hidden state vector.</li>
+    <li><strong>Normalize and gate the recurrent output.</strong> After the DeltaNet core produces <code>h_t</code>, the block applies gated normalization: <code>RMSNorm(h_t) * SiLU(z)</code>.</li>
+    <li><strong>Project back out.</strong> The gated normalized result goes through <code>ssm_out</code> to rejoin the residual stream.</li>
+</ol>
+
+<p>For single-token decode, the recurrent update that CK matches in <code>src/kernels/deltanet_kernels.c</code> is:</p>
+
+<pre><code>q_hat   = norm(q) / sqrt(d)
+k_hat   = norm(k)
+beta_s  = sigmoid(beta)
+gate    = exp(g)
+
+S_decay = gate * S_prev
+kv_mem  = S_decay^T * k_hat
+delta   = beta_s * (v - kv_mem)
+S_new   = S_decay + outer(k_hat, delta)
+out     = S_new^T * q_hat</code></pre>
+
+<p>Interpretation:</p>
+<ul>
+    <li><strong><code>g</code></strong> controls forgetting / decay of old memory.</li>
+    <li><strong><code>beta</code></strong> controls how aggressively the block writes the correction term.</li>
+    <li><strong><code>z</code></strong> is the output gate applied after the recurrent core, during gated normalization.</li>
+</ul>
+
+<p>This is why Qwen3.5 feels Mamba-like without being "just Mamba": it has a short convolution path and a recurrent cache, but the core memory update is a DeltaNet matrix-state rule, and Qwen3.5 alternates these DeltaNet blocks with separate full Gated Attention blocks.</p>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3>📊 Flash Attention Analysis</h3>
+        <p>For a detailed comparison of attention implementations and performance analysis (including benchmarks vs llama.cpp), see:</p>
+        <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
+        <p><small>SIMD optimizations, threading strategies, and performance trade-offs.</small></p>
+    </div>
+    <div class="card card-accent">
+        <h3>🔁 Gated DeltaNet Deep Dive</h3>
+        <p>Visual infographic of the single-token recurrent update, memory layout, ISA dispatch, and how DeltaNet compares to standard attention:</p>
+        <p><a href="deltanet-deep-dive.html"><strong>Gated DeltaNet: Recurrent Attention Deep Dive</strong></a></p>
+        <p><small>SVG diagrams, SIMD tier breakdown, and CK-Engine kernel rules.</small></p>
+    </div>
 </div>
 
 <h2>2. Elementwise & Activation</h2>
@@ -1333,7 +1393,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-10</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-11</p>
             </div>
         </div>
     </footer>
