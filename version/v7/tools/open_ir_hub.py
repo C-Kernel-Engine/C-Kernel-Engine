@@ -46,6 +46,30 @@ Usage:
 │   • CSS dark theme with orange/cyan/purple/teal accents                      │
 │                                                                              │
 │  If adding features, follow the existing patterns and update this manifest.  │
+│                                                                              │
+│  HOW TO EDIT:                                                                │
+│   • Python side: RunRecord dataclass + build_index() → hub payload JSON      │
+│   • HTML/JS is embedded as a Python f-string in generate_hub_html()          │
+│   • Run cards: add fields to RunRecord, surface in card template             │
+│   • Commands: add to _build_*_cmd() helpers, surface in renderCommandsPanel  │
+│                                                                              │
+│  WHAT NOT TO BREAK:                                                          │
+│   • run-card CSS class — L1 health checks for this marker                    │
+│   • ir_report.html links — L3 validates hub links to ir_report               │
+│   • dataset_viewer.html links — hub must show dataset button for runs        │
+│   • RunRecord.to_dict() — serialised into embedded JSON for JS               │
+│                                                                              │
+│  TESTING:                                                                    │
+│   make v7-visualizer-health          # L1 checks hub source structure        │
+│   make v7-visualizer-generated-e2e   # L3 generates hub + validates          │
+│   Pre-push:  .githooks/pre-push step [0.5/6]                                │
+│   Nightly:   nightly_runner.py → v7_visualizer_health + generated_e2e       │
+│                                                                              │
+│  The hub has no JSON contract file (unlike ir_visualizer / dataset_viewer)   │
+│  because it's a Python generator, not an HTML template. The L1 checker       │
+│  validates: file_exists, hub_marker:run-card, hub_marker:ir_report.html,     │
+│  hub_marker:dataset_viewer.html.                                             │
+│                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
 

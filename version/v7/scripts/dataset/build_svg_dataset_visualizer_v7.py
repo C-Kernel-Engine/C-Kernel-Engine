@@ -59,6 +59,29 @@ viewer works offline with full search, sort, gallery, quality checks, and proven
 │   2. Write a renderXxx() function                                            │
 │   3. Call it from renderAll()                                                │
 │   4. Update this manifest                                                    │
+│   5. Update version/v7/tests/contracts/dataset_viewer_contract.json:         │
+│      — Add tab entry with id, label, render_function, panel_id              │
+│      — Add render function to required_functions list                        │
+│   6. If adding a pure utility function, also add to:                         │
+│      version/v7/tests/fixtures/ds_pure_functions.js (with module.exports)    │
+│      + add test vectors to the contract JSON                                 │
+│   7. Run: make v7-visualizer-health  (must pass before pushing)              │
+│                                                                              │
+│  WHAT NOT TO BREAK:                                                          │
+│   • attnColor — was missing before, caused ReferenceError (the original bug) │
+│   • embColor, embNormalise, cosineSim — L2-tested pure functions             │
+│   • renderAll — entry point, wraps each section in try/catch                 │
+│   • esc() — HTML escaping, used in every render function                     │
+│   • CKTable — reusable sort/search/pagination class, used by 4+ tabs        │
+│   • Null guards: every render function must handle missing/null data safely  │
+│                                                                              │
+│  TESTING:                                                                    │
+│   make v7-visualizer-health          # L1 static + L2 JS units (~3s)        │
+│   make v7-visualizer-generated-e2e   # L3 generate + validate (~10s)        │
+│   Contracts: version/v7/tests/contracts/dataset_viewer_contract.json        │
+│   Fixtures:  version/v7/tests/fixtures/ds_pure_functions.js                 │
+│   Pre-push:  .githooks/pre-push step [0.5/6] runs health checks            │
+│   Nightly:   nightly_runner.py runs v7_visualizer_health + generated_e2e    │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 """

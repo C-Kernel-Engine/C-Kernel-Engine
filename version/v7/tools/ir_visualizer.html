@@ -1,4 +1,56 @@
 <!DOCTYPE html>
+<!--
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  IR VISUALIZER — Source template for ir_report.html                      │
+  │  version/v7/tools/ir_visualizer.html  (~24K lines)                       │
+  ├──────────────────────────────────────────────────────────────────────────┤
+  │                                                                          │
+  │  ⚠️  DO NOT DELETE OR REGRESS EXISTING TABS OR FUNCTIONS  ⚠️              │
+  │                                                                          │
+  │  TABS (11 tabs):                                                         │
+  │   Memory · Kernel Flow · Stats · Training · Quantization · Dataflow ·    │
+  │   Interpretability · Profile · Data Pipeline · Parity · Overview         │
+  │                                                                          │
+  │  HOW TO EDIT:                                                            │
+  │   • Each tab has a render function (e.g. renderMemory, renderTraining)   │
+  │   • Tab switching: showTab(tabId) → renderTabIfDirty(tabId)              │
+  │   • Safe DOM helpers: setElText(id, text), setElHtml(id, html)           │
+  │   • Data is embedded as JSON: window.__DATA__ = { ... }                  │
+  │   • open_ir_visualizer.py --generate fills in the JSON blobs             │
+  │                                                                          │
+  │  HOW TO ADD A NEW TAB:                                                   │
+  │   1. Add <button class="tab" data-tab="yourTab"> in the nav             │
+  │   2. Add <div id="yourTab" class="content-section"> panel               │
+  │   3. Write renderYourTab() function                                      │
+  │   4. Add to renderTabIfDirty() switch/case                              │
+  │   5. Update version/v7/tests/contracts/ir_visualizer_contract.json:      │
+  │      — Add tab entry with id, label, render_function                     │
+  │      — Add render function to required_functions list                    │
+  │   6. Run: make v7-visualizer-health  (must pass)                         │
+  │                                                                          │
+  │  HOW TO ADD A NEW UTILITY FUNCTION:                                      │
+  │   1. Add the function in the appropriate script block                    │
+  │   2. If it's a pure function (no DOM), also add it to:                   │
+  │      version/v7/tests/fixtures/ir_pure_functions.js                      │
+  │   3. Add test vectors to ir_visualizer_contract.json                     │
+  │   4. Run: make v7-visualizer-health  (must pass)                         │
+  │                                                                          │
+  │  WHAT NOT TO BREAK:                                                      │
+  │   • setElText / setElHtml — safe DOM helpers used everywhere             │
+  │   • formatBytes, escapeHtml, quoteShell — tested via L2 unit tests       │
+  │   • renderAll / renderTabIfDirty — entry points for all tab rendering    │
+  │   • bootstrapFromEmbeddedData — parses embedded JSON on load             │
+  │   • showTab — tab navigation (all 11 tabs must remain accessible)        │
+  │                                                                          │
+  │  TESTING:                                                                │
+  │   make v7-visualizer-health          # L1 static + L2 JS units (3s)      │
+  │   make v7-visualizer-generated-e2e   # L3 generate + validate (10s)      │
+  │   Contracts: version/v7/tests/contracts/ir_visualizer_contract.json      │
+  │   Fixtures:  version/v7/tests/fixtures/ir_pure_functions.js              │
+  │   Pre-push:  .githooks/pre-push step [0.5/6] runs health checks         │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
