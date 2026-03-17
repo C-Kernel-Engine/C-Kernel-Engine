@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Spec04 and Spec05 Iteration Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f1e8;
+      --panel: #fffdf8;
+      --ink: #1f2428;
+      --muted: #5b6470;
+      --border: #d6c9b3;
+      --accent: #9b3d22;
+      --accent-soft: #f6e3d8;
+      --table-head: #efe4d0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: linear-gradient(180deg, #f7f3eb 0%, #efe7d7 100%);
+      color: var(--ink);
+      font: 16px/1.55 "Iowan Old Style", "Palatino Linotype", serif;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 20px 48px rgba(54, 40, 22, 0.08);
+    }
+    h1, h2, h3 {
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      line-height: 1.1;
+      margin: 0 0 14px;
+    }
+    h1 { font-size: 2.4rem; letter-spacing: 0.01em; }
+    h2 {
+      margin-top: 30px;
+      font-size: 1.45rem;
+      color: var(--accent);
+    }
+    p, li { margin: 0 0 12px; }
+    ul { margin: 0 0 8px 20px; }
+    .lede {
+      font-size: 1.08rem;
+      color: var(--muted);
+      max-width: 80ch;
+    }
+    .callout {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 8px;
+      font-size: 0.97rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--table-head);
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      letter-spacing: 0.02em;
+    }
+    code {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      background: #f4eee3;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    a { color: #7b2d18; }
+    .small { color: var(--muted); font-size: 0.92rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Spec04 and Spec05 Iteration Report</h1>
+    <p class="lede">
+      This report summarizes the structured-scene line from the original <code>spec04</code>
+      baseline through the stronger <code>spec05</code> runs. It focuses on the iterations that
+      materially changed curriculum or architecture, using the canonical probe reports where available
+      and the stage-eval matrix for older <code>spec04</code> diagnostics.
+    </p>
+
+    <div class="callout">
+      <strong>Executive read.</strong> <code>spec04</code> learned SVG syntax and renderability first,
+      not semantic control. Curriculum-only tweaks inside the flat atom target helped a little, but did
+      not generalize on <code>dev/test</code>. <code>spec05</code> is where the line became a real
+      structured-generation capability.
+    </div>
+
+    <h2>Run Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Line</th>
+          <th>Run</th>
+          <th>Kind</th>
+          <th>Overall Exact</th>
+          <th>Train</th>
+          <th>Dev</th>
+          <th>Test</th>
+          <th>Renderable</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>spec04</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224">canonical baseline</a></td>
+          <td>baseline structured scenes</td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Valid SVG, weak semantic binding.</td>
+        </tr>
+        <tr>
+          <td><code>spec04</code></td>
+          <td><a href="/tmp/spec04_structured_scenes_comp_midtrain_eval2">composition-only midtrain</a></td>
+          <td>composition-only midtrain</td>
+          <td><code>5.0%</code></td>
+          <td><code>10.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Narrow train improvement only.</td>
+        </tr>
+        <tr>
+          <td><code>spec04</code></td>
+          <td><a href="/tmp/spec04_structured_scenes_blended_midtrain_r2">blended midtrain r2</a></td>
+          <td>blended midtrain</td>
+          <td><code>10.0%</code></td>
+          <td><code>20.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>95.0%</code></td>
+          <td>Best <code>spec04</code> exact score, still no holdout generalization.</td>
+        </tr>
+        <tr>
+          <td><code>spec04</code></td>
+          <td><a href="/tmp/spec04_structured_scenes_blended_midtrain_r3">blended midtrain r3</a></td>
+          <td>lighter blended midtrain</td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Reverted to generic valid SVGs.</td>
+        </tr>
+        <tr>
+          <td><code>spec05</code></td>
+          <td><a href="/tmp/spec05_structured_scenes_l3_d192_h384_ctx128">first scaled run</a></td>
+          <td>first scaled structured-scenes run</td>
+          <td><code>69.2%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>50.0%</code></td>
+          <td><code>50.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>First run with real held-out semantic control.</td>
+        </tr>
+        <tr>
+          <td><code>spec05</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2">best canonical run</a></td>
+          <td>targeted midtrain repair</td>
+          <td><code>80.8%</code></td>
+          <td><code>80.0%</code></td>
+          <td><code>75.0%</code></td>
+          <td><code>87.5%</code></td>
+          <td><code>92.3%</code></td>
+          <td>Best overall run in this line.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Stage-Level Spec04 Diagnostics</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Valid SVG</th>
+          <th>Closure</th>
+          <th>OOD</th>
+          <th>Adherence</th>
+          <th>Tag Adherence</th>
+          <th>Prefix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224/stage_eval_matrix.json">spec04 baseline</a></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>12.5%</code></td>
+          <td><code>18.8%</code></td>
+          <td><code>0.0%</code></td>
+        </tr>
+        <tr>
+          <td><a href="/tmp/spec04_structured_scenes_comp_midtrain_eval2/stage_eval_matrix.json">composition-only midtrain</a></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>25.0%</code></td>
+          <td><code>25.0%</code></td>
+          <td><code>0.0%</code></td>
+        </tr>
+        <tr>
+          <td><a href="/tmp/spec04_structured_scenes_blended_midtrain_r2/stage_eval_matrix.json">blended midtrain r2</a></td>
+          <td><code>87.5%</code></td>
+          <td><code>87.5%</code></td>
+          <td><code>50.0%</code></td>
+          <td><code>25.0%</code></td>
+          <td><code>31.3%</code></td>
+          <td><code>0.0%</code></td>
+        </tr>
+        <tr>
+          <td><a href="/tmp/spec04_structured_scenes_blended_midtrain_r3/stage_eval_matrix.json">blended midtrain r3</a></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>25.0%</code></td>
+          <td><code>0.0%</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>What Changed Across Iterations</h2>
+    <h3>1. Baseline Spec04</h3>
+    <p>
+      Run: <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224">spec04_structured_scenes_ctx512_d64_h128_v224</a>
+    </p>
+    <ul>
+      <li>Outputs were usually renderable.</li>
+      <li>Outputs did not bind the requested controls reliably.</li>
+      <li>Balanced probe exact match was <code>0.0%</code>.</li>
+    </ul>
+    <p class="small">Main lesson: flat next-token learning over the atom DSL was enough for grammar, not enough for compositional control.</p>
+
+    <h3>2. Spec04 Composition-Only Midtrain</h3>
+    <p>Run: <a href="/tmp/spec04_structured_scenes_comp_midtrain_eval2">/tmp/spec04_structured_scenes_comp_midtrain_eval2</a></p>
+    <ul>
+      <li>Train exact moved slightly.</li>
+      <li><code>dev/test</code> exact remained <code>0.0%</code>.</li>
+    </ul>
+    <p class="small">Main lesson: composition belongs in midtrain, but composition-only data caused forgetting of the broader scene contract.</p>
+
+    <h3>3. Spec04 Blended Midtrain</h3>
+    <p>
+      Runs:
+      <a href="/tmp/spec04_structured_scenes_blended_midtrain_r2">r2</a>,
+      <a href="/tmp/spec04_structured_scenes_blended_midtrain_r3">r3</a>
+    </p>
+    <ul>
+      <li><code>r2</code> was the best <code>spec04</code> variant on exact match.</li>
+      <li><code>r3</code> kept valid SVG but lost semantic control again.</li>
+    </ul>
+    <p class="small">Main lesson: curriculum balance mattered, but the flat target representation was still the ceiling.</p>
+
+    <h3>4. First Spec05 Run</h3>
+    <p>Run: <a href="/tmp/spec05_structured_scenes_l3_d192_h384_ctx128">/tmp/spec05_structured_scenes_l3_d192_h384_ctx128</a></p>
+    <ul>
+      <li>First run with strong train exact and real held-out generalization.</li>
+      <li><code>dev</code> and <code>test</code> exact both reached <code>50.0%</code>.</li>
+    </ul>
+    <p class="small">Main lesson: richer composition controls plus a larger model moved the task from syntax benchmark toward real capability.</p>
+
+    <h3>5. Best Spec05 Run</h3>
+    <p>Run: <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2">spec05_structured_scenes_l3_d192_h384_ctx128_r2</a></p>
+    <ul>
+      <li><code>80.8%</code> overall exact.</li>
+      <li><code>75.0%</code> dev exact.</li>
+      <li><code>87.5%</code> test exact.</li>
+    </ul>
+    <p class="small">Main lesson: narrow midtrain repair on the right failure slice was more valuable than immediately scaling again.</p>
+
+    <h2>Best Current Artifacts</h2>
+    <ul>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224/spec04_probe_report.html">spec04 baseline truth-telling report</a></li>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2/spec05_probe_report.html">spec05 best run probe report</a></li>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2/spec05_tested_prompts_report.html">spec05 prompt-by-prompt report</a></li>
+      <li><a href="/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/spec05_midtrain_analysis_20260311.md">spec05 narrative analysis</a></li>
+    </ul>
+
+    <h2>Bottom Line</h2>
+    <p>
+      <code>spec04</code> established the evaluation problem and showed that renderability alone was not enough.
+      <code>spec05</code> is the run family that demonstrated the real transition from valid SVG syntax to held-out
+      structured control following.
+    </p>
+  </main>
+</body>
+</html>

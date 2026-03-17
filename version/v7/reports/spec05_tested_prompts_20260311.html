@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>spec05_structured_svg_atoms Structured Scenes Probe Report</title>
+  <style>
+    :root { --bg: #f5f1e8; --ink: #1f2933; --muted: #52606d; --card: #fffdf8; --line: #d9d1c2; --pass: #1f7a4d; --fail: #b42318; }
+    body { margin: 0; padding: 32px; font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif; background: linear-gradient(180deg, #f7f2e8 0%, #efe7d8 100%); color: var(--ink); }
+    main { max-width: 1200px; margin: 0 auto; }
+    h1, h2, h3 { margin: 0 0 12px; }
+    p, li, td, th, span { line-height: 1.4; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0 28px; }
+    .metric, .split-table, .case { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 6px 18px rgba(31, 41, 51, 0.06); }
+    .metric { padding: 16px; }
+    .metric .label { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .metric .value { display: block; margin-top: 6px; font-size: 28px; font-weight: 700; }
+    .split-table { padding: 16px; margin: 0 0 28px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .case { padding: 18px; margin: 0 0 18px; }
+    .case.pass { border-left: 6px solid var(--pass); }
+    .case.fail { border-left: 6px solid var(--fail); }
+    .meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); margin: 0 0 14px; }
+    pre { overflow-x: auto; background: #f8f5ee; padding: 12px; border-radius: 12px; border: 1px solid #e6dece; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+<main>
+<h1>spec05_structured_svg_atoms Structured Scenes Probe Report</h1>
+<p>spec05_structured_scenes_l3_d192_h384_ctx128_r2</p>
+<section class="summary">
+<article class="metric"><span class="label">Cases</span><span class="value">26</span></article>
+<article class="metric"><span class="label">Exact</span><span class="value">80.8%</span></article>
+<article class="metric"><span class="label">Renderable</span><span class="value">92.3%</span></article>
+<article class="metric"><span class="label">Materialized Exact</span><span class="value">80.8%</span></article>
+<article class="metric"><span class="label">SVG Exact</span><span class="value">80.8%</span></article>
+</section>
+<section class="split-table">
+<h2>Split Summary</h2>
+<table>
+<thead><tr><th>Split</th><th>Count</th><th>Exact</th><th>Renderable</th><th>SVG Exact</th></tr></thead>
+<tbody><tr><td>dev</td><td>8</td><td>75.0%</td><td>100.0%</td><td>75.0%</td></tr><tr><td>test</td><td>8</td><td>87.5%</td><td>100.0%</td><td>87.5%</td></tr><tr><td>train</td><td>10</td><td>80.0%</td><td>80.0%</td><td>80.0%</td></tr></tbody>
+</table>
+</section>
+<h2>Train Cases</h2>
+<section class="case pass">
+<h3>Train Single #1</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:blue] [size:big] [bg:none] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:none] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:paper] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:none] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:paper] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Single #2</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:blue] [size:big] [bg:paper] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Pair-H #3</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-h] [shape:circle] [shape2:rect] [color:blue] [color2:green] [size:big] [bg:paper] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-h] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:34] [cy:64] [r:16] [fill:blue] [stroke:black] [sw:2] [rect] [x:84] [y:56] [width:20] [height:16] [rx:7] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-h] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:34] [cy:64] [r:16] [fill:blue] [stroke:black] [sw:2] [rect] [x:84] [y:56] [width:20] [height:16] [rx:7] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Pair-H #4</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-h] [shape:circle] [shape2:rect] [color:blue] [color2:green] [size:big] [bg:mint] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-h] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:34] [cy:64] [r:16] [fill:blue] [stroke:black] [sw:2] [rect] [x:84] [y:56] [width:20] [height:16] [rx:7] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-h] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:34] [cy:64] [r:16] [fill:blue] [stroke:black] [sw:2] [rect] [x:84] [y:56] [width:20] [height:16] [rx:7] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Pair-V #5</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:blue] [color2:green] [size:big] [bg:paper] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:blue] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:blue] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Pair-V #6</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:blue] [color2:green] [size:big] [bg:mint] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:blue] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:blue] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:green] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Label #7</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:paper] [label:ai] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:white] [stroke:black] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:black] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:black] AI [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:white] [stroke:black] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:black] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:black] AI [/text] [/svg]</pre>
+</section>
+<section class="case fail">
+<h3>Train Label #8</h3>
+<div class="meta">
+<span>Exact: <strong>no</strong></span>
+<span>Renderable: <strong>no</strong></span>
+<span>Valid SVG: <strong>no</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:paper] [label:ai] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:label-card] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:white] [stroke:black] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:black] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:black] AI [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[w:128] [h:128] [bg:paper] [bg:paper] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:white] [stroke:black] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:black] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:black] AI [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Train Badge #9</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:circle] [color:blue] [bg:paper] [label:ai] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [circle] [cx:32] [cy:57] [r:11] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] AI [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [circle] [cx:32] [cy:57] [r:11] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] AI [/text] [/svg]</pre>
+</section>
+<section class="case fail">
+<h3>Train Badge #10</h3>
+<div class="meta">
+<span>Exact: <strong>no</strong></span>
+<span>Renderable: <strong>no</strong></span>
+<span>Valid SVG: <strong>no</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:circle] [color:blue] [bg:paper] [label:ai] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:compact] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [circle] [cx:28] [cy:58] [r:13] [fill:blue] [stroke:black] [sw:2] [text] [tx:48] [ty:61] [font:12] [anchor:start] [fill:black] AI [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[w:128] [h:128] [bg:paper] [bg:paper] [frame:card] [density:compact] [x:10] [x:10] [width:108] [width:108] [height:76] [rx:18] [fill:white] [stroke:black] [fill:white] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:black] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:black] AI [/text] [/svg]</pre>
+</section>
+<h2>Dev Cases</h2>
+<section class="case pass">
+<h3>Dev Single #1</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:gold] [size:big] [bg:mint] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:gold] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:gold] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Dev Single #2</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:gold] [size:big] [bg:mint] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:single] [frame:card] [density:compact] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:32] [fill:gold] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:single] [frame:card] [density:compact] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:32] [fill:gold] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case fail">
+<h3>Dev Pair-V #3</h3>
+<div class="meta">
+<span>Exact: <strong>no</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:gold] [color2:blue] [size:big] [bg:paper] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:gold] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:gold] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case fail">
+<h3>Dev Pair-V #4</h3>
+<div class="meta">
+<span>Exact: <strong>no</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:gold] [color2:blue] [size:big] [bg:slate] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:gold] [stroke:white] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:white] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [x:54] [cy:34] [r:16] [points:64,10|54,58|74,58] [stroke:white] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:white] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Dev Label #5</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:slate] [label:flow] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:white] FLOW [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:white] FLOW [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Dev Label #6</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:slate] [label:ops] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:white] OPS [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:airy] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:64] [font:13] [anchor:middle] [fill:white] OPS [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Dev Badge #7</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:triangle] [color:blue] [bg:paper] [label:map] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:31,45|19,67|43,67] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:31,45|19,67|43,67] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Dev Badge #8</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:triangle] [color:blue] [bg:paper] [label:map] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:compact] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:28,44|16,70|40,70] [fill:blue] [stroke:black] [sw:2] [text] [tx:48] [ty:61] [font:12] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:badge] [frame:card] [density:compact] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:28,44|16,70|40,70] [fill:blue] [stroke:black] [sw:2] [text] [tx:48] [ty:61] [font:12] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+</section>
+<h2>Test Cases</h2>
+<section class="case pass">
+<h3>Test Single #1</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:gold] [size:big] [bg:slate] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:gold] [stroke:white] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:single] [frame:card] [density:airy] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [cx:64] [cy:64] [r:26] [fill:gold] [stroke:white] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Single #2</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:single] [shape:circle] [color:gold] [size:big] [bg:slate] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:single] [frame:card] [density:compact] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [cx:64] [cy:64] [r:32] [fill:gold] [stroke:white] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:single] [frame:card] [density:compact] [rect] [x:14] [y:14] [width:100] [height:100] [rx:18] [fill:gray] [stroke:white] [sw:2] [circle] [cx:64] [cy:64] [r:32] [fill:gold] [stroke:white] [sw:2] [/svg]</pre>
+</section>
+<section class="case fail">
+<h3>Test Pair-V #3</h3>
+<div class="meta">
+<span>Exact: <strong>no</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:gold] [color2:blue] [size:big] [bg:mint] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [cx:64] [cy:34] [r:16] [fill:gold] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:pair-v] [frame:card] [density:airy] [rect] [x:10] [y:20] [width:108] [height:88] [rx:18] [fill:white] [stroke:black] [sw:2] [circle] [x:54] [cy:34] [r:16] [x:54] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Pair-V #4</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:pair-v] [shape:circle] [shape2:triangle] [color:gold] [color2:blue] [size:big] [bg:paper] [frame:plain] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-v] [frame:plain] [density:airy] [circle] [cx:64] [cy:34] [r:16] [fill:gold] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:paper] [layout:pair-v] [frame:plain] [density:airy] [circle] [cx:64] [cy:34] [r:16] [fill:gold] [stroke:black] [sw:2] [polygon] [points:64,70|54,118|74,118] [fill:blue] [stroke:black] [sw:2] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Label #5</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:slate] [label:flow] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:white] FLOW [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:white] FLOW [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Label #6</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:label-card] [color:blue] [bg:slate] [label:ops] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:white] OPS [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:slate] [layout:label-card] [frame:card] [density:compact] [rect] [x:10] [y:26] [width:108] [height:76] [rx:18] [fill:gray] [stroke:white] [sw:2] [rect] [x:20] [y:42] [width:88] [height:36] [rx:10] [fill:blue] [stroke:white] [sw:2] [text] [tx:64] [ty:65] [font:14] [anchor:middle] [fill:white] OPS [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Badge #7</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:triangle] [color:blue] [bg:mint] [label:map] [frame:card] [density:airy] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:31,45|19,67|43,67] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:badge] [frame:card] [density:airy] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:31,45|19,67|43,67] [fill:blue] [stroke:black] [sw:2] [text] [tx:52] [ty:60] [font:11] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+</section>
+<section class="case pass">
+<h3>Test Badge #8</h3>
+<div class="meta">
+<span>Exact: <strong>yes</strong></span>
+<span>Renderable: <strong>yes</strong></span>
+<span>Valid SVG: <strong>yes</strong></span>
+</div>
+<h4>Prompt</h4>
+<pre>[task:svg] [layout:badge] [shape:triangle] [color:blue] [bg:mint] [label:map] [frame:card] [density:compact] [OUT]</pre>
+<h4>Expected</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:badge] [frame:card] [density:compact] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:28,44|16,70|40,70] [fill:blue] [stroke:black] [sw:2] [text] [tx:48] [ty:61] [font:12] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+<h4>Response</h4>
+<pre>[svg] [w:128] [h:128] [bg:mint] [layout:badge] [frame:card] [density:compact] [rect] [x:10] [y:32] [width:108] [height:50] [rx:16] [fill:white] [stroke:black] [sw:2] [rect] [x:18] [y:42] [width:92] [height:30] [rx:10] [fill:white] [stroke:black] [sw:2] [polygon] [points:28,44|16,70|40,70] [fill:blue] [stroke:black] [sw:2] [text] [tx:48] [ty:61] [font:12] [anchor:start] [fill:black] MAP [/text] [/svg]</pre>
+</section>
+</main>
+</body>
+</html>

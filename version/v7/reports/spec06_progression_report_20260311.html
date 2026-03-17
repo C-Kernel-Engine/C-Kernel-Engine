@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Spec06 Progression Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4efe7;
+      --panel: #fffdfa;
+      --ink: #1f252a;
+      --muted: #5b6672;
+      --border: #d8cab8;
+      --accent: #9a3b1f;
+      --accent-soft: #f7e5dc;
+      --head: #efe3d2;
+      --good: #275d38;
+      --warn: #8f5b12;
+      --bad: #8d2e24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: linear-gradient(180deg, #f7f3ec 0%, #ede5d8 100%);
+      color: var(--ink);
+      font: 16px/1.55 "Iowan Old Style", "Palatino Linotype", serif;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 34px;
+      box-shadow: 0 20px 46px rgba(45, 32, 17, 0.08);
+    }
+    h1, h2, h3 {
+      margin: 0 0 14px;
+      line-height: 1.08;
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+    }
+    h1 { font-size: 2.45rem; letter-spacing: 0.01em; }
+    h2 {
+      margin-top: 30px;
+      font-size: 1.45rem;
+      color: var(--accent);
+    }
+    p, li { margin: 0 0 12px; }
+    ul { margin: 0 0 8px 20px; }
+    a { color: #7a2a16; }
+    code {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      background: #f4eee5;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .lede {
+      max-width: 82ch;
+      color: var(--muted);
+      font-size: 1.07rem;
+    }
+    .callout {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 10px;
+    }
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin: 20px 0 8px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #fffaf3;
+    }
+    .card h3 {
+      margin-bottom: 8px;
+      font-size: 1.05rem;
+    }
+    .metric {
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      font-size: 1.8rem;
+    }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 8px;
+      font-size: 0.97rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--head);
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      letter-spacing: 0.02em;
+    }
+    .small {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Spec06 Progression Report</h1>
+    <p class="lede">
+      This report tracks the structured infographic line from the first template-filling
+      run through the current <code>r6</code> result. The goal is simple: show which iterations materially
+      improved held-out infographic control and which ones regressed.
+    </p>
+
+    <div class="callout">
+      <strong>Executive read.</strong> <code>r1</code> proved the infographic template
+      path worked mechanically, <code>r2</code> was the first real capability jump,
+      <code>r3</code> regressed through narrow overweighting, <code>r4</code> fixed
+      slot semantics but hurt layout binding, <code>r5</code> recovered most of that
+      damage, and <code>r6</code> is now the best run in the line.
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Best Balanced Run</h3>
+        <div class="metric good">r2</div>
+        <p><code>75.0%</code> overall exact on the earlier balanced probe with <code>100%</code> renderability.</p>
+      </section>
+      <section class="card">
+        <h3>Best Run</h3>
+        <div class="metric good">r6</div>
+        <p><code>91.7%</code> overall exact, <code>91.7%</code> dev, <code>83.3%</code> test, <code>100%</code> renderable.</p>
+      </section>
+      <section class="card">
+        <h3>Main Remaining Weakness</h3>
+        <div class="metric warn">3 misses</div>
+        <p>Only the <code>bullet-panel governance_path</code> family on <code>slate/card</code> remains unstable.</p>
+      </section>
+      <section class="card">
+        <h3>Current Focus</h3>
+        <div class="metric warn">r7 target</div>
+        <p>Repair the remaining <code>governance_path</code> bullet-panel slice without disturbing the other layouts.</p>
+      </section>
+    </div>
+
+    <h2>Run Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Overall Exact</th>
+          <th>Train</th>
+          <th>Dev</th>
+          <th>Test</th>
+          <th>Renderable</th>
+          <th>What Changed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r1">r1</a></td>
+          <td><code>25.0%</code></td>
+          <td><code>20.0%</code></td>
+          <td><code>28.6%</code></td>
+          <td><code>28.6%</code></td>
+          <td><code>100.0%</code></td>
+          <td>First asset-derived infographic line. Mechanical success, weak topic binding.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r2">r2</a></td>
+          <td><code>75.0%</code></td>
+          <td><code>80.0%</code></td>
+          <td><code>85.7%</code></td>
+          <td><code>57.1%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Topic-binding midtrain patch. First real capability jump.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r3">r3</a></td>
+          <td><code>29.2%</code></td>
+          <td><code>40.0%</code></td>
+          <td><code>42.9%</code></td>
+          <td><code>0.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Narrow overweight improved one slice and damaged the rest.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r4">r4</a></td>
+          <td><code>38.9%</code></td>
+          <td><code>50.0%</code></td>
+          <td><code>41.7%</code></td>
+          <td><code>25.0%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Generic slots fixed topic-slot mismatch, but layout aliasing regressed.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r5">r5</a></td>
+          <td><code>69.4%</code></td>
+          <td><code>91.7%</code></td>
+          <td><code>75.0%</code></td>
+          <td><code>41.7%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Removed redundant source tokens and strengthened layout separation.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6">r6</a></td>
+          <td><code>91.7%</code></td>
+          <td><code>100.0%</code></td>
+          <td><code>91.7%</code></td>
+          <td><code>83.3%</code></td>
+          <td><code>100.0%</code></td>
+          <td>Best run so far; fixed <code>spectrum-band</code> and left only three bullet-panel misses.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Midtrain Loss Trend</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Loss First</th>
+          <th>Loss Final</th>
+          <th>Loss Min</th>
+          <th>Read</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r1/train_spec06_stage_b.json">r1</a></td>
+          <td><code>2.4213</code></td>
+          <td><code>0.0230</code></td>
+          <td><code>0.0142</code></td>
+          <td>Numerically healthy.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r2/train_spec06_stage_b.json">r2</a></td>
+          <td><code>3.0498</code></td>
+          <td><code>0.0180</code></td>
+          <td><code>0.0131</code></td>
+          <td>Healthy. Better generalization came from curriculum, not instability.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r3/train_spec06_stage_b.json">r3</a></td>
+          <td><code>1.9101</code></td>
+          <td><code>0.0192</code></td>
+          <td><code>0.0145</code></td>
+          <td>Healthy training, bad semantic outcome.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r4/train_spec06_stage_b.json">r4</a></td>
+          <td><code>2.3358</code></td>
+          <td><code>0.0242</code></td>
+          <td><code>0.0142</code></td>
+          <td>Healthy training, schema/layout tradeoff.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r5/train_spec06_stage_b.json">r5</a></td>
+          <td><code>1.8456</code></td>
+          <td><code>0.0430</code></td>
+          <td><code>0.0144</code></td>
+          <td>Still numerically healthy. Remaining problems are semantic slices.</td>
+        </tr>
+        <tr>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/train_spec06_stage_b.json">r6</a></td>
+          <td><code>1.5005</code></td>
+          <td><code>0.0208</code></td>
+          <td><code>0.0141</code></td>
+          <td>Healthy training and strongest semantic result in the line.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Layout Progression</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Bullet</th>
+          <th>Compare</th>
+          <th>Stats</th>
+          <th>Spectrum</th>
+          <th>Flow</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>r1</code></td>
+          <td><code>2/4</code></td>
+          <td><code>2/6</code></td>
+          <td><code>0/4</code></td>
+          <td><code>0/6</code></td>
+          <td><code>2/4</code></td>
+        </tr>
+        <tr>
+          <td><code>r2</code></td>
+          <td><code>2/4</code></td>
+          <td><code>5/6</code></td>
+          <td><code>4/4</code></td>
+          <td><code>4/6</code></td>
+          <td><code>3/4</code></td>
+        </tr>
+        <tr>
+          <td><code>r3</code></td>
+          <td><code>2/4</code></td>
+          <td><code>0/6</code></td>
+          <td><code>0/4</code></td>
+          <td><code>3/6</code></td>
+          <td><code>2/4</code></td>
+        </tr>
+        <tr>
+          <td><code>r4</code></td>
+          <td><code>6/9</code></td>
+          <td><code>3/9</code></td>
+          <td><code>0/6</code></td>
+          <td><code>0/6</code></td>
+          <td><code>5/6</code></td>
+        </tr>
+        <tr>
+          <td><code>r5</code></td>
+          <td><code>4/9</code></td>
+          <td><code>8/9</code></td>
+          <td><code>6/6</code></td>
+          <td><code>2/6</code></td>
+          <td><code>5/6</code></td>
+        </tr>
+        <tr>
+          <td><code>r6</code></td>
+          <td><code>6/9</code></td>
+          <td><code>9/9</code></td>
+          <td><code>6/6</code></td>
+          <td><code>6/6</code></td>
+          <td><code>6/6</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>What Changed by Run</h2>
+    <p><strong>r1</strong>: Introduced asset-derived infographic templates and topic-specific slot families. Result: the renderer contract worked, but topic binding drifted toward dominant templates.</p>
+    <p><strong>r2</strong>: Reweighted midtrain toward topic edits and away from layout edits. Result: large jump in exact match and the strongest balanced run in the line.</p>
+    <p><strong>r3</strong>: Narrow overweighting around the <code>governance_path</code> bullet-panel slice. Result: partial local gain, broad regression.</p>
+    <p><strong>r4</strong>: Switched to generic slots like <code>[slot:title]</code>, resolved by topic at render time. Result: topic-slot mismatch fixed, layout aliasing worsened.</p>
+    <p><strong>r5</strong>: Removed redundant <code>source</code> tokens and strengthened layout-separation edits. Result: <code>stat-cards</code> recovered fully, <code>compare-panels</code> became strong, <code>spectrum-band</code> improved but remains weak.</p>
+    <p><strong>r6</strong>: Added a narrow repair for <code>bullet-panel governance_path</code> on <code>slate</code> and sharpened contrast between <code>spectrum-band</code> and neighboring layouts. Result: <code>spectrum-band</code> is fully fixed on the probe and only three bullet-panel misses remain.</p>
+
+    <h2>Remaining Failure Slices After R5</h2>
+    <ul>
+      <li><code>bullet-panel governance_path</code> on <code>slate</code> with <code>frame:card</code>.</li>
+      <li>Specific misses in <code>r6</code>: <code>dev_02</code> green/airy, <code>test_02</code> green/compact, <code>test_03</code> orange/compact.</li>
+    </ul>
+
+    <h2>Current Best Run</h2>
+    <p>The current best run is <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6">r6</a>.</p>
+    <ul>
+      <li>Full parity passed in <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/training_parity_regimen_latest.json">training_parity_regimen_latest.json</a>.</li>
+      <li>Probe report: <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/spec06_probe_report.html">spec06_probe_report.html</a>.</li>
+      <li>Tested prompts: <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/spec06_tested_prompts_report.html">spec06_tested_prompts_report.html</a>.</li>
+    </ul>
+
+    <h2>Best Artifacts To Open</h2>
+    <ul>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r2/spec06_probe_report.html">r2 probe report</a></li>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/spec06_probe_report.html">r6 probe report</a></li>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/spec06_tested_prompts_report.html">r6 tested prompts</a></li>
+      <li><a href="/home/antshiv/.cache/ck-engine-v7/models/ir_hub.html">IR Hub</a></li>
+    </ul>
+
+    <p class="small">
+      Bottom line: <code>spec06</code> is beyond the initial toy-template stage. By <code>r6</code> it has strong
+      held-out infographic behavior, and the remaining error surface is now one narrow slice instead of a broad layout problem.
+    </p>
+  </main>
+</body>
+</html>

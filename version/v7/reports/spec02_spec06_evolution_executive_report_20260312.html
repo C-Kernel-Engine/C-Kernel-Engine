@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SVG Capability Evolution Executive Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f0e7;
+      --panel: #fffdfa;
+      --ink: #1f2529;
+      --muted: #5e6873;
+      --border: #d8cbb8;
+      --accent: #93381e;
+      --accent-soft: #f7e4da;
+      --head: #efe2d2;
+      --good: #275b38;
+      --warn: #8c5a14;
+      --bad: #8b2d22;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: linear-gradient(180deg, #f7f3eb 0%, #ede5d7 100%);
+      color: var(--ink);
+      font: 16px/1.58 "Iowan Old Style", "Palatino Linotype", serif;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 34px;
+      box-shadow: 0 20px 52px rgba(44, 31, 16, 0.08);
+    }
+    h1, h2, h3 {
+      margin: 0 0 14px;
+      line-height: 1.08;
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+    }
+    h1 { font-size: 2.55rem; letter-spacing: 0.01em; }
+    h2 {
+      margin-top: 32px;
+      font-size: 1.46rem;
+      color: var(--accent);
+    }
+    p, li { margin: 0 0 12px; }
+    ul { margin: 0 0 8px 20px; }
+    a { color: #7a2a16; }
+    code {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      background: #f4eee5;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .lede {
+      max-width: 84ch;
+      color: var(--muted);
+      font-size: 1.08rem;
+    }
+    .callout {
+      margin: 24px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 10px;
+    }
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin: 20px 0 8px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #fffaf4;
+    }
+    .card h3 {
+      margin-bottom: 8px;
+      font-size: 1.05rem;
+    }
+    .metric {
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      font-size: 1.8rem;
+    }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 8px;
+      font-size: 0.97rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--head);
+      font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+      letter-spacing: 0.02em;
+    }
+    .gallery {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      margin: 18px 0 10px;
+    }
+    figure {
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fffaf3;
+    }
+    figure img {
+      display: block;
+      width: 100%;
+      height: 210px;
+      object-fit: cover;
+      background: #efe8dc;
+    }
+    figcaption {
+      padding: 10px 12px 12px;
+      font-size: 0.93rem;
+      color: var(--muted);
+    }
+    .small {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SVG Capability Evolution Executive Report</h1>
+    <p class="lede">
+      This page summarizes the capability progression from <code>spec02</code> through
+      <code>spec06</code>. The early runs were raw-SVG experiments with older legacy probes;
+      the later runs use structured probe contracts and richer held-out evaluation. The
+      numbers are not perfectly comparable across every line, but the capability trend is.
+    </p>
+
+    <div class="callout">
+      <strong>Bottom line.</strong> The line has progressed from raw valid SVG emission,
+      to representation failure diagnosis, to structured scene control, and then into
+      held-out infographic template filling. With <code>spec06 r6</code>, the work is now
+      in very narrow repair territory, not basic feasibility territory.
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h3>First Practical Win</h3>
+        <div class="metric good">Spec02</div>
+        <p>Raw SVG training worked end to end and produced valid files with partial control.</p>
+      </section>
+      <section class="card">
+        <h3>Critical Failure Lesson</h3>
+        <div class="metric bad">Spec03</div>
+        <p>The bootstrap/tokenizer path failed visibly, proving representation matters more than loss alone.</p>
+      </section>
+      <section class="card">
+        <h3>Held-Out Scene Success</h3>
+        <div class="metric good">Spec05</div>
+        <p><code>80.8%</code> overall exact on the structured scene probe.</p>
+      </section>
+      <section class="card">
+        <h3>Richer Layout Frontier</h3>
+        <div class="metric good">Spec06</div>
+        <p><code>r6</code> reached <code>91.7%</code> overall exact with <code>100%</code> renderability.</p>
+      </section>
+    </div>
+
+    <h2>Capability Timeline</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Spec</th>
+          <th>Representation</th>
+          <th>Headline Result</th>
+          <th>What It Proved</th>
+          <th>Main Limitation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>spec02</code></td>
+          <td>Raw SVG tokens</td>
+          <td>Legacy probe reached up to <code>87.5%</code> adherence on a tiny 6-probe slice; latest stable phase was <code>50.0%</code> adherence with <code>100%</code> valid SVG</td>
+          <td>End-to-end raw SVG generation is trainable</td>
+          <td>Prompt control is fragile and the old probe is noisy</td>
+        </tr>
+        <tr>
+          <td><code>spec03</code></td>
+          <td>Bootstrap + tokenizer variant</td>
+          <td><code>0%</code> valid SVG, <code>0%</code> adherence, <code>0%</code> closure</td>
+          <td>A bad representation contract can fail cleanly and visibly</td>
+          <td>No usable generation capability emerged</td>
+        </tr>
+        <tr>
+          <td><code>spec04</code></td>
+          <td>Structured scene atom DSL</td>
+          <td><code>100%</code> renderable but <code>0%</code> exact on balanced structured probe</td>
+          <td>Syntax and rendering can be made deterministic and automatically scorable</td>
+          <td>Semantic binding and composition were weak</td>
+        </tr>
+        <tr>
+          <td><code>spec05</code></td>
+          <td>Improved structured scene DSL + richer midtrain + 3-layer model</td>
+          <td><code>80.8%</code> overall exact, <code>75.0%</code> dev, <code>87.5%</code> test</td>
+          <td>Held-out structured visual control really emerged</td>
+          <td>A few narrow scene slices still fail</td>
+        </tr>
+        <tr>
+          <td><code>spec06</code></td>
+          <td>Asset-derived infographic templates + slot filling</td>
+          <td><code>r6</code> reached <code>91.7%</code> overall exact with <code>100%</code> renderability</td>
+          <td>The same method extends into headings, bullets, comparison panels, stat cards, and spectrum layouts</td>
+          <td>Only three <code>bullet-panel governance_path</code> mismatches remain</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Evidence Snapshots</h2>
+    <div class="gallery">
+      <figure>
+        <img src="../../../Screenshots/Screenshot%202026-03-10%20at%2009-48-28%20SVG%20Training%20Report%20Card.png" alt="Spec02 training report card">
+        <figcaption>
+          <strong>Spec02.</strong> First practical raw-SVG baseline.
+          <a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_l16_d128_h512_v1024_ctx512_spec02/svg_training_report_card.html">Open training card</a>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="../../../Screenshots/Screenshot%202026-03-09%20at%2009-58-44%20IR%20Visualizer%20svg_spec03_bootstrap_l16_d128_h512_v2048_ctx512%20C-Kernel-Engine.png" alt="Spec03 IR visualizer">
+        <figcaption>
+          <strong>Spec03.</strong> Clear bootstrap miss.
+          <a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_spec03_bootstrap_l16_d128_h512_v2048_ctx512/ir_report.html">Open IR report</a>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="../../../Screenshots/Screenshot%202026-03-10%20at%2014-15-12%20Spec04%20Capability%20Report.png" alt="Spec04 capability report">
+        <figcaption>
+          <strong>Spec04.</strong> Syntax became reliable, semantics did not.
+          <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224/spec04_capability_report.html">Open capability report</a>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="../../../Screenshots/Screenshot%202026-03-11%20at%2009-35-18%20spec05_structured_svg_atoms%20Structured%20Scenes%20Probe%20Report.png" alt="Spec05 probe report">
+        <figcaption>
+          <strong>Spec05.</strong> First strong held-out structured-scene result.
+          <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2/spec05_probe_report.html">Open probe report</a>
+        </figcaption>
+      </figure>
+    </div>
+
+    <h2>What Changed by Line</h2>
+    <p><strong>Spec02:</strong> raw SVG generation proved the training/runtime stack could produce valid files, but the output surface was too entangled for reliable control.</p>
+    <p><strong>Spec03:</strong> the bootstrap/tokenizer path failed despite training running, which made the representation problem impossible to ignore.</p>
+    <p><strong>Spec04:</strong> the structured scene DSL solved syntax, closure, and renderability, and enabled automatic balanced probes. But curriculum-only tweaks inside a flat atom target were not enough to get composition and control binding.</p>
+    <p><strong>Spec05:</strong> richer minimal-pair midtrain data plus a modest architecture increase produced the first real held-out semantic generalization on structured scenes.</p>
+    <p><strong>Spec06:</strong> the same structured approach extended to infographic templates with deterministic layout geometry and model-predicted content slots. By <code>r6</code>, this line reached <code>91.7%</code> overall exact and <code>100%</code> renderability, which is the clearest evidence yet of practical infographic capability.</p>
+
+    <h2>Canonical Artifacts</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Spec</th>
+          <th>Canonical Artifact</th>
+          <th>Supporting Report</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>spec02</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_l16_d128_h512_v1024_ctx512_spec02/svg_training_report_card.html">training card</a></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_l16_d128_h512_v1024_ctx512_spec02/ir_report.html">IR report</a></td>
+        </tr>
+        <tr>
+          <td><code>spec03</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_spec03_bootstrap_l16_d128_h512_v2048_ctx512/svg_training_report_card.html">training card</a></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/svg_spec03_bootstrap_l16_d128_h512_v2048_ctx512/ir_report.html">IR report</a></td>
+        </tr>
+        <tr>
+          <td><code>spec04</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224/spec04_capability_report.html">capability report</a></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec04_structured_scenes_ctx512_d64_h128_v224/spec04_probe_report.html">probe report</a></td>
+        </tr>
+        <tr>
+          <td><code>spec05</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2/spec05_probe_report.html">probe report</a></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec05_structured_scenes_l3_d192_h384_ctx128_r2/spec05_tested_prompts_report.html">tested prompts</a></td>
+        </tr>
+        <tr>
+          <td><code>spec06</code></td>
+          <td><a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/spec06_probe_report.html">r6 probe report</a></td>
+          <td><a href="/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/spec06_progression_report_20260311.html">progression report</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Why This Matters</h2>
+    <ul>
+      <li>This is not just “making SVGs.” It is building a governed benchmark for structured generation that can be scored automatically.</li>
+      <li>The line now demonstrates progression from syntax learning to layout control and then to richer templated infographic composition.</li>
+      <li>The remaining failures in <code>spec06</code> are narrow and diagnosable, which is a much stronger engineering position than broad collapse.</li>
+    </ul>
+
+    <h2>Live Status</h2>
+    <p>As of March 12, 2026, the current best run is <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6">spec06 r6</a>.</p>
+    <ul>
+      <li>Ledger: <a href="/home/antshiv/.cache/ck-engine-v7/models/train/spec06_structured_infographics_l3_d192_h384_ctx512_r6/run_ledger.jsonl">run_ledger.jsonl</a></li>
+      <li>Status: pretrain and midtrain completed; probe report generated</li>
+    </ul>
+
+    <p class="small">
+      Companion reports:
+      <a href="/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/spec04_spec05_iteration_report_20260311.html">spec04/spec05 iteration report</a>,
+      <a href="/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/spec06_progression_report_20260311.html">spec06 progression report</a>,
+      <a href="/home/antshiv/.cache/ck-engine-v7/models/ir_hub.html">IR Hub</a>.
+    </p>
+  </main>
+</body>
+</html>
