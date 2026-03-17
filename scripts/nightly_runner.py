@@ -373,6 +373,18 @@ MAKE_TARGETS = {
         "target": "v7-ir-visualizer-e2e-nightly",
         "timeout_sec": 5400,
     },
+    "v7_visualizer_health": {
+        "name": "v7 Visualizer Health (L1+L2)",
+        "category": "parity",
+        "target": "v7-visualizer-health",
+        "timeout_sec": 60,
+    },
+    "v7_visualizer_generated_e2e": {
+        "name": "v7 Visualizer Generated E2E (L3)",
+        "category": "parity",
+        "target": "v7-visualizer-generated-e2e",
+        "timeout_sec": 600,
+    },
     "v7_core_stabilization_nightly": {
         "name": "v7 Core Stabilization Matrix",
         "category": "training",
@@ -404,6 +416,8 @@ QUICK_TESTS = [
 MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v6.6-validate-matrix-nightly": ROOT / "version" / "v6.6" / "tools" / "model_matrix_report_latest.json",
     "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
+    "v7-visualizer-health": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_health_latest.json",
+    "v7-visualizer-generated-e2e": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_generated_e2e_latest.json",
     "v7-stabilization-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "training_stabilization_scorecard_latest.json",
 }
 

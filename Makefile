@@ -1276,6 +1276,7 @@ unittest:
 	@echo "  make visualizer       - Run v7 IR visualizer E2E regression"
 	@echo "  make visualizer-full  - Run visualizer E2E + train-runtime ASan artifact checks"
 	@echo "  make v7-visualizer-health - Fast HTML/JS health check (tabs, functions, contracts)"
+	@echo "  make v7-visualizer-generated-e2e - L3: generate + validate all visualizer artifacts"
 	@echo ""
 
 # Typo aliases
@@ -3164,7 +3165,7 @@ report-md:
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
-.PHONY: v7-visualizer-health
+.PHONY: v7-visualizer-health v7-visualizer-generated-e2e
 .PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
@@ -4084,6 +4085,12 @@ v7-visualizer-health:
 	@$(PYTHON) version/v7/scripts/test_visualizer_health_v7.py --source --json-out $(V7_REPORT_DIR)/visualizer_health_latest.json
 	@echo "Running visualizer JS unit tests..."
 	@$(PYTHON) version/v7/scripts/test_visualizer_js_units_v7.py --json-out $(V7_REPORT_DIR)/visualizer_js_units_latest.json
+
+v7-visualizer-generated-e2e:
+	@echo "Running Level 3 generated-file E2E..."
+	@$(PYTHON) version/v7/scripts/test_visualizer_generated_e2e_v7.py \
+		$(if $(RUN),--run $(RUN),) \
+		--json-out $(V7_REPORT_DIR)/visualizer_generated_e2e_latest.json
 
 visualizer-full:
 	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1

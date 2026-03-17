@@ -458,6 +458,7 @@
     }
     .viz-l1 { background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.3); color: #47b475; }
     .viz-l2 { background: rgba(7,173,248,0.12); border: 1px solid rgba(7,173,248,0.3); color: #07adf8; }
+    .viz-l3 { background: rgba(255,140,0,0.12); border: 1px solid rgba(255,140,0,0.3); color: #ff8c00; }
     .viz-count {
       font-family: 'JetBrains Mono', monospace;
       color: #ffb400;
@@ -561,6 +562,7 @@
       <tr><td><span class="viz-level viz-l1">L1</span></td><td>IR Hub</td><td class="viz-count">~5</td><td><code>pre-push</code></td></tr>
       <tr><td><span class="viz-level viz-l2">L2</span></td><td>IR Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
       <tr><td><span class="viz-level viz-l2">L2</span></td><td>DS Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l3">L3</span></td><td>Generated E2E (all 3 visualizers)</td><td class="viz-count">~24-44</td><td><code>nightly</code></td></tr>
       <tr>
         <td colspan="2" style="text-align: right; font-weight: 700;">Total</td>
         <td class="viz-count" style="font-size: 1rem;">~260</td>
@@ -578,6 +580,33 @@
       Add a tab or function? Update the contract — tests auto-expand.
     </div>
   </div>
+
+  <h3>Level 3 — Generated-File E2E (Nightly)</h3>
+  <p>
+    Validates the full generation → validation chain: generate all three
+    visualizer HTML files from the latest training run, then run L1 health
+    checks + embedded JSON structure + cross-artifact consistency on the output.
+  </p>
+  <p style="font-size: 0.85rem; color: var(--text-muted);">
+    Run locally: <code>make v7-visualizer-generated-e2e</code>
+    · Specific run: <code>make v7-visualizer-generated-e2e RUN=/path/to/run</code>
+  </p>
+
+  <table class="viz-matrix">
+    <thead>
+      <tr><th>Stage</th><th>What it validates</th><th>Artifact</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="viz-component">Generate</td><td>ir_report.html via <code>open_ir_visualizer.py</code></td><td>ir_report.html</td></tr>
+      <tr><td class="viz-component">Generate</td><td>dataset_viewer.html via <code>prepare_run_viewer.py</code></td><td>dataset_viewer.html</td></tr>
+      <tr><td class="viz-component">Generate</td><td>ir_hub.html via <code>open_ir_hub.py</code></td><td>ir_hub.html</td></tr>
+      <tr><td class="viz-component">L1 Health</td><td>Tabs, functions, DOM targets in generated output</td><td>All three files</td></tr>
+      <tr><td class="viz-component">JSON Structure</td><td>Embedded JSON blobs (run_config, ir1_decode, layout_decode)</td><td>ir_report.html</td></tr>
+      <tr><td class="viz-component">Panel Structure</td><td>Panel IDs, attnColor presence, file size</td><td>dataset_viewer.html</td></tr>
+      <tr><td class="viz-component">Hub Structure</td><td>Run cards, ir_report links, navigation</td><td>ir_hub.html</td></tr>
+      <tr><td class="viz-component">Cross-artifact</td><td>Run name in hub, vocab consistency, config.json</td><td>All three files</td></tr>
+    </tbody>
+  </table>
 </div>
 
 <script>
