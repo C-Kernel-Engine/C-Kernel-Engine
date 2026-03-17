@@ -1,0 +1,216 @@
+{
+  "$schema": "visualizer_contract_v1",
+  "name": "ir_visualizer",
+  "description": "CK-Engine v7 IR Visualizer — inference + training tabs",
+  "source": "version/v7/tools/ir_visualizer.html",
+
+  "tabs": [
+    {
+      "id": "memory",
+      "label": "Memory",
+      "render_fn": "renderMemory",
+      "panel_id": "memory",
+      "description": "Bump allocator layout, weight/activation memory"
+    },
+    {
+      "id": "kernels",
+      "label": "Kernel Flow",
+      "render_fn": "renderKernelFlow",
+      "panel_id": "kernels",
+      "description": "Operator DAG, kernel selection, fusion"
+    },
+    {
+      "id": "stats",
+      "label": "Stats",
+      "render_fn": "renderStats",
+      "panel_id": "stats",
+      "description": "FLOP counts, throughput, operator summary"
+    },
+    {
+      "id": "training",
+      "label": "Training",
+      "render_fn": "renderTraining",
+      "panel_id": "training",
+      "description": "Loss curves, optimizer state, parity dashboard"
+    },
+    {
+      "id": "quantization",
+      "label": "Quantization",
+      "render_fn": "renderQuantizationAudit",
+      "panel_id": "quantization",
+      "description": "Quant format audit, precision analysis"
+    },
+    {
+      "id": "dataflow",
+      "label": "Dataflow",
+      "render_fn": "renderDataflow",
+      "panel_id": "dataflow",
+      "description": "Tensor dataflow graph, shape propagation"
+    },
+    {
+      "id": "interpretability",
+      "label": "Interpretability",
+      "render_fn": "renderOperatorMathIntuition",
+      "panel_id": "interpretability",
+      "description": "Operator math intuition, transformer anatomy"
+    },
+    {
+      "id": "profile",
+      "label": "Profile",
+      "render_fn": "renderProfile",
+      "panel_id": "profile",
+      "description": "Decode timing, token/s, VTune/Advisor"
+    },
+    {
+      "id": "data-pipeline",
+      "label": "Data Pipeline",
+      "render_fn": "renderDataPipeline",
+      "panel_id": "data-pipeline",
+      "description": "Tokenizer stats, GGUF metadata, model provenance"
+    },
+    {
+      "id": "parity",
+      "label": "Parity",
+      "render_fn": "renderParityCockpit",
+      "panel_id": "parity",
+      "description": "CK vs llama.cpp parity results"
+    }
+  ],
+
+  "required_functions": {
+    "core": [
+      "formatBytes",
+      "setElText",
+      "setElHtml",
+      "renderAll",
+      "renderActiveTab",
+      "renderTabIfDirty",
+      "bootstrapFromEmbeddedData",
+      "showTab",
+      "updateOperatorSummary"
+    ],
+    "per_tab": [
+      "renderMemory",
+      "renderKernelFlow",
+      "renderStats",
+      "renderTraining",
+      "renderQuantizationAudit",
+      "renderDataflow",
+      "renderProfile",
+      "renderDataPipeline",
+      "renderParityCockpit"
+    ],
+    "utilities": [
+      "normalizeShapeInput",
+      "formatShapeDisplay",
+      "normalizeMode",
+      "escapeHtml",
+      "quoteShell",
+      "normalizePathString",
+      "pathDirname",
+      "extractGgufStem",
+      "relativePathFromTo"
+    ]
+  },
+
+  "required_dom_elements": [
+    "totalWeights",
+    "totalActivations",
+    "totalMemory",
+    "perfFlops",
+    "bumpSize",
+    "bumpLayers",
+    "bumpWeights"
+  ],
+
+  "pure_function_tests": {
+    "fixture_file": "version/v7/tests/fixtures/ir_pure_functions.js",
+    "functions": [
+      {
+        "name": "formatBytes",
+        "tests": [
+          { "name": "bytes",     "call": "formatBytes(512)",                     "expect": "512 B" },
+          { "name": "KB",        "call": "formatBytes(2048)",                    "expect": "2.00 KB" },
+          { "name": "MB",        "call": "formatBytes(3 * 1024 * 1024)",         "expect": "3.00 MB" },
+          { "name": "GB",        "call": "formatBytes(2.5 * 1024 ** 3)",         "expect": "2.50 GB" }
+        ]
+      },
+      {
+        "name": "normalizeShapeInput",
+        "tests": [
+          { "name": "null",       "call": "normalizeShapeInput(null)",             "expect": [] },
+          { "name": "array",      "call": "normalizeShapeInput([2,3,4])",          "expect": ["2","3","4"] },
+          { "name": "string",     "call": "normalizeShapeInput('2x3x4')",          "expect": ["2","3","4"] },
+          { "name": "bracketed",  "call": "normalizeShapeInput('[2,3,4]')",         "expect": ["2","3","4"] },
+          { "name": "number",     "call": "normalizeShapeInput(42)",               "expect": ["42"] },
+          { "name": "empty",      "call": "normalizeShapeInput('')",               "expect": [] },
+          { "name": "obj_shape",  "call": "normalizeShapeInput({shape:[1,2]})",    "expect": ["1","2"] }
+        ]
+      },
+      {
+        "name": "formatShapeDisplay",
+        "tests": [
+          { "name": "multi",  "call": "formatShapeDisplay([2,3,4])",  "expect": "2 × 3 × 4" },
+          { "name": "single", "call": "formatShapeDisplay([5])",      "expect": "[5]" },
+          { "name": "empty",  "call": "formatShapeDisplay(null)",     "expect": "-" }
+        ]
+      },
+      {
+        "name": "normalizeMode",
+        "tests": [
+          { "name": "prefill", "call": "normalizeMode('prefill')", "expect": "prefill" },
+          { "name": "decode",  "call": "normalizeMode('decode')",  "expect": "decode" },
+          { "name": "other",   "call": "normalizeMode('xyz')",     "expect": "decode" }
+        ]
+      },
+      {
+        "name": "escapeHtml",
+        "tests": [
+          { "name": "tags",   "call": "escapeHtml('<b>hi</b>')",  "expect": "&lt;b&gt;hi&lt;/b&gt;" },
+          { "name": "quotes", "call": "escapeHtml('a\"b')",       "expect": "a&quot;b" },
+          { "name": "null",   "call": "escapeHtml(null)",         "expect": "" }
+        ]
+      },
+      {
+        "name": "quoteShell",
+        "tests": [
+          { "name": "safe",   "call": "quoteShell('hello')",       "expect": "hello" },
+          { "name": "spaces", "call": "quoteShell('hello world')", "expect": "\"hello world\"" },
+          { "name": "empty",  "call": "quoteShell('')",            "expect": "" }
+        ]
+      },
+      {
+        "name": "normalizePathString",
+        "tests": [
+          { "name": "backslash", "call": "normalizePathString('a\\\\b\\\\c')", "expect": "a/b/c" },
+          { "name": "trailing",  "call": "normalizePathString('/a/b/')",       "expect": "/a/b" }
+        ]
+      },
+      {
+        "name": "pathDirname",
+        "tests": [
+          { "name": "basic", "call": "pathDirname('/a/b/c')", "expect": "/a/b" },
+          { "name": "root",  "call": "pathDirname('/a')",     "expect": "/" },
+          { "name": "empty", "call": "pathDirname('')",       "expect": "" }
+        ]
+      },
+      {
+        "name": "extractGgufStem",
+        "tests": [
+          { "name": "path",     "call": "extractGgufStem('/models/qwen.gguf')",          "expect": "qwen" },
+          { "name": "url",      "call": "extractGgufStem('https://x.co/m.gguf?dl=1')",   "expect": "m" },
+          { "name": "non_gguf", "call": "extractGgufStem('model.bin')",                   "expect": "" }
+        ]
+      },
+      {
+        "name": "relativePathFromTo",
+        "tests": [
+          { "name": "sibling", "call": "relativePathFromTo('/a/b', '/a/c')",   "expect": "../c" },
+          { "name": "child",   "call": "relativePathFromTo('/a/b', '/a/b/c')", "expect": "c" },
+          { "name": "same",    "call": "relativePathFromTo('/a/b', '/a/b')",   "expect": "." },
+          { "name": "nonabs",  "call": "relativePathFromTo('a/b', '/c')",      "expect": null }
+        ]
+      }
+    ]
+  }
+}

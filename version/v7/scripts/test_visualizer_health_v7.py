@@ -185,77 +185,64 @@ def check_js_syntax(js: str) -> tuple[bool, str]:
 
 # ── Contract definitions ─────────────────────────────────────────────────────
 
-# IR Visualizer: expected tabs and their render functions
-IR_VIZ_TAB_CONTRACTS: dict[str, dict[str, Any]] = {
-    "memory":           {"render_fn": "renderMemory",            "panel_id": "memory"},
-    "kernels":          {"render_fn": "renderKernelFlow",        "panel_id": "kernels"},
-    "stats":            {"render_fn": "renderStats",             "panel_id": "stats"},
-    "training":         {"render_fn": "renderTraining",          "panel_id": "training"},
-    "quantization":     {"render_fn": "renderQuantizationAudit", "panel_id": "quantization"},
-    "dataflow":         {"render_fn": "renderDataflow",          "panel_id": "dataflow"},
-    "interpretability": {"render_fn": "renderOperatorMathIntuition", "panel_id": "interpretability"},
-    "profile":          {"render_fn": "renderProfile",           "panel_id": "profile"},
-    "data-pipeline":    {"render_fn": "renderDataPipeline",      "panel_id": "data-pipeline"},
-    "parity":           {"render_fn": "renderParityCockpit",     "panel_id": "parity"},
-}
+CONTRACTS_DIR = ROOT / "version" / "v7" / "tests" / "contracts"
 
-# IR Visualizer: critical functions that must exist
-IR_VIZ_REQUIRED_FUNCTIONS = [
-    "formatBytes", "setElText", "setElHtml", "renderAll", "renderActiveTab",
-    "renderTabIfDirty", "bootstrapFromEmbeddedData", "showTab",
-    "updateOperatorSummary", "renderMemory", "renderKernelFlow",
-    "renderStats", "renderTraining", "renderQuantizationAudit",
-    "renderDataflow", "renderProfile", "renderDataPipeline",
-    "renderParityCockpit",
-]
 
-# IR Visualizer: critical DOM elements
-IR_VIZ_REQUIRED_ELEMENTS = [
-    "totalWeights", "totalActivations", "totalMemory",
-    "perfFlops", "bumpSize", "bumpLayers", "bumpWeights",
-]
+def _load_contract(name: str) -> dict:
+    """Load a contract JSON, return empty dict on failure."""
+    path = CONTRACTS_DIR / f"{name}_contract.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
 
-# Dataset Viewer: expected tabs and their render functions
-DV_TAB_CONTRACTS: dict[str, dict[str, Any]] = {
-    "overview":       {"render_fn": "renderOverview",       "panel_el": True},
-    "preflight":      {"render_fn": "renderPreflight",      "panel_el": True},
-    "gallery":        {"render_fn": "renderGallery",        "panel_el": True},
-    "text":           {"render_fn": "renderTextSamples",    "panel_el": True},
-    "tokenizer":      {"render_fn": "renderTokenizer",      "panel_el": True},
-    "vocabulary":     {"render_fn": "renderVocabulary",     "panel_el": True},
-    "classification": {"render_fn": "renderClassification", "panel_el": True},
-    "browse":         {"render_fn": "renderBrowse",         "panel_el": True},
-    "candidates":     {"render_fn": "renderCandidates",     "panel_el": True},
-    "quality":        {"render_fn": "renderQuality",        "panel_el": True},
-    "embeddings":     {"render_fn": "renderEmbeddings",     "panel_el": True},
-    "attention":      {"render_fn": "renderAttention",      "panel_el": True},
-}
 
-# Dataset Viewer: critical functions that must exist
-DV_REQUIRED_FUNCTIONS = [
-    "renderAll", "openModal", "closeModal", "esc", "statCardHtml",
-    "filteredEntries", "renderHeader", "renderOverview", "renderPreflight",
-    "renderGallery", "renderTextSamples", "renderTokenizer",
-    "renderVocabulary", "renderClassification", "renderBrowse",
-    "renderCandidates", "renderQuality", "renderEmbeddings", "renderAttention",
-    # Embedding subsystem
-    "embColor", "embNormalise", "cosineSim", "drawEmbHeatmap",
-    "loadEmbData", "embSortedIndices", "drawEmbColorbar", "renderSimPanel",
-    # Attention subsystem
-    "attnColor", "drawAttnMatrix", "drawAttnThumb", "attnEntropy",
-    "avgMatrices", "attnGetMatrix", "loadAttnData",
-    "renderAttnMain", "renderAttnSeqList", "renderAttnTokenChips",
-    "openAttnDetail", "openAttnDetailMatrix",
-    # Demo generators
-    "generateEmbDemo", "generateAttnDemo",
-]
+def _contract_to_tab_map(contract: dict) -> dict[str, dict[str, Any]]:
+    """Convert contract tabs list → {tab_id: {render_fn, panel_id}} dict."""
+    result: dict[str, dict[str, Any]] = {}
+    for tab in contract.get("tabs", []):
+        result[tab["id"]] = {
+            "render_fn": tab.get("render_fn", ""),
+            "panel_id": tab.get("panel_id", tab["id"]),
+        }
+    return result
 
-# Dataset Viewer: critical DOM elements referenced by JS
-DV_REQUIRED_ELEMENTS = [
-    "searchBox", "filterFamily", "filterRole", "modalOverlay",
-    "attnMainView", "attnDetailPanel", "attnDetailCanvas",
-    "embCanvas", "embColorbar",
-]
+
+def _contract_required_fns(contract: dict) -> list[str]:
+    """Collect all required functions from a contract."""
+    fns = contract.get("required_functions", {})
+    result: list[str] = []
+    for group in fns.values():
+        if isinstance(group, list):
+            result.extend(group)
+    return result
+
+
+def _contract_required_els(contract: dict) -> list[str]:
+    """Collect required DOM elements from a contract."""
+    return contract.get("required_dom_elements", [])
+
+
+def _load_contracts() -> tuple:
+    """Load IR and dataset viewer contracts, return (ir_tabs, ir_fns, ir_els, dv_tabs, dv_fns, dv_els)."""
+    ir = _load_contract("ir_visualizer")
+    dv = _load_contract("dataset_viewer")
+    return (
+        _contract_to_tab_map(ir),
+        _contract_required_fns(ir),
+        _contract_required_els(ir),
+        _contract_to_tab_map(dv),
+        _contract_required_fns(dv),
+        _contract_required_els(dv),
+    )
+
+
+# Load from JSON contracts (single source of truth)
+(IR_VIZ_TAB_CONTRACTS, IR_VIZ_REQUIRED_FUNCTIONS, IR_VIZ_REQUIRED_ELEMENTS,
+ DV_TAB_CONTRACTS, DV_REQUIRED_FUNCTIONS, DV_REQUIRED_ELEMENTS) = _load_contracts()
+
 
 
 # ── Test suites ──────────────────────────────────────────────────────────────
