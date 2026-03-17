@@ -49,8 +49,10 @@ def _dataset_workspace(run_dir: Path) -> Path | None:
         manifest_dir = candidate / "manifests"
         if not manifest_dir.is_dir():
             continue
-        required = ["asset_classification_manifest.json"]
-        if all((manifest_dir / f).exists() for f in required):
+        # Accept any workspace manifest: *_workspace_manifest.json,
+        # asset_classification_manifest.json, or any .json in manifests/
+        jsons = list(manifest_dir.glob("*.json"))
+        if jsons:
             return candidate
     # Also check dataset_snapshot.json for workspace pointer
     snap = run_dir / "dataset" / "dataset_snapshot.json"
@@ -63,8 +65,7 @@ def _dataset_workspace(run_dir: Path) -> Path | None:
                     ws_path = Path(ws)
                     manifest_dir = ws_path / "manifests"
                     if manifest_dir.is_dir():
-                        required = ["asset_classification_manifest.json"]
-                        if all((manifest_dir / f).exists() for f in required):
+                        if list(manifest_dir.glob("*.json")):
                             return ws_path
         except Exception:
             pass
@@ -137,12 +138,32 @@ def prepare_run(run_dir: Path, *, force: bool = False, dry_run: bool = False) ->
         cmd = [sys.executable, str(SCRIPT_DIR / "export_attention.py"), str(run_dir)]
         if has_probe:
             cmd.append("--probe")
-        ok = run_step(
-            "Export attention → attention.json",
-            cmd,
-            dry_run,
-        )
-        status["attention"] = "ok" if ok else "fail"
+        else:
+            # No probe_report — try generating one from tokenizer vocab
+            gen_script = REPO_ROOT / "version" / "v7" / "tools" / "generate_fallback_probe_v7.py"
+            if gen_script.exists():
+                run_step(
+                    "Generate fallback probe_report.json",
+                    [sys.executable, str(gen_script), str(run_dir)],
+                    dry_run,
+                )
+                if (run_dir / "probe_report.json").exists():
+                    cmd.append("--probe")
+                else:
+                    print(f"  ⏭ skipping attention: no probe_report and fallback generation failed")
+                    status["attention"] = "skip"
+                    cmd = None
+            else:
+                print(f"  ⏭ skipping attention: no probe_report.json (run generate_fallback_probe_v7.py first)")
+                status["attention"] = "skip"
+                cmd = None
+        if cmd is not None:
+            ok = run_step(
+                "Export attention → attention.json",
+                cmd,
+                dry_run,
+            )
+            status["attention"] = "ok" if ok else "fail"
     elif attn_path.exists():
         print(f"  ⏭ attention.json already exists (use --force to regenerate)")
         status["attention"] = "exists"
