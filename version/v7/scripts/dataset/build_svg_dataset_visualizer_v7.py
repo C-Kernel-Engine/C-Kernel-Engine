@@ -4141,7 +4141,7 @@ function renderTraining() {
             var stg = stages[sn];
             var red = (stg.first_loss && stg.last_loss && stg.last_loss > 0) ? (stg.first_loss / stg.last_loss).toFixed(1) + '\u00d7' : '\u2014';
             html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
-                + '<td style="padding:0.4rem;color:var(--orange);">' + escapeHtml(sn) + '</td>'
+                + '<td style="padding:0.4rem;color:var(--orange);">' + esc(sn) + '</td>'
                 + '<td style="text-align:right;padding:0.4rem;">' + stg.count + '</td>'
                 + '<td style="text-align:right;padding:0.4rem;">' + (stg.first_loss != null ? stg.first_loss.toFixed(4) : '\u2014') + '</td>'
                 + '<td style="text-align:right;padding:0.4rem;">' + (stg.last_loss != null ? stg.last_loss.toFixed(4) : '\u2014') + '</td>'
