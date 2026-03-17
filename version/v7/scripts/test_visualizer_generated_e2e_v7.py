@@ -444,6 +444,22 @@ def validate_dataset_viewer_structure(dv_path: Path) -> StageResult:
             "defined" if has_attn_def else "not referenced (ok)",
         ))
 
+    # Pipeline map: script → artifact → tab mapping
+    has_pipeline_map = "CK_PIPELINE_MAP" in html
+    stage.checks.append(Check(
+        "has CK_PIPELINE_MAP embedded data",
+        has_pipeline_map,
+        "present" if has_pipeline_map else "missing — pipeline map not embedded",
+    ))
+
+    # Provenance banner for synthesized data
+    has_provenance = "provenanceBanner" in html
+    stage.checks.append(Check(
+        "has provenanceBanner function",
+        has_provenance,
+        "defined" if has_provenance else "missing — no data provenance tracking",
+    ))
+
     # File size check
     size = len(html)
     stage.checks.append(Check(

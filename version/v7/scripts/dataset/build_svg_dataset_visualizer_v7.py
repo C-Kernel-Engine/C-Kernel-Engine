@@ -223,6 +223,106 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
     return normalized, classified
 
 
+def _build_pipeline_map(workspace: Path, raw_inventory: dict, normalized: dict,
+                        classified: dict, training_data: dict | None,
+                        emb_data: dict | None, attn_data: dict | None) -> list[dict]:
+    """Build a script → artifact → tab mapping with live status.
+
+    Each entry tells the operator:
+      - which tab uses this artifact
+      - which script generates it
+      - whether the artifact is present, synthesized, or missing
+      - the command to generate it if missing
+    """
+    run_dir = _resolve_run_dir(workspace)
+    if not run_dir:
+        candidate = workspace.parent
+        if (candidate / "weights_manifest.json").exists():
+            run_dir = candidate
+    run_str = str(run_dir) if run_dir else str(workspace.parent)
+    ws_str = str(workspace)
+
+    is_synth = normalized.get("schema", "").startswith("ck.structured_atoms_synthesized")
+
+    entries = [
+        {
+            "tab": "Vocabulary",
+            "artifact": "normalized_assets_manifest.json",
+            "script": "normalize_svg_assets_v7.py",
+            "status": "synthesized" if is_synth else ("present" if normalized.get("normalized_entries") else "missing"),
+            "detail": (f"Synthesized from render catalog ({normalized.get('normalized_entries', 0)} entries)"
+                       if is_synth
+                       else f"{normalized.get('normalized_entries', 0)} entries" if normalized.get("normalized_entries")
+                       else "Trained without SVG normalization step"),
+            "command": f"python3 version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace {ws_str}",
+        },
+        {
+            "tab": "Classification",
+            "artifact": "asset_classification_manifest.json",
+            "script": "classify_svg_assets_v7.py",
+            "status": "synthesized" if (is_synth and classified.get("entries")) else ("present" if classified.get("entries") else "missing"),
+            "detail": (f"Synthesized from render catalog ({len(classified.get('entries', []))} entries)"
+                       if is_synth
+                       else f"{len(classified.get('entries', []))} entries" if classified.get("entries")
+                       else "Trained without asset classification step"),
+            "command": f"python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace {ws_str}",
+        },
+        {
+            "tab": "Gallery",
+            "artifact": "asset_classification_manifest.json + SVG files",
+            "script": "classify_svg_assets_v7.py",
+            "status": "present" if classified.get("entries") and not is_synth else ("na" if is_synth else "missing"),
+            "detail": ("N/A — structured-atoms workspace uses DSL text, not rendered SVG files"
+                       if is_synth
+                       else f"{len(classified.get('entries', []))} assets" if classified.get("entries")
+                       else "No classified SVG assets found"),
+            "command": f"python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace {ws_str}",
+        },
+        {
+            "tab": "Training",
+            "artifact": "training_loss_curve.json",
+            "script": "train_e2e_v7.py (generated during training)",
+            "status": "present" if (training_data and training_data.get("available")) else "missing",
+            "detail": (f"{training_data.get('summary', {}).get('total_steps', 0)} steps recorded"
+                       if training_data and training_data.get("available")
+                       else "No training curve recorded — re-run training with loss logging enabled"),
+            "command": f"python3 version/v7/scripts/train_e2e_v7.py --run-dir {run_str}",
+        },
+        {
+            "tab": "Embeddings",
+            "artifact": "embeddings.json",
+            "script": "export_embeddings.py",
+            "status": "present" if emb_data else "missing",
+            "detail": (f"{emb_data.get('num_tokens', '?')} tokens × {emb_data.get('embed_dim', '?')} dims"
+                       if emb_data
+                       else "Export token embeddings from trained weights"),
+            "command": f"python3 version/v7/tools/export_embeddings.py {run_str}",
+        },
+        {
+            "tab": "Attention",
+            "artifact": "attention.json",
+            "script": "export_attention.py",
+            "status": "present" if attn_data else "missing",
+            "detail": (f"{attn_data.get('num_sequences', '?')} sequences, {attn_data.get('num_layers', '?')} layers"
+                       if attn_data
+                       else "Export attention matrices from probe sequences"),
+            "command": f"python3 version/v7/tools/export_attention.py {run_str} --probe",
+        },
+        {
+            "tab": "Quality",
+            "artifact": "normalized_assets_manifest.json",
+            "script": "normalize_svg_assets_v7.py",
+            "status": "synthesized" if is_synth else ("present" if normalized.get("normalized_entries") else "missing"),
+            "detail": (f"Synthesized from render catalog"
+                       if is_synth
+                       else f"{normalized.get('normalized_entries', 0)} entries" if normalized.get("normalized_entries")
+                       else "Requires normalization corpus"),
+            "command": f"python3 version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace {ws_str}",
+        },
+    ]
+    return entries
+
+
 def _build_gallery_items(classified: dict, workspace: Path) -> list[dict]:
     """Build gallery items with embedded SVG data-URIs from classification manifest."""
     items = []
@@ -980,6 +1080,9 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
     emb_data = _load_embeddings_data(run_dir) if run_dir else None
     attn_data = _load_attention_data(run_dir) if run_dir else None
     training_data = _load_training_data(run_dir) if run_dir else None
+
+    pipeline_map = _build_pipeline_map(workspace, raw_inventory, normalized,
+                                       classified, training_data, emb_data, attn_data)
     
     return (
         _HTML_PREFIX
@@ -995,6 +1098,7 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
         + f"const CK_ATTENTION = {_json_for_embed(attn_data)};\n"
         + f"const CK_PREFLIGHT = {_json_for_embed(preflight_info)};\n"
         + f"const CK_TRAINING = {_json_for_embed(training_data)};\n"
+        + f"const CK_PIPELINE_MAP = {_json_for_embed(pipeline_map)};\n"
         + "</script>\n"
         + _HTML_SUFFIX
     )
@@ -2041,6 +2145,14 @@ const suggested     = (typeof cls.suggested_splits === 'object' && cls.suggested
 // ── Empty-state helper ──────────────────────────────────────────
 // ws = CK_WORKSPACE (dataset dir), runDir = parent of ws (run dir)
 var runDir = ws ? ws.replace(/\/dataset\/?$/, '') : '';
+// Data provenance: detect if vocab/classification was synthesized from render catalog
+var isSynthesized = (norm.schema || '').indexOf('synthesized') >= 0;
+
+function provenanceBanner(source) {
+    return '<div style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.2);border-radius:6px;padding:0.6rem 1rem;margin-bottom:1rem;font-size:0.8rem;color:var(--orange);">'
+        + '🔄 <strong>Data source:</strong> ' + source
+        + '</div>';
+}
 
 function emptyTabHtml(icon, title, reason, cmds) {
     var h = '<div style="text-align:center;padding:2.5rem;color:var(--text-muted);">'
@@ -2235,6 +2347,33 @@ function renderPreflight() {
     canaryHtml += healthRowHtml(preflight.holdout_count > 0 ? 'ok' : 'err', 'Holdout assets reserved', `${fmt(preflight.holdout_count || 0)} assets`);
     canaryHtml += healthRowHtml(preflight.canary_prompt_files_present ? 'ok' : 'warn', 'Prompt-level canary file', preflight.canary_prompt_files_present ? 'present' : 'missing');
     document.getElementById('preflightCanaryBody').innerHTML = canaryHtml;
+
+    // ── Pipeline Map: script → artifact → tab ──
+    var pmap = (typeof CK_PIPELINE_MAP !== 'undefined') ? CK_PIPELINE_MAP : [];
+    if (pmap.length) {
+        var pmDiv = document.createElement('div');
+        pmDiv.style.marginTop = '1.5rem';
+        var pmHtml = '<div class="subhead">🗺️ Pipeline Map — Script → Artifact → Tab</div>';
+        pmHtml += '<div class="subnote">Which scripts produce which artifacts for which tabs. Status shows whether the artifact was found, synthesized from the render catalog, or is missing. Copy commands to generate missing artifacts.</div>';
+        pmHtml += '<table><thead><tr><th>Tab</th><th>Artifact</th><th>Script</th><th>Status</th><th>Detail</th></tr></thead><tbody>';
+        pmap.forEach(function(row) {
+            var tone = row.status === 'present' ? 'color:var(--green)' : (row.status === 'synthesized' ? 'color:var(--orange)' : (row.status === 'na' ? 'color:var(--text-muted)' : 'color:var(--red)'));
+            var badge = row.status === 'present' ? '✅' : (row.status === 'synthesized' ? '🔄' : (row.status === 'na' ? '➖' : '❌'));
+            pmHtml += '<tr>';
+            pmHtml += '<td class="mono">' + esc(row.tab) + '</td>';
+            pmHtml += '<td class="mono" style="font-size:0.75rem">' + esc(row.artifact) + '</td>';
+            pmHtml += '<td class="mono" style="font-size:0.75rem">' + esc(row.script) + '</td>';
+            pmHtml += '<td style="' + tone + '">' + badge + ' ' + esc(row.status) + '</td>';
+            pmHtml += '<td style="font-size:0.75rem">' + esc(row.detail) + '</td>';
+            pmHtml += '</tr>';
+            if (row.status === 'missing') {
+                pmHtml += '<tr><td colspan="5" style="padding:0.2rem 1rem 0.6rem 1rem;border-top:none;"><code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;font-size:0.72rem;user-select:all;cursor:text;">' + esc(row.command) + '</code></td></tr>';
+            }
+        });
+        pmHtml += '</tbody></table>';
+        pmDiv.innerHTML = pmHtml;
+        el.appendChild(pmDiv);
+    }
 }
 
 /* ── Tab: Vocabulary ───────────────────────────────────────────── */
@@ -2250,7 +2389,11 @@ function renderVocabulary() {
     const tagTotal = Object.values(tagTotals).reduce((s,v) => s+v, 0);
     const phTotal  = Object.values(placeholders).reduce((s,v) => s+v, 0);
 
-    let html = '<div class="stats-grid">';
+    let html = '';
+    if (isSynthesized) {
+        html += provenanceBanner('Synthesized from structured-atoms render catalog (' + fmt(norm.normalized_entries || 0) + ' DSL entries). This workspace uses DSL text training, not raw SVG files. Tag frequencies reflect DSL tokens and rendered SVG elements.');
+    }
+    html += '<div class="stats-grid">';
     html += statCardHtml(fmt(Object.keys(tagTotals).length), 'SVG Tag Types');
     html += statCardHtml(fmt(tagTotal), 'Total Tag Instances', null, 'blue');
     html += statCardHtml(fmt(Object.keys(placeholders).length), 'Placeholder Types');
@@ -2283,7 +2426,11 @@ function renderClassification() {
         return;
     }
 
-    let html = '<div class="stats-grid">';
+    let html = '';
+    if (isSynthesized) {
+        html += provenanceBanner('Synthesized from render catalog. Families = DSL layout types, sources = topic categories. ' + fmt(total) + ' training entries.');
+    }
+    html += '<div class="stats-grid">';
     html += statCardHtml(fmt(Object.keys(familyCounts).length), 'Families');
     html += statCardHtml(fmt(Object.keys(roleCounts).length), 'Roles');
     html += statCardHtml(fmt(total), 'Classified Assets', null, 'blue');
@@ -2332,6 +2479,11 @@ function renderBrowse() {
     }
     document.getElementById('resultCount').textContent = `${rows.length} assets`;
 
+    var browseProvenance = '';
+    if (isSynthesized) {
+        browseProvenance = provenanceBanner('Synthesized from render catalog. Each row = one DSL training entry. Family = layout type, source = topic.');
+    }
+
     if (state.sortCol) {
         rows = [...rows].sort((a,b) => {
             let va = a[state.sortCol], vb = b[state.sortCol];
@@ -2372,7 +2524,7 @@ function renderBrowse() {
     });
     html += '</tbody></table>';
     html += '<div class="pagination" id="browsePag"></div>';
-    el.innerHTML = html;
+    el.innerHTML = browseProvenance + html;
 
     renderPagination('browsePag', rows.length, PAGE_SIZE, state.browsePage, p => { state.browsePage = p; renderBrowse(); });
 }
@@ -2472,7 +2624,11 @@ function renderQuality() {
     const prompt = tok.prompt_contract || {};
     const drift = tok.manifest_drift || { count: 0, entries: [] };
 
-    let html = '<div class="stats-grid">';
+    let html = '';
+    if (isSynthesized) {
+        html += provenanceBanner('Synthesized from render catalog. Duplicate/failure metrics reflect catalog-level data, not SVG normalization.');
+    }
+    html += '<div class="stats-grid">';
     html += statCardHtml(fmt(dupes), 'Duplicates', null, dupes === 0 ? 'green' : 'red');
     html += statCardHtml(fmt(failCount), 'Parse Failures', null, failCount === 0 ? 'green' : 'red');
     html += statCardHtml(fmt(norm.normalized_entries||0), 'Normalized OK', null, 'green');
@@ -2562,7 +2718,14 @@ function galApplyFilters() {
 
 function renderGallery() {
     if (!CK_GALLERY.length) {
-        document.getElementById('panel-gallery').innerHTML = '<div class="subnote" style="padding:2rem;text-align:center;">No SVG assets found in this dataset.</div>';
+        var galleryMsg = isSynthesized
+            ? 'This workspace uses structured-atoms DSL text training. SVG gallery is not available — visual previews require raw SVG file assets. See the Browse tab for entry-level data.'
+            : 'No SVG assets found in this dataset. Run the classifier to populate gallery items.';
+        document.getElementById('panel-gallery').innerHTML = emptyTabHtml('🖼️', 'No Gallery Data', galleryMsg,
+            isSynthesized ? [] : [
+                'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace ' + ws,
+                'python3 version/v7/tools/prepare_run_viewer.py ' + runDir + ' --force'
+            ]);
         return;
     }
     const families = {};
