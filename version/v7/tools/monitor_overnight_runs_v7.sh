@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PATH="/usr/bin:/bin:/usr/local/bin"
+shopt -s nullglob
 
 ROOT="/home/antshiv/Workspace/C-Kernel-Engine"
 SESSION_NAME="${SESSION_NAME:-ck-v7-overnight}"
@@ -10,6 +11,8 @@ RUN2="${RUN2:-}"
 MAIN_LOG="${MAIN_LOG:-}"
 SNAPSHOT_DIR="${SNAPSHOT_DIR:-$HOME/.cache/ck-engine-v7/models/reports/overnight_monitor}"
 HISTORY_LOG="${HISTORY_LOG:-$SNAPSHOT_DIR/history.log}"
+BASELINE_PROBE="${BASELINE_PROBE:-}"
+TARGET_PROBE="${TARGET_PROBE:-}"
 
 timestamp_utc="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 timestamp_slug="$(date -u +"%Y%m%dT%H%M%SZ")"
@@ -22,23 +25,23 @@ print_probe_summary() {
     return 0
   fi
   jq -r '
-    "probe.count=" + ((.totals.count // 0) | tostring),
-    "probe.exact_rate=" + ((.totals.exact_rate // 0) | tostring),
-    "probe.renderable_rate=" + ((.totals.renderable_rate // 0) | tostring)
+    "probe.path=" + input_filename,
+    "probe.count=" + (((.totals.count // .summary.count) // 0) | tostring),
+    "probe.exact_rate=" + (((.totals.exact_rate // .summary.exact_rate) // 0) | tostring),
+    "probe.renderable_rate=" + (((.totals.renderable_rate // .summary.renderable_rate) // 0) | tostring),
+    "probe.materialized_exact_rate=" + (((.totals.materialized_exact_rate // .summary.materialized_exact_rate) // 0) | tostring)
   ' "$probe_json" 2>/dev/null || true
 }
 
 print_stage_summary() {
   local run_dir="$1"
   local stage_json=""
-  if [[ -f "$run_dir/train_spec07_stage_b.json" ]]; then
-    stage_json="$run_dir/train_spec07_stage_b.json"
-  elif [[ -f "$run_dir/train_spec06_stage_b.json" ]]; then
-    stage_json="$run_dir/train_spec06_stage_b.json"
-  elif [[ -f "$run_dir/train_spec07_stage_a.json" ]]; then
-    stage_json="$run_dir/train_spec07_stage_a.json"
-  elif [[ -f "$run_dir/train_spec06_stage_a.json" ]]; then
-    stage_json="$run_dir/train_spec06_stage_a.json"
+  local candidates=(
+    "$run_dir"/train_spec*_stage_b.json
+    "$run_dir"/train_spec*_stage_a.json
+  )
+  if (( ${#candidates[@]} > 0 )); then
+    stage_json="${candidates[0]}"
   fi
   if [[ -z "$stage_json" ]]; then
     return 0
@@ -61,8 +64,32 @@ print_training_plan() {
   ' "$plan_json" 2>/dev/null || true
 }
 
+print_probe_delta() {
+  local label="$1"
+  local ref_json="$2"
+  local current_json="$3"
+  if [[ ! -f "$ref_json" || ! -f "$current_json" ]]; then
+    return 0
+  fi
+  jq -nr --arg label "$label" --arg ref_path "$ref_json" --arg cur_path "$current_json" \
+    --slurpfile ref_doc "$ref_json" --slurpfile cur_doc "$current_json" '
+    def totals(doc): (doc.totals // doc.summary // {});
+    def num(v): if (v == null) then 0 else v end;
+    (totals($ref_doc[0])) as $ref_totals |
+    (totals($cur_doc[0])) as $cur_totals |
+    $label + ".path=" + $ref_path,
+    $label + ".exact_rate=" + ((num($ref_totals.exact_rate)) | tostring),
+    $label + ".renderable_rate=" + ((num($ref_totals.renderable_rate)) | tostring),
+    $label + ".materialized_exact_rate=" + ((num($ref_totals.materialized_exact_rate)) | tostring),
+    $label + ".delta_exact_rate=" + ((num($cur_totals.exact_rate) - num($ref_totals.exact_rate)) | tostring),
+    $label + ".delta_renderable_rate=" + ((num($cur_totals.renderable_rate) - num($ref_totals.renderable_rate)) | tostring),
+    $label + ".delta_materialized_exact_rate=" + ((num($cur_totals.materialized_exact_rate) - num($ref_totals.materialized_exact_rate)) | tostring)
+  ' 2>/dev/null || true
+}
+
 print_run_snapshot() {
   local run_dir="$1"
+  local probe_json=""
   echo "== run: $run_dir =="
   if [[ ! -d "$run_dir" ]]; then
     echo "status=missing"
@@ -72,14 +99,22 @@ print_run_snapshot() {
   print_training_plan "$run_dir/training_plan.json"
   print_stage_summary "$run_dir"
 
-  if [[ -f "$run_dir/spec07_probe_report.json" ]]; then
-    print_probe_summary "$run_dir/spec07_probe_report.json"
-  elif [[ -f "$run_dir/spec06_probe_report.json" ]]; then
-    print_probe_summary "$run_dir/spec06_probe_report.json"
+  local probe_candidates=( "$run_dir"/spec*_probe_report.json )
+  if (( ${#probe_candidates[@]} > 0 )); then
+    probe_json="${probe_candidates[0]}"
+    print_probe_summary "$probe_json"
   else
     echo "probe.status=not_ready"
   fi
 
+  if [[ -n "$probe_json" ]]; then
+    if [[ -n "$BASELINE_PROBE" ]]; then
+      print_probe_delta "baseline" "$BASELINE_PROBE" "$probe_json"
+    fi
+    if [[ -n "$TARGET_PROBE" ]]; then
+      print_probe_delta "target" "$TARGET_PROBE" "$probe_json"
+    fi
+  fi
 }
 
 {
