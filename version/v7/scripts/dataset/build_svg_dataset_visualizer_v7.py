@@ -1534,11 +1534,15 @@ function toggleSection(hdr) {
     if (body.style.display === 'none') { body.style.display = ''; arrow.textContent = '▼'; }
     else { body.style.display = 'none'; arrow.textContent = '▶'; }
 }
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal() { var el = document.getElementById('modalOverlay'); if (el) el.classList.remove('open'); }
 function openModal(title, html) {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').innerHTML = html;
-    document.getElementById('modalOverlay').classList.add('open');
+    var overlay = document.getElementById('modalOverlay');
+    var titleEl = document.getElementById('modalTitle');
+    var bodyEl  = document.getElementById('modalBody');
+    if (!overlay || !titleEl || !bodyEl) return;
+    titleEl.textContent = title;
+    bodyEl.innerHTML = html;
+    overlay.classList.add('open');
 }
 
 function distBarsHtml(countsObj, total, baseColor) {
@@ -2824,6 +2828,7 @@ function embColor(t) {
 }
 
 function embNormalise(matrix, mode) {
+    if (!matrix || !matrix.length || !matrix[0]) return { norm: [], vmin: 0, vmax: 0, note: '' };
     const V = matrix.length, D = matrix[0].length;
     const out = matrix.map(r => Float32Array.from(r));
     if (mode === 'global') {
@@ -2913,6 +2918,7 @@ function drawEmbHeatmap() {
     embSt.rowPx = rowPx;
 
     const V = indices.length;
+    if (!V || !embSt.data.matrix[0]) return;
     const D = embSt.data.matrix[0].length;
 
     const orderedMatrix = indices.map(i => embSt.data.matrix[i]);
@@ -3039,17 +3045,17 @@ function loadEmbData(data) {
     if (document.getElementById('embContent')) document.getElementById('embContent').style.display = '';
     if (document.getElementById('simPanel')) document.getElementById('simPanel').style.display = 'none';
 
-    const s = data.stats;
+    const s = data.stats || {};
     if (document.getElementById('embStats')) {
         document.getElementById('embStats').innerHTML =
             statCardHtml(escHtml(data.run_id || '—'), 'Run', '') +
             statCardHtml(data.step != null ? data.step : '—', 'Step', '') +
-            statCardHtml(s.vocab_size, 'Vocab', '') +
-            statCardHtml(s.embed_dim, 'Dim', '') +
+            statCardHtml(s.vocab_size != null ? s.vocab_size : '—', 'Vocab', '') +
+            statCardHtml(s.embed_dim != null ? s.embed_dim : '—', 'Dim', '') +
             statCardHtml(s.nonzero_rows != null ? s.nonzero_rows : '—', 'Non-zero', '') +
-            statCardHtml(s.min.toFixed(4), 'Min', '') +
-            statCardHtml(s.max.toFixed(4), 'Max', '') +
-            statCardHtml(s.std.toFixed(4), 'Std', '');
+            statCardHtml(s.min != null ? s.min.toFixed(4) : '—', 'Min', '') +
+            statCardHtml(s.max != null ? s.max.toFixed(4) : '—', 'Max', '') +
+            statCardHtml(s.std != null ? s.std.toFixed(4) : '—', 'Std', '');
     }
 
     const groups = [...new Set(data.vocab.map(v => v.group))];
@@ -3075,6 +3081,34 @@ function loadEmbData(data) {
 
 const ATTN_LAYER_COLORS = ['#07adf8', '#47b475', '#9b59b6', '#e74c3c', '#ffb400', '#1abc9c'];
 
+/* Map attention weight (0–1) to [r, g, b] for the chosen colourmap.
+   Supports: 'orange', 'blue', 'green', 'heatmap'. */
+function attnColor(v, cmap) {
+    const t = Math.max(0, Math.min(1, v));
+    if (cmap === 'heatmap') {
+        const blue   = [7, 100, 248];
+        const mid    = [240, 240, 240];
+        const orange = [255, 160, 0];
+        if (t < 0.5) {
+            const s = t * 2;
+            return [Math.round(blue[0] + (mid[0] - blue[0]) * s),
+                    Math.round(blue[1] + (mid[1] - blue[1]) * s),
+                    Math.round(blue[2] + (mid[2] - blue[2]) * s)];
+        }
+        const s = (t - 0.5) * 2;
+        return [Math.round(mid[0] + (orange[0] - mid[0]) * s),
+                Math.round(mid[1] + (orange[1] - mid[1]) * s),
+                Math.round(mid[2] + (orange[2] - mid[2]) * s)];
+    }
+    const targets = {
+        orange: [255, 180, 0],
+        blue:   [7, 173, 248],
+        green:  [71, 180, 117],
+    };
+    const col = targets[cmap] || targets.orange;
+    return [Math.round(col[0] * t), Math.round(col[1] * t), Math.round(col[2] * t)];
+}
+
 const attnSt = {
     data: null,         // loaded attention.json
     seqIdx: 0,          // selected sequence index
@@ -3090,15 +3124,17 @@ function loadAttnData(data) {
     if (document.getElementById('attnContent')) document.getElementById('attnContent').style.display = '';
 
     const cfg = data.config || {};
+    const seq0 = (data.sequences && data.sequences[0]) || {};
+    const seq0L0 = (seq0.layers && seq0.layers[0]) || {};
     if (document.getElementById('attnMeta')) {
         document.getElementById('attnMeta').innerHTML =
             statCardHtml(esc(data.run_id || '—'), 'Run', '') +
             statCardHtml(data.step != null ? data.step : '—', 'Step', '') +
-            statCardHtml(cfg.num_layers || data.sequences[0].layers.length, 'Layers', '') +
-            statCardHtml(cfg.num_heads || data.sequences[0].layers[0].heads.length, 'Heads', '') +
+            statCardHtml(cfg.num_layers || (seq0.layers ? seq0.layers.length : '—'), 'Layers', '') +
+            statCardHtml(cfg.num_heads || (seq0L0.heads ? seq0L0.heads.length : '—'), 'Heads', '') +
             statCardHtml(cfg.num_kv_heads || '—', 'KV Heads', '') +
             statCardHtml(cfg.head_dim || '—', 'Head Dim', '') +
-            statCardHtml(data.sequences.length, 'Sequences', '');
+            statCardHtml(data.sequences ? data.sequences.length : 0, 'Sequences', '');
     }
     renderAttnSeqList();
     renderAttnTokenChips();
@@ -3131,6 +3167,7 @@ function renderAttnTokenChips() {
     const el = document.getElementById('attnTokenChips');
     if (!el || !attnSt.data) return;
     const seq = attnSt.data.sequences[attnSt.seqIdx];
+    if (!seq || !seq.tokens) return;
     const chips = seq.tokens.map((t, i) => {
         const isPred = seq.top_preds && i > 0 && seq.top_preds[i-1] === seq.token_ids[i];
         const dot = isPred ? '<span style="color:var(--green);margin-right:3px" title="next-tok correct">✓</span>' : '';
@@ -3141,6 +3178,7 @@ function renderAttnTokenChips() {
 
 /* ── Draw a single attention matrix onto a canvas ── */
 function drawAttnMatrix(canvas, matrix, tokens, opts) {
+    if (!canvas || !matrix || !tokens) return {};
     opts = opts || {};
     const cmap = opts.cmap || 'orange';
     const showBos = opts.showBos !== false;
@@ -3151,11 +3189,12 @@ function drawAttnMatrix(canvas, matrix, tokens, opts) {
     const startTok = showBos ? 0 : 1;
     const toks = tokens.slice(startTok);
     const L = toks.length;
+    if (!L) return {};
     const matSlice = matrix.slice(startTok).map(r => r.slice(startTok));
 
     const labelW = labels ? Math.min(labelPx * 7, 140) : 0;
     const labelH = labels ? labelPx + 4 : 0;
-    const cellPx = opts.cellPx || Math.max(4, Math.min(24, Math.floor((maxSize - labelW) / L)));
+    const cellPx = opts.cellPx || Math.max(4, Math.min(24, Math.floor((maxSize - labelW) / (L || 1))));
     const W = labelW + L * cellPx;
     const H = labelH + L * cellPx;
 
@@ -3236,6 +3275,7 @@ function attnEntropy(row) {
 }
 
 function avgMatrices(matrices) {
+    if (!matrices || !matrices.length || !matrices[0]) return [[]];
     const L = matrices[0].length;
     const out = Array.from({length:L}, () => new Float32Array(L));
     for (const m of matrices)
@@ -3246,7 +3286,9 @@ function avgMatrices(matrices) {
 }
 
 function attnGetMatrix(layerData, headIdx, showBos) {
+    if (!layerData || !layerData.heads || !layerData.heads[headIdx]) return [[]];
     let mat = layerData.heads[headIdx].attn;
+    if (!mat || !mat.length) return [[]];
     if (!showBos) { mat = mat.slice(1).map(r => r.slice(1)); }
     return mat;
 }
@@ -3261,9 +3303,9 @@ function renderAttnMain() {
     const showBos = document.getElementById('attnShowBos') ? document.getElementById('attnShowBos').checked : true;
     const tokens = showBos ? seq.tokens : seq.tokens.slice(1);
     const numL = seq.layers.length;
-    const numH = seq.layers[0].heads.length;
+    const numH = (seq.layers[0] && seq.layers[0].heads) ? seq.layers[0].heads.length : 0;
     const wrap = document.getElementById('attnMainView');
-    if (!wrap) return;
+    if (!wrap || !numH) return;
 
     if (view === 'grid') {
         wrap.innerHTML = '';
@@ -3348,8 +3390,10 @@ function openAttnDetail(seq, li, hi, tokens, cmap, showBos) {
 function openAttnDetailMatrix(mat, tokens, label, cmap) {
     const panel = document.getElementById('attnDetailPanel');
     if (!panel) return;
-    document.getElementById('attnDetailLabel').textContent = label;
+    const labelEl = document.getElementById('attnDetailLabel');
+    if (labelEl) labelEl.textContent = label;
     const cv = document.getElementById('attnDetailCanvas');
+    if (!cv || !mat || !mat.length) return;
     const L = mat.length;
     const cellPx = L <= 8 ? 48 : L <= 16 ? 32 : L <= 32 ? 18 : L <= 64 ? 12 : 8;
     const labelPx = cellPx >= 14 ? 12 : 9;
@@ -3361,8 +3405,9 @@ function openAttnDetailMatrix(mat, tokens, label, cmap) {
         const lw = Math.min(labelPx * 7, 140), lh = labelPx + 4;
         if (x < lw || y < lh) { attnTip.style.display = 'none'; return; }
         const ki = Math.floor((x - lw) / cellPx), qi = Math.floor((y - lh) / cellPx);
-        if (qi >= 0 && qi < L && ki >= 0 && ki < L) {
-            attnTip.innerHTML = '<span style="color:var(--orange)">from</span> <strong>' + esc(tokens[qi]) + '</strong><br><span style="color:var(--orange)">to</span> <strong>' + esc(tokens[ki]) + '</strong><br><span style="color:var(--text-muted)">weight:</span> <strong>' + mat[qi][ki].toFixed(5) + '</strong>';
+        if (qi >= 0 && qi < L && ki >= 0 && ki < L && mat[qi]) {
+            const w = mat[qi][ki] != null ? mat[qi][ki] : 0;
+            attnTip.innerHTML = '<span style="color:var(--orange)">from</span> <strong>' + esc(tokens[qi] || '') + '</strong><br><span style="color:var(--orange)">to</span> <strong>' + esc(tokens[ki] || '') + '</strong><br><span style="color:var(--text-muted)">weight:</span> <strong>' + w.toFixed(5) + '</strong>';
             attnTip.style.display = 'block';
             attnTip.style.left = (e.clientX + 14) + 'px';
             attnTip.style.top = (e.clientY - 20) + 'px';
@@ -3722,20 +3767,15 @@ function generateAttnDemo() {
 }
 
 function renderAll() {
-    renderHeader();
-    renderOverview();
-    renderPreflight();
-    renderGallery();
-    renderTextSamples();
-    renderTokenizer();
-    renderVocabulary();
-    renderClassification();
-    renderBrowse();
-    renderCandidates();
-    renderQuality();
-    renderEmbeddings();
-    renderAttention();
-    populateFilters();
+    const sections = [
+        renderHeader, renderOverview, renderPreflight, renderGallery,
+        renderTextSamples, renderTokenizer, renderVocabulary,
+        renderClassification, renderBrowse, renderCandidates,
+        renderQuality, renderEmbeddings, renderAttention, populateFilters
+    ];
+    for (const fn of sections) {
+        try { fn(); } catch (e) { console.error('[dataset-viewer] ' + fn.name + ' failed:', e); }
+    }
 }
 
 // Tabs

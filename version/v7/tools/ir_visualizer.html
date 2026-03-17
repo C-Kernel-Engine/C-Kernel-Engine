@@ -3662,6 +3662,10 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             selectedNodeId: null,
         };
 
+        /* Safe DOM text/html setter — avoids crash when element is absent */
+        function setElText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
+        function setElHtml(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+
         function formatBytes(bytes) {
             if (bytes >= 1024*1024*1024) return (bytes / (1024*1024*1024)).toFixed(2) + ' GB';
             if (bytes >= 1024*1024) return (bytes / (1024*1024)).toFixed(2) + ' MB';
@@ -5107,10 +5111,9 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             reader.onload = (e) => {
                 manifestData = JSON.parse(e.target.result);
                 renderTensorList();
-                // Update bump stats if loaded
-                document.getElementById('bumpLayers').textContent = manifestData?.config?.n_layers || '--';
-                document.getElementById('bumpDtypes').textContent = '--';
-                document.getElementById('bumpWeights').textContent = manifestData?.weights?.length || '--';
+                setElText('bumpLayers', manifestData?.config?.n_layers || '--');
+                setElText('bumpDtypes', '--');
+                setElText('bumpWeights', manifestData?.weights?.length || '--');
                 updateOperatorSummary();
             };
             reader.readAsText(file);
@@ -5183,6 +5186,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
         function renderTabIfDirty(tabId) {
             if (!_dirtyTabs[tabId]) return;
             _dirtyTabs[tabId] = false;
+            try {
             switch (tabId) {
                 case 'memory':
                     renderMemory();
@@ -5225,6 +5229,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     break;
             }
             updateOperatorSummary();
+            } catch (e) { console.error('[ir-viz] tab ' + tabId + ' render failed:', e); }
         }
 
         function bootstrapFromEmbeddedData() {
@@ -6179,15 +6184,14 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const data = resolveQuantMath(dtypeKey);
             if (!data) return;
 
-            clearTimeout(qmathHideTimer);
+                        clearTimeout(qmathHideTimer);
 
-            document.getElementById('qmathTitle').textContent = data.title;
+            setElText('qmathTitle', data.title);
             const badgeEl = document.getElementById('qmathBadge');
-            badgeEl.textContent = data.badge;
-            badgeEl.style.background = data.badgeBg;
+            if (badgeEl) { badgeEl.textContent = data.badge; badgeEl.style.background = data.badgeBg; }
 
-            document.getElementById('qmathDesc').textContent = data.desc;
-            document.getElementById('qmathFormula').textContent = data.formula;
+            setElText('qmathDesc', data.desc);
+            setElText('qmathFormula', data.formula);
 
             const structDl = document.getElementById('qmathStruct');
             structDl.innerHTML = Object.entries(data.struct).map(([k, v]) =>
@@ -6614,15 +6618,15 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 activationsBody.appendChild(row);
             });
 
-            document.getElementById('totalWeights').textContent = formatBytes(totalWeightSize);
-            document.getElementById('totalActivations').textContent = formatBytes(totalActivationSize);
-            document.getElementById('weightsRegionSize').textContent = formatBytes(totalWeightSize);
-            document.getElementById('activationsRegionSize').textContent = formatBytes(totalActivationSize);
+            setElText('totalWeights', formatBytes(totalWeightSize));
+            setElText('totalActivations', formatBytes(totalActivationSize));
+            setElText('weightsRegionSize', formatBytes(totalWeightSize));
+            setElText('activationsRegionSize', formatBytes(totalActivationSize));
 
             const kvCache = activationBuffers.find(b => b.name === 'kv_cache');
             const kvSize = kvCache ? parseInt(kvCache.size) : 0;
-            document.getElementById('totalKVCache').textContent = formatBytes(kvSize);
-            document.getElementById('totalMemory').textContent = formatBytes(totalWeightSize + totalActivationSize);
+            setElText('totalKVCache', formatBytes(kvSize));
+            setElText('totalMemory', formatBytes(totalWeightSize + totalActivationSize));
 
             renderMemoryBar('weightsBar', weightsEntries, totalWeightSize, 'weights');
             renderMemoryBar('activationsBar', activationBuffers, totalActivationSize, 'activation');
@@ -8620,7 +8624,7 @@ function renderTraining() {
         function generateDebugCode() {
             const data = callData || loweredData;
             if (!data) {
-                document.getElementById('debugCodeOutput').textContent = 'Load an IR file first.';
+                setElText('debugCodeOutput', 'Load an IR file first.');
                 return;
             }
 
@@ -8647,7 +8651,7 @@ function renderTraining() {
                    }
                });
 
-            document.getElementById('debugCodeOutput').textContent = code;
+            setElText('debugCodeOutput', code);
         }
 
         // D3.js Graph Visualization
@@ -9294,11 +9298,11 @@ function renderTraining() {
             document.getElementById('graphLegend').style.display = 'flex';
 
             // Populate layer filter dropdown
-            populateLayerFilter();
+                        populateLayerFilter();
 
             // Update node count
-            document.getElementById('graphNodeCount').textContent =
-                `${nodes.length} nodes, ${links.length} edges | ${layerOrder.length} layers`;
+            setElText('graphNodeCount',
+                `${nodes.length} nodes, ${links.length} edges | ${layerOrder.length} layers`);
 
             graphSvg = svg;
             graphLayerCount = layerOrder.length;
@@ -9599,13 +9603,13 @@ function renderTraining() {
                 else otherFlops += flops;
             });
 
-            document.getElementById('perfFlops').textContent = formatNumber(totalFlops);
+            setElText('perfFlops', formatNumber(totalFlops));
 
             // Memory estimates (rough)
             const weightsMem = numLayers * 6 * embedDim * embedDim * 4;  // 6 weight matrices
             const activationsMem = numLayers * embedDim * 4;
-            document.getElementById('perfMemRead').textContent = formatNumber(weightsMem + activationsMem) + 'B';
-            document.getElementById('perfMemWrite').textContent = formatNumber(activationsMem) + 'B';
+            setElText('perfMemRead', formatNumber(weightsMem + activationsMem) + 'B');
+            setElText('perfMemWrite', formatNumber(activationsMem) + 'B');
 
             // Update bars
             const updateBar = (id, value) => {
@@ -10059,10 +10063,10 @@ function renderTraining() {
         }
 
         function updateBumpStats(bumpInfo) {
-            document.getElementById('bumpSize').textContent = formatBytes(bumpInfo.size);
-            document.getElementById('bumpLayers').textContent = manifestData?.config?.n_layers || '--';
-            document.getElementById('bumpDtypes').textContent = '--';
-            document.getElementById('bumpWeights').textContent = manifestData?.weights?.length || '--';
+            setElText('bumpSize', formatBytes(bumpInfo.size));
+            setElText('bumpLayers', manifestData?.config?.n_layers || '--');
+            setElText('bumpDtypes', '--');
+            setElText('bumpWeights', manifestData?.weights?.length || '--');
         }
 
         // Load BUMP file directly
@@ -10070,7 +10074,7 @@ function renderTraining() {
             const file = event.target.files[0];
             if (!file) return;
 
-            document.getElementById('bumpSize').textContent = formatBytes(file.size);
+            setElText('bumpSize', formatBytes(file.size));
 
             // For binary BUMP files, we can only show metadata
             // Full parsing would require WASM or server-side processing
@@ -10085,14 +10089,14 @@ function renderTraining() {
                     const version = view.getUint32(4, true);
                     const numTensors = view.getUint32(8, true);
 
-                    document.getElementById('bumpLayers').textContent = version || '--';
-                    document.getElementById('bumpWeights').textContent = numTensors || '--';
+                    setElText('bumpLayers', version || '--');
+                    setElText('bumpWeights', numTensors || '--');
 
                     // Show header info
                     showWeightDistribution(buffer, numTensors);
                 } catch (err) {
                     console.warn('Could not parse BUMP header:', err);
-                    document.getElementById('bumpWeights').textContent = '?';
+                    setElText('bumpWeights', '?');
                 }
             };
             reader.readAsArrayBuffer(file);
