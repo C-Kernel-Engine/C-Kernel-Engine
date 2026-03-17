@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from render_svg_structured_scene_spec09_v7 import render_structured_scene_spec09_svg as _render_structured_scene_spec09_svg_v7
 from render_svg_structured_scene_rich_v7 import render_structured_scene_rich_svg as _render_structured_scene_rich_svg_v7
 from render_svg_structured_scene_v7 import render_structured_scene_svg as _render_structured_scene_svg_v7
 from render_svg_structured_atoms_v7 import render_structured_svg_atoms as _render_structured_svg_atoms_v7
@@ -93,10 +94,15 @@ def render_structured_scene_rich_svg(text: str) -> str:
     return _render_structured_scene_rich_svg_v7(text)
 
 
+def render_structured_scene_spec09_svg(text: str) -> str:
+    return _render_structured_scene_spec09_svg_v7(text)
+
+
 _SVG_DSL_RENDERERS: dict[str, Callable[[str], str]] = {
     "structured_svg_atoms.v1": render_structured_svg_atoms,
     "structured_svg_scene.v1": render_structured_scene_svg,
     "structured_svg_scene_rich.v1": render_structured_scene_rich_svg,
+    "structured_svg_scene_spec09.v1": render_structured_scene_spec09_svg,
 }
 
 
@@ -104,6 +110,7 @@ _RENDERER_MIME_TYPES: dict[str, str] = {
     "structured_svg_atoms.v1": "image/svg+xml",
     "structured_svg_scene.v1": "image/svg+xml",
     "structured_svg_scene_rich.v1": "image/svg+xml",
+    "structured_svg_scene_spec09.v1": "image/svg+xml",
 }
 
 

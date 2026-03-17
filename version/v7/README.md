@@ -91,6 +91,10 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   `../../docs/v7-svg-training-ablation.md` (quick decision guide).
 - Adapter-based deterministic preflight design for compiler-backed datasets:
   `reports/DETERMINISTIC_PREFLIGHT_ADAPTERS.md`.
+- Production-oriented infographic DSL path:
+  `reports/SPEC09_BACKWARD_DESIGN_PLAN_2026-03-17.md`,
+  `reports/SPEC09_SCENE_DSL_V2_GRAMMAR_2026-03-17.md`, and
+  `reports/SPEC10_DSL_TRAINING_PLAYBOOK_2026-03-17.md`.
 - `v7-validate-contracts` now verifies that training-required kernels are both registered and bound in
   `kernel_maps/KERNEL_REGISTRY.json` and `kernel_maps/kernel_bindings.json`.
 - `v7-train-ir-smoke` defaults to strict unresolved policy (`V7_TRAIN_STRICT_UNRESOLVED=1`) and

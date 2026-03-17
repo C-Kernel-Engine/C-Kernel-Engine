@@ -1940,16 +1940,19 @@ const roleCounts    = cls.counts || {};
 const suggested     = (typeof cls.suggested_splits === 'object' && cls.suggested_splits) ? cls.suggested_splits : {};
 
 // ── Empty-state helper ──────────────────────────────────────────
+// ws = CK_WORKSPACE (dataset dir), runDir = parent of ws (run dir)
+var runDir = ws ? ws.replace(/\/dataset\/?$/, '') : '';
+
 function emptyTabHtml(icon, title, reason, cmds) {
     var h = '<div style="text-align:center;padding:2.5rem;color:var(--text-muted);">'
         + '<div style="font-size:2rem;margin-bottom:0.8rem">' + icon + '</div>'
         + '<div style="font-size:1rem;font-weight:600;color:var(--orange);margin-bottom:0.4rem">' + title + '</div>'
         + '<div style="font-size:0.85rem;margin-bottom:1rem">' + reason + '</div>';
     if (cmds && cmds.length) {
-        h += '<div style="text-align:left;max-width:600px;margin:0 auto;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:1rem;">';
+        h += '<div style="text-align:left;max-width:700px;margin:0 auto;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:1rem;">';
         h += '<div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;color:var(--orange);">How to populate</div>';
         for (var i = 0; i < cmds.length; i++) {
-            h += '<div style="margin-bottom:0.4rem;font-size:0.8rem;">' + (i+1) + '. <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;font-size:0.75rem;">' + cmds[i] + '</code></div>';
+            h += '<div style="margin-bottom:0.4rem;font-size:0.8rem;">' + (i+1) + '. <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:3px;font-size:0.75rem;user-select:all;cursor:text;">' + cmds[i] + '</code></div>';
         }
         h += '</div>';
     }
@@ -2140,8 +2143,8 @@ function renderVocabulary() {
     const el = document.getElementById('panel-vocabulary');
     if (!Object.keys(tagTotals).length && !Object.keys(placeholders).length) {
         el.innerHTML = emptyTabHtml('🔤', 'No Vocabulary Data', 'Normalized SVG corpus not found. The vocabulary tab shows tag frequency analysis from normalized assets.', [
-            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace &lt;DATASET_DIR&gt;',
-            'python3 version/v7/tools/prepare_run_viewer.py &lt;RUN_DIR&gt; --force'
+            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace ' + ws,
+            'python3 version/v7/tools/prepare_run_viewer.py ' + runDir + ' --force'
         ]);
         return;
     }
@@ -2175,8 +2178,8 @@ function renderClassification() {
     const total = classEntries.length;
     if (!total) {
         el.innerHTML = emptyTabHtml('🏷️', 'No Classification Data', 'No classified assets found. Run the asset classifier to populate families, roles, and split candidates.', [
-            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace &lt;DATASET_DIR&gt;',
-            'python3 version/v7/tools/prepare_run_viewer.py &lt;RUN_DIR&gt; --force'
+            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace ' + ws,
+            'python3 version/v7/tools/prepare_run_viewer.py ' + runDir + ' --force'
         ]);
         return;
     }
@@ -2223,8 +2226,8 @@ function renderBrowse() {
     let rows = filteredEntries();
     if (!classEntries.length) {
         el.innerHTML = emptyTabHtml('📋', 'No Assets to Browse', 'The browse tab shows classified and normalized assets. No classified entries found in this workspace.', [
-            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace &lt;DATASET_DIR&gt;',
-            'python3 version/v7/tools/prepare_run_viewer.py &lt;RUN_DIR&gt; --force'
+            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace ' + ws,
+            'python3 version/v7/tools/prepare_run_viewer.py ' + runDir + ' --force'
         ]);
         return;
     }
@@ -2324,7 +2327,7 @@ function renderCandidates() {
     const el = document.getElementById('panel-candidates');
     if (!classEntries.length) {
         el.innerHTML = emptyTabHtml('🎯', 'No Candidates Available', 'Split candidates require classified assets. Run the classifier first.', [
-            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace &lt;DATASET_DIR&gt;'
+            'python3 version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace ' + ws
         ]);
         return;
     }
@@ -2360,7 +2363,7 @@ function renderQuality() {
     const el = document.getElementById('panel-quality');
     if (!Object.keys(norm).length || (!norm.normalized_entries && !norm.duplicate_normalized_entries)) {
         el.innerHTML = emptyTabHtml('🔍', 'No Quality Data', 'Quality analysis requires a normalized corpus. No normalization data found.', [
-            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace &lt;DATASET_DIR&gt;'
+            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace ' + ws
         ]);
         return;
     }
