@@ -1,0 +1,788 @@
+<!-- TITLE: v7 Visualizer Test Runbook -->
+<!-- NAV: testing -->
+
+<style>
+/* ── Hero ──────────────────────────────────────────────────────────── */
+.vtr-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+}
+.vtr-hero-card {
+    background: linear-gradient(145deg, rgba(255,180,0,0.12), rgba(7,173,248,0.08));
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+}
+.vtr-hero-card h2 { margin-top: 0; }
+.vtr-hero-card h2::before { display: none; }
+.vtr-hero-card p { margin: 0; }
+.vtr-hero-svg {
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Levels ────────────────────────────────────────────────────────── */
+.level-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
+    margin: 1rem 0 1.5rem;
+}
+.level-card {
+    background: var(--dark-card, #151b26);
+    border: 1px solid var(--grey, #2a2f3a);
+    border-radius: 10px;
+    padding: 0.9rem;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.level-card:hover {
+    border-color: var(--orange, #ffb400);
+}
+.level-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    background: linear-gradient(135deg, rgba(255,180,0,0.22), rgba(255,180,0,0.08));
+    border: 1.5px solid rgba(255,180,0,0.55);
+    border-radius: 50%;
+    color: var(--orange, #ffb400);
+    font-size: 0.9rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 0.4rem;
+}
+.level-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--white, #e8e6e3);
+    margin: 0.3rem 0 0.15rem;
+}
+.level-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+    line-height: 1.4;
+}
+.level-time {
+    display: inline-block;
+    margin-top: 0.4rem;
+    padding: 0.12rem 0.4rem;
+    border-radius: 12px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+.time-fast   { background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.3); color: #47b475; }
+.time-medium { background: rgba(255,180,0,0.12);  border: 1px solid rgba(255,180,0,0.3);  color: #ffb400; }
+.time-slow   { background: rgba(7,173,248,0.12);  border: 1px solid rgba(7,173,248,0.3);  color: #07adf8; }
+.time-future { background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.3); color: #a070ff; }
+
+/* ── Step headings ─────────────────────────────────────────────────── */
+.step-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+.step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.4rem;
+    background: linear-gradient(135deg, rgba(255,180,0,0.22), rgba(255,180,0,0.10));
+    border: 1.5px solid rgba(255,180,0,0.55);
+    border-radius: 8px;
+    color: var(--orange, #ffb400);
+    font-size: 0.75rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+}
+.step-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 1.4rem;
+    padding: 0 0.5rem;
+    border-radius: 20px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.tag-prepush    { background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.38); color: #47b475; }
+.tag-ci         { background: rgba(7,173,248,0.12);  border: 1px solid rgba(7,173,248,0.38);  color: #07adf8; }
+.tag-nightly    { background: rgba(255,180,0,0.12);  border: 1px solid rgba(255,180,0,0.38);  color: #ffb400; }
+.tag-future     { background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.38); color: #a070ff; }
+
+/* ── Command blocks ────────────────────────────────────────────────── */
+.cmd-block {
+    position: relative;
+}
+.cmd-block pre {
+    margin-top: 0.5rem;
+    margin-bottom: 0.9rem;
+}
+.copy-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-45%);
+    border: 1px solid var(--grey-light);
+    background: var(--dark-lighter);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    color: var(--white);
+    border-color: var(--orange);
+}
+
+/* ── Coverage table ────────────────────────────────────────────────── */
+.cov-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin: 0.75rem 0;
+}
+.cov-table th {
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    border-bottom: 2px solid rgba(255,180,0,0.3);
+    color: var(--orange, #ffb400);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.cov-table td {
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-secondary, #bbb);
+}
+.cov-table tr:hover td {
+    background: rgba(255,180,0,0.03);
+}
+.cov-check { color: #47b475; font-weight: 700; }
+.cov-count { font-family: 'JetBrains Mono', monospace; color: #ffb400; }
+
+/* ── Produces footer ───────────────────────────────────────────────── */
+.step-produces {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(71,180,117,0.05);
+    border-top: 1px solid rgba(71,180,117,0.18);
+    border-radius: 0 0 8px 8px;
+    font-size: 0.73rem;
+    color: var(--text-muted, #888);
+}
+.produces-label {
+    color: #47b475;
+    font-weight: 700;
+    margin-right: 0.15rem;
+}
+.produces-item {
+    background: rgba(71,180,117,0.09);
+    border: 1px solid rgba(71,180,117,0.25);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #8cd9a8;
+}
+.produces-item.item-json { border-color: rgba(255,180,0,0.3); color: #ffd58a; background: rgba(255,180,0,0.07); }
+.produces-item.item-html { border-color: rgba(7,173,248,0.3); color: #8cb4ff; background: rgba(7,173,248,0.07); }
+
+/* ── Section divider ─────────────────────────────────────────────────── */
+.runbook-section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,180,0,0.2), transparent);
+    margin: 1.5rem 0;
+}
+
+/* ── Flow diagram ─────────────────────────────────────────────────── */
+.flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.8rem 0;
+    flex-wrap: wrap;
+}
+.flow-box {
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.flow-l1 { background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.35); color: #47b475; }
+.flow-l2 { background: rgba(7,173,248,0.12);  border: 1px solid rgba(7,173,248,0.35);  color: #07adf8; }
+.flow-l3 { background: rgba(255,180,0,0.12);  border: 1px solid rgba(255,180,0,0.35);  color: #ffb400; }
+.flow-l4 { background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.35); color: #a070ff; }
+.flow-arrow {
+    color: var(--text-muted, #555);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 920px) {
+    .vtr-hero { grid-template-columns: 1fr; }
+    .level-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+    .level-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- HERO                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="vtr-hero">
+    <div class="vtr-hero-card">
+        <h2>Visualizer Test Runbook</h2>
+        <p>
+            Four-level verification pyramid for the IR visualizer, dataset viewer,
+            and IR hub. Catches broken tabs, missing functions, numeric regressions,
+            and rendering failures &mdash; all without npm or Playwright.
+        </p>
+        <p style="margin-top:0.6rem; font-size:0.82rem; color:var(--text-muted);">
+            <strong>Zero dependencies</strong> &mdash; Python&nbsp;3.8+ and Node.js only.
+            Every level runs from <code>make v7-visualizer-health</code>.
+        </p>
+    </div>
+    <div class="vtr-hero-svg">
+        <svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:340px;">
+            <!-- Pyramid -->
+            <polygon points="170,18 310,170 30,170" fill="none" stroke="rgba(255,180,0,0.3)" stroke-width="1.5"/>
+            <!-- L1 -->
+            <line x1="70" y1="130" x2="270" y2="130" stroke="rgba(71,180,117,0.4)" stroke-width="1"/>
+            <text x="170" y="155" text-anchor="middle" fill="#47b475" font-size="11" font-weight="700" font-family="monospace">L1  Static Health</text>
+            <!-- L2 -->
+            <line x1="100" y1="100" x2="240" y2="100" stroke="rgba(7,173,248,0.4)" stroke-width="1"/>
+            <text x="170" y="122" text-anchor="middle" fill="#07adf8" font-size="11" font-weight="700" font-family="monospace">L2  JS Units</text>
+            <!-- L3 -->
+            <line x1="125" y1="72" x2="215" y2="72" stroke="rgba(255,180,0,0.4)" stroke-width="1"/>
+            <text x="170" y="92" text-anchor="middle" fill="#ffb400" font-size="11" font-weight="700" font-family="monospace">L3  Generated E2E</text>
+            <!-- L4 -->
+            <text x="170" y="60" text-anchor="middle" fill="#a070ff" font-size="10" font-weight="700" font-family="monospace">L4  Browser</text>
+            <!-- Timing -->
+            <text x="170" y="188" text-anchor="middle" fill="#666" font-size="9" font-family="monospace">&lt;1s · &lt;2s · ~60s · future</text>
+        </svg>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- LEVEL OVERVIEW CARDS                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="level-grid">
+    <div class="level-card">
+        <div class="level-num">1</div>
+        <div class="level-title">Static Health</div>
+        <div class="level-desc">
+            Tabs, panels, render&nbsp;functions, required&nbsp;functions,
+            DOM&nbsp;targets, JS&nbsp;syntax&nbsp;(node&nbsp;--check)
+        </div>
+        <div class="level-time time-fast">&lt; 1 s</div>
+    </div>
+    <div class="level-card">
+        <div class="level-num">2</div>
+        <div class="level-title">JS Unit Tests</div>
+        <div class="level-desc">
+            Pure functions extracted &amp; run through Node.js with test&nbsp;vectors.
+            formatBytes, attnColor, cosineSim, embNormalise&hellip;
+        </div>
+        <div class="level-time time-fast">&lt; 2 s</div>
+    </div>
+    <div class="level-card">
+        <div class="level-num">3</div>
+        <div class="level-title">Generated E2E</div>
+        <div class="level-desc">
+            Generate tiny model &rarr; build IR&nbsp;visualizer &amp;
+            dataset&nbsp;viewer &rarr; validate generated&nbsp;HTML
+        </div>
+        <div class="level-time time-medium">~ 60 s</div>
+    </div>
+    <div class="level-card">
+        <div class="level-num">4</div>
+        <div class="level-title">Browser Runtime</div>
+        <div class="level-desc">
+            Open generated HTML in headless browser, verify tabs render,
+            click interactions, canvas&nbsp;output
+        </div>
+        <div class="level-time time-future">future</div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- FLOW DIAGRAM                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h3>Test Flow</h3>
+
+<div class="flow-row">
+    <span class="flow-box flow-l1">L1 Static Health</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-box flow-l2">L2 JS Units</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-box flow-l3">L3 Generate Model</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-box flow-l3">L3 Build Visualizers</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-box flow-l3">L3 Validate Output</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-box flow-l4">L4 Browser</span>
+</div>
+
+<p style="font-size:0.8rem; color:var(--text-muted);">
+    L1+L2 run in pre-push (&lt;&thinsp;3&thinsp;s). L3 runs in <code>make visualizer-full</code>
+    or nightly. L4 is future work.
+</p>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- LEVEL 1: STATIC HEALTH                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 class="step-heading">
+    <span class="step-num">L1</span>
+    Static Health Gate
+    <span class="step-tag tag-prepush">pre-push</span>
+</h2>
+
+<p>
+    Python static analysis of HTML source templates. Zero runtime &mdash; no browser,
+    no model needed. Catches missing tabs, undefined functions, broken DOM targets.
+</p>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('python3 version/v7/scripts/test_visualizer_health_v7.py --source')">copy</button>
+    <pre><code>python3 version/v7/scripts/test_visualizer_health_v7.py --source</code></pre>
+</div>
+
+<p style="font-size:0.82rem;">Or via Makefile (runs L1 + L2 together):</p>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('make v7-visualizer-health')">copy</button>
+    <pre><code>make v7-visualizer-health</code></pre>
+</div>
+
+<h3>What It Checks</h3>
+
+<table class="cov-table">
+    <thead>
+        <tr><th>Category</th><th>Visualizer</th><th>Checks</th><th>Catches</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Tab Existence</td>
+            <td>IR (11) · Dataset (12)</td>
+            <td class="cov-count">23</td>
+            <td>Tab button removed or renamed without updating HTML</td>
+        </tr>
+        <tr>
+            <td>Panel Existence</td>
+            <td>IR (11) · Dataset (12)</td>
+            <td class="cov-count">23</td>
+            <td>Panel container missing for a tab</td>
+        </tr>
+        <tr>
+            <td>Render Functions</td>
+            <td>IR (10) · Dataset (12)</td>
+            <td class="cov-count">22</td>
+            <td>Tab has no matching render function</td>
+        </tr>
+        <tr>
+            <td>Required Functions</td>
+            <td>IR (19) · Dataset (30)</td>
+            <td class="cov-count">49</td>
+            <td>Missing attnColor, setElText, embNormalise, etc.</td>
+        </tr>
+        <tr>
+            <td>Undefined Call Detection</td>
+            <td>IR · Dataset · Hub</td>
+            <td class="cov-count">3</td>
+            <td>Calling a function that doesn&rsquo;t exist (the attnColor bug)</td>
+        </tr>
+        <tr>
+            <td>DOM Target Coverage</td>
+            <td>IR</td>
+            <td class="cov-count">7+</td>
+            <td>getElementById() with no matching element</td>
+        </tr>
+        <tr>
+            <td>JS Syntax</td>
+            <td>IR · Dataset</td>
+            <td class="cov-count">1</td>
+            <td>Syntax errors via <code>node --check</code></td>
+        </tr>
+        <tr>
+            <td>Hub Structure</td>
+            <td>Hub</td>
+            <td class="cov-count">5</td>
+            <td>Missing run-card, link templates</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="mini-note">
+    Total: <strong>~151 checks</strong> across 3 visualizers. All must pass for pre-push.
+</p>
+
+<div class="step-produces">
+    <span class="produces-label">Produces →</span>
+    <span class="produces-item item-json">visualizer_health_latest.json</span>
+</div>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- LEVEL 2: JS UNIT TESTS                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 class="step-heading">
+    <span class="step-num">L2</span>
+    JS Unit Tests
+    <span class="step-tag tag-prepush">pre-push</span>
+</h2>
+
+<p>
+    Extracts pure JavaScript functions from the IR visualizer and dataset viewer
+    generator source, writes them to a temp <code>.js</code> file with test vectors,
+    and runs via <code>node</code>. No npm, no bundler, no browser.
+</p>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('python3 version/v7/scripts/test_visualizer_js_units_v7.py')">copy</button>
+    <pre><code>python3 version/v7/scripts/test_visualizer_js_units_v7.py</code></pre>
+</div>
+
+<h3>IR Visualizer Functions</h3>
+
+<table class="cov-table">
+    <thead>
+        <tr><th>Function</th><th>Tests</th><th>What It Validates</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>formatBytes</code></td><td class="cov-count">4</td><td>B/KB/MB/GB formatting</td></tr>
+        <tr><td><code>normalizeShapeInput</code></td><td class="cov-count">7</td><td>Array/string/object → normalised shape array</td></tr>
+        <tr><td><code>formatShapeDisplay</code></td><td class="cov-count">3</td><td>Shape → &ldquo;2 × 3 × 4&rdquo; display string</td></tr>
+        <tr><td><code>normalizeMode</code></td><td class="cov-count">3</td><td>Mode canonicalization (prefill/decode)</td></tr>
+        <tr><td><code>escapeHtml</code></td><td class="cov-count">3</td><td>XSS-safe HTML entity escaping</td></tr>
+        <tr><td><code>quoteShell</code></td><td class="cov-count">3</td><td>Shell-safe quoting for command generation</td></tr>
+        <tr><td><code>normalizePathString</code></td><td class="cov-count">2</td><td>Backslash → forward slash, trailing strip</td></tr>
+        <tr><td><code>pathDirname</code></td><td class="cov-count">3</td><td>POSIX parent-directory extraction</td></tr>
+        <tr><td><code>extractGgufStem</code></td><td class="cov-count">3</td><td>Model filename stem from path/URL</td></tr>
+        <tr><td><code>relativePathFromTo</code></td><td class="cov-count">4</td><td>Relative path computation between absolute paths</td></tr>
+    </tbody>
+</table>
+
+<h3>Dataset Viewer Functions</h3>
+
+<table class="cov-table">
+    <thead>
+        <tr><th>Function</th><th>Tests</th><th>What It Validates</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>attnColor</code></td><td class="cov-count">9</td><td>Attention heatmap colormaps (orange/blue/green/heatmap)</td></tr>
+        <tr><td><code>embColor</code></td><td class="cov-count">3</td><td>Embedding heatmap blue→mid→orange interpolation</td></tr>
+        <tr><td><code>cosineSim</code></td><td class="cov-count">4</td><td>Cosine similarity: identical, orthogonal, opposite, scaled</td></tr>
+        <tr><td><code>attnEntropy</code></td><td class="cov-count">4</td><td>Attention entropy: uniform, peaked, with zeros</td></tr>
+        <tr><td><code>avgMatrices</code></td><td class="cov-count">3</td><td>Matrix averaging, single, null safety</td></tr>
+        <tr><td><code>embNormalise</code></td><td class="cov-count">4</td><td>Global/col/row normalisation modes + null guard</td></tr>
+    </tbody>
+</table>
+
+<p class="mini-note">
+    Total: <strong>78 unit tests</strong> across 16 pure functions. Extracts from source → runs via Node.js.
+</p>
+
+<div class="step-produces">
+    <span class="produces-label">Produces →</span>
+    <span class="produces-item item-json">visualizer_js_units_latest.json</span>
+</div>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- LEVEL 3: GENERATED E2E                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 class="step-heading">
+    <span class="step-num">L3</span>
+    Generated-File E2E
+    <span class="step-tag tag-nightly">nightly</span>
+</h2>
+
+<p>
+    Generates a tiny model, runs inference and training, builds both the IR visualizer
+    and dataset viewer, then runs L1 health checks on the <em>generated</em> HTML output.
+    This catches template regressions where source looks fine but generated output is stale.
+</p>
+
+<h3>Step 3a — Generate &amp; Train Tiny Model</h3>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('python3 version/v7/scripts/ck_run_v7.py init --run-name test_viz_e2e --generate-ir --generate-runtime')">copy</button>
+    <pre><code># Initialize tiny model (vocab=256, d=64, layers=2)
+python3 version/v7/scripts/ck_run_v7.py init \
+  --run-name test_viz_e2e \
+  --generate-ir --generate-runtime</code></pre>
+</div>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('python3 version/v7/scripts/ck_run_v7.py sanity --run ~/.cache/ck-engine-v7/models/train/test_viz_e2e --train-epochs 1 --train-total-tokens 1024')">copy</button>
+    <pre><code># Quick sanity train (1 epoch, 1024 tokens, ~30 seconds)
+python3 version/v7/scripts/ck_run_v7.py sanity \
+  --run ~/.cache/ck-engine-v7/models/train/test_viz_e2e \
+  --train-epochs 1 --train-total-tokens 1024</code></pre>
+</div>
+
+<h3>Step 3b — Generate Visualizers</h3>
+
+<div class="cmd-block">
+    <pre><code># IR Visualizer (inference mode)
+make visualizer
+# IR Visualizer (inference + training)
+make visualizer-full</code></pre>
+</div>
+
+<h3>Step 3c — Validate Generated Output</h3>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('python3 version/v7/scripts/test_visualizer_health_v7.py --all')">copy</button>
+    <pre><code># Run health checks on source + all generated files
+python3 version/v7/scripts/test_visualizer_health_v7.py --all</code></pre>
+</div>
+
+<p style="font-size:0.82rem;">
+    <code>--all</code> scans <code>~/.cache/ck-engine-v7/models/</code> for generated
+    <code>ir_report.html</code> and <code>dataset_viewer.html</code> files and validates
+    each against the same 151-check contract. Stale files that are missing new required
+    functions (e.g., <code>setElText</code>) will fail.
+</p>
+
+<h3>Or use the existing E2E harness</h3>
+
+<div class="cmd-block">
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('make visualizer-full')">copy</button>
+    <pre><code># Runs test_ir_visualizer_e2e_v7.py with training runtime
+make visualizer-full</code></pre>
+</div>
+
+<div class="step-produces">
+    <span class="produces-label">Produces →</span>
+    <span class="produces-item item-html">ir_report.html</span>
+    <span class="produces-item item-html">dataset_viewer.html</span>
+    <span class="produces-item item-json">ir_visualizer_e2e_latest.json</span>
+</div>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- LEVEL 4: BROWSER RUNTIME (FUTURE)                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2 class="step-heading">
+    <span class="step-num">L4</span>
+    Browser Runtime Smoke
+    <span class="step-tag tag-future">future</span>
+</h2>
+
+<p>
+    Headless browser validation using Playwright or Puppeteer. Not yet implemented &mdash;
+    L1+L2+L3 currently cover all contract and numeric correctness without a browser dependency.
+</p>
+
+<h3>When to add L4</h3>
+
+<ul style="font-size:0.82rem; line-height:1.6;">
+    <li>Canvas rendering bugs that L1-L3 cannot catch (pixel-level attention heatmaps)</li>
+    <li>Tab-switch JavaScript errors that only manifest with a live DOM</li>
+    <li>CSS layout regressions (e.g., panels overlapping, scrollbars missing)</li>
+    <li>Interactive features: modal open/close, search/filter, copy buttons</li>
+</ul>
+
+<h3>Candidate Implementation</h3>
+
+<div class="cmd-block">
+    <pre><code># Future: headless Playwright smoke test
+# npx playwright test tests/visualizer-smoke.spec.ts
+#   ✓ IR visualizer: all 11 tabs render non-empty content
+#   ✓ Dataset viewer: all 12 tabs render non-empty content
+#   ✓ Attention heatmap canvas has non-zero pixel data
+#   ✓ Tab switch does not throw JS errors</code></pre>
+</div>
+
+<p class="mini-note">
+    Until L4 is needed, the combination of static analysis (L1), numeric unit tests (L2),
+    and generated-file E2E (L3) provides robust coverage.
+</p>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- INTEGRATION MAP                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Integration Map</h2>
+
+<table class="cov-table">
+    <thead>
+        <tr><th>Hook / Target</th><th>Levels</th><th>Command</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>.githooks/pre-push</code> [0.5/6]</td>
+            <td><span class="cov-check">L1 + L2</span></td>
+            <td><code>test_visualizer_health_v7.py --source --quiet && test_visualizer_js_units_v7.py --quiet</code></td>
+        </tr>
+        <tr>
+            <td><code>make v7-visualizer-health</code></td>
+            <td><span class="cov-check">L1 + L2</span></td>
+            <td>Static health + JS unit tests with JSON reports</td>
+        </tr>
+        <tr>
+            <td><code>make visualizer</code></td>
+            <td><span class="cov-check">L3 (inference)</span></td>
+            <td>Generate + validate IR visualizer (inference mode)</td>
+        </tr>
+        <tr>
+            <td><code>make visualizer-full</code></td>
+            <td><span class="cov-check">L3 (train)</span></td>
+            <td>Generate + validate IR visualizer (inference + training)</td>
+        </tr>
+        <tr>
+            <td><code>make v7-visualizer-e2e-nightly</code></td>
+            <td><span class="cov-check">L3 (full)</span></td>
+            <td>Nightly: full E2E with training, skip inference parity</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- FAILURE PLAYBOOK                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Failure Playbook</h2>
+
+<table class="cov-table">
+    <thead>
+        <tr><th>Failure</th><th>Level</th><th>Meaning</th><th>Fix</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>tab_exists:attention FAIL</code></td>
+            <td>L1</td>
+            <td>Tab button removed from HTML source</td>
+            <td>Restore tab in generator or update test contract</td>
+        </tr>
+        <tr>
+            <td><code>required_fn:attnColor FAIL</code></td>
+            <td>L1</td>
+            <td>Function definition deleted or renamed</td>
+            <td>Restore function in source; if renamed, update callers + contract</td>
+        </tr>
+        <tr>
+            <td><code>ir:extract:formatBytes FAIL</code></td>
+            <td>L2</td>
+            <td>Function body cannot be parsed from source</td>
+            <td>Check for syntax changes in function; may need extraction update</td>
+        </tr>
+        <tr>
+            <td><code>ds:cosineSim:orthogonal FAIL</code></td>
+            <td>L2</td>
+            <td>Numeric regression in cosineSim implementation</td>
+            <td>Review recent changes to cosineSim function</td>
+        </tr>
+        <tr>
+            <td><code>no_undefined_fn_calls FAIL</code></td>
+            <td>L1</td>
+            <td>Code calls a function that isn&rsquo;t defined</td>
+            <td>Add the missing function or fix the caller</td>
+        </tr>
+        <tr>
+            <td><code>L3 generated ir_report.html missing setElText</code></td>
+            <td>L3</td>
+            <td>Generated file is stale (built before latest source change)</td>
+            <td>Regenerate: <code>make visualizer</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="runbook-section-divider"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- ADDING NEW TESTS                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<h2>Adding New Tests</h2>
+
+<h3>Add a new L1 contract</h3>
+
+<p style="font-size:0.82rem;">
+    Edit <code>test_visualizer_health_v7.py</code>. Add the function name to the
+    <code>required_fns</code> list for the appropriate visualizer (IR or dataset viewer).
+    The test will verify the function exists in source.
+</p>
+
+<h3>Add a new L2 unit test</h3>
+
+<p style="font-size:0.82rem;">
+    Edit <code>test_visualizer_js_units_v7.py</code>. Add the function name to
+    <code>fns_needed</code> and add test cases to the <code>test_cases</code> list.
+    Each test case has a <code>name</code> and a <code>body</code> (JS code that returns
+    <code>true</code> on pass).
+</p>
+
+<div class="cmd-block">
+    <pre><code># Example: adding a test for a new function myHelper()
+{"name": "ds:myHelper:basic", "body": "return assertDeepEq(myHelper('input'), 'expected');"},
+{"name": "ds:myHelper:null",  "body": "return assertDeepEq(myHelper(null), '');"},</code></pre>
+</div>
+
+<h3>Add a new tab to a visualizer</h3>
+
+<p style="font-size:0.82rem;">
+    When adding a new tab to the IR visualizer or dataset viewer:
+</p>
+<ol style="font-size:0.82rem; line-height:1.6;">
+    <li>Add the tab name to the <code>TABS</code> list in <code>test_visualizer_health_v7.py</code></li>
+    <li>Add the render function to <code>RENDER_FNS</code> and <code>required_fns</code></li>
+    <li>Run <code>make v7-visualizer-health</code> &mdash; new checks are automatically included</li>
+</ol>
+
+<script>
+/* Copy-button feedback */
+document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const orig = btn.textContent;
+        btn.textContent = 'copied!';
+        setTimeout(() => btn.textContent = orig, 1200);
+    });
+});
+</script>

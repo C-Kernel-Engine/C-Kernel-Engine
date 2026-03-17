@@ -8,5 +8,5 @@ var ckernel__ir__v2__lower_8h =
     [ "ck_ir_v2_lower_emit_json", "ckernel__ir__v2__lower_8h.html#ab2afc44e824ca8ed4de7e445f9cc06d3", null ],
     [ "ck_ir_v2_lower_graph", "ckernel__ir__v2__lower_8h.html#ad92c2089721962b2160c2cab45ace188", null ],
     [ "ck_ir_v2_lower_mode_from_string", "ckernel__ir__v2__lower_8h.html#ad77a3931fd63e54350cafae5c0852b8a", null ],
-    [ "ck_ir_v2_lower_mode_name", "ckernel__ir__v2__lower_8h.html#a3e9efe6be861d2ba1c9ccdb1e9e07ce4", null ]
+    [ "ck_ir_v2_lower_mode_name", "ckernel__ir__v2__lower_8h.html#a845e259d2ba37e77fbc5111b1dccdd93", null ]
 ];
