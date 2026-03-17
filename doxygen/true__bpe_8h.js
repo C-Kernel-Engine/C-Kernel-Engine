@@ -3,12 +3,10 @@ var true__bpe_8h =
     [ "CKBPEConfig", "structCKBPEConfig.html", "structCKBPEConfig" ],
     [ "CK_TRUE_BPE_API", "true__bpe_8h.html#aad53eaecf0a0944b0b9c62652972a758", null ],
     [ "CKSpacePrefixStyle", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6", [
-      [ "CK_SPACE_PREFIX_AUTO", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
-      [ "CK_SPACE_PREFIX_GPT2", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
-      [ "CK_SPACE_PREFIX_SPM", "tokenizer_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ],
       [ "CK_SPACE_PREFIX_AUTO", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78075f758c43702d3ee388d0c889d1be", null ],
       [ "CK_SPACE_PREFIX_GPT2", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a7fcf6d5e4746461773fe5d284d96458a", null ],
-      [ "CK_SPACE_PREFIX_SPM", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ]
+      [ "CK_SPACE_PREFIX_SPM", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6a78c91e3a7c0c7ffa315393e524df931b", null ],
+      [ "CK_SPACE_PREFIX_ASCII", "true__bpe_8h.html#a28ac02199cd1d8b7d24c13952b86e9e6ad4d8886d2e14e942cd49eac70933bd7b", null ]
     ] ],
     [ "__attribute__", "true__bpe_8h.html#ac33d61fabbeba23ba208eec1f7a14cb2", null ],
     [ "bos", "true__bpe_8h.html#afbcf72e6f3f003096f1fb9ce31a13736", null ],
