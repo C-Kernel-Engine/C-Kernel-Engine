@@ -179,6 +179,11 @@ def _build_run_make_cmd(target: str, run_dir: Path) -> str:
     return f"make {target} RUN={run_q}"
 
 
+def _build_prepare_all_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"python3 version/v7/tools/prepare_run_viewer.py {run_q} --force"
+
+
 def _build_model_make_cmd(target: str, run_dir: Path) -> str:
     run_q = shlex.quote(str(run_dir))
     return f"make {target} V7_MODEL={run_q}"
@@ -656,6 +661,7 @@ class RunRecord:
     generate_report_cmd: str
     export_embeddings_cmd: str
     export_attention_cmd: str
+    prepare_all_cmd: str
     artifact_sections: list[dict[str, Any]]
     coverage_summary: dict[str, Any]
     next_actions: list[dict[str, str]]
@@ -709,6 +715,7 @@ class RunRecord:
             "generate_report_cmd": self.generate_report_cmd,
             "export_embeddings_cmd": self.export_embeddings_cmd,
             "export_attention_cmd": self.export_attention_cmd,
+            "prepare_all_cmd": self.prepare_all_cmd,
             "artifact_sections": self.artifact_sections,
             "coverage_summary": self.coverage_summary,
             "next_actions": self.next_actions,
@@ -1024,6 +1031,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         generate_report_cmd=_build_generate_report_cmd(run_dir),
         export_embeddings_cmd=_build_export_embeddings_cmd(run_dir),
         export_attention_cmd=_build_export_attention_cmd(run_dir),
+        prepare_all_cmd=_build_prepare_all_cmd(run_dir),
         artifact_sections=artifact_sections,
         coverage_summary=coverage_summary,
         next_actions=next_actions,
@@ -2838,6 +2846,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
           ${run.datasetRefreshCmd ? cmdBlock(run.datasetRefreshCmd, '🔄 Materialize Dataset', 'Stages raw SVG assets, normalizes them, and writes split manifests into the workspace.') : ''}
           ${cmdBlock(run.export_embeddings_cmd, '🧬 Export Embeddings', 'Extracts the token embedding matrix from the latest checkpoint into embeddings.json — view in the Dataset Viewer Embeddings tab.')}
           ${cmdBlock(run.export_attention_cmd, '🔭 Export Attention', 'Runs a full forward pass on probe sequences and saves per-layer/per-head attention matrices to attention.json.')}
+          ${cmdBlock(run.prepare_all_cmd, '🚀 Prepare All Viewer Artifacts', 'One-click: generates embeddings.json + attention.json + dataset_viewer.html. Use --force to regenerate existing.')}
         </div>
       `;
     }
