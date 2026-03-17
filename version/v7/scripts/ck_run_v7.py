@@ -2732,6 +2732,20 @@ def _canonical_json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
+def _write_json_if_changed(path: Path, payload: Any) -> bool:
+    """Write JSON only when semantic content changed to avoid false stale mtimes."""
+    encoded = json.dumps(payload, indent=2, ensure_ascii=True) + "\n"
+    try:
+        if path.exists():
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if _canonical_json_bytes(existing) == _canonical_json_bytes(payload):
+                return False
+    except Exception:
+        pass
+    path.write_text(encoded, encoding="utf-8")
+    return True
+
+
 def _hash_sha256_file(path: Path) -> Optional[str]:
     if not path.exists() or not path.is_file():
         return None
@@ -9862,8 +9876,7 @@ def run_pipeline(args: argparse.Namespace):
                 cfg_data = json.load(f)
             cfg_data["num_merges"] = num_merges
             cfg_data["total_vocab_bytes"] = total_vocab_bytes
-            with open(config_path, "w") as f:
-                json.dump(cfg_data, f, indent=2)
+            _write_json_if_changed(config_path, cfg_data)
         except Exception:
             pass
 
