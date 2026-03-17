@@ -28,6 +28,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from probe_report_adapters_v7 import apply_output_adapter
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -133,6 +135,7 @@ def _default_eval_contract() -> dict[str, Any]:
         "schema": EVAL_CONTRACT_SCHEMA,
         "dataset_type": "svg",
         "scorer": "svg",
+        "output_adapter": None,
         "probes": [dict(p) for p in DEFAULT_PROBES],
         "stage_metrics": [dict(m) for m in DEFAULT_STAGE_METRICS],
         "probe_metrics": [dict(m) for m in DEFAULT_PROBE_METRICS],
@@ -267,6 +270,8 @@ def _load_eval_contract(run_dir: Path, probe_config_path: str | None) -> tuple[d
         contract = dict(default_contract)
         contract["dataset_type"] = str(doc.get("dataset_type") or default_contract["dataset_type"]).strip().lower() or "svg"
         contract["scorer"] = str(doc.get("scorer") or ("svg" if contract["dataset_type"] == "svg" else "text_rules")).strip().lower()
+        if isinstance(doc.get("output_adapter"), dict):
+            contract["output_adapter"] = dict(doc["output_adapter"])
         normalized_probes: list[dict[str, Any]] = []
         for p in probes:
             if not isinstance(p, dict):
@@ -514,12 +519,13 @@ def _repetition_score(text: str, n: int = 5) -> float:
 
 
 def _adherence_score(text: str, probe: dict[str, Any]) -> float:
-    """Check adherence to probe's expect_shape / expect_palette."""
+    """Check adherence to probe's expect_shape / expect_palette / expect_color."""
     score = 0.0
     checks = 0
 
     shape = probe.get("expect_shape")
     palette = probe.get("expect_palette")
+    color = probe.get("expect_color")
     text_lower = text.lower()
     tag_block_raw = _extract_tag_block(text).lower()
 
@@ -539,6 +545,13 @@ def _adherence_score(text: str, probe: dict[str, Any]) -> float:
         hit = any(v in tag_block_raw for v in shape_variants)
         if not hit and canonical_shape in _SHAPE_SVG_TAGS:
             hit = any(tag.lower() in text_lower for tag in _SHAPE_SVG_TAGS[canonical_shape])
+        if hit:
+            score += 1.0
+
+    if color:
+        checks += 1
+        c = str(color).strip().lower()
+        hit = f"color:{c}" in tag_block_raw or f"fill:{c}" in text_lower or f">{c}<" in text_lower
         if hit:
             score += 1.0
 
@@ -567,26 +580,40 @@ def _extract_response_text(raw: str, prompt: str) -> str:
     return raw
 
 
-def _score_output_svg(raw: str, probe: dict[str, Any]) -> dict[str, Any]:
+def _score_output_svg(raw: str, probe: dict[str, Any], output_adapter: dict[str, Any] | None = None) -> dict[str, Any]:
     response = _extract_response_text(raw, probe["prompt"])
+    scored_text = response
+    materialized_output = ""
+    if isinstance(output_adapter, dict) and str(output_adapter.get("name") or "").strip():
+        try:
+            adapted = apply_output_adapter(str(output_adapter.get("name")), response, output_adapter)
+        except Exception:
+            adapted = {}
+        parsed_output = adapted.get("parsed_output")
+        if isinstance(parsed_output, str) and parsed_output.strip():
+            scored_text = parsed_output.strip()
+        materialized = adapted.get("materialized_output")
+        if isinstance(materialized, str) and materialized.strip():
+            materialized_output = materialized.strip()
     # Reconstruct full sequence for validity/closure checks.
     # Insert a guaranteed space between prompt and response so "<svg"+"xmlns=..."
     # doesn't collapse to "<svgxmlns=...>".
+    validity_target = materialized_output or scored_text
     if "<svg" in probe["prompt"]:
-        sep = " " if response and response[0] not in (" ", ">", "\n", "\t", "]", "/") else ""
-        full_text = probe["prompt"] + sep + response
+        sep = " " if validity_target and validity_target[0] not in (" ", ">", "\n", "\t", "]", "/") else ""
+        full_text = probe["prompt"] + sep + validity_target
     else:
-        full_text = response
+        full_text = validity_target
     return {
         "valid_svg": float(_is_valid_svg(full_text)),
         "closure": float(_has_closure(full_text)),
         # prefix_integrity is measured on generated response only.
-        "prefix_integrity": float(_prefix_integrity(response)),
-        "repetition": _repetition_score(response),
-        "adherence": _adherence_score(response, probe),
-        "tag_adherence": _tag_adherence_score(response, probe),
+        "prefix_integrity": float(_prefix_integrity(scored_text)),
+        "repetition": _repetition_score(scored_text),
+        "adherence": _adherence_score(scored_text, probe),
+        "tag_adherence": _tag_adherence_score(scored_text, probe),
         # Store the substituted tag block so the visualizer can show it
-        "model_tag_block": _extract_tag_block(response),
+        "model_tag_block": _extract_tag_block(scored_text),
     }
 
 
@@ -611,6 +638,7 @@ def _tag_adherence_score(response: str, probe: dict[str, Any]) -> float:
 
     palette = probe.get("expect_palette")
     shape = _canonical_shape(probe.get("expect_shape"))
+    color = str(probe.get("expect_color") or "").strip().lower()
 
     if palette:
         checks += 1
@@ -622,6 +650,11 @@ def _tag_adherence_score(response: str, probe: dict[str, Any]) -> float:
         # Normalise: bar_chart vs bar-chart etc.
         shape_variants = [shape, shape.replace("_", "-"), shape.replace("-", "_")]
         if any(v in tag_block_raw for v in shape_variants):
+            score += 1.0
+
+    if color:
+        checks += 1
+        if f"color:{color}" in tag_block_raw or f"fill:{color}" in tag_block_raw:
             score += 1.0
 
     if checks == 0:
@@ -675,12 +708,12 @@ def _score_output_text_rules(raw: str, probe: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _score_output(raw: str, probe: dict[str, Any], scorer: str) -> dict[str, Any]:
+def _score_output(raw: str, probe: dict[str, Any], scorer: str, output_adapter: dict[str, Any] | None = None) -> dict[str, Any]:
     s = str(scorer or "").strip().lower()
     if s in {"text", "text_rules", "generic"}:
         return _score_output_text_rules(raw, probe)
     # default svg scorer
-    return _score_output_svg(raw, probe)
+    return _score_output_svg(raw, probe, output_adapter)
 
 
 def _probe_expected_summary(probe: dict[str, Any]) -> str:
@@ -689,6 +722,9 @@ def _probe_expected_summary(probe: dict[str, Any]) -> str:
         value = probe.get(key)
         if isinstance(value, str) and value.strip():
             parts.append(f"{key.replace('expect_', '')}={value.strip()}")
+    color = probe.get("expect_color")
+    if isinstance(color, str) and color.strip():
+        parts.append(f"color={color.strip()}")
     contains = probe.get("expect_contains")
     if contains is None:
         contains = probe.get("expect_contains_all")
@@ -818,6 +854,7 @@ def eval_run(
     probes = eval_contract.get("probes") if isinstance(eval_contract.get("probes"), list) else []
     scorer_default = str(eval_contract.get("scorer") or "svg").strip().lower()
     dataset_type = str(eval_contract.get("dataset_type") or "svg").strip().lower()
+    output_adapter_default = eval_contract.get("output_adapter") if isinstance(eval_contract.get("output_adapter"), dict) else None
     stage_metric_defs = eval_contract.get("stage_metrics") if isinstance(eval_contract.get("stage_metrics"), list) else []
     probe_metric_defs = eval_contract.get("probe_metrics") if isinstance(eval_contract.get("probe_metrics"), list) else []
     headline_metrics = eval_contract.get("headline_metrics") if isinstance(eval_contract.get("headline_metrics"), list) else []
@@ -829,6 +866,8 @@ def eval_run(
     print(f"  stage:      {stage}  pass={stage_pass}  label={phase_label}")
     print(f"  final_loss: {final_loss}")
     print(f"  dataset:    {dataset_type}  scorer={scorer_default}")
+    if output_adapter_default:
+        print(f"  adapter:    {output_adapter_default.get('name')}:{output_adapter_default.get('renderer', '-')}")
     print(
         f"  eval budget:{resolved_max_tokens} "
         f"(source={budget_meta.get('source')}, base={budget_meta.get('base_tokens')}, x{budget_meta.get('multiplier')})"
@@ -857,6 +896,7 @@ def eval_run(
         probe_id = probe["id"]
         prompt = probe["prompt"]
         scorer = str(probe.get("scorer") or scorer_default).strip().lower() or "svg"
+        probe_output_adapter = probe.get("output_adapter") if isinstance(probe.get("output_adapter"), dict) else output_adapter_default
         print(f"\n[Step 3] Probe: {probe_id} (n={n_samples})")
         samples: list[dict[str, Any]] = []
         for i in range(n_samples):
@@ -884,7 +924,7 @@ def eval_run(
                 )
             raw = (output or "").strip()
             response = _extract_response_text(raw, prompt)
-            scores = _score_output(raw, probe, scorer)
+            scores = _score_output(raw, probe, scorer, probe_output_adapter)
             samples.append({
                 "idx": i,
                 "response": response[:600],   # store clean response text

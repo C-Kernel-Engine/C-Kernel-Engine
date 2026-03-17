@@ -6,6 +6,9 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from render_svg_structured_scene_v7 import render_structured_scene_svg as _render_structured_scene_svg_v7
+from render_svg_structured_atoms_v7 import render_structured_svg_atoms as _render_structured_svg_atoms_v7
+
 
 _SVG_OPEN_RE = re.compile(r"<svg\b", re.IGNORECASE)
 _SVG_CLOSE_RE = re.compile(r"</svg>", re.IGNORECASE)
@@ -78,75 +81,22 @@ def is_valid_svg(svg_text: str | None) -> bool:
 
 
 def render_structured_svg_atoms(text: str) -> str:
-    tokens = [tok.strip() for tok in str(text or "").split() if tok.strip()]
-    if "[/svg]" in tokens:
-        tokens = tokens[: tokens.index("[/svg]") + 1]
-    width = "128"
-    height = "128"
-    fill = "red"
-    stroke = "black"
-    stroke_width = "2"
-    for tok in tokens:
-        if tok.startswith("[w:") and tok.endswith("]"):
-            width = tok[len("[w:") : -1]
-        elif tok.startswith("[h:") and tok.endswith("]"):
-            height = tok[len("[h:") : -1]
-        elif tok.startswith("[fill:") and tok.endswith("]"):
-            fill = tok[len("[fill:") : -1]
-        elif tok.startswith("[stroke:") and tok.endswith("]"):
-            stroke = tok[len("[stroke:") : -1]
-        elif tok.startswith("[sw:") and tok.endswith("]"):
-            stroke_width = tok[len("[sw:") : -1]
+    return _render_structured_svg_atoms_v7(text)
 
-    if "[circle]" in tokens:
-        attrs = {"cx": "64", "cy": "64", "r": "18"}
-        for tok in tokens:
-            if tok.startswith("[cx:") and tok.endswith("]"):
-                attrs["cx"] = tok[len("[cx:") : -1]
-            elif tok.startswith("[cy:") and tok.endswith("]"):
-                attrs["cy"] = tok[len("[cy:") : -1]
-            elif tok.startswith("[r:") and tok.endswith("]"):
-                attrs["r"] = tok[len("[r:") : -1]
-        body = (
-            f'<circle cx="{attrs["cx"]}" cy="{attrs["cy"]}" r="{attrs["r"]}" '
-            f'fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}"/>'
-        )
-    elif "[rect]" in tokens:
-        attrs = {"x": "42", "y": "48", "width": "44", "height": "32", "rx": "6"}
-        for key in list(attrs):
-            prefix = f"[{key}:"
-            for tok in tokens:
-                if tok.startswith(prefix) and tok.endswith("]"):
-                    attrs[key] = tok[len(prefix) : -1]
-        body = (
-            f'<rect x="{attrs["x"]}" y="{attrs["y"]}" width="{attrs["width"]}" '
-            f'height="{attrs["height"]}" rx="{attrs["rx"]}" fill="{fill}" '
-            f'stroke="{stroke}" stroke-width="{stroke_width}"/>'
-        )
-    elif "[polygon]" in tokens:
-        points = "64,34 36,86 92,86"
-        for tok in tokens:
-            if tok.startswith("[points:") and tok.endswith("]"):
-                points = tok[len("[points:") : -1].replace("|", " ")
-        body = (
-            f'<polygon points="{points}" fill="{fill}" stroke="{stroke}" '
-            f'stroke-width="{stroke_width}"/>'
-        )
-    else:
-        raise ValueError("unsupported structured SVG DSL")
-    return (
-        f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">'
-        f"{body}</svg>"
-    )
+
+def render_structured_scene_svg(text: str) -> str:
+    return _render_structured_scene_svg_v7(text)
 
 
 _SVG_DSL_RENDERERS: dict[str, Callable[[str], str]] = {
     "structured_svg_atoms.v1": render_structured_svg_atoms,
+    "structured_svg_scene.v1": render_structured_scene_svg,
 }
 
 
 _RENDERER_MIME_TYPES: dict[str, str] = {
     "structured_svg_atoms.v1": "image/svg+xml",
+    "structured_svg_scene.v1": "image/svg+xml",
 }
 
 
