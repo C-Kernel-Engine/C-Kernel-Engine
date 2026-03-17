@@ -76,11 +76,14 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
 - `v7-gate` should remain deterministic and reproducible on CPU-only environments.
 - Training runs belong under `~/.cache/ck-engine-v7/models/train/<run-name>`.
   Do not create ad-hoc run directories under `version/v7/runs/`; that pollutes the source tree and breaks `open_ir_hub.py` discovery.
+  Automated progression scripts and overnight ladders should default to that same cache-backed train root, not bespoke repo folders.
+  Why: the operator needs one place to view the full experiment ledger, compare runs, open `ir_report.html`, and inspect datasets/checkpoints/probe artifacts without hunting through bespoke project folders.
 - Repo data workspaces such as `version/v7/data/spec04` are seed templates only.
   Generated datasets, `dataset_viewer.html`, `ir_report.html`, checkpoints, parity JSON, and perf artifacts should live together under one cache run directory so operators can inspect, tar, and share a single folder and `open_ir_hub.py --open` can see the whole run cleanly.
 - `version/v7/reports/` is for curated, source-controlled writeups and canonical ledgers only.
   Do not place generated HTML, ad hoc analysis pages, or one-off machine-produced reports there; put those under the relevant cache run directory or under `~/.cache/ck-engine-v7/models/reports/` for cross-run generated analysis.
   Run-family progression dashboards such as `spec06 r1 -> rN` summaries are cross-run generated analysis too, so they belong under `~/.cache/ck-engine-v7/models/reports/` until there is a dedicated first-class family dashboard.
+  If a monitor or progression script backfills a missing probe after a failed launch, treat that probe as a diagnostic artifact only, not as a canonical completed-run result.
 - When bootstrapping a new training run, prefer `python3 version/v7/scripts/ck_run_v7.py init --run-name <name> ...`.
   In general, let the tool choose the default cache location and provide only the run name; use `--run <path>` only when you intentionally need a nonstandard location.
 - `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
