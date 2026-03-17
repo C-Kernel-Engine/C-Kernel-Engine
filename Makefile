@@ -1275,6 +1275,7 @@ unittest:
 	@echo "  make nightly          - Run full nightly test suite (scripts/nightly_runner.py)"
 	@echo "  make visualizer       - Run v7 IR visualizer E2E regression"
 	@echo "  make visualizer-full  - Run visualizer E2E + train-runtime ASan artifact checks"
+	@echo "  make v7-visualizer-health - Fast HTML/JS health check (tabs, functions, contracts)"
 	@echo ""
 
 # Typo aliases
@@ -3163,6 +3164,7 @@ report-md:
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
+.PHONY: v7-visualizer-health
 .PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
@@ -4076,6 +4078,10 @@ test-v7-svg-overfit-regression:
 	@$(PYTHON) version/v7/scripts/test_svg_overfit_regression_v7.py --json-out "$(V7_SVG_OVERFIT_JSON)"
 
 visualizer: v7-ir-visualizer-e2e
+
+v7-visualizer-health:
+	@echo "Running visualizer health checks..."
+	@$(PYTHON) version/v7/scripts/test_visualizer_health_v7.py --source --json-out $(V7_REPORT_DIR)/visualizer_health_latest.json
 
 visualizer-full:
 	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1
