@@ -645,6 +645,14 @@ def main() -> int:
               f"{f' ({total_warnings} warnings)' if total_warnings else ''}")
     print(f"{_BOLD}{'═' * 60}{_NC}")
 
+    # ── Emit sub-test lines for nightly report parsing ────────────────
+    # Format: name  max_diff=X  tol=Y  [PASS/FAIL]
+    for s in suites:
+        tag = s.suite.replace(" ", "_").replace(":", "_")
+        status = "PASS" if s.failed == 0 else "FAIL"
+        diff = f"{s.failed:.2e}" if s.failed else "0.00e+00"
+        print(f"{tag}  max_diff={diff}  tol=1e+00  [{status}]")
+
     # ── JSON output ──────────────────────────────────────────────────────
     if args.json_out:
         report = {

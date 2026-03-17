@@ -268,6 +268,22 @@ def main() -> int:
     else:
         print(f"{bar}\n  {RED}{CROSS} {failed}/{total} JS unit tests FAILED{RESET}\n{bar}")
 
+    # ── Emit sub-test lines for nightly report parsing ────────────────
+    # Group by component (ir_visualizer / dataset_viewer)
+    component_pass: dict[str, int] = {}
+    component_fail: dict[str, int] = {}
+    for r in results:
+        comp = r["name"].split(":")[0] if ":" in r["name"] else "js_units"
+        if r["passed"]:
+            component_pass[comp] = component_pass.get(comp, 0) + 1
+        else:
+            component_fail[comp] = component_fail.get(comp, 0) + 1
+    for comp in sorted(set(list(component_pass) + list(component_fail))):
+        f = component_fail.get(comp, 0)
+        status = "PASS" if f == 0 else "FAIL"
+        diff = f"{f:.2e}" if f else "0.00e+00"
+        print(f"L2_{comp}  max_diff={diff}  tol=1e+00  [{status}]")
+
     # ── JSON output ──
     if args.json_out:
         outpath = Path(args.json_out)

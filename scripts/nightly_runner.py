@@ -476,6 +476,23 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
             details.append(f"+{len(failing) - 4} more")
         return f"{prefix}; failing_checks={' | '.join(details)}"
 
+    if target in ("v7-visualizer-health", "v7-visualizer-generated-e2e"):
+        if payload.get("skipped"):
+            return f"{prefix}; skipped={payload.get('reason', 'no runs')}"
+        total = payload.get("total_checks", payload.get("total", 0))
+        passed = payload.get("passed", 0)
+        failed = payload.get("failed", 0)
+        warnings = payload.get("warnings", 0)
+        if failed == 0:
+            return f"{prefix}; {passed}/{total} passed ({warnings} warnings)"
+        # Show failing stages/suites
+        stages = payload.get("stages", payload.get("suites", []))
+        failing_names = [
+            s.get("stage", s.get("suite", "?"))
+            for s in stages if isinstance(s, dict) and s.get("failed", 0) > 0
+        ]
+        return f"{prefix}; {failed}/{total} failed: {', '.join(failing_names[:5])}"
+
     if target == "v7-stabilization-nightly":
         summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
         tokenizer = payload.get("tokenizer_gates") if isinstance(payload.get("tokenizer_gates"), list) else []
