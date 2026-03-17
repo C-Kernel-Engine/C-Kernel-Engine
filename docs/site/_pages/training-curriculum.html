@@ -1,0 +1,655 @@
+<!-- TITLE: CK-Native Training Curriculum -->
+<!-- NAV: quickstart -->
+
+<style>
+.curriculum-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.curriculum-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(71,180,117,0.16), transparent 32%),
+        radial-gradient(circle at 85% 10%, rgba(7,173,248,0.14), transparent 28%),
+        linear-gradient(145deg, rgba(255,180,0,0.08), rgba(42,42,42,0));
+    pointer-events: none;
+}
+
+.curriculum-hero-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.curriculum-kicker {
+    color: var(--orange);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.65rem;
+}
+
+.curriculum-subtitle {
+    max-width: 960px;
+    color: var(--text-secondary);
+}
+
+.curriculum-alert {
+    margin: 1.2rem 0 1.6rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,180,0,0.26);
+    background: linear-gradient(135deg, rgba(255,180,0,0.12), rgba(7,173,248,0.08));
+    color: var(--text-secondary);
+}
+
+.curriculum-alert strong {
+    color: var(--text-primary);
+}
+
+.integration-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0 1.8rem 0;
+}
+
+.integration-step {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.9rem;
+    background: var(--dark-card);
+    box-shadow: var(--shadow-sm);
+}
+
+.integration-step .step-version {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
+}
+
+.step-v7 { background: rgba(71,180,117,0.18); color: #8de0ad; }
+.step-v89 { background: rgba(7,173,248,0.16); color: #79d4ff; }
+.step-v10 { background: rgba(233,30,99,0.18); color: #ff8ec0; }
+.step-v1114 { background: rgba(255,180,0,0.16); color: #ffd16b; }
+.step-v15 { background: rgba(52,73,94,0.26); color: #c6d3df; }
+.step-v1617 { background: rgba(22,160,133,0.22); color: #8fe6d2; }
+
+.integration-step h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+}
+
+.integration-step p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 2rem 0;
+}
+
+.matrix-table th,
+.matrix-table td {
+    padding: 0.8rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid var(--grey);
+    vertical-align: top;
+}
+
+.matrix-table th {
+    color: var(--orange);
+    background: var(--dark-card);
+    font-size: 0.84rem;
+}
+
+.matrix-table td {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.matrix-table td:first-child {
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.phase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.phase-card {
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1rem;
+    background: linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,180,0,0.06));
+}
+
+.phase-card h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+}
+
+.phase-card .phase-window {
+    color: var(--orange);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
+}
+
+.phase-card p {
+    margin: 0 0 0.55rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.phase-card ul {
+    margin: 0;
+    padding-left: 1.15rem;
+}
+
+.phase-card li {
+    margin-bottom: 0.38rem;
+    color: var(--text-secondary);
+}
+
+.gate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.gate-card {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    background: var(--dark-card);
+    padding: 1rem;
+}
+
+.gate-card h3 {
+    margin: 0 0 0.45rem 0;
+}
+
+.gate-card ul {
+    margin: 0;
+    padding-left: 1.15rem;
+}
+
+.gate-card li {
+    margin-bottom: 0.38rem;
+    color: var(--text-secondary);
+}
+
+.ops-loop {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.ops-step {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.95rem;
+    background: rgba(0,0,0,0.14);
+}
+
+.ops-step .ops-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--dark);
+    background: var(--orange);
+    margin-bottom: 0.55rem;
+}
+
+.ops-step h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.98rem;
+}
+
+.ops-step p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+.resource-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.9rem;
+    margin-top: 1rem;
+}
+
+.resource-card {
+    display: block;
+    text-decoration: none;
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.95rem 1rem;
+    background: var(--dark-card);
+    color: inherit;
+    transition: var(--transition);
+}
+
+.resource-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,180,0,0.35);
+    box-shadow: var(--shadow-md);
+}
+
+.resource-card h3 {
+    margin: 0 0 0.35rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.resource-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+@media (max-width: 860px) {
+    .matrix-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+</style>
+
+<div class="hero curriculum-hero">
+    <div class="curriculum-hero-inner">
+        <div class="badge-row">
+            <span class="badge badge-green">CK-native</span>
+            <span class="badge badge-amber">CPU-first</span>
+            <span class="badge badge-blue">Version-integrated roadmap</span>
+        </div>
+        <div class="curriculum-kicker">Training Curriculum</div>
+        <h1>CK-Native Training Curriculum</h1>
+        <p class="curriculum-subtitle">
+            This is the training plan that connects <code>v7</code> to the rest of the roadmap.
+            The point is not to learn one narrow SVG task. The point is to use <code>C-Kernel-Engine</code>
+            to learn the whole stack: contracts, data, codegen, replay, distributed execution, multimodal
+            expansion, and eventually embedded control-grade AI.
+        </p>
+    </div>
+</div>
+
+<div class="curriculum-alert">
+    <strong>Core framing:</strong> <code>v7</code> is the foundation track, not a side quest.
+    It makes training correct, observable, and repeatable. Later versions are multipliers on top of that:
+    <code>v8-v9</code> add sparse scale, <code>v10</code> adds adapters, <code>v11-v14</code> add modalities,
+    <code>v15</code> lands embedded inference, <code>v16</code> explains model behavior, and <code>v17</code>
+    closes the loop with real-time policy integration.
+</div>
+
+<h2>How v7 and Beyond Integrate</h2>
+<p>
+    The version history is not a list of disconnected features. It is a dependency chain. Each version teaches
+    a new operating skill and depends on the contracts from earlier stages.
+</p>
+
+<div class="integration-strip">
+    <div class="integration-step">
+        <span class="step-version step-v7">v7</span>
+        <h3>Correctness</h3>
+        <p>Training IR, backward lowering, replay determinism, checkpoints, run artifacts, and operator-grade gates.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v89">v8-v9</span>
+        <h3>Scale + Sparsity</h3>
+        <p>MoE routing, expert execution, sparse backward, and eventually CK-native distributed training.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v10">v10</span>
+        <h3>Adaptation</h3>
+        <p>LoRA and QLoRA let the project specialize downstream models without retraining the full stack.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v1114">v11-v14</span>
+        <h3>Modalities</h3>
+        <p>Vision and audio force the engine to handle new front-ends, new data contracts, and new evals.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v15">v15</span>
+        <h3>Deployment</h3>
+        <p>Embedded inference turns the training work into bounded, portable, hardware-aware systems.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v1617">v16-v17</span>
+        <h3>Interpret + Control</h3>
+        <p>Mechanistic interpretability and multimodal control make the model explainable enough to trust in loops.</p>
+    </div>
+</div>
+
+<h2>Version-to-Skill Matrix</h2>
+<table class="matrix-table">
+    <thead>
+        <tr>
+            <th>Version Track</th>
+            <th>Built Capability</th>
+            <th>Core Skills</th>
+            <th>Hard Exit Gate</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>v7.0-v7.2</code></td>
+            <td>Single-rank training core, IR-driven backward, compiler-backed task curricula, deterministic replay, threaded training runtime.</td>
+            <td>Optimizer math, codegen/runtime contracts, data packing, token budgets, parity triage, profiler discipline.</td>
+            <td>Runs are reproducible, replay is stable, checkpoints resume cleanly, and operator gates pass from a clean checkout.</td>
+        </tr>
+        <tr>
+            <td><code>v8.0-v9.0</code></td>
+            <td>MoE forward/backward plus the first serious CK-native distributed training stack.</td>
+            <td>Routing, sparse load balance, all-reduce behavior, sharded data loading, multi-rank failure modes.</td>
+            <td><code>1-rank</code> and <code>N-rank</code> tiny runs agree within declared tolerance and distributed checkpoints restore correctly.</td>
+        </tr>
+        <tr>
+            <td><code>v10.0</code></td>
+            <td>LoRA/QLoRA adapters injected into the same IR/codegen path.</td>
+            <td>Parameter-efficient fine-tuning, frozen-base training, low-rank update accounting, adapter promotion policy.</td>
+            <td>Adapter-only runs match the declared update surface and inference promotion works without full-model surgery.</td>
+        </tr>
+        <tr>
+            <td><code>v11.0-v14.0</code></td>
+            <td>Vision and audio encoders plus their backward paths and modality-specific datasets.</td>
+            <td>Patching/tokenization for new modalities, encoder contracts, multimodal batching, modality-specific eval design.</td>
+            <td>Each modality has a deterministic preflight, stable probes, and no regression to the text-only path.</td>
+        </tr>
+        <tr>
+            <td><code>v15.0</code></td>
+            <td>Embedded inference runtime with deterministic memory and HAL integration.</td>
+            <td>Latency budgets, memory ceilings, real-time constraints, portable runtime surfaces, deployment sign-off.</td>
+            <td>Embedded targets hit bounded memory/latency envelopes and keep deterministic runtime behavior.</td>
+        </tr>
+        <tr>
+            <td><code>v16.0-v17.0</code></td>
+            <td>Interpretability tooling, feature tracing, causal intervention, and policy integration with vision/control loops.</td>
+            <td>Activation tracing, SAE-style feature learning, intervention experiments, closed-loop safety reasoning.</td>
+            <td>Model behavior can be inspected, perturbed, and validated before it is allowed into autonomy loops.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>12-Month Learning Ladder</h2>
+<p>
+    A good first project year is not “buy a cluster and hope.” It is staged competence: first correctness, then representation,
+    then scale, then modality expansion, then deployment-grade systems.
+</p>
+
+<div class="phase-grid">
+    <div class="phase-card">
+        <div class="phase-window">Months 1-2</div>
+        <h3>Phase 1: Engine Contracts</h3>
+        <p>Master the <code>v7</code> gates before chasing capability expansion.</p>
+        <ul>
+            <li>Run IR build, compile smoke, parity, replay, and checkpoint flows until the failure classes are explainable and repeatable.</li>
+            <li>Learn how run directories, manifests, token packing, and visualizer artifacts fit together.</li>
+            <li>Treat the oracle as a measuring tool, not a permanent training dependency.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 3-4</div>
+        <h3>Phase 2: Representation Learning</h3>
+        <p>Use compiler-backed datasets to learn data shaping and evaluation.</p>
+        <ul>
+            <li>Push scene DSL work from structured SVG toward richer compiler-owned visual vocabularies.</li>
+            <li>Add page-level DSL work that can later lower into Databoard or other structured web surfaces.</li>
+            <li>Make preflight, canary, and non-regression gates mandatory.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 5-6</div>
+        <h3>Phase 3: Code and Data Tasks</h3>
+        <p>Leave “visual only” and start teaching transformation.</p>
+        <ul>
+            <li>Train on config transforms, schema mapping, patch IRs, route/controller/model tasks, and build-file edits.</li>
+            <li>Broaden into <code>C</code>, <code>C++</code>, <code>Python</code>, <code>Bash</code>, <code>Awk</code>, <code>Lua</code>, <code>PHP</code>, <code>HTML/CSS/JS</code>.</li>
+            <li>Evaluate with validators, build success, and tests instead of loss alone.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 7-8</div>
+        <h3>Phase 4: CK-Native Distribution</h3>
+        <p>Build the training system the project can own end-to-end.</p>
+        <ul>
+            <li>Start with 1 host and many ranks before moving to many hosts.</li>
+            <li>Implement rank/world bootstrap, deterministic sharded sampling, collective ops, and distributed checkpoints.</li>
+            <li>Prove <code>1-rank</code> vs <code>N-rank</code> equivalence on tiny runs before attempting long jobs.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 9-10</div>
+        <h3>Phase 5: MoE and Adapters</h3>
+        <p>Only scale the model family once the core runtime and gates are stable.</p>
+        <ul>
+            <li>Land <code>v8-v9</code> sparse expert routing and backward.</li>
+            <li>Use <code>v10</code> adapters to learn specialization without full retraining cost.</li>
+            <li>Track exact ownership of trainable parameters and promotion paths.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 11-12</div>
+        <h3>Phase 6: Multimodal to Embedded</h3>
+        <p>Make the system useful in concrete downstream domains.</p>
+        <ul>
+            <li>Bridge into vision/audio training tracks from <code>v11-v14</code>.</li>
+            <li>Add executable tasks from <a href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">controlSystems</a>, <a href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">stateEstimation</a>, <a href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">inertial_navigation_system</a>, and <a href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">AeroDynControlRig</a>.</li>
+            <li>Use that work to prepare the jump to <code>v15-v17</code>.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Domain Ladder Inside v7</h2>
+<table class="matrix-table">
+    <thead>
+        <tr>
+            <th>Track</th>
+            <th>Primary Target</th>
+            <th>What It Teaches</th>
+            <th>Best Evidence</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Visual DSL</td>
+            <td>Compiler-backed SVG scene contracts</td>
+            <td>Representation design, slot structure, compiler ownership, renderable probes</td>
+            <td>Exact DSL match, materialized SVG match, renderability, family non-regression</td>
+        </tr>
+        <tr>
+            <td>Page DSL</td>
+            <td>Structured page scenes that can lower into web/template systems</td>
+            <td>Section composition, variant selection, semantic layout, validator-driven generation</td>
+            <td>Schema pass, section correctness, stable page render</td>
+        </tr>
+        <tr>
+            <td>Code/Data IR</td>
+            <td>Config transforms, patch IR, schema mapping, route/controller/model tasks</td>
+            <td>Machine-checkable code transformation, exactness, build discipline</td>
+            <td>Validator pass, diff quality, compile/test success</td>
+        </tr>
+        <tr>
+            <td>Direct Code</td>
+            <td>Real repo tasks across <code>C/C++/Python/Bash/Awk/Lua/PHP/JS/CSS</code></td>
+            <td>Language fluency, multi-file editing, debugging, refactor quality</td>
+            <td>Tests passing, build success, review findings shrinking over time</td>
+        </tr>
+        <tr>
+            <td>Tool Use</td>
+            <td>Search, inspect, patch, rerun, compare, retry</td>
+            <td>Engineering behavior instead of plain text generation</td>
+            <td>Task success rate, fix rate, retry efficiency</td>
+        </tr>
+        <tr>
+            <td>Math + Embedded</td>
+            <td><a href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">controlSystems</a>, <a href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">stateEstimation</a>, <a href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">inertial_navigation_system</a>, <a href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">AeroDynControlRig</a>, and hardware-facing utilities</td>
+            <td>Executable scientific reasoning, tolerances, systems thinking</td>
+            <td>Numerical correctness, simulation stability, embedded test pass</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Reference Repositories</h2>
+<p>
+    Public curriculum references should point to concrete repositories instead of private local shorthand. In particular,
+    the local <code>DroneMath</code> workspace is a multi-repo family, so public docs should name the exact downstream repositories.
+</p>
+
+<div class="resource-grid">
+    <a class="resource-card" href="https://github.com/antshiv/C-Kernel-Engine" target="_blank" rel="noopener noreferrer">
+        <h3>C-Kernel-Engine</h3>
+        <p>The core runtime, codegen, tokenizer, IR, training, profiling, and distributed systems project.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antsand/antsand.com" target="_blank" rel="noopener noreferrer">
+        <h3>antsand.com</h3>
+        <p>The web stack and Databoard host repository for page-DSL, templates, and style-variant integration work.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/LinuxUtilities" target="_blank" rel="noopener noreferrer">
+        <h3>LinuxUtilities</h3>
+        <p>Shell, system, and operator-facing tasks for tool-use, scripting, config repair, and deployment automation.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">
+        <h3>controlSystems</h3>
+        <p>Control-theory code for executable math, controllers, tuning tasks, and embedded-facing numerical evaluation.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">
+        <h3>stateEstimation</h3>
+        <p>Filtering, sensor fusion, and estimator tasks for numerical correctness, drift analysis, and systems reasoning.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">
+        <h3>inertial_navigation_system</h3>
+        <p>Navigation pipelines and inertial reasoning tasks that bridge math, simulation, and robotics deployment.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">
+        <h3>AeroDynControlRig</h3>
+        <p>Flight-dynamics and control-loop work for higher-consequence embedded and autonomy evaluation.</p>
+    </a>
+</div>
+
+<h2>Before Investing in Serious In-House Server-Grade Distributed Computing Infrastructure</h2>
+<p>
+    Serious in-house server-grade distributed computing infrastructure is useful when it multiplies a stable loop.
+    It is a waste when it magnifies confusion. Invest only after the single-node and small-multi-rank gates are boring.
+</p>
+
+<div class="gate-grid">
+    <div class="gate-card">
+        <h3>Must Already Be True</h3>
+        <ul>
+            <li>Single-rank CK training is deterministic enough to replay and debug.</li>
+            <li>Run directories are standardized and artifact-rich.</li>
+            <li>Preflight, canary, and non-regression gates catch bad runs early.</li>
+            <li>Checkpoint/resume is reliable and documented.</li>
+        </ul>
+    </div>
+    <div class="gate-card">
+        <h3>Distributed Bring-Up Gates</h3>
+        <ul>
+            <li><code>1-rank</code> and <code>2-rank</code> tiny runs match within declared tolerance.</li>
+            <li>Sharded data reading preserves exact token accounting.</li>
+            <li>Collectives behave deterministically enough to debug regressions.</li>
+            <li>Per-rank logs and checkpoints are inspectable without guesswork.</li>
+        </ul>
+    </div>
+    <div class="gate-card">
+        <h3>Only Then Scale Spend</h3>
+        <ul>
+            <li>Use the first cluster months for parallel experiments and validation, not giant speculative runs.</li>
+            <li>Benchmark experiments/day, not just tokens/sec.</li>
+            <li>Delay large-model pushes until representation and compiler surfaces are stable.</li>
+            <li>Keep cluster rollout tied to concrete gates instead of hope.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>The Operator Loop to Internalize</h2>
+<div class="ops-loop">
+    <div class="ops-step">
+        <div class="ops-num">1</div>
+        <h3>Define the contract</h3>
+        <p>Make the target explicit enough to evaluate exactly and debug cheaply.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">2</div>
+        <h3>Build the data</h3>
+        <p>Materialize rows, token budgets, holdouts, and canaries before touching model size.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">3</div>
+        <h3>Run small first</h3>
+        <p>Canary the format, verify render/build/test behavior, then launch the real run.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">4</div>
+        <h3>Inspect real evidence</h3>
+        <p>Use probes, replay, checkpoints, diffs, and profiler output. Do not trust loss alone.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">5</div>
+        <h3>Repair the right layer</h3>
+        <p>Fix representation, data, runtime, or capacity based on evidence, not instinct.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">6</div>
+        <h3>Scale only after closure</h3>
+        <p>Once the loop is boring, then spend compute on more ranks, more models, or more modalities.</p>
+    </div>
+</div>
+
+<h2>Related Pages</h2>
+<div class="resource-grid">
+    <a class="resource-card" href="version-history.html">
+        <h3>Version History</h3>
+        <p>The public roadmap from <code>v6.6</code> through <code>v17</code>, including the training-first execution order.</p>
+    </a>
+    <a class="resource-card" href="v7-runbook.html">
+        <h3>v7 Runbook</h3>
+        <p>The operator page for concrete commands, training setup, parity gates, and run-dir workflows.</p>
+    </a>
+    <a class="resource-card" href="v7-training-progression-playbook.html">
+        <h3>v7 Training Progression Playbook</h3>
+        <p>The current multi-track progression document for SVG, routing, and code experiments.</p>
+    </a>
+    <a class="resource-card" href="training-intuition.html">
+        <h3>Training Intuition</h3>
+        <p>The deeper intuition page for checkpoints, triage loops, and why failure visibility matters.</p>
+    </a>
+    <a class="resource-card" href="v7-backprop-ir.html">
+        <h3>v7 Backprop IR</h3>
+        <p>The visual explanation of how training lowering, memory layout, and runtime checks fit together.</p>
+    </a>
+    <a class="resource-card" href="research.html">
+        <h3>Research Tracker</h3>
+        <p>The broader research page that will feed later version tracks such as multimodal and sparse architectures.</p>
+    </a>
+</div>

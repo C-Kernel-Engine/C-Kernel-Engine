@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeepTrainingIntuition | C-Kernel-Engine</title>
+    <title>CK | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -934,1087 +934,656 @@
     <main>
 
 <style>
-.intuition-hero {
+.curriculum-hero {
     position: relative;
     overflow: hidden;
 }
 
-.intuition-hero .badge-row {
+.curriculum-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(71,180,117,0.16), transparent 32%),
+        radial-gradient(circle at 85% 10%, rgba(7,173,248,0.14), transparent 28%),
+        linear-gradient(145deg, rgba(255,180,0,0.08), rgba(42,42,42,0));
+    pointer-events: none;
+}
+
+.curriculum-hero-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.badge-row {
     display: flex;
-    justify-content: center;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
-.badge-blue {
-    background: var(--blue);
-    color: #fff;
+.curriculum-kicker {
+    color: var(--orange);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.65rem;
 }
 
-.badge-amber {
-    background: var(--orange);
-    color: var(--dark);
-}
-
-.subtitle {
-    max-width: 860px;
-    margin: 0 auto 1.25rem auto;
+.curriculum-subtitle {
+    max-width: 960px;
     color: var(--text-secondary);
 }
 
-.stack-board {
-    background: linear-gradient(180deg, rgba(255,180,0,0.08), rgba(7,173,248,0.08));
-    border: 1px solid var(--grey);
-    border-radius: 12px;
-    padding: 1.25rem;
-}
-
-.stack-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
-}
-
-.stack-item {
-    background: rgba(42, 42, 42, 0.9);
-    border: 1px solid var(--grey);
-    border-radius: 8px;
-    padding: 0.9rem;
-    text-align: center;
-}
-
-.stack-item strong {
-    display: block;
-    margin-bottom: 0.35rem;
-    color: var(--white);
-}
-
-.stack-item .layer-meta {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.board-caption {
-    margin-top: 0.75rem;
-    font-size: 0.9rem;
+.curriculum-alert {
+    margin: 1.2rem 0 1.6rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255,180,0,0.26);
+    background: linear-gradient(135deg, rgba(255,180,0,0.12), rgba(7,173,248,0.08));
     color: var(--text-secondary);
 }
 
-.gap-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
+.curriculum-alert strong {
+    color: var(--text-primary);
 }
 
-.gap-card {
-    background: var(--dark-card);
+.integration-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0 1.8rem 0;
+}
+
+.integration-step {
     border: 1px solid var(--grey);
     border-radius: 10px;
-    padding: 1rem;
-}
-
-.gap-card h3 {
-    margin-top: 0;
-}
-
-.gap-list {
-    margin: 0.75rem 0 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.gap-list li {
-    margin: 0 0 0.55rem 0;
-    padding: 0.5rem 0.65rem;
-    border-radius: 6px;
-    border: 1px solid var(--grey);
-    background: rgba(0,0,0,0.18);
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.size-compare {
-    display: grid;
-    gap: 0.9rem;
-}
-
-.estimate-note {
-    margin-top: 0.6rem;
-    font-size: 0.83rem;
-    color: var(--text-muted);
-}
-
-.size-row {
-    background: var(--dark-card);
-    border: 1px solid var(--grey);
-    border-radius: 8px;
-    padding: 0.8rem;
-}
-
-.size-row .row-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    font-size: 0.9rem;
-    margin-bottom: 0.4rem;
-}
-
-.bar-wrap {
-    width: 100%;
-    background: #202020;
-    border: 1px solid #3a3a3a;
-    border-radius: 999px;
-    height: 12px;
-    overflow: hidden;
-}
-
-.bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--orange), var(--orange-light));
-}
-
-.bar-small {
-    background: linear-gradient(90deg, var(--blue), #53c7ff);
-}
-
-.bar-resume {
-    background: linear-gradient(90deg, var(--green), #7ad8a0);
-}
-
-.cadence-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.85rem;
-}
-
-.cadence-card {
-    border: 1px solid var(--grey);
-    border-left: 3px solid var(--orange);
-    border-radius: 8px;
-    background: var(--dark-card);
     padding: 0.9rem;
+    background: var(--dark-card);
+    box-shadow: var(--shadow-sm);
 }
 
-.cadence-card h4 {
-    margin: 0 0 0.4rem 0;
-    color: var(--white);
+.integration-step .step-version {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
 }
 
-.cadence-card p {
+.step-v7 { background: rgba(71,180,117,0.18); color: #8de0ad; }
+.step-v89 { background: rgba(7,173,248,0.16); color: #79d4ff; }
+.step-v10 { background: rgba(233,30,99,0.18); color: #ff8ec0; }
+.step-v1114 { background: rgba(255,180,0,0.16); color: #ffd16b; }
+.step-v15 { background: rgba(52,73,94,0.26); color: #c6d3df; }
+.step-v1617 { background: rgba(22,160,133,0.22); color: #8fe6d2; }
+
+.integration-step h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+}
+
+.integration-step p {
     margin: 0;
     font-size: 0.9rem;
+    color: var(--text-secondary);
 }
 
-.trigger-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.8rem;
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 2rem 0;
 }
 
-.trigger-pill {
-    border: 1px solid var(--grey);
-    background: rgba(255,180,0,0.1);
+.matrix-table th,
+.matrix-table td {
+    padding: 0.8rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid var(--grey);
+    vertical-align: top;
+}
+
+.matrix-table th {
     color: var(--orange);
-    border-radius: 999px;
-    padding: 0.35rem 0.7rem;
-    font-size: 0.78rem;
+    background: var(--dark-card);
+    font-size: 0.84rem;
+}
+
+.matrix-table td {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.matrix-table td:first-child {
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 .phase-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1rem;
+    margin: 1rem 0 2rem 0;
 }
 
-.phase {
+.phase-card {
     border: 1px solid var(--grey);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 1rem;
-    background: var(--dark-card);
-    box-shadow: var(--shadow-sm);
+    background: linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,180,0,0.06));
 }
 
-.phase h3 {
-    margin-top: 0;
+.phase-card h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
 }
 
-.phase .phase-tag {
+.phase-card .phase-window {
+    color: var(--orange);
     font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--orange);
-    margin-bottom: 0.5rem;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin-bottom: 0.55rem;
 }
 
-.phase ol {
+.phase-card p {
+    margin: 0 0 0.55rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.phase-card ul {
     margin: 0;
-    padding-left: 1.2rem;
+    padding-left: 1.15rem;
 }
 
-.phase li {
-    margin-bottom: 0.45rem;
+.phase-card li {
+    margin-bottom: 0.38rem;
     color: var(--text-secondary);
 }
 
-.triage table td:first-child {
-    font-weight: 600;
-    color: var(--white);
-}
-
-.triage code {
-    font-size: 0.78rem;
-}
-
-.pipeline {
-    margin-top: 1rem;
-    padding: 1rem;
-    border: 1px dashed var(--grey-light);
-    border-radius: 8px;
-    background: rgba(0,0,0,0.16);
-}
-
-.pipeline pre {
-    margin: 0;
-}
-
-.run-grid {
+.gate-grid {
     display: grid;
-    gap: 0.9rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 2rem 0;
 }
 
-.run-step {
+.gate-card {
     border: 1px solid var(--grey);
-    border-left: 3px solid var(--blue);
-    border-radius: 8px;
-    background: var(--dark-card);
-    padding: 0.9rem;
-}
-
-.run-step h4 {
-    margin: 0 0 0.45rem 0;
-    color: var(--white);
-}
-
-.run-step p {
-    margin: 0 0 0.6rem 0;
-    font-size: 0.9rem;
-}
-
-.run-step pre {
-    margin: 0;
-}
-
-.playbook-wrap {
-    margin-top: 2rem;
-}
-
-.playbook-phase {
-    margin: 1rem 0;
-    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
     border-radius: 10px;
     background: var(--dark-card);
-    overflow: hidden;
-}
-
-.playbook-phase summary {
-    cursor: pointer;
-    padding: 0.95rem 1rem;
-    font-weight: 700;
-    color: var(--white);
-    background: rgba(255, 180, 0, 0.08);
-    border-bottom: 1px solid var(--grey);
-}
-
-.playbook-phase .phase-body {
     padding: 1rem;
 }
 
-.playbook-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0.6rem 0 0 0;
+.gate-card h3 {
+    margin: 0 0 0.45rem 0;
 }
 
-.playbook-table th {
-    font-size: 0.78rem;
-}
-
-.playbook-table td {
-    font-size: 0.86rem;
-    vertical-align: top;
-}
-
-.playbook-table td:first-child {
-    font-weight: 600;
-    color: var(--white);
-}
-
-.phase-note {
-    margin-top: 0.65rem;
-    font-size: 0.83rem;
-    color: var(--text-muted);
-}
-
-.protocol-step {
-    border: 1px solid var(--grey);
-    border-left: 3px solid var(--green);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.14);
-    padding: 0.8rem;
-    margin: 0.6rem 0;
-}
-
-.protocol-step h4 {
-    margin: 0 0 0.35rem 0;
-    color: var(--white);
-}
-
-.protocol-step p {
+.gate-card ul {
     margin: 0;
-    font-size: 0.9rem;
+    padding-left: 1.15rem;
 }
 
-@media (max-width: 720px) {
-    .subtitle {
-        font-size: 0.95rem;
+.gate-card li {
+    margin-bottom: 0.38rem;
+    color: var(--text-secondary);
+}
+
+.ops-loop {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.ops-step {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.95rem;
+    background: rgba(0,0,0,0.14);
+}
+
+.ops-step .ops-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--dark);
+    background: var(--orange);
+    margin-bottom: 0.55rem;
+}
+
+.ops-step h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.98rem;
+}
+
+.ops-step p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+.resource-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.9rem;
+    margin-top: 1rem;
+}
+
+.resource-card {
+    display: block;
+    text-decoration: none;
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.95rem 1rem;
+    background: var(--dark-card);
+    color: inherit;
+    transition: var(--transition);
+}
+
+.resource-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,180,0,0.35);
+    box-shadow: var(--shadow-md);
+}
+
+.resource-card h3 {
+    margin: 0 0 0.35rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.resource-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+@media (max-width: 860px) {
+    .matrix-table {
+        display: block;
+        overflow-x: auto;
     }
 }
 </style>
 
-<div class="hero intuition-hero">
-    <div class="badge-row">
-        <span class="badge badge-amber">Correctness -> Intuition</span>
-        <span class="badge badge-blue">IR + Kernels + Gradients</span>
-        <span class="badge badge-green">Checkpoint-Efficient</span>
-    </div>
-    <h1>Deep Training Intuition Playbook</h1>
-    <p class="subtitle">
-        A practical roadmap for moving from pass/fail parity gates to gradient-level intuition:
-        what to log, what to inspect, what to adjust, and how to learn from recurring failure patterns.
-    </p>
-</div>
-
-<div class="card card-accent" style="margin-top: 1rem;">
-    <h3 style="margin-top: 0;">Companion Guide</h3>
-    <p style="margin: 0;">For full operator details on v7 init, IR1/IR2 lowering, memory layout/canary diagnostics, and CK-vs-oracle parity commands, open <a href="v7-backprop-ir.html"><code>v7-backprop-ir.html</code></a>.</p>
-</div>
-
-<h2>Infographic Snapshot</h2>
-<div class="img-container svg-viewer" data-title="Deep Training Intuition Map">
-    <img src="assets/training-intuition-map.svg" alt="Deep training intuition infographic: visibility stack, checkpoint strategy, curriculum, and triage loops">
-</div>
-
-<div class="alert alert-info">
-    <div class="alert-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-        </svg>
-    </div>
-    <div>
-        <strong>Core idea:</strong> keep full model checkpoints rare for resume, but write dense
-        <strong>analysis checkpoints</strong> (statistics + sampled grids) for insight.
+<div class="hero curriculum-hero">
+    <div class="curriculum-hero-inner">
+        <div class="badge-row">
+            <span class="badge badge-green">CK-native</span>
+            <span class="badge badge-amber">CPU-first</span>
+            <span class="badge badge-blue">Version-integrated roadmap</span>
+        </div>
+        <div class="curriculum-kicker">Training Curriculum</div>
+        <h1>CK-Native Training Curriculum</h1>
+        <p class="curriculum-subtitle">
+            This is the training plan that connects <code>v7</code> to the rest of the roadmap.
+            The point is not to learn one narrow SVG task. The point is to use <code>C-Kernel-Engine</code>
+            to learn the whole stack: contracts, data, codegen, replay, distributed execution, multimodal
+            expansion, and eventually embedded control-grade AI.
+        </p>
     </div>
 </div>
 
-<h2>Visibility Stack</h2>
-<div class="stack-board">
-    <div class="stack-grid">
-        <div class="stack-item">
-            <strong>Loss Curves</strong>
-            <span class="layer-meta">Surface behavior</span>
-        </div>
-        <div class="stack-item">
-            <strong>Per-Param Grad Norms</strong>
-            <span class="layer-meta">Tensor-level magnitude</span>
-        </div>
-        <div class="stack-item">
-            <strong>IR2 Backward Graph</strong>
-            <span class="layer-meta">Op-by-op gradient path</span>
-        </div>
-        <div class="stack-item">
-            <strong>Generated C + Kernel ID</strong>
-            <span class="layer-meta">Exact compute path</span>
-        </div>
-        <div class="stack-item">
-            <strong>SIMD + Memory Layout</strong>
-            <span class="layer-meta">Hardware-level truth</span>
-        </div>
-    </div>
-    <p class="board-caption">
-        This stack is your advantage: anomalies can be traced from metric -> tensor -> op -> kernel -> runtime.
-    </p>
+<div class="curriculum-alert">
+    <strong>Core framing:</strong> <code>v7</code> is the foundation track, not a side quest.
+    It makes training correct, observable, and repeatable. Later versions are multipliers on top of that:
+    <code>v8-v9</code> add sparse scale, <code>v10</code> adds adapters, <code>v11-v14</code> add modalities,
+    <code>v15</code> lands embedded inference, <code>v16</code> explains model behavior, and <code>v17</code>
+    closes the loop with real-time policy integration.
 </div>
 
-<h2>Correctness vs Intuition</h2>
-<div class="gap-grid">
-    <div class="gap-card">
-        <h3>Already Strong (Correctness)</h3>
-        <ul class="gap-list">
-            <li>Parity and deterministic replay gates</li>
-            <li>Contract checks and kernel coverage</li>
-            <li>Single-run scalar dashboards</li>
-            <li>IR and codegen traceability</li>
-        </ul>
-    </div>
-    <div class="gap-card">
-        <h3>Next Layer (Intuition)</h3>
-        <ul class="gap-list">
-            <li>Activation histograms per layer over time</li>
-            <li>Weight and gradient heatmaps (spatial)</li>
-            <li>Gradient flow waterfall (layer boundary view)</li>
-            <li>Attention entropy + sampled QK pattern evolution</li>
-            <li>Run-to-run diff views, not only single-run views</li>
-        </ul>
-    </div>
-</div>
-
-<h2>Checkpoint Strategy That Fits Real Disk</h2>
-<div class="size-compare">
-    <div class="size-row">
-        <div class="row-top">
-            <strong>Raw full dump (weights + grads + opt + activations)</strong>
-            <span>~5.7 GB per checkpoint</span>
-        </div>
-        <div class="bar-wrap"><div class="bar" style="width: 100%;"></div></div>
-    </div>
-    <div class="size-row">
-        <div class="row-top">
-            <strong>Analysis checkpoint (stats + sampled grids)</strong>
-            <span>~200 KB per checkpoint</span>
-        </div>
-        <div class="bar-wrap"><div class="bar bar-small" style="width: 4%;"></div></div>
-    </div>
-    <div class="size-row">
-        <div class="row-top">
-            <strong>Rare resume checkpoint (weights + optimizer state)</strong>
-            <span>~3 GB each, keep a small rolling window</span>
-        </div>
-        <div class="bar-wrap"><div class="bar bar-resume" style="width: 52%;"></div></div>
-    </div>
-</div>
-<p class="estimate-note">
-    Size values are planning estimates for a Qwen3-0.6B-like setup and vary with precision, sequence length, optimizer state, and which tensors you retain.
+<h2>How v7 and Beyond Integrate</h2>
+<p>
+    The version history is not a list of disconnected features. It is a dependency chain. Each version teaches
+    a new operating skill and depends on the contracts from earlier stages.
 </p>
 
-<div class="card card-blue">
-    <h3 style="margin-top:0;">Logarithmic Cadence + Event Triggers</h3>
-    <div class="cadence-grid">
-        <div class="cadence-card">
-            <h4>Steps 1-100</h4>
-            <p>Analysis checkpoint every 10 steps</p>
-        </div>
-        <div class="cadence-card">
-            <h4>Steps 100-1000</h4>
-            <p>Analysis checkpoint every 50 steps</p>
-        </div>
-        <div class="cadence-card">
-            <h4>Steps 1000-10000</h4>
-            <p>Analysis checkpoint every 200 steps</p>
-        </div>
-        <div class="cadence-card">
-            <h4>Steps 10000+</h4>
-            <p>Analysis checkpoint every 1000 steps</p>
-        </div>
+<div class="integration-strip">
+    <div class="integration-step">
+        <span class="step-version step-v7">v7</span>
+        <h3>Correctness</h3>
+        <p>Training IR, backward lowering, replay determinism, checkpoints, run artifacts, and operator-grade gates.</p>
     </div>
-    <div class="trigger-strip">
-        <span class="trigger-pill">loss spike > 2x moving average</span>
-        <span class="trigger-pill">global grad norm threshold exceeded</span>
-        <span class="trigger-pill">dead-parameter alert (near-zero grad)</span>
+    <div class="integration-step">
+        <span class="step-version step-v89">v8-v9</span>
+        <h3>Scale + Sparsity</h3>
+        <p>MoE routing, expert execution, sparse backward, and eventually CK-native distributed training.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v10">v10</span>
+        <h3>Adaptation</h3>
+        <p>LoRA and QLoRA let the project specialize downstream models without retraining the full stack.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v1114">v11-v14</span>
+        <h3>Modalities</h3>
+        <p>Vision and audio force the engine to handle new front-ends, new data contracts, and new evals.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v15">v15</span>
+        <h3>Deployment</h3>
+        <p>Embedded inference turns the training work into bounded, portable, hardware-aware systems.</p>
+    </div>
+    <div class="integration-step">
+        <span class="step-version step-v1617">v16-v17</span>
+        <h3>Interpret + Control</h3>
+        <p>Mechanistic interpretability and multimodal control make the model explainable enough to trust in loops.</p>
     </div>
 </div>
 
-<h2>Analysis Checkpoint Data Contract</h2>
-<pre><code>{
-  "schema_version": "ck.analysis.v1",
-  "model_scale_hint": "qwen3_0.6b_like",
-  "step": 500,
-  "loss": 2.341,
-  "weights": {
-    "layer.0.wq": {
-      "mean": 0.0012,
-      "std": 0.045,
-      "min": -0.23,
-      "max": 0.19,
-      "percentiles": [0.01, 0.05, 0.25, 0.50, 0.75, 0.95, 0.99],
-      "histogram": { "bins": [...], "counts": [...] },
-      "sampled_grid_32x32": [[...], ...]
-    }
-  },
-  "gradients": { "...": { "norm": 0.045, "histogram": {...} } },
-  "activations": { "...": { "mean": 0.12, "std": 0.45, "sparsity": 0.32 } },
-  "attention": {
-    "layer.0": {
-      "entropy_per_head": [...],
-      "max_attn_per_head": [...],
-      "sampled_qk_grid_32x32_per_head": [...]
-    }
-  }
-}</code></pre>
-<p class="estimate-note">
-    Keep this contract versioned. Dashboards should reject incompatible schema versions early rather than silently misrendering.
+<h2>Version-to-Skill Matrix</h2>
+<table class="matrix-table">
+    <thead>
+        <tr>
+            <th>Version Track</th>
+            <th>Built Capability</th>
+            <th>Core Skills</th>
+            <th>Hard Exit Gate</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>v7.0-v7.2</code></td>
+            <td>Single-rank training core, IR-driven backward, compiler-backed task curricula, deterministic replay, threaded training runtime.</td>
+            <td>Optimizer math, codegen/runtime contracts, data packing, token budgets, parity triage, profiler discipline.</td>
+            <td>Runs are reproducible, replay is stable, checkpoints resume cleanly, and operator gates pass from a clean checkout.</td>
+        </tr>
+        <tr>
+            <td><code>v8.0-v9.0</code></td>
+            <td>MoE forward/backward plus the first serious CK-native distributed training stack.</td>
+            <td>Routing, sparse load balance, all-reduce behavior, sharded data loading, multi-rank failure modes.</td>
+            <td><code>1-rank</code> and <code>N-rank</code> tiny runs agree within declared tolerance and distributed checkpoints restore correctly.</td>
+        </tr>
+        <tr>
+            <td><code>v10.0</code></td>
+            <td>LoRA/QLoRA adapters injected into the same IR/codegen path.</td>
+            <td>Parameter-efficient fine-tuning, frozen-base training, low-rank update accounting, adapter promotion policy.</td>
+            <td>Adapter-only runs match the declared update surface and inference promotion works without full-model surgery.</td>
+        </tr>
+        <tr>
+            <td><code>v11.0-v14.0</code></td>
+            <td>Vision and audio encoders plus their backward paths and modality-specific datasets.</td>
+            <td>Patching/tokenization for new modalities, encoder contracts, multimodal batching, modality-specific eval design.</td>
+            <td>Each modality has a deterministic preflight, stable probes, and no regression to the text-only path.</td>
+        </tr>
+        <tr>
+            <td><code>v15.0</code></td>
+            <td>Embedded inference runtime with deterministic memory and HAL integration.</td>
+            <td>Latency budgets, memory ceilings, real-time constraints, portable runtime surfaces, deployment sign-off.</td>
+            <td>Embedded targets hit bounded memory/latency envelopes and keep deterministic runtime behavior.</td>
+        </tr>
+        <tr>
+            <td><code>v16.0-v17.0</code></td>
+            <td>Interpretability tooling, feature tracing, causal intervention, and policy integration with vision/control loops.</td>
+            <td>Activation tracing, SAE-style feature learning, intervention experiments, closed-loop safety reasoning.</td>
+            <td>Model behavior can be inspected, perturbed, and validated before it is allowed into autonomy loops.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>12-Month Learning Ladder</h2>
+<p>
+    A good first project year is not “buy a cluster and hope.” It is staged competence: first correctness, then representation,
+    then scale, then modality expansion, then deployment-grade systems.
 </p>
 
-<h2>12-Experiment Learning Curriculum</h2>
 <div class="phase-grid">
-    <div class="phase">
-        <div class="phase-tag">Phase 1</div>
-        <h3>Learn Healthy Baselines</h3>
-        <ol>
-            <li>Run a stable baseline and memorize normal gradients.</li>
-            <li>Vary init scale (tiny to huge) and inspect layerwise drift.</li>
-        </ol>
-    </div>
-    <div class="phase">
-        <div class="phase-tag">Phase 2</div>
-        <h3>Break Gradient Flow On Purpose</h3>
-        <ol>
-            <li>Sweep LR too high and too low.</li>
-            <li>Zero one projection path and observe blocked upstream grads.</li>
-            <li>Scale weights 5x, then recover with clipping.</li>
-        </ol>
-    </div>
-    <div class="phase">
-        <div class="phase-tag">Phase 3</div>
-        <h3>Understand Optimizer Dynamics</h3>
-        <ol>
-            <li>Compare SGD vs Adam using weight-delta statistics.</li>
-            <li>Add warmup and inspect early-step stability.</li>
-        </ol>
-    </div>
-    <div class="phase">
-        <div class="phase-tag">Phase 4</div>
-        <h3>Read Attention Behavior</h3>
-        <ol>
-            <li>Track head entropy over time.</li>
-            <li>Visualize sampled QK heatmaps and head redundancy.</li>
-        </ol>
-    </div>
-    <div class="phase">
-        <div class="phase-tag">Phase 5</div>
-        <h3>Scale To Real Models</h3>
-        <ol>
-            <li>Build layer gradient waterfalls on Qwen-scale runs.</li>
-            <li>Rank params by relative movement from step 0.</li>
-            <li>Perturb QK-norm and RoPE to identify load-bearing paths.</li>
-        </ol>
-    </div>
-    <div class="phase">
-        <div class="phase-tag">Execution Rule</div>
-        <h3>One Change, Full Observability</h3>
-        <ol>
-            <li>Change one variable per run.</li>
-            <li>Compare against baseline at fixed steps.</li>
-            <li>Record diagnosis as a repeatable failure pattern.</li>
-        </ol>
-    </div>
-</div>
-
-<h2>Gradient Triage Cheat Sheet</h2>
-<div class="card triage">
-    <table>
-        <tr>
-            <th>What You See</th>
-            <th>Likely Cause</th>
-            <th>First Knob To Adjust</th>
-            <th>Where To Inspect</th>
-        </tr>
-        <tr>
-            <td>Layer waterfall pinches mid-depth</td>
-            <td>Vanishing path or norm bottleneck</td>
-            <td>Init scale, residual path, norm params</td>
-            <td><code>activation_stats</code> + per-layer grad norms</td>
-        </tr>
-        <tr>
-            <td>Loss spikes after smooth phase</td>
-            <td>LR too high for local curvature</td>
-            <td>LR decay or longer warmup</td>
-            <td>Weight delta magnitudes vs grad norms</td>
-        </tr>
-        <tr>
-            <td>Frequent clipping</td>
-            <td>Single tensor dominates global norm</td>
-            <td>Find offending tensor; adjust LR/regularization</td>
-            <td>Per-param gradient histogram outliers</td>
-        </tr>
-        <tr>
-            <td>Attention entropy collapses too early</td>
-            <td>Saturated logits / unstable attention scale</td>
-            <td>Check QK-norm path, init, LR</td>
-            <td>Head entropy timeline + sampled QK grids</td>
-        </tr>
-        <tr>
-            <td>Some params barely move across many steps</td>
-            <td>Dead or weakly-coupled path</td>
-            <td>Inspect upstream gradients and mask logic</td>
-            <td>Relative movement ranking + grad flow graph</td>
-        </tr>
-    </table>
-</div>
-
-<h2>Implementation Order (Minimal, High Impact)</h2>
-<div class="grid grid-2">
-    <div class="card card-accent">
-        <h3 style="margin-top:0;">Step 1-3: Stats Instrumentation</h3>
+    <div class="phase-card">
+        <div class="phase-window">Months 1-2</div>
+        <h3>Phase 1: Engine Contracts</h3>
+        <p>Master the <code>v7</code> gates before chasing capability expansion.</p>
         <ul>
-            <li>Buffer stats for weights, grads, activations</li>
-            <li>Attention entropy and sparsity per head</li>
-            <li>Weight-delta stats after optimizer step</li>
+            <li>Run IR build, compile smoke, parity, replay, and checkpoint flows until the failure classes are explainable and repeatable.</li>
+            <li>Learn how run directories, manifests, token packing, and visualizer artifacts fit together.</li>
+            <li>Treat the oracle as a measuring tool, not a permanent training dependency.</li>
         </ul>
     </div>
-    <div class="card card-green">
-        <h3 style="margin-top:0;">Step 4-6: Visual Layers</h3>
+    <div class="phase-card">
+        <div class="phase-window">Months 3-4</div>
+        <h3>Phase 2: Representation Learning</h3>
+        <p>Use compiler-backed datasets to learn data shaping and evaluation.</p>
         <ul>
-            <li>Weight and gradient heatmaps (sampled grid)</li>
-            <li>Gradient waterfall and run-diff overlays</li>
-            <li>Attention inspector with entropy timeline</li>
+            <li>Push scene DSL work from structured SVG toward richer compiler-owned visual vocabularies.</li>
+            <li>Add page-level DSL work that can later lower into Databoard or other structured web surfaces.</li>
+            <li>Make preflight, canary, and non-regression gates mandatory.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 5-6</div>
+        <h3>Phase 3: Code and Data Tasks</h3>
+        <p>Leave “visual only” and start teaching transformation.</p>
+        <ul>
+            <li>Train on config transforms, schema mapping, patch IRs, route/controller/model tasks, and build-file edits.</li>
+            <li>Broaden into <code>C</code>, <code>C++</code>, <code>Python</code>, <code>Bash</code>, <code>Awk</code>, <code>Lua</code>, <code>PHP</code>, <code>HTML/CSS/JS</code>.</li>
+            <li>Evaluate with validators, build success, and tests instead of loss alone.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 7-8</div>
+        <h3>Phase 4: CK-Native Distribution</h3>
+        <p>Build the training system the project can own end-to-end.</p>
+        <ul>
+            <li>Start with 1 host and many ranks before moving to many hosts.</li>
+            <li>Implement rank/world bootstrap, deterministic sharded sampling, collective ops, and distributed checkpoints.</li>
+            <li>Prove <code>1-rank</code> vs <code>N-rank</code> equivalence on tiny runs before attempting long jobs.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 9-10</div>
+        <h3>Phase 5: MoE and Adapters</h3>
+        <p>Only scale the model family once the core runtime and gates are stable.</p>
+        <ul>
+            <li>Land <code>v8-v9</code> sparse expert routing and backward.</li>
+            <li>Use <code>v10</code> adapters to learn specialization without full retraining cost.</li>
+            <li>Track exact ownership of trainable parameters and promotion paths.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <div class="phase-window">Months 11-12</div>
+        <h3>Phase 6: Multimodal to Embedded</h3>
+        <p>Make the system useful in concrete downstream domains.</p>
+        <ul>
+            <li>Bridge into vision/audio training tracks from <code>v11-v14</code>.</li>
+            <li>Add executable tasks from <a href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">controlSystems</a>, <a href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">stateEstimation</a>, <a href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">inertial_navigation_system</a>, and <a href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">AeroDynControlRig</a>.</li>
+            <li>Use that work to prepare the jump to <code>v15-v17</code>.</li>
         </ul>
     </div>
 </div>
 
-<div class="pipeline">
-<pre><code>train loop -> write analysis_checkpoint_*.json
-          -> open_ir_visualizer.py embeds data
-          -> ir_report training tabs render:
-             [gradient flow] [weights + activations] [attention]
-</code></pre>
+<h2>Domain Ladder Inside v7</h2>
+<table class="matrix-table">
+    <thead>
+        <tr>
+            <th>Track</th>
+            <th>Primary Target</th>
+            <th>What It Teaches</th>
+            <th>Best Evidence</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Visual DSL</td>
+            <td>Compiler-backed SVG scene contracts</td>
+            <td>Representation design, slot structure, compiler ownership, renderable probes</td>
+            <td>Exact DSL match, materialized SVG match, renderability, family non-regression</td>
+        </tr>
+        <tr>
+            <td>Page DSL</td>
+            <td>Structured page scenes that can lower into web/template systems</td>
+            <td>Section composition, variant selection, semantic layout, validator-driven generation</td>
+            <td>Schema pass, section correctness, stable page render</td>
+        </tr>
+        <tr>
+            <td>Code/Data IR</td>
+            <td>Config transforms, patch IR, schema mapping, route/controller/model tasks</td>
+            <td>Machine-checkable code transformation, exactness, build discipline</td>
+            <td>Validator pass, diff quality, compile/test success</td>
+        </tr>
+        <tr>
+            <td>Direct Code</td>
+            <td>Real repo tasks across <code>C/C++/Python/Bash/Awk/Lua/PHP/JS/CSS</code></td>
+            <td>Language fluency, multi-file editing, debugging, refactor quality</td>
+            <td>Tests passing, build success, review findings shrinking over time</td>
+        </tr>
+        <tr>
+            <td>Tool Use</td>
+            <td>Search, inspect, patch, rerun, compare, retry</td>
+            <td>Engineering behavior instead of plain text generation</td>
+            <td>Task success rate, fix rate, retry efficiency</td>
+        </tr>
+        <tr>
+            <td>Math + Embedded</td>
+            <td><a href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">controlSystems</a>, <a href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">stateEstimation</a>, <a href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">inertial_navigation_system</a>, <a href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">AeroDynControlRig</a>, and hardware-facing utilities</td>
+            <td>Executable scientific reasoning, tolerances, systems thinking</td>
+            <td>Numerical correctness, simulation stability, embedded test pass</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Reference Repositories</h2>
+<p>
+    Public curriculum references should point to concrete repositories instead of private local shorthand. In particular,
+    the local <code>DroneMath</code> workspace is a multi-repo family, so public docs should name the exact downstream repositories.
+</p>
+
+<div class="resource-grid">
+    <a class="resource-card" href="https://github.com/antshiv/C-Kernel-Engine" target="_blank" rel="noopener noreferrer">
+        <h3>C-Kernel-Engine</h3>
+        <p>The core runtime, codegen, tokenizer, IR, training, profiling, and distributed systems project.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antsand/antsand.com" target="_blank" rel="noopener noreferrer">
+        <h3>antsand.com</h3>
+        <p>The web stack and Databoard host repository for page-DSL, templates, and style-variant integration work.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/LinuxUtilities" target="_blank" rel="noopener noreferrer">
+        <h3>LinuxUtilities</h3>
+        <p>Shell, system, and operator-facing tasks for tool-use, scripting, config repair, and deployment automation.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/controlSystems" target="_blank" rel="noopener noreferrer">
+        <h3>controlSystems</h3>
+        <p>Control-theory code for executable math, controllers, tuning tasks, and embedded-facing numerical evaluation.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/stateEstimation" target="_blank" rel="noopener noreferrer">
+        <h3>stateEstimation</h3>
+        <p>Filtering, sensor fusion, and estimator tasks for numerical correctness, drift analysis, and systems reasoning.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/inertial_navigation_system" target="_blank" rel="noopener noreferrer">
+        <h3>inertial_navigation_system</h3>
+        <p>Navigation pipelines and inertial reasoning tasks that bridge math, simulation, and robotics deployment.</p>
+    </a>
+    <a class="resource-card" href="https://github.com/antshiv/AeroDynControlRig" target="_blank" rel="noopener noreferrer">
+        <h3>AeroDynControlRig</h3>
+        <p>Flight-dynamics and control-loop work for higher-consequence embedded and autonomy evaluation.</p>
+    </a>
 </div>
 
-<h2>Run This Now (v7)</h2>
-<div class="run-grid">
-    <div class="run-step">
-        <h4>1) Generate deterministic training reports</h4>
-        <p>Creates core parity/replay artifacts in <code>version/v7/reports/</code>.</p>
-        <pre><code>make v7-train-parity-3
-make v7-replay</code></pre>
+<h2>Before Investing in Serious In-House Server-Grade Distributed Computing Infrastructure</h2>
+<p>
+    Serious in-house server-grade distributed computing infrastructure is useful when it multiplies a stable loop.
+    It is a waste when it magnifies confusion. Invest only after the single-node and small-multi-rank gates are boring.
+</p>
+
+<div class="gate-grid">
+    <div class="gate-card">
+        <h3>Must Already Be True</h3>
+        <ul>
+            <li>Single-rank CK training is deterministic enough to replay and debug.</li>
+            <li>Run directories are standardized and artifact-rich.</li>
+            <li>Preflight, canary, and non-regression gates catch bad runs early.</li>
+            <li>Checkpoint/resume is reliable and documented.</li>
+        </ul>
     </div>
-    <div class="run-step">
-        <h4>2) Generate visual report HTML</h4>
-        <p>Build an IR report from your latest artifacts without rerunning probes.</p>
-        <pre><code>python3 version/v7/tools/open_ir_visualizer.py --generate --html-only</code></pre>
+    <div class="gate-card">
+        <h3>Distributed Bring-Up Gates</h3>
+        <ul>
+            <li><code>1-rank</code> and <code>2-rank</code> tiny runs match within declared tolerance.</li>
+            <li>Sharded data reading preserves exact token accounting.</li>
+            <li>Collectives behave deterministically enough to debug regressions.</li>
+            <li>Per-rank logs and checkpoints are inspectable without guesswork.</li>
+        </ul>
     </div>
-    <div class="run-step">
-        <h4>3) Iterate with one change at a time</h4>
-        <p>Change exactly one knob (LR, init scale, clipping, warmup), rerun, and compare snapshots at fixed steps.</p>
-        <pre><code>artifacts: version/v7/reports/*.json
-report:    version/v7/tools/ir_visualizer.html (or generated ir_report*.html)</code></pre>
+    <div class="gate-card">
+        <h3>Only Then Scale Spend</h3>
+        <ul>
+            <li>Use the first cluster months for parallel experiments and validation, not giant speculative runs.</li>
+            <li>Benchmark experiments/day, not just tokens/sec.</li>
+            <li>Delay large-model pushes until representation and compiler surfaces are stable.</li>
+            <li>Keep cluster rollout tied to concrete gates instead of hope.</li>
+        </ul>
     </div>
 </div>
 
-<div class="playbook-wrap">
-    <h2>Full Diagnostic Matrix (Phases 1-7)</h2>
-    <p class="estimate-note">
-        This section is meant to be operational. Keep it open during training and use it as a live checklist.
-    </p>
-
-    <details class="playbook-phase" open>
-        <summary>Phase 1: Is It Even Working?</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good</th>
-                    <th>Bad</th>
-                </tr>
-                <tr>
-                    <td>Is it training at all?</td>
-                    <td>Loss curve, first 10 steps</td>
-                    <td>Loss drops from random baseline (for 151K vocab, ln(vocab_size) is about 11.9)</td>
-                    <td>Loss flat or NaN on step 1</td>
-                </tr>
-                <tr>
-                    <td>Are gradients flowing to every layer?</td>
-                    <td>Gradient waterfall (layer 0 -> layer N)</td>
-                    <td>All layers nonzero, typically within 10x range</td>
-                    <td>Early layers near 1e-12 while late layers are around 1e-1</td>
-                </tr>
-                <tr>
-                    <td>Is any parameter dead?</td>
-                    <td>Gradient Health tab, sort by norm</td>
-                    <td>All trainable params above ~1e-7</td>
-                    <td>Repeated exact 0.0 or near-zero (&lt;1e-10) norms</td>
-                </tr>
-                <tr>
-                    <td>Is implementation correct?</td>
-                    <td>Parity tracker (CK vs PyTorch)</td>
-                    <td><code>loss_diff &lt; 1e-6</code>, <code>param_diff &lt; 1e-5</code></td>
-                    <td>Diverges after a few steps</td>
-                </tr>
-                <tr>
-                    <td>Are weights updating?</td>
-                    <td>Weight delta statistics, <code>||w_new - w_old||_2</code></td>
-                    <td>Nonzero deltas for expected trainable tensors</td>
-                    <td>Near-zero deltas despite nonzero gradients</td>
-                </tr>
-                <tr>
-                    <td>Is it deterministic?</td>
-                    <td>Replay determinism gate</td>
-                    <td>Two identical runs produce identical losses/metrics</td>
-                    <td>Any unexplained drift indicates race/uninitialized state</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 2: Is The Model Learning?</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good</th>
-                    <th>Bad</th>
-                </tr>
-                <tr>
-                    <td>Is loss decreasing over real horizon?</td>
-                    <td>Loss curve over 100+ steps</td>
-                    <td>Clear downward trend (allowing noise)</td>
-                    <td>Immediate plateau or pure oscillation</td>
-                </tr>
-                <tr>
-                    <td>Is it memorizing training data?</td>
-                    <td>Inference on training samples, training perplexity</td>
-                    <td>Perplexity steadily drops toward 1.0 on repeated data</td>
-                    <td>Perplexity remains high on same seen samples</td>
-                </tr>
-                <tr>
-                    <td>How fast is memorization?</td>
-                    <td>Early epoch loss slope</td>
-                    <td>Steep initial drop</td>
-                    <td>Shallow slope points to LR/capacity/data bottleneck</td>
-                </tr>
-                <tr>
-                    <td>Has train set been mostly absorbed?</td>
-                    <td>Training loss near data entropy floor</td>
-                    <td>Plateau near expected entropy floor</td>
-                    <td>Flat but still high means stuck optimization</td>
-                </tr>
-                <tr>
-                    <td>Is it learning tokens or patterns?</td>
-                    <td>Attention heatmaps on seen examples</td>
-                    <td>Positional + semantic structure appears</td>
-                    <td>Uniform attention or always position-0 attention</td>
-                </tr>
-                <tr>
-                    <td>Are all layers contributing?</td>
-                    <td>Per-layer movement, <code>||w_t - w_0||_2 / ||w_0||_2</code></td>
-                    <td>Broad movement across multiple layers</td>
-                    <td>Only small subset moves while others remain frozen</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 3: What Is It Learning?</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good</th>
-                    <th>Bad</th>
-                </tr>
-                <tr>
-                    <td>What are attention heads doing?</td>
-                    <td>Per-head heatmaps across layers</td>
-                    <td>Head specialization (positional, semantic, induction-like)</td>
-                    <td>All heads uniform or all heads nearly identical</td>
-                </tr>
-                <tr>
-                    <td>Which heads are redundant?</td>
-                    <td>Head similarity matrix (cosine similarity)</td>
-                    <td>Diversity within a layer</td>
-                    <td>Many heads with similarity above 0.9</td>
-                </tr>
-                <tr>
-                    <td>Content vs position dependence?</td>
-                    <td>Same tokens at different positions</td>
-                    <td>Attention follows content as well as position</td>
-                    <td>Purely diagonal regardless of content changes</td>
-                </tr>
-                <tr>
-                    <td>Which weights changed most?</td>
-                    <td>Global ranking by relative movement</td>
-                    <td>Core projections and MLP weights move significantly</td>
-                    <td>Only embeddings/norms move while core blocks stay static</td>
-                </tr>
-                <tr>
-                    <td>Are MLP neurons specializing?</td>
-                    <td>MLP hidden activation distributions</td>
-                    <td>Distributions become structured/multimodal</td>
-                    <td>No shape evolution over training</td>
-                </tr>
-                <tr>
-                    <td>Is embedding space organizing?</td>
-                    <td>Embedding heatmap step 0 vs step N</td>
-                    <td>Visible structure/clustering emerges</td>
-                    <td>Matrix remains random-looking with little change</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 4: Is Something Going Wrong?</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good</th>
-                    <th>Bad</th>
-                </tr>
-                <tr>
-                    <td>Why did loss spike?</td>
-                    <td>Checkpoint at spike step: grads, deltas, activations</td>
-                    <td>Transient spike that recovers quickly</td>
-                    <td>No recovery; basin ejection requiring earlier restart</td>
-                </tr>
-                <tr>
-                    <td>Vanishing gradient?</td>
-                    <td>Layer waterfall at fixed step</td>
-                    <td>Roughly stable magnitude across depth (about 2-3x variance)</td>
-                    <td>100x+ collapse from late to early layers</td>
-                </tr>
-                <tr>
-                    <td>Exploding gradient?</td>
-                    <td>Global + per-param norm trends</td>
-                    <td>Stable or slowly decaying norm</td>
-                    <td>Exponential norm growth across steps</td>
-                </tr>
-                <tr>
-                    <td>Is clipping hiding root cause?</td>
-                    <td>Per-param norms when clipping active</td>
-                    <td>Rare clipping on few tensors</td>
-                    <td>Clipping every step from same offenders</td>
-                </tr>
-                <tr>
-                    <td>Are activations healthy?</td>
-                    <td>Per-layer min/max/mean/std</td>
-                    <td>Stable mean/std with bounded ranges</td>
-                    <td>Drift, exploding std, or extreme outliers</td>
-                </tr>
-                <tr>
-                    <td>Is LR schedule right?</td>
-                    <td>Loss, LR, and delta magnitude overlay</td>
-                    <td>Warmup stable, peak controlled, decay helpful</td>
-                    <td>Spike at LR peak or no gain during decay phase</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 5: Memorization -> Generalization</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good</th>
-                    <th>Bad</th>
-                </tr>
-                <tr>
-                    <td>Is it overfitting?</td>
-                    <td>Training loss vs held-out validation loss</td>
-                    <td>Both decrease with a small and stable gap</td>
-                    <td>Train improves while validation stalls/rises</td>
-                </tr>
-                <tr>
-                    <td>When to stop pretraining?</td>
-                    <td>Validation loss plateau window</td>
-                    <td>Minimal improvement for long horizon (for example 100+ steps)</td>
-                    <td>Still meaningful downward trend, or clear overfit trend</td>
-                </tr>
-                <tr>
-                    <td>Is model capacity sufficient?</td>
-                    <td>Final train loss vs entropy estimate</td>
-                    <td>Approaches expected floor</td>
-                    <td>Plateaus far above floor</td>
-                </tr>
-                <tr>
-                    <td>Has it seen enough data?</td>
-                    <td>Tokens processed + slope decay</td>
-                    <td>Diminishing returns clearly visible</td>
-                    <td>Still in steep drop phase</td>
-                </tr>
-                <tr>
-                    <td>Any catastrophic forgetting?</td>
-                    <td>Perplexity on early training probes over time</td>
-                    <td>Remains low at late steps</td>
-                    <td>Rises while training on newer slices</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 6: Transition Readiness (Pretrain -> SFT -> RLHF/GRPO)</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question</th>
-                    <th>What to look at</th>
-                    <th>Good signal to transition</th>
-                    <th>Not ready</th>
-                </tr>
-                <tr>
-                    <td>When is pretraining done?</td>
-                    <td>Validation slope over last 1K steps</td>
-                    <td>Very low slope and coherent next-token quality on unseen text</td>
-                    <td>Validation still dropping clearly</td>
-                </tr>
-                <tr>
-                    <td>Should SFT start?</td>
-                    <td>Instruction-like generation probes</td>
-                    <td>Fluent language but weak instruction following</td>
-                    <td>Still produces unstable or broken language</td>
-                </tr>
-                <tr>
-                    <td>How to verify SFT works?</td>
-                    <td>Instruction-format loss + held-out instruction eval</td>
-                    <td>Format adherence and response quality improve</td>
-                    <td>Loss drops but behavior still ignores instruction format</td>
-                </tr>
-                <tr>
-                    <td>When move SFT -> preference tuning?</td>
-                    <td>Consistency and quality profile</td>
-                    <td>Follows format reliably, needs preference shaping</td>
-                    <td>Still fails basic instruction compliance</td>
-                </tr>
-                <tr>
-                    <td>How evaluate pretraining quality before SFT?</td>
-                    <td>Half-prompt continuation on seen and held-out samples</td>
-                    <td>Strong continuation on train + reasonable held-out perplexity</td>
-                    <td>Cannot reliably continue seen samples</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>Phase 7: Memorization Test Protocol</summary>
-        <div class="phase-body">
-            <div class="protocol-step">
-                <h4>Step 1: Reserve probes before training</h4>
-                <p>Set aside 10-20 fixed probe samples from training data for longitudinal memorization checks.</p>
-            </div>
-            <div class="protocol-step">
-                <h4>Step 2: Evaluate at resume checkpoints</h4>
-                <p>Feed first half of each probe, generate continuation, and score exact-match, overlap, and perplexity on the true continuation.</p>
-            </div>
-            <div class="protocol-step">
-                <h4>Step 3: Plot memorization curve</h4>
-                <p>Track progression from near-random accuracy toward high completion accuracy as steps grow.</p>
-            </div>
-            <div class="protocol-step">
-                <h4>Step 4: Compare with held-out curve</h4>
-                <p>Training-probe vs held-out accuracy gap is your best generalization indicator for transition decisions.</p>
-            </div>
-
-            <table class="playbook-table">
-                <tr>
-                    <th>Step</th>
-                    <th>Probe accuracy (rough)</th>
-                    <th>Interpretation</th>
-                </tr>
-                <tr>
-                    <td>0</td>
-                    <td>about 0%</td>
-                    <td>Untrained baseline</td>
-                </tr>
-                <tr>
-                    <td>100</td>
-                    <td>5-15%</td>
-                    <td>Learning token statistics</td>
-                </tr>
-                <tr>
-                    <td>500</td>
-                    <td>30-50%</td>
-                    <td>Pattern acquisition phase</td>
-                </tr>
-                <tr>
-                    <td>2000</td>
-                    <td>70-90%</td>
-                    <td>Strong memorization of seen structures</td>
-                </tr>
-                <tr>
-                    <td>5000+</td>
-                    <td>90%+</td>
-                    <td>Train probes mostly memorized</td>
-                </tr>
-            </table>
-        </div>
-    </details>
-
-    <details class="playbook-phase">
-        <summary>The Map: Question -> Tool</summary>
-        <div class="phase-body">
-            <table class="playbook-table">
-                <tr>
-                    <th>Question category</th>
-                    <th>Primary tool</th>
-                    <th>Secondary tool</th>
-                </tr>
-                <tr>
-                    <td>Is it training?</td>
-                    <td>Loss curve + parity tracker</td>
-                    <td>Gradient Health</td>
-                </tr>
-                <tr>
-                    <td>Are gradients correct?</td>
-                    <td>Gradient waterfall</td>
-                    <td>Finite-difference gradient checks</td>
-                </tr>
-                <tr>
-                    <td>What is it learning?</td>
-                    <td>Attention heatmaps</td>
-                    <td>Weight movement ranking</td>
-                </tr>
-                <tr>
-                    <td>Is it memorizing?</td>
-                    <td>Inference on probe set</td>
-                    <td>Loss slope + perplexity trends</td>
-                </tr>
-                <tr>
-                    <td>Is something wrong?</td>
-                    <td>Event checkpoint autopsy</td>
-                    <td>Triage cheat sheet</td>
-                </tr>
-                <tr>
-                    <td>Is pretraining done?</td>
-                    <td>Validation plateau</td>
-                    <td>Held-out quality probes</td>
-                </tr>
-                <tr>
-                    <td>Ready for SFT?</td>
-                    <td>Instruction-following eval</td>
-                    <td>Format compliance tracking</td>
-                </tr>
-            </table>
-            <p class="phase-note">
-                UI framing rule: each dashboard tab should be phrased as a question, not just a metric name.
-            </p>
-        </div>
-    </details>
+<h2>The Operator Loop to Internalize</h2>
+<div class="ops-loop">
+    <div class="ops-step">
+        <div class="ops-num">1</div>
+        <h3>Define the contract</h3>
+        <p>Make the target explicit enough to evaluate exactly and debug cheaply.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">2</div>
+        <h3>Build the data</h3>
+        <p>Materialize rows, token budgets, holdouts, and canaries before touching model size.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">3</div>
+        <h3>Run small first</h3>
+        <p>Canary the format, verify render/build/test behavior, then launch the real run.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">4</div>
+        <h3>Inspect real evidence</h3>
+        <p>Use probes, replay, checkpoints, diffs, and profiler output. Do not trust loss alone.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">5</div>
+        <h3>Repair the right layer</h3>
+        <p>Fix representation, data, runtime, or capacity based on evidence, not instinct.</p>
+    </div>
+    <div class="ops-step">
+        <div class="ops-num">6</div>
+        <h3>Scale only after closure</h3>
+        <p>Once the loop is boring, then spend compute on more ranks, more models, or more modalities.</p>
+    </div>
 </div>
 
-<div class="alert alert-success">
-    <div class="alert-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 6L9 17l-5-5"></path>
-        </svg>
-    </div>
-    <div>
-        <strong>Outcome:</strong> this shifts the workflow from "did it pass?" to
-        "why did it move this way?" with fast, affordable, and repeatable evidence.
-    </div>
+<h2>Related Pages</h2>
+<div class="resource-grid">
+    <a class="resource-card" href="version-history.html">
+        <h3>Version History</h3>
+        <p>The public roadmap from <code>v6.6</code> through <code>v17</code>, including the training-first execution order.</p>
+    </a>
+    <a class="resource-card" href="v7-runbook.html">
+        <h3>v7 Runbook</h3>
+        <p>The operator page for concrete commands, training setup, parity gates, and run-dir workflows.</p>
+    </a>
+    <a class="resource-card" href="v7-training-progression-playbook.html">
+        <h3>v7 Training Progression Playbook</h3>
+        <p>The current multi-track progression document for SVG, routing, and code experiments.</p>
+    </a>
+    <a class="resource-card" href="training-intuition.html">
+        <h3>Training Intuition</h3>
+        <p>The deeper intuition page for checkpoints, triage loops, and why failure visibility matters.</p>
+    </a>
+    <a class="resource-card" href="v7-backprop-ir.html">
+        <h3>v7 Backprop IR</h3>
+        <p>The visual explanation of how training lowering, memory layout, and runtime checks fit together.</p>
+    </a>
+    <a class="resource-card" href="research.html">
+        <h3>Research Tracker</h3>
+        <p>The broader research page that will feed later version tracks such as multimodal and sparse architectures.</p>
+    </a>
 </div>
     </main>
 

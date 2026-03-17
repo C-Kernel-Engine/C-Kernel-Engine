@@ -3166,6 +3166,7 @@ report-md:
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
+.PHONY: v7-dataset-normalize v7-dataset-classify v7-dataset-embeddings v7-dataset-attention v7-dataset-viewer v7-dataset-all
 .PHONY: ck-cli-v7 ck-bpe-train
 
 # ============================================================================
@@ -4091,6 +4092,48 @@ v7-visualizer-generated-e2e:
 	@$(PYTHON) version/v7/scripts/test_visualizer_generated_e2e_v7.py \
 		$(if $(RUN),--run $(RUN),) \
 		--json-out $(V7_REPORT_DIR)/visualizer_generated_e2e_latest.json
+
+# ── Dataset Pipeline Targets ─────────────────────────────────────────────────
+# Usage: make v7-dataset-all RUN=~/.cache/ck-engine-v7/models/train/<run_name>
+# Each target maps to a tab in the Dataset Viewer.  See the Pipeline Map
+# in the Preflight tab for the full script → artifact → tab mapping.
+#
+#   Target                  │ Artifact                            │ DV Tab
+#   ────────────────────────┼─────────────────────────────────────┼───────────────
+#   v7-dataset-normalize    │ normalized_assets_manifest.json     │ Vocabulary, Quality
+#   v7-dataset-classify     │ asset_classification_manifest.json  │ Classification, Browse, Gallery
+#   v7-dataset-embeddings   │ embeddings.json                     │ Embeddings
+#   v7-dataset-attention    │ attention.json                      │ Attention
+#   v7-dataset-viewer       │ dataset_viewer.html                 │ All tabs
+#   v7-dataset-all          │ (all above + regenerate viewer)     │ All tabs
+#
+V7_DATASET_RUN ?= $(RUN)
+
+v7-dataset-normalize:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-normalize RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace "$(V7_DATASET_RUN)/dataset" --force
+
+v7-dataset-classify:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-classify RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace "$(V7_DATASET_RUN)/dataset" --force
+
+v7-dataset-embeddings:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-embeddings RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/tools/export_embeddings.py "$(V7_DATASET_RUN)"
+
+v7-dataset-attention:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-attention RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/tools/export_attention.py "$(V7_DATASET_RUN)" --probe
+
+v7-dataset-viewer:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-viewer RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/scripts/dataset/build_svg_dataset_visualizer_v7.py \
+		--workspace "$(V7_DATASET_RUN)/dataset" \
+		--output "$(V7_DATASET_RUN)/dataset_viewer.html"
+
+v7-dataset-all:
+	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-all RUN=<run_dir>"; exit 1; }
+	$(PYTHON) version/v7/tools/prepare_run_viewer.py "$(V7_DATASET_RUN)" --force
 
 visualizer-full:
 	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1

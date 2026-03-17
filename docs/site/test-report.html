@@ -1307,6 +1307,8 @@
       (<code>make v7-kernel-parity-train</code>)</li>
     <li><strong>v7 IR Visualizer E2E</strong>: Runbook-path regression with explicit run-dir wiring, decode profile checks, and tiny train-runtime ASan artifact validation
       (<code>make visualizer</code>, <code>make visualizer-full</code>)</li>
+    <li><strong>v7 Visualizer Health Gate</strong>: Contract-driven static analysis (160 checks) + JS unit tests (100 test vectors) for IR visualizer, dataset viewer, and IR hub
+      (<code>make v7-visualizer-health</code>)</li>
     <li><strong>v7 Regression Ledger</strong>: Canonical root-cause log for fixed and monitored bugs, consumed by operators in the visualizer
       (<code>version/v7/reports/REGRESSION_LEDGER.md</code>, <code>version/v7/reports/REGRESSION_LEDGER.json</code>)</li>
     <li><strong>llama.cpp Parity</strong>: CK vs llama.cpp kernel parity flow
@@ -1333,6 +1335,211 @@
   <p>
     See also: <a href="version-history.html">Version History</a> for project roadmap and milestone tracking.
   </p>
+
+  <hr>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- VISUALIZER HEALTH MATRIX                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+
+  <h2>Visualizer Health Matrix</h2>
+  <p>
+    Contract-driven test coverage for the IR Visualizer and Dataset Viewer.
+    Each component declares its tab/function/DOM contracts in JSON; tests
+    validate against those contracts at every push.
+    See the <a href="v7-visualizer-test-runbook.html">full test runbook</a>.
+  </p>
+
+  <p style="font-size: 0.85rem; color: var(--text-muted);">
+    Run locally: <code>make v7-visualizer-health</code>
+  </p>
+
+  <style>
+    .viz-matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 1rem 0;
+    }
+    .viz-matrix th {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 2px solid rgba(255,180,0,0.3);
+      color: #ffb400;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .viz-matrix td {
+      padding: 0.35rem 0.6rem;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .viz-matrix tr:hover td {
+      background: rgba(255,180,0,0.03);
+    }
+    .viz-component {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .viz-level {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .viz-l1 { background: rgba(71,180,117,0.12); border: 1px solid rgba(71,180,117,0.3); color: #47b475; }
+    .viz-l2 { background: rgba(7,173,248,0.12); border: 1px solid rgba(7,173,248,0.3); color: #07adf8; }
+    .viz-l3 { background: rgba(255,140,0,0.12); border: 1px solid rgba(255,140,0,0.3); color: #ff8c00; }
+    .viz-count {
+      font-family: 'JetBrains Mono', monospace;
+      color: #ffb400;
+      font-weight: 600;
+    }
+    .viz-fn-list {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      max-width: 500px;
+    }
+    .viz-fn-list code {
+      font-size: 0.72rem;
+      color: #8cb4ff;
+    }
+  </style>
+
+  <h3>IR Visualizer — 11 tabs, 19 core functions</h3>
+  <table class="viz-matrix">
+    <thead>
+      <tr>
+        <th>Tab</th>
+        <th>Render Function</th>
+        <th>L1 Static</th>
+        <th>L2 Unit Tests</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="viz-component">Memory</td><td><code>renderMemory</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Kernel Flow</td><td><code>renderKernelFlow</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Stats</td><td><code>renderStats</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Training</td><td><code>renderTraining</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Quantization</td><td><code>renderQuantizationAudit</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Dataflow</td><td><code>renderDataflow</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Interpretability</td><td><code>renderOperatorMathIntuition</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Profile</td><td><code>renderProfile</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Data Pipeline</td><td><code>renderDataPipeline</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Parity</td><td><code>renderParityCockpit</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <p class="viz-fn-list">
+    <strong>L2-tested utilities:</strong>
+    <code>formatBytes</code> (4) ·
+    <code>normalizeShapeInput</code> (7) ·
+    <code>formatShapeDisplay</code> (3) ·
+    <code>normalizeMode</code> (3) ·
+    <code>escapeHtml</code> (3) ·
+    <code>quoteShell</code> (3) ·
+    <code>normalizePathString</code> (2) ·
+    <code>pathDirname</code> (3) ·
+    <code>extractGgufStem</code> (3) ·
+    <code>relativePathFromTo</code> (4)
+    — <span class="viz-count">35 tests</span>
+  </p>
+
+  <h3>Dataset Viewer — 12 tabs, 30 core functions</h3>
+  <table class="viz-matrix">
+    <thead>
+      <tr>
+        <th>Tab</th>
+        <th>Render Function</th>
+        <th>L1 Static</th>
+        <th>L2 Unit Tests</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="viz-component">Overview</td><td><code>renderOverview</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Preflight</td><td><code>renderPreflight</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Gallery</td><td><code>renderGallery</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Text</td><td><code>renderTextSamples</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Tokenizer</td><td><code>renderTokenizer</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Vocabulary</td><td><code>renderVocabulary</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Classification</td><td><code>renderClassification</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Browse</td><td><code>renderBrowse</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Candidates</td><td><code>renderCandidates</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Quality</td><td><code>renderQuality</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td>—</td></tr>
+      <tr><td class="viz-component">Embeddings</td><td><code>renderEmbeddings</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td><span class="viz-level viz-l2">embColor · embNormalise · cosineSim</span></td></tr>
+      <tr><td class="viz-component">Attention</td><td><code>renderAttention</code></td><td><span class="viz-level viz-l1">tab + panel + fn</span></td><td><span class="viz-level viz-l2">attnColor · attnEntropy · avgMatrices</span></td></tr>
+    </tbody>
+  </table>
+
+  <p class="viz-fn-list">
+    <strong>L2-tested functions:</strong>
+    <code>attnColor</code> (9) ·
+    <code>embColor</code> (3) ·
+    <code>cosineSim</code> (4) ·
+    <code>attnEntropy</code> (4) ·
+    <code>avgMatrices</code> (3) ·
+    <code>embNormalise</code> (4)
+    — <span class="viz-count">27 tests</span>
+  </p>
+
+  <h3>Coverage Summary</h3>
+  <table class="viz-matrix">
+    <thead>
+      <tr><th>Level</th><th>Component</th><th>Checks</th><th>Run In</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="viz-level viz-l1">L1</span></td><td>IR Visualizer</td><td class="viz-count">~68</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l1">L1</span></td><td>Dataset Viewer</td><td class="viz-count">~78</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l1">L1</span></td><td>IR Hub</td><td class="viz-count">~5</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l2">L2</span></td><td>IR Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l2">L2</span></td><td>DS Pure Functions</td><td class="viz-count">~50</td><td><code>pre-push</code></td></tr>
+      <tr><td><span class="viz-level viz-l3">L3</span></td><td>Generated E2E (all 3 visualizers)</td><td class="viz-count">~24-44</td><td><code>nightly</code></td></tr>
+      <tr>
+        <td colspan="2" style="text-align: right; font-weight: 700;">Total</td>
+        <td class="viz-count" style="font-size: 1rem;">~260</td>
+        <td><code>&lt; 3 seconds</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="alert alert-info" style="margin-top: 1rem;">
+    <span class="alert-icon">📋</span>
+    <div>
+      <strong>Contract-driven:</strong> All tab, function, and test vector definitions live in
+      <code>version/v7/tests/contracts/ir_visualizer_contract.json</code> and
+      <code>dataset_viewer_contract.json</code>.
+      Add a tab or function? Update the contract — tests auto-expand.
+    </div>
+  </div>
+
+  <h3>Level 3 — Generated-File E2E (Nightly)</h3>
+  <p>
+    Validates the full generation → validation chain: generate all three
+    visualizer HTML files from the latest training run, then run L1 health
+    checks + embedded JSON structure + cross-artifact consistency on the output.
+  </p>
+  <p style="font-size: 0.85rem; color: var(--text-muted);">
+    Run locally: <code>make v7-visualizer-generated-e2e</code>
+    · Specific run: <code>make v7-visualizer-generated-e2e RUN=/path/to/run</code>
+  </p>
+
+  <table class="viz-matrix">
+    <thead>
+      <tr><th>Stage</th><th>What it validates</th><th>Artifact</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="viz-component">Generate</td><td>ir_report.html via <code>open_ir_visualizer.py</code></td><td>ir_report.html</td></tr>
+      <tr><td class="viz-component">Generate</td><td>dataset_viewer.html via <code>prepare_run_viewer.py</code></td><td>dataset_viewer.html</td></tr>
+      <tr><td class="viz-component">Generate</td><td>ir_hub.html via <code>open_ir_hub.py</code></td><td>ir_hub.html</td></tr>
+      <tr><td class="viz-component">L1 Health</td><td>Tabs, functions, DOM targets in generated output</td><td>All three files</td></tr>
+      <tr><td class="viz-component">JSON Structure</td><td>Embedded JSON blobs (run_config, ir1_decode, layout_decode)</td><td>ir_report.html</td></tr>
+      <tr><td class="viz-component">Panel Structure</td><td>Panel IDs, attnColor presence, file size</td><td>dataset_viewer.html</td></tr>
+      <tr><td class="viz-component">Hub Structure</td><td>Run cards, ir_report links, navigation</td><td>ir_hub.html</td></tr>
+      <tr><td class="viz-component">Cross-artifact</td><td>Run name in hub, vocab consistency, config.json</td><td>All three files</td></tr>
+    </tbody>
+  </table>
 </div>
 
 <script>
@@ -1790,7 +1997,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-11</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-17</p>
             </div>
         </div>
     </footer>

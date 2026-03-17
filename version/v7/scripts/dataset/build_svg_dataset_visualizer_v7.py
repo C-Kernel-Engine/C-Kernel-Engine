@@ -174,6 +174,25 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
     }
 
     # --- Synthesize classified-like data (entries with family, roles) ---
+    # Human-readable descriptions for DSL layout families
+    layout_descriptions = {
+        "bullet-panel": "Hero title + bullet list + callout — classic infographic card",
+        "compare-panels": "Side-by-side comparison panels — A vs B layouts",
+        "flow-steps": "Sequential step flow — process/pipeline diagrams",
+        "spectrum-band": "Gradient spectrum with labeled positions — range/scale visuals",
+        "stat-cards": "Grid of metric cards — KPI dashboard style",
+        "timeline": "Chronological event sequence",
+        "hierarchy": "Tree/org-chart structure",
+    }
+    topic_descriptions = {
+        "capacity_math": "GPU/compute capacity calculations and sizing",
+        "eval_discipline": "Model evaluation methodology and metrics",
+        "governance_path": "Policy, compliance, and governance workflows",
+        "gpu_readiness": "Hardware readiness checks and provisioning",
+        "platform_rollout": "Platform deployment and launch planning",
+        "structured_outputs": "Structured output formats and schemas",
+    }
+
     entries = []
     for i, entry in enumerate(catalog):
         layout = entry.get("layout", "unknown")
@@ -212,6 +231,11 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
             "by_family": {},
             "by_source": {},
         },
+        "family_counts": {},
+        "family_descriptions": {k: v for k, v in layout_descriptions.items()
+                                if k in {e["family"] for e in entries}},
+        "source_descriptions": {k: v for k, v in topic_descriptions.items()
+                                if k in {e["source_name"] for e in entries}},
     }
     # Compute by_family / by_source counts
     for e in entries:
@@ -219,6 +243,7 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
         s = e["source_name"]
         classified["counts"]["by_family"][f] = classified["counts"]["by_family"].get(f, 0) + 1
         classified["counts"]["by_source"][s] = classified["counts"]["by_source"].get(s, 0) + 1
+        classified["family_counts"][f] = classified["family_counts"].get(f, 0) + 1
 
     return normalized, classified
 
@@ -2141,6 +2166,8 @@ const placeholders  = norm.placeholder_totals || {};
 const familyCounts  = cls.family_counts || {};
 const roleCounts    = cls.counts || {};
 const suggested     = (typeof cls.suggested_splits === 'object' && cls.suggested_splits) ? cls.suggested_splits : {};
+const familyDescs   = cls.family_descriptions || {};
+const sourceDescs   = cls.source_descriptions || {};
 
 // ── Empty-state helper ──────────────────────────────────────────
 // ws = CK_WORKSPACE (dataset dir), runDir = parent of ws (run dir)
@@ -2394,19 +2421,21 @@ function renderVocabulary() {
         html += provenanceBanner('Synthesized from structured-atoms render catalog (' + fmt(norm.normalized_entries || 0) + ' DSL entries). This workspace uses DSL text training, not raw SVG files. Tag frequencies reflect DSL tokens and rendered SVG elements.');
     }
     html += '<div class="stats-grid">';
-    html += statCardHtml(fmt(Object.keys(tagTotals).length), 'SVG Tag Types');
-    html += statCardHtml(fmt(tagTotal), 'Total Tag Instances', null, 'blue');
+    html += statCardHtml(fmt(Object.keys(tagTotals).length), isSynthesized ? 'DSL + SVG Tags' : 'SVG Tag Types');
+    html += statCardHtml(fmt(tagTotal), 'Total Instances', null, 'blue');
     html += statCardHtml(fmt(Object.keys(placeholders).length), 'Placeholder Types');
     html += statCardHtml(fmt(phTotal), 'Placeholder Instances', null, 'green');
     html += '</div>';
 
-    html += sectionHtml('🔤', 'SVG Vocabulary Histogram', fmt(Object.keys(tagTotals).length)+' tags', 'badge-blue', 'vocabBody');
+    html += sectionHtml('🔤', isSynthesized ? 'DSL + SVG Tag Histogram' : 'SVG Vocabulary Histogram', fmt(Object.keys(tagTotals).length)+' tags', 'badge-blue', 'vocabBody');
     html += sectionHtml('📝', 'Placeholder Histogram', '', 'badge-green', 'phBody');
 
     el.innerHTML = html;
 
     document.getElementById('vocabBody').innerHTML =
-        '<div class="subnote">Top tag counts across the normalized corpus — the visual grammar the model learns from.</div>' +
+        (isSynthesized
+            ? '<div class="subnote">Tag frequencies from DSL tokens (layout, theme, canvas…) and rendered SVG elements (rect, text, line…). Hover bars for counts.</div>'
+            : '<div class="subnote">Top tag counts across the normalized corpus — the visual grammar the model learns from.</div>') +
         distBarsHtml(tagTotals, tagTotal, '#07adf8');
 
     document.getElementById('phBody').innerHTML =
@@ -2431,13 +2460,13 @@ function renderClassification() {
         html += provenanceBanner('Synthesized from render catalog. Families = DSL layout types, sources = topic categories. ' + fmt(total) + ' training entries.');
     }
     html += '<div class="stats-grid">';
-    html += statCardHtml(fmt(Object.keys(familyCounts).length), 'Families');
-    html += statCardHtml(fmt(Object.keys(roleCounts).length), 'Roles');
-    html += statCardHtml(fmt(total), 'Classified Assets', null, 'blue');
+    html += statCardHtml(fmt(Object.keys(familyCounts).length), isSynthesized ? 'Layouts' : 'Families');
+    html += statCardHtml(isSynthesized ? fmt(Object.keys(cls.counts && cls.counts.by_source ? cls.counts.by_source : {}).length) : fmt(Object.keys(roleCounts).length), isSynthesized ? 'Topics' : 'Roles');
+    html += statCardHtml(fmt(total), isSynthesized ? 'Training Entries' : 'Classified Assets', null, 'blue');
     html += '</div>';
 
-    html += sectionHtml('🏷️', 'Family Distribution', '', 'badge-blue', 'famDistBody');
-    html += sectionHtml('🎭', 'Role Distribution', '', 'badge-purple', 'roleDistBody');
+    html += sectionHtml('🏷️', isSynthesized ? 'Layout Distribution' : 'Family Distribution', '', 'badge-blue', 'famDistBody');
+    html += sectionHtml('🎭', isSynthesized ? 'Topic Distribution' : 'Role Distribution', '', 'badge-purple', 'roleDistBody');
 
     // Split candidates summary
     html += sectionHtml('✂️', 'Split Candidates', '', 'badge-orange', 'splitBody');
@@ -2445,12 +2474,32 @@ function renderClassification() {
     el.innerHTML = html;
 
     document.getElementById('famDistBody').innerHTML =
-        '<div class="subnote">Heuristic family labels from normalized filenames and structure.</div>' +
-        distBarsHtml(familyCounts, total, '#07adf8');
+        (isSynthesized
+            ? '<div class="subnote">DSL layout families from the render catalog. Each family is a distinct infographic layout type the model learns to generate.</div>'
+            : '<div class="subnote">Heuristic family labels from normalized filenames and structure.</div>') +
+        distBarsHtml(familyCounts, total, '#07adf8') +
+        (Object.keys(familyDescs).length
+            ? '<div style="margin-top:0.8rem;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.6rem;">' +
+              '<div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:0.4rem;">Layout Legend</div>' +
+              Object.entries(familyDescs).map(function(kv) {
+                  return '<div style="font-size:0.78rem;margin-bottom:0.3rem;"><span style="color:var(--purple);font-weight:600;">' + esc(kv[0]) + '</span> — <span style="color:var(--text-muted)">' + esc(kv[1]) + '</span></div>';
+              }).join('') +
+              '</div>'
+            : '');
 
     document.getElementById('roleDistBody').innerHTML =
-        '<div class="subnote">Roles assigned by the classifier. Assets can carry multiple roles.</div>' +
-        distBarsHtml(roleCounts, total, '#ffb400');
+        (isSynthesized
+            ? '<div class="subnote">Topic categories from the render catalog. Each topic provides domain-specific content for the layouts.</div>'
+            : '<div class="subnote">Roles assigned by the classifier. Assets can carry multiple roles.</div>') +
+        (isSynthesized ? distBarsHtml(cls.counts && cls.counts.by_source ? cls.counts.by_source : roleCounts, total, '#ffb400') : distBarsHtml(roleCounts, total, '#ffb400')) +
+        (Object.keys(sourceDescs).length
+            ? '<div style="margin-top:0.8rem;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.6rem;">' +
+              '<div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:0.4rem;">Topic Legend</div>' +
+              Object.entries(sourceDescs).map(function(kv) {
+                  return '<div style="font-size:0.78rem;margin-bottom:0.3rem;"><span style="color:var(--orange);font-weight:600;">' + esc(kv[0]) + '</span> — <span style="color:var(--text-muted)">' + esc(kv[1]) + '</span></div>';
+              }).join('') +
+              '</div>'
+            : '');
 
     const splits = {
         'Pretrain: small full': (suggested.pretrain_small_full||[]).length,
@@ -2504,8 +2553,18 @@ function renderBrowse() {
 
     const cols = [
         { key: 'idx',    label: '#',      render: (r,i) => `<span class="mono">${start+i}</span>` },
-        { key: 'normalized_path', label: 'Asset', render: r => `<span class="mono" style="color:var(--blue)">${esc(trunc(pathName(r.normalized_path),40))}</span>` },
-        { key: 'family', label: 'Family', render: r => `<span style="color:var(--purple)">${esc(r.family||'—')}</span>` },
+        { key: 'normalized_path', label: isSynthesized ? 'Entry' : 'Asset', render: r => {
+            var name = isSynthesized ? (r.source_path || r.family + '_' + (r.source_name||'')) : pathName(r.normalized_path);
+            return `<span class="mono" style="color:var(--blue)">${esc(trunc(name,40))}</span>`;
+        }},
+        { key: 'family', label: isSynthesized ? 'Layout' : 'Family', render: r => {
+            var desc = familyDescs[r.family] || '';
+            return `<span style="color:var(--purple)" ${desc ? 'title="'+esc(desc)+'"' : ''}>${esc(r.family||'—')}${desc ? ' ℹ️' : ''}</span>`;
+        }},
+        { key: 'source_name', label: 'Topic', render: r => {
+            var desc = sourceDescs[r.source_name] || '';
+            return `<span style="color:var(--orange)" ${desc ? 'title="'+esc(desc)+'"' : ''}>${esc(r.source_name||'—')}</span>`;
+        }},
         { key: 'chars',  label: 'Chars',  render: r => `<span class="mono">${fmt(r.chars||0)}</span>` },
         { key: 'size_band', label: 'Size Band', render: r => `<span class="mono">${esc(r.size_band||'—')}</span>` },
         { key: 'roles',  label: 'Roles',  render: r => (r.roles||[]).map(role => `<span class="mono" style="color:var(--orange);font-size:0.68rem">${esc(role)}</span>`).join(', ') || '—' },
