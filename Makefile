@@ -4082,6 +4082,8 @@ visualizer: v7-ir-visualizer-e2e
 v7-visualizer-health:
 	@echo "Running visualizer health checks..."
 	@$(PYTHON) version/v7/scripts/test_visualizer_health_v7.py --source --json-out $(V7_REPORT_DIR)/visualizer_health_latest.json
+	@echo "Running visualizer JS unit tests..."
+	@$(PYTHON) version/v7/scripts/test_visualizer_js_units_v7.py --json-out $(V7_REPORT_DIR)/visualizer_js_units_latest.json
 
 visualizer-full:
 	@$(MAKE) --no-print-directory v7-ir-visualizer-e2e V7_VISUALIZER_E2E_WITH_TRAIN=1

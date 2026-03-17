@@ -75,7 +75,8 @@ fi
 # Test 0.5: Visualizer health (fast static analysis, no build needed)
 # =============================================================================
 echo -e "${YELLOW}[0.5/6]${NC} Visualizer HTML/JS health check..."
-if python3 version/v7/scripts/test_visualizer_health_v7.py --source --quiet > /tmp/ck_visualizer_health.log 2>&1; then
+if python3 version/v7/scripts/test_visualizer_health_v7.py --source --quiet > /tmp/ck_visualizer_health.log 2>&1 \
+   && python3 version/v7/scripts/test_visualizer_js_units_v7.py --quiet >> /tmp/ck_visualizer_health.log 2>&1; then
     echo -e "${GREEN}  ✓ Visualizer health passed${NC}"
 else
     echo -e "${RED}  ✗ Visualizer health failed (tabs/functions/contracts)${NC}"
