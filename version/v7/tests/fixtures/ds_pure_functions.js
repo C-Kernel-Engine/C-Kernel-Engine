@@ -103,9 +103,18 @@ function avgMatrices(matrices) {
     return out.map(r => Array.from(r));
 }
 
+// ── Training chart utilities ─────────────────────────────────────
+function fmtAxisVal(v) {
+    if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    if (Math.abs(v) < 0.001 && v !== 0) return v.toExponential(1);
+    if (Number.isInteger(v)) return v.toString();
+    return v.toPrecision(3);
+}
+
 // Export for test harness (CommonJS for Node.js compatibility)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        attnColor, embColor, embNormalise, cosineSim, attnEntropy, avgMatrices
+        attnColor, embColor, embNormalise, cosineSim, attnEntropy, avgMatrices, fmtAxisVal
     };
 }

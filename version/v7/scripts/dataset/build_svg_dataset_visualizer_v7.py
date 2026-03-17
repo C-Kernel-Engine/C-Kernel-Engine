@@ -702,6 +702,128 @@ def _build_preflight_info(workspace: Path, raw_inventory: dict[str, Any],
     }
 
 
+def _downsample_steps(steps: list[dict], max_pts: int = 500) -> list[dict]:
+    """Downsample a time-series to max_pts keeping first, last, and evenly spaced points."""
+    n = len(steps)
+    if n <= max_pts:
+        return steps
+    indices = set()
+    indices.add(0)
+    indices.add(n - 1)
+    stride = (n - 1) / (max_pts - 1)
+    for i in range(max_pts):
+        indices.add(min(int(i * stride), n - 1))
+    return [steps[i] for i in sorted(indices)]
+
+
+def _load_training_data(run_dir: Path) -> dict[str, Any] | None:
+    """Load training telemetry: loss curve, grad norms, step profile.
+
+    Downsamples to ~500 points to keep embedded HTML reasonable (~200KB).
+    Returns structured dict with 'loss_curve', 'grad_norms', 'step_profile', 'summary'.
+    """
+    if not run_dir or not run_dir.exists():
+        return None
+
+    result: dict[str, Any] = {"available": False}
+
+    # Loss curve (the richest source — has loss, lr, grad_norm, timing per step)
+    for name in ("training_loss_curve_latest.json", "training_loss_curve.json"):
+        lc_path = run_dir / name
+        if lc_path.exists():
+            try:
+                lc = json.loads(lc_path.read_text(encoding="utf-8"))
+                steps = lc.get("steps", [])
+                if steps:
+                    ds = _downsample_steps(steps)
+                    # Extract only fields we need to keep size small
+                    compact = []
+                    for s in ds:
+                        compact.append({
+                            "step": s.get("step"),
+                            "loss_ck": s.get("loss_ck"),
+                            "loss_pt": s.get("loss_pt"),
+                            "lr": s.get("lr"),
+                            "grad_norm": s.get("grad_norm"),
+                            "epoch": s.get("epoch"),
+                            "source_stage": s.get("source_stage"),
+                            "forward_ms": s.get("forward_ms"),
+                            "backward_ms": s.get("backward_ms"),
+                            "optimizer_ms": s.get("optimizer_ms"),
+                        })
+                    result["loss_curve"] = compact
+                    result["total_steps"] = len(steps)
+                    result["available"] = True
+                    # Summary metrics
+                    first = steps[0]
+                    last = steps[-1]
+                    result["summary"] = {
+                        "start_loss": first.get("loss_ck"),
+                        "final_loss": last.get("loss_ck"),
+                        "final_loss_pt": last.get("loss_pt"),
+                        "total_steps": len(steps),
+                        "final_lr": last.get("lr"),
+                        "source": lc.get("source"),
+                    }
+            except Exception:
+                pass
+            break
+
+    # Grad norms (separate file, may have per-param detail)
+    for name in ("training_grad_norms.json",):
+        gn_path = run_dir / name
+        if gn_path.exists():
+            try:
+                gn = json.loads(gn_path.read_text(encoding="utf-8"))
+                gn_steps = gn.get("steps", [])
+                gn_global = gn.get("global", [])
+                if gn_steps and gn_global and len(gn_steps) == len(gn_global):
+                    ds_idx = set()
+                    stride = max(1, len(gn_steps) // 500)
+                    for i in range(0, len(gn_steps), stride):
+                        ds_idx.add(i)
+                    ds_idx.add(len(gn_steps) - 1)
+                    result["grad_norms"] = [
+                        {"step": gn_steps[i], "norm": gn_global[i]}
+                        for i in sorted(ds_idx)
+                    ]
+                    result["available"] = True
+            except Exception:
+                pass
+
+    # Step profile (timing per step)
+    for name in ("training_step_profile.json",):
+        sp_path = run_dir / name
+        if sp_path.exists():
+            try:
+                sp = json.loads(sp_path.read_text(encoding="utf-8"))
+                sp_steps = sp.get("steps", [])
+                ck_ms = sp.get("ck_total_ms", [])
+                pt_ms = sp.get("torch_total_ms", [])
+                tok_s = sp.get("train_tok_s", [])
+                if sp_steps:
+                    n = len(sp_steps)
+                    ds_idx = set()
+                    stride = max(1, n // 500)
+                    for i in range(0, n, stride):
+                        ds_idx.add(i)
+                    ds_idx.add(n - 1)
+                    profile = []
+                    for i in sorted(ds_idx):
+                        profile.append({
+                            "step": sp_steps[i],
+                            "ck_ms": ck_ms[i] if i < len(ck_ms) else None,
+                            "pt_ms": pt_ms[i] if i < len(pt_ms) else None,
+                            "tok_s": tok_s[i] if i < len(tok_s) else None,
+                        })
+                    result["step_profile"] = profile
+                    result["available"] = True
+            except Exception:
+                pass
+
+    return result if result["available"] else None
+
+
 def _load_embeddings_data(run_dir: Path) -> dict[str, Any] | None:
     """Load embeddings.json if it exists and is ≤ 1MB, otherwise return None."""
     if not run_dir or not run_dir.exists():
@@ -758,6 +880,7 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
             run_dir = workspace
     emb_data = _load_embeddings_data(run_dir) if run_dir else None
     attn_data = _load_attention_data(run_dir) if run_dir else None
+    training_data = _load_training_data(run_dir) if run_dir else None
     
     return (
         _HTML_PREFIX
@@ -772,6 +895,7 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
         + f"const CK_EMBEDDINGS = {_json_for_embed(emb_data)};\n"
         + f"const CK_ATTENTION = {_json_for_embed(attn_data)};\n"
         + f"const CK_PREFLIGHT = {_json_for_embed(preflight_info)};\n"
+        + f"const CK_TRAINING = {_json_for_embed(training_data)};\n"
         + "</script>\n"
         + _HTML_SUFFIX
     )
@@ -1455,6 +1579,7 @@ _HTML_SUFFIX = r"""
     <button class="tab" data-tab="quality">Quality</button>
     <button class="tab" data-tab="embeddings">🧬 Embeddings</button>
     <button class="tab" data-tab="attention">🔭 Attention</button>
+    <button class="tab" data-tab="training">📈 Training</button>
 </nav>
 
 <main>
@@ -1470,6 +1595,7 @@ _HTML_SUFFIX = r"""
     <div class="panel" id="panel-quality"></div>
     <div class="panel" id="panel-embeddings"></div>
     <div class="panel" id="panel-attention"></div>
+    <div class="panel" id="panel-training"></div>
 </main>
 
 <!-- ═══ Gallery Full-Screen Overlay ══════════════════════════════ -->
@@ -3789,12 +3915,305 @@ function generateAttnDemo() {
     };
 }
 
+// ── Canvas Chart Engine (zero-dependency) ────────────────────────────────────
+
+function drawCanvasChart(canvas, series, opts) {
+    opts = opts || {};
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const W = rect.width || 400;
+    const H = rect.height || 180;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+
+    var margin = { top: 24, right: 14, bottom: 32, left: 56 };
+    var pw = W - margin.left - margin.right;
+    var ph = H - margin.top - margin.bottom;
+    if (pw <= 0 || ph <= 0) return;
+
+    var xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (var si = 0; si < series.length; si++) {
+        var sd = series[si].data;
+        for (var pi = 0; pi < sd.length; pi++) {
+            var pt = sd[pi];
+            if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+            if (pt.x < xMin) xMin = pt.x;
+            if (pt.x > xMax) xMax = pt.x;
+            if (pt.y < yMin) yMin = pt.y;
+            if (pt.y > yMax) yMax = pt.y;
+        }
+    }
+    if (!Number.isFinite(xMin) || xMin === xMax) return;
+    if (yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
+    if (opts.yIncludeZero && yMin > 0) yMin = 0;
+
+    function toX(v) { return margin.left + ((v - xMin) / (xMax - xMin)) * pw; }
+    function toY(v) { return margin.top + (1 - (v - yMin) / (yMax - yMin)) * ph; }
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    var yTicks = 5, xTicks = 5;
+    for (var i = 0; i <= yTicks; i++) {
+        var y = margin.top + (i / yTicks) * ph;
+        ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(margin.left + pw, y); ctx.stroke();
+    }
+    for (var i = 0; i <= xTicks; i++) {
+        var x = margin.left + (i / xTicks) * pw;
+        ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + ph); ctx.stroke();
+    }
+
+    // Axis labels
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    for (var i = 0; i <= yTicks; i++) {
+        var v = yMax - (i / yTicks) * (yMax - yMin);
+        ctx.fillText(fmtAxisVal(v), margin.left - 4, margin.top + (i / yTicks) * ph + 3);
+    }
+    ctx.textAlign = 'center';
+    for (var i = 0; i <= xTicks; i++) {
+        var v = xMin + (i / xTicks) * (xMax - xMin);
+        ctx.fillText(fmtAxisVal(v), margin.left + (i / xTicks) * pw, H - margin.bottom + 16);
+    }
+
+    if (opts.title) {
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = 'bold 11px JetBrains Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(opts.title, margin.left, margin.top - 8);
+    }
+    if (opts.xLabel) {
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '9px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(opts.xLabel, margin.left + pw / 2, H - 2);
+    }
+
+    // Draw series lines
+    for (var si = 0; si < series.length; si++) {
+        var s = series[si];
+        var pts = s.data.filter(function(p) { return Number.isFinite(p.x) && Number.isFinite(p.y); });
+        if (pts.length < 2) continue;
+        ctx.strokeStyle = s.color || '#ffb400';
+        ctx.lineWidth = s.width || 1.5;
+        ctx.globalAlpha = s.alpha || 1.0;
+        ctx.beginPath();
+        ctx.moveTo(toX(pts[0].x), toY(pts[0].y));
+        for (var pi = 1; pi < pts.length; pi++) {
+            ctx.lineTo(toX(pts[pi].x), toY(pts[pi].y));
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+    }
+
+    // Legend
+    if (series.length > 1) {
+        var lx = margin.left + pw - 10;
+        ctx.textAlign = 'right';
+        ctx.font = '9px JetBrains Mono, monospace';
+        for (var si = series.length - 1; si >= 0; si--) {
+            var s = series[si];
+            if (!s.label) continue;
+            var tw = ctx.measureText(s.label).width;
+            ctx.fillStyle = s.color || '#ffb400';
+            ctx.fillRect(lx - tw - 14, margin.top + 2, 8, 8);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.fillText(s.label, lx, margin.top + 10);
+            lx -= tw + 24;
+        }
+    }
+}
+
+function fmtAxisVal(v) {
+    if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    if (Math.abs(v) < 0.001 && v !== 0) return v.toExponential(1);
+    if (Number.isInteger(v)) return v.toString();
+    return v.toPrecision(3);
+}
+
+// ── Training Dynamics Tab ────────────────────────────────────────────────────
+
+function renderTraining() {
+    var panel = document.getElementById('panel-training');
+    if (!panel) return;
+    var td = (typeof CK_TRAINING !== 'undefined') ? CK_TRAINING : null;
+
+    if (!td || !td.available) {
+        panel.innerHTML = '<div class="subnote" style="padding:2rem;text-align:center;">'
+            + '<h3 style="color:var(--orange);">📈 Training Dynamics</h3>'
+            + '<p>No training telemetry found for this run.</p>'
+            + '<p style="font-size:0.8rem;color:var(--text-muted);">Generate with: '
+            + '<code>python3 version/v7/scripts/ck_run_v7.py --run &lt;DIR&gt;</code></p>'
+            + '</div>';
+        return;
+    }
+
+    var summary = td.summary || {};
+    var lossCurve = td.loss_curve || [];
+    var gradNorms = td.grad_norms || [];
+    var stepProfile = td.step_profile || [];
+    var totalSteps = td.total_steps || lossCurve.length;
+
+    var html = '<div style="padding:1rem;">';
+    html += '<h3 style="color:var(--orange);margin:0 0 0.5rem 0;">📈 Training Dynamics</h3>';
+    html += '<p class="subnote" style="margin-bottom:1rem;">Loss convergence, gradient health, parity drift, and step timing from <code>training_loss_curve.json</code></p>';
+
+    // Stat cards
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin-bottom:1.5rem;">';
+    var cards = [
+        { label: 'Start Loss', value: summary.start_loss != null ? summary.start_loss.toFixed(4) : '\u2014', color: '#f87171' },
+        { label: 'Final Loss', value: summary.final_loss != null ? summary.final_loss.toFixed(4) : '\u2014', color: '#4ade80' },
+        { label: 'PT Final', value: summary.final_loss_pt != null ? summary.final_loss_pt.toFixed(4) : '\u2014', color: '#60a5fa' },
+        { label: 'Total Steps', value: totalSteps.toLocaleString(), color: '#fbbf24' },
+        { label: 'Final LR', value: summary.final_lr != null ? summary.final_lr.toExponential(2) : '\u2014', color: '#a78bfa' }
+    ];
+    if (summary.start_loss && summary.final_loss && summary.final_loss > 0) {
+        var ratio = summary.start_loss / summary.final_loss;
+        cards.push({ label: 'Reduction', value: ratio.toFixed(1) + '\u00d7', color: '#2dd4bf' });
+    }
+    for (var ci = 0; ci < cards.length; ci++) {
+        var c = cards[ci];
+        html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.6rem;text-align:center;">'
+            + '<div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">' + c.label + '</div>'
+            + '<div style="font-size:1.2rem;font-weight:700;color:' + c.color + ';font-family:JetBrains Mono,monospace;">' + c.value + '</div>'
+            + '</div>';
+    }
+    html += '</div>';
+
+    // Chart canvases (only create if data exists)
+    var chartDefs = [];
+    if (lossCurve.length > 1) {
+        chartDefs.push({ id: 'ck-loss-chart', h: 220 });
+        chartDefs.push({ id: 'ck-parity-drift-chart', h: 160 });
+    }
+    if (lossCurve.length > 1 && lossCurve.some(function(s) { return s.lr != null && s.lr > 0; })) {
+        chartDefs.push({ id: 'ck-lr-chart', h: 160 });
+    }
+    if (gradNorms.length > 1 || lossCurve.some(function(s) { return s.grad_norm != null && s.grad_norm > 0; })) {
+        chartDefs.push({ id: 'ck-grad-chart', h: 160 });
+    }
+    if (lossCurve.some(function(s) { return s.forward_ms > 0; }) || stepProfile.length > 1) {
+        chartDefs.push({ id: 'ck-timing-chart', h: 160 });
+    }
+
+    html += '<div style="display:grid;grid-template-columns:1fr;gap:1rem;">';
+    for (var di = 0; di < chartDefs.length; di++) {
+        var cd = chartDefs[di];
+        html += '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;">'
+            + '<canvas id="' + cd.id + '" style="width:100%;height:' + cd.h + 'px;display:block;"></canvas>'
+            + '</div>';
+    }
+    html += '</div>';
+
+    // Per-stage breakdown table
+    var stages = {};
+    var stageOrder = [];
+    for (var i = 0; i < lossCurve.length; i++) {
+        var s = lossCurve[i];
+        var st = s.source_stage || 'unknown';
+        if (!stages[st]) { stages[st] = { count: 0, first_loss: null, last_loss: null }; stageOrder.push(st); }
+        stages[st].count++;
+        if (stages[st].first_loss == null) stages[st].first_loss = s.loss_ck;
+        stages[st].last_loss = s.loss_ck;
+    }
+    if (stageOrder.length > 0) {
+        html += '<h4 style="color:var(--orange);margin:1.5rem 0 0.5rem 0;">Stage Breakdown</h4>';
+        html += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
+        html += '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1);">'
+            + '<th style="text-align:left;padding:0.4rem;">Stage</th>'
+            + '<th style="text-align:right;padding:0.4rem;">Steps</th>'
+            + '<th style="text-align:right;padding:0.4rem;">Start Loss</th>'
+            + '<th style="text-align:right;padding:0.4rem;">End Loss</th>'
+            + '<th style="text-align:right;padding:0.4rem;">Reduction</th>'
+            + '</tr></thead><tbody>';
+        for (var si = 0; si < stageOrder.length; si++) {
+            var sn = stageOrder[si];
+            var stg = stages[sn];
+            var red = (stg.first_loss && stg.last_loss && stg.last_loss > 0) ? (stg.first_loss / stg.last_loss).toFixed(1) + '\u00d7' : '\u2014';
+            html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+                + '<td style="padding:0.4rem;color:var(--orange);">' + escapeHtml(sn) + '</td>'
+                + '<td style="text-align:right;padding:0.4rem;">' + stg.count + '</td>'
+                + '<td style="text-align:right;padding:0.4rem;">' + (stg.first_loss != null ? stg.first_loss.toFixed(4) : '\u2014') + '</td>'
+                + '<td style="text-align:right;padding:0.4rem;">' + (stg.last_loss != null ? stg.last_loss.toFixed(4) : '\u2014') + '</td>'
+                + '<td style="text-align:right;padding:0.4rem;color:#4ade80;">' + red + '</td>'
+                + '</tr>';
+        }
+        html += '</tbody></table>';
+    }
+
+    html += '</div>';
+    panel.innerHTML = html;
+
+    // ── Draw charts after DOM is ready ───────────────────────────────
+
+    // 1. Loss Curve (CK red, PT blue)
+    if (lossCurve.length > 1) {
+        drawCanvasChart(document.getElementById('ck-loss-chart'),
+            [{ label: 'CK', color: '#f87171', data: lossCurve.map(function(s) { return {x: s.step, y: s.loss_ck}; }) },
+             { label: 'PyTorch', color: '#60a5fa', alpha: 0.7, data: lossCurve.map(function(s) { return {x: s.step, y: s.loss_pt}; }) }],
+            { title: 'Loss Curve \u2014 CK (red) vs PyTorch (blue)', xLabel: 'step' });
+
+        // 2. Parity Drift |CK - PT|
+        var driftData = lossCurve
+            .filter(function(s) { return s.loss_ck != null && s.loss_pt != null; })
+            .map(function(s) { return {x: s.step, y: Math.abs(s.loss_ck - s.loss_pt)}; });
+        if (driftData.length > 1) {
+            drawCanvasChart(document.getElementById('ck-parity-drift-chart'),
+                [{ label: '|CK \u2212 PT|', color: '#fbbf24', data: driftData }],
+                { title: 'Parity Drift \u2014 |loss_ck \u2212 loss_pt| per step', xLabel: 'step', yIncludeZero: true });
+        }
+    }
+
+    // 3. LR Schedule
+    var lrData = lossCurve.filter(function(s) { return s.lr != null && s.lr > 0; }).map(function(s) { return {x: s.step, y: s.lr}; });
+    if (lrData.length > 1) {
+        drawCanvasChart(document.getElementById('ck-lr-chart'),
+            [{ label: 'lr', color: '#a78bfa', data: lrData }],
+            { title: 'Learning Rate Schedule', xLabel: 'step' });
+    }
+
+    // 4. Gradient Norms (prefer dedicated file, fallback to loss_curve field)
+    var gnData = gradNorms.map(function(g) { return {x: g.step, y: g.norm}; }).filter(function(p) { return Number.isFinite(p.y) && p.y > 0; });
+    if (gnData.length < 2) {
+        gnData = lossCurve.filter(function(s) { return s.grad_norm != null && s.grad_norm > 0; }).map(function(s) { return {x: s.step, y: s.grad_norm}; });
+    }
+    if (gnData.length > 1) {
+        drawCanvasChart(document.getElementById('ck-grad-chart'),
+            [{ label: 'grad_norm', color: '#fbbf24', data: gnData }],
+            { title: 'Gradient Norms over Training', xLabel: 'step', yIncludeZero: true });
+    }
+
+    // 5. Step Timing (CK ms green, PT ms blue)
+    var timingCk = stepProfile.map(function(s) { return {x: s.step, y: s.ck_ms}; }).filter(function(p) { return Number.isFinite(p.y) && p.y > 0; });
+    var timingPt = stepProfile.map(function(s) { return {x: s.step, y: s.pt_ms}; }).filter(function(p) { return Number.isFinite(p.y) && p.y > 0; });
+    if (timingCk.length < 2) {
+        timingCk = lossCurve.filter(function(s) { return s.forward_ms > 0; }).map(function(s) { return {x: s.step, y: (s.forward_ms || 0) + (s.backward_ms || 0) + (s.optimizer_ms || 0)}; });
+    }
+    var timingSeries = [];
+    if (timingCk.length > 1) timingSeries.push({ label: 'CK ms', color: '#4ade80', data: timingCk });
+    if (timingPt.length > 1) timingSeries.push({ label: 'PT ms', color: '#60a5fa', data: timingPt });
+    if (timingSeries.length > 0) {
+        drawCanvasChart(document.getElementById('ck-timing-chart'), timingSeries,
+            { title: 'Step Timing \u2014 CK (green) vs PyTorch (blue)', xLabel: 'step', yIncludeZero: true });
+    }
+}
+
 function renderAll() {
     const sections = [
         renderHeader, renderOverview, renderPreflight, renderGallery,
         renderTextSamples, renderTokenizer, renderVocabulary,
         renderClassification, renderBrowse, renderCandidates,
-        renderQuality, renderEmbeddings, renderAttention, populateFilters
+        renderQuality, renderEmbeddings, renderAttention, renderTraining, populateFilters
     ];
     for (const fn of sections) {
         try { fn(); } catch (e) { console.error('[dataset-viewer] ' + fn.name + ' failed:', e); }

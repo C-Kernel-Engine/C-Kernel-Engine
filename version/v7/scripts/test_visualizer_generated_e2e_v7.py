@@ -400,11 +400,33 @@ def validate_dataset_viewer_structure(dv_path: Path) -> StageResult:
     html = dv_path.read_text(encoding="utf-8")
 
     # Must have panel containers for key tabs
-    for panel_id in ["panel-overview", "panel-attention", "panel-embeddings", "panel-browse"]:
+    for panel_id in ["panel-overview", "panel-attention", "panel-embeddings", "panel-browse", "panel-training"]:
         stage.checks.append(Check(
             f"has {panel_id}",
             f'id="{panel_id}"' in html,
         ))
+
+    # Training tab must have renderTraining and drawCanvasChart
+    has_render_training = "function renderTraining" in html
+    stage.checks.append(Check(
+        "has renderTraining function",
+        has_render_training,
+        "defined" if has_render_training else "MISSING — training tab will be empty",
+    ))
+    has_canvas_chart = "function drawCanvasChart" in html
+    stage.checks.append(Check(
+        "has drawCanvasChart function",
+        has_canvas_chart,
+        "defined" if has_canvas_chart else "MISSING — charts will not render",
+    ))
+
+    # If training data is embedded, verify it has the right structure
+    has_ck_training = "CK_TRAINING" in html
+    stage.checks.append(Check(
+        "has CK_TRAINING embedded data",
+        has_ck_training,
+        "present" if has_ck_training else "null/missing (ok if no training run)",
+    ))
 
     # Must have attnColor function defined (the original bug was calling without definition)
     has_attn_def = "function attnColor" in html
@@ -474,6 +496,22 @@ def validate_ir_hub_structure(hub_path: Path) -> StageResult:
     stage.checks.append(Check(
         "has closing </html>",
         "</html>" in html,
+    ))
+
+    # Cross-run comparison: loss curve overlay function
+    has_loss_overlay = "drawHubLossOverlay" in html
+    stage.checks.append(Check(
+        "has loss curve overlay (drawHubLossOverlay)",
+        has_loss_overlay,
+        "present" if has_loss_overlay else "MISSING — compare panel will lack charts",
+    ))
+
+    # loss_curve_summary in run data
+    has_loss_summary = "loss_curve_summary" in html
+    stage.checks.append(Check(
+        "has loss_curve_summary in run data",
+        has_loss_summary,
+        "present" if has_loss_summary else "MISSING — compare panel will lack sparklines",
     ))
 
     stage.elapsed_sec = time.monotonic() - t0

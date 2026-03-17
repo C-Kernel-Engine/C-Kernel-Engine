@@ -445,6 +445,68 @@ def _extract_final_loss(path: Path | None) -> float | None:
     return None
 
 
+def _extract_loss_curve_summary(path: Path | None) -> dict[str, Any]:
+    """Extract a compact summary of the training loss curve for cross-run comparison.
+
+    Returns dict with start_loss, final_loss, total_steps, convergence_rate,
+    and a downsampled sparkline (max 50 points) for hub-level overlay charts.
+    """
+    empty: dict[str, Any] = {"available": False}
+    if path is None:
+        return empty
+    obj = _safe_read_json(path)
+    if not isinstance(obj, dict):
+        return empty
+    steps = obj.get("steps")
+    if not isinstance(steps, list) or len(steps) < 2:
+        return empty
+
+    first = steps[0]
+    last = steps[-1]
+    start_loss = None
+    final_loss = None
+    for key in ("loss_ck", "loss"):
+        if start_loss is None:
+            v = first.get(key)
+            if isinstance(v, (int, float)):
+                start_loss = float(v)
+        if final_loss is None:
+            v = last.get(key)
+            if isinstance(v, (int, float)):
+                final_loss = float(v)
+
+    if start_loss is None or final_loss is None:
+        return empty
+
+    total_steps = len(steps)
+    convergence_rate = (start_loss - final_loss) / total_steps if total_steps > 0 else 0.0
+    reduction = start_loss / final_loss if final_loss > 0 else 0.0
+
+    # Sparkline: downsample to ~50 points
+    spark = []
+    stride = max(1, total_steps // 50)
+    for i in range(0, total_steps, stride):
+        s = steps[i]
+        loss = s.get("loss_ck", s.get("loss"))
+        step_num = s.get("step", i)
+        if isinstance(loss, (int, float)):
+            spark.append({"s": step_num, "l": round(float(loss), 6)})
+    # Always include last point
+    if spark and spark[-1]["s"] != last.get("step"):
+        spark.append({"s": last.get("step", total_steps), "l": round(float(final_loss), 6)})
+
+    return {
+        "available": True,
+        "start_loss": round(start_loss, 6),
+        "final_loss": round(final_loss, 6),
+        "total_steps": total_steps,
+        "convergence_rate": round(convergence_rate, 8),
+        "reduction": round(reduction, 2),
+        "final_lr": float(last.get("lr", 0)) if isinstance(last.get("lr"), (int, float)) else None,
+        "sparkline": spark,
+    }
+
+
 def _extract_valid_svg_rate(path: Path | None) -> float | None:
     if path is None:
         return None
@@ -650,6 +712,7 @@ class RunRecord:
     dims: dict[str, Any]
     parity_regimen: dict[str, Any]
     final_loss: float | None
+    loss_curve_summary: dict[str, Any]
     valid_svg_rate: float | None
     checkpoint_count: int
     latest_checkpoint_step: int | None
@@ -702,6 +765,7 @@ class RunRecord:
             "dims": self.dims,
             "parity_regimen": self.parity_regimen,
             "final_loss": self.final_loss,
+            "loss_curve_summary": self.loss_curve_summary,
             "valid_svg_rate": self.valid_svg_rate,
             "checkpoint_count": self.checkpoint_count,
             "latest_checkpoint_step": self.latest_checkpoint_step,
@@ -953,6 +1017,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     weights_step, weights_reason = _extract_manifest_info(wm)
     parity_status = _extract_parity_regimen(parity)
     final_loss = _extract_final_loss(loss)
+    loss_curve_summary = _extract_loss_curve_summary(loss)
     valid_svg_rate = _extract_valid_svg_rate(post_eval)
     latest_ckpt_step, latest_ckpt_bump, latest_ckpt_manifest, ckpt_count = _latest_checkpoint(run_dir)
 
@@ -1020,6 +1085,7 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         dims=dims,
         parity_regimen=parity_status,
         final_loss=final_loss,
+        loss_curve_summary=loss_curve_summary,
         valid_svg_rate=valid_svg_rate,
         checkpoint_count=ckpt_count,
         latest_checkpoint_step=latest_ckpt_step,
@@ -3155,6 +3221,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
       const trainRows = collectRowsFromDefs(selected, [
         { label: 'Final Loss', get: (run) => run.final_loss },
+        { label: 'Start Loss', get: (run) => run.loss_curve_summary && run.loss_curve_summary.available ? run.loss_curve_summary.start_loss : null },
+        { label: 'Reduction', get: (run) => run.loss_curve_summary && run.loss_curve_summary.available ? run.loss_curve_summary.reduction + '\u00d7' : null },
+        { label: 'Total Steps', get: (run) => run.loss_curve_summary && run.loss_curve_summary.available ? run.loss_curve_summary.total_steps : null },
+        { label: 'Convergence Rate', get: (run) => run.loss_curve_summary && run.loss_curve_summary.available ? run.loss_curve_summary.convergence_rate : null },
+        { label: 'Final LR', get: (run) => run.loss_curve_summary && run.loss_curve_summary.available ? run.loss_curve_summary.final_lr : null },
         { label: 'Valid SVG Rate', get: (run) => run.validSvgRate },
         { label: 'Parity', get: (run) => run.parityStatus },
         { label: 'Weights Step', get: (run) => run.weightsStep },
@@ -3554,6 +3625,123 @@ def render_html(index_payload: dict[str, Any]) -> str:
 </html>`;
     }
 
+    // ── Loss Curve Overlay for Compare Panel ───────────────────────
+    const SPARK_COLORS = ['#f87171','#60a5fa','#4ade80','#fbbf24','#a78bfa','#2dd4bf','#fb923c','#e879f9'];
+
+    function buildLossCurveOverlay(selected) {
+      const withCurves = selected.filter(function(run) {
+        return run.loss_curve_summary && run.loss_curve_summary.available && run.loss_curve_summary.sparkline && run.loss_curve_summary.sparkline.length > 1;
+      });
+      if (withCurves.length === 0) return '';
+      var canvasId = 'hub-loss-overlay-' + Date.now();
+      setTimeout(function() { drawHubLossOverlay(canvasId, withCurves); }, 50);
+      return '<div class="compare-section"><h3>Loss Curve Overlay</h3>'
+        + '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;">'
+        + '<canvas id="' + canvasId + '" style="width:100%;height:250px;display:block;"></canvas>'
+        + '</div>'
+        + '<div class="compare-mini" style="margin-top:0.3rem;">' + withCurves.map(function(run, i) {
+            return '<span style="color:' + SPARK_COLORS[i % SPARK_COLORS.length] + ';">\u25cf ' + escapeHtml(run.name) + '</span>';
+          }).join(' &nbsp; ') + '</div>'
+        + '</div>';
+    }
+
+    function drawHubLossOverlay(canvasId, withCurves) {
+      var canvas = document.getElementById(canvasId);
+      if (!canvas || !canvas.getContext) return;
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var rect = canvas.getBoundingClientRect();
+      var W = rect.width || 500;
+      var H = rect.height || 250;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.scale(dpr, dpr);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+
+      var margin = {top: 24, right: 14, bottom: 32, left: 56};
+      var pw = W - margin.left - margin.right;
+      var ph = H - margin.top - margin.bottom;
+      if (pw <= 0 || ph <= 0) return;
+
+      // Compute global axis range across all runs
+      var xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      withCurves.forEach(function(run) {
+        run.loss_curve_summary.sparkline.forEach(function(pt) {
+          if (pt.s < xMin) xMin = pt.s;
+          if (pt.s > xMax) xMax = pt.s;
+          if (pt.l < yMin) yMin = pt.l;
+          if (pt.l > yMax) yMax = pt.l;
+        });
+      });
+      if (!Number.isFinite(xMin) || xMin === xMax) return;
+      if (yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
+
+      function toX(v) { return margin.left + ((v - xMin) / (xMax - xMin)) * pw; }
+      function toY(v) { return margin.top + (1 - (v - yMin) / (yMax - yMin)) * ph; }
+
+      // Background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 0.5;
+      for (var i = 0; i <= 5; i++) {
+        var y = margin.top + (i / 5) * ph;
+        ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(margin.left + pw, y); ctx.stroke();
+        var x = margin.left + (i / 5) * pw;
+        ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + ph); ctx.stroke();
+      }
+
+      // Axis labels
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+      for (var i = 0; i <= 5; i++) {
+        var v = yMax - (i / 5) * (yMax - yMin);
+        var label = v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v < 0.01 && v !== 0 ? v.toExponential(1) : v.toPrecision(3);
+        ctx.fillText(label, margin.left - 4, margin.top + (i / 5) * ph + 3);
+      }
+      ctx.textAlign = 'center';
+      for (var i = 0; i <= 5; i++) {
+        var v = xMin + (i / 5) * (xMax - xMin);
+        ctx.fillText(Math.round(v).toLocaleString(), margin.left + (i / 5) * pw, H - margin.bottom + 16);
+      }
+
+      // Title
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = 'bold 11px JetBrains Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('Loss Curve Overlay \u2014 Cross-Run Comparison', margin.left, margin.top - 8);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('step', margin.left + pw / 2, H - 2);
+
+      // Draw each run's sparkline
+      withCurves.forEach(function(run, idx) {
+        var spark = run.loss_curve_summary.sparkline;
+        var color = SPARK_COLORS[idx % SPARK_COLORS.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(toX(spark[0].s), toY(spark[0].l));
+        for (var i = 1; i < spark.length; i++) {
+          ctx.lineTo(toX(spark[i].s), toY(spark[i].l));
+        }
+        ctx.stroke();
+
+        // End-point dot with final loss label
+        var last = spark[spark.length - 1];
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(toX(last.s), toY(last.l), 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
     function renderComparePanel(filteredRuns) {
       const selected = selectedRuns();
       const seed = filteredRuns[0] || runs[0] || null;
@@ -3621,6 +3809,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 ${selected.map((run) => run.report_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">${escapeHtml(run.name)} report</a>` : `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">${escapeHtml(run.name)} run</a>`).join('')}
               </div>
             </div>
+            ${buildLossCurveOverlay(selected)}
           </div>
         </div>
       `;
