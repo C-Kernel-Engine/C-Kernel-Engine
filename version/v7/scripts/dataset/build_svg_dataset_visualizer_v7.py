@@ -124,6 +124,105 @@ def _json_for_embed(obj: Any) -> str:
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).replace("</", "<\\/")
 
 
+def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
+    """Detect structured-atoms workspace and synthesize normalized/classified equivalents.
+
+    Structured-atoms workspaces (spec06+) store training data as DSL text in
+    render_catalog.json rather than raw SVG files.  This function extracts
+    vocabulary (DSL tag frequency) and classification (layout/topic families)
+    data so the DV tabs render meaningful content.
+
+    Returns (normalized_equiv, classified_equiv) — empty dicts if not applicable.
+    """
+    # Find the generated manifest with render catalog
+    gen_dir = workspace / "manifests" / "generated" / "structured_atoms"
+    if not gen_dir.is_dir():
+        return {}, {}
+
+    catalog_files = list(gen_dir.glob("*_render_catalog.json"))
+    if not catalog_files:
+        return {}, {}
+
+    catalog = _load_json_if_exists(catalog_files[0])
+    if not catalog or not isinstance(catalog, list):
+        return {}, {}
+
+    # --- Synthesize normalized-like data (tag_totals, placeholder_totals) ---
+    tag_totals: dict[str, int] = {}
+    placeholder_totals: dict[str, int] = {}
+    for entry in catalog:
+        out = entry.get("output_tokens", "")
+        # Count DSL tag families: [tag:value] → tag
+        for m in re.finditer(r"\[(\w+):([^\]]*)\]", out):
+            tag_name = m.group(1)
+            tag_totals[tag_name] = tag_totals.get(tag_name, 0) + 1
+        # Count SVG tags if svg_xml present
+        svg_xml = entry.get("svg_xml", "")
+        if svg_xml:
+            for m in re.finditer(r"<(\w+)[\s/>]", svg_xml):
+                svg_tag = m.group(1).lower()
+                tag_totals[svg_tag] = tag_totals.get(svg_tag, 0) + 1
+
+    normalized = {
+        "schema": "ck.structured_atoms_synthesized.v1",
+        "normalized_entries": len(catalog),
+        "unique_normalized_hashes": len(catalog),
+        "duplicate_normalized_entries": 0,
+        "tag_totals": dict(sorted(tag_totals.items(), key=lambda kv: -kv[1])),
+        "placeholder_totals": placeholder_totals,
+        "normalized_root": str(gen_dir),
+    }
+
+    # --- Synthesize classified-like data (entries with family, roles) ---
+    entries = []
+    for i, entry in enumerate(catalog):
+        layout = entry.get("layout", "unknown")
+        topic = entry.get("topic", "unknown")
+        split = entry.get("split", "train")
+        prompt = entry.get("prompt", "")
+        out_tokens = entry.get("output_tokens", "")
+
+        # Extract DSL tag counts from output
+        entry_tags: dict[str, int] = {}
+        for m in re.finditer(r"<(\w+)[\s/>]", entry.get("svg_xml", "")):
+            t = m.group(1).lower()
+            entry_tags[t] = entry_tags.get(t, 0) + 1
+
+        chars = len(entry.get("svg_xml", "") or out_tokens)
+        entries.append({
+            "source_path": f"{layout}_{topic}_{i:04d}",
+            "normalized_path": "",
+            "family": layout,
+            "source_name": topic,
+            "split": split,
+            "chars": chars,
+            "size_band": "small" if chars < 500 else "medium" if chars < 2000 else "large",
+            "roles": [split],
+            "features": {"has_text": True, "has_color": True},
+            "tag_counts": entry_tags,
+            "placeholders": {},
+            "normalized_sha256": "",
+        })
+
+    classified = {
+        "schema": "ck.structured_atoms_classification.v1",
+        "entries": entries,
+        "counts": {
+            "total": len(entries),
+            "by_family": {},
+            "by_source": {},
+        },
+    }
+    # Compute by_family / by_source counts
+    for e in entries:
+        f = e["family"]
+        s = e["source_name"]
+        classified["counts"]["by_family"][f] = classified["counts"]["by_family"].get(f, 0) + 1
+        classified["counts"]["by_source"][s] = classified["counts"]["by_source"].get(s, 0) + 1
+
+    return normalized, classified
+
+
 def _build_gallery_items(classified: dict, workspace: Path) -> list[dict]:
     """Build gallery items with embedded SVG data-URIs from classification manifest."""
     items = []
@@ -2143,7 +2242,7 @@ function renderVocabulary() {
     const el = document.getElementById('panel-vocabulary');
     if (!Object.keys(tagTotals).length && !Object.keys(placeholders).length) {
         el.innerHTML = emptyTabHtml('🔤', 'No Vocabulary Data', 'Normalized SVG corpus not found. The vocabulary tab shows tag frequency analysis from normalized assets.', [
-            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace ' + ws,
+            'python3 version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace ' + ws,
             'python3 version/v7/tools/prepare_run_viewer.py ' + runDir + ' --force'
         ]);
         return;
@@ -2363,7 +2462,7 @@ function renderQuality() {
     const el = document.getElementById('panel-quality');
     if (!Object.keys(norm).length || (!norm.normalized_entries && !norm.duplicate_normalized_entries)) {
         el.innerHTML = emptyTabHtml('🔍', 'No Quality Data', 'Quality analysis requires a normalized corpus. No normalization data found.', [
-            'python3 version/v7/scripts/dataset/normalize_svg_dataset_v7.py --workspace ' + ws
+            'python3 version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace ' + ws
         ]);
         return;
     }
@@ -4322,6 +4421,14 @@ def main() -> int:
     raw_inventory = _load_json_if_exists(workspace / "manifests" / "raw_assets_inventory.json") or {}
     normalized = _load_json_if_exists(workspace / "manifests" / "normalized_assets_manifest.json") or {}
     classified = _load_json_if_exists(workspace / "manifests" / "asset_classification_manifest.json") or {}
+
+    # Structured-atoms fallback: synthesize from render catalog when no SVG manifests
+    if not normalized.get("normalized_entries") and not classified.get("entries"):
+        synth_norm, synth_cls = _synthesize_structured_atoms(workspace)
+        if synth_norm:
+            normalized = synth_norm
+        if synth_cls:
+            classified = synth_cls
 
     html_doc = build_html(workspace, raw_inventory, normalized, classified)
     output.parent.mkdir(parents=True, exist_ok=True)
