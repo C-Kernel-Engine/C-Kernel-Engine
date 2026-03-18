@@ -2,6 +2,10 @@
 
 This note captures the practical training approach for the infographic line after the exploratory `spec06 -> spec08` phase.
 
+For the stricter post-`spec10` production method, especially the `DSL != data` split, dummy-text asset mirroring, and the required HTML run-report contract, see:
+
+- [SVG_DSL_PRODUCTION_RUNBOOK_2026-03-17.md](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/SVG_DSL_PRODUCTION_RUNBOOK_2026-03-17.md)
+
 The older line answered:
 
 - can a small model learn a closed infographic contract at all?
@@ -64,6 +68,8 @@ Why this is mandatory:
 
 If automation ever backfills a missing probe report after a failed launch, treat that probe as diagnostic only.
 It is useful for triage, but it is not a promotable run result and should not be compared against baselines as if the training run completed normally.
+For scene/DSL evaluation, keep semantic end markers such as `[/scene]` in the adapter/parser layer rather than `decode.stop_on_text`.
+`scripts/ck_chat.py` returns text up to, but excluding, the matched stop string, which will make well-formed scene outputs look unterminated if the probe decoder stops on the structural close token itself.
 
 ## Training Contract
 
@@ -228,6 +234,37 @@ See:
 
 Do not generate training data before this phase is acceptable.
 
+Make this stricter than "directionally acceptable" before serious training:
+
+- use a gold pack of 5 to 10 assets, not just a couple of hero examples
+- cover at least comparison, poster, table-heavy, and pipeline families
+- publish a side-by-side HTML report and record the operator judgment
+- treat failure here as a compiler/DSL problem, not a model problem
+
+### Phase C2: Token Granularity
+
+After the structure/content split is proven, token granularity becomes its own explicit experiment.
+
+Do not leave whole component rows as the permanent atomic token surface if they still look like:
+
+```text
+[compare_bar:@compare_bar.0.label|@compare_bar.0.value|@compare_bar.0.caption|accent=amber|note=@compare_bar.0.note]
+```
+
+Prefer a smaller compositional boundary such as:
+
+```text
+[compare_bar]
+[label_ref:compare_bar.0.label]
+[value_ref:compare_bar.0.value]
+[caption_ref:compare_bar.0.caption]
+[accent:amber]
+[note_ref:compare_bar.0.note]
+[/compare_bar]
+```
+
+That should be a dedicated run question, not a side effect of changing the compiler, asset pack, and model size all at once.
+
 ### Phase D: Variant Generation
 
 Once the gold reconstructions are good enough, generate controlled variants:
@@ -242,6 +279,14 @@ Once the gold reconstructions are good enough, generate controlled variants:
 Important rule:
 
 - keep the compiled output visually inside the same design language as the gold assets
+
+Also generate negative repair variants, not just positive variants:
+
+- wrong layout -> corrected layout
+- wrong component order -> corrected order
+- missing required component -> corrected scene
+- wrong theme/tone -> corrected scene
+- parseable but semantically wrong scene -> corrected scene
 
 ### Phase E: Training Corpora
 
@@ -318,6 +363,7 @@ Training should be promoted only if it passes all of these:
 - scene exact or canonical-equivalent match
 - materialized exact where exact equivalence is appropriate
 - held-out content binding success
+- gold-asset parity / reconstruction acceptance
 - renderability must remain `100%`
 
 ### Product Gates
@@ -354,9 +400,12 @@ Before a serious run, we still need:
 The next practical sequence should be:
 
 1. keep expanding and tightening the `spec09` gold asset bridge
-2. define the `spec10` materializer contract
-3. emit a small real dataset with content JSON included
-4. run preflight and a tiny canary
-5. only then launch a serious training run
+2. prove the keyed structure/content split on a stable compiler boundary
+3. run a dedicated token-granularity spec after that split is proven
+4. emit a small real dataset with content JSON included
+5. run preflight and a tiny canary
+6. only then launch a serious training run
+
+Do not scale the model size before compiler fidelity and token granularity are both proven. Representation quality and dataset shape are the active bottlenecks first.
 
 That gives us a much better chance of spending compute on the right target.

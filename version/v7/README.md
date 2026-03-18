@@ -84,6 +84,7 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   Do not place generated HTML, ad hoc analysis pages, or one-off machine-produced reports there; put those under the relevant cache run directory or under `~/.cache/ck-engine-v7/models/reports/` for cross-run generated analysis.
   Run-family progression dashboards such as `spec06 r1 -> rN` summaries are cross-run generated analysis too, so they belong under `~/.cache/ck-engine-v7/models/reports/` until there is a dedicated first-class family dashboard.
   If a monitor or progression script backfills a missing probe after a failed launch, treat that probe as a diagnostic artifact only, not as a canonical completed-run result.
+  For scene/DSL probes, do not use semantic closers like `[/scene]` as `decode.stop_on_text`; `scripts/ck_chat.py` strips matched stop text from the returned response, so the probe adapter should own truncation at structural end markers instead.
 - When bootstrapping a new training run, prefer `python3 version/v7/scripts/ck_run_v7.py init --run-name <name> ...`.
   In general, let the tool choose the default cache location and provide only the run name; use `--run <path>` only when you intentionally need a nonstandard location.
 - `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
@@ -98,6 +99,18 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   `reports/SPEC09_BACKWARD_DESIGN_PLAN_2026-03-17.md`,
   `reports/SPEC09_SCENE_DSL_V2_GRAMMAR_2026-03-17.md`, and
   `reports/SPEC10_DSL_TRAINING_PLAYBOOK_2026-03-17.md`.
+- Post-`spec10` production method for separating DSL from content/data and standardizing per-run HTML reporting:
+  `reports/SVG_DSL_PRODUCTION_RUNBOOK_2026-03-17.md`.
+  Public checklist page:
+  `docs/site/_pages/spec-training-method.html`.
+- `spec11` is the first keyed scene line:
+  train the model on scene structure only, keep visible text/data in `content_json`,
+  and let the compiler blend `scene DSL + content_json -> SVG`.
+  Canonical entrypoints:
+  `scripts/generate_svg_structured_spec11_v7.py`,
+  `scripts/dataset/materialize_spec11_scene_dsl_v7.py`,
+  `scripts/spec11_preflight_v7.py`,
+  `scripts/spec11_pretrain_midtrain_v7.sh`.
 - `v7-validate-contracts` now verifies that training-required kernels are both registered and bound in
   `kernel_maps/KERNEL_REGISTRY.json` and `kernel_maps/kernel_bindings.json`.
 - `v7-train-ir-smoke` defaults to strict unresolved policy (`V7_TRAIN_STRICT_UNRESOLVED=1`) and

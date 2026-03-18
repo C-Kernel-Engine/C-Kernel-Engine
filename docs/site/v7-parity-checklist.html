@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> | C-Kernel-Engine</title>
+    <title>v7TrainingParityChecklist | C-Kernel-Engine</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -932,55 +932,168 @@
         </nav>
     </header>
     <main>
----
-layout: default
-title: v7 Training Parity Checklist
----
 
-# v7 Training Parity Checklist
+<style>
+.checklist-hero {
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1.15rem 1.2rem;
+    background: linear-gradient(145deg, rgba(255,180,0,0.10), rgba(7,173,248,0.06));
+    box-shadow: var(--shadow-sm);
+}
 
-Use this checklist as the operator gate for runbook execution readiness.
+.checklist-intro {
+    color: var(--text-secondary);
+    max-width: 960px;
+}
 
-## Scope
+.criteria-grid,
+.touchpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.9rem;
+    margin: 1rem 0 1.8rem 0;
+}
 
-This checklist answers one operational question:
-"Can I proceed with the v7 training/inference runbook flow on this run directory?"
+.criteria-card,
+.touchpoint-card {
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 0.95rem;
+    background: var(--dark-card);
+}
 
-Current GO criteria:
-- `dataset_qc.json` is pass.
-- `tokenizer_roundtrip.json` has `exact_match == true`.
-- `D1/E1/F1` are pass in parity regimen.
-- canary parity gate (`row1`/`row2`) is pass.
+.criteria-card h3,
+.touchpoint-card h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+}
 
-Caveat:
-- `A1/A2` may still fail today.
-- Treat `A1/A2` as an active kernel-harness bug track (currently suspected around SwiGLU harness path), separate from runbook execution readiness.
+.criteria-card p,
+.touchpoint-card p,
+.mini-note {
+    color: var(--text-secondary);
+}
 
-## 0) Set Run Path
+.alert-card {
+    margin: 1rem 0 1.5rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border-left: 4px solid #e67e22;
+    background: rgba(230,126,34,0.10);
+}
 
-```bash
-export RUN="$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1_seq128"
-cd /home/antshiv/Workspace/C-Kernel-Engine
-```
+.go-card {
+    margin: 1rem 0 1.8rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--green);
+    background: rgba(71,180,117,0.10);
+}
 
-## 1) Dataset + Tokenizer Gates
+.nogo-card {
+    margin: 1rem 0 1.8rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 10px;
+    border-left: 4px solid #e74c3c;
+    background: rgba(231,76,60,0.10);
+}
 
-```bash
-jq '{status, checks, non_empty_lines, path}' "$RUN/dataset_qc.json"
-jq '{status, exact_match, line_eval, tokenizer_json_path}' "$RUN/tokenizer_roundtrip.json"
-```
+.section-kicker {
+    display: inline-block;
+    margin-bottom: 0.45rem;
+    padding: 0.16rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255,180,0,0.14);
+    color: var(--orange);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
 
-Pass criteria:
-- `dataset_qc.status == "pass"`
-- `tokenizer_roundtrip.status == "pass"`
-- `tokenizer_roundtrip.exact_match == true`
+.command-card {
+    margin: 0.8rem 0 1.4rem 0;
+}
 
-## 2) Canary Parity Gate (row1/row2)
+.command-card pre {
+    margin: 0;
+}
 
-Run Step 3.1 from the runbook, then verify pass lines:
+.step-list {
+    margin: 0.75rem 0 1.8rem 1.15rem;
+}
 
-```bash
-python3 - <<'PY'
+.step-list li {
+    margin-bottom: 0.4rem;
+    color: var(--text-secondary);
+}
+</style>
+
+<div class="checklist-hero">
+    <span class="section-kicker">Operator Gate</span>
+    <h1>v7 Training Parity Checklist</h1>
+    <p class="checklist-intro">
+        Use this checklist as the operator gate for runbook execution readiness. It answers one operational question:
+        <strong>can the runbook proceed on this run directory right now?</strong>
+    </p>
+</div>
+
+<h2>Scope</h2>
+
+<p>This checklist is for runbook readiness, not final numerical signoff.</p>
+
+<div class="criteria-grid">
+    <div class="criteria-card">
+        <h3>Dataset Gate</h3>
+        <p><code>dataset_qc.json</code> must be present and pass.</p>
+    </div>
+    <div class="criteria-card">
+        <h3>Tokenizer Gate</h3>
+        <p><code>tokenizer_roundtrip.json</code> must report <code>exact_match == true</code>.</p>
+    </div>
+    <div class="criteria-card">
+        <h3>Parity Regimen Gate</h3>
+        <p><code>D1</code>, <code>E1</code>, and <code>F1</code> must pass in the latest regimen summary.</p>
+    </div>
+    <div class="criteria-card">
+        <h3>Canary Gate</h3>
+        <p>The <code>row1</code>/<code>row2</code> parity canary must pass.</p>
+    </div>
+</div>
+
+<div class="alert-card">
+    <strong>Caveat:</strong> <code>A1/A2</code> may still fail today. Treat those as an active kernel-harness bug track,
+    currently suspected around the SwiGLU harness path, separate from runbook execution readiness.
+</div>
+
+<h2>0) Set Run Path</h2>
+
+<div class="card command-card">
+<pre>export RUN="$HOME/.cache/ck-engine-v7/models/train/v7_svg_assets_bpe_l24_full_e1_seq128"
+cd /home/antshiv/Workspace/C-Kernel-Engine</pre>
+</div>
+
+<h2>1) Dataset + Tokenizer Gates</h2>
+
+<div class="card command-card">
+<pre>jq '{status, checks, non_empty_lines, path}' "$RUN/dataset_qc.json"
+jq '{status, exact_match, line_eval, tokenizer_json_path}' "$RUN/tokenizer_roundtrip.json"</pre>
+</div>
+
+<p>Pass criteria:</p>
+<ul class="step-list">
+    <li><code>dataset_qc.status == "pass"</code></li>
+    <li><code>tokenizer_roundtrip.status == "pass"</code></li>
+    <li><code>tokenizer_roundtrip.exact_match == true</code></li>
+</ul>
+
+<h2>2) Canary Parity Gate (row1/row2)</h2>
+
+<p>Run Step 3.1 from the main runbook, then verify pass lines:</p>
+
+<div class="card command-card">
+<pre>python3 - &lt;&lt;'PY'
 import json
 import os
 from pathlib import Path
@@ -1016,45 +1129,45 @@ for idx in (1, 2):
     max_abs = max(diffs)
     mean_abs = mean(diffs)
     final_param = float(ck.get("final_param_max_abs_diff", 1.0))
-    passed = max_abs <= TH_MAX and mean_abs <= TH_MEAN and final_param <= TH_PARAM
+    passed = max_abs &lt;= TH_MAX and mean_abs &lt;= TH_MEAN and final_param &lt;= TH_PARAM
     print(f"[row{idx}] max_abs={max_abs:.6e} mean_abs={mean_abs:.6e} final_param={final_param:.6e} pass={passed}")
     ok = ok and passed
 print("CANARY_PARITY_GATE=PASS" if ok else "CANARY_PARITY_GATE=FAIL")
-PY
-```
+PY</pre>
+</div>
 
-## 3) Run Full Parity Regimen (for D1/E1/F1 evidence)
+<h2>3) Run Full Parity Regimen</h2>
 
-```bash
-python3 version/v7/scripts/run_training_parity_regimen_v7.py \
+<div class="card command-card">
+<pre>python3 version/v7/scripts/run_training_parity_regimen_v7.py \
   --run-dir "$RUN" \
-  --force
-```
+  --force</pre>
+</div>
 
-Inspect summary:
+<p>Inspect summary:</p>
 
-```bash
-jq '.summary' "$RUN/training_parity_regimen_latest.json"
-```
+<div class="card command-card">
+<pre>jq '.summary' "$RUN/training_parity_regimen_latest.json"</pre>
+</div>
 
-Inspect stage table quickly:
+<p>Inspect stage table quickly:</p>
 
-```bash
-jq '.stages[] | {id,name,status,metrics,artifact_json,artifact_log}' \
-  "$RUN/training_parity_regimen_latest.json"
-```
+<div class="card command-card">
+<pre>jq '.stages[] | {id,name,status,metrics,artifact_json,artifact_log}' \
+  "$RUN/training_parity_regimen_latest.json"</pre>
+</div>
 
-Check generated-runtime stages:
+<p>Check generated-runtime stages:</p>
 
-```bash
-jq '.stages[] | select(.id=="D1" or .id=="E1" or .id=="F1") | {id,status,metrics}' \
-  "$RUN/training_parity_regimen_latest.json"
-```
+<div class="card command-card">
+<pre>jq '.stages[] | select(.id=="D1" or .id=="E1" or .id=="F1") | {id,status,metrics}' \
+  "$RUN/training_parity_regimen_latest.json"</pre>
+</div>
 
-## 4) One-Shot GO Evaluation
+<h2>4) One-Shot GO Evaluation</h2>
 
-```bash
-python3 - <<'PY'
+<div class="card command-card">
+<pre>python3 - &lt;&lt;'PY'
 import json
 import os
 from pathlib import Path
@@ -1094,68 +1207,86 @@ checks["canary_row1_row2_pass"] = row_pass(1) and row_pass(2)
 go = all(checks.values())
 print(json.dumps({"GO": go, "checks": checks}, indent=2))
 print("GO_EVIDENCE=PASS" if go else "GO_EVIDENCE=FAIL")
-PY
-```
+PY</pre>
+</div>
 
-## 5) A1/A2 Caveat and Bug Track
+<h2>5) A1/A2 Caveat and Bug Track</h2>
 
-Backend xray is produced by the same regimen run:
+<p>Backend xray is produced by the same regimen run:</p>
 
-```bash
-jq '.summary, .improvement' "$RUN/regimen_backend_xray.json"
-```
+<div class="card command-card">
+<pre>jq '.summary, .improvement' "$RUN/regimen_backend_xray.json"</pre>
+</div>
 
-Read suspected source:
+<p>Read suspected source:</p>
 
-```bash
-jq '.summary.suspected_source, .summary.rationale' "$RUN/regimen_backend_xray.json"
-```
+<div class="card command-card">
+<pre>jq '.summary.suspected_source, .summary.rationale' "$RUN/regimen_backend_xray.json"</pre>
+</div>
 
-Inspect first-step gradient drift:
+<p>Inspect first-step gradient drift:</p>
 
-```bash
-jq '{step, global_max_abs_diff, global_mean_abs_diff, worst_tensor, top5: (.per_tensor|sort_by(-.max_abs_diff)|.[0:5])}' \
-  "$RUN/regimen_debug_step_grads/step_00000001_grad_diff_summary.json"
-```
+<div class="card command-card">
+<pre>jq '{step, global_max_abs_diff, global_mean_abs_diff, worst_tensor, top5: (.per_tensor|sort_by(-.max_abs_diff)|.[0:5])}' \
+  "$RUN/regimen_debug_step_grads/step_00000001_grad_diff_summary.json"</pre>
+</div>
 
-Interpretation:
-- `A1/A2` failing does **not** block runbook execution readiness under this checklist.
-- `A1/A2` still blocks strict kernel-harness parity signoff.
-- Track/fix `A1/A2` in parallel while continuing operator runbook validation.
+<p>Interpretation:</p>
+<ul class="step-list">
+    <li><code>A1/A2</code> failing does <strong>not</strong> block runbook execution readiness under this checklist.</li>
+    <li><code>A1/A2</code> still blocks strict kernel-harness parity signoff.</li>
+    <li>Track and fix <code>A1/A2</code> in parallel while continuing operator runbook validation.</li>
+</ul>
 
-## 6) Operator Code Touchpoints
+<h2>6) Operator Code Touchpoints</h2>
 
-When diagnosing A1/A2:
+<div class="touchpoint-grid">
+    <div class="touchpoint-card">
+        <h3>Regimen orchestration</h3>
+        <p><code>version/v7/scripts/run_training_parity_regimen_v7.py</code></p>
+    </div>
+    <div class="touchpoint-card">
+        <h3>CK/PyTorch parity harness</h3>
+        <p><code>version/v7/scripts/train_parity_epochs_v7.py</code></p>
+    </div>
+    <div class="touchpoint-card">
+        <h3>RMSNorm kernels</h3>
+        <p><code>src/kernels/rmsnorm_kernels.c</code></p>
+    </div>
+    <div class="touchpoint-card">
+        <h3>SwiGLU kernels</h3>
+        <p><code>src/kernels/swiglu_kernels.c</code></p>
+    </div>
+</div>
 
-- Regimen orchestration:
-  - `version/v7/scripts/run_training_parity_regimen_v7.py`
-- CK/PyTorch parity harness:
-  - `version/v7/scripts/train_parity_epochs_v7.py`
-- RMSNorm kernels:
-  - `src/kernels/rmsnorm_kernels.c`
-- SwiGLU kernels:
-  - `src/kernels/swiglu_kernels.c`
+<h2>7) Go / No-Go</h2>
 
-## 7) Go / No-Go
+<div class="go-card">
+    <strong>GO</strong> for runbook execution readiness if all four criteria pass:
+    <ul class="step-list">
+        <li>dataset QC pass</li>
+        <li>tokenizer exact roundtrip pass</li>
+        <li><code>D1/E1/F1</code> pass</li>
+        <li>canary <code>row1/row2</code> pass</li>
+    </ul>
+</div>
 
-`GO` for runbook execution readiness if all four criteria pass:
-- dataset QC pass,
-- tokenizer exact roundtrip pass,
-- D1/E1/F1 pass,
-- canary row1/row2 pass.
+<div class="nogo-card">
+    <strong>NO-GO</strong> if any of the four fail. Strict kernel-harness parity signoff remains separate and still
+    requires <code>A1/A2</code> closure.
+</div>
 
-`NO-GO` if any of the four fail.
+<h2>8) Exploratory Training</h2>
 
-Strict kernel-harness parity signoff remains separate and still requires `A1/A2` closure.
+<p>Exploratory means:</p>
+<ul class="step-list">
+    <li>training is functional and loss can decrease</li>
+    <li>outputs can improve</li>
+    <li>CK-vs-PyTorch numerical equivalence is not guaranteed over horizon</li>
+    <li>behavior and regression conclusions are therefore provisional</li>
+</ul>
 
-## 8) Exploratory Training (what it means)
-
-Exploratory means:
-- training is functional (loss can decrease, outputs can improve),
-- but CK-vs-PyTorch numerical equivalence is not guaranteed over horizon,
-- so behavior/regression conclusions are provisional.
-
-Use exploratory only for idea testing, not final parity claims.
+<p class="mini-note">Use exploratory mode for idea testing, not for final parity claims.</p>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1384,7 +1515,7 @@ Use exploratory only for idea testing, not final parity claims.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-17</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-18</p>
             </div>
         </div>
     </footer>

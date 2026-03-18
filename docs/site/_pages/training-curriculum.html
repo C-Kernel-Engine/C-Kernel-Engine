@@ -423,6 +423,9 @@
         <p>Use compiler-backed datasets to learn data shaping and evaluation.</p>
         <ul>
             <li>Push scene DSL work from structured SVG toward richer compiler-owned visual vocabularies.</li>
+            <li>Treat compiler fidelity on a gold asset pack as a hard gate before serious training.</li>
+            <li>Make token granularity its own explicit spec step after structure/content separation is proven.</li>
+            <li>Add negative correction pairs, not just positive rows, so the model learns how to recover from wrong-but-parseable scenes.</li>
             <li>Add page-level DSL work that can later lower into Databoard or other structured web surfaces.</li>
             <li>Make preflight, canary, and non-regression gates mandatory.</li>
         </ul>
@@ -483,8 +486,8 @@
         <tr>
             <td>Visual DSL</td>
             <td>Compiler-backed SVG scene contracts</td>
-            <td>Representation design, slot structure, compiler ownership, renderable probes</td>
-            <td>Exact DSL match, materialized SVG match, renderability, family non-regression</td>
+            <td>Representation design, slot structure, compiler ownership, token-granularity design, negative repair curriculum, renderable probes</td>
+            <td>Exact DSL match, materialized SVG match, renderability, content binding success, gold-asset parity, family non-regression</td>
         </tr>
         <tr>
             <td>Page DSL</td>
@@ -605,6 +608,11 @@
         <p>Materialize rows, token budgets, holdouts, and canaries before touching model size.</p>
     </div>
     <div class="ops-step">
+        <div class="ops-num">2b</div>
+        <h3>Check token granularity</h3>
+        <p>Use explicit structural tokens early if the contract is tiny and formal, but treat whole component-row tokens as a temporary control tactic. Once the DSL stabilizes, run a dedicated token-granularity step that breaks them into a smaller compositional grammar.</p>
+    </div>
+    <div class="ops-step">
         <div class="ops-num">3</div>
         <h3>Run small first</h3>
         <p>Canary the format, verify render/build/test behavior, then launch the real run.</p>
@@ -612,12 +620,12 @@
     <div class="ops-step">
         <div class="ops-num">4</div>
         <h3>Inspect real evidence</h3>
-        <p>Use probes, replay, checkpoints, diffs, and profiler output. Do not trust loss alone.</p>
+        <p>Use probes, replay, checkpoints, gold-asset compiler reports, diffs, and profiler output. Do not trust loss alone.</p>
     </div>
     <div class="ops-step">
         <div class="ops-num">5</div>
         <h3>Repair the right layer</h3>
-        <p>Fix representation, data, runtime, or capacity based on evidence, not instinct.</p>
+        <p>Fix representation, data, compiler, runtime, or capacity based on evidence, not instinct. Add richer negative rows when the model is parseable but semantically wrong.</p>
     </div>
     <div class="ops-step">
         <div class="ops-num">6</div>
@@ -639,6 +647,10 @@
     <a class="resource-card" href="v7-training-progression-playbook.html">
         <h3>v7 Training Progression Playbook</h3>
         <p>The current multi-track progression document for SVG, routing, and code experiments.</p>
+    </a>
+    <a class="resource-card" href="spec-training-method.html">
+        <h3>Spec Training Method</h3>
+        <p>The method page for separating asset libraries, DSLs, compilers, token boundaries, and per-run report decisions.</p>
     </a>
     <a class="resource-card" href="training-intuition.html">
         <h3>Training Intuition</h3>
