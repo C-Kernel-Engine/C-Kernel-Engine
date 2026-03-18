@@ -219,7 +219,7 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
             "split": split,
             "chars": chars,
             "size_band": "small" if chars < 500 else "medium" if chars < 2000 else "large",
-            "roles": [topic, split],
+            "roles": [topic],
             "features": {"has_text": True, "has_color": True},
             "tag_counts": entry_tags,
             "placeholders": {},
@@ -1906,6 +1906,8 @@ const fmt = n => n == null ? '—' : typeof n === 'number' ? n.toLocaleString() 
 const pct = (n,t) => t ? (n/t*100).toFixed(1)+'%' : '0%';
 const fmtPct = (n, digits) => n == null ? '—' : (n*100).toFixed(digits == null ? 1 : digits) + '%';
 const esc = s => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+// escAttr: safe for HTML attribute values — also escapes quotes
+const escAttr = s => esc(String(s||'')).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const trunc = (s,n) => { s=String(s||''); return s.length>n ? s.slice(0,n)+'…' : s; };
 const pathName = p => String(p||'').split('/').pop();
 
@@ -1933,7 +1935,7 @@ function distBarsHtml(countsObj, total, baseColor) {
         const w = (count/max*100).toFixed(1);
         const c = PAL[i % PAL.length] || baseColor;
         return `<div class="dist-row">
-            <span class="dist-label" title="${esc(name)}">${esc(name)}</span>
+            <span class="dist-label" title="${escAttr(name)}">${esc(name)}</span>
             <div class="dist-bar-bg"><div class="dist-bar-fill" style="width:${w}%;background:${c}"><span>${pct(count,total)}</span></div></div>
             <span class="dist-count">${fmt(count)}</span>
         </div>`;
@@ -1993,7 +1995,7 @@ class CKTable {
         if (!container) return;
 
         // Build search input
-        let html = `<input type="text" class="ck-table-search" placeholder="Search..." value="${esc(this.state.searchQuery)}">`;
+        let html = `<input type="text" class="ck-table-search" placeholder="Search..." value="${escAttr(this.state.searchQuery)}">`;
         
         // Build table
         html += '<div style="overflow-x:auto;border:1px solid var(--grey);border-radius:6px;"><table class="table"><thead><tr>';
@@ -2220,7 +2222,13 @@ function filteredEntries() {
         );
     }
     if (state.filterFamily) rows = rows.filter(r => r.family === state.filterFamily);
-    if (state.filterRole)   rows = rows.filter(r => (r.roles||[]).includes(state.filterRole));
+    if (state.filterRole) {
+        if (isSynthesized) {
+            rows = rows.filter(r => r.source_name === state.filterRole);
+        } else {
+            rows = rows.filter(r => (r.roles||[]).includes(state.filterRole));
+        }
+    }
     return rows;
 }
 
@@ -2564,11 +2572,11 @@ function renderBrowse() {
         }},
         { key: 'family', label: isSynthesized ? 'Layout' : 'Family', render: r => {
             var desc = familyDescs[r.family] || '';
-            return `<span style="color:var(--purple)" ${desc ? 'title="'+esc(desc)+'"' : ''}>${esc(r.family||'—')}${desc ? ' ℹ️' : ''}</span>`;
+            return `<span style="color:var(--purple)" ${desc ? 'title="'+escAttr(desc)+'"' : ''}>${esc(r.family||'—')}${desc ? ' ℹ️' : ''}</span>`;
         }},
         { key: 'source_name', label: 'Topic', render: r => {
             var desc = sourceDescs[r.source_name] || '';
-            return `<span style="color:var(--orange)" ${desc ? 'title="'+esc(desc)+'"' : ''}>${esc(r.source_name||'—')}</span>`;
+            return `<span style="color:var(--orange)" ${desc ? 'title="'+escAttr(desc)+'"' : ''}>${esc(r.source_name||'—')}</span>`;
         }},
         { key: 'chars',  label: 'Chars',  render: r => `<span class="mono">${fmt(r.chars||0)}</span>` },
         { key: 'size_band', label: 'Size Band', render: r => `<span class="mono">${esc(r.size_band||'—')}</span>` },
@@ -2766,19 +2774,26 @@ function populateFilters() {
     const families = new Set(), roles = new Set();
     classEntries.forEach(e => {
         if (e.family) families.add(e.family);
-        (e.roles||[]).forEach(r => roles.add(r));
+        if (isSynthesized) {
+            // For synthesized: use source_name (topic) for the topic filter, skip split labels
+            if (e.source_name) roles.add(e.source_name);
+        } else {
+            (e.roles||[]).forEach(r => roles.add(r));
+        }
     });
     const famEl = document.getElementById('filterFamily');
     const roleEl = document.getElementById('filterRole');
     var famLabel = isSynthesized ? 'All layouts' : 'All families';
     var roleLabel = isSynthesized ? 'All topics' : 'All roles';
-    famEl.innerHTML = '<option value="">' + famLabel + '</option>' + [...families].sort().map(f => {
+    famEl.innerHTML = '<option value="">' + famLabel + '</option>' + [...families].sort().map(function(f) {
         var desc = familyDescs[f];
-        return '<option value="' + esc(f) + '" ' + (desc ? 'title="' + esc(desc) + '"' : '') + '>' + esc(f) + (desc ? ' — ' + esc(desc.split('—')[0].trim()) : '') + '</option>';
+        var label = f + (desc ? ' \u2014 ' + desc.split('\u2014')[0].trim() : '');
+        return '<option value="' + escAttr(f) + '"' + (desc ? ' title="' + escAttr(desc) + '"' : '') + '>' + esc(label) + '</option>';
     }).join('');
-    roleEl.innerHTML = '<option value="">' + roleLabel + '</option>' + [...roles].sort().map(r => {
+    roleEl.innerHTML = '<option value="">' + roleLabel + '</option>' + [...roles].sort().map(function(r) {
         var desc = sourceDescs[r];
-        return '<option value="' + esc(r) + '">' + esc(r) + (desc ? ' — ' + esc(desc) : '') + '</option>';
+        var label = r + (desc ? ' \u2014 ' + desc : '');
+        return '<option value="' + escAttr(r) + '">' + esc(label) + '</option>';
     }).join('');
 }
 
@@ -2850,9 +2865,9 @@ function renderGalleryGrid() {
         return;
     }
     grid.innerHTML = galState.filtered.map((item, i) => `
-        <div class="gal-card" onclick="galViewer.open(${i})" title="${esc(item.name)}">
+        <div class="gal-card" onclick="galViewer.open(${i})" title="${escAttr(item.name)}">
             <div class="gal-thumb">
-                <img src="${item.data_uri}" alt="${esc(item.name)}" loading="lazy">
+                <img src="${item.data_uri}" alt="${escAttr(item.name)}" loading="lazy">
                 <span class="gal-badge fam-${item.family}">${item.family}</span>
             </div>
             <div class="gal-info">
@@ -2957,7 +2972,7 @@ function renderTextSamples() {
         html += `<button class="dt-split-pill ${active}" data-dtkey="${esc(k)}">${esc(s.split)} <span style="opacity:0.6">${fmt(s.total_rows)}</span></button>`;
     });
     html += '</div>';
-    html += '<input type="text" class="dt-search" id="dtSearch" placeholder="Search rows…" value="' + esc(dtState.search) + '">';
+    html += '<input type="text" class="dt-search" id="dtSearch" placeholder="Search rows…" value="' + escAttr(dtState.search) + '">';
     html += '<div class="dt-meta" id="dtMeta"></div>';
     html += '</div>';
 
@@ -3720,7 +3735,7 @@ function renderAttnTokenChips() {
     const chips = seq.tokens.map((t, i) => {
         const isPred = seq.top_preds && i > 0 && seq.top_preds[i-1] === seq.token_ids[i];
         const dot = isPred ? '<span style="color:var(--green);margin-right:3px" title="next-tok correct">✓</span>' : '';
-        return '<span class="attn-tok-chip" title="id=' + (seq.token_ids ? seq.token_ids[i] : i) + '">' + dot + esc(t) + '</span>';
+        return '<span class="attn-tok-chip" title="id=' + escAttr(seq.token_ids ? seq.token_ids[i] : i) + '">' + dot + esc(t) + '</span>';
     }).join('');
     el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Tokens (L=' + seq.tokens.length + '):</div>' + chips;
 }
@@ -3920,7 +3935,7 @@ function renderAttnMain() {
                 for (let ti = 0; ti < tokens.length; ti++) {
                     const ep = Math.min(1, entropies[ti] / maxLogL);
                     const c = attnColor(1 - ep, 'orange');
-                    html += '<div title="' + esc(tokens[ti]) + ': ' + entropies[ti].toFixed(3) + ' bits" style="display:inline-block;width:10px;height:10px;margin:1px;border-radius:2px;background:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')"></div>';
+                    html += '<div title="' + escAttr(tokens[ti]) + ': ' + entropies[ti].toFixed(3) + ' bits" style="display:inline-block;width:10px;height:10px;margin:1px;border-radius:2px;background:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')"></div>';
                 }
                 html += '</div></div>';
             }
