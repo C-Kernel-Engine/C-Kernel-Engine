@@ -978,14 +978,44 @@
     color: var(--text-secondary);
 }
 
-.triad-grid,
-.report-grid,
-.phase-grid,
+.triad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+    margin: 1.2rem 0 2rem 0;
+}
+
+.report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin: 1.2rem 0 2rem 0;
+    max-width: 1200px;
+}
+
+.phase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+    margin: 1.2rem 0 2rem 0;
+    max-width: 1200px;
+}
+
 .decision-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1rem;
-    margin: 1rem 0 1.8rem 0;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.2rem;
+    margin: 1.2rem 0 2rem 0;
+    max-width: 1000px;
+}
+
+@media (max-width: 900px) {
+    .triad-grid,
+    .report-grid,
+    .phase-grid,
+    .decision-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .triad-card,
@@ -994,7 +1024,7 @@
 .decision-card {
     border: 1px solid var(--grey);
     border-radius: 12px;
-    padding: 1rem;
+    padding: 1.25rem 1.3rem;
     background: linear-gradient(155deg, rgba(255,255,255,0.02), rgba(7,173,248,0.05));
     box-shadow: var(--shadow-sm);
 }
@@ -1032,9 +1062,10 @@
 
 .flow-strip {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.85rem;
-    margin: 1rem 0 1.8rem 0;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0 2rem 0;
+    max-width: 1200px;
 }
 
 .flow-step {
@@ -1072,7 +1103,10 @@
 .report-table {
     width: 100%;
     border-collapse: collapse;
-    margin: 1rem 0 1.8rem 0;
+    margin: 1.2rem 0 2rem 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--grey);
 }
 
 .axis-table th,
@@ -1080,9 +1114,10 @@
 .report-table th,
 .report-table td {
     border-bottom: 1px solid var(--grey);
-    padding: 0.75rem 0.8rem;
+    padding: 0.9rem 1rem;
     text-align: left;
     vertical-align: top;
+    line-height: 1.5;
 }
 
 .axis-table th,
@@ -1090,6 +1125,20 @@
     color: var(--orange);
     background: var(--dark-card);
     font-size: 0.84rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 0.75rem 1rem;
+}
+
+.axis-table tbody tr:nth-child(even),
+.report-table tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+.axis-table tbody tr:hover,
+.report-table tbody tr:hover {
+    background: rgba(7,173,248,0.06);
 }
 
 .axis-table td,
@@ -1100,9 +1149,30 @@
 
 .axis-table td:first-child,
 .report-table td:first-child {
-    white-space: nowrap;
     color: var(--text-primary);
     font-weight: 600;
+    min-width: 180px;
+}
+
+@media (min-width: 901px) {
+    .axis-table td:first-child,
+    .report-table td:first-child {
+        white-space: nowrap;
+    }
+}
+
+/* Highlight rows for critical/warning symptoms in diagnostic tables */
+.axis-table tr.row-critical td:first-child {
+    border-left: 3px solid #e74c3c;
+    padding-left: calc(1rem - 3px);
+}
+.axis-table tr.row-warning td:first-child {
+    border-left: 3px solid var(--orange);
+    padding-left: calc(1rem - 3px);
+}
+.axis-table tr.row-info td:first-child {
+    border-left: 3px solid var(--blue, #07adf8);
+    padding-left: calc(1rem - 3px);
 }
 
 .policy-code {
@@ -1148,7 +1218,7 @@
 <div class="card method-hero">
     <div class="method-hero-inner">
         <div class="method-kicker">Training Method</div>
-        <h1>Methodical Spec Training After Spec10</h1>
+        <h1>Methodical DSL Training Methods</h1>
         <p class="method-subtitle">
             A <code>spec</code> is not just a dataset or a model run. It is a contract between an asset library,
             a scene DSL, and a compiler. The model should learn structure against a stable contract, not absorb
@@ -1913,61 +1983,61 @@ Next run:</pre>
         </tr>
     </thead>
     <tbody>
-        <tr>
+        <tr class="row-warning">
             <td>Low exact across <strong>all</strong> layouts</td>
             <td>Undertrained (too few epochs or too little curriculum pressure)</td>
             <td>Raise midtrain epochs from 1 to 2–3. Keep everything else frozen.</td>
             <td>spec11 r1: 2/35 exact after 1 midtrain epoch, all 5 layouts weak</td>
         </tr>
-        <tr>
+        <tr class="row-warning">
             <td>Low exact on <strong>some</strong> layouts, others strong</td>
             <td>Curriculum imbalance — weak families got less edit pressure</td>
             <td>Add targeted negative/repair rows for the weak families. Anchor the strong families with replay.</td>
             <td>spec06 r3: 29% — over-weighted one slice caused cascading failure</td>
         </tr>
-        <tr>
+        <tr class="row-critical">
             <td>High exact match, but <code>rendered_svg_ok: null</code></td>
             <td>Probe/compiler plumbing bug — model output is right but the render path fails silently</td>
             <td>Fix the probe pipeline first. Do not retrain until the eval is trustworthy.</td>
             <td>spec11 r1: pipeline_lane exact=true but rendered_svg=null — accounting bug</td>
         </tr>
-        <tr>
+        <tr class="row-critical">
             <td>Loss drops below 0.1 but exact match stays low</td>
             <td>The model memorized training distribution but not the DSL contract</td>
             <td>Check tokenizer coverage, holdout prompt diversity, and whether edits cover all layout × topic combinations.</td>
             <td>spec03: loss converged but 0% capability — representation was wrong</td>
         </tr>
-        <tr>
+        <tr class="row-warning">
             <td>Loss stuck above 0.5 after full midtrain</td>
             <td>Capacity wall, LR too low, or data packing issue</td>
             <td>Check grad norms for saturation. Try LR sweep. Verify token packing fill rate (&gt;0.85).</td>
             <td>spec08 r1: 81% reduction but final loss 0.905 — richer DSL needed more capacity/epochs</td>
         </tr>
-        <tr>
+        <tr class="row-info">
             <td>Good exact on train prompts, bad on dev/test</td>
             <td>Overfitting to train distribution</td>
             <td>Widen holdout prompt coverage. Add more topic × layout combinations. Reduce epoch count if loss is very low.</td>
             <td>spec06 r6: 100% train, 91.7% dev, 83.3% test — healthy but gradient visible</td>
         </tr>
-        <tr>
+        <tr class="row-warning">
             <td>Good exact on one spec, regression on next</td>
             <td>DSL contract changed silently, or tokenizer/compiler mismatch</td>
             <td>Diff the DSL grammar, tokenizer vocab, and compiler output between specs. Use canary probes from the previous best.</td>
             <td>spec05→spec06 r1: new layout families introduced, old families still passed</td>
         </tr>
-        <tr>
+        <tr class="row-critical">
             <td>100% syntax valid, 0% semantic match</td>
             <td>Model learned token order but not composition choices</td>
             <td>Richer curriculum with edit pairs (wrong→right), not just direct generation examples.</td>
             <td>spec04: 100% syntactically valid DSL, 0% correct scene composition</td>
         </tr>
-        <tr>
+        <tr class="row-info">
             <td>Stage labels wrong in loss curve</td>
             <td>Telemetry bookkeeping bug in pipeline — stage transitions not recorded</td>
             <td>Fix the pipeline stage labeling. Do not trust source_stage field until verified. Use step counts to infer boundaries.</td>
             <td>spec11 r1: all 665 steps labeled "pretrain" but included midtrain steps</td>
         </tr>
-        <tr>
+        <tr class="row-info">
             <td>training_plan.json says "active" after run completed</td>
             <td>Pipeline did not finalize stage status</td>
             <td>Fix the plan update logic. Probe report should not depend on plan status for results.</td>
@@ -1975,6 +2045,12 @@ Next run:</pre>
         </tr>
     </tbody>
 </table>
+
+<p class="mini-note" style="margin-top:-0.8rem">
+    <span style="display:inline-block;width:12px;height:12px;background:#e74c3c;border-radius:2px;vertical-align:middle;margin-right:4px"></span> Critical — fix before retraining
+    <span style="display:inline-block;width:12px;height:12px;background:var(--orange);border-radius:2px;vertical-align:middle;margin:0 4px 0 16px"></span> Warning — likely cause of weak results
+    <span style="display:inline-block;width:12px;height:12px;background:var(--blue, #07adf8);border-radius:2px;vertical-align:middle;margin:0 4px 0 16px"></span> Info — plumbing or telemetry issue
+</p>
 
 <h3>Reading the Probe Report</h3>
 
