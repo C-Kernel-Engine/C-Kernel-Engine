@@ -1,0 +1,2371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpecTrainingMethod | C-Kernel-Engine</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <style>
+        :root {
+            /* Antsand Brand Colors - Lightened */
+            --orange: #ffb400;
+            --orange-dark: #e5a200;
+            --orange-light: #ffc933;
+            --dark: #2a2a2a;
+            --dark-lighter: #363636;
+            --dark-card: #323232;
+            --grey: #454545;
+            --grey-light: #555555;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-muted: #808080;
+            --bg-dark: #232323;
+            --white: #ffffff;
+            --code-bg: #1a1a1a;
+            --green: #47b475;
+            --blue: #07adf8;
+            --gradient-header: linear-gradient(135deg, #2a2a2a 0%, #363636 50%, #2a2a2a 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            background: var(--gradient-header);
+            border-bottom: 3px solid var(--orange);
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            background: var(--orange);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 1.1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-title {
+            color: var(--white);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .header-subtitle {
+            color: var(--orange);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .site-nav {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .site-nav > a,
+        .nav-dropdown > .nav-trigger {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+        }
+
+        .site-nav > a:hover,
+        .nav-dropdown:hover > .nav-trigger {
+            color: var(--white);
+            background: var(--grey);
+        }
+
+        .site-nav > a.active {
+            background: var(--orange);
+            color: var(--dark);
+            font-weight: 600;
+        }
+
+        /* Dropdown */
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-trigger::after {
+            content: '';
+            border: solid currentColor;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-top: -3px;
+            transition: transform 0.2s;
+        }
+
+        .nav-dropdown:hover .nav-trigger::after {
+            transform: rotate(-135deg);
+            margin-top: 3px;
+        }
+
+        .nav-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: var(--transition);
+            overflow: hidden;
+            margin-top: 0.5rem;
+            border: 1px solid var(--grey);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background: var(--grey);
+            border-left-color: var(--orange);
+            color: var(--white);
+        }
+
+        .nav-dropdown-menu a small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        /* Last dropdown aligns to the right edge */
+        .nav-dropdown:last-child .nav-dropdown-menu {
+            left: auto;
+            right: 0;
+        }
+
+        /* Mega menu for Architecture dropdown */
+        .nav-dropdown-menu.mega-menu {
+            min-width: 580px;
+            padding: 1.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 2rem;
+            /* Position to the left so it doesn't clip right edge */
+            left: 50%;
+            transform: translateX(-60%);
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu.mega-menu {
+            transform: translateX(-60%) translateY(0);
+        }
+
+        .mega-menu .menu-section {
+            margin-bottom: 0.75rem;
+        }
+
+        .mega-menu .menu-heading {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--orange);
+            padding: 0.5rem 0.75rem 0.35rem;
+            border-bottom: 1px solid var(--grey);
+            margin-bottom: 0.35rem;
+        }
+
+        .mega-menu a {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border-left: none;
+            line-height: 1.3;
+        }
+
+        .mega-menu a:hover {
+            border-left: none;
+            background: var(--grey);
+        }
+
+        .mega-menu a small {
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--gradient-header);
+            border: 1px solid var(--grey);
+            color: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--orange), var(--orange-light), var(--orange));
+        }
+
+        .hero h1 {
+            color: var(--white);
+            border: none;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Typography */
+        h1 {
+            color: var(--white);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--orange);
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            color: var(--white);
+            font-size: 1.4rem;
+            margin: 2rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h2::before {
+            content: '';
+            width: 4px;
+            height: 1.4rem;
+            background: var(--orange);
+            border-radius: 2px;
+        }
+
+        h3 {
+            color: var(--orange);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--dark-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            border-left: 3px solid var(--grey-light);
+            transition: var(--transition);
+            border: 1px solid var(--grey);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--orange);
+        }
+
+        .card-accent {
+            border-left-color: var(--orange);
+        }
+
+        .card-green {
+            border-left-color: var(--green);
+        }
+
+        .card-blue {
+            border-left-color: var(--blue);
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        /* Clickable Cards */
+        a.card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        a.card-link .card {
+            cursor: pointer;
+        }
+
+        a.card-link .card:hover {
+            border-left-width: 5px;
+        }
+
+        .card-arrow {
+            color: var(--orange);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        a.card-link:hover .card-arrow {
+            gap: 0.75rem;
+        }
+
+        /* Feature Icons */
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon.orange { background: rgba(255, 180, 0, 0.15); color: var(--orange); }
+        .feature-icon.green { background: rgba(71, 180, 117, 0.15); color: var(--green); }
+        .feature-icon.blue { background: rgba(7, 173, 248, 0.15); color: var(--blue); }
+        .feature-icon.grey { background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); }
+
+        /* Stats */
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--orange);
+            line-height: 1;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e0e0e0;
+            padding: 1.25rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--grey);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: var(--grey);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: var(--orange);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #e0e0e0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: var(--dark-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--grey);
+        }
+
+        th {
+            background: var(--dark);
+            color: var(--orange);
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--grey);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Links */
+        a {
+            color: var(--orange);
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--orange-light);
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.25rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .alert-info {
+            background: rgba(7, 173, 248, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .alert-warning {
+            background: rgba(255, 180, 0, 0.1);
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .alert-success {
+            background: rgba(71, 180, 117, 0.1);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        /* Image containers */
+        .img-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+
+        .img-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--grey);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-orange {
+            background: var(--orange);
+            color: var(--dark);
+        }
+
+        .badge-green {
+            background: var(--green);
+            color: white;
+        }
+
+        .badge-grey {
+            background: var(--grey);
+            color: var(--text-secondary);
+        }
+
+        /* Diagram blocks (monospace pre with colored spans) */
+        .diagram {
+            background: var(--code-bg);
+            border: 1px solid var(--grey);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            line-height: 1.55;
+            white-space: pre;
+            color: var(--text-muted);
+        }
+        .diagram .hl     { color: var(--blue); font-weight: 700; }
+        .diagram .grn    { color: var(--green); }
+        .diagram .wrn    { color: var(--orange); }
+        .diagram .err    { color: #f85149; }
+        .diagram .purple { color: #bc8cff; }
+        .diagram .dim    { color: #484f58; }
+
+        /* Inline status colors */
+        .good { color: var(--green); font-weight: 600; }
+        .bad  { color: #f85149; font-weight: 600; }
+        .meh  { color: var(--orange); font-weight: 600; }
+
+        /* Section numbering */
+        .section-num {
+            color: var(--orange);
+            font-weight: 400;
+            margin-right: 0.25rem;
+        }
+
+        /* Accordion */
+        details {
+            background: var(--dark-card);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--grey);
+            border-left: 3px solid var(--grey-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        details:hover {
+            border-left-color: var(--orange);
+        }
+
+        details[open] {
+            border-left-color: var(--orange);
+        }
+
+        summary {
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            list-style: none;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: '';
+            border: solid var(--orange);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        details[open] summary::after {
+            transform: rotate(45deg);
+        }
+
+        summary:hover {
+            background: var(--grey);
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid var(--grey);
+        }
+
+        .accordion-content {
+            padding: 1rem 1.25rem;
+        }
+
+        /* Mobile hamburger button */
+        .nav-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-toggle span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: var(--orange);
+            border-radius: 2px;
+            transition: var(--transition);
+        }
+
+        .nav-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .nav-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .nav-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .site-header {
+                flex-direction: row;
+                justify-content: space-between;
+                padding: 0.75rem 1rem;
+            }
+
+            .nav-toggle {
+                display: flex;
+            }
+
+            .site-nav {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--dark);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 999;
+            }
+
+            .site-nav.open {
+                transform: translateX(0);
+            }
+
+            .site-nav > a,
+            .nav-dropdown > .nav-trigger {
+                width: 100%;
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+                overflow: hidden;
+                transform: none;
+                margin-top: 0;
+                transition: max-height 0.3s ease, visibility 0.3s ease;
+                background: var(--dark-lighter);
+                border-radius: 0;
+                border: none;
+                box-shadow: none;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            .nav-dropdown-menu a {
+                padding: 0.75rem 1.5rem;
+            }
+
+            /* Disable hover on mobile */
+            .nav-dropdown:hover .nav-dropdown-menu {
+                opacity: 1;
+                visibility: hidden;
+                max-height: 0;
+            }
+
+            .nav-dropdown.open .nav-dropdown-menu,
+            .nav-dropdown.open:hover .nav-dropdown-menu {
+                visibility: visible;
+                max-height: 500px;
+            }
+
+            main {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .hero {
+                padding: 2rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a href="index.html" class="header-brand">
+            <div class="header-logo">CK</div>
+            <div>
+                <div class="header-title">C-Kernel-Engine</div>
+                <div class="header-subtitle">High-Performance ML Kernels</div>
+            </div>
+        </a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav class="site-nav">
+            <a href="index.html" class="">Home</a>
+            <a href="spectrum.html" class="" style="color:var(--orange)">⚡ Spectrum</a>
+            <a href="quickstart.html" class="">Getting Started</a>
+            <a href="developer-guide.html" class="">Developer Guide</a>
+            <a href="scaling.html" class="">Scaling</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">Architecture</span>
+                <div class="nav-dropdown-menu mega-menu">
+                    <!-- Architecture Home Link -->
+                    <div class="menu-section" style="grid-column: 1 / -1; border-bottom: 1px solid var(--grey); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <a href="architecture-links.html" style="font-weight: 600; color: var(--orange);">
+                            View All Architecture Docs
+                            <small>Complete documentation index</small>
+                        </a>
+                    </div>
+                    <!-- Left Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Core</div>
+                        <a href="architecture.html">System Overview<small>IR, Codegen, Kernels</small></a>
+                        <a href="tokenizer.html">Tokenizer<small>BPE, WordPiece, Trie</small></a>
+                        <a href="sentencepiece.html">SentencePiece<small>Viterbi DP, byte fallback</small></a>
+                        <a href="kernels.html">Kernel Reference<small>Forward/backward ops</small></a>
+                        <a href="codegen.html">Code Generation<small>IR to C compilation</small></a>
+                        <a href="iteration-philosophy.html">Iteration Philosophy<small>Why v1→v6 matters</small></a>
+                        <a href="ir-v2.html">IR v2 Format<small>Case study: symbolic dimensions</small></a>
+                        <a href="v7-backprop-ir.html">v7 Backprop IR<small>IR1/IR2 + layout/codegen flow</small></a>
+                        <a href="v7-cross-entropy-parity.html">v7 Cross-Entropy Parity<small>p - one_hot, reduction semantics, drift fixes</small></a>
+                        <a href="concepts.html">Deep Dive Concepts<small>RoPE, Flash Attention, GQA</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Quantization</div>
+                        <a href="quantization.html">Quant Fundamentals<small>Block formats, grouping</small></a>
+                        <a href="gguf-bump.html">GGUF to Bump<small>Weight conversion</small></a>
+                        <a href="gguf-conversion.html">GGUF Parsing<small>Byte-level guide</small></a>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="menu-section">
+                        <div class="menu-heading">Optimization</div>
+                        <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
+                        <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
+                        <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
+                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-heading">Infrastructure</div>
+                        <a href="memory-safety.html">Memory Safety<small>Bump allocator, canaries</small></a>
+                        <a href="deterministic-memory.html">Deterministic Memory<small>RDMA, interpretability</small></a>
+                        <a href="profiling.html">Profiling Guide<small>Valgrind, perf, flamegraphs</small></a>
+                        <a href="v7-profiling.html">v7 Profiling Runbook<small>Train kernels: VTune, Advisor, perf</small></a>
+                        <a href="v7-runbook.html">v7 Inference + Training Runbook<small>Copy/paste train + infer workflow</small></a>
+                        <a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook<small>Pretrain + midtrain data generation</small></a>
+                        <a href="testing.html">Testing<small>Numerical parity verification</small></a>
+                        <a href="threadpool.html">Thread Pool<small>Persistent pthreads, dispatch</small></a>
+                    </div>
+                </div>
+            </div>
+            <a href="pytorch-parity.html" class="">PyTorch Parity</a>
+            <a href="test-report.html" class="">Test Report</a>
+            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="research.html" class="">Research</a>
+            <a href="decisions.html" class="">ADR</a>
+            <div class="nav-dropdown">
+                <span class="nav-trigger">API & Docs</span>
+                <div class="nav-dropdown-menu">
+                    <a href="api.html">
+                        API Reference
+                        <small>Function signatures & usage</small>
+                    </a>
+                    <a href="doxygen/index.html">
+                        Doxygen Docs
+                        <small>Full source documentation</small>
+                    </a>
+                    <a href="doxygen/files.html">
+                        Source Files
+                        <small>Browse kernel source code</small>
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main>
+
+<style>
+.method-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.method-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 18% 20%, rgba(7,173,248,0.16), transparent 34%),
+        radial-gradient(circle at 82% 14%, rgba(255,180,0,0.14), transparent 30%),
+        linear-gradient(145deg, rgba(71,180,117,0.08), rgba(255,255,255,0));
+    pointer-events: none;
+}
+
+.method-hero-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.method-kicker {
+    color: var(--orange);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.65rem;
+}
+
+.method-subtitle {
+    max-width: 960px;
+    color: var(--text-secondary);
+}
+
+.method-alert {
+    margin: 1rem 0 1.6rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255,180,0,0.25);
+    background: linear-gradient(145deg, rgba(255,180,0,0.12), rgba(7,173,248,0.08));
+    color: var(--text-secondary);
+}
+
+.triad-grid,
+.report-grid,
+.phase-grid,
+.decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.8rem 0;
+}
+
+.triad-card,
+.report-card,
+.phase-card,
+.decision-card {
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1rem;
+    background: linear-gradient(155deg, rgba(255,255,255,0.02), rgba(7,173,248,0.05));
+    box-shadow: var(--shadow-sm);
+}
+
+.triad-card h3,
+.report-card h3,
+.phase-card h3,
+.decision-card h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+}
+
+.triad-card p,
+.report-card p,
+.phase-card p,
+.decision-card p {
+    margin: 0 0 0.45rem 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.triad-card ul,
+.phase-card ul,
+.decision-card ul {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.triad-card li,
+.phase-card li,
+.decision-card li {
+    margin-bottom: 0.35rem;
+    color: var(--text-secondary);
+}
+
+.flow-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.85rem;
+    margin: 1rem 0 1.8rem 0;
+}
+
+.flow-step {
+    border: 1px solid var(--grey);
+    border-left: 4px solid var(--orange);
+    border-radius: 10px;
+    padding: 0.95rem;
+    background: var(--dark-card);
+}
+
+.flow-step .flow-num {
+    display: inline-block;
+    min-width: 2rem;
+    margin-bottom: 0.55rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(255,180,0,0.16);
+    color: var(--orange);
+    font-weight: 700;
+    font-size: 0.78rem;
+}
+
+.flow-step h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 0.98rem;
+}
+
+.flow-step p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.axis-table,
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.8rem 0;
+}
+
+.axis-table th,
+.axis-table td,
+.report-table th,
+.report-table td {
+    border-bottom: 1px solid var(--grey);
+    padding: 0.75rem 0.8rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.axis-table th,
+.report-table th {
+    color: var(--orange);
+    background: var(--dark-card);
+    font-size: 0.84rem;
+}
+
+.axis-table td,
+.report-table td {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.axis-table td:first-child,
+.report-table td:first-child {
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.policy-code {
+    margin: 1rem 0 1.8rem 0;
+}
+
+.policy-code pre {
+    margin: 0;
+}
+
+.mini-note {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.85rem 0 0 0;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.24rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,180,0,0.28);
+    background: rgba(255,180,0,0.08);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .axis-table td:first-child,
+    .report-table td:first-child {
+        white-space: normal;
+    }
+}
+</style>
+
+<div class="card method-hero">
+    <div class="method-hero-inner">
+        <div class="method-kicker">Training Method</div>
+        <h1>Methodical Spec Training After Spec10</h1>
+        <p class="method-subtitle">
+            A <code>spec</code> is not just a dataset or a model run. It is a contract between an asset library,
+            a scene DSL, and a compiler. The model should learn structure against a stable contract, not absorb
+            random changes in vocabulary, content, and rendering all at once.
+        </p>
+        <div class="tag-row">
+            <span class="tag">Asset library</span>
+            <span class="tag">Placeholder content</span>
+            <span class="tag">Scene DSL</span>
+            <span class="tag">Compiler gate</span>
+            <span class="tag">Tokenizer gate</span>
+            <span class="tag">Probe report</span>
+        </div>
+    </div>
+</div>
+
+<div class="method-alert">
+    <strong>Core rule:</strong> the model always sees both structure and content placeholders, but an experiment should
+    have only one <em>primary teaching target</em>. If the DSL, the compiler, the asset library, the tokenizer, the
+    token budget, and the model size all move at once, the run becomes uninterpretable.
+</div>
+
+<h2>Three Separate Contracts</h2>
+
+<div class="triad-grid">
+    <div class="triad-card">
+        <h3>1. Asset/Data Contract</h3>
+        <p>The asset library is the visual reference set and the context library is the semantic reference set.</p>
+        <ul>
+            <li>Source from <code>docs/site/assets/*.svg</code> or later public asset libraries.</li>
+            <li>Strip literal text into placeholders first.</li>
+            <li>Track layout family, composition, theme, color system, shapes, connectors, charts, and text roles.</li>
+            <li>Do not let real copy hide layout mistakes.</li>
+        </ul>
+    </div>
+    <div class="triad-card">
+        <h3>2. DSL Contract</h3>
+        <p>The DSL is the model boundary. It should describe composition and roles, not raw SVG bookkeeping.</p>
+        <ul>
+            <li>Emit scene choices such as layout, theme, rail, density, gap, background, and components.</li>
+            <li>Use placeholders like <code>heading_1</code>, <code>paragraph_1</code>, <code>badge_1</code>.</li>
+            <li>Keep canonical token order and fixed arity.</li>
+            <li>Remove inferable fields from the model surface.</li>
+        </ul>
+    </div>
+    <div class="triad-card">
+        <h3>3. Compiler Contract</h3>
+        <p>The compiler owns geometry, defs, gradients, markers, wrapping, and final render semantics.</p>
+        <ul>
+            <li>Compile scene DSL into SVG with deterministic layout rules.</li>
+            <li>Guarantee round-trip reconstruction before any serious training run.</li>
+            <li>Keep rendering policy stable across runs unless the run is explicitly a compiler experiment.</li>
+            <li>Treat compiler regressions separately from model regressions.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>What We Are Actually Training</h2>
+
+<p>
+    In this line, the model is not being trained to be a free-form SVG artist. It is being trained to choose
+    structured visual intent against a stable compiler contract.
+</p>
+
+<div class="report-grid">
+    <div class="report-card">
+        <h3>Composition</h3>
+        <p>Composition means the overall information shape: compare two systems, show a pipeline, build a poster stack, or arrange dashboard cards.</p>
+        <p>Examples: <code>poster_stack</code>, <code>comparison_span_chart</code>, <code>pipeline_lane</code>.</p>
+    </div>
+    <div class="report-card">
+        <h3>Layout Family</h3>
+        <p>Layout is the reusable geometry family inside the composition. It decides where headers, panels, tables, bars, and connectors belong.</p>
+        <p>Examples: one tall poster, two compare panels, three-column dashboard, staged pipeline lane.</p>
+    </div>
+    <div class="report-card">
+        <h3>Theme And Tone</h3>
+        <p>Theme is the visual language. Tone is the accent family inside that language.</p>
+        <p>Examples: <code>theme:infra_dark</code>, <code>theme:paper_editorial</code>, <code>tone:amber</code>, <code>tone:green</code>.</p>
+    </div>
+    <div class="report-card">
+        <h3>Content Binding</h3>
+        <p>The content is not the same thing as the scene structure. The model should choose where content goes; a separate payload should provide what the text and values actually are.</p>
+        <p>This is why later lines should move from literal prose inside scene tokens to keyed refs plus <code>content.json</code>.</p>
+    </div>
+</div>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Layer</th>
+            <th>Example</th>
+            <th>Who Owns It</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Composition</td>
+            <td><code>comparison_span_chart</code></td>
+            <td>Model</td>
+        </tr>
+        <tr>
+            <td>Theme</td>
+            <td><code>infra_dark</code></td>
+            <td>Model</td>
+        </tr>
+        <tr>
+            <td>Tone</td>
+            <td><code>amber</code></td>
+            <td>Model</td>
+        </tr>
+        <tr>
+            <td>Content role</td>
+            <td><code>@section_card.0.title</code></td>
+            <td>Model chooses the slot, external content provides the value</td>
+        </tr>
+        <tr>
+            <td>Exact SVG path, gradient, shadow, marker, wrap</td>
+            <td><code>&lt;path ...&gt;</code>, <code>&lt;linearGradient ...&gt;</code></td>
+            <td>Compiler</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Worked Example</h2>
+
+<p>
+    A concrete keyed-scene example should look like this:
+</p>
+
+<div class="card policy-code">
+<pre>Request prompt
+
+[task:svg]
+[layout:poster_stack]
+[topic:memory_reality]
+[theme:infra_dark]
+[tone:green]
+[density:compact]
+[OUT]
+
+Scene DSL emitted by the model
+
+[scene]
+[canvas:tall]
+[layout:poster_stack]
+[theme:infra_dark]
+[tone:green]
+[frame:card]
+[density:compact]
+[inset:md]
+[gap:sm]
+[hero:center]
+[columns:1]
+[emphasis:top]
+[rail:accent]
+[background:rings]
+[connector:line]
+[topic:memory_reality]
+[header_band:@header_band.0.kicker|@header_band.0.headline|@header_band.0.subtitle]
+[section_card:@section_card.0.title|@section_card.0.value|@section_card.0.caption|variant=hero|accent=amber]
+[compare_bar:@compare_bar.0.label|@compare_bar.0.value|@compare_bar.0.caption|accent=red]
+[table_row:@table_row.0.column_1|@table_row.0.column_2|@table_row.0.column_3|state=highlight|accent=amber]
+[/scene]
+
+content.json bound by the compiler
+
+{
+  "header_band": [
+    {
+      "kicker": "First Principle",
+      "headline": "LLM Memory Reality",
+      "subtitle": "The math marketing will not show you"
+    }
+  ],
+  "section_card": [
+    {
+      "title": "Memory Capacity",
+      "value": "25x more memory capacity",
+      "caption": "Capacity sets the real context boundary"
+    }
+  ],
+  "compare_bar": [
+    {
+      "label": "GPU VRAM",
+      "value": "80 GB",
+      "caption": "single device"
+    }
+  ],
+  "table_row": [
+    {
+      "column_1": "128K",
+      "column_2": "3x GPUs",
+      "column_3": "Fits"
+    }
+  ]
+}</pre>
+</div>
+
+<p class="mini-note">
+    The training target here is the <em>scene decision</em>, not the literal prose. The compiler can now render the
+    same scene with different content payloads without retraining the model.
+</p>
+
+<h2>Why Explicit Tokens Instead Of Generic BPE Right Now?</h2>
+
+<p>
+    The short answer is: because this output language is small, formal, and brittle, and the current training line is
+    optimizing for control and interpretability before token-efficiency.
+</p>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>Why not plain BPE first?</h3>
+        <p>If the tokenizer is free to break tags arbitrarily, a tiny model must learn both the scene language and the spelling of the scene language at the same time.</p>
+    </div>
+    <div class="decision-card">
+        <h3>What explicit reserved tokens buy</h3>
+        <p>They make the contract visible. A probe miss can be read as the wrong scene decision instead of arbitrary subword drift across brackets, separators, and role markers.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Why this is not a universal rule</h3>
+        <p>Frontier models absolutely use learned tokenizers like BPE or SentencePiece at base-model scale. The explicit token surface here is a local engineering choice for a narrow formal DSL.</p>
+    </div>
+    <div class="decision-card">
+        <h3>What should happen later</h3>
+        <p>Once the DSL is stable, revisit the tokenizer boundary as its own spec question: smaller reserved surface, learned merges, or mixed strategy. Do that after the contract is proven, not before.</p>
+    </div>
+</div>
+
+<p>
+    A useful rule is:
+</p>
+
+<div class="card policy-code">
+<pre>Early line:
+prefer explicit structural tokens so the contract is obvious.
+
+Later line:
+shrink or relax the reserved surface only after the model, compiler, and evals agree on the language.</pre>
+</div>
+
+<p>
+    One mistake to avoid is treating a whole component row as the permanent atomic token surface.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Shape</th>
+            <th>What It Buys</th>
+            <th>What It Risks</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>[compare_bar:@compare_bar.0.label|@compare_bar.0.value|@compare_bar.0.caption|accent=amber|note=@compare_bar.0.note]</code></td>
+            <td>Short sequences and strong format control.</td>
+            <td>Too brittle if kept forever. Similar component variants do not share enough structure, so the vocabulary becomes overly specific.</td>
+        </tr>
+        <tr>
+            <td><code>[compare_bar]</code><br><code>[label_ref:compare_bar.0.label]</code><br><code>[value_ref:compare_bar.0.value]</code><br><code>[caption_ref:compare_bar.0.caption]</code><br><code>[accent:amber]</code><br><code>[note_ref:compare_bar.0.note]</code><br><code>[/compare_bar]</code></td>
+            <td>More compositional reuse across fields and component variants.</td>
+            <td>Longer sequences and a slightly harder grammar, but much better long-term generalization.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="mini-note">
+    The first shape can be acceptable as a transition step. It should not be treated as the final production tokenizer boundary.
+</p>
+
+<div class="method-alert">
+    <strong>What went wrong in practice:</strong> one of the keyed-scene lines still inherited the old tokenizer builder,
+    which collected every whitespace-delimited bracket chunk as a reserved control token. That turned rows like
+    <code>[compare_bar:@compare_bar.0.label|@compare_bar.0.value|@compare_bar.0.caption|accent=amber]</code> into
+    single atomic tokens again. This is not training-token packing in the data pipeline. It is tokenizer-boundary
+    packing, and it makes the DSL brittle.
+</div>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Failure Mode</th>
+            <th>Why It Is Wrong</th>
+            <th>Corrective Direction</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Whole bracketed component rows become reserved tokens because the tokenizer harvests every whitespace-delimited <code>[...]</code> chunk.</td>
+            <td>The model no longer learns a compositional scene language. It learns oversized one-off control ids.</td>
+            <td>Keep only small structural tokens reserved and stop reserving payload-bearing ref tokens like <code>@compare_bar.0.label</code>.</td>
+        </tr>
+        <tr>
+            <td>Dense packing is confused with normal training-token packing.</td>
+            <td>The packed-window step is not the issue here. The issue is the token boundary chosen before packing.</td>
+            <td>Debug tokenizer boundaries first, then debug total-token budgets and effective epochs second.</td>
+        </tr>
+        <tr>
+            <td>Keyed refs still sit inside one monolithic component token.</td>
+            <td>The content moved out of literal prose, but the structure is still too atomic.</td>
+            <td>Move to block-style components such as <code>[compare_bar]</code>, field-role tokens, and separate ref tokens or unreserved ref payloads.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card policy-code">
+<pre>Bad tokenizer boundary
+
+[compare_bar:@compare_bar.0.label|@compare_bar.0.value|@compare_bar.0.caption|accent=amber]
+
+Better boundary
+
+[compare_bar]
+[field:label]
+[@compare_bar.0.label]
+[field:value]
+[@compare_bar.0.value]
+[field:caption]
+[@compare_bar.0.caption]
+[accent:amber]
+[/compare_bar]</pre>
+</div>
+
+<p class="mini-note">
+    The rule is simple: reserve structure, not payload. If a token contains too much scene-specific data or too many
+    keyed refs, it is probably the wrong token boundary.
+</p>
+
+<h2>Spec Lifecycle</h2>
+
+<div class="flow-strip">
+    <div class="flow-step">
+        <div class="flow-num">0</div>
+        <h3>State the hypothesis</h3>
+        <p>Write down exactly what the next spec is trying to prove: richer DSL, better compiler, stronger asset family, or narrower repair.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">1</div>
+        <h3>Snapshot the assets</h3>
+        <p>Copy the chosen asset family into the cache-backed run workspace so the training contract is frozen and reproducible.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">2</div>
+        <h3>Replace literal text</h3>
+        <p>Strip shipped copy and replace it with placeholders. Train structure first, then bind content from a separate library.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">3</div>
+        <h3>Extract vocabulary</h3>
+        <p>Build the scene vocabulary from layouts, components, composition patterns, style families, and semantic text roles.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">4</div>
+        <h3>Prove the compiler</h3>
+        <p>Compile the DSL with dummy text and verify that the output is acceptably close to the reference asset family before training.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">5</div>
+        <h3>Freeze a gold asset gate</h3>
+        <p>Require a real gold pack, ideally 5 to 10 assets spanning comparison, poster, table, and pipeline families. Treat compiler fidelity as a gate, not a note.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">6</div>
+        <h3>Freeze the tokenizer surface</h3>
+        <p>Tokenize the DSL vocabulary plus placeholder text roles. Do not let arbitrary literal text dominate the tokenizer early, and do not keep whole component rows as permanent atomic tokens once the structure-content split is proven.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">7</div>
+        <h3>Train with one primary axis</h3>
+        <p>Change one main thing per run: DSL, compiler, data mix, tokenizer budget, or capacity. Hold the rest stable.</p>
+    </div>
+    <div class="flow-step">
+        <div class="flow-num">8</div>
+        <h3>Write the decision</h3>
+        <p>After every run, decide: promote, reject, repair, or branch. Every run ends with a next action, not just a score.</p>
+    </div>
+</div>
+
+<h2>How To Build Frontier-Style Intuition</h2>
+
+<p>
+    No serious engineer would laugh at the core idea here. The separation of structure, content, compiler, and eval is
+    exactly the kind of thinking that makes systems reliable. What strong teams would challenge is not the direction,
+    but the discipline of the method.
+</p>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>Good instinct</h3>
+        <p>Separating asset library, scene DSL, content, compiler, and probe contracts is a strong instinct. It reduces ambiguity and makes failures legible.</p>
+    </div>
+    <div class="decision-card">
+        <h3>What frontier teams would push harder on</h3>
+        <p>Cleaner ablations, stricter gates, more automatic validation, less manual drift between specs, and fewer simultaneous changes per run.</p>
+    </div>
+    <div class="decision-card">
+        <h3>What to copy from them</h3>
+        <p>Treat every run like an experiment with a written hypothesis, a fixed baseline, a canary, a non-regression gate, and a clear promotion or rejection rule.</p>
+    </div>
+    <div class="decision-card">
+        <h3>What not to imitate blindly</h3>
+        <p>Do not jump to giant-scale training intuition too early. On narrow compiler-backed tasks, clarity of interface and eval quality matter more than trying to mimic a frontier pretraining stack.</p>
+    </div>
+</div>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>If a frontier engineer reviewed this</th>
+            <th>Likely reaction</th>
+            <th>What to improve</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Separating DSL and content</td>
+            <td>Good systems instinct</td>
+            <td>Push it fully through the dataset, compiler, and probe path</td>
+        </tr>
+        <tr>
+            <td>Compiler-first validation</td>
+            <td>Correct</td>
+            <td>Keep the gold asset round-trip gate strict</td>
+        </tr>
+        <tr>
+            <td>Custom explicit tokens</td>
+            <td>Reasonable for a narrow formal language</td>
+            <td>Revisit only after the DSL stabilizes</td>
+        </tr>
+        <tr>
+            <td>Many specs in sequence</td>
+            <td>Fine if each run is interpretable</td>
+            <td>Make the hypothesis and held-constant set even more explicit</td>
+        </tr>
+        <tr>
+            <td>Weak or drifting evals</td>
+            <td>Unacceptable</td>
+            <td>Keep the report contract and canary gate mandatory</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>One Primary Axis Per Run</h2>
+
+<p>
+    The model can only teach intuition if each run is interpretable. Every run should declare one primary axis and list
+    everything held constant.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Primary Axis</th>
+            <th>What Changes</th>
+            <th>What Stays Fixed</th>
+            <th>Question Answered</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>DSL run</td>
+            <td>Scene grammar, token order, component vocabulary, canonicalization rules</td>
+            <td>Asset set, compiler, tokenizer family, model size, training budgets</td>
+            <td>Did the representation become easier and cleaner to learn?</td>
+        </tr>
+        <tr>
+            <td>Compiler run</td>
+            <td>Layout engine, gradients, wrappers, markers, defs, text wrapping, style packs</td>
+            <td>DSL, prompts, tokenizer, model config</td>
+            <td>Did the rendering surface become richer without widening the model surface?</td>
+        </tr>
+        <tr>
+            <td>Data run</td>
+            <td>Asset coverage, placeholder catalog, contrast pairs, holdout balance, context library</td>
+            <td>DSL, compiler, model size</td>
+            <td>Is the model underfit on coverage, or was the contract itself weak?</td>
+        </tr>
+        <tr>
+            <td>Budget run</td>
+            <td>Packed token budgets, effective epochs, stage mix</td>
+            <td>DSL, compiler, dataset rows, model config</td>
+            <td>Was failure caused by under-training or over-training rather than representation?</td>
+        </tr>
+        <tr>
+            <td>Capacity run</td>
+            <td>Layers, embed dim, hidden dim, context, optimizer scaling</td>
+            <td>DSL, compiler, dataset mix, evaluation contract</td>
+            <td>Has the representation stabilized enough that more capacity is the next lever?</td>
+        </tr>
+        <tr>
+            <td>Repair run</td>
+            <td>Narrow contrast slices for specific misses</td>
+            <td>Everything else, especially the winning baseline</td>
+            <td>Can a specific failure cluster be closed without global regression?</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="mini-note">
+    A run is only methodical when it can be summarized as one sentence: <em>“This run changed X, held Y constant,
+    and answered Z.”</em>
+</p>
+
+<h2>Recommended Asset-to-DSL Workflow for SVG</h2>
+
+<div class="phase-grid">
+    <div class="phase-card">
+        <h3>Asset intake</h3>
+        <p>Track every reference SVG in the public asset set and copy it into the run-local cache workspace.</p>
+        <ul>
+            <li>Keep original assets immutable.</li>
+            <li>Record family, source file, and intended holdout split.</li>
+            <li>Use run-local copies for extraction and experiments.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <h3>Dummy-text normalization</h3>
+        <p>Replace all literal text with placeholders before vocabulary design.</p>
+        <ul>
+            <li><code>heading_1</code>, <code>heading_2</code>, <code>paragraph_1</code>, <code>callout_1</code></li>
+            <li>Keep text roles, not the original prose.</li>
+            <li>Make layout errors visible by removing content noise.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <h3>Vocabulary extraction</h3>
+        <p>Infer the reusable scene vocabulary from the normalized assets.</p>
+        <ul>
+            <li>layout family</li>
+            <li>component families such as panels, charts, connectors, legend, band, poster stack</li>
+            <li>theme, tone, spacing, background motif, frame, emphasis, hero alignment</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <h3>Compiler validation</h3>
+        <p>Compile the new DSL back into placeholder SVG and compare it against the normalized asset.</p>
+        <ul>
+            <li>Require deterministic output.</li>
+            <li>Require acceptable visual round-trip on the gold asset subset.</li>
+            <li>Reject the spec if the compiler cannot express the asset family cleanly.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <h3>Training corpus</h3>
+        <p>Train on the DSL and placeholder roles, not on raw shipped copy.</p>
+        <ul>
+            <li>Tokenize scene vocabulary plus placeholder text roles.</li>
+            <li>Add content/context libraries later as a separate layer.</li>
+            <li>Keep placeholder slot resolution external and deterministic when possible.</li>
+        </ul>
+    </div>
+    <div class="phase-card">
+        <h3>Probe discipline</h3>
+        <p>Score both DSL exactness and compiled render exactness.</p>
+        <ul>
+            <li>A wrong DSL with right render means hygiene is bad but the contract may still be close.</li>
+            <li>A right DSL with wrong render means the compiler is the problem.</li>
+            <li>Do not read train loss as the final answer.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>HTML Report Contract After Every Spec or Run</h2>
+
+<p>
+    Every run should leave behind a readable HTML report that answers the same questions in the same order. The point is
+    not decoration. The point is to make the next decision obvious.
+</p>
+
+<table class="report-table">
+    <thead>
+        <tr>
+            <th>Report Section</th>
+            <th>Question Answered</th>
+            <th>Recommended Content</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Run card</td>
+            <td>What is this run?</td>
+            <td>Spec name, run id, date, model config, dataset version, primary axis changed, baseline compared against.</td>
+        </tr>
+        <tr>
+            <td>Hypothesis</td>
+            <td>Why was the run executed?</td>
+            <td>One paragraph stating what changed, why it should help, and what would count as success or rejection.</td>
+        </tr>
+        <tr>
+            <td>Held constant</td>
+            <td>What was intentionally not changed?</td>
+            <td>DSL/compiler/data/tokenizer/capacity matrix with one primary axis highlighted.</td>
+        </tr>
+        <tr>
+            <td>Data + tokenizer</td>
+            <td>What did the model actually see?</td>
+            <td>Row counts, packed token counts, effective epochs, tokenizer size, reserved tokens, placeholder coverage.</td>
+        </tr>
+        <tr>
+            <td>Compiler gate</td>
+            <td>Could the compiler express the target family?</td>
+            <td>Round-trip gallery on gold assets, render diffs, unsupported primitives, fallback paths.</td>
+        </tr>
+        <tr>
+            <td>Probe summary</td>
+            <td>Did the run work?</td>
+            <td>Exact, renderable, materialized exact, split metrics, per-layout metrics, delta vs baseline.</td>
+        </tr>
+        <tr>
+            <td>Product scorecard</td>
+            <td>Did it get closer to usable output?</td>
+            <td>Content-binding success, gold-asset parity status, family non-regression, and whether the output is visibly in-family.</td>
+        </tr>
+        <tr>
+            <td>Failure gallery</td>
+            <td>Where did it fail?</td>
+            <td>Show the remaining misses with prompt, expected DSL, actual DSL, content JSON or refs, compiled SVG, and a short diagnosis.</td>
+        </tr>
+        <tr>
+            <td>Lessons</td>
+            <td>What was learned?</td>
+            <td>Two or three concrete takeaways about representation, compiler, data, or budgeting.</td>
+        </tr>
+        <tr>
+            <td>Decision</td>
+            <td>What happens next?</td>
+            <td>Promote, reject, repair, or branch. Include the next run shape and the intended axis change.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="report-grid">
+    <div class="report-card">
+        <h3>Beautiful means legible</h3>
+        <p>A good report should show the metric headline, the delta from baseline, and the actual failure cards above the fold.</p>
+        <p>Use color sparingly: green for proven gain, amber for ambiguity, red for rejection, blue for structural notes.</p>
+    </div>
+    <div class="report-card">
+        <h3>Show the evidence</h3>
+        <p>Every claim should anchor to an artifact: probe JSON, tested prompts report, compiler validation gallery, dataset profile, tokenizer stats.</p>
+    </div>
+    <div class="report-card">
+        <h3>End with a decision</h3>
+        <p>The report is incomplete if it only says what happened. It must say what the next run should do and what should stay frozen.</p>
+    </div>
+</div>
+
+<div class="card policy-code">
+<pre>Run summary template
+
+Spec:
+Run:
+Primary axis changed:
+Held constant:
+Baseline:
+
+Hypothesis:
+
+Data delta:
+DSL delta:
+Compiler delta:
+Tokenizer delta:
+Budget delta:
+Capacity delta:
+
+Preflight result:
+Compiler round-trip result:
+Probe result:
+Failure clusters:
+
+Decision:
+Next run:</pre>
+</div>
+
+<h2>What The Experiments Proved</h2>
+
+<p>
+    These conclusions did not come from theory alone. They came from repeated runs that failed, partially worked,
+    regressed, recovered, and exposed the actual pressure points in the system.
+</p>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>1. Evaluation bugs can masquerade as model collapse</h3>
+        <p>We learned that decode/stop-marker mistakes and bad probe contracts can make a healthy model look broken. Evaluation infrastructure is part of the system, not an afterthought.</p>
+    </div>
+    <div class="decision-card">
+        <h3>2. Freeze the winning baseline</h3>
+        <p>Once a run becomes strong on the current contract, freeze it. Do not erase the baseline with broad speculative follow-ups.</p>
+    </div>
+    <div class="decision-card">
+        <h3>3. Repair narrowly</h3>
+        <p>When only a few misses remain, the next run should be a surgical repair run with strong anchor replay, not a broad new rewrite.</p>
+    </div>
+    <div class="decision-card">
+        <h3>4. Separate asset, DSL, compiler, and content work</h3>
+        <p>Runs became interpretable only after we started isolating which layer changed: richer scene vocabulary, richer compiler, broader asset family, or better structure-content separation.</p>
+    </div>
+    <div class="decision-card">
+        <h3>5. Token granularity is its own spec axis</h3>
+        <p>Whole-component tokens were useful as training wheels, but they should not remain the long-term boundary. Once keyed structure works, shrinking token granularity deserves a dedicated run.</p>
+    </div>
+</div>
+
+<h2>How We Reached The Current Design</h2>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Observed pattern</th>
+            <th>What it taught us</th>
+            <th>Design conclusion</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Raw or flat structural targets could render, but were brittle and hard to steer.</td>
+            <td>The model was spending too much capacity on low-level surface decisions.</td>
+            <td>Move upward into a scene DSL.</td>
+        </tr>
+        <tr>
+            <td>A richer compiler improved visual output without requiring the model to emit raw gradients, paths, or markers.</td>
+            <td>Beauty and fidelity can often be improved at the compiler layer first.</td>
+            <td>Keep low-level SVG machinery compiler-owned.</td>
+        </tr>
+        <tr>
+            <td>Some runs got stronger exact-match by baking visible text directly into component tokens.</td>
+            <td>That can help short-term contract accuracy, but it mixes structure and content in the wrong place.</td>
+            <td>Separate scene structure from content payloads.</td>
+        </tr>
+        <tr>
+            <td>Narrow fixes sometimes improved the target slice and damaged solved slices elsewhere.</td>
+            <td>Repair runs need strong anchor replay and non-regression checks by family, not just aggregate score.</td>
+            <td>Gate every repair against the frozen baseline.</td>
+        </tr>
+        <tr>
+            <td>Loss often looked healthy even when contract behavior regressed.</td>
+            <td>Train loss is not the product metric.</td>
+            <td>Use probe, canary, compiler round-trip, and failure galleries as the real decision surface.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>How To Decide What Is Next</h2>
+
+<h3>Diagnostic Matrix</h3>
+
+<p>
+    After a run finishes, use the probe report, loss curve, and per-layout breakdown to decide what to do next.
+    Do not guess — match the symptom pattern to the action.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Symptom</th>
+            <th>Likely Cause</th>
+            <th>Action</th>
+            <th>Example</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Low exact across <strong>all</strong> layouts</td>
+            <td>Undertrained (too few epochs or too little curriculum pressure)</td>
+            <td>Raise midtrain epochs from 1 to 2–3. Keep everything else frozen.</td>
+            <td>spec11 r1: 2/35 exact after 1 midtrain epoch, all 5 layouts weak</td>
+        </tr>
+        <tr>
+            <td>Low exact on <strong>some</strong> layouts, others strong</td>
+            <td>Curriculum imbalance — weak families got less edit pressure</td>
+            <td>Add targeted negative/repair rows for the weak families. Anchor the strong families with replay.</td>
+            <td>spec06 r3: 29% — over-weighted one slice caused cascading failure</td>
+        </tr>
+        <tr>
+            <td>High exact match, but <code>rendered_svg_ok: null</code></td>
+            <td>Probe/compiler plumbing bug — model output is right but the render path fails silently</td>
+            <td>Fix the probe pipeline first. Do not retrain until the eval is trustworthy.</td>
+            <td>spec11 r1: pipeline_lane exact=true but rendered_svg=null — accounting bug</td>
+        </tr>
+        <tr>
+            <td>Loss drops below 0.1 but exact match stays low</td>
+            <td>The model memorized training distribution but not the DSL contract</td>
+            <td>Check tokenizer coverage, holdout prompt diversity, and whether edits cover all layout × topic combinations.</td>
+            <td>spec03: loss converged but 0% capability — representation was wrong</td>
+        </tr>
+        <tr>
+            <td>Loss stuck above 0.5 after full midtrain</td>
+            <td>Capacity wall, LR too low, or data packing issue</td>
+            <td>Check grad norms for saturation. Try LR sweep. Verify token packing fill rate (&gt;0.85).</td>
+            <td>spec08 r1: 81% reduction but final loss 0.905 — richer DSL needed more capacity/epochs</td>
+        </tr>
+        <tr>
+            <td>Good exact on train prompts, bad on dev/test</td>
+            <td>Overfitting to train distribution</td>
+            <td>Widen holdout prompt coverage. Add more topic × layout combinations. Reduce epoch count if loss is very low.</td>
+            <td>spec06 r6: 100% train, 91.7% dev, 83.3% test — healthy but gradient visible</td>
+        </tr>
+        <tr>
+            <td>Good exact on one spec, regression on next</td>
+            <td>DSL contract changed silently, or tokenizer/compiler mismatch</td>
+            <td>Diff the DSL grammar, tokenizer vocab, and compiler output between specs. Use canary probes from the previous best.</td>
+            <td>spec05→spec06 r1: new layout families introduced, old families still passed</td>
+        </tr>
+        <tr>
+            <td>100% syntax valid, 0% semantic match</td>
+            <td>Model learned token order but not composition choices</td>
+            <td>Richer curriculum with edit pairs (wrong→right), not just direct generation examples.</td>
+            <td>spec04: 100% syntactically valid DSL, 0% correct scene composition</td>
+        </tr>
+        <tr>
+            <td>Stage labels wrong in loss curve</td>
+            <td>Telemetry bookkeeping bug in pipeline — stage transitions not recorded</td>
+            <td>Fix the pipeline stage labeling. Do not trust source_stage field until verified. Use step counts to infer boundaries.</td>
+            <td>spec11 r1: all 665 steps labeled "pretrain" but included midtrain steps</td>
+        </tr>
+        <tr>
+            <td>training_plan.json says "active" after run completed</td>
+            <td>Pipeline did not finalize stage status</td>
+            <td>Fix the plan update logic. Probe report should not depend on plan status for results.</td>
+            <td>spec11 r1: active_stage still "midtrain" after completion</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Reading the Probe Report</h3>
+
+<p>
+    The probe report is the real decision surface, not the loss curve. A healthy loss curve with bad probe results
+    means the representation or curriculum is wrong. A noisy loss curve with good probe results means the model
+    learned despite training-signal noise.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Metric</th>
+            <th>What It Tells You</th>
+            <th>Healthy Range</th>
+            <th>Red Flag</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>exact_match</code></td>
+            <td>Model output matches expected DSL token-for-token</td>
+            <td>&gt;70% overall, &gt;50% per layout</td>
+            <td>&lt;20% after full curriculum = representation or data problem</td>
+        </tr>
+        <tr>
+            <td><code>renderable</code></td>
+            <td>Output parses and compiles to valid SVG</td>
+            <td>100% (compiler contract must not break)</td>
+            <td>&lt;90% = compiler or tokenizer bug, not model bug</td>
+        </tr>
+        <tr>
+            <td><code>rendered_svg_ok</code></td>
+            <td>Compiled SVG matches expected visual</td>
+            <td>Should track exact_match closely</td>
+            <td><code>null</code> = probe pipeline broken, fix before interpreting other metrics</td>
+        </tr>
+        <tr>
+            <td>Per-layout breakdown</td>
+            <td>Which families the model learned vs. missed</td>
+            <td>All families above 50%</td>
+            <td>One family at 0% with others at 80%+ = curriculum imbalance</td>
+        </tr>
+        <tr>
+            <td>Train vs dev vs test split</td>
+            <td>Generalization gradient</td>
+            <td>Train≥dev≥test, gap &lt;20pp</td>
+            <td>Train 100%, test 0% = severe overfitting</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Reading the Loss Curve</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Pattern</th>
+            <th>What It Means</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Smooth descent, final &lt;0.05</td>
+            <td>Model is memorizing the training set well</td>
+            <td>Check probe to confirm generalization, not just memorization</td>
+        </tr>
+        <tr>
+            <td>Descent plateaus at 0.1–0.3</td>
+            <td>Model hit a capacity or data ceiling</td>
+            <td>If probe is also stuck, try more epochs, richer edits, or LR restart</td>
+        </tr>
+        <tr>
+            <td>Sudden spike at stage boundary</td>
+            <td>New data distribution — expected at pretrain→midtrain transition</td>
+            <td>Not a bug. Watch if it recovers within 50–100 steps</td>
+        </tr>
+        <tr>
+            <td>CK loss ≠ PT loss</td>
+            <td>Numerical parity broken</td>
+            <td>Stop training. Fix kernel parity before continuing. This should never happen.</td>
+        </tr>
+        <tr>
+            <td>Grad norms spike or collapse</td>
+            <td>Training instability — exploding or vanishing gradients</td>
+            <td>Check max_grad_norm clipping. If persistent, reduce LR or check data packing for degenerate sequences.</td>
+        </tr>
+        <tr>
+            <td>Loss oscillates without converging</td>
+            <td>LR too high, or data has conflicting signals (e.g., same prompt → different targets)</td>
+            <td>Verify dataset uniqueness. Try lower LR. Check for duplicate or contradictory training rows.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Decision Actions</h3>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>Use a repair run when the contract is almost closed</h3>
+        <p>If the current representation is strong and only a few cases remain, do a narrow repair run. Keep the baseline frozen and target the exact failure slice.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use a compiler step when visuals are still weak</h3>
+        <p>If the generated infographic is structurally correct but still visually simple, improve the compiler and asset vocabulary before spending more model compute.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use a tokenizer step when outputs are too brittle</h3>
+        <p>If the model only behaves well when whole component rows are reserved atomically, run a token-granularity spec next instead of adding more layouts or model size.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use a DSL step when the representation is still too literal or too loose</h3>
+        <p>If the model surface still carries inferable fields, arbitrary prose, or non-canonical structure, fix the DSL before scaling the model.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use a structure-content split when generalization is the problem</h3>
+        <p>If the scene language is still carrying visible prose or one-off values, branch to keyed structure plus separate <code>content.json</code>. The model should emit refs like <code>@section_card.0.title</code>, not literal asset prose inside the component token.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use richer negative examples when self-correction is weak</h3>
+        <p>Closing-tag repairs are not enough. Add wrong-layout, wrong-order, wrong-theme, and missing-component correction pairs when outputs are parseable but semantically wrong.</p>
+    </div>
+</div>
+
+<h2>Promotion Rules</h2>
+
+<ul>
+    <li>Promote a run only if it improves the primary target metric without regressing the already-solved slices.</li>
+    <li>Reject a run if it changes too many axes to interpret, even if the final number looks better.</li>
+    <li>Branch a new spec only when the current spec ceiling is real and well measured.</li>
+    <li>Make compiler fidelity a hard gate: use a gold pack, not just a couple of hand-picked examples.</li>
+    <li>Scale model size only after the DSL and compiler contracts are stable.</li>
+    <li>Keep run artifacts in <code>~/.cache/ck-engine-v7/models/train/</code>; keep curated project docs in the repo.</li>
+</ul>
+
+<h2>Related Pages</h2>
+
+<div class="report-grid">
+    <div class="report-card">
+        <h3>v7 Runbook</h3>
+        <p>The concrete operator commands, parity gates, and train/infer workflow.</p>
+        <p><a href="v7-runbook.html">Open v7-runbook.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Training Intuition</h3>
+        <p>The deeper failure-analysis and checkpointing page with the Phase 1–7 diagnostic matrix for training dynamics (gradients, attention, weights).</p>
+        <p><a href="training-intuition.html">Open training-intuition.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Training Curriculum</h3>
+        <p>The long-range CK-native learning ladder from <code>v7</code> through later versions.</p>
+        <p><a href="training-curriculum.html">Open training-curriculum.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Version History</h3>
+        <p>The public roadmap showing how each version track feeds the next capability layer.</p>
+        <p><a href="version-history.html">Open version-history.html</a></p>
+    </div>
+</div>
+    </main>
+
+    <!-- SVG Viewer Overlay (shared across all pages) -->
+    <style>
+    .svg-viewer { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .svg-viewer:hover { transform: scale(1.01); box-shadow: 0 8px 32px rgba(255, 180, 0, 0.3); }
+    #svg-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 999999; }
+    #svg-overlay .toolbar { position: fixed; top: 0; left: 0; right: 0; padding: 10px 20px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-between; align-items: center; z-index: 1000000; border-bottom: 1px solid #333; }
+    #svg-overlay .toolbar .title { color: #ccc; font-size: 14px; }
+    #svg-overlay .toolbar .controls { display: flex; gap: 8px; align-items: center; }
+    #svg-overlay .toolbar button { background: #333; color: #ffb400; border: 1px solid #555; padding: 8px 14px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+    #svg-overlay .toolbar button:hover { background: #444; border-color: #ffb400; }
+    #svg-overlay .toolbar .close-btn { font-size: 20px; padding: 4px 12px; }
+    #svg-overlay .toolbar .zoom-display { color: #888; font-size: 12px; min-width: 45px; text-align: center; }
+    #svg-overlay .toolbar .separator { color: #444; }
+    #svg-overlay .image-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 60px 20px 20px; cursor: grab; }
+    #svg-overlay .image-container:active { cursor: grabbing; }
+    #svg-overlay .image-container img { max-width: 95%; max-height: 90vh; transform-origin: center center; }
+    #svg-overlay .nav-btn { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.7); color: #ffb400; border: 1px solid #555; font-size: 30px; padding: 20px 15px; cursor: pointer; z-index: 1000000; border-radius: 4px; }
+    #svg-overlay .nav-btn:hover { background: rgba(255,180,0,0.2); border-color: #ffb400; }
+    #svg-overlay .nav-prev { left: 10px; }
+    #svg-overlay .nav-next { right: 10px; }
+    #svg-overlay .hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: #666; font-size: 12px; background: rgba(0,0,0,0.8); padding: 8px 20px; border-radius: 20px; }
+    </style>
+
+    <div id="svg-overlay">
+        <div class="toolbar">
+            <span class="title" id="svg-title">Image</span>
+            <div class="controls">
+                <button onclick="svgViewer.zoomOut()" title="Zoom Out (-)">-</button>
+                <span class="zoom-display" id="zoom-display">100%</span>
+                <button onclick="svgViewer.zoomIn()" title="Zoom In (+)">+</button>
+                <span class="separator">|</span>
+                <button onclick="svgViewer.fitWidth()" title="Fit Width (W)">Width</button>
+                <button onclick="svgViewer.fitHeight()" title="Fit Height (H)">Height</button>
+                <button onclick="svgViewer.resetZoom()" title="Reset (0)">Reset</button>
+                <span class="separator">|</span>
+                <button class="close-btn" onclick="svgViewer.close()" title="Close (ESC)">&times;</button>
+            </div>
+        </div>
+        <button class="nav-btn nav-prev" onclick="svgViewer.prev()" title="Previous">&larr;</button>
+        <button class="nav-btn nav-next" onclick="svgViewer.next()" title="Next">&rarr;</button>
+        <div class="image-container" id="svg-container">
+            <img id="svg-image" src="" alt="">
+        </div>
+        <div class="hint">Scroll to zoom | Drag to pan | W/H to fit | 0 to reset | ESC to close</div>
+    </div>
+
+    <script>
+    var svgViewer = (function() {
+        var overlay, img, titleEl, container;
+        var images = [];
+        var currentIndex = 0;
+        var scale = 1, panX = 0, panY = 0;
+        var isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+
+        function init() {
+            overlay = document.getElementById('svg-overlay');
+            img = document.getElementById('svg-image');
+            titleEl = document.getElementById('svg-title');
+            container = document.getElementById('svg-container');
+            if (!overlay || !img) return;
+
+            document.querySelectorAll('.svg-viewer').forEach(function(viewer, index) {
+                var viewerImg = viewer.querySelector('img');
+                if (viewerImg) {
+                    images.push({ src: viewerImg.src, title: viewer.getAttribute('data-title') || viewerImg.alt || 'Diagram' });
+                    viewer.onclick = function(e) { e.preventDefault(); open(index); };
+                }
+            });
+
+            container.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                scale = Math.max(0.5, Math.min(10, scale + (e.deltaY > 0 ? -0.2 : 0.2)));
+                updateTransform();
+            });
+
+            container.addEventListener('mousedown', function(e) { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; panStartX = panX; panStartY = panY; });
+            document.addEventListener('mousemove', function(e) { if (!isDragging) return; panX = panStartX + (e.clientX - dragStartX); panY = panStartY + (e.clientY - dragStartY); updateTransform(); });
+            document.addEventListener('mouseup', function() { isDragging = false; });
+
+            document.addEventListener('keydown', function(e) {
+                if (overlay.style.display !== 'block') return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'ArrowLeft') prev();
+                if (e.key === 'ArrowRight') next();
+                if (e.key === '+' || e.key === '=') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === '0') resetZoom();
+                if (e.key === 'w' || e.key === 'W') fitWidth();
+                if (e.key === 'h' || e.key === 'H') fitHeight();
+            });
+
+            overlay.addEventListener('click', function(e) { if (e.target === overlay || e.target === container) close(); });
+        }
+
+        function updateTransform() {
+            img.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + scale + ')';
+            var zd = document.getElementById('zoom-display');
+            if (zd) zd.textContent = Math.round(scale * 100) + '%';
+        }
+
+        function open(index) {
+            if (!images[index]) return;
+            currentIndex = index; scale = 1; panX = 0; panY = 0;
+            img.src = images[index].src;
+            titleEl.textContent = images[index].title + ' (' + (index + 1) + '/' + images.length + ')';
+            updateTransform();
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function close() { overlay.style.display = 'none'; document.body.style.overflow = ''; }
+        function prev() { open((currentIndex - 1 + images.length) % images.length); }
+        function next() { open((currentIndex + 1) % images.length); }
+        function zoomIn() { scale = Math.min(10, scale + 0.25); updateTransform(); }
+        function zoomOut() { scale = Math.max(0.5, scale - 0.25); updateTransform(); }
+        function resetZoom() { scale = 1; panX = 0; panY = 0; updateTransform(); }
+
+        function fitWidth() {
+            if (!img.naturalWidth || !img.complete) { img.onload = fitWidth; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerWidth - 150) / img.naturalWidth));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        function fitHeight() {
+            if (!img.naturalHeight || !img.complete) { img.onload = fitHeight; return; }
+            scale = Math.max(0.1, Math.min(10, (window.innerHeight - 120) / img.naturalHeight));
+            panX = 0; panY = 0; updateTransform();
+        }
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+        return { open: open, close: close, prev: prev, next: next, zoomIn: zoomIn, zoomOut: zoomOut, resetZoom: resetZoom, fitWidth: fitWidth, fitHeight: fitHeight };
+    })();
+
+    // Mobile navigation
+    (function() {
+        var navToggle = document.querySelector('.nav-toggle');
+        var siteNav = document.querySelector('.site-nav');
+        var dropdowns = document.querySelectorAll('.nav-dropdown');
+
+        if (navToggle && siteNav) {
+            navToggle.addEventListener('click', function() {
+                navToggle.classList.toggle('active');
+                siteNav.classList.toggle('open');
+                navToggle.setAttribute('aria-expanded', siteNav.classList.contains('open'));
+            });
+
+            // Close menu when clicking a non-dropdown link
+            siteNav.querySelectorAll('a:not(.nav-dropdown-menu a)').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        navToggle.classList.remove('active');
+                        siteNav.classList.remove('open');
+                    }
+                });
+            });
+        }
+
+        // Handle dropdowns on mobile
+        dropdowns.forEach(function(dropdown) {
+            var trigger = dropdown.querySelector('.nav-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        e.preventDefault();
+                        // Close other dropdowns
+                        dropdowns.forEach(function(d) {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        dropdown.classList.toggle('open');
+                    }
+                });
+            }
+        });
+
+        // Close dropdowns when clicking outside on mobile
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 768 && !e.target.closest('.nav-dropdown')) {
+                dropdowns.forEach(function(d) { d.classList.remove('open'); });
+            }
+        });
+    })();
+    </script>
+
+    <!-- MathJax for LaTeX equations across docs pages -->
+    <script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+        },
+        options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        svg: {
+            fontCache: 'global'
+        }
+    };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <footer style="background: #2a2a2a; border-top: 1px solid #454545; color: #b0b0b0; padding: 3rem 2rem; margin-top: auto;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">C-Kernel-Engine</h4>
+                <p style="color: #707070; font-size: 0.875rem; margin: 0;">High-performance ML kernels with full PyTorch parity.</p>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Resources</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://github.com/antshiv/C-Kernel-Engine" style="color: #909090; text-decoration: none; font-size: 0.875rem;">GitHub</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="architecture.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">Architecture</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="api.html" style="color: #909090; text-decoration: none; font-size: 0.875rem;">API Reference</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #ffb400; margin-bottom: 0.75rem; font-size: 1rem;">Related</h4>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="margin-bottom: 0.5rem;"><a href="https://pytorch.org" style="color: #909090; text-decoration: none; font-size: 0.875rem;">PyTorch</a></li>
+                    <li style="margin-bottom: 0.5rem;"><a href="https://antsand.com" style="color: #909090; text-decoration: none; font-size: 0.875rem;">antsand.com</a></li>
+                </ul>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-18</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
