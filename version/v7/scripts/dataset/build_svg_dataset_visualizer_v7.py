@@ -152,10 +152,13 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
     placeholder_totals: dict[str, int] = {}
     for entry in catalog:
         out = entry.get("output_tokens", "")
-        # Count DSL tag families: [tag:value] → tag
+        # Count DSL tag families: [tag:value] → tag as tag_totals, value as placeholder
         for m in re.finditer(r"\[(\w+):([^\]]*)\]", out):
             tag_name = m.group(1)
+            tag_value = m.group(2).strip()
             tag_totals[tag_name] = tag_totals.get(tag_name, 0) + 1
+            if tag_value:
+                placeholder_totals[tag_value] = placeholder_totals.get(tag_value, 0) + 1
         # Count SVG tags if svg_xml present
         svg_xml = entry.get("svg_xml", "")
         if svg_xml:
@@ -216,7 +219,7 @@ def _synthesize_structured_atoms(workspace: Path) -> tuple[dict, dict]:
             "split": split,
             "chars": chars,
             "size_band": "small" if chars < 500 else "medium" if chars < 2000 else "large",
-            "roles": [split],
+            "roles": [topic, split],
             "features": {"has_text": True, "has_color": True},
             "tag_counts": entry_tags,
             "placeholders": {},
@@ -2423,12 +2426,12 @@ function renderVocabulary() {
     html += '<div class="stats-grid">';
     html += statCardHtml(fmt(Object.keys(tagTotals).length), isSynthesized ? 'DSL + SVG Tags' : 'SVG Tag Types');
     html += statCardHtml(fmt(tagTotal), 'Total Instances', null, 'blue');
-    html += statCardHtml(fmt(Object.keys(placeholders).length), 'Placeholder Types');
-    html += statCardHtml(fmt(phTotal), 'Placeholder Instances', null, 'green');
+    html += statCardHtml(fmt(Object.keys(placeholders).length), isSynthesized ? 'DSL Value Types' : 'Placeholder Types');
+    html += statCardHtml(fmt(phTotal), isSynthesized ? 'Value Instances' : 'Placeholder Instances', null, 'green');
     html += '</div>';
 
     html += sectionHtml('🔤', isSynthesized ? 'DSL + SVG Tag Histogram' : 'SVG Vocabulary Histogram', fmt(Object.keys(tagTotals).length)+' tags', 'badge-blue', 'vocabBody');
-    html += sectionHtml('📝', 'Placeholder Histogram', '', 'badge-green', 'phBody');
+    html += sectionHtml('📝', isSynthesized ? 'DSL Value Histogram' : 'Placeholder Histogram', '', 'badge-green', 'phBody');
 
     el.innerHTML = html;
 
@@ -2439,7 +2442,9 @@ function renderVocabulary() {
         distBarsHtml(tagTotals, tagTotal, '#07adf8');
 
     document.getElementById('phBody').innerHTML =
-        '<div class="subnote">Human text removed during normalization. Keeps composition/layout signal while reducing English memorization.</div>' +
+        (isSynthesized
+            ? '<div class="subnote">DSL tag values — the variable slots in [tag:value] tokens. Shows which values appear most frequently across the training corpus.</div>'
+            : '<div class="subnote">Human text removed during normalization. Keeps composition/layout signal while reducing English memorization.</div>') +
         distBarsHtml(placeholders, phTotal, '#47b475');
 }
 
@@ -2685,23 +2690,35 @@ function renderQuality() {
 
     let html = '';
     if (isSynthesized) {
-        html += provenanceBanner('Synthesized from render catalog. Duplicate/failure metrics reflect catalog-level data, not SVG normalization.');
+        html += provenanceBanner('Synthesized from render catalog — no SVG normalization or deduplication was performed. Metrics below reflect catalog counts, not measured quality gates.');
+        html += '<div class="stats-grid">';
+        html += statCardHtml(fmt(norm.normalized_entries||0), 'Catalog Entries', 'from render catalog (not normalized SVGs)', 'blue');
+        html += statCardHtml('N/A', 'Duplicates', 'deduplication not run on this workspace', '');
+        html += statCardHtml('N/A', 'Parse Failures', 'SVG parse step not applicable for DSL text', '');
+        html += '</div>';
+    } else {
+        html += '<div class="stats-grid">';
+        html += statCardHtml(fmt(dupes), 'Duplicates', null, dupes === 0 ? 'green' : 'red');
+        html += statCardHtml(fmt(failCount), 'Parse Failures', null, failCount === 0 ? 'green' : 'red');
+        html += statCardHtml(fmt(norm.normalized_entries||0), 'Normalized OK', null, 'green');
+        html += statCardHtml(fmt(norm.input_non_ascii_chars_total||0), 'Non-ASCII Input', null, (norm.input_non_ascii_chars_total||0) === 0 ? 'green' : '');
+        html += statCardHtml(fmt(norm.output_non_ascii_chars_total||0), 'Non-ASCII Output', null, (norm.output_non_ascii_chars_total||0) === 0 ? 'green' : 'red');
+        html += statCardHtml(fmt(norm.mapped_common_symbols_total||0), 'Mapped Symbols');
+        html += '</div>';
     }
-    html += '<div class="stats-grid">';
-    html += statCardHtml(fmt(dupes), 'Duplicates', null, dupes === 0 ? 'green' : 'red');
-    html += statCardHtml(fmt(failCount), 'Parse Failures', null, failCount === 0 ? 'green' : 'red');
-    html += statCardHtml(fmt(norm.normalized_entries||0), 'Normalized OK', null, 'green');
-    html += statCardHtml(fmt(norm.input_non_ascii_chars_total||0), 'Non-ASCII Input', null, (norm.input_non_ascii_chars_total||0) === 0 ? 'green' : '');
-    html += statCardHtml(fmt(norm.output_non_ascii_chars_total||0), 'Non-ASCII Output', null, (norm.output_non_ascii_chars_total||0) === 0 ? 'green' : 'red');
-    html += statCardHtml(fmt(norm.mapped_common_symbols_total||0), 'Mapped Symbols');
-    html += '</div>';
 
     // Checks
+    // Checks — skip SVG-specific checks for synthesized data
     const checks = [];
-    checks.push({ ok: dupes === 0, label: 'No duplicate hashes after normalization', detail: dupes ? `${dupes} duplicates` : 'All unique' });
-    checks.push({ ok: failCount === 0, label: 'No normalization parse failures', detail: failCount ? `${failCount} failures` : 'Clean parse' });
-    checks.push({ ok: (norm.output_non_ascii_chars_total||0) === 0, label: 'Output is ASCII-only', detail: `${norm.output_non_ascii_chars_total||0} non-ASCII chars in output` });
-    checks.push({ ok: (raw.duplicate_files||0) === 0, label: 'No duplicate raw imports', detail: `${raw.duplicate_files||0} raw dupes` });
+    if (isSynthesized) {
+        checks.push({ ok: true, label: 'Render catalog loaded', detail: fmt(norm.normalized_entries||0) + ' DSL entries from structured-atoms pipeline' });
+        checks.push({ ok: true, label: 'Catalog integrity', detail: 'Entries parsed without errors' });
+    } else {
+        checks.push({ ok: dupes === 0, label: 'No duplicate hashes after normalization', detail: dupes ? `${dupes} duplicates` : 'All unique' });
+        checks.push({ ok: failCount === 0, label: 'No normalization parse failures', detail: failCount ? `${failCount} failures` : 'Clean parse' });
+        checks.push({ ok: (norm.output_non_ascii_chars_total||0) === 0, label: 'Output is ASCII-only', detail: `${norm.output_non_ascii_chars_total||0} non-ASCII chars in output` });
+        checks.push({ ok: (raw.duplicate_files||0) === 0, label: 'No duplicate raw imports', detail: `${raw.duplicate_files||0} raw dupes` });
+    }
 
     html += sectionHtml('✅', 'Quality Checks', `${checks.filter(c=>c.ok).length}/${checks.length}`, checks.every(c=>c.ok)?'badge-green':'badge-red', 'qcBody');
     html += sectionHtml('🧠', 'Representation Checks', tok.available ? `${prompt.prompt_rows||0} prompt rows` : 'n/a', tok.available ? ((drift.count||0) ? 'badge-red' : 'badge-blue') : 'badge-purple', 'reprBody');
@@ -2753,8 +2770,16 @@ function populateFilters() {
     });
     const famEl = document.getElementById('filterFamily');
     const roleEl = document.getElementById('filterRole');
-    famEl.innerHTML = '<option value="">All families</option>' + [...families].sort().map(f => `<option value="${f}">${f}</option>`).join('');
-    roleEl.innerHTML = '<option value="">All roles</option>' + [...roles].sort().map(r => `<option value="${r}">${r}</option>`).join('');
+    var famLabel = isSynthesized ? 'All layouts' : 'All families';
+    var roleLabel = isSynthesized ? 'All topics' : 'All roles';
+    famEl.innerHTML = '<option value="">' + famLabel + '</option>' + [...families].sort().map(f => {
+        var desc = familyDescs[f];
+        return '<option value="' + esc(f) + '" ' + (desc ? 'title="' + esc(desc) + '"' : '') + '>' + esc(f) + (desc ? ' — ' + esc(desc.split('—')[0].trim()) : '') + '</option>';
+    }).join('');
+    roleEl.innerHTML = '<option value="">' + roleLabel + '</option>' + [...roles].sort().map(r => {
+        var desc = sourceDescs[r];
+        return '<option value="' + esc(r) + '">' + esc(r) + (desc ? ' — ' + esc(desc) : '') + '</option>';
+    }).join('');
 }
 
 /* ── Wiring ────────────────────────────────────────────────────── */

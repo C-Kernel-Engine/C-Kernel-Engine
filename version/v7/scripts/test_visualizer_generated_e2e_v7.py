@@ -460,6 +460,45 @@ def validate_dataset_viewer_structure(dv_path: Path) -> StageResult:
         "defined" if has_provenance else "missing — no data provenance tracking",
     ))
 
+    # Synthesized data integrity: if structured-atoms, verify synthesized path is honest
+    is_synth = "ck.structured_atoms_synthesized" in html
+    if is_synth:
+        # Quality tab must NOT show false-green metrics for synthesized data
+        has_catalog_entries = "Catalog Entries" in html
+        stage.checks.append(Check(
+            "synthesized quality shows 'Catalog Entries' not 'Normalized OK'",
+            has_catalog_entries,
+            "honest label" if has_catalog_entries else "still shows misleading 'Normalized OK'",
+        ))
+
+        # Must have family_descriptions for layout legend
+        has_fam_desc = "family_descriptions" in html
+        stage.checks.append(Check(
+            "synthesized data includes family_descriptions",
+            has_fam_desc,
+            "layout legend data present" if has_fam_desc else "missing layout descriptions",
+        ))
+
+        # Placeholder totals should be non-empty (DSL values)
+        has_ph = '"placeholder_totals":{' in html and '"placeholder_totals":{}' not in html
+        stage.checks.append(Check(
+            "synthesized placeholder_totals is populated",
+            has_ph,
+            "DSL values extracted" if has_ph else "empty — DSL tag values not counted",
+        ))
+
+        # Roles should include topic, not just split
+        # Check that roles array has more than just train/holdout
+        import re as _re
+        role_matches = _re.findall(r'"roles":\["([^"]+)"', html[:200000])
+        unique_roles = set(role_matches)
+        has_topic_roles = len(unique_roles) > 2  # more than just train/holdout
+        stage.checks.append(Check(
+            "synthesized roles include topic data (not just split)",
+            has_topic_roles,
+            f"{len(unique_roles)} unique role values" if has_topic_roles else "only split-based roles",
+        ))
+
     # File size check
     size = len(html)
     stage.checks.append(Check(

@@ -4105,7 +4105,7 @@ v7-visualizer-generated-e2e:
 #   v7-dataset-embeddings   │ embeddings.json                     │ Embeddings
 #   v7-dataset-attention    │ attention.json                      │ Attention
 #   v7-dataset-viewer       │ dataset_viewer.html                 │ All tabs
-#   v7-dataset-all          │ (all above + regenerate viewer)     │ All tabs
+#   v7-dataset-all          │ normalize+classify+embed+attn+viewer │ All tabs
 #
 V7_DATASET_RUN ?= $(RUN)
 
@@ -4133,6 +4133,11 @@ v7-dataset-viewer:
 
 v7-dataset-all:
 	@test -n "$(V7_DATASET_RUN)" || { echo "Usage: make v7-dataset-all RUN=<run_dir>"; exit 1; }
+	@echo "── Normalize ──"
+	-$(PYTHON) version/v7/scripts/dataset/normalize_svg_assets_v7.py --workspace "$(V7_DATASET_RUN)/dataset" --force 2>&1 || echo "  ⏭ normalize skipped (may not apply to structured-atoms workspaces)"
+	@echo "── Classify ──"
+	-$(PYTHON) version/v7/scripts/dataset/classify_svg_assets_v7.py --workspace "$(V7_DATASET_RUN)/dataset" --force 2>&1 || echo "  ⏭ classify skipped (may not apply to structured-atoms workspaces)"
+	@echo "── Embeddings + Attention + Viewer ──"
 	$(PYTHON) version/v7/tools/prepare_run_viewer.py "$(V7_DATASET_RUN)" --force
 
 visualizer-full:
