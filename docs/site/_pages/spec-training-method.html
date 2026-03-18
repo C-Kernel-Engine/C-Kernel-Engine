@@ -309,6 +309,77 @@
     token budget, and the model size all move at once, the run becomes uninterpretable.
 </div>
 
+<h2>Why This Method Exists</h2>
+
+<p>
+    This curriculum is not just local preference. It follows the same broad logic seen in scaling-law work, compute-optimal
+    training research, and capability-predictability discussions: use smaller and cheaper experiments to validate the
+    contract, the data, the tokenizer surface, and the evaluation loop before spending serious compute on larger runs.
+</p>
+
+<div class="report-grid">
+    <div class="report-card">
+        <h3>Scaling Laws</h3>
+        <p>
+            OpenAI's scaling-laws work is the clearest public reference for why small and medium runs are useful first:
+            they help forecast how loss changes with model size, data size, and compute before larger training runs.
+        </p>
+        <p><strong>Outcome:</strong> larger trends can be forecast from smaller controlled experiments.</p>
+        <p><strong>Applied here:</strong> use cheap spec runs to validate DSL, tokenizer, and eval contracts before spending serious training compute.</p>
+        <p><a href="https://openai.com/research/scaling-laws-for-neural-language-models" target="_blank" rel="noopener noreferrer">OpenAI — Scaling Laws for Neural Language Models</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Compute-Optimal Training</h3>
+        <p>
+            DeepMind's Chinchilla result is the classic argument against blindly scaling parameters without checking data
+            and token budgets. It supports the habit of using many smaller runs to find the recipe before the expensive run.
+        </p>
+        <p><strong>Outcome:</strong> better results often come from the right model/data/token balance, not just a bigger model.</p>
+        <p><strong>Applied here:</strong> compute packed token budgets and effective epochs per spec instead of copying old totals into new DSLs.</p>
+        <p><a href="https://proceedings.neurips.cc/paper_files/paper/2022/hash/c1e2faff6f588870935f114ebe04a3e5-Abstract-Conference.html" target="_blank" rel="noopener noreferrer">DeepMind — Training Compute-Optimal Large Language Models</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Predictability vs Surprise</h3>
+        <p>
+            Anthropic's paper is a useful reminder that broad trends can be predictable even while specific capabilities
+            and outputs remain surprising. That is why this project insists on probes, canaries, and run reports rather than loss alone.
+        </p>
+        <p><strong>Outcome:</strong> aggregate scaling behavior can be smooth while concrete behaviors still surprise operators.</p>
+        <p><strong>Applied here:</strong> every run needs split-aware probes, failure galleries, and promotion rules instead of trusting train loss.</p>
+        <p><a href="https://www.anthropic.com/news/predictability-and-surprise-in-large-generative-models" target="_blank" rel="noopener noreferrer">Anthropic — Predictability and Surprise in Large Generative Models</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Large-Scale Recipe Practice</h3>
+        <p>
+            Meta's Llama 3 paper is a useful public example of a model family trained with scaling-law thinking across
+            multiple sizes, rather than one single blind flagship run.
+        </p>
+        <p><strong>Outcome:</strong> a family of models is often used to refine the recipe, not just to ship different sizes.</p>
+        <p><strong>Applied here:</strong> keep `spec` lines interpretable at small scale first, then widen to mixed training and larger CK-native runs later.</p>
+        <p><a href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener noreferrer">Meta — The Llama 3 Herd of Models</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Project Curriculum</h3>
+        <p>
+            The CK-native version ladder explains how the current visual DSL work fits into the broader path from
+            compiler-backed training to page DSLs, code/data/tool IR, and eventually mixed coding/scientific tasks.
+        </p>
+        <p><strong>Outcome:</strong> visual DSL work is treated as foundation-building, not the final destination.</p>
+        <p><strong>Applied here:</strong> move from `spec06-12` SVG work toward page DSLs, code/data/tool IR, and broader mixed models.</p>
+        <p><a href="training-curriculum.html">Open training-curriculum.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Failure Visibility</h3>
+        <p>
+            The local intuition page explains why this method emphasizes canaries, parity gates, checkpoints, and
+            structured post-run reports instead of random trial-and-error.
+        </p>
+        <p><strong>Outcome:</strong> visibility turns failed runs into reusable knowledge instead of wasted compute.</p>
+        <p><strong>Applied here:</strong> every spec should leave behind a fixed HTML report with hypothesis, deltas, failures, and a decision.</p>
+        <p><a href="training-intuition.html">Open training-intuition.html</a></p>
+    </div>
+</div>
+
 <h2>Three Separate Contracts</h2>
 
 <div class="triad-grid">
