@@ -2699,7 +2699,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
 </head>
 <body>
   <div class="page-shell">
-    <section class="hero">
+    <section class="hero hub-header">
       <div class="hero-grid">
         <div>
           <div class="brand-badge">
