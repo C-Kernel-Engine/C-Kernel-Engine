@@ -2840,7 +2840,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
   <script>
     const HUB = __HUB_DATA__;
 
-    const els = {
+    const _els = {
       heroMeta: document.getElementById('heroMeta'),
       orbitalCoreValue: document.getElementById('orbitalCoreValue'),
       orbitFreshest: document.getElementById('orbitFreshest'),
@@ -2865,6 +2865,14 @@ def render_html(index_payload: dict[str, Any]) -> str:
       legendPanel: document.getElementById('legendPanel'),
       actionPanel: document.getElementById('actionPanel'),
     };
+    // Null-safe element accessor: returns a no-op stub if element missing
+    const _noop = new Proxy({}, { get: () => () => {}, set: () => true });
+    const els = new Proxy(_els, {
+      get(target, key) { return target[key] || _noop; }
+    });
+    function onEl(key, event, handler) {
+      if (_els[key]) _els[key].addEventListener(event, handler);
+    }
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -4368,36 +4376,36 @@ def render_html(index_payload: dict[str, Any]) -> str:
     }
 
     function bind() {
-      els.searchInput.addEventListener('input', (event) => {
+      onEl('searchInput', 'input', (event) => {
         state.search = event.target.value || '';
         refresh();
       });
-      els.kindFilter.addEventListener('change', (event) => {
+      onEl('kindFilter', 'change', (event) => {
         state.kind = event.target.value || 'all';
         refresh();
       });
-      els.parityFilter.addEventListener('change', (event) => {
+      onEl('parityFilter', 'change', (event) => {
         state.parity = event.target.value || 'all';
         refresh();
       });
-      els.reportFilter.addEventListener('change', (event) => {
+      onEl('reportFilter', 'change', (event) => {
         state.report = event.target.value || 'all';
         refresh();
       });
-      els.svgFilter.addEventListener('change', (event) => {
+      onEl('svgFilter', 'change', (event) => {
         state.svg = event.target.value || 'all';
         refresh();
       });
-      els.sortSelect.addEventListener('change', (event) => {
+      onEl('sortSelect', 'change', (event) => {
         state.sort = event.target.value || 'updated_desc';
         refresh();
       });
-      els.viewSelect.addEventListener('change', (event) => {
+      onEl('viewSelect', 'change', (event) => {
         state.view = event.target.value || 'cards';
         savePreference('ck_v7_run_hub_view', state.view);
         refresh();
       });
-      els.densitySelect.addEventListener('change', (event) => {
+      onEl('densitySelect', 'change', (event) => {
         state.density = event.target.value || 'comfortable';
         savePreference('ck_v7_run_hub_density', state.density);
         refresh();

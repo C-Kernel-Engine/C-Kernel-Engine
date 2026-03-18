@@ -23,6 +23,7 @@ import sys
 import json
 import base64
 import re
+import html as html_mod
 import shutil
 import platform
 import webbrowser
@@ -4058,7 +4059,7 @@ def generate_html_report(
     # Update title
     html = html.replace(
         '<title>IR Visualizer | C-Kernel-Engine</title>',
-        f'<title>IR Visualizer | {model_name} | C-Kernel-Engine</title>'
+        f'<title>IR Visualizer | {html_mod.escape(model_name)} | C-Kernel-Engine</title>'
     )
 
     # Write output
