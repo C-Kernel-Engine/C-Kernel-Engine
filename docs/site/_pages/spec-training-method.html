@@ -491,6 +491,52 @@ content.json bound by the compiler
     same scene with different content payloads without retraining the model.
 </p>
 
+<h2>Topology Refs vs Content Refs</h2>
+
+<p>
+    Some richer layout families need more than content slots. Trees, maps, and graph-style layouts also need stable
+    structural handles so the compiler knows what connects to what.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Ref Type</th>
+            <th>Example</th>
+            <th>Used For</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Topology ref</td>
+            <td><code>[node_id:start]</code>, <code>[from_ref:start]</code>, <code>[to_ref:l2]</code></td>
+            <td>Identity, routing, graph layout, branch placement, segment attachment</td>
+        </tr>
+        <tr>
+            <td>Content ref</td>
+            <td><code>[title_ref:nodes.start.title]</code>, <code>[branch_label_ref:edges.start_l2]</code></td>
+            <td>Visible text and numeric payload from <code>content.json</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="card policy-code">
+<pre>[decision_node]
+[node_id:start]
+[title_ref:nodes.start.title]
+[/decision_node]
+
+[decision_edge]
+[from_ref:start]
+[to_ref:l2]
+[branch_label_ref:edges.start_l2]
+[/decision_edge]</pre>
+</div>
+
+<p class="mini-note">
+    This dual-reference pattern is not a bug. It is the right compiler boundary for tree, map, and topology layouts.
+</p>
+
 <h2>Why Explicit Tokens Instead Of Generic BPE Right Now?</h2>
 
 <p>
@@ -666,6 +712,41 @@ Better boundary
         <p>After every run, decide: promote, reject, repair, or branch. Every run ends with a next action, not just a score.</p>
     </div>
 </div>
+
+<h2>Context Budget Is A Gate</h2>
+
+<p>
+    Do not guess the next context length. Measure the gold scenes with the current tokenizer family before training.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Rule</th>
+            <th>Interpretation</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>p95(prompt + output) &lt; 400</code></td>
+            <td><code>ctx=512</code> is probably still enough.</td>
+        </tr>
+        <tr>
+            <td><code>400-600</code></td>
+            <td>Move to <code>ctx=768</code> only if the gold pack actually lives here.</td>
+        </tr>
+        <tr>
+            <td><code>&gt; 768</code></td>
+            <td>Use <code>ctx=1024</code> only when the gold scenes really need it.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    The important lesson from the keyed-scene line was that a layout can fail because of decode or context budget even
+    when the model already learned the structure correctly. Budget diagnostics should therefore be part of the probe
+    contract, not an afterthought.
+</p>
 
 <h2>How To Build Frontier-Style Intuition</h2>
 
@@ -1111,6 +1192,18 @@ Next run:</pre>
             <td>Fix the plan update logic. Probe report should not depend on plan status for results.</td>
             <td>spec11 r1: active_stage still "midtrain" after completion</td>
         </tr>
+        <tr class="row-critical">
+            <td>One layout perfect until truncated — missing closing tags</td>
+            <td>Output exceeds context window — model learned the content but runs out of tokens</td>
+            <td>Measure output token count vs context length. Either compress the DSL (remove inferable fields) or raise context. Do not add more training data — the model already knows it.</td>
+            <td>spec11 r2: poster_stack matched 2208/2606 chars perfectly, then truncated — 9/9 failures all identical</td>
+        </tr>
+        <tr class="row-warning">
+            <td>Gold mapping token budget far exceeds context window</td>
+            <td>DSL is too verbose — carrying fields the compiler could infer</td>
+            <td>Run a DSL compression pass before defining the tokenizer. Target: output tokens &lt; 80% of context length. Measure with <code>build_spec12_gold_budget_report_v7.py</code>.</td>
+            <td>spec12 gold: memory_map = 2793 tokens, ctx = 512 — 5.5× over budget</td>
+        </tr>
     </tbody>
 </table>
 
@@ -1253,7 +1346,112 @@ Next run:</pre>
     <li>Make compiler fidelity a hard gate: use a gold pack, not just a couple of hand-picked examples.</li>
     <li>Scale model size only after the DSL and compiler contracts are stable.</li>
     <li>Keep run artifacts in <code>~/.cache/ck-engine-v7/models/train/</code>; keep curated project docs in the repo.</li>
+    <li>Measure output token budget against context window before training. If the longest gold mapping exceeds 80% of context length, compress the DSL or raise context first.</li>
 </ul>
+
+<h2>Asset Scaling Strategy</h2>
+
+<p>
+    Do not try to train on a large asset library immediately. Prove each capability level first, then widen.
+    The pattern is: <strong>memorize → generalize → expand</strong>.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Phase</th>
+            <th>Gold Assets</th>
+            <th>Goal</th>
+            <th>Pass Criteria</th>
+            <th>What Failure Means</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr class="row-info">
+            <td>Memorization</td>
+            <td>3 hand-mapped</td>
+            <td>Can the model reproduce 3 exact gold scenes from their prompts?</td>
+            <td>100% exact on train, compiler round-trips all 3</td>
+            <td>DSL, tokenizer, or context window is wrong — fix before adding more data</td>
+        </tr>
+        <tr class="row-info">
+            <td>Held-out generalization</td>
+            <td>3 gold + 3 synthetic variants</td>
+            <td>Can the model produce correct scenes for unseen topic × layout combinations?</td>
+            <td>&gt;70% exact on dev/test splits</td>
+            <td>Curriculum needs more edit diversity — add topic swaps, density changes, theme variations</td>
+        </tr>
+        <tr class="row-warning">
+            <td>Family expansion</td>
+            <td>7–10 gold across 5+ families</td>
+            <td>Does adding new layout families break already-learned ones?</td>
+            <td>&gt;70% exact overall, no per-family regression below 50%</td>
+            <td>Anchor replay too weak — increase replay ratio for stable families</td>
+        </tr>
+        <tr class="row-warning">
+            <td>Compositional generalization</td>
+            <td>10+ gold, compositional tokens</td>
+            <td>Can the model compose components it has seen in new combinations?</td>
+            <td>&gt;60% exact on novel layout × component combinations</td>
+            <td>Token granularity too coarse — break monolithic tokens into compositional pieces</td>
+        </tr>
+        <tr>
+            <td>Open planning</td>
+            <td>20+ gold, underspecified prompts</td>
+            <td>Can the model choose layout family from an ambiguous request?</td>
+            <td>Reasonable family choice &gt;80%, compiler renders successfully &gt;90%</td>
+            <td>Model needs more prompt diversity and possibly larger capacity</td>
+        </tr>
+    </tbody>
+</table>
+
+<p class="mini-note">
+    Each phase should be a separate spec or run. Do not skip phases — a failure at phase 2 means phase 3 data will be wasted compute.
+    The gold asset count is a guide, not a rule. What matters is that each phase answers its specific question before the next one starts.
+</p>
+
+<h3>Pre-Training Checklist</h3>
+
+<p>
+    Before launching any training run in a new spec, verify all of these gates. If any fails, fix it before spending compute.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Gate</th>
+            <th>Check</th>
+            <th>Tool</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Compiler parity</td>
+            <td>Every gold scene.dsl + content.json compiles to valid SVG that matches the reference asset</td>
+            <td>Compiler round-trip test against gold pack</td>
+        </tr>
+        <tr>
+            <td>Token budget</td>
+            <td>Longest gold output fits within 80% of context window after tokenization</td>
+            <td><code>build_spec12_gold_budget_report_v7.py</code> or equivalent</td>
+        </tr>
+        <tr>
+            <td>Tokenizer coverage</td>
+            <td>All DSL tokens in the gold pack are in the tokenizer vocabulary — no <code>&lt;unk&gt;</code> fallbacks</td>
+            <td>Tokenize each gold scene and check for unknown tokens</td>
+        </tr>
+        <tr>
+            <td>Parity regimen</td>
+            <td>CK ↔ PyTorch forward/backward/optimizer parity passes at the target model size</td>
+            <td><code>training_parity_regimen_latest.json</code></td>
+        </tr>
+        <tr>
+            <td>Dataset QC</td>
+            <td>All training rows parse, no duplicates, holdout prompts are disjoint from train</td>
+            <td>Dataset QC step in training pipeline</td>
+        </tr>
+    </tbody>
+</table>
 
 <h2>Related Pages</h2>
 
