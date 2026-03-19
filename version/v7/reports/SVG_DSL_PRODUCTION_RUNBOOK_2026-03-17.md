@@ -634,12 +634,26 @@ Deliverables:
 
 Goal:
 
-- improve content generation separately or connect retrieval/template systems
+- bridge from explicit scene-control prompts to intent-driven scene planning
+- keep content generation separate from scene planning
+
+Recommended first step:
+
+- `spec13a`: semi-structured intent prompts with `topic + goal + audience`, but
+  no explicit `layout`, `theme`, `tone`, or `density`
+- keep `content.json` external and the compiler deterministic
+- measure layout-family choice and inferred-field accuracy before introducing
+  freer language
+
+See:
+
+- [SPEC13A_INTENT_PROMPT_BRIDGE_2026-03-18.md](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/reports/SPEC13A_INTENT_PROMPT_BRIDGE_2026-03-18.md)
 
 Deliverables:
 
-- larger content library
-- optional separate content-generation line
+- `spec13a`: intent-prompt bridge with bounded ontology
+- `spec13b`: controlled paraphrases over the same topic/family set
+- optional separate content-generation line later
 - production-style scene + content rendering tests
 
 ## Bottom Line
