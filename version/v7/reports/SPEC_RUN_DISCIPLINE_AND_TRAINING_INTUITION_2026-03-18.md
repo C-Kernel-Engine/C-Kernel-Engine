@@ -201,6 +201,57 @@ Good rule:
 
 This is how failures become supervision rather than wasted compute.
 
+## The Failure Matrix
+
+Use this matrix as the default run read before deciding whether to repair data,
+change the DSL, fix the compiler, or scale compute.
+
+| Failure Class | What It Looks Like | What To Track | Likely Cause | Typical Fix |
+|---|---|---|---|---|
+| `scene_prefix_failure` | missing `[scene]`, missing `[layout:...]`, duplicated top-level attrs | start-valid rate, missing-layout rate, duplicate-attr rate | weak canonical anchors, too much fragment training | add full-scene canonical rows and prefix-only repair rows |
+| `scene_suffix_failure` | missing `[/scene]` | close-tag miss rate | weak termination training, decode stop/budget issues | add close-tag rows, verify stop markers, verify decode budget |
+| `block_nesting_failure` | wrong closing tag, invalid nesting, repeated block open | nesting error rate by block type | weak block grammar, fragment-heavy repair rows | add balanced block rows, transition rows, canonical block-order rows |
+| `budget_truncation` | correct prefix cut off | `truncated_at_budget` rate, prompt/output token counts | decode budget too small or context too small | raise decode budget first, then context only if needed |
+| `special_token_leak` | `<|bos|>`, `<|eos|>`, prompt tokens inside scene output | special-token leak rate | tokenizer boundary contamination, bad row boundaries | strip/control special tokens and strengthen scene-only targets |
+| `layout_drift` | wrong family or empty layout | per-layout confusion matrix | family overlap, weak family anchors | more direct family rows and layout-class repair rows |
+| `theme_tone_drift` | wrong or duplicated theme/tone attrs | theme/tone confusion matrix, duplicate-attr rate | weak top-level canonicalization, over-repair | canonical scene-header rows and dedupe rules |
+| `renderable_but_not_exact` | SVG compiles but scene DSL is off | exact vs renderable gap | semantic drift, ordering drift | targeted exactness repair rows |
+| `exact_but_not_materialized` | scene matches but final SVG differs | materialized-exact gap | compiler or content-binding bug | fix renderer/probe path, not training |
+| `family_imbalance` | one family learns, one collapses | per-family exact/renderable/materialized | data imbalance or family-specific grammar difficulty | family-specific anchors and family-weight tuning |
+| `undertraining` | high loss, broad failure everywhere | loss curve, steps per epoch, token budget | too little budget for the grammar difficulty | raise epochs or total tokens |
+| `over_repair_fragmentation` | valid local fragments but corrupted full scenes after a repair push | renderable drop after repair-row increase, local grammar error counts | too many fragment rows relative to clean full scenes | reduce fragment ratio and add more clean full-scene anchors |
+| `compiler_parity_gap` | model may be fine but target family still looks weak | gold asset parity score | compiler not expressive enough | do a compiler pass before more training |
+| `probe_accounting_bug` | obviously good outputs score wrong | mismatch between exact, renderable, and materialized evidence | reporting or probe bug | fix probe/report path first |
+
+## Minimum Run Scoreboard
+
+Every run should publish the same small scoreboard:
+
+| Metric | Why |
+|---|---|
+| `exact_rate` | scene contract fidelity |
+| `renderable_rate` | structural validity |
+| `materialized_exact_rate` | final compiler truth |
+| `budget_truncation_rate` | separates learning failure from budget failure |
+| `missing_scene_start_rate` | top-level grammar health |
+| `missing_scene_end_rate` | termination health |
+| `duplicate_attr_rate` | canonicalization health |
+| `block_nesting_error_rate` | nested grammar health |
+| `special_token_leak_rate` | tokenizer/output contamination |
+| per-layout exact/renderable/materialized | family-specific diagnosis |
+| train/dev/test split rates | overfit detection |
+| `gold_asset_parity_score` | compiler readiness |
+
+Simple interpretation rules:
+
+- low exact + high renderable -> semantic or ordering drift
+- low renderable + low truncation -> grammar corruption
+- high truncation -> budget problem
+- high exact + low materialized exact -> compiler or probe bug
+- one family bad, others good -> family-specific curriculum problem
+- all families bad + high loss -> undertraining
+- all families bad after huge repair increase -> over-repair fragmentation
+
 ## What To Copy From Frontier Practice
 
 The useful habits are not mystical. They are operational:

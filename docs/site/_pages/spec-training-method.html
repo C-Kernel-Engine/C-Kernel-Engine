@@ -1713,6 +1713,193 @@ Next run:</pre>
     A practical rule is: <strong>same spec -> usually continue or rerun inside the same family; new spec -> usually start a new line</strong>. This is how failures become supervision instead of wasted compute.
 </p>
 
+<h3>Run Failure Matrix</h3>
+
+<p>
+    The most useful next step is not "train more." It is to name the failure class correctly. The table below is the default matrix for interpreting a run before deciding whether to repair the data, change the DSL, fix the compiler, or scale capacity.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Failure Class</th>
+            <th>What It Looks Like</th>
+            <th>What To Track</th>
+            <th>Likely Cause</th>
+            <th>Typical Fix</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>scene_prefix_failure</code></td>
+            <td>Missing <code>[scene]</code>, missing <code>[layout:...]</code>, duplicated top-level attrs</td>
+            <td>start-valid rate, missing-layout rate, duplicate-attr rate</td>
+            <td>weak canonical anchors, too much fragment training</td>
+            <td>add full-scene canonical rows and prefix-only repair rows</td>
+        </tr>
+        <tr>
+            <td><code>scene_suffix_failure</code></td>
+            <td>Missing <code>[/scene]</code></td>
+            <td>close-tag miss rate</td>
+            <td>weak termination training, decode stop/budget issues</td>
+            <td>add close-tag rows, verify stop markers, verify decode budget</td>
+        </tr>
+        <tr>
+            <td><code>block_nesting_failure</code></td>
+            <td>wrong closing tag, invalid nesting, repeated block open</td>
+            <td>nesting error rate by block type</td>
+            <td>weak block grammar, fragment-heavy repair rows</td>
+            <td>add balanced block rows, transition rows, canonical block-order rows</td>
+        </tr>
+        <tr>
+            <td><code>budget_truncation</code></td>
+            <td>Output is a correct prefix but cut off</td>
+            <td><code>truncated_at_budget</code> rate, prompt/output token counts</td>
+            <td>decode budget too small or context too small</td>
+            <td>raise decode budget first, then context only if needed</td>
+        </tr>
+        <tr>
+            <td><code>special_token_leak</code></td>
+            <td><code>&lt;|bos|&gt;</code>, <code>&lt;|eos|&gt;</code>, or prompt tokens leaking inside scene output</td>
+            <td>special-token leak rate</td>
+            <td>tokenizer boundary contamination, bad row boundaries</td>
+            <td>strip/control special tokens and strengthen scene-only targets</td>
+        </tr>
+        <tr>
+            <td><code>layout_drift</code></td>
+            <td>Wrong family or empty layout</td>
+            <td>per-layout confusion matrix</td>
+            <td>family overlap, weak family anchors</td>
+            <td>more direct family rows and layout-class repair rows</td>
+        </tr>
+        <tr>
+            <td><code>theme_tone_drift</code></td>
+            <td>wrong or duplicated theme/tone attrs</td>
+            <td>theme/tone confusion matrix, duplicate-attr rate</td>
+            <td>weak top-level canonicalization, over-repair</td>
+            <td>canonical scene-header rows and dedupe rules</td>
+        </tr>
+        <tr>
+            <td><code>renderable_but_not_exact</code></td>
+            <td>SVG compiles but scene DSL is off</td>
+            <td>exact vs renderable gap</td>
+            <td>semantic drift, ordering drift</td>
+            <td>targeted exactness repair rows</td>
+        </tr>
+        <tr>
+            <td><code>exact_but_not_materialized</code></td>
+            <td>scene matches but final SVG differs</td>
+            <td>materialized-exact gap</td>
+            <td>compiler or content-binding bug</td>
+            <td>fix renderer/probe path, not training</td>
+        </tr>
+        <tr>
+            <td><code>family_imbalance</code></td>
+            <td>one family learns, one collapses</td>
+            <td>per-family exact/renderable/materialized</td>
+            <td>data imbalance or family-specific grammar difficulty</td>
+            <td>family-specific anchors and family-weight tuning</td>
+        </tr>
+        <tr>
+            <td><code>undertraining</code></td>
+            <td>high loss, broad failure everywhere</td>
+            <td>loss curve, steps per epoch, token budget</td>
+            <td>too little budget for the grammar difficulty</td>
+            <td>raise epochs or total tokens</td>
+        </tr>
+        <tr>
+            <td><code>over_repair_fragmentation</code></td>
+            <td>valid local fragments but corrupted full scenes after a repair push</td>
+            <td>renderable drop after repair-row increase, local grammar error counts</td>
+            <td>too many fragment rows relative to clean full scenes</td>
+            <td>reduce fragment ratio and add more clean full-scene anchors</td>
+        </tr>
+        <tr>
+            <td><code>compiler_parity_gap</code></td>
+            <td>the model may be fine but the target family still looks weak</td>
+            <td>gold asset parity score</td>
+            <td>compiler not expressive enough</td>
+            <td>do a compiler pass before more training</td>
+        </tr>
+        <tr>
+            <td><code>probe_accounting_bug</code></td>
+            <td>obviously good outputs score wrong</td>
+            <td>mismatch between exact, renderable, and materialized evidence</td>
+            <td>reporting or probe bug</td>
+            <td>fix probe/report path first</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Minimum Run Scoreboard</h3>
+
+<p>
+    Every run should publish the same small scoreboard. This keeps comparisons honest and makes failure classes visible without reading raw prompt dumps first.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Metric</th>
+            <th>Why It Matters</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>exact_rate</code></td>
+            <td>scene contract fidelity</td>
+        </tr>
+        <tr>
+            <td><code>renderable_rate</code></td>
+            <td>structural validity</td>
+        </tr>
+        <tr>
+            <td><code>materialized_exact_rate</code></td>
+            <td>final compiler truth</td>
+        </tr>
+        <tr>
+            <td><code>budget_truncation_rate</code></td>
+            <td>separates learning failure from budget failure</td>
+        </tr>
+        <tr>
+            <td><code>missing_scene_start_rate</code></td>
+            <td>top-level grammar health</td>
+        </tr>
+        <tr>
+            <td><code>missing_scene_end_rate</code></td>
+            <td>termination health</td>
+        </tr>
+        <tr>
+            <td><code>duplicate_attr_rate</code></td>
+            <td>canonicalization health</td>
+        </tr>
+        <tr>
+            <td><code>block_nesting_error_rate</code></td>
+            <td>nested grammar health</td>
+        </tr>
+        <tr>
+            <td><code>special_token_leak_rate</code></td>
+            <td>tokenizer/output contamination</td>
+        </tr>
+        <tr>
+            <td>per-layout exact/renderable/materialized</td>
+            <td>family-specific diagnosis</td>
+        </tr>
+        <tr>
+            <td>train/dev/test split rates</td>
+            <td>overfit detection</td>
+        </tr>
+        <tr>
+            <td><code>gold_asset_parity_score</code></td>
+            <td>compiler readiness</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    A simple interpretation rule helps keep the read honest: low exact with high renderable usually means semantic or ordering drift; low renderable with low truncation usually means grammar corruption; high truncation is a budget problem; high exact with low materialized exact is a compiler or probe bug.
+</p>
+
 <h3>What To Copy From Frontier Practice</h3>
 
 <ul>
