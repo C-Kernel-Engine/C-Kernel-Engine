@@ -2352,6 +2352,56 @@ Next run:</pre>
     <li>Measure output token budget against context window before training. If the longest gold mapping exceeds 80% of context length, compress the DSL or raise context first.</li>
 </ul>
 
+<h2>Spec Versus Run</h2>
+
+<p>
+    The project uses <code>spec[x]</code> and <code>r[y]</code> for a reason. A <strong>spec</strong> is a new training contract. A <strong>run revision</strong> is a controlled iteration inside the same contract.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Level</th>
+            <th>Meaning</th>
+            <th>What May Change</th>
+            <th>What Should Stay Fixed</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>spec[x]</code></td>
+            <td>A new experiment question and a new learning boundary</td>
+            <td>DSL, prompt surface, compiler ownership, token granularity, output family, structure/content split</td>
+            <td>The project goal and the evaluation discipline</td>
+        </tr>
+        <tr>
+            <td><code>r[y]</code></td>
+            <td>A revision inside one spec</td>
+            <td>Repair rows, replay ratios, token budgets, epochs, balance, decode hygiene, capacity after the contract is stable</td>
+            <td>The DSL contract, the probe target, and the main question</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    Start a new spec when the current ceiling is real and measured. Stay inside the same spec when the failure is narrow and the representation still matches the intended product boundary.
+</p>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>Use a new spec when the question changed</h3>
+        <p>Examples: move from flat atoms to scene DSL, move from explicit layout prompts to intent prompts, or split visible content out into <code>content.json</code>.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Use a new run when the contract is right but weak</h3>
+        <p>Examples: add closure repairs, strengthen replay, rebalance families, or raise effective epochs for the same grammar.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Reject blurry runs</h3>
+        <p>If a run changes grammar, curriculum, and capacity at once, it may still improve a metric, but it will not teach much. That is wasted research signal.</p>
+    </div>
+</div>
+
 <h2>Asset Scaling Strategy</h2>
 
 <p>
@@ -2413,6 +2463,158 @@ Next run:</pre>
     The gold asset count is a guide, not a rule. What matters is that each phase answers its specific question before the next one starts.
 </p>
 
+<h2>How To Build Training Intuition Without Frontier Compute</h2>
+
+<p>
+    The useful lesson from frontier work is not that every internal circuit is understood. The useful lesson is that model behavior can still be shaped in predictable directions through disciplined control of data, interfaces, budgets, and evaluation.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Layer</th>
+            <th>Question</th>
+            <th>What To Learn</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Distribution</td>
+            <td>What experiences is the model compressing?</td>
+            <td>Data mix, replay pressure, repair rows, holdouts, contradiction checks</td>
+        </tr>
+        <tr>
+            <td>Interface</td>
+            <td>What problem is the model actually being asked to solve?</td>
+            <td>Prompt contract, DSL scope, structure/content split, canonical ordering</td>
+        </tr>
+        <tr>
+            <td>Budget</td>
+            <td>Did the model see enough clean signal to learn the task?</td>
+            <td>Effective epochs, packed token budgets, context usage, canary gates</td>
+        </tr>
+        <tr>
+            <td>Capacity</td>
+            <td>Is the model too small, or is the task still badly shaped?</td>
+            <td>Only scale after grammar, compiler, and data are stable</td>
+        </tr>
+        <tr>
+            <td>Evaluation</td>
+            <td>Are the right things being measured?</td>
+            <td>Probe exactness, renderability, materialized exactness, per-family breakdowns, non-regression</td>
+        </tr>
+        <tr>
+            <td>System boundary</td>
+            <td>What belongs in the model versus the compiler or content system?</td>
+            <td>Keep deterministic rendering and data retrieval out of the model when possible</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    In other words, practical intuition comes from asking: <em>what changed, why did behavior change, and which layer actually caused it?</em> This is why the spec/run method matters. It turns training into a ledger of answers instead of a collection of lucky outcomes.
+</p>
+
+<h3>What Frontier Labs Usually Know</h3>
+
+<p>
+    The claim that "no one knows how LLMs work" is too broad to be useful. A better version is this: full mechanistic theory is still incomplete, but empirical control is strong, and product/system control is often stronger still.
+</p>
+
+<p>
+    In practice, serious teams may not be able to explain every internal circuit, but they can still learn, with real discipline, that a particular data mixture, architecture, scale, objective, post-training recipe, and evaluation set tends to produce particular kinds of behavior. That is not total understanding, but it is real engineering knowledge.
+</p>
+
+<h3>Why Data Curation Still Matters</h3>
+
+<p>
+    Scaling does not erase the training distribution. The model still compresses what it sees. Bad data creates bad priors, noisy mixtures create unstable behavior, narrow data creates narrow generalization, and well-shaped data creates cleaner abstractions.
+</p>
+
+<p>
+    This is why data curation remains central even without a complete theory of generalization. The practical loop is still: define the contract, shape the data to teach that contract, measure the right behavior, and repair the actual failure layer.
+</p>
+
+<h3>The Failure-To-Repair Loop</h3>
+
+<p>
+    In practice, much of the progress comes from a simple discipline: observe the weakness, classify the weakness, teach that weakness directly, and rerun from the best relevant checkpoint when the spec has not changed.
+</p>
+
+<p>
+    This is not the same as "keep adding more data." Before adding rows, decide whether the failure is mainly in the data, DSL, compiler, tokenizer, token budget, decode hygiene, or capacity. Then fix the right layer.
+</p>
+
+<ul>
+    <li>If the model misses <code>[/scene]</code>, add closure and continuation rows and tighten stop hygiene.</li>
+    <li>If the model confuses two families, add contrast rows and family-local anchors.</li>
+    <li>If the DSL is too verbose or ambiguous, start a new spec instead of piling on more data.</li>
+    <li>If the compiler cannot express the target asset, fix the compiler before retraining.</li>
+</ul>
+
+<p>
+    A practical rule is: <strong>same spec -> usually continue or rerun inside the same family; new spec -> usually start a new line</strong>. This is how failures become supervision instead of wasted compute.
+</p>
+
+<h3>What To Copy From Frontier Practice</h3>
+
+<ul>
+    <li>Use proxy runs before expensive runs.</li>
+    <li>Design evals aggressively instead of trusting loss alone.</li>
+    <li>Run controlled ablations instead of relying on folklore.</li>
+    <li>Keep explicit failure taxonomies.</li>
+    <li>Control data mixtures carefully.</li>
+    <li>Separate base learning, post-training, and system scaffolding.</li>
+    <li>Do not expect one run to answer five different questions at once.</li>
+</ul>
+
+<h3>Ethical Scaling Path</h3>
+
+<p>
+    Going from something simple to something bigger should not mean removing constraints faster than understanding improves. The safer path is to widen capability in stages while keeping the boundaries of responsibility clear.
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Stage</th>
+            <th>Ethical Rule</th>
+            <th>Why It Matters</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Bounded contract</td>
+            <td>Start with a narrow, measurable task.</td>
+            <td>Prevents vague demos from being mistaken for robust capability.</td>
+        </tr>
+        <tr>
+            <td>Honest boundaries</td>
+            <td>State clearly what the model does, what the compiler does, and what external data does.</td>
+            <td>Keeps the system understandable and avoids false claims about generality.</td>
+        </tr>
+        <tr>
+            <td>Bridge prompts</td>
+            <td>Move from explicit prompts to weaker prompts gradually.</td>
+            <td>Avoids turning one experiment into language learning, planning, retrieval, and rendering all at once.</td>
+        </tr>
+        <tr>
+            <td>Hard gates</td>
+            <td>Require non-regression, canaries, and probe honesty before widening scope.</td>
+            <td>Stops capability drift from being hidden behind bigger compute.</td>
+        </tr>
+        <tr>
+            <td>Human oversight</td>
+            <td>Keep humans in the loop for high-stakes domains and claims.</td>
+            <td>Capability should expand with accountability, not just with confidence.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    Ethical scaling is not only about policy. It is also about research honesty: know what the model is really doing, know what the compiler is doing, know what the content system is doing, and report those boundaries clearly.
+</p>
+
 <h3>Pre-Training Checklist</h3>
 
 <p>
@@ -2456,6 +2658,25 @@ Next run:</pre>
     </tbody>
 </table>
 
+<h2>Next Bridge After spec12</h2>
+
+<p>The next step after <code>spec12</code> is not open-ended prose. It is a bounded intent bridge where the prompt still names the topic and goal, but stops prescribing the scene directly.</p>
+
+<p>The internal design note for that step is <code>version/v7/reports/SPEC13A_INTENT_PROMPT_BRIDGE_2026-03-18.md</code>. The short rule is:</p>
+
+<ul>
+    <li>keep <code>content.json</code> external</li>
+    <li>keep the compiler deterministic</li>
+    <li>let the model infer <code>layout</code>, <code>theme</code>, <code>tone</code>, <code>density</code>, and related scene-planning fields from <code>topic + goal + audience</code></li>
+    <li>measure planning quality separately from syntax and renderability</li>
+</ul>
+
+<p>Example <code>spec13a</code> prompt:</p>
+
+<pre><code>[task:svg] [topic:memory_layout_map] [goal:explain_structure] [audience:engineer] [OUT]</code></pre>
+
+<p>This keeps the task bounded. The model is not being asked to learn open-domain language or free-written infographic copy. It is being asked to choose a good scene plan under weaker prompt control.</p>
+
 <h2>Related Pages</h2>
 
 <div class="report-grid">
@@ -2478,6 +2699,11 @@ Next run:</pre>
         <h3>Version History</h3>
         <p>The public roadmap showing how each version track feeds the next capability layer.</p>
         <p><a href="version-history.html">Open version-history.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Spec / Run Discipline</h3>
+        <p>The versioned internal note explaining why the project uses <code>spec[x]</code> and <code>r[y]</code>, and how that method builds training intuition.</p>
+        <p><code>version/v7/reports/SPEC_RUN_DISCIPLINE_AND_TRAINING_INTUITION_2026-03-18.md</code></p>
     </div>
 </div>
     </main>
@@ -2708,7 +2934,7 @@ Next run:</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-19</p>
             </div>
         </div>
     </footer>
