@@ -6,40 +6,37 @@
 <div class="card card-accent" style="border: 2px solid #ffb400; padding: 2rem; margin-bottom: 2rem;">
     <h2 style="margin-top: 0; color: #ffb400;">The Bet Behind This Project</h2>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        Every generation, proprietary hardware dominates a new workload — and every generation, commodity hardware catches up once the software gets good enough.
-        The bet behind C-Kernel-Engine is that AI is no different. The operations are matrix multiply, softmax, layer norm, attention, and backprop.
-        <strong>Standard linear algebra and calculus. Not quantum mechanics. Not unsolved mathematics.</strong>
-        Nothing physically exotic — which means there is no permanent hardware moat.
+        The bet here is simple: AI will not stay locked inside premium proprietary boxes forever.
+        C-Kernel-Engine takes a different path:
+        <strong>Linux-only, CPU-only, server-grade hardware, open software, and standard data-center parts.</strong>
+        If the software gets good enough, ordinary servers become practical AI machines.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        The reality: different CPU architectures, different generations, and different system configurations give different results &mdash;
-        but the numbers are already practical. A quantized 0.6B model (Qwen3&ndash;0.6B Q8_0) on a 12th-gen Intel Alder Lake (12-core, AVX2) has hit
-        <strong>~100 tokens/sec when the system is otherwise idle</strong>.
-        On an older-gen 4-core machine, the same model runs at <strong>~20&ndash;25 tokens/sec</strong> depending on available compute capacity.
-        No GPU. No CUDA. No special hardware. AVX2 and SSE2 &mdash;
-        instructions that have existed in x86 for over a decade.
-        <strong>That's well into human-readable speed</strong> &mdash; fast enough for a local assistant, a natural language interface
-        to your Linux command line, or a utility running on hardware already in every data center.
-        <em>(Run the Qwen3 model on your machine and see for yourself.)</em>
+        This is not a claim that CPUs always beat GPU systems on raw peak throughput.
+        That is not the point.
+        The real question is whether CPU-only Linux systems can become
+        <strong>good enough, cheap enough, and accessible enough</strong>
+        to handle serious inference and eventually serious training.
+        That is the thesis being tested here.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        And before anyone says <em>"you're running on commodity laptop hardware and comparing it to server-grade H300 GPUs"</em> &mdash;
-        the laptop numbers above are the floor, not the ceiling.
-        <strong>Research and testing is currently underway on 5th-gen Intel Xeon Scalable processors with AVX-512 and AMX</strong> &mdash;
-        the same server-grade silicon sitting in data center racks today.
-        AMX gives us native BF16/INT8 matrix-multiply acceleration in hardware, and AVX-512 doubles the SIMD width.
-        When those numbers land, the comparison to GPU clusters will be apples-to-apples: server CPU vs. server GPU.
+        The early numbers already show that CPU-only inference is practical.
+        A quantized 0.6B model on a 12th-gen Intel Alder Lake machine has reached
+        <strong>about 100 tokens/sec</strong> when the system is otherwise idle.
+        On an older 4-core machine, the same model still runs at
+        <strong>about 20&ndash;25 tokens/sec</strong>.
+        No GPU. No CUDA. No special hardware. Just common x86 instructions and Linux.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7;">
-        C-Kernel-Engine is actively closing the gap with llama.cpp. We use Intel VTune, FlameGraph, Intel Advisor,
-        <code>perf stat</code>, and roofline analysis to identify exactly where cycles are being left on the table &mdash;
-        and we fix them, kernel by kernel. The profiling infrastructure is as much a part of this project as the kernels themselves.
+        The bigger target is server-grade CPU infrastructure.
+        Testing is underway on 5th-gen Intel Xeon Scalable systems with AVX-512 and AMX &mdash;
+        the same class of machines already sitting in real data centers.
+        The bet is that these machines will be cheaper, easier to procure, easier to operate, and more broadly deployable than proprietary accelerator-heavy stacks.
     </p>
     <p style="font-size: 1.15em; line-height: 1.7; border-top: 1px solid #333; padding-top: 1.5rem; margin-bottom: 0;">
-        With hand-tuned SIMD kernels, a custom memory planner, and weight stitching built from scratch &mdash;
-        the math is settled. We know the computation works on commodity hardware.
-        <strong>The rest is all hardcore engineering.</strong>
-        Distributed computing is on the horizon &mdash; and when we get there, this page will be updated with real measured numbers.
+        The method is straightforward: profile, find the real bottleneck, fix one kernel at a time, and measure again.
+        C-Kernel-Engine uses VTune, FlameGraph, Intel Advisor, <code>perf stat</code>, and roofline analysis to do exactly that.
+        <strong>The point of this page is not hype. It is to state the engineering bet clearly and then earn it with measurements.</strong>
     </p>
 </div>
 
@@ -54,8 +51,9 @@
         🧭 Engineering Compass &mdash; What This Page Is Really For
     </h3>
     <p style="font-size: 1.1em; line-height: 1.7; color: #ccc;">
-        Honestly? This page is mostly for me. It's the guiding light &mdash; the thing that keeps me focused
-        on what to work on next with C-Kernel-Engine. The scaling story is the <em>direction</em>, not a press release.
+        This page is the reminder to stay focused on the real thesis:
+        make CPU-only Linux systems useful for modern AI by improving the software until commodity server hardware becomes practical.
+        The scaling story is a direction, not a marketing slogan.
     </p>
     <p style="font-size: 1.1em; line-height: 1.7; color: #ccc; margin-bottom: 0.5rem;">
         The engineering discipline is simple and repeatable:
@@ -68,10 +66,9 @@
         <li><strong style="color: #47b475;">Fix one kernel at a time.</strong> Don't boil the ocean. One bottleneck, one fix, one measurement.</li>
     </ol>
     <p style="font-size: 1.1em; line-height: 1.7; color: #999; border-top: 1px solid #333; padding-top: 1rem; margin-bottom: 0;">
-        Will people criticize this project? Absolutely. But there is strong engineering behind it &mdash;
-        step by step, measurement by measurement, kernel by kernel.
-        That's the process. Follow the data, not the hype.
-        <em>Who knows where it leads &mdash; but at least the path is honest.</em>
+        People will disagree with the thesis, and that is fine.
+        The only useful answer is better measurement, better kernels, and clearer system design.
+        Follow the data, not the hype.
     </p>
 </div>
 
@@ -97,8 +94,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 13"></polyline></svg>
     </div>
     <div>
-        <strong>CPU Horizontal Scaling Is Truly Linear</strong><br>
-        Add a server: add compute. No topology planning, no NVLink fabric, no cluster pre-configuration. Each node is independent. GPU clusters require upfront coordination architecture — fixed cluster sizes, NVLink topology constraints, and tightly coupled scheduling. CPU clusters are just servers on Ethernet.
+        <strong>CPU Horizontal Scaling Can Stay Simpler</strong><br>
+        Adding CPU servers still requires sharding, scheduling, networking, and NUMA discipline. But it avoids vendor-specific programming models, specialized accelerator fabrics, and the assumption that serious AI must depend on external accelerators from the start. The bet here is that standard Linux servers on Ethernet remain a simpler operational path for many real deployments.
     </div>
 </div>
 
