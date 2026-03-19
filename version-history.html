@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VersionHistory | C-Kernel-Engine</title>
+    <title>Version History and Roadmap | C-Kernel-Engine</title>
+    <meta name="description" content="Version-by-version roadmap for C-Kernel-Engine, including inference, training, parity, distributed systems, and future capability milestones.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/version-history.html">
+    <meta property="og:title" content="Version History and Roadmap | C-Kernel-Engine">
+    <meta property="og:description" content="Version-by-version roadmap for C-Kernel-Engine, including inference, training, parity, distributed systems, and future capability milestones.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/version-history.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -962,6 +969,7 @@
       min-width: 80px;
       text-align: center;
     }
+    .version-badge.v18 { background: #2c3e50; color: white; }
     .version-badge.v17 { background: #7f8c8d; color: white; }
     .version-badge.v16 { background: #16a085; color: white; }
     .version-badge.v15 { background: #34495e; color: white; }
@@ -1225,6 +1233,12 @@
       <div class="arch-node-label">LLM+Vision Ctrl</div>
       <div class="arch-node-dot"></div>
     </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node planned">
+      <div class="arch-node-badge arch-v18">v18</div>
+      <div class="arch-node-label">Dist HPC Train</div>
+      <div class="arch-node-dot"></div>
+    </div>
   </div>
 
   <style>
@@ -1277,6 +1291,7 @@
     .arch-node-badge.arch-v15 { background: #34495e; color: white; }
     .arch-node-badge.arch-v16 { background: #16a085; color: white; }
     .arch-node-badge.arch-v17 { background: #7f8c8d; color: white; }
+    .arch-node-badge.arch-v18 { background: #2c3e50; color: white; }
     .arch-node-label {
       font-size: 0.75rem;
       color: var(--text-muted);
@@ -1852,6 +1867,13 @@
         <td>v16.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
+      <tr>
+        <td><strong>v18.0</strong></td>
+        <td>Distributed HPC Training</td>
+        <td>Multi-node CPU training with RDMA (InfiniBand/RoCE), gradient compression, and HPC cluster orchestration for large-scale model training (10-100B parameters) on commodity hardware</td>
+        <td>v17.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
     </tbody>
   </table>
 
@@ -2086,6 +2108,42 @@
     </li>
   </ul>
 
+  <h3>v18 Timeline (2028+)</h3>
+  <ul class="milestone-list">
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">RDMA transport layer (InfiniBand/RoCE) for gradient synchronization.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Distributed optimizer state sharding (ZeRO-2/3 style for CPU memory).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Gradient compression (top-k, quantization) to reduce bandwidth requirements.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Activation checkpointing (recompute forward activations to trade compute for memory).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Pipeline parallelism for model-layer distribution across nodes.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">HPC cluster job scheduler integration (SLURM, PBS, Flux).</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Fault tolerance with checkpoint restart and node failure recovery.</span>
+    </li>
+    <li class="milestone">
+      <span class="milestone-icon planned">○</span>
+      <span class="milestone-text">Validation on 64+ node cluster with 10-100B parameter models.</span>
+    </li>
+  </ul>
+
   <h2>v7 PR Progress (As of 2026-02-15)</h2>
   <p style="color: var(--text-secondary); margin-bottom: 1rem;">
     Snapshot of current v7 workstream in this repository. Status is based on implemented PR slices and current gate behavior.
@@ -2316,6 +2374,7 @@
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
     <li><strong>v16.x:</strong> Mechanistic interpretability (SAE feature learning, IR feature mapping, causal intervention tooling)</li>
     <li><strong>v17.x:</strong> LLM + vision policy integration for realtime autonomy loops</li>
+    <li><strong>v18.x:</strong> Distributed HPC training on CPUs with RDMA (InfiniBand/RoCE), gradient compression, and multi-node orchestration for 10-100B parameter models</li>
   </ul>
 
   <div class="alert alert-info" style="margin-top: 1rem;">
@@ -2594,7 +2653,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-18</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-19</p>
             </div>
         </div>
     </footer>

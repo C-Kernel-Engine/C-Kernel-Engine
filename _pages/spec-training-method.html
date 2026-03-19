@@ -1455,6 +1455,95 @@ Next run:</pre>
     Start a new spec when the current ceiling is real and measured. Stay inside the same spec when the failure is narrow and the representation still matches the intended product boundary.
 </p>
 
+<h3>Working Definitions</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Term</th>
+            <th>Meaning Here</th>
+            <th>Example</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Trainable contract</td>
+            <td>The exact input/output behavior the model is being taught, with a form that can be evaluated reliably.</td>
+            <td><code>prompt -> scene.dsl</code> with exact-match and render checks.</td>
+        </tr>
+        <tr>
+            <td>Representation</td>
+            <td>The model-facing format for the task: the grammar, fields, token shapes, and structure it must predict.</td>
+            <td>Flat SVG atoms versus a scene DSL with <code>layout</code>, <code>theme</code>, and component blocks.</td>
+        </tr>
+        <tr>
+            <td>Data</td>
+            <td>The actual examples used to teach the contract, including prompts, targets, repairs, anchors, and holdouts.</td>
+            <td>Direct gold rows, topic-swap rows, close-tag continuation rows, or negative contrast rows.</td>
+        </tr>
+        <tr>
+            <td>Compiler</td>
+            <td>The deterministic layer that turns structured outputs into the final product artifact.</td>
+            <td><code>scene.dsl + content.json -> SVG</code>.</td>
+        </tr>
+        <tr>
+            <td>Eval</td>
+            <td>The measurement layer that decides whether the run actually improved the desired behavior.</td>
+            <td>Exact match, renderability, materialized exactness, and per-family breakdowns.</td>
+        </tr>
+        <tr>
+            <td>Canary</td>
+            <td>A tiny, cheap, high-signal test slice run before a full job to catch obvious format or compiler failures.</td>
+            <td>12 prompt cases that must parse and render before the real training run starts.</td>
+        </tr>
+        <tr>
+            <td>Eval gate</td>
+            <td>A pass/fail condition that must hold before a run is accepted or promoted.</td>
+            <td><code>100%</code> renderability on the canary or no regression on solved families.</td>
+        </tr>
+        <tr>
+            <td>Ablation</td>
+            <td>A controlled experiment where one factor is changed while the rest stays fixed, so the effect can be interpreted.</td>
+            <td>Keep the DSL fixed and change only midtrain epochs from <code>1</code> to <code>3</code>.</td>
+        </tr>
+        <tr>
+            <td>Data mixture control</td>
+            <td>Deliberately choosing how much of each example type the model sees.</td>
+            <td><code>40%</code> anchor replay, <code>40%</code> direct rows, <code>20%</code> repair rows.</td>
+        </tr>
+        <tr>
+            <td>Failure taxonomy</td>
+            <td>A named breakdown of failure classes so the next action is chosen from evidence instead of guesswork.</td>
+            <td>Grammar failure versus compiler failure versus capacity failure.</td>
+        </tr>
+        <tr>
+            <td>Repair run</td>
+            <td>A narrow run that targets a known failure slice without redefining the overall contract.</td>
+            <td>Add table-matrix transition rows to fix one broken family in <code>spec12 r3</code>.</td>
+        </tr>
+        <tr>
+            <td>Replay / anchor rows</td>
+            <td>Stable rows from already-solved behavior that are kept in the curriculum to prevent regressions.</td>
+            <td>Keep strong <code>decision_tree</code> rows present while repairing <code>table_matrix</code>.</td>
+        </tr>
+        <tr>
+            <td>Prompt surface</td>
+            <td>The information exposed on the input side of the task.</td>
+            <td>Explicit <code>[layout:...]</code> prompts versus intent prompts with only <code>topic + goal + audience</code>.</td>
+        </tr>
+        <tr>
+            <td>System boundary</td>
+            <td>The line between what the model must learn and what deterministic systems should own.</td>
+            <td>The model chooses scene structure; the compiler owns exact geometry and gradients.</td>
+        </tr>
+        <tr>
+            <td>Canonicalization</td>
+            <td>Forcing one stable legal form for equivalent outputs so exact-match metrics mean something.</td>
+            <td>One legal field order for scene attributes, not many interchangeable spellings.</td>
+        </tr>
+    </tbody>
+</table>
+
 <div class="decision-grid">
     <div class="decision-card">
         <h3>Use a new spec when the question changed</h3>

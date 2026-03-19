@@ -9,6 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARTIALS_DIR="$SCRIPT_DIR/_partials"
 PAGES_DIR="$SCRIPT_DIR/_pages"
 DOCS_DIR="$(dirname "$SCRIPT_DIR")"
+SITE_URL="${SITE_URL:-https://antshiv.github.io/C-Kernel-Engine}"
+PAGE_METADATA_FILE="$SCRIPT_DIR/page_metadata.json"
 
 # Get current date/time dynamically from system
 CURRENT_YEAR=$(date +%Y)
@@ -39,6 +41,46 @@ inject_content() {
 
         rm -f "$tmp_before" "$tmp_after"
     fi
+}
+
+build_canonical_url() {
+    local filename="$1"
+    if [ "$filename" = "index.html" ]; then
+        printf '%s/\n' "$SITE_URL"
+    else
+        printf '%s/%s\n' "$SITE_URL" "$filename"
+    fi
+}
+
+page_metadata_field() {
+    local filename="$1"
+    local field="$2"
+    local fallback="${3:-}"
+    python3 - "$PAGE_METADATA_FILE" "$filename" "$field" "$fallback" <<'PY'
+import json
+import os
+import sys
+
+metadata_path, filename, field, fallback = sys.argv[1:5]
+if not os.path.exists(metadata_path):
+    print(fallback, end="")
+    raise SystemExit(0)
+
+with open(metadata_path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+value = data.get("pages", {}).get(filename, {}).get(
+    field,
+    data.get("defaults", {}).get(field, fallback),
+)
+
+if isinstance(value, bool):
+    print("true" if value else "false", end="")
+elif value is None:
+    print(fallback, end="")
+else:
+    print(str(value), end="")
+PY
 }
 
 # Step 1: Run Doxygen if Doxyfile exists
@@ -75,8 +117,14 @@ for page in "$PAGES_DIR"/*.html; do
         # Extract page metadata from comments at top of file
         # Format: <!-- TITLE: Page Title -->
         # Format: <!-- NAV: index -->
-        page_title=$(grep -oP '<!--\s*TITLE:\s*\K[^-]+' "$page" | tr -d ' ' || echo "Documentation")
-        nav_active=$(grep -oP '<!--\s*NAV:\s*\K\w+' "$page" || echo "")
+        page_title=$(sed -n 's/^<!--[[:space:]]*TITLE:[[:space:]]*\(.*\)[[:space:]]*-->$/\1/p' "$page" | head -n 1)
+        nav_active=$(sed -n 's/^<!--[[:space:]]*NAV:[[:space:]]*\([[:alnum:]_-]*\)[[:space:]]*-->$/\1/p' "$page" | head -n 1)
+        if [ -z "$page_title" ]; then
+            page_title="Documentation"
+        fi
+        page_title=$(page_metadata_field "$filename" "title" "$page_title")
+        page_description=$(page_metadata_field "$filename" "description" "C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.")
+        page_robots=$(page_metadata_field "$filename" "robots" "index,follow")
 
         # Read partials
         header=$(cat "$PARTIALS_DIR/header.html")
@@ -87,6 +135,10 @@ for page in "$PAGES_DIR"/*.html; do
 
         # Replace template variables in header
         header="${header//\{\{PAGE_TITLE\}\}/$page_title}"
+        canonical_url=$(build_canonical_url "$filename")
+        header="${header//\{\{CANONICAL_URL\}\}/$canonical_url}"
+        header="${header//\{\{META_DESCRIPTION\}\}/$page_description}"
+        header="${header//\{\{META_ROBOTS\}\}/$page_robots}"
 
         # Clear all nav active states
         header="${header//\{\{NAV_INDEX\}\}/}"
@@ -150,6 +202,37 @@ for page in "$PAGES_DIR"/*.html; do
         fi
     fi
 done
+
+touch "$SCRIPT_DIR/.nojekyll"
+
+echo "  Writing: robots.txt"
+cat > "$SCRIPT_DIR/robots.txt" <<EOF
+User-agent: *
+Allow: /
+
+Sitemap: $SITE_URL/sitemap.xml
+EOF
+
+echo "  Writing: sitemap.xml"
+{
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    for built_page in "$SCRIPT_DIR"/*.html; do
+        if [ -f "$built_page" ]; then
+            built_name=$(basename "$built_page")
+            include_in_sitemap=$(page_metadata_field "$built_name" "sitemap" "true")
+            if [ "$include_in_sitemap" != "true" ]; then
+                continue
+            fi
+            built_url=$(build_canonical_url "$built_name")
+            echo '  <url>'
+            echo "    <loc>$built_url</loc>"
+            echo "    <lastmod>$CURRENT_DATE</lastmod>"
+            echo '  </url>'
+        fi
+    done
+    echo '</urlset>'
+} > "$SCRIPT_DIR/sitemap.xml"
 
 echo "Build complete! Generated files:"
 ls -la "$SCRIPT_DIR"/*.html 2>/dev/null || echo "  No HTML files generated"
