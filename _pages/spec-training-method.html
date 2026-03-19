@@ -2,6 +2,122 @@
 <!-- NAV: quickstart -->
 
 <style>
+/* ── SVG showcase ─────────────────────────────────────────── */
+.svg-showcase {
+    margin: 2rem 0;
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(145deg, rgba(13,27,42,0.6), rgba(15,15,26,0.5));
+    border: 1px solid rgba(255,180,0,0.12);
+}
+
+.svg-showcase img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0;
+}
+
+.svg-showcase-caption {
+    padding: 0.7rem 1.1rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: rgba(0,0,0,0.25);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.svg-showcase-caption strong {
+    color: var(--orange);
+}
+
+.svg-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.2rem;
+    margin: 2rem 0;
+}
+
+.svg-gallery-item {
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(145deg, rgba(13,27,42,0.5), rgba(15,15,26,0.4));
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: border-color 0.25s ease, transform 0.2s ease;
+}
+
+.svg-gallery-item:hover {
+    border-color: rgba(255,180,0,0.25);
+    transform: translateY(-2px);
+}
+
+.svg-gallery-item img {
+    display: block;
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    object-position: top left;
+}
+
+.svg-gallery-label {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.svg-gallery-label .gallery-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    margin-right: 0.4rem;
+}
+
+.gallery-tag-asset    { background: rgba(71,180,117,0.2); color: #47b475; }
+.gallery-tag-dsl      { background: rgba(7,173,248,0.2);  color: #07adf8; }
+.gallery-tag-compiler { background: rgba(255,180,0,0.2);  color: #ffb400; }
+.gallery-tag-model    { background: rgba(160,112,255,0.2); color: #a070ff; }
+
+.svg-hero-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    margin: 1.5rem 0 0 0;
+}
+
+.svg-hero-thumb {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.3);
+    transition: border-color 0.25s ease;
+}
+
+.svg-hero-thumb:hover {
+    border-color: rgba(255,180,0,0.3);
+}
+
+.svg-hero-thumb img {
+    display: block;
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    object-position: top center;
+}
+
+@media (max-width: 900px) {
+    .svg-gallery { grid-template-columns: 1fr; }
+    .svg-hero-strip { grid-template-columns: 1fr; }
+    .svg-gallery-item img { height: 180px; }
+}
+
+/* ── end SVG showcase ─────────────────────────────────────── */
+
 .method-hero {
     position: relative;
     overflow: hidden;
@@ -300,6 +416,17 @@
             <span class="tag">Tokenizer gate</span>
             <span class="tag">Probe report</span>
         </div>
+        <div class="svg-hero-strip">
+            <div class="svg-hero-thumb">
+                <img src="assets/compute-bandwidth-chasm.svg" alt="Compute-bandwidth chasm infographic" loading="lazy">
+            </div>
+            <div class="svg-hero-thumb">
+                <img src="assets/activation-memory-infographic.svg" alt="Activation memory analysis infographic" loading="lazy">
+            </div>
+            <div class="svg-hero-thumb">
+                <img src="assets/operator-spectrum-map-presentation.svg" alt="Operator spectrum map" loading="lazy">
+            </div>
+        </div>
     </div>
 </div>
 
@@ -415,6 +542,34 @@
     </div>
 </div>
 
+<div class="svg-gallery">
+    <div class="svg-gallery-item">
+        <img src="assets/memory-layout-map.svg" alt="Memory layout map — model weight geometry" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-asset">Asset</span>
+            Memory layout map — what the compiler owns
+        </div>
+    </div>
+    <div class="svg-gallery-item">
+        <img src="assets/ir-lowering-pipeline.svg" alt="IR lowering pipeline — deterministic compilation stages" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-compiler">Compiler</span>
+            IR lowering pipeline — deterministic stages
+        </div>
+    </div>
+    <div class="svg-gallery-item">
+        <img src="assets/ir-v66-failure-decision-tree.svg" alt="Failure decision tree — diagnostic branching" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-dsl">DSL</span>
+            Decision tree — gate failure diagnostics
+        </div>
+    </div>
+</div>
+
+<p class="mini-note">
+    These are real assets from the project library — the same asset families the training pipeline learns to plan and compose.
+</p>
+
 <h2>What We Are Actually Training</h2>
 
 <p>
@@ -481,6 +636,14 @@
         </tr>
     </tbody>
 </table>
+
+<div class="svg-showcase">
+    <img src="assets/activation-memory-infographic.svg" alt="Activation memory infographic — poster_stack layout family" loading="lazy">
+    <div class="svg-showcase-caption">
+        <strong>poster_stack</strong> layout family — the model chooses composition, theme, tone, and content slots.
+        The compiler handles gradients, geometry, text wrapping, and final SVG rendering.
+    </div>
+</div>
 
 <h2>Worked Example</h2>
 
@@ -610,6 +773,14 @@ content.json bound by the compiler
 
 <h2>Why Explicit Tokens Instead Of Generic BPE Right Now?</h2>
 
+<div class="svg-showcase">
+    <img src="assets/tokenizer-architecture.svg" alt="Tokenizer architecture — hash vs trie lookup" loading="lazy">
+    <div class="svg-showcase-caption">
+        <strong>Tokenizer architecture</strong> — the CK-Engine tokenizer uses explicit reserved tokens for the DSL surface.
+        This makes every probe miss interpretable as a scene decision error, not subword spelling drift.
+    </div>
+</div>
+
 <p>
     The short answer is: because this output language is small, formal, and brittle, and the current training line is
     optimizing for control and interpretability before token-efficiency.
@@ -735,6 +906,14 @@ Better boundary
 </p>
 
 <h2>Spec Lifecycle</h2>
+
+<div class="svg-showcase">
+    <img src="assets/ir-v66-evolution-timeline.svg" alt="v6.6 evolution timeline — spec progression milestones" loading="lazy">
+    <div class="svg-showcase-caption">
+        <strong>Evolution timeline</strong> — each spec passes through the same lifecycle stages below.
+        The milestones above show how the v6.6 line matured through this exact process.
+    </div>
+</div>
 
 <div class="flow-strip">
     <div class="flow-step">
@@ -946,6 +1125,14 @@ Better boundary
 
 <h2>Recommended Asset-to-DSL Workflow for SVG</h2>
 
+<div class="svg-showcase">
+    <img src="assets/ir-pipeline-flow.svg" alt="IR pipeline flow — GGUF to C runtime" loading="lazy">
+    <div class="svg-showcase-caption">
+        <strong>Full pipeline flow</strong> — from input artifacts through IR stages to compiled output.
+        The compiler validation phase in the workflow below ensures the DSL round-trips through this pipeline deterministically.
+    </div>
+</div>
+
 <div class="phase-grid">
     <div class="phase-card">
         <h3>Asset intake</h3>
@@ -1117,6 +1304,30 @@ Next run:</pre>
 
 <h2>What The Experiments Proved</h2>
 
+<div class="svg-gallery">
+    <div class="svg-gallery-item">
+        <img src="assets/compute-bandwidth-chasm.svg" alt="Compute-bandwidth chasm — why small specs first" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-asset">Insight</span>
+            Start small — bridge the chasm with cheap specs first
+        </div>
+    </div>
+    <div class="svg-gallery-item">
+        <img src="assets/theory-of-constraints.svg" alt="Theory of constraints — find the bottleneck" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-model">Method</span>
+            Find the real bottleneck before scaling
+        </div>
+    </div>
+    <div class="svg-gallery-item">
+        <img src="assets/iteration-philosophy.svg" alt="Iteration philosophy — fail fast, learn, repeat" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-dsl">Practice</span>
+            Fail fast, learn, repair narrowly, repeat
+        </div>
+    </div>
+</div>
+
 <p>
     These conclusions did not come from theory alone. They came from repeated runs that failed, partially worked,
     regressed, recovered, and exposed the actual pressure points in the system.
@@ -1146,6 +1357,14 @@ Next run:</pre>
 </div>
 
 <h2>How We Reached The Current Design</h2>
+
+<div class="svg-showcase">
+    <img src="assets/quantization-formats.svg" alt="Quantization formats — structured technical reference" loading="lazy">
+    <div class="svg-showcase-caption">
+        <strong>table_matrix</strong> layout family — a structured byte-level reference.
+        The experiments below showed that this level of visual detail requires a compiler, not a model that emits raw SVG.
+    </div>
+</div>
 
 <table class="axis-table">
     <thead>
@@ -1185,6 +1404,23 @@ Next run:</pre>
 </table>
 
 <h2>How To Decide What Is Next</h2>
+
+<div class="svg-gallery">
+    <div class="svg-gallery-item">
+        <img src="assets/ir-v66-failure-decision-tree.svg" alt="Failure decision tree — gate failure branching" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-model">Diagnostic</span>
+            Gate failure decision tree — match symptom to action
+        </div>
+    </div>
+    <div class="svg-gallery-item">
+        <img src="assets/ir-v66-evolution-timeline.svg" alt="Evolution timeline — how specs mature" loading="lazy">
+        <div class="svg-gallery-label">
+            <span class="gallery-tag gallery-tag-compiler">Timeline</span>
+            How specs mature through repeated gate passes
+        </div>
+    </div>
+</div>
 
 <h3>Diagnostic Matrix</h3>
 
