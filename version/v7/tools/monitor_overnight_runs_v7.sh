@@ -64,6 +64,26 @@ print_training_plan() {
   ' "$plan_json" 2>/dev/null || true
 }
 
+print_run_ledger() {
+  local ledger_jsonl="$1"
+  if [[ ! -f "$ledger_jsonl" ]]; then
+    return 0
+  fi
+  jq -sr '
+    if length == 0 then empty else
+      .[-1] as $row |
+      "ledger.stage_id=" + (($row.stage_id // "unknown") | tostring),
+      "ledger.phase_label=" + (($row.phase_label // "unknown") | tostring),
+      "ledger.status=" + (($row.status // "unknown") | tostring),
+      "ledger.steps=" + (($row.steps // "n/a") | tostring),
+      "ledger.total_tokens=" + (($row.total_tokens // "n/a") | tostring),
+      "ledger.loss_first=" + (($row.loss_first // "n/a") | tostring),
+      "ledger.loss_final=" + (($row.loss_final // "n/a") | tostring),
+      "ledger.loss_min=" + (($row.loss_min // "n/a") | tostring)
+    end
+  ' "$ledger_jsonl" 2>/dev/null || true
+}
+
 print_probe_delta() {
   local label="$1"
   local ref_json="$2"
@@ -97,6 +117,7 @@ print_run_snapshot() {
   fi
 
   print_training_plan "$run_dir/training_plan.json"
+  print_run_ledger "$run_dir/run_ledger.jsonl"
   print_stage_summary "$run_dir"
 
   local probe_candidates=( "$run_dir"/spec*_probe_report.json )
