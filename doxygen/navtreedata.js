@@ -52,25 +52,24 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "add__kernels__bf16_8c.html",
-"ck__cli__v6_8c.html#a95ed28babfedacb5342319a65f76e489",
-"ck__tokenizer_8c.html#aec779163dcf0f67868d1fdf622326da3",
-"ckernel__codegen__v6_8c.html#a3478c5c741c441ba7f4aca0dd4007558",
-"ckernel__engine_8h.html#ac7e379fa8eb4c8b963e70daf7e761277",
-"ckernel__ir__v6_8c.html#a601cf1d7923b5d7440623b5cfc9ea9a1",
-"ckernel__quant_8h.html#aa6d6be89dba6b145e0bb597417b33861",
-"gemm__batch__int8_8c.html#af13e8b7fd92d0f48c1cfca7161552d4a",
-"gemm__kernels__q8__0_8c.html#af900f8a5b4172fadbb2342b63276e7c3",
-"mega__fused__attention__decode__q5__0_8c.html",
-"rmsnorm__kernels__bf16_8c.html#a14d80153de303766038a231e4932e357",
-"structCKIRV2Node.html#ad351fdec7e39e8af9d29b729f8c0196b",
-"structCKLayerLayout.html#accc0cc61e693a25dfa5e140f91534dc6",
-"structCKTokenizer.html#a70622f7babd13c77a93825497fdf2c5f",
-"structRecommendationList.html",
-"tokenizer__spm_8c.html#a67319d1870a3020397c7c458d577f8ec",
-"v6_85_2test__generated_2ck-kernel-inference_8h.html#a5679336dfb3a2d4f45c0390e57a8d2b8",
-"v6_85__cli_8c.html#a08655c2a0dd0258f5ac34d18ab76a12b",
-"v6_86_2test__generated_2generic__api__test_8c.html#a25338df066600a2ac04ea7f0e7711699",
-"v6_86__inference_8c.html#ada4f9b3c886bed3958edc50360437d85"
+"ck__cli__v6_8c.html#a97d23c9b1367e79d27112bf0efe43afa",
+"ck__tokenizer_8h.html#aa03130843a2ba7714a87b1bf8ac7e10c",
+"ckernel__codegen__v6_8c.html#a9f6b5ba2373060f9e3c58c05b2deb62f",
+"ckernel__ir_8c.html#a57b34e6db4ee6617037edc06c0edf7e0",
+"ckernel__kernel__specs_8h.html#a3d91eb22ec223e36c65a04283581e390a93c285e641a7b5adf02ab5789bd6c67e",
+"ckernel__section__layout_8h.html#aff5ee31d19be80e3bc7d00f0506f8efea97e883e02f60415d64767579e4b65eb2",
+"gemm__kernels__q4__0_8c_source.html",
+"globals_func_v.html",
+"optimizer__kernels__bf16_8c.html#ac1a9ed01c15286fc6e3be73f96371d76",
+"structCKHeaderOffsets.html",
+"structCKLayerGradOffsets.html#a4d4316073d5fb0d152b0c2d670dada62",
+"structCKSection.html#aa030a13ebf6b121d19344e0249786fb8",
+"structQWEN2__0__5B__DECODECanary.html#a18aabfa5f115473f97230e403dd86333",
+"tokenizer_8c.html#aec44767b58e6c10421a99b4b7f2f65b1",
+"v6_85_2test__generated_2ck-kernel-inference_8c.html#a56a1e6ed9c95375f32c056ef84069326",
+"v6_85_2test__generated_2qwen2__int8_8c.html#a7c83f54f04117dda01a7330bb5d64957",
+"v6_86_2test__generated_2ck-kernel-inference_8c.html#ac7d801497f0acb9ab9d768b7e1aae354",
+"v6_86_2test__generated_2qwen2__int8_8c.html#aca32a7724796c4a33662c75aefc4a279"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
