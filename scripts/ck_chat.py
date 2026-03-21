@@ -323,6 +323,7 @@ class CKModel:
         self.use_chat_template = True
         self.chat_template_mode = "auto"
         self.default_system_prompt = "You are a helpful assistant."
+        self.prefill_policy = "batched"
 
     def _runtime_artifact_staleness_errors(self, lib_path: Path) -> List[str]:
         """Return fatal staleness diagnostics for an out-of-date compiled runtime."""
@@ -525,6 +526,7 @@ class CKModel:
 
         # Configure chat template usage first (needed for marker support checks).
         self._configure_chat_template(chat_template)
+        self.prefill_policy = str(self._load_runtime_contract().get("prefill_policy") or "batched")
 
         # Keep the built-in C tokenizer as the default unless the user explicitly
         # requested the Python/HF tokenizer path.
@@ -674,7 +676,7 @@ class CKModel:
         markers: List[str] = []
         if self.chat_template_mode == "gemma":
             markers = ["<start_of_turn>", "<end_of_turn>"]
-        elif self.chat_template_mode == "qwen":
+        elif self.chat_template_mode in {"qwen", "qwen35"}:
             markers = ["<|im_start|>", "<|im_end|>"]
 
         for marker in markers:
@@ -707,12 +709,20 @@ class CKModel:
     def _load_model_meta(self) -> dict:
         """Load chat-related metadata from config/manifest if present."""
         meta = {}
+
+        def _merge_non_null(src: dict) -> None:
+            for key in ("chat_template", "finetune", "model_name", "name", "model_type", "default_system_prompt"):
+                value = src.get(key)
+                if value is not None:
+                    meta[key] = value
+
         config_path = self.model_dir / "config.json"
         if config_path.exists():
             try:
                 with open(config_path, "r") as f:
                     cfg = json.load(f)
-                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name", "model_type", "default_system_prompt")})
+                if isinstance(cfg, dict):
+                    _merge_non_null(cfg)
             except Exception:
                 pass
         manifest_path = self.model_dir / "weights_manifest.json"
@@ -721,10 +731,53 @@ class CKModel:
                 with open(manifest_path, "r") as f:
                     manifest = json.load(f)
                 cfg = manifest.get("config", {})
-                meta.update({k: cfg.get(k) for k in ("chat_template", "finetune", "model_name", "name", "model_type", "default_system_prompt")})
+                if isinstance(cfg, dict):
+                    _merge_non_null(cfg)
             except Exception:
                 pass
         return meta
+
+    def _load_runtime_contract(self) -> dict:
+        """Load generic runtime behavior flags from config/manifest/template."""
+        contract = {"prefill_policy": "batched"}
+        candidates = [
+            self.model_dir / "config.json",
+            self.model_dir / "weights_manifest.json",
+            (self.model_dir.parent / "config.json") if self.model_dir.name == ".ck_build" else None,
+            (self.model_dir.parent / "weights_manifest.json") if self.model_dir.name == ".ck_build" else None,
+        ]
+        for path in candidates:
+            if path is None or not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if not isinstance(data, dict):
+                continue
+
+            cfg = data.get("config") if isinstance(data.get("config"), dict) else data
+            if isinstance(cfg, dict):
+                explicit_prefill = cfg.get("prefill_policy")
+                if isinstance(explicit_prefill, str) and explicit_prefill.strip():
+                    contract["prefill_policy"] = explicit_prefill.strip()
+
+                layer_kinds = cfg.get("layer_kinds")
+                if (
+                    contract["prefill_policy"] == "batched"
+                    and isinstance(layer_kinds, list)
+                    and any(str(kind).strip().lower() not in {"full_attention", "attention", "dense_attention"} for kind in layer_kinds)
+                ):
+                    contract["prefill_policy"] = "sequential_decode"
+
+            template = data.get("template")
+            if isinstance(template, dict):
+                flags = template.get("flags")
+                if isinstance(flags, dict):
+                    template_prefill = flags.get("prefill_policy")
+                    if isinstance(template_prefill, str) and template_prefill.strip():
+                        contract["prefill_policy"] = template_prefill.strip()
+        return contract
 
     def _configure_chat_template(self, mode: str) -> None:
         """Select chat template based on metadata or explicit override."""
@@ -735,6 +788,9 @@ class CKModel:
             self.use_chat_template = False
             return
         if mode == "qwen":
+            self.use_chat_template = True
+            return
+        if mode == "qwen35":
             self.use_chat_template = True
             return
         if mode == "gemma":
@@ -754,9 +810,11 @@ class CKModel:
         if chat_template:
             if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
                 self.use_chat_template = True
-                self.chat_template_mode = "qwen"
+                self.chat_template_mode = "qwen35" if model_type == "qwen35" else "qwen"
                 if isinstance(default_system, str) and default_system.strip():
                     self.default_system_prompt = default_system
+                elif model_type == "qwen35":
+                    self.default_system_prompt = ""
                 elif model_type == "qwen3":
                     self.default_system_prompt = ""
                 elif model_type.startswith("qwen"):
@@ -781,13 +839,15 @@ class CKModel:
             # ChatML-style templates (Qwen)
             if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
                 self.use_chat_template = True
-                self.chat_template_mode = "qwen"
+                self.chat_template_mode = "qwen35" if model_type == "qwen35" else "qwen"
                 # Default system prompt behavior:
                 # - Qwen2 templates inject a default system prompt if none is provided.
                 # - Qwen3 templates do NOT inject a default system prompt.
-                # Use model_type (if available) to avoid forcing a system prompt on Qwen3.
+                # - Qwen3.5 should not inject a synthetic default system prompt here.
                 if isinstance(default_system, str) and default_system.strip():
                     self.default_system_prompt = default_system
+                elif model_type == "qwen35":
+                    self.default_system_prompt = ""
                 elif model_type == "qwen3":
                     self.default_system_prompt = ""
                 else:
@@ -969,7 +1029,7 @@ class CKModel:
                 token_id = self._lookup_single_token_id(marker)
                 if token_id >= 0:
                     self.eos_tokens.add(token_id)
-        elif mode == "qwen":
+        elif mode in {"qwen", "qwen35"}:
             for marker in ("<|im_end|>",):
                 token_id = self._lookup_single_token_id(marker)
                 if token_id >= 0:
@@ -1123,12 +1183,17 @@ class CKModel:
                 continue
             clean_messages.append((role, str(content or "")))
 
-        if self.chat_template_mode == "qwen":
-            prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+        if self.chat_template_mode in {"qwen", "qwen35"}:
+            prompt = ""
+            if system_prompt:
+                prompt += f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
             for role, content in clean_messages:
                 label = "assistant" if role == "assistant" else "user"
                 prompt += f"<|im_start|>{label}\n{content}<|im_end|>\n"
-            prompt += "<|im_start|>assistant\n"
+            if self.chat_template_mode == "qwen35":
+                prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+            else:
+                prompt += "<|im_start|>assistant\n"
             return prompt
 
         if self.chat_template_mode == "gemma":
@@ -1153,7 +1218,7 @@ class CKModel:
         mode = getattr(self, "chat_template_mode", "none")
         if mode == "gemma":
             return ["<end_of_turn>"]
-        if mode == "qwen":
+        if mode in {"qwen", "qwen35"}:
             return ["<|im_end|>"]
         return []
 
@@ -1478,12 +1543,15 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
         )
 
     if model.has_kv_decode and model.kv_cache_enable():
+        use_sequential_prefill = bool(
+            no_prefill or str(getattr(model, "prefill_policy", "batched")).strip().lower() == "sequential_decode"
+        )
         # Each generate() call is a fresh prompt pass.
         # Reset KV state so prior turns do not leak into the new prefill/decode.
         model.kv_cache_reset()
         # KV-cache path: prefill once, then decode token-by-token.
         t0 = time.time()
-        if no_prefill:
+        if use_sequential_prefill:
             # Slow path: feed prompt tokens via decode to avoid prefill crashes
             logits = None
             for idx, tok in enumerate(token_ids):
@@ -1506,7 +1574,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             generated_tokens.append(next_token)
             token_ids.append(next_token)
             token_text = model.decode([next_token])
-            generated_text += token_text
+            generated_text = model.decode(generated_tokens)
             if show_token_ids:
                 display_text = _escape_text_for_display(
                     token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
@@ -1569,7 +1637,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
             # Decode and print incrementally
             token_text = model.decode([next_token])
-            generated_text += token_text
+            generated_text = model.decode(generated_tokens)
             if show_token_ids:
                 display_text = _escape_text_for_display(
                     token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
@@ -1795,8 +1863,8 @@ def main():
                        help="Stop generation when '<eos>' appears in decoded text")
     parser.add_argument("--stop-on-text", action="append", default=[],
                        help="Stop generation when this decoded text marker appears (repeatable)")
-    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "gemma"], default="auto",
-                       help="Chat template mode: auto (from GGUF), none, qwen, or gemma")
+    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen35", "gemma"], default="auto",
+                       help="Chat template mode: auto (from GGUF), none, qwen, qwen35, or gemma")
     parser.add_argument("--no-chat-template", action="store_true",
                        help="Disable chat template formatting (same as --chat-template=none)")
     parser.add_argument("--memory", action="store_true",

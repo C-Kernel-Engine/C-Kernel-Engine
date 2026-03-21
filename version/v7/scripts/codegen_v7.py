@@ -378,9 +378,16 @@ def emit_memory_layout(layout: Dict, config: Dict) -> str:
         lines.append("#define VOCAB_STRINGS_SIZE 0")
     lines.append("")
 
-    # Layer offsets struct - get fields from layer 0
-    layer0_entries = [e for e in weights.get("entries", []) if e.get("name", "").startswith("layer.0.")]
-    field_names = sorted(set(e["name"].replace("layer.0.", "") for e in layer0_entries))
+    # Layer offsets struct - union fields across all layers so mixed layer kinds
+    # can share one compiled offsets table without generator-side special cases.
+    layer_entries = [e for e in weights.get("entries", []) if e.get("name", "").startswith("layer.")]
+    field_names = sorted(
+        {
+            e["name"].split(".", 2)[2]
+            for e in layer_entries
+            if len(e.get("name", "").split(".", 2)) == 3
+        }
+    )
 
     lines.append("/* Per-layer weight offsets */")
     lines.append("typedef struct {")
@@ -966,7 +973,13 @@ def get_init_free_code(init_call: Dict) -> str:
     return "\n".join(free_lines)
 
 
-def emit_model_and_api(init_call: Dict = None, profile: bool = False, logits_stride: int = 0, dump: bool = False) -> str:
+def emit_model_and_api(
+    init_call: Dict = None,
+    profile: bool = False,
+    logits_stride: int = 0,
+    dump: bool = False,
+    layout: Dict | None = None,
+) -> str:
     """Emit model struct and clean API functions.
 
     Args:
@@ -1136,6 +1149,23 @@ CK_EXPORT void ck_model_profile_dump(void) {
 #endif
 }
 """
+
+    layout = layout or {}
+    recurrent_reset_lines: list[str] = []
+    for buf_name, macro_name in (
+        ("recurrent_conv_state", "A_RECURRENT_CONV_STATE"),
+        ("recurrent_ssm_state", "A_RECURRENT_SSM_STATE"),
+    ):
+        for buf in layout.get("memory", {}).get("activations", {}).get("buffers", []):
+            if buf.get("name") != buf_name:
+                continue
+            recurrent_reset_lines.append(
+                f"    memset(g_model->bump + {macro_name}, 0, {int(buf.get('size', 0))});"
+            )
+            break
+    recurrent_reset_code = "\n".join(recurrent_reset_lines)
+    if recurrent_reset_code:
+        recurrent_reset_code += "\n"
 
     return f'''
 /* ============================================================================
@@ -1310,7 +1340,7 @@ CK_EXPORT void ck_model_free(void) {{
 CK_EXPORT void ck_model_kv_cache_reset(void) {{
     if (!g_model) return;
     memset(g_model->kv_cache, 0, KV_CACHE_SIZE);
-    g_model->pos = 0;
+{recurrent_reset_code}    g_model->pos = 0;
 }}
 
 CK_EXPORT int ck_model_kv_cache_enable(int capacity) {{
@@ -1655,7 +1685,15 @@ static void _ck_profile_dump(void) {
 ''')
 
     parts.append(emit_memory_layout(layout, config))
-    parts.append(emit_model_and_api(init_call=init_call, profile=profile, logits_stride=logits_stride, dump=dump))  # Pass lowered init IR for init ops
+    parts.append(
+        emit_model_and_api(
+            init_call=init_call,
+            profile=profile,
+            logits_stride=logits_stride,
+            dump=dump,
+            layout=layout,
+        )
+    )  # Pass lowered init IR for init ops
     parts.append(
         emit_decode_function(
             ops,

@@ -74,6 +74,18 @@ PHYSICAL_BUFFERS = {
         last_writer=-1,
         can_hold=["fp32"]
     ),
+    "A_ATTN_Q_GATE_PACKED": PhysicalBuffer(
+        name="A_ATTN_Q_GATE_PACKED",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_ATTN_GATE": PhysicalBuffer(
+        name="A_ATTN_GATE",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
     "A_MLP_SCRATCH": PhysicalBuffer(
         name="A_MLP_SCRATCH",
         dtype="fp32",
@@ -88,6 +100,66 @@ PHYSICAL_BUFFERS = {
     ),
     "A_LOGITS": PhysicalBuffer(
         name="A_LOGITS",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_PACKED": PhysicalBuffer(
+        name="A_RECURRENT_PACKED",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_Z": PhysicalBuffer(
+        name="A_RECURRENT_Z",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_G": PhysicalBuffer(
+        name="A_RECURRENT_G",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_NORMED": PhysicalBuffer(
+        name="A_RECURRENT_NORMED",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_BETA": PhysicalBuffer(
+        name="A_RECURRENT_BETA",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_Q": PhysicalBuffer(
+        name="A_RECURRENT_Q",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_K": PhysicalBuffer(
+        name="A_RECURRENT_K",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_V": PhysicalBuffer(
+        name="A_RECURRENT_V",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_CONV_STATE": PhysicalBuffer(
+        name="A_RECURRENT_CONV_STATE",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_RECURRENT_SSM_STATE": PhysicalBuffer(
+        name="A_RECURRENT_SSM_STATE",
         dtype="fp32",
         last_writer=-1,
         can_hold=["fp32"]
@@ -114,9 +186,31 @@ SLOT_TO_BUFFER_DEFAULT = {
     "k_scratch": "A_ATTN_SCRATCH",  # K/V share with Q (sequential access)
     "v_scratch": "A_ATTN_SCRATCH",
     "attn_scratch": "A_ATTN_SCRATCH",
+    "attn_q_gate_packed": "A_ATTN_Q_GATE_PACKED",
+    "attn_gate": "A_ATTN_GATE",
 
     # MLP scratch
     "mlp_scratch": "A_MLP_SCRATCH",
+    "recurrent_qkv_packed": "A_RECURRENT_PACKED",
+    "recurrent_conv_input": "A_RECURRENT_PACKED",
+    "recurrent_conv_qkv_raw": "A_RECURRENT_PACKED",
+    "recurrent_conv_qkv": "A_RECURRENT_PACKED",
+    "recurrent_attn_out": "A_RECURRENT_PACKED",
+    "recurrent_normed": "A_RECURRENT_NORMED",
+    "recurrent_z": "A_RECURRENT_Z",
+    "recurrent_alpha": "A_RECURRENT_G",
+    "recurrent_g": "A_RECURRENT_G",
+    "recurrent_beta": "A_RECURRENT_BETA",
+    "recurrent_q_preconv": "A_RECURRENT_Q",
+    "recurrent_q": "A_RECURRENT_Q",
+    "recurrent_k_preconv": "A_RECURRENT_K",
+    "recurrent_k": "A_RECURRENT_K",
+    "recurrent_v_preconv": "A_RECURRENT_V",
+    "recurrent_v": "A_RECURRENT_V",
+    "external:recurrent_conv_state": "A_RECURRENT_CONV_STATE",
+    "recurrent_conv_state_out": "A_RECURRENT_CONV_STATE",
+    "external:recurrent_ssm_state": "A_RECURRENT_SSM_STATE",
+    "recurrent_ssm_state_out": "A_RECURRENT_SSM_STATE",
 
     # KV cache (handled specially)
     "kv_cache": "kv_cache",  # Not a bump buffer
@@ -256,6 +350,9 @@ class MemoryPlanner:
         """Determine which buffer an input should read from."""
 
         dtype = input_info.get("dtype", "fp32")
+        slot = input_info.get("slot")
+        if isinstance(input_info.get("from"), str) and input_info["from"].startswith("external:"):
+            slot = input_info["from"]
 
         # Special cases based on op type and input name
         if op_type == "residual_add":
@@ -267,7 +364,7 @@ class MemoryPlanner:
                 # 'b' is the saved residual
                 return "A_RESIDUAL", "fp32"
 
-        elif op_type in ("q_proj", "k_proj", "v_proj"):
+        elif op_type in ("q_proj", "q_gate_proj", "k_proj", "v_proj"):
             # QKV projections read FP32 or quantized input based on kernel activation
             # Only use Q8 buffer when dtype is explicitly q8_0 or q8_k.
             # "unknown" or anything else → FP32 (covers FP32-activation kernels
@@ -344,6 +441,9 @@ class MemoryPlanner:
             # logits reads quantized final hidden state
             return self.state.main_stream_q8_buffer, dtype
 
+        if isinstance(slot, str) and slot:
+            return self.state.get_buffer_for_slot(slot), dtype
+
         # Default: use main stream
         return self.state.main_stream_buffer, dtype
 
@@ -352,6 +452,7 @@ class MemoryPlanner:
         """Determine which buffer an output should write to."""
 
         dtype = output_info.get("dtype", "fp32")
+        slot = output_info.get("slot")
 
         # Special cases based on op type
         if op_type == "dense_embedding_lookup":
@@ -390,9 +491,12 @@ class MemoryPlanner:
             self.state.record_write(buffer, op_id, dtype)
             return buffer, dtype
 
-        elif op_type in ("q_proj", "k_proj", "v_proj"):
+        elif op_type in ("q_proj", "q_gate_proj", "k_proj", "v_proj"):
             # QKV projections write to attention scratch
-            buffer = "A_ATTN_SCRATCH"
+            if op_type == "q_gate_proj":
+                buffer = "A_ATTN_Q_GATE_PACKED"
+            else:
+                buffer = "A_ATTN_SCRATCH"
             self.state.record_write(buffer, op_id, "fp32")
             return buffer, "fp32"
 
@@ -452,6 +556,11 @@ class MemoryPlanner:
             buffer = "A_RESIDUAL"
             self.state.record_write(buffer, op_id, "fp32")
             return buffer, "fp32"
+
+        if isinstance(slot, str) and slot:
+            buffer = self.state.get_buffer_for_slot(slot)
+            self.state.record_write(buffer, op_id, dtype)
+            return buffer, dtype
 
         # Default: use main stream
         buffer = self.state.main_stream_buffer

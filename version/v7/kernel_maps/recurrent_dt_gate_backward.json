@@ -1,0 +1,62 @@
+{
+  "id": "recurrent_dt_gate_backward_f32",
+  "op": "recurrent_dt_gate_backward",
+  "variant": "fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "d_gate", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gradient of the recurrent gate output"},
+    {"name": "alpha", "dtype": "fp32", "shape": ["R", "D"], "desc": "Forward alpha input"},
+    {"name": "dt_bias", "dtype": "fp32", "shape": ["D"], "desc": "Forward dt bias"},
+    {"name": "a", "dtype": "fp32", "shape": ["D"], "desc": "Forward recurrent A scale"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_alpha", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gradient of alpha"},
+    {"name": "d_dt_bias", "dtype": "fp32", "shape": ["D"], "desc": "Gradient of dt bias"},
+    {"name": "d_a", "dtype": "fp32", "shape": ["D"], "desc": "Gradient of recurrent A scale"}
+  ],
+  "scratch": [],
+  "dims": ["R", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each row gradient can be computed independently before per-dimension accumulation."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Backward for softplus(alpha + dt_bias) * a."
+  },
+  "impl": {
+    "function": "recurrent_dt_gate_backward",
+    "c_declaration": "void recurrent_dt_gate_backward(const float *d_gate, const float *alpha, const float *dt_bias, const float *a, float *d_alpha, float *d_dt_bias, float *d_a, int rows, int dim);",
+    "sources": ["src/kernels/recurrent_gate_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_dt_gate.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_recurrent_dt_gate.py",
+        "tolerance": "5e-5",
+        "notes": "Backward parity against torch autograd."
+      }
+    ]
+  },
+  "notes": "Backward kernel for the recurrent dt gate transform."
+}

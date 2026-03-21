@@ -69,6 +69,45 @@ def discover_gguf(path: Path | None, model_dir: Path) -> Path:
     raise FileNotFoundError("Unable to locate GGUF; pass --gguf explicitly")
 
 
+def load_runtime_contract(model_dir: Path) -> dict[str, Any]:
+    contract: dict[str, Any] = {"prefill_policy": "batched"}
+    candidates = [
+        model_dir / "config.json",
+        model_dir / "weights_manifest.json",
+        (model_dir.parent / "config.json") if model_dir.name in {".ck_build", "ck_build"} else None,
+        (model_dir.parent / "weights_manifest.json") if model_dir.name in {".ck_build", "ck_build"} else None,
+    ]
+    for path in candidates:
+        if path is None or not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        cfg = data.get("config") if isinstance(data.get("config"), dict) else data
+        if isinstance(cfg, dict):
+            explicit_prefill = cfg.get("prefill_policy")
+            if isinstance(explicit_prefill, str) and explicit_prefill.strip():
+                contract["prefill_policy"] = explicit_prefill.strip()
+            layer_kinds = cfg.get("layer_kinds")
+            if (
+                contract["prefill_policy"] == "batched"
+                and isinstance(layer_kinds, list)
+                and any(str(kind).strip().lower() not in {"full_attention", "attention", "dense_attention"} for kind in layer_kinds)
+            ):
+                contract["prefill_policy"] = "sequential_decode"
+        template = data.get("template")
+        if isinstance(template, dict):
+            flags = template.get("flags")
+            if isinstance(flags, dict):
+                template_prefill = flags.get("prefill_policy")
+                if isinstance(template_prefill, str) and template_prefill.strip():
+                    contract["prefill_policy"] = template_prefill.strip()
+    return contract
+
+
 def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
@@ -200,6 +239,14 @@ def load_ck_logits(model_dir: Path, tokens: list[int]) -> dict[str, Any]:
     if has_active:
         lib.ck_model_get_active_tokens.argtypes = []
         lib.ck_model_get_active_tokens.restype = ctypes.c_int
+    has_decode = hasattr(lib, "ck_model_decode")
+    if has_decode:
+        lib.ck_model_decode.argtypes = [ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
+        lib.ck_model_decode.restype = ctypes.c_int
+    has_kv_reset = hasattr(lib, "ck_model_kv_cache_reset")
+    if has_kv_reset:
+        lib.ck_model_kv_cache_reset.argtypes = []
+        lib.ck_model_kv_cache_reset.restype = None
     has_free = hasattr(lib, "ck_model_free")
     if has_free:
         lib.ck_model_free.argtypes = []
@@ -230,16 +277,28 @@ def load_ck_logits(model_dir: Path, tokens: list[int]) -> dict[str, Any]:
             f"ck_model_init failed for all init dirs ({', '.join(init_errors)}) lib_dir={model_dir}"
         )
     try:
+        runtime_contract = load_runtime_contract(model_dir)
+        prefill_policy = str(runtime_contract.get("prefill_policy") or "batched").strip().lower()
         vocab = int(lib.ck_model_get_vocab_size())
         if vocab <= 0:
             raise RuntimeError(f"invalid CK vocab size: {vocab}")
-        arr = (ctypes.c_int32 * len(tokens))(*[int(x) for x in tokens])
-        rc = lib.ck_model_embed_tokens(arr, len(tokens))
-        if rc != 0:
-            raise RuntimeError(f"ck_model_embed_tokens failed rc={rc}")
-        rc = lib.ck_model_forward(None)
-        if rc != 0:
-            raise RuntimeError(f"ck_model_forward failed rc={rc}")
+        if prefill_policy == "sequential_decode":
+            if not has_decode:
+                raise RuntimeError("runtime contract requires sequential prefill but ck_model_decode is unavailable")
+            if has_kv_reset:
+                lib.ck_model_kv_cache_reset()
+            for tok in tokens:
+                rc = lib.ck_model_decode(ctypes.c_int32(int(tok)), None)
+                if rc != 0:
+                    raise RuntimeError(f"ck_model_decode failed rc={rc}")
+        else:
+            arr = (ctypes.c_int32 * len(tokens))(*[int(x) for x in tokens])
+            rc = lib.ck_model_embed_tokens(arr, len(tokens))
+            if rc != 0:
+                raise RuntimeError(f"ck_model_embed_tokens failed rc={rc}")
+            rc = lib.ck_model_forward(None)
+            if rc != 0:
+                raise RuntimeError(f"ck_model_forward failed rc={rc}")
 
         logits_ptr = lib.ck_model_get_logits()
         if not logits_ptr:
@@ -258,6 +317,7 @@ def load_ck_logits(model_dir: Path, tokens: list[int]) -> dict[str, Any]:
             "active_tokens": active,
             "stride": stride,
             "init_dir": str(init_dir_used) if init_dir_used is not None else str(model_dir),
+            "prefill_policy": prefill_policy,
             "logits": logits,
         }
     finally:
@@ -357,6 +417,7 @@ def main() -> int:
             "active_tokens": int(ck["active_tokens"]),
             "logits_stride": int(ck["stride"]),
             "init_dir": str(ck.get("init_dir", "")),
+            "prefill_policy": str(ck.get("prefill_policy", "batched")),
         },
         "llama": {
             "n_vocab": int(ll["meta"]["n_vocab"]),

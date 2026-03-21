@@ -1,0 +1,58 @@
+{
+  "id": "split_q_gate_backward_f32",
+  "op": "split_q_gate_backward",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "d_q", "dtype": "fp32", "shape": ["R", "Q"], "desc": "Gradient of split query rows"},
+    {"name": "d_gate", "dtype": "fp32", "shape": ["R", "G"], "desc": "Gradient of split gate rows"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_packed_qg", "dtype": "fp32", "shape": ["R", "Q+G"], "desc": "Gradient of packed Q+gate rows"}
+  ],
+  "scratch": [],
+  "dims": ["R", "Q", "G", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each Q+gate row gradient can be reconstructed independently."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Backward for the full-attention Q+gate split."
+  },
+  "impl": {
+    "function": "split_q_gate_backward",
+    "c_declaration": "void split_q_gate_backward(const float *d_q, const float *d_gate, float *d_packed_qg, int rows, int q_dim, int gate_dim, int group_dim);",
+    "sources": ["src/kernels/hybrid_attention_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_split_q_gate.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_split_q_gate.py",
+        "tolerance": "0",
+        "notes": "Backward parity against grouped or contiguous torch split wiring."
+      }
+    ]
+  },
+  "notes": "Backward kernel for the full-attention joint Q+gate split."
+}

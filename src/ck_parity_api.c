@@ -78,6 +78,96 @@ extern void attention_forward_causal_head_major_gqa_flash_strided(
     int num_heads, int num_kv_heads, int num_tokens,
     int head_dim, int aligned_head_dim, int kv_stride_tokens);
 
+/* SSM convolution kernel (from ssm_kernels.c) */
+extern void ssm_conv1d_forward(
+    const float *conv_x,
+    const float *kernel,
+    float *out,
+    int kernel_size,
+    int num_channels,
+    int num_tokens,
+    int num_seqs);
+
+/* Full-attention hybrid helper kernels (from hybrid_attention_kernels.c) */
+extern void split_q_gate_forward(
+    const float *packed_qg,
+    float *q,
+    float *gate,
+    int rows,
+    int q_dim,
+    int gate_dim,
+    int group_dim);
+extern void attn_gate_sigmoid_mul_forward(
+    const float *x,
+    const float *gate,
+    float *out,
+    int rows,
+    int dim);
+
+/* Recurrent packed QKV split kernel (from recurrent_split_kernels.c) */
+extern void recurrent_split_qkv_forward(
+    const float *packed_qkv,
+    float *q,
+    float *k,
+    float *v,
+    int rows,
+    int q_dim,
+    int k_dim,
+    int v_dim);
+
+/* Recurrent dt gate kernel (from recurrent_gate_kernels.c) */
+extern void recurrent_dt_gate_forward(
+    const float *alpha,
+    const float *dt_bias,
+    const float *a,
+    float *gate,
+    int rows,
+    int dim);
+extern void recurrent_conv_state_update_forward(
+    const float *state_in,
+    const float *q,
+    const float *k,
+    const float *v,
+    float *conv_x,
+    float *state_out,
+    int history_len,
+    int num_seqs,
+    int num_tokens,
+    int q_dim,
+    int k_dim,
+    int v_dim);
+extern void recurrent_silu_forward(
+    const float *x,
+    float *out,
+    int rows,
+    int dim);
+extern void recurrent_split_conv_qkv_forward(
+    const float *packed_qkv,
+    float *q,
+    float *k,
+    float *v,
+    int rows,
+    int q_dim,
+    int k_dim,
+    int v_dim);
+extern void recurrent_qk_l2_norm_forward(
+    float *q,
+    float *k,
+    int rows,
+    int q_dim,
+    int k_dim,
+    int head_dim,
+    float eps);
+extern void recurrent_norm_gate_forward(
+    const float *x,
+    const float *gate,
+    const float *weight,
+    float *out,
+    int rows,
+    int num_heads,
+    int head_dim,
+    float eps);
+
 /* Gated DeltaNet kernel (from deltanet_kernels.c) */
 extern void gated_deltanet_autoregressive_forward(
     const float *q,
@@ -649,6 +739,119 @@ void ck_test_gated_deltanet_autoregressive(const float *q,
         num_heads,
         state_dim,
         norm_eps);
+}
+
+void ck_test_ssm_conv1d(const float *conv_x,
+                        const float *kernel,
+                        float *out,
+                        int kernel_size,
+                        int num_channels,
+                        int num_tokens,
+                        int num_seqs)
+{
+    ssm_conv1d_forward(conv_x, kernel, out, kernel_size, num_channels, num_tokens, num_seqs);
+}
+
+void ck_test_split_q_gate(const float *packed_qg,
+                          float *q,
+                          float *gate,
+                          int rows,
+                          int q_dim,
+                          int gate_dim,
+                          int group_dim)
+{
+    split_q_gate_forward(packed_qg, q, gate, rows, q_dim, gate_dim, group_dim);
+}
+
+void ck_test_recurrent_split_qkv(const float *packed_qkv,
+                                 float *q,
+                                 float *k,
+                                 float *v,
+                                 int rows,
+                                 int q_dim,
+                                 int k_dim,
+                                 int v_dim)
+{
+    recurrent_split_qkv_forward(packed_qkv, q, k, v, rows, q_dim, k_dim, v_dim);
+}
+
+void ck_test_recurrent_dt_gate(const float *alpha,
+                               const float *dt_bias,
+                               const float *a,
+                               float *gate,
+                               int rows,
+                               int dim)
+{
+    recurrent_dt_gate_forward(alpha, dt_bias, a, gate, rows, dim);
+}
+
+void ck_test_recurrent_conv_state_update(const float *state_in,
+                                         const float *q,
+                                         const float *k,
+                                         const float *v,
+                                         float *conv_x,
+                                         float *state_out,
+                                         int history_len,
+                                         int num_seqs,
+                                         int num_tokens,
+                                         int q_dim,
+                                         int k_dim,
+                                         int v_dim)
+{
+    recurrent_conv_state_update_forward(
+        state_in, q, k, v, conv_x, state_out, history_len, num_seqs, num_tokens, q_dim, k_dim, v_dim);
+}
+
+void ck_test_recurrent_silu(const float *x,
+                            float *out,
+                            int rows,
+                            int dim)
+{
+    recurrent_silu_forward(x, out, rows, dim);
+}
+
+void ck_test_recurrent_split_conv_qkv(const float *packed_qkv,
+                                      float *q,
+                                      float *k,
+                                      float *v,
+                                      int rows,
+                                      int q_dim,
+                                      int k_dim,
+                                      int v_dim)
+{
+    recurrent_split_conv_qkv_forward(packed_qkv, q, k, v, rows, q_dim, k_dim, v_dim);
+}
+
+void ck_test_recurrent_qk_l2_norm(float *q,
+                                  float *k,
+                                  int rows,
+                                  int q_dim,
+                                  int k_dim,
+                                  int head_dim,
+                                  float eps)
+{
+    recurrent_qk_l2_norm_forward(q, k, rows, q_dim, k_dim, head_dim, eps);
+}
+
+void ck_test_attn_gate_sigmoid_mul(const float *x,
+                                   const float *gate,
+                                   float *out,
+                                   int rows,
+                                   int dim)
+{
+    attn_gate_sigmoid_mul_forward(x, gate, out, rows, dim);
+}
+
+void ck_test_recurrent_norm_gate(const float *x,
+                                 const float *gate,
+                                 const float *weight,
+                                 float *out,
+                                 int rows,
+                                 int num_heads,
+                                 int head_dim,
+                                 float eps)
+{
+    recurrent_norm_gate_forward(x, gate, weight, out, rows, num_heads, head_dim, eps);
 }
 
 /* ============================================================================

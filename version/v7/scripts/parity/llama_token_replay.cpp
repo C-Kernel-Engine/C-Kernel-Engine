@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 struct Args {
@@ -14,10 +17,19 @@ struct Args {
     std::vector<int32_t> tokens;
     std::string prompt;
     std::string logits_out_path;
+    std::string dump_dir;
+    std::vector<std::string> dump_names;
     std::string decode_mode = "batched";
     int ctx_len = 256;
     int top_k = 16;
     int threads = 0;
+};
+
+struct DumpState {
+    std::filesystem::path dump_dir;
+    std::unordered_set<std::string> names;
+    bool dump_all = false;
+    int dumped = 0;
 };
 
 static std::vector<std::string> split_csv(const std::string & s) {
@@ -115,6 +127,18 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             args.logits_out_path = v;
             continue;
         }
+        if (a == "--dump-dir") {
+            const char * v = need_value("--dump-dir");
+            if (!v) return false;
+            args.dump_dir = v;
+            continue;
+        }
+        if (a == "--dump-names") {
+            const char * v = need_value("--dump-names");
+            if (!v) return false;
+            args.dump_names = split_csv(v);
+            continue;
+        }
         if (a == "--decode-mode") {
             const char * v = need_value("--decode-mode");
             if (!v) return false;
@@ -130,7 +154,7 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
                 << "Usage: llama_token_replay --model <path.gguf> "
                 << "(--tokens <id,id,...> | --prompt <text>) "
                 << "--logits-out <path.bin> [--ctx N] [--top-k K] [--threads N] "
-                << "[--decode-mode batched|sequential]\n";
+                << "[--decode-mode batched|sequential] [--dump-dir dir --dump-names a,b,c]\n";
             std::exit(0);
         }
         err = "unknown arg: " + a;
@@ -164,6 +188,73 @@ static void print_json_error(const std::string & msg) {
         }
     }
     std::cout << "\"}\n";
+}
+
+static bool should_dump_tensor(const DumpState * state, const ggml_tensor * t) {
+    if (!state || state->dump_dir.empty() || !t) {
+        return false;
+    }
+    const char * raw_name = ggml_get_name(t);
+    if (!raw_name || !raw_name[0]) {
+        return false;
+    }
+    if (state->dump_all) {
+        return true;
+    }
+    if (state->names.empty()) {
+        return false;
+    }
+    return state->names.find(raw_name) != state->names.end();
+}
+
+static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_data) {
+    const DumpState * state = static_cast<const DumpState *>(user_data);
+    if (!should_dump_tensor(state, t)) {
+        return false;
+    }
+    if (ask) {
+        return true;
+    }
+
+    const char * raw_name = ggml_get_name(t);
+    if (!raw_name || !raw_name[0]) {
+        return true;
+    }
+
+    const int64_t nbytes = ggml_nbytes(t);
+    if (nbytes <= 0) {
+        return true;
+    }
+
+    std::vector<uint8_t> raw(static_cast<size_t>(nbytes));
+    ggml_backend_tensor_get(t, raw.data(), 0, static_cast<size_t>(nbytes));
+
+    std::filesystem::create_directories(state->dump_dir);
+    const std::filesystem::path bin_path = state->dump_dir / (std::string(raw_name) + ".bin");
+    std::ofstream f(bin_path, std::ios::binary | std::ios::trunc);
+    if (!f) {
+        return false;
+    }
+    f.write(reinterpret_cast<const char *>(raw.data()), static_cast<std::streamsize>(raw.size()));
+    if (!f.good()) {
+        return false;
+    }
+
+    const std::filesystem::path meta_path = state->dump_dir / (std::string(raw_name) + ".json");
+    std::ofstream meta(meta_path, std::ios::binary | std::ios::trunc);
+    if (meta) {
+        meta << "{";
+        meta << "\"name\":\"" << raw_name << "\",";
+        meta << "\"type\":" << static_cast<int>(t->type) << ",";
+        meta << "\"nbytes\":" << nbytes << ",";
+        meta << "\"ne\":[" << t->ne[0] << "," << t->ne[1] << "," << t->ne[2] << "," << t->ne[3] << "],";
+        meta << "\"nb\":[" << t->nb[0] << "," << t->nb[1] << "," << t->nb[2] << "," << t->nb[3] << "]";
+        meta << "}\n";
+    }
+
+    DumpState * mut = static_cast<DumpState *>(user_data);
+    mut->dumped += 1;
+    return true;
 }
 
 static bool tokenize_prompt(
@@ -280,6 +371,20 @@ int main(int argc, char ** argv) {
     int n_threads = args.threads > 0 ? args.threads : std::max(1, hw_threads);
     cparams.n_threads = n_threads;
     cparams.n_threads_batch = n_threads;
+    DumpState dump_state;
+    if (!args.dump_dir.empty()) {
+        dump_state.dump_dir = args.dump_dir;
+        dump_state.dump_all = args.dump_names.empty();
+        for (const std::string & name : args.dump_names) {
+            if (!name.empty()) {
+                dump_state.names.insert(name);
+            }
+        }
+        if (dump_state.dump_all || !dump_state.names.empty()) {
+            cparams.cb_eval = dump_eval_callback;
+            cparams.cb_eval_user_data = &dump_state;
+        }
+    }
 
     llama_context * ctx = llama_init_from_model(model, cparams);
     if (!ctx) {
@@ -366,6 +471,7 @@ int main(int argc, char ** argv) {
     }
     std::cout << "],";
     std::cout << "\"decode_mode\":\"" << args.decode_mode << "\",";
+    std::cout << "\"dumped\":" << dump_state.dumped << ",";
     std::cout << "\"topk\":[";
     for (int i = 0; i < k; ++i) {
         if (i) std::cout << ",";

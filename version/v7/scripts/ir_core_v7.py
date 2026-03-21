@@ -481,14 +481,17 @@ def emit_c_header(layout: ModelLayout, path: str, extra_api: str = "") -> None:
     add("")
 
     # ==== Layer Offsets Structure ====
-    # Get layer buffer names from first layer
+    # Union layer buffer names across all layers so mixed recurrent/attention
+    # templates can compile from the declared graph without generator-side
+    # model-family branching.
     section = layout.sections[0] if layout.sections else None
     layer_buffer_names = []
     if section and hasattr(section, 'layers') and section.layers:
-        first_layer = section.layers[0]
-        if hasattr(first_layer, 'buffers'):
-            for buf in first_layer.buffers:
-                # Extract field name from "layer.0.fieldname"
+        for layer in section.layers:
+            if not hasattr(layer, 'buffers'):
+                continue
+            for buf in layer.buffers:
+                # Extract field name from "layer.N.fieldname"
                 if hasattr(buf, 'name'):
                     parts = buf.name.split(".", 2)
                     if len(parts) == 3 and parts[0] == "layer":

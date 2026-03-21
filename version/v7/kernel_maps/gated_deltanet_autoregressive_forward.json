@@ -1,0 +1,67 @@
+{
+  "id": "gated_deltanet_autoregressive_forward",
+  "op": "gated_deltanet",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "D"], "desc": "Normalized query vectors [num_heads, state_dim]"},
+    {"name": "k", "dtype": "fp32", "shape": ["H", "D"], "desc": "Normalized key vectors [num_heads, state_dim]"},
+    {"name": "v", "dtype": "fp32", "shape": ["H", "D"], "desc": "Value vectors [num_heads, state_dim]"},
+    {"name": "g", "dtype": "fp32", "shape": ["H"], "desc": "Gate values per DeltaNet head"},
+    {"name": "beta", "dtype": "fp32", "shape": ["H"], "desc": "Beta/update values per DeltaNet head"},
+    {"name": "state_in", "dtype": "fp32", "shape": ["H", "D", "D"], "desc": "Input recurrent state [num_heads, state_dim, state_dim]"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "state_out", "dtype": "fp32", "shape": ["H", "D", "D"], "desc": "Updated recurrent state [num_heads, state_dim, state_dim]"},
+    {"name": "out", "dtype": "fp32", "shape": ["H", "D"], "desc": "DeltaNet output vectors [num_heads, state_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["H", "D"],
+  "params": [
+    {"name": "norm_eps", "dtype": "float32", "desc": "Normalization epsilon for Q/K scaling"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Each DeltaNet head is independent for the autoregressive single-token update."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Single-token recurrent DeltaNet update. FP32 only in v7 today."
+  },
+  "impl": {
+    "function": "gated_deltanet_autoregressive_forward",
+    "c_declaration": "void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps);",
+    "sources": ["src/kernels/deltanet_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["tests/test_deltanet.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python tests/test_deltanet.py",
+        "tolerance": "1e-5",
+        "notes": "Forward/backward parity against the local PyTorch DeltaNet reference."
+      }
+    ]
+  },
+  "notes": "Gated DeltaNet single-token recurrent update used by qwen3next/Qwen3.5 linear attention blocks."
+}

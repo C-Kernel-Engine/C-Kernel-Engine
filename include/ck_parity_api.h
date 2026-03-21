@@ -367,6 +367,161 @@ void ck_test_gated_deltanet_autoregressive(const float *q,
                                            int state_dim,
                                            float norm_eps);
 
+/**
+ * @brief qwen3next/Qwen3.5 SSM causal depthwise convolution.
+ *
+ * Layout:
+ *   conv_x  [num_seqs, num_channels, kernel_size - 1 + num_tokens]
+ *   kernel  [num_channels, kernel_size]
+ *   out     [num_seqs, num_tokens, num_channels]
+ *
+ * This mirrors ggml's GGML_OP_SSM_CONV used immediately before the DeltaNet
+ * recurrent update in qwen3next/Qwen3.5.
+ */
+void ck_test_ssm_conv1d(const float *conv_x,
+                        const float *kernel,
+                        float *out,
+                        int kernel_size,
+                        int num_channels,
+                        int num_tokens,
+                        int num_seqs);
+
+/**
+ * @brief Split a packed full-attention Q+gate matrix into Q rows and gate rows.
+ *
+ * Layout:
+ *   packed_qg : [rows, q_dim + gate_dim]
+ *   q         : [rows, q_dim]
+ *   gate      : [rows, gate_dim]
+ */
+void ck_test_split_q_gate(const float *packed_qg,
+                          float *q,
+                          float *gate,
+                          int rows,
+                          int q_dim,
+                          int gate_dim,
+                          int group_dim);
+
+/**
+ * @brief Split a packed recurrent QKV matrix into explicit Q, K, and V outputs.
+ *
+ * Layout:
+ *   packed_qkv : [rows, q_dim + k_dim + v_dim]
+ *   q          : [rows, q_dim]
+ *   k          : [rows, k_dim]
+ *   v          : [rows, v_dim]
+ */
+void ck_test_recurrent_split_qkv(const float *packed_qkv,
+                                 float *q,
+                                 float *k,
+                                 float *v,
+                                 int rows,
+                                 int q_dim,
+                                 int k_dim,
+                                 int v_dim);
+
+/**
+ * @brief Transform recurrent alpha rows into the DeltaNet gate.
+ *
+ * Layout:
+ *   alpha   : [rows, dim]
+ *   dt_bias : [dim]
+ *   a       : [dim]
+ *   gate    : [rows, dim]
+ */
+void ck_test_recurrent_dt_gate(const float *alpha,
+                               const float *dt_bias,
+                               const float *a,
+                               float *gate,
+                               int rows,
+                               int dim);
+
+/**
+ * @brief Build the recurrent convolution input history window.
+ *
+ * Layout:
+ *   state_in  [num_seqs, channels, history_len]
+ *   q         [num_seqs * num_tokens, q_dim]
+ *   k         [num_seqs * num_tokens, k_dim]
+ *   v         [num_seqs * num_tokens, v_dim]
+ *   conv_x    [num_seqs, channels, history_len + num_tokens]
+ *   state_out [num_seqs, channels, history_len]
+ */
+void ck_test_recurrent_conv_state_update(const float *state_in,
+                                         const float *q,
+                                         const float *k,
+                                         const float *v,
+                                         float *conv_x,
+                                         float *state_out,
+                                         int history_len,
+                                         int num_seqs,
+                                         int num_tokens,
+                                         int q_dim,
+                                         int k_dim,
+                                         int v_dim);
+
+/**
+ * @brief Apply SiLU elementwise to recurrent rows.
+ */
+void ck_test_recurrent_silu(const float *x,
+                            float *out,
+                            int rows,
+                            int dim);
+
+/**
+ * @brief Split the post-convolution recurrent packed QKV rows.
+ */
+void ck_test_recurrent_split_conv_qkv(const float *packed_qkv,
+                                      float *q,
+                                      float *k,
+                                      float *v,
+                                      int rows,
+                                      int q_dim,
+                                      int k_dim,
+                                      int v_dim);
+
+/**
+ * @brief Apply per-head L2 normalization to recurrent Q/K rows in-place.
+ *
+ * Layout:
+ *   q : [rows, q_dim]
+ *   k : [rows, k_dim]
+ * where q_dim and k_dim are multiples of head_dim.
+ */
+void ck_test_recurrent_qk_l2_norm(float *q,
+                                  float *k,
+                                  int rows,
+                                  int q_dim,
+                                  int k_dim,
+                                  int head_dim,
+                                  float eps);
+
+/**
+ * @brief Multiply attention output rows by sigmoid(gate) elementwise.
+ *
+ * Layout:
+ *   x    : [rows, dim]
+ *   gate : [rows, dim]
+ *   out  : [rows, dim]
+ */
+void ck_test_attn_gate_sigmoid_mul(const float *x,
+                                   const float *gate,
+                                   float *out,
+                                   int rows,
+                                   int dim);
+
+/**
+ * @brief Per-head RMSNorm followed by SiLU(z) gating for recurrent outputs.
+ */
+void ck_test_recurrent_norm_gate(const float *x,
+                                 const float *gate,
+                                 const float *weight,
+                                 float *out,
+                                 int rows,
+                                 int num_heads,
+                                 int head_dim,
+                                 float eps);
+
 /* ============================================================================
  * Attention Kernels
  * ============================================================================ */

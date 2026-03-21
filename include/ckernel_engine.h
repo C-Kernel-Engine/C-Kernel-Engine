@@ -1177,6 +1177,277 @@ void attention_forward_causal_head_major_gqa_flash_strided_sliding(
 //   g, beta   : [num_heads]
 //   state_*   : [num_heads, state_dim, state_dim] row-major per head
 //   out       : [num_heads, state_dim]
+//
+// Qwen3.5/qwen3next also uses an SSM causal depthwise convolution before the
+// recurrent DeltaNet update. That kernel consumes:
+//   conv_x  : [seqs, channels, kernel_size - 1 + num_tokens]
+//   kernel  : [channels, kernel_size]
+//   out     : [seqs, num_tokens, channels]
+// and matches ggml's GGML_OP_SSM_CONV layout/semantics.
+void ssm_conv1d_forward(const float *conv_x,
+                        const float *kernel,
+                        float *out,
+                        int kernel_size,
+                        int num_channels,
+                        int num_tokens,
+                        int num_seqs);
+
+// Backward for the causal depthwise SSM convolution used in qwen3next/Qwen3.5.
+// Layout:
+//   d_out      : [seqs, num_tokens, channels]
+//   conv_x     : [seqs, channels, kernel_size - 1 + num_tokens]
+//   kernel     : [channels, kernel_size]
+//   d_conv_x   : same as conv_x
+//   d_kernel   : same as kernel
+void ssm_conv1d_backward(const float *d_out,
+                         const float *conv_x,
+                         const float *kernel,
+                         float *d_conv_x,
+                         float *d_kernel,
+                         int kernel_size,
+                         int num_channels,
+                         int num_tokens,
+                         int num_seqs);
+
+// Split a packed recurrent QKV projection into explicit Q, K, and V rows.
+// Layout:
+//   packed_qkv : [rows, q_dim + k_dim + v_dim] row-major
+//   q          : [rows, q_dim]
+//   k          : [rows, k_dim]
+//   v          : [rows, v_dim]
+//
+// For qwen3.5 recurrent layers, rows usually means num_tokens * num_seqs after
+// the packed projection has been flattened into a token-major matrix.
+//
+// Full-attention qwen3.5 layers also use a joint Q+gate projection before the
+// standard attention block:
+//   packed_qg : [rows, interleaved (q_group, gate_group) segments]
+//   q         : [rows, q_dim]
+//   gate      : [rows, gate_dim]
+//   group_dim : per-group width; if q_dim == gate_dim == group_dim the layout
+//               degenerates to a single [Q | G] split, otherwise it is treated
+//               as [Q0 | G0 | Q1 | G1 | ...].
+void split_q_gate_forward(const float *packed_qg,
+                          float *q,
+                          float *gate,
+                          int rows,
+                          int q_dim,
+                          int gate_dim,
+                          int group_dim);
+
+void split_q_gate_backward(const float *d_q,
+                           const float *d_gate,
+                           float *d_packed_qg,
+                           int rows,
+                           int q_dim,
+                           int gate_dim,
+                           int group_dim);
+
+void recurrent_split_qkv_forward(const float *packed_qkv,
+                                 float *q,
+                                 float *k,
+                                 float *v,
+                                 int rows,
+                                 int q_dim,
+                                 int k_dim,
+                                 int v_dim);
+
+// Backward for the packed recurrent QKV split.
+// Layout:
+//   d_q          : [rows, q_dim]
+//   d_k          : [rows, k_dim]
+//   d_v          : [rows, v_dim]
+//   d_packed_qkv : [rows, q_dim + k_dim + v_dim]
+void recurrent_split_qkv_backward(const float *d_q,
+                                  const float *d_k,
+                                  const float *d_v,
+                                  float *d_packed_qkv,
+                                  int rows,
+                                  int q_dim,
+                                  int k_dim,
+                                  int v_dim);
+
+// Transform recurrent alpha rows into the DeltaNet gate using per-dimension
+// dt bias and scale weights.
+// Layout:
+//   alpha   : [rows, dim]
+//   dt_bias : [dim]
+//   a       : [dim]
+//   gate    : [rows, dim]
+// Formula:
+//   gate[row, col] = softplus(alpha[row, col] + dt_bias[col]) * a[col]
+void recurrent_dt_gate_forward(const float *alpha,
+                               const float *dt_bias,
+                               const float *a,
+                               float *gate,
+                               int rows,
+                               int dim);
+
+// Backward for recurrent_dt_gate_forward.
+// Layout:
+//   d_gate    : [rows, dim]
+//   alpha     : [rows, dim]
+//   dt_bias   : [dim]
+//   a         : [dim]
+//   d_alpha   : [rows, dim]
+//   d_dt_bias : [dim]
+//   d_a       : [dim]
+void recurrent_dt_gate_backward(const float *d_gate,
+                                const float *alpha,
+                                const float *dt_bias,
+                                const float *a,
+                                float *d_alpha,
+                                float *d_dt_bias,
+                                float *d_a,
+                                int rows,
+                                int dim);
+
+// Update the causal convolution history for a recurrent SSM block.
+// Layout:
+//   state_in  : [num_seqs, channels, history_len]
+//   q         : [num_seqs * num_tokens, q_dim]
+//   k         : [num_seqs * num_tokens, k_dim]
+//   v         : [num_seqs * num_tokens, v_dim]
+//   conv_x    : [num_seqs, channels, history_len + num_tokens]
+//   state_out : [num_seqs, channels, history_len]
+void recurrent_conv_state_update_forward(const float *state_in,
+                                         const float *q,
+                                         const float *k,
+                                         const float *v,
+                                         float *conv_x,
+                                         float *state_out,
+                                         int history_len,
+                                         int num_seqs,
+                                         int num_tokens,
+                                         int q_dim,
+                                         int k_dim,
+                                         int v_dim);
+
+// Backward for recurrent_conv_state_update_forward.
+void recurrent_conv_state_update_backward(const float *d_conv_x,
+                                          const float *d_state_out,
+                                          float *d_state_in,
+                                          float *d_q,
+                                          float *d_k,
+                                          float *d_v,
+                                          int history_len,
+                                          int num_seqs,
+                                          int num_tokens,
+                                          int q_dim,
+                                          int k_dim,
+                                          int v_dim);
+
+// Apply SiLU elementwise to recurrent convolution output rows.
+// Layout:
+//   x   : [rows, dim]
+//   out : [rows, dim]
+void recurrent_silu_forward(const float *x,
+                            float *out,
+                            int rows,
+                            int dim);
+
+// Backward for recurrent_silu_forward.
+void recurrent_silu_backward(const float *d_out,
+                             const float *x,
+                             float *d_x,
+                             int rows,
+                             int dim);
+
+// Split the post-convolution recurrent packed QKV rows into explicit Q, K, and V.
+// Layout matches recurrent_split_qkv_forward.
+void recurrent_split_conv_qkv_forward(const float *packed_qkv,
+                                      float *q,
+                                      float *k,
+                                      float *v,
+                                      int rows,
+                                      int q_dim,
+                                      int k_dim,
+                                      int v_dim);
+
+// Backward for recurrent_split_conv_qkv_forward.
+void recurrent_split_conv_qkv_backward(const float *d_q,
+                                       const float *d_k,
+                                       const float *d_v,
+                                       float *d_packed_qkv,
+                                       int rows,
+                                       int q_dim,
+                                       int k_dim,
+                                       int v_dim);
+
+// Apply per-head L2 normalization to recurrent Q and K rows in-place.
+// Layout:
+//   q : [rows, q_dim]
+//   k : [rows, k_dim]
+// where q_dim and k_dim are multiples of head_dim.
+void recurrent_qk_l2_norm_forward(float *q,
+                                  float *k,
+                                  int rows,
+                                  int q_dim,
+                                  int k_dim,
+                                  int head_dim,
+                                  float eps);
+
+// Backward for recurrent_qk_l2_norm_forward.
+void recurrent_qk_l2_norm_backward(const float *d_q_out,
+                                   const float *d_k_out,
+                                   const float *q,
+                                   const float *k,
+                                   float *d_q,
+                                   float *d_k,
+                                   int rows,
+                                   int q_dim,
+                                   int k_dim,
+                                   int head_dim,
+                                   float eps);
+
+// Per-head RMSNorm followed by SiLU(z) gating for recurrent outputs.
+// Layout:
+//   x       : [rows, num_heads * head_dim]
+//   gate    : [rows, num_heads * head_dim]
+//   weight  : [head_dim]
+//   out     : [rows, num_heads * head_dim]
+void recurrent_norm_gate_forward(const float *x,
+                                 const float *gate,
+                                 const float *weight,
+                                 float *out,
+                                 int rows,
+                                 int num_heads,
+                                 int head_dim,
+                                 float eps);
+
+// Backward for recurrent_norm_gate_forward.
+void recurrent_norm_gate_backward(const float *d_out,
+                                  const float *x,
+                                  const float *gate,
+                                  const float *weight,
+                                  float *d_x,
+                                  float *d_gate,
+                                  float *d_weight,
+                                  int rows,
+                                  int num_heads,
+                                  int head_dim,
+                                  float eps);
+
+// Apply sigmoid(gate) to the full-attention qwen3.5 gate path and multiply it
+// elementwise with the attention output before the output projection.
+// Layout:
+//   x      : [rows, dim]
+//   gate   : [rows, dim]
+//   out    : [rows, dim]
+void attn_gate_sigmoid_mul_forward(const float *x,
+                                   const float *gate,
+                                   float *out,
+                                   int rows,
+                                   int dim);
+
+void attn_gate_sigmoid_mul_backward(const float *d_out,
+                                    const float *x,
+                                    const float *gate,
+                                    float *d_x,
+                                    float *d_gate,
+                                    int rows,
+                                    int dim);
+
 void gated_deltanet_autoregressive_forward(const float *q,
                                            const float *k,
                                            const float *v,

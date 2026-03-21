@@ -179,6 +179,196 @@ def weight_dtype(info: "gguf.TensorInfo", label: str) -> int:
     return gguf.ck_dtype_from_ggml_type(info.ggml_type)
 
 
+def _shape_from_tensor(info: "gguf.TensorInfo") -> List[int]:
+    if len(info.dims) <= 1:
+        return [info.ne0]
+    return [int(d) for d in reversed(info.dims)]
+
+
+def _entry_from_tensor(
+    name: str,
+    info: "gguf.TensorInfo",
+    *,
+    label: Optional[str] = None,
+    layer_kind: Optional[str] = None,
+) -> Dict:
+    entry = {
+        "name": name,
+        "dtype": dtype_name(weight_dtype(info, label or name)),
+        "shape": _shape_from_tensor(info),
+        "source_dtype": gguf.ggml_type_name(info.ggml_type),
+    }
+    if info.name != name:
+        entry["source_name"] = info.name
+    if len(info.dims) > 1:
+        entry["gguf_dims"] = [int(d) for d in info.dims]
+    if layer_kind:
+        entry["layer_kind"] = layer_kind
+    return entry
+
+
+def _inspect_qwen35_manifest(
+    *,
+    arch: str,
+    meta_int_arch,
+    meta_float_arch,
+    tensors: Dict[str, "gguf.TensorInfo"],
+    tok: "gguf.TensorInfo",
+    embed_dim: int,
+    vocab_size: int,
+    num_layers: int,
+    intermediate: int,
+    num_heads: int,
+    num_kv_heads: int,
+    head_dim: int,
+    context_len: int,
+    rope_theta: float,
+    rms_eps: float,
+) -> Tuple[Dict, List[Dict]]:
+    layer_kinds: List[str] = []
+    manifest_entries: List[Dict] = []
+
+    tok_dt = weight_dtype(tok, "token_emb")
+    if tok.ggml_type == gguf.GGML_TYPE_F16:
+        tok_dt = gguf.CK_DT_FP32
+    manifest_entries.append({
+        "name": "token_emb",
+        "dtype": dtype_name(tok_dt),
+        "shape": [tok.ne1, tok.ne0],
+        "source_dtype": gguf.ggml_type_name(tok.ggml_type),
+        "source_name": tok.name,
+        "gguf_dims": [int(d) for d in tok.dims],
+    })
+
+    full_attention_interval = meta_int_arch("full_attention_interval")
+    ssm_conv_kernel = meta_int_arch("ssm.conv_kernel")
+    ssm_state_size = meta_int_arch("ssm.state_size")
+    ssm_group_count = meta_int_arch("ssm.group_count")
+    ssm_time_step_rank = meta_int_arch("ssm.time_step_rank")
+    ssm_inner_size = meta_int_arch("ssm.inner_size")
+
+    attn_q_gate_proj_dim = None
+    attn_query_dim = None
+    for layer in range(num_layers):
+        kind = gguf.classify_layer_contract(tensors, layer)
+        if kind == "qwen35_recurrent_hybrid":
+            layer_kinds.append("recurrent")
+            required = {
+                "attn_norm.weight": f"layer.{layer}.attn_norm",
+                "post_attention_norm.weight": f"layer.{layer}.post_attention_norm",
+                "attn_qkv.weight": f"layer.{layer}.attn_qkv",
+                "attn_gate.weight": f"layer.{layer}.attn_gate",
+                "ssm_alpha.weight": f"layer.{layer}.ssm_alpha",
+                "ssm_beta.weight": f"layer.{layer}.ssm_beta",
+                "ssm_conv1d.weight": f"layer.{layer}.ssm_conv1d",
+                "ssm_dt.bias": f"layer.{layer}.ssm_dt_bias",
+                "ssm_a": f"layer.{layer}.ssm_a",
+                "ssm_norm.weight": f"layer.{layer}.ssm_norm",
+                "ssm_out.weight": f"layer.{layer}.ssm_out",
+                "ffn_gate.weight": f"layer.{layer}.ffn_gate",
+                "ffn_up.weight": f"layer.{layer}.ffn_up",
+                "ffn_down.weight": f"layer.{layer}.ffn_down",
+            }
+            for src_name, dst_name in required.items():
+                info = tensors.get(f"blk.{layer}.{src_name}")
+                if info is None:
+                    raise gguf.GGUFError(
+                        f"Layer {layer}: qwen35 recurrent block missing required tensor {src_name}"
+                    )
+                manifest_entries.append(
+                    _entry_from_tensor(dst_name, info, label=src_name, layer_kind="recurrent")
+                )
+            continue
+
+        if kind == "qwen35_full_attention_hybrid":
+            layer_kinds.append("full_attention")
+            required = {
+                "attn_norm.weight": f"layer.{layer}.attn_norm",
+                "post_attention_norm.weight": f"layer.{layer}.post_attention_norm",
+                "attn_q.weight": f"layer.{layer}.attn_q_gate",
+                "attn_k.weight": f"layer.{layer}.attn_k",
+                "attn_v.weight": f"layer.{layer}.attn_v",
+                "attn_output.weight": f"layer.{layer}.attn_output",
+                "attn_q_norm.weight": f"layer.{layer}.attn_q_norm",
+                "attn_k_norm.weight": f"layer.{layer}.attn_k_norm",
+                "ffn_gate.weight": f"layer.{layer}.ffn_gate",
+                "ffn_up.weight": f"layer.{layer}.ffn_up",
+                "ffn_down.weight": f"layer.{layer}.ffn_down",
+            }
+            for src_name, dst_name in required.items():
+                info = tensors.get(f"blk.{layer}.{src_name}")
+                if info is None:
+                    raise gguf.GGUFError(
+                        f"Layer {layer}: qwen35 full-attention block missing required tensor {src_name}"
+                    )
+                manifest_entries.append(
+                    _entry_from_tensor(dst_name, info, label=src_name, layer_kind="full_attention")
+                )
+
+            if attn_q_gate_proj_dim is None:
+                q_info = tensors.get(f"blk.{layer}.attn_q.weight")
+                if q_info is not None:
+                    attn_q_gate_proj_dim = q_info.ne1
+                    if q_info.ne1 % 2 == 0:
+                        attn_query_dim = q_info.ne1 // 2
+            continue
+
+        detail = gguf.describe_layer_contract(tensors, layer, arch=arch)
+        if detail:
+            raise gguf.GGUFError(detail)
+        raise gguf.GGUFError(
+            f"Layer {layer}: unsupported qwen35 layer contract ({kind})"
+        )
+
+    config = {
+        "model": arch,
+        "arch": arch,
+        "model_type": arch,
+        "embed_dim": embed_dim,
+        "attn_out_dim": attn_query_dim or (num_heads * head_dim),
+        "num_heads": num_heads,
+        "num_kv_heads": num_kv_heads,
+        "head_dim": head_dim,
+        "intermediate_dim": intermediate,
+        "num_layers": num_layers,
+        "vocab_size": vocab_size,
+        "max_seq_len": context_len,
+        "rope_theta": rope_theta,
+        "rms_norm_eps": rms_eps,
+        "tie_word_embeddings": "output.weight" not in tensors,
+        "has_qk_norm": any(kind == "full_attention" for kind in layer_kinds),
+        "has_attention_biases": False,
+        "dtype": "fp32",
+        "layer_kinds": layer_kinds,
+        "hybrid_block_pattern": layer_kinds[:],
+    }
+    if full_attention_interval is not None:
+        config["full_attention_interval"] = full_attention_interval
+    if attn_q_gate_proj_dim is not None:
+        config["attn_q_gate_proj_dim"] = attn_q_gate_proj_dim
+    if ssm_conv_kernel is not None:
+        config["ssm_conv_kernel"] = ssm_conv_kernel
+    if ssm_state_size is not None:
+        config["ssm_state_size"] = ssm_state_size
+    if ssm_group_count is not None:
+        config["ssm_group_count"] = ssm_group_count
+    if ssm_time_step_rank is not None:
+        config["ssm_time_step_rank"] = ssm_time_step_rank
+    if ssm_inner_size is not None:
+        config["ssm_inner_size"] = ssm_inner_size
+
+    out_norm = tensors.get("output_norm.weight")
+    if out_norm is None:
+        raise gguf.GGUFError("Missing required tensor: output_norm.weight")
+    manifest_entries.append(_entry_from_tensor("final_ln_weight", out_norm, label="output_norm"))
+
+    out_weight = tensors.get("output.weight")
+    if out_weight is not None:
+        manifest_entries.append(_entry_from_tensor("lm_head_weight", out_weight, label="lm_head"))
+
+    return config, manifest_entries
+
+
 def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List[Dict]]:
     with open(gguf_path, "rb") as f:
         r = gguf.GGUFReader(f)
@@ -341,6 +531,8 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         has_attn_bias = "blk.0.attn_q.bias" in tensors
 
         config = {
+            "model": arch,
+            "arch": arch,
             "model_type": arch,
             "embed_dim": embed_dim,
             "attn_out_dim": attn_out_dim,
@@ -361,6 +553,25 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
         if sliding_window is not None:
             config["sliding_window"] = sliding_window
 
+        if arch == "qwen35":
+            return _inspect_qwen35_manifest(
+                arch=arch,
+                meta_int_arch=meta_int_arch,
+                meta_float_arch=meta_float_arch,
+                tensors=tensors,
+                tok=tok,
+                embed_dim=embed_dim,
+                vocab_size=vocab_size,
+                num_layers=num_layers,
+                intermediate=intermediate,
+                num_heads=num_heads,
+                num_kv_heads=num_kv_heads,
+                head_dim=head_dim,
+                context_len=context_len,
+                rope_theta=rope_theta,
+                rms_eps=rms_eps,
+            )
+
         manifest_entries: List[Dict] = []
 
         tok_dt = weight_dtype(tok, "token_emb")
@@ -380,6 +591,9 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             post_attention_norm = tensors.get(f"blk.{layer}.post_attention_norm.weight")
             post_ffn_norm = tensors.get(f"blk.{layer}.post_ffn_norm.weight") or tensors.get(f"blk.{layer}.post_ffw_norm.weight")
             if not attn_norm or not ffn_norm:
+                detail = gguf.describe_layer_contract(tensors, layer, arch=arch)
+                if detail:
+                    raise gguf.GGUFError(detail)
                 raise gguf.GGUFError(f"Layer {layer}: missing norms")
 
             wq = tensors.get(f"blk.{layer}.attn_q.weight")
@@ -393,8 +607,14 @@ def inspect_gguf(gguf_path: Path, max_layers: Optional[int]) -> Tuple[Dict, List
             up = tensors.get(f"blk.{layer}.ffn_up.weight")
             down = tensors.get(f"blk.{layer}.ffn_down.weight")
             if not wq or not wk or not wv or not wo:
+                detail = gguf.describe_layer_contract(tensors, layer, arch=arch)
+                if detail:
+                    raise gguf.GGUFError(detail)
                 raise gguf.GGUFError(f"Layer {layer}: missing attention tensors")
             if not gate or not up or not down:
+                detail = gguf.describe_layer_contract(tensors, layer, arch=arch)
+                if detail:
+                    raise gguf.GGUFError(detail)
                 raise gguf.GGUFError(f"Layer {layer}: missing ffn tensors")
 
             for info in (wq, wk, wv, wo, gate, up, down):

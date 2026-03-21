@@ -248,6 +248,13 @@ SRCS    := src/backend_native.c \
 	           src/kernels/attention_kernels.c \
 	           src/kernels/attention_kernels_sliding.c \
 	           src/kernels/attention_flash_true.c \
+	           src/kernels/ssm_kernels.c \
+	           src/kernels/hybrid_attention_kernels.c \
+	           src/kernels/recurrent_split_kernels.c \
+	           src/kernels/recurrent_gate_kernels.c \
+	           src/kernels/recurrent_state_kernels.c \
+	           src/kernels/recurrent_qk_norm_kernels.c \
+	           src/kernels/recurrent_norm_kernels.c \
 	           src/kernels/deltanet_kernels.c \
 	           src/kernels/attention_decode_fused.c \
 	           src/kernels/embedding_kernels.c \
@@ -996,6 +1003,36 @@ test-vision: $(LIB_VISION)
 test-deltanet: $(LIB)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_deltanet.py $(ARGS)
 
+test-ssm-conv: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_ssm_conv.py $(ARGS)
+
+test-recurrent-split-qkv: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_split_qkv.py $(ARGS)
+
+test-split-q-gate: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_split_q_gate.py $(ARGS)
+
+test-recurrent-dt-gate: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_dt_gate.py $(ARGS)
+
+test-recurrent-conv-state-update: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_conv_state_update.py $(ARGS)
+
+test-recurrent-silu: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_silu.py $(ARGS)
+
+test-recurrent-split-conv-qkv: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_split_conv_qkv.py $(ARGS)
+
+test-recurrent-qk-l2-norm: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_qk_l2_norm.py $(ARGS)
+
+test-recurrent-norm-gate: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_recurrent_norm_gate.py $(ARGS)
+
+test-attn-gate-sigmoid-mul: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_attn_gate_sigmoid_mul.py $(ARGS)
+
 libckernel_rope.so: $(LIB_ROPE)
 	@true
 
@@ -1239,6 +1276,7 @@ unittest:
 	@echo "  unittest/test_mlp.py                   - MLP block forward/backward"
 	@echo "  unittest/test_swiglu.py                - SwiGLU activation"
 	@echo "  unittest/test_deltanet.py              - Gated DeltaNet forward/backward"
+	@echo "  unittest/test_ssm_conv.py              - SSM causal conv forward/backward"
 	@echo "  unittest/test_relu.py                  - ReLU activation"
 	@echo "  unittest/test_attention.py             - Attention forward/backward"
 	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
@@ -1611,6 +1649,7 @@ tests-list:
 	@echo "  unittest/test_mlp.py               - MLP block forward/backward vs PyTorch"
 	@echo "  unittest/test_swiglu.py            - SwiGLU activation forward/backward"
 	@echo "  unittest/test_deltanet.py          - Gated DeltaNet forward/backward vs PyTorch"
+	@echo "  unittest/test_ssm_conv.py          - SSM causal conv forward/backward vs PyTorch"
 	@echo "  unittest/test_attention.py         - Multi-head attention forward vs PyTorch"
 	@echo "  unittest/test_attention_sliding_contract.py - Sliding-window attention contract"
 	@echo "  unittest/test_attention_backward.py - Attention backward (MHA/GQA)"
@@ -2498,10 +2537,17 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/sigmoid_kernels.c \
                src/kernels/gelu_kernels.c \
                src/kernels/geglu_kernels.c \
-               src/kernels/attention_kernels.c \
-               src/kernels/attention_kernels_sliding.c \
-               src/kernels/attention_flash_true.c \
-               src/kernels/deltanet_kernels.c \
+	               src/kernels/attention_kernels.c \
+	               src/kernels/attention_kernels_sliding.c \
+	               src/kernels/attention_flash_true.c \
+	               src/kernels/ssm_kernels.c \
+	               src/kernels/hybrid_attention_kernels.c \
+	               src/kernels/recurrent_split_kernels.c \
+	               src/kernels/recurrent_gate_kernels.c \
+	               src/kernels/recurrent_state_kernels.c \
+	               src/kernels/recurrent_qk_norm_kernels.c \
+	               src/kernels/recurrent_norm_kernels.c \
+	               src/kernels/deltanet_kernels.c \
                src/kernels/fused/prefill_fused_gemm.c \
                src/kernels/fused/mega_fused_outproj_mlp_prefill.c \
                src/kernels/fused/gemv_fused_quant_bias.c \
@@ -2586,6 +2632,7 @@ TEST_HARNESS_SRCS := src/backend_native.c \
 	src/kernels/fused/gemv_fused_quant_bias.c \
 	src/kernels/gemm_head_major_output.c \
 	src/kernels/gemm_microkernel.c \
+	src/kernels/hybrid_attention_kernels.c \
 	src/kernels/layernorm_kernels.c \
 	src/kernels/mlp_kernels.c \
 	src/kernels/rmsnorm_kernels.c \

@@ -1,0 +1,36 @@
+{
+  "id": "recurrent_silu_forward",
+  "op": "recurrent_silu",
+  "variant": "fp32",
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [{"name": "x", "dtype": "fp32", "shape": ["R", "D"]}],
+  "weights": [],
+  "activations": [],
+  "outputs": [{"name": "out", "dtype": "fp32", "shape": ["R", "D"]}],
+  "scratch": [],
+  "dims": ["R", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "recurrent_silu_forward",
+    "c_declaration": "void recurrent_silu_forward(const float *x, float *out, int rows, int dim);",
+    "sources": ["src/kernels/recurrent_gate_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_silu.py"],
+    "parity": [
+      {"kind": "pytorch", "command": ".venv/bin/python unittest/test_recurrent_silu.py", "tolerance": "5e-5"},
+      {"kind": "llamacpp", "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_silu", "tolerance": "5e-6"}
+    ]
+  }
+}

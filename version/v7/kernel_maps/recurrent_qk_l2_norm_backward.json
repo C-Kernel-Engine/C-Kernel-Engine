@@ -1,0 +1,49 @@
+{
+  "id": "recurrent_qk_l2_norm_backward_f32",
+  "op": "recurrent_qk_l2_norm",
+  "variant": "fp32_backward",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "d_q_out", "dtype": "fp32", "shape": ["rows", "q_dim"], "desc": "Gradient of normalized recurrent Q"},
+    {"name": "d_k_out", "dtype": "fp32", "shape": ["rows", "k_dim"], "desc": "Gradient of normalized recurrent K"},
+    {"name": "q", "dtype": "fp32", "shape": ["rows", "q_dim"], "desc": "Original recurrent Q rows before normalization"},
+    {"name": "k", "dtype": "fp32", "shape": ["rows", "k_dim"], "desc": "Original recurrent K rows before normalization"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_q", "dtype": "fp32", "shape": ["rows", "q_dim"], "desc": "Gradient w.r.t. recurrent Q input"},
+    {"name": "d_k", "dtype": "fp32", "shape": ["rows", "k_dim"], "desc": "Gradient w.r.t. recurrent K input"}
+  ],
+  "scratch": [],
+  "dims": ["R", "Q", "K", "D"],
+  "params": [
+    {"name": "rows", "dtype": "i32"},
+    {"name": "q_dim", "dtype": "i32"},
+    {"name": "k_dim", "dtype": "i32"},
+    {"name": "head_dim", "dtype": "i32"},
+    {"name": "eps", "dtype": "f32"}
+  ],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "recurrent_qk_l2_norm_backward",
+    "c_declaration": "void recurrent_qk_l2_norm_backward(const float *d_q_out, const float *d_k_out, const float *q, const float *k, float *d_q, float *d_k, int rows, int q_dim, int k_dim, int head_dim, float eps);",
+    "sources": ["src/kernels/recurrent_qk_norm_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_qk_l2_norm.py"],
+    "parity": [
+      {"kind": "pytorch", "command": ".venv/bin/python unittest/test_recurrent_qk_l2_norm.py", "tolerance": "5e-5"}
+    ]
+  }
+}

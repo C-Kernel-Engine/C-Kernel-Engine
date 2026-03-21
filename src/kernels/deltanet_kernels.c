@@ -14,21 +14,21 @@
  * This file implements the single-token recurrent update used by the
  * qwen3next / Gated DeltaNet path in llama.cpp.
  *
- * Per head:
- *   q_hat   = l2_norm(q) / sqrt(state_dim)
- *   k_hat   = l2_norm(k)
- *   beta_s  = sigmoid(beta)
- *   gate    = exp(g)
- *   S       = gate * S_prev
- *   kv_mem  = S^T * k_hat
- *   delta   = (v - kv_mem) * beta_s
- *   S_new   = S + outer(k_hat, delta)
- *   out     = S_new^T * q_hat
+ * Per head, matching llama.cpp qwen35/qwen3next autoregressive DeltaNet:
+ *   q_scaled = q / sqrt(state_dim)   // q and k arrive pre-normalized
+ *   k_hat    = k
+ *   beta_s   = sigmoid(beta)
+ *   gate     = exp(g)
+ *   S        = gate * S_prev
+ *   kv_mem   = S^T * k_hat
+ *   delta    = (v - kv_mem) * beta_s
+ *   S_new    = S + outer(k_hat, delta)
+ *   out      = S_new^T * q_scaled
  *
  * Design:
  *   - *_ref is the scalar reference implementation.
  *   - *_avx keeps a simple 1-row vector walk.
- *   - *_avx2 precomputes normalized q/k rows and unrolls the state sweep in
+ *   - *_avx2 precomputes scaled q rows and unrolls the state sweep in
  *     row pairs to reduce loop overhead and layout churn.
  *   - The public dispatcher selects the best compiled ISA unless strict parity
  *     is enabled, in which case it falls back to *_ref.
@@ -48,34 +48,6 @@
 static inline float ck_deltanet_sigmoidf(float x)
 {
     return 1.0f / (1.0f + expf(-x));
-}
-
-static float ck_deltanet_l2_inv_norm_scalar(const float *x, int dim, float eps)
-{
-    float sum_sq = 0.0f;
-    for (int i = 0; i < dim; ++i) {
-        sum_sq += x[i] * x[i];
-    }
-    return 1.0f / sqrtf(sum_sq + eps);
-}
-
-static void ck_deltanet_scaled_l2_norm_backward_ref(const float *x,
-                                                    const float *d_y,
-                                                    float *d_x,
-                                                    int dim,
-                                                    float inv_norm,
-                                                    float scale)
-{
-    float dot = 0.0f;
-    for (int i = 0; i < dim; ++i) {
-        dot += d_y[i] * x[i];
-    }
-
-    const float scaled_inv = scale * inv_norm;
-    const float proj_scale = scale * inv_norm * inv_norm * inv_norm * dot;
-    for (int i = 0; i < dim; ++i) {
-        d_x[i] = scaled_inv * d_y[i] - proj_scale * x[i];
-    }
 }
 
 void gated_deltanet_autoregressive_forward_ref(const float *q,
@@ -102,8 +74,6 @@ void gated_deltanet_autoregressive_forward_ref(const float *q,
         float *state_cur = state_out + (size_t)h * state_stride;
         float *out_head = out + (size_t)h * vec_stride;
 
-        const float q_inv_norm = ck_deltanet_l2_inv_norm_scalar(q_head, state_dim, norm_eps);
-        const float k_inv_norm = ck_deltanet_l2_inv_norm_scalar(k_head, state_dim, norm_eps);
         const float beta_s = ck_deltanet_sigmoidf(beta[h]);
         const float gate = expf(g[h]);
 
@@ -117,13 +87,13 @@ void gated_deltanet_autoregressive_forward_ref(const float *q,
         for (int col = 0; col < state_dim; ++col) {
             float kv_mem = 0.0f;
             for (int row = 0; row < state_dim; ++row) {
-                const float k_hat = k_head[row] * k_inv_norm;
+                const float k_hat = k_head[row];
                 kv_mem += state_cur[(size_t)row * (size_t)state_dim + (size_t)col] * k_hat;
             }
 
             const float delta = (v_head[col] - kv_mem) * beta_s;
             for (int row = 0; row < state_dim; ++row) {
-                const float k_hat = k_head[row] * k_inv_norm;
+                const float k_hat = k_head[row];
                 state_cur[(size_t)row * (size_t)state_dim + (size_t)col] += k_hat * delta;
             }
         }
@@ -131,7 +101,7 @@ void gated_deltanet_autoregressive_forward_ref(const float *q,
         for (int col = 0; col < state_dim; ++col) {
             float acc = 0.0f;
             for (int row = 0; row < state_dim; ++row) {
-                const float q_hat = q_head[row] * q_inv_norm * q_scale;
+                const float q_hat = q_head[row] * q_scale;
                 acc += state_cur[(size_t)row * (size_t)state_dim + (size_t)col] * q_hat;
             }
             out_head[col] = acc;
@@ -183,8 +153,6 @@ void gated_deltanet_autoregressive_backward_ref(const float *d_out,
         float *d_v_head = d_v + (size_t)h * vec_stride;
         float *d_state_prev = d_state_in + (size_t)h * state_stride;
 
-        const float q_inv_norm = ck_deltanet_l2_inv_norm_scalar(q_head, state_dim, norm_eps);
-        const float k_inv_norm = ck_deltanet_l2_inv_norm_scalar(k_head, state_dim, norm_eps);
         const float beta_s = ck_deltanet_sigmoidf(beta[h]);
         const float gate = expf(g[h]);
 
@@ -194,8 +162,8 @@ void gated_deltanet_autoregressive_backward_ref(const float *d_out,
         float gate_acc = 0.0f;
 
         for (int i = 0; i < state_dim; ++i) {
-            q_hat[i] = q_head[i] * q_inv_norm * q_scale;
-            k_hat[i] = k_head[i] * k_inv_norm;
+            q_hat[i] = q_head[i] * q_scale;
+            k_hat[i] = k_head[i];
             kv_mem[i] = 0.0f;
             d_q_hat[i] = 0.0f;
             d_k_hat[i] = 0.0f;
@@ -258,10 +226,10 @@ void gated_deltanet_autoregressive_backward_ref(const float *d_out,
             }
         }
 
-        ck_deltanet_scaled_l2_norm_backward_ref(
-            q_head, d_q_hat, d_q_head, state_dim, q_inv_norm, q_scale);
-        ck_deltanet_scaled_l2_norm_backward_ref(
-            k_head, d_k_hat, d_k_head, state_dim, k_inv_norm, 1.0f);
+        for (int i = 0; i < state_dim; ++i) {
+            d_q_head[i] = d_q_hat[i] * q_scale;
+            d_k_head[i] = d_k_hat[i];
+        }
 
         d_g[h] = gate_acc * gate;
         d_beta[h] = beta_acc * beta_s * (1.0f - beta_s);
@@ -785,25 +753,14 @@ void gated_deltanet_autoregressive_forward(const float *q,
         return;
     }
 
-    if (ck_strict_parity_enabled() || state_dim > CK_DELTANET_MAX_STACK_DIM) {
-        gated_deltanet_autoregressive_forward_ref(
-            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
-        return;
-    }
-
-#if defined(__AVX512F__)
-    gated_deltanet_autoregressive_forward_avx512(
-        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
-#elif defined(__AVX2__)
-    gated_deltanet_autoregressive_forward_avx2(
-        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
-#elif defined(__AVX__)
-    gated_deltanet_autoregressive_forward_avx(
-        q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
-#else
+    /*
+     * The explicit qwen35/qwen3next graph now performs recurrent Q/K
+     * normalization before this kernel. Keep the public runtime on the scalar
+     * reference implementation until the ISA-specialized variants are updated
+     * and revalidated against that contract.
+     */
     gated_deltanet_autoregressive_forward_ref(
         q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
-#endif
 }
 
 void gated_deltanet_autoregressive_backward(const float *d_out,

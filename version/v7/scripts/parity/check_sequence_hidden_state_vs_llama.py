@@ -86,6 +86,32 @@ def find_op(
     return idx, ops[idx]
 
 
+def find_op_any(
+    ops: list[dict[str, Any]],
+    layer: int,
+    op_names: tuple[str, ...],
+    occurrence: int = 0,
+) -> tuple[int | None, dict[str, Any] | None]:
+    for op_name in op_names:
+        idx, op = find_op(ops, layer, op_name, occurrence)
+        if idx is not None and op is not None:
+            return idx, op
+    return None, None
+
+
+def find_named_or_fallback(
+    ops: list[dict[str, Any]],
+    layer: int,
+    preferred_names: tuple[str, ...],
+    fallback_name: str,
+    fallback_occurrence: int,
+) -> tuple[int | None, dict[str, Any] | None]:
+    idx, op = find_op_any(ops, layer, preferred_names, 0)
+    if idx is not None and op is not None:
+        return idx, op
+    return find_op(ops, layer, fallback_name, fallback_occurrence)
+
+
 def resolve_abs_offset(lowered: dict[str, Any], rel_off: int) -> int:
     arena = lowered.get("memory", {}).get("arena", {})
     if str(arena.get("mode", "")) == "region":
@@ -297,37 +323,39 @@ def make_probe_specs(lowered: dict[str, Any], lowered_call: dict[str, Any]) -> l
         raise RuntimeError("invalid embed_dim in lowered decode config")
 
     res0_stop, res0_op = find_op(call_ops, 0, "residual_save", 0)
-    attn_norm_stop, attn_norm_op = find_op(call_ops, 0, "rmsnorm", 0)
+    attn_aliases = ("attn", "attn_sliding")
+    mlp_act_aliases = ("silu_mul", "geglu")
+    attn_norm_stop, attn_norm_op = find_named_or_fallback(call_ops, 0, ("attn_norm",), "rmsnorm", 0)
     q_stop, q_op = find_op(call_ops, 0, "q_proj", 0)
     k_stop, k_op = find_op(call_ops, 0, "k_proj", 0)
     v_stop, v_op = find_op(call_ops, 0, "v_proj", 0)
     rope_stop, rope_op = find_op(call_ops, 0, "rope_qk", 0)
-    attn_stop, attn_op = find_op(call_ops, 0, "attn", 0)
+    attn_stop, attn_op = find_op_any(call_ops, 0, attn_aliases, 0)
     out_stop, out_op = find_op(call_ops, 0, "out_proj", 0)
     ffn_inp_stop, ffn_inp_op = find_op(call_ops, 0, "residual_add", 0)
-    ffn_norm_stop, ffn_norm_op = find_op(call_ops, 0, "rmsnorm", 1)
+    ffn_norm_stop, ffn_norm_op = find_named_or_fallback(call_ops, 0, ("ffn_norm",), "rmsnorm", 1)
     gate_up_stop, gate_up_op = find_op(call_ops, 0, "mlp_gate_up", 0)
-    swiglu_stop, swiglu_op = find_op(call_ops, 0, "silu_mul", 0)
+    swiglu_stop, swiglu_op = find_op_any(call_ops, 0, mlp_act_aliases, 0)
     down_stop, down_op = find_op(call_ops, 0, "mlp_down", 0)
     l_out_stop, l_out_op = find_op(call_ops, 0, "residual_add", 1)
-    final_norm_stop, final_norm_op = find_op(call_ops, -1, "rmsnorm", 0)
+    final_norm_stop, final_norm_op = find_named_or_fallback(call_ops, -1, ("final_rmsnorm",), "rmsnorm", 0)
     logits_stop, logits_op = find_op(call_ops, -1, "logits", 0)
 
     res0_idx, res0_meta = find_op(ops, 0, "residual_save", 0)
-    attn_norm_idx, attn_norm_meta = find_op(ops, 0, "rmsnorm", 0)
+    attn_norm_idx, attn_norm_meta = find_named_or_fallback(ops, 0, ("attn_norm",), "rmsnorm", 0)
     q_idx, q_meta = find_op(ops, 0, "q_proj", 0)
     k_idx, k_meta = find_op(ops, 0, "k_proj", 0)
     v_idx, v_meta = find_op(ops, 0, "v_proj", 0)
     rope_idx, rope_meta = find_op(ops, 0, "rope_qk", 0)
-    attn_idx, attn_meta = find_op(ops, 0, "attn", 0)
+    attn_idx, attn_meta = find_op_any(ops, 0, attn_aliases, 0)
     out_idx, out_meta = find_op(ops, 0, "out_proj", 0)
     ffn_inp_idx, ffn_inp_meta = find_op(ops, 0, "residual_add", 0)
-    ffn_norm_idx, ffn_norm_meta = find_op(ops, 0, "rmsnorm", 1)
+    ffn_norm_idx, ffn_norm_meta = find_named_or_fallback(ops, 0, ("ffn_norm",), "rmsnorm", 1)
     gate_up_idx, gate_up_meta = find_op(ops, 0, "mlp_gate_up", 0)
-    swiglu_idx, swiglu_meta = find_op(ops, 0, "silu_mul", 0)
+    swiglu_idx, swiglu_meta = find_op_any(ops, 0, mlp_act_aliases, 0)
     down_idx, down_meta = find_op(ops, 0, "mlp_down", 0)
     l_out_idx, l_out_meta = find_op(ops, 0, "residual_add", 1)
-    final_norm_idx, final_norm_meta = find_op(ops, -1, "rmsnorm", 0)
+    final_norm_idx, final_norm_meta = find_named_or_fallback(ops, -1, ("final_rmsnorm",), "rmsnorm", 0)
     logits_idx, logits_meta = find_op(ops, -1, "logits", 0)
 
     required = {

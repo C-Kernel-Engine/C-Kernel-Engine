@@ -652,6 +652,226 @@ void test_softmax(const float * input, float * output, int n) {
     }
 }
 
+void test_recurrent_split_qkv(const float * packed_qkv,
+                              float * q,
+                              float * k,
+                              float * v,
+                              int rows,
+                              int q_dim,
+                              int k_dim,
+                              int v_dim) {
+    const int packed_dim = q_dim + k_dim + v_dim;
+    for (int row = 0; row < rows; ++row) {
+        const float * src = packed_qkv + row * packed_dim;
+        float * q_dst = q + row * q_dim;
+        float * k_dst = k + row * k_dim;
+        float * v_dst = v + row * v_dim;
+        std::memcpy(q_dst, src, sizeof(float) * q_dim);
+        std::memcpy(k_dst, src + q_dim, sizeof(float) * k_dim);
+        std::memcpy(v_dst, src + q_dim + k_dim, sizeof(float) * v_dim);
+    }
+}
+
+void test_split_q_gate(const float * packed_qg,
+                       float * q,
+                       float * gate,
+                       int rows,
+                       int q_dim,
+                       int gate_dim,
+                       int group_dim) {
+    const int packed_dim = q_dim + gate_dim;
+    if (group_dim <= 0) {
+        group_dim = q_dim;
+    }
+    const int q_groups = q_dim / group_dim;
+    const int gate_group_dim = (q_groups > 0 && gate_dim % q_groups == 0) ? (gate_dim / q_groups) : gate_dim;
+    for (int row = 0; row < rows; ++row) {
+        const float * src = packed_qg + row * packed_dim;
+        float * q_dst = q + row * q_dim;
+        float * gate_dst = gate + row * gate_dim;
+        if (q_groups > 0 && q_groups * group_dim == q_dim && q_groups * gate_group_dim == gate_dim) {
+            for (int group = 0; group < q_groups; ++group) {
+                const size_t src_group_off = (size_t) group * (size_t) (group_dim + gate_group_dim);
+                std::memcpy(q_dst + group * group_dim, src + src_group_off, sizeof(float) * group_dim);
+                std::memcpy(gate_dst + group * gate_group_dim, src + src_group_off + group_dim, sizeof(float) * gate_group_dim);
+            }
+        } else {
+            std::memcpy(q_dst, src, sizeof(float) * q_dim);
+            std::memcpy(gate_dst, src + q_dim, sizeof(float) * gate_dim);
+        }
+    }
+}
+
+void test_recurrent_dt_gate(const float * alpha,
+                            const float * dt_bias,
+                            const float * a,
+                            float * gate,
+                            int rows,
+                            int dim) {
+    for (int row = 0; row < rows; ++row) {
+        const float * alpha_row = alpha + row * dim;
+        float * gate_row = gate + row * dim;
+        for (int col = 0; col < dim; ++col) {
+            const float x = alpha_row[col] + dt_bias[col];
+            gate_row[col] = log1pf(expf(x)) * a[col];
+        }
+    }
+}
+
+void test_recurrent_conv_state_update(const float * state_in,
+                                      const float * q,
+                                      const float * k,
+                                      const float * v,
+                                      float * conv_x,
+                                      float * state_out,
+                                      int history_len,
+                                      int num_seqs,
+                                      int num_tokens,
+                                      int q_dim,
+                                      int k_dim,
+                                      int v_dim) {
+    const int channels = q_dim + k_dim + v_dim;
+    for (int seq = 0; seq < num_seqs; ++seq) {
+        const float * state_seq = state_in + (size_t) seq * (size_t) channels * (size_t) history_len;
+        const int total_len = history_len + num_tokens;
+        float * conv_seq = conv_x + (size_t) seq * (size_t) channels * (size_t) total_len;
+        float * state_out_seq = state_out + (size_t) seq * (size_t) channels * (size_t) history_len;
+
+        for (int ch = 0; ch < channels; ++ch) {
+            std::memcpy(
+                conv_seq + (size_t) ch * (size_t) total_len,
+                state_seq + (size_t) ch * (size_t) history_len,
+                sizeof(float) * (size_t) history_len);
+        }
+        for (int tok = 0; tok < num_tokens; ++tok) {
+            const int row = seq * num_tokens + tok;
+            const float * q_row = q + (size_t) row * (size_t) q_dim;
+            const float * k_row = k + (size_t) row * (size_t) k_dim;
+            const float * v_row = v + (size_t) row * (size_t) v_dim;
+            for (int col = 0; col < q_dim; ++col) {
+                conv_seq[(size_t) col * (size_t) total_len + (size_t) (history_len + tok)] = q_row[col];
+            }
+            for (int col = 0; col < k_dim; ++col) {
+                conv_seq[(size_t) (q_dim + col) * (size_t) total_len + (size_t) (history_len + tok)] = k_row[col];
+            }
+            for (int col = 0; col < v_dim; ++col) {
+                conv_seq[(size_t) (q_dim + k_dim + col) * (size_t) total_len + (size_t) (history_len + tok)] = v_row[col];
+            }
+        }
+        for (int ch = 0; ch < channels; ++ch) {
+            std::memcpy(
+                state_out_seq + (size_t) ch * (size_t) history_len,
+                conv_seq + (size_t) ch * (size_t) total_len + (size_t) num_tokens,
+                sizeof(float) * (size_t) history_len);
+        }
+    }
+}
+
+void test_recurrent_silu(const float * x,
+                         float * out,
+                         int rows,
+                         int dim) {
+    for (int row = 0; row < rows; ++row) {
+        const float * x_row = x + (size_t) row * (size_t) dim;
+        float * out_row = out + (size_t) row * (size_t) dim;
+        for (int col = 0; col < dim; ++col) {
+            const float xv = x_row[col];
+            out_row[col] = xv / (1.0f + expf(-xv));
+        }
+    }
+}
+
+void test_recurrent_split_conv_qkv(const float * packed_qkv,
+                                   float * q,
+                                   float * k,
+                                   float * v,
+                                   int rows,
+                                   int q_dim,
+                                   int k_dim,
+                                   int v_dim) {
+    test_recurrent_split_qkv(packed_qkv, q, k, v, rows, q_dim, k_dim, v_dim);
+}
+
+void test_recurrent_qk_l2_norm(float * q,
+                               float * k,
+                               int rows,
+                               int q_dim,
+                               int k_dim,
+                               int head_dim,
+                               float eps) {
+    auto normalize = [rows, head_dim, eps](float * x, int dim) {
+        const int num_heads = dim / head_dim;
+        for (int row = 0; row < rows; ++row) {
+            float * row_ptr = x + (size_t) row * (size_t) dim;
+            for (int head = 0; head < num_heads; ++head) {
+                float * head_ptr = row_ptr + (size_t) head * (size_t) head_dim;
+                float sum_sq = 0.0f;
+                for (int col = 0; col < head_dim; ++col) {
+                    sum_sq += head_ptr[col] * head_ptr[col];
+                }
+                const float inv_norm = 1.0f / std::sqrt(sum_sq + eps);
+                for (int col = 0; col < head_dim; ++col) {
+                    head_ptr[col] *= inv_norm;
+                }
+            }
+        }
+    };
+
+    if (!q || !k || rows <= 0 || q_dim <= 0 || k_dim <= 0 || head_dim <= 0) {
+        return;
+    }
+    normalize(q, q_dim);
+    normalize(k, k_dim);
+}
+
+void test_attn_gate_sigmoid_mul(const float * x,
+                                const float * gate,
+                                float * out,
+                                int rows,
+                                int dim) {
+    for (int row = 0; row < rows; ++row) {
+        const float * x_row = x + (size_t) row * (size_t) dim;
+        const float * gate_row = gate + (size_t) row * (size_t) dim;
+        float * out_row = out + (size_t) row * (size_t) dim;
+        for (int col = 0; col < dim; ++col) {
+            const float sig = 1.0f / (1.0f + expf(-gate_row[col]));
+            out_row[col] = x_row[col] * sig;
+        }
+    }
+}
+
+void test_recurrent_norm_gate(const float * x,
+                              const float * gate,
+                              const float * weight,
+                              float * out,
+                              int rows,
+                              int num_heads,
+                              int head_dim,
+                              float eps) {
+    const int inner_dim = num_heads * head_dim;
+    for (int row = 0; row < rows; ++row) {
+        const float * x_row = x + (size_t) row * (size_t) inner_dim;
+        const float * gate_row = gate + (size_t) row * (size_t) inner_dim;
+        float * out_row = out + (size_t) row * (size_t) inner_dim;
+        for (int head = 0; head < num_heads; ++head) {
+            const float * x_head = x_row + (size_t) head * (size_t) head_dim;
+            const float * gate_head = gate_row + (size_t) head * (size_t) head_dim;
+            float * out_head = out_row + (size_t) head * (size_t) head_dim;
+            float ms = 0.0f;
+            for (int col = 0; col < head_dim; ++col) {
+                ms += x_head[col] * x_head[col];
+            }
+            ms /= (float) head_dim;
+            const float inv_rms = 1.0f / std::sqrt(ms + eps);
+            for (int col = 0; col < head_dim; ++col) {
+                const float g = gate_head[col];
+                const float silu = g / (1.0f + expf(-g));
+                out_head[col] = x_head[col] * inv_rms * weight[col] * silu;
+            }
+        }
+    }
+}
+
 /**
  * Test Gated DeltaNet autoregressive update.
  *
@@ -724,6 +944,54 @@ void test_gated_deltanet_autoregressive(const float * q,
                 acc += state_cur[(size_t) row * (size_t) state_dim + (size_t) col] * q_hat;
             }
             out_head[col] = acc;
+        }
+    }
+}
+
+/**
+ * Test qwen3next/Qwen3.5 SSM causal depthwise convolution.
+ *
+ * Layout:
+ *   conv_x  [num_seqs, num_channels, kernel_size - 1 + num_tokens]
+ *   kernel  [num_channels, kernel_size]
+ *   out     [num_seqs, num_tokens, num_channels]
+ *
+ * This mirrors ggml's GGML_OP_SSM_CONV semantics.
+ */
+void test_ssm_conv1d(const float * conv_x,
+                     const float * kernel,
+                     float * out,
+                     int kernel_size,
+                     int num_channels,
+                     int num_tokens,
+                     int num_seqs) {
+    if (!conv_x || !kernel || !out) {
+        return;
+    }
+    if (kernel_size <= 0 || num_channels <= 0 || num_tokens < 0 || num_seqs <= 0) {
+        return;
+    }
+
+    const size_t seq_width = (size_t) kernel_size - 1u + (size_t) num_tokens;
+    const size_t conv_seq_stride = (size_t) num_channels * seq_width;
+    const size_t out_seq_stride = (size_t) num_tokens * (size_t) num_channels;
+
+    for (int seq = 0; seq < num_seqs; ++seq) {
+        const float * conv_seq = conv_x + (size_t) seq * conv_seq_stride;
+        float * out_seq = out + (size_t) seq * out_seq_stride;
+
+        for (int tok = 0; tok < num_tokens; ++tok) {
+            float * out_tok = out_seq + (size_t) tok * (size_t) num_channels;
+
+            for (int ch = 0; ch < num_channels; ++ch) {
+                const float * conv_row = conv_seq + (size_t) ch * seq_width + (size_t) tok;
+                const float * kernel_row = kernel + (size_t) ch * (size_t) kernel_size;
+                float sumf = 0.0f;
+                for (int k = 0; k < kernel_size; ++k) {
+                    sumf += conv_row[k] * kernel_row[k];
+                }
+                out_tok[ch] = sumf;
+            }
         }
     }
 }

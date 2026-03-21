@@ -5,12 +5,14 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v7/kernel_maps",
     "counts": {
-      "total": 79,
+      "total": 100,
       "by_op": {
         "add_backward": 1,
         "attention": 5,
         "attention_projection": 1,
         "attention_sliding": 2,
+        "attn_gate_sigmoid_mul": 1,
+        "attn_gate_sigmoid_mul_backward": 1,
         "bias_add": 1,
         "embedding": 5,
         "embedding_backward": 1,
@@ -18,6 +20,7 @@
         "fused_linear_bias": 3,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
+        "gated_deltanet": 1,
         "geglu": 2,
         "gemm": 12,
         "gemm_backward": 1,
@@ -30,6 +33,15 @@
         "qkv_projection": 1,
         "quantize": 2,
         "quantize_batch": 2,
+        "recurrent_conv_state_update": 2,
+        "recurrent_dt_gate": 1,
+        "recurrent_dt_gate_backward": 1,
+        "recurrent_norm_gate": 2,
+        "recurrent_qk_l2_norm": 2,
+        "recurrent_silu": 2,
+        "recurrent_split_conv_qkv": 2,
+        "recurrent_split_qkv": 1,
+        "recurrent_split_qkv_backward": 1,
         "residual_add": 1,
         "residual_save": 1,
         "rmsnorm": 2,
@@ -37,6 +49,10 @@
         "rope_backward": 1,
         "rope_init": 2,
         "softmax": 1,
+        "split_q_gate": 1,
+        "split_q_gate_backward": 1,
+        "ssm_conv1d": 1,
+        "ssm_conv1d_backward": 1,
         "swiglu": 2,
         "tokenizer": 1
       }
@@ -1135,6 +1151,234 @@
       "notes": "Flash attention for decode mode with sliding window: single query token attends to the last W KV cache entries.",
       "name": "attention_forward_decode_head_major_gqa_flash_sliding",
       "_source_file": "attention_forward_decode_head_major_gqa_flash_sliding.json"
+    },
+    {
+      "id": "attn_gate_sigmoid_mul_backward_f32",
+      "op": "attn_gate_sigmoid_mul_backward",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gradient of gated attention output"
+        },
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Attention output rows"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gate rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gradient wrt attention output"
+        },
+        {
+          "name": "d_gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gradient wrt gate rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each token row gradient can be computed independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward for the fused qwen3.5 full-attention gate."
+      },
+      "impl": {
+        "function": "attn_gate_sigmoid_mul_backward",
+        "c_declaration": "void attn_gate_sigmoid_mul_backward(const float *d_out, const float *x, const float *gate, float *d_x, float *d_gate, int rows, int dim);",
+        "sources": [
+          "src/kernels/hybrid_attention_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attn_gate_sigmoid_mul.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_attn_gate_sigmoid_mul.py",
+            "tolerance": "1e-6",
+            "notes": "Backward parity against torch autograd."
+          }
+        ]
+      },
+      "notes": "Backward kernel for qwen3.5 full-attention gate sigmoid multiply.",
+      "name": "attn_gate_sigmoid_mul_backward_f32",
+      "_source_file": "attn_gate_sigmoid_mul_backward.json"
+    },
+    {
+      "id": "attn_gate_sigmoid_mul_forward",
+      "op": "attn_gate_sigmoid_mul",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Attention output rows"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gate rows to sigmoid"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Attention output scaled by sigmoid(gate)"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each token row can be gated independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Fused sigmoid(gate) * attention-output kernel used by qwen3.5 full-attention layers."
+      },
+      "impl": {
+        "function": "attn_gate_sigmoid_mul_forward",
+        "c_declaration": "void attn_gate_sigmoid_mul_forward(const float *x, const float *gate, float *out, int rows, int dim);",
+        "sources": [
+          "src/kernels/hybrid_attention_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attn_gate_sigmoid_mul.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_attn_gate_sigmoid_mul.py",
+            "tolerance": "1e-6",
+            "notes": "Forward/backward parity against torch.sigmoid and elementwise multiply."
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel attn_gate_sigmoid_mul",
+            "tolerance": "1e-6",
+            "notes": "Forward parity against the qwen35 helper reference."
+          }
+        ]
+      },
+      "notes": "Applies the qwen3.5 full-attention gate after attention and before the output projection.",
+      "name": "attn_gate_sigmoid_mul_forward",
+      "_source_file": "attn_gate_sigmoid_mul_forward.json"
     },
     {
       "id": "bias_add",
@@ -2526,6 +2770,187 @@
       "notes": "Fused RMSNorm + QKV projection producing head-major output. Fuses 4 operations into 1, reducing memory traffic.",
       "name": "fused_rmsnorm_qkv_prefill_head_major_quant",
       "_source_file": "fused_rmsnorm_qkv_prefill_head_major_quant.json"
+    },
+    {
+      "id": "gated_deltanet_autoregressive_forward",
+      "op": "gated_deltanet",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "desc": "Normalized query vectors [num_heads, state_dim]"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "desc": "Normalized key vectors [num_heads, state_dim]"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "desc": "Value vectors [num_heads, state_dim]"
+        },
+        {
+          "name": "g",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ],
+          "desc": "Gate values per DeltaNet head"
+        },
+        {
+          "name": "beta",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ],
+          "desc": "Beta/update values per DeltaNet head"
+        },
+        {
+          "name": "state_in",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ],
+          "desc": "Input recurrent state [num_heads, state_dim, state_dim]"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "state_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ],
+          "desc": "Updated recurrent state [num_heads, state_dim, state_dim]"
+        },
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ],
+          "desc": "DeltaNet output vectors [num_heads, state_dim]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "norm_eps",
+          "dtype": "float32",
+          "desc": "Normalization epsilon for Q/K scaling"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Each DeltaNet head is independent for the autoregressive single-token update."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Single-token recurrent DeltaNet update. FP32 only in v7 today."
+      },
+      "impl": {
+        "function": "gated_deltanet_autoregressive_forward",
+        "c_declaration": "void gated_deltanet_autoregressive_forward(const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, float *state_out, float *out, int num_heads, int state_dim, float norm_eps);",
+        "sources": [
+          "src/kernels/deltanet_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_deltanet.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python tests/test_deltanet.py",
+            "tolerance": "1e-5",
+            "notes": "Forward/backward parity against the local PyTorch DeltaNet reference."
+          }
+        ]
+      },
+      "notes": "Gated DeltaNet single-token recurrent update used by qwen3next/Qwen3.5 linear attention blocks.",
+      "name": "gated_deltanet_autoregressive_forward",
+      "_source_file": "gated_deltanet_autoregressive_forward.json"
     },
     {
       "id": "geglu_forward_bf16",
@@ -7810,6 +8235,1705 @@
       "_source_file": "quantize_row_q8_k.json"
     },
     {
+      "id": "recurrent_conv_state_update_backward_f32",
+      "op": "recurrent_conv_state_update",
+      "variant": "backward_fp32",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_conv_x",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "Q+K+V",
+            "H+T"
+          ]
+        },
+        {
+          "name": "d_state_out",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "Q+K+V",
+            "H"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_state_in",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "C",
+            "H"
+          ]
+        },
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ]
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ]
+        },
+        {
+          "name": "d_v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "S",
+        "T",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "seq"
+        ],
+        "preferred": {
+          "prefill": "seq",
+          "decode": "seq"
+        },
+        "strategies": [
+          {
+            "name": "seq",
+            "partition_dim": "S",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_conv_state_update_backward",
+        "c_declaration": "void recurrent_conv_state_update_backward(const float *d_conv_x, const float *d_state_out, float *d_state_in, float *d_q, float *d_k, float *d_v, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_state_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_conv_state_update.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_conv_state_update.py",
+            "tolerance": "5e-5"
+          }
+        ]
+      },
+      "name": "recurrent_conv_state_update_backward_f32",
+      "_source_file": "recurrent_conv_state_update_backward.json"
+    },
+    {
+      "id": "recurrent_conv_state_update_forward",
+      "op": "recurrent_conv_state_update",
+      "variant": "fp32",
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "state_in",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "C",
+            "H"
+          ],
+          "desc": "Cached recurrent convolution history"
+        },
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ],
+          "desc": "Pre-convolution recurrent Q rows"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "desc": "Pre-convolution recurrent K rows"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "desc": "Pre-convolution recurrent V rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "conv_x",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "Q+K+V",
+            "H+T"
+          ],
+          "desc": "Channel-major history plus current token rows"
+        },
+        {
+          "name": "state_out",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "Q+K+V",
+            "H"
+          ],
+          "desc": "Updated cached history window"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "S",
+        "T",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "seq"
+        ],
+        "preferred": {
+          "prefill": "seq",
+          "decode": "seq"
+        },
+        "strategies": [
+          {
+            "name": "seq",
+            "partition_dim": "S",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Pure graph-stitch state update before qwen3next/Qwen3.5 SSM convolution."
+      },
+      "impl": {
+        "function": "recurrent_conv_state_update_forward",
+        "c_declaration": "void recurrent_conv_state_update_forward(const float *state_in, const float *q, const float *k, const float *v, float *conv_x, float *state_out, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_state_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_conv_state_update.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_conv_state_update.py",
+            "tolerance": "5e-5"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_conv_state_update",
+            "tolerance": "0"
+          }
+        ]
+      },
+      "name": "recurrent_conv_state_update_forward",
+      "_source_file": "recurrent_conv_state_update_forward.json"
+    },
+    {
+      "id": "recurrent_dt_gate_backward_f32",
+      "op": "recurrent_dt_gate_backward",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gradient of the recurrent gate output"
+        },
+        {
+          "name": "alpha",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Forward alpha input"
+        },
+        {
+          "name": "dt_bias",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Forward dt bias"
+        },
+        {
+          "name": "a",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Forward recurrent A scale"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_alpha",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Gradient of alpha"
+        },
+        {
+          "name": "d_dt_bias",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Gradient of dt bias"
+        },
+        {
+          "name": "d_a",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Gradient of recurrent A scale"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each row gradient can be computed independently before per-dimension accumulation."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward for softplus(alpha + dt_bias) * a."
+      },
+      "impl": {
+        "function": "recurrent_dt_gate_backward",
+        "c_declaration": "void recurrent_dt_gate_backward(const float *d_gate, const float *alpha, const float *dt_bias, const float *a, float *d_alpha, float *d_dt_bias, float *d_a, int rows, int dim);",
+        "sources": [
+          "src/kernels/recurrent_gate_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_dt_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_dt_gate.py",
+            "tolerance": "5e-5",
+            "notes": "Backward parity against torch autograd."
+          }
+        ]
+      },
+      "notes": "Backward kernel for the recurrent dt gate transform.",
+      "name": "recurrent_dt_gate_backward_f32",
+      "_source_file": "recurrent_dt_gate_backward.json"
+    },
+    {
+      "id": "recurrent_dt_gate_forward",
+      "op": "recurrent_dt_gate",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "alpha",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "Per-row recurrent alpha values"
+        }
+      ],
+      "weights": [
+        {
+          "name": "dt_bias",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Per-dimension dt bias"
+        },
+        {
+          "name": "a",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ],
+          "desc": "Per-dimension recurrent A scale"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ],
+          "desc": "DeltaNet gate rows after dt transform"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each row can be transformed independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Applies softplus(alpha + dt_bias) * a row-wise."
+      },
+      "impl": {
+        "function": "recurrent_dt_gate_forward",
+        "c_declaration": "void recurrent_dt_gate_forward(const float *alpha, const float *dt_bias, const float *a, float *gate, int rows, int dim);",
+        "sources": [
+          "src/kernels/recurrent_gate_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_dt_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_dt_gate.py",
+            "tolerance": "5e-5",
+            "notes": "Forward/backward parity against torch.softplus composition."
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_dt_gate",
+            "tolerance": "5e-6",
+            "notes": "Forward parity against the helper reference implementation."
+          }
+        ]
+      },
+      "notes": "Explicit recurrent dt gate transform used before the DeltaNet core.",
+      "name": "recurrent_dt_gate_forward",
+      "_source_file": "recurrent_dt_gate_forward.json"
+    },
+    {
+      "id": "recurrent_norm_gate_backward_f32",
+      "op": "recurrent_norm_gate",
+      "variant": "backward_fp32",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        },
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        },
+        {
+          "name": "d_gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        },
+        {
+          "name": "d_weight",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "H",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_norm_gate_backward",
+        "c_declaration": "void recurrent_norm_gate_backward(const float *d_out, const float *x, const float *gate, const float *weight, float *d_x, float *d_gate, float *d_weight, int rows, int num_heads, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/recurrent_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_norm_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_norm_gate.py",
+            "tolerance": "8e-5"
+          }
+        ]
+      },
+      "name": "recurrent_norm_gate_backward_f32",
+      "_source_file": "recurrent_norm_gate_backward.json"
+    },
+    {
+      "id": "recurrent_norm_gate_forward",
+      "op": "recurrent_norm_gate",
+      "variant": "fp32",
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        }
+      ],
+      "weights": [
+        {
+          "name": "weight",
+          "dtype": "fp32",
+          "shape": [
+            "D"
+          ]
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "H*D"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "H",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_norm_gate_forward",
+        "c_declaration": "void recurrent_norm_gate_forward(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/recurrent_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_norm_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_norm_gate.py",
+            "tolerance": "8e-5"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_norm_gate",
+            "tolerance": "8e-5"
+          }
+        ]
+      },
+      "name": "recurrent_norm_gate_forward",
+      "_source_file": "recurrent_norm_gate_forward.json"
+    },
+    {
+      "id": "recurrent_qk_l2_norm_backward_f32",
+      "op": "recurrent_qk_l2_norm",
+      "variant": "fp32_backward",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_q_out",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "q_dim"
+          ],
+          "desc": "Gradient of normalized recurrent Q"
+        },
+        {
+          "name": "d_k_out",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "k_dim"
+          ],
+          "desc": "Gradient of normalized recurrent K"
+        },
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "q_dim"
+          ],
+          "desc": "Original recurrent Q rows before normalization"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "k_dim"
+          ],
+          "desc": "Original recurrent K rows before normalization"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "q_dim"
+          ],
+          "desc": "Gradient w.r.t. recurrent Q input"
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "k_dim"
+          ],
+          "desc": "Gradient w.r.t. recurrent K input"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "rows",
+          "dtype": "i32"
+        },
+        {
+          "name": "q_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "k_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "eps",
+          "dtype": "f32"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_qk_l2_norm_backward",
+        "c_declaration": "void recurrent_qk_l2_norm_backward(const float *d_q_out, const float *d_k_out, const float *q, const float *k, float *d_q, float *d_k, int rows, int q_dim, int k_dim, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/recurrent_qk_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_qk_l2_norm.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_qk_l2_norm.py",
+            "tolerance": "5e-5"
+          }
+        ]
+      },
+      "name": "recurrent_qk_l2_norm_backward_f32",
+      "_source_file": "recurrent_qk_l2_norm_backward.json"
+    },
+    {
+      "id": "recurrent_qk_l2_norm_forward",
+      "op": "recurrent_qk_l2_norm",
+      "variant": "fp32",
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "q_dim"
+          ],
+          "desc": "Recurrent Q rows, normalized in-place"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "k_dim"
+          ],
+          "desc": "Recurrent K rows, normalized in-place"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "q_dim"
+          ],
+          "desc": "Normalized recurrent Q rows"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "rows",
+            "k_dim"
+          ],
+          "desc": "Normalized recurrent K rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "rows",
+          "dtype": "i32"
+        },
+        {
+          "name": "q_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "k_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "i32"
+        },
+        {
+          "name": "eps",
+          "dtype": "f32"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_qk_l2_norm_forward",
+        "c_declaration": "void recurrent_qk_l2_norm_forward(float *q, float *k, int rows, int q_dim, int k_dim, int head_dim, float eps);",
+        "sources": [
+          "src/kernels/recurrent_qk_norm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_qk_l2_norm.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_qk_l2_norm.py",
+            "tolerance": "5e-5"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_qk_l2_norm",
+            "tolerance": "5e-5"
+          }
+        ]
+      },
+      "name": "recurrent_qk_l2_norm_forward",
+      "_source_file": "recurrent_qk_l2_norm_forward.json"
+    },
+    {
+      "id": "recurrent_silu_backward_f32",
+      "op": "recurrent_silu",
+      "variant": "backward_fp32",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ]
+        },
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_silu_backward",
+        "c_declaration": "void recurrent_silu_backward(const float *d_out, const float *x, float *d_x, int rows, int dim);",
+        "sources": [
+          "src/kernels/recurrent_gate_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_silu.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_silu.py",
+            "tolerance": "5e-5"
+          }
+        ]
+      },
+      "name": "recurrent_silu_backward_f32",
+      "_source_file": "recurrent_silu_backward.json"
+    },
+    {
+      "id": "recurrent_silu_forward",
+      "op": "recurrent_silu",
+      "variant": "fp32",
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "D"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_silu_forward",
+        "c_declaration": "void recurrent_silu_forward(const float *x, float *out, int rows, int dim);",
+        "sources": [
+          "src/kernels/recurrent_gate_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_silu.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_silu.py",
+            "tolerance": "5e-5"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_silu",
+            "tolerance": "5e-6"
+          }
+        ]
+      },
+      "name": "recurrent_silu_forward",
+      "_source_file": "recurrent_silu_forward.json"
+    },
+    {
+      "id": "recurrent_split_conv_qkv_backward_f32",
+      "op": "recurrent_split_conv_qkv",
+      "variant": "backward_fp32",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ]
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ]
+        },
+        {
+          "name": "d_v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_packed_qkv",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+K+V"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_split_conv_qkv_backward",
+        "c_declaration": "void recurrent_split_conv_qkv_backward(const float *d_q, const float *d_k, const float *d_v, float *d_packed_qkv, int rows, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_split_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_split_conv_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_split_conv_qkv.py",
+            "tolerance": "0"
+          }
+        ]
+      },
+      "name": "recurrent_split_conv_qkv_backward_f32",
+      "_source_file": "recurrent_split_conv_qkv_backward.json"
+    },
+    {
+      "id": "recurrent_split_conv_qkv_forward",
+      "op": "recurrent_split_conv_qkv",
+      "variant": "fp32",
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "packed_qkv",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+K+V"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ]
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            }
+          }
+        ]
+      },
+      "impl": {
+        "function": "recurrent_split_conv_qkv_forward",
+        "c_declaration": "void recurrent_split_conv_qkv_forward(const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_split_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_split_conv_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_split_conv_qkv.py",
+            "tolerance": "0"
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_split_conv_qkv",
+            "tolerance": "0"
+          }
+        ]
+      },
+      "name": "recurrent_split_conv_qkv_forward",
+      "_source_file": "recurrent_split_conv_qkv_forward.json"
+    },
+    {
+      "id": "recurrent_split_qkv_backward_f32",
+      "op": "recurrent_split_qkv_backward",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ],
+          "desc": "Gradient of split query rows"
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "desc": "Gradient of split key rows"
+        },
+        {
+          "name": "d_v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "desc": "Gradient of split value rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_packed_qkv",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+K+V"
+          ],
+          "desc": "Gradient of packed recurrent QKV rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each packed row gradient can be reconstructed independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward for the recurrent packed QKV split."
+      },
+      "impl": {
+        "function": "recurrent_split_qkv_backward",
+        "c_declaration": "void recurrent_split_qkv_backward(const float *d_q, const float *d_k, const float *d_v, float *d_packed_qkv, int rows, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_split_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_split_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_split_qkv.py",
+            "tolerance": "0",
+            "notes": "Backward parity against torch.split autograd."
+          }
+        ]
+      },
+      "notes": "Backward kernel for the recurrent packed QKV split.",
+      "name": "recurrent_split_qkv_backward_f32",
+      "_source_file": "recurrent_split_qkv_backward.json"
+    },
+    {
+      "id": "recurrent_split_qkv_forward",
+      "op": "recurrent_split_qkv",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "packed_qkv",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+K+V"
+          ],
+          "desc": "Packed recurrent QKV rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ],
+          "desc": "Split query rows"
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "K"
+          ],
+          "desc": "Split key rows"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "V"
+          ],
+          "desc": "Split value rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "K",
+        "V"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each packed row can be split independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Pure graph-stitch split for recurrent packed QKV rows."
+      },
+      "impl": {
+        "function": "recurrent_split_qkv_forward",
+        "c_declaration": "void recurrent_split_qkv_forward(const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim);",
+        "sources": [
+          "src/kernels/recurrent_split_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_recurrent_split_qkv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_recurrent_split_qkv.py",
+            "tolerance": "0",
+            "notes": "Forward/backward parity against torch.split."
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_split_qkv",
+            "tolerance": "0",
+            "notes": "Forward parity against the helper reference split."
+          }
+        ]
+      },
+      "notes": "Explicit split kernel for recurrent packed QKV rows.",
+      "name": "recurrent_split_qkv_forward",
+      "_source_file": "recurrent_split_qkv_forward.json"
+    },
+    {
       "id": "residual_add_backward_f32",
       "op": "add_backward",
       "variant": "fp32_split",
@@ -9203,6 +11327,460 @@
       "notes": "Softmax cross-entropy forward + dlogits kernel for v7 training (index-target mean reduction aligned to PyTorch ignore_index semantics).",
       "name": "softmax_cross_entropy_loss",
       "_source_file": "softmax_cross_entropy_loss.json"
+    },
+    {
+      "id": "split_q_gate_backward_f32",
+      "op": "split_q_gate_backward",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ],
+          "desc": "Gradient of split query rows"
+        },
+        {
+          "name": "d_gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "G"
+          ],
+          "desc": "Gradient of split gate rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_packed_qg",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+G"
+          ],
+          "desc": "Gradient of packed Q+gate rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "G",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each Q+gate row gradient can be reconstructed independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward for the full-attention Q+gate split."
+      },
+      "impl": {
+        "function": "split_q_gate_backward",
+        "c_declaration": "void split_q_gate_backward(const float *d_q, const float *d_gate, float *d_packed_qg, int rows, int q_dim, int gate_dim, int group_dim);",
+        "sources": [
+          "src/kernels/hybrid_attention_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_split_q_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_split_q_gate.py",
+            "tolerance": "0",
+            "notes": "Backward parity against grouped or contiguous torch split wiring."
+          }
+        ]
+      },
+      "notes": "Backward kernel for the full-attention joint Q+gate split.",
+      "name": "split_q_gate_backward_f32",
+      "_source_file": "split_q_gate_backward.json"
+    },
+    {
+      "id": "split_q_gate_forward",
+      "op": "split_q_gate",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "packed_qg",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q+G"
+          ],
+          "desc": "Packed full-attention Q+gate rows"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "Q"
+          ],
+          "desc": "Split query rows"
+        },
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "R",
+            "G"
+          ],
+          "desc": "Split gate rows"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "R",
+        "Q",
+        "G",
+        "D"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "row"
+        ],
+        "preferred": {
+          "prefill": "row",
+          "decode": "row"
+        },
+        "strategies": [
+          {
+            "name": "row",
+            "partition_dim": "R",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each Q+gate row can be split independently."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Graph-stitch split for the qwen3.5 full-attention joint Q+gate projection."
+      },
+      "impl": {
+        "function": "split_q_gate_forward",
+        "c_declaration": "void split_q_gate_forward(const float *packed_qg, float *q, float *gate, int rows, int q_dim, int gate_dim, int group_dim);",
+        "sources": [
+          "src/kernels/hybrid_attention_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_split_q_gate.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_split_q_gate.py",
+            "tolerance": "0",
+            "notes": "Forward/backward parity against grouped or contiguous torch reference splits."
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel split_q_gate",
+            "tolerance": "0",
+            "notes": "Forward parity against grouped/interleaved q+gate helper reference."
+          }
+        ]
+      },
+      "notes": "Explicit split kernel for qwen3.5 full-attention joint Q+gate projections.",
+      "name": "split_q_gate_forward",
+      "_source_file": "split_q_gate_forward.json"
+    },
+    {
+      "id": "ssm_conv1d_backward",
+      "op": "ssm_conv1d_backward",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_out",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "T",
+            "C"
+          ],
+          "desc": "Gradient of the SSM conv output [num_seqs, num_tokens, num_channels]"
+        },
+        {
+          "name": "conv_x",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "C",
+            "K-1+T"
+          ],
+          "desc": "Forward input history + current tokens"
+        },
+        {
+          "name": "kernel",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "desc": "Forward convolution kernel"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_conv_x",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "C",
+            "K-1+T"
+          ],
+          "desc": "Input gradient matching conv_x layout"
+        },
+        {
+          "name": "d_kernel",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "desc": "Kernel gradient matching kernel layout"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "K",
+        "C",
+        "T",
+        "S"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "channel",
+          "sequence"
+        ],
+        "preferred": {
+          "prefill": "channel",
+          "decode": "channel"
+        },
+        "strategies": [
+          {
+            "name": "channel",
+            "partition_dim": "C",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Channels are independent in the depthwise SSM convolution backward pass."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward pass for the qwen3next/Qwen3.5 SSM causal depthwise convolution."
+      },
+      "impl": {
+        "function": "ssm_conv1d_backward",
+        "c_declaration": "void ssm_conv1d_backward(const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs);",
+        "sources": [
+          "src/kernels/ssm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_ssm_conv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_ssm_conv.py",
+            "tolerance": "5e-5",
+            "notes": "Backward parity against grouped torch.conv1d autograd."
+          }
+        ]
+      },
+      "notes": "Backward kernel for the qwen3next/Qwen3.5 SSM causal depthwise convolution.",
+      "name": "ssm_conv1d_backward",
+      "_source_file": "ssm_conv1d_backward.json"
+    },
+    {
+      "id": "ssm_conv1d_forward",
+      "op": "ssm_conv1d",
+      "variant": "fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "conv_x",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "C",
+            "K-1+T"
+          ],
+          "desc": "Packed convolution history + new tokens [num_seqs, num_channels, kernel_size - 1 + num_tokens]"
+        }
+      ],
+      "weights": [
+        {
+          "name": "kernel",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "K"
+          ],
+          "desc": "Per-channel causal depthwise SSM convolution weights"
+        }
+      ],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "S",
+            "T",
+            "C"
+          ],
+          "desc": "Convolved per-token recurrent inputs [num_seqs, num_tokens, num_channels]"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "K",
+        "C",
+        "T",
+        "S"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "channel",
+          "sequence"
+        ],
+        "preferred": {
+          "prefill": "channel",
+          "decode": "channel"
+        },
+        "strategies": [
+          {
+            "name": "channel",
+            "partition_dim": "C",
+            "param_style": "range",
+            "range": {
+              "min_chunk": 1
+            },
+            "notes": "Each channel is independent for the causal depthwise convolution."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Matches ggml's GGML_OP_SSM_CONV used by qwen3next/Qwen3.5 before the recurrent DeltaNet update."
+      },
+      "impl": {
+        "function": "ssm_conv1d_forward",
+        "c_declaration": "void ssm_conv1d_forward(const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs);",
+        "sources": [
+          "src/kernels/ssm_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_ssm_conv.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python unittest/test_ssm_conv.py",
+            "tolerance": "5e-5",
+            "notes": "Forward/backward parity against grouped torch.conv1d."
+          },
+          {
+            "kind": "llamacpp",
+            "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel ssm_conv1d",
+            "tolerance": "1e-6",
+            "notes": "Forward parity against the llama.cpp helper implementation matching GGML_OP_SSM_CONV."
+          }
+        ]
+      },
+      "notes": "SSM causal depthwise convolution used by qwen3next/Qwen3.5 recurrent blocks.",
+      "name": "ssm_conv1d_forward",
+      "_source_file": "ssm_conv1d_forward.json"
     },
     {
       "id": "swiglu_backward_exact",

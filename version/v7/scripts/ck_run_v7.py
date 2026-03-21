@@ -105,6 +105,50 @@ def _get_default_report_dir() -> Path:
 
 DEFAULT_REPORT_DIR = _get_default_report_dir()
 
+
+def _resolve_path_for_policy(path_like: Path | str) -> Path:
+    return Path(path_like).expanduser().resolve(strict=False)
+
+
+def _path_is_within(child: Path, parent: Path) -> bool:
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def _enforce_training_run_dir_policy(
+    run_dir: Path,
+    *,
+    allow_non_cache_run_dir: bool = False,
+    command_name: str = "train",
+) -> Path:
+    """Keep training runs under the canonical cache-backed train root by default."""
+    resolved = _resolve_path_for_policy(run_dir)
+    train_root = _resolve_path_for_policy(DEFAULT_TRAIN_ROOT)
+    repo_runs_root = _resolve_path_for_policy(V7_ROOT / "runs")
+
+    if allow_non_cache_run_dir:
+        return resolved
+
+    if _path_is_within(resolved, repo_runs_root):
+        raise ValueError(
+            f"{command_name}: training run dirs under {repo_runs_root} are disallowed.\n"
+            f"Use --run-name so the default cache path {train_root}/<run-name> is used, "
+            f"or pass --run under {train_root}.\n"
+            "This keeps IR hub discovery, reports, checkpoints, and dataset artifacts in one operator-visible tree."
+        )
+
+    if not _path_is_within(resolved, train_root):
+        raise ValueError(
+            f"{command_name}: training run dirs must live under {train_root}.\n"
+            "Use --run-name or choose a --run path under the canonical cache-backed train root.\n"
+            "For intentional ephemeral smoke work only, pass --allow-non-cache-run-dir explicitly."
+        )
+
+    return resolved
+
 # Colors
 C_RESET = "\033[0m"
 C_BOLD = "\033[1m"
@@ -473,6 +517,32 @@ def _sync_runtime_lib(src: Path, dst: Path, label: str) -> None:
         log(f"  Refreshed {label} at {dst}", C_DIM)
     except Exception as e:
         log(f"  Warning: failed to refresh {label}: {e}", C_ORANGE)
+
+
+def _resolve_chat_runtime_dir(model_dir: Path) -> Path:
+    """Pick the freshest valid compiled runtime dir for chat/inference."""
+    candidates = [model_dir, model_dir / ".ck_build", model_dir / "ck_build"]
+    valid: list[tuple[float, Path]] = []
+    for candidate in candidates:
+        if not candidate.exists() or not candidate.is_dir():
+            continue
+        weights_path = candidate / "weights.bump"
+        if not weights_path.exists():
+            continue
+        lib_candidates = [
+            candidate / "ck-kernel-inference.so",
+            candidate / "ck-kernel-decode.so",
+            candidate / "libmodel.so",
+        ]
+        existing_libs = [p for p in lib_candidates if p.exists()]
+        if not existing_libs:
+            continue
+        newest_runtime = max(p.stat().st_mtime for p in existing_libs)
+        valid.append((newest_runtime, candidate))
+    if not valid:
+        return model_dir
+    valid.sort(key=lambda item: (item[0], str(item[1])), reverse=True)
+    return valid[0][1]
 
 
 def _detect_default_ck_threads() -> int:
@@ -1355,10 +1425,19 @@ def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[s
         or cfg.get("has_qk_norm")
         or any(name.endswith((".q_norm", ".k_norm")) for name in entry_names)
     )
+    body_type = str(body_doc.get("type", "")).strip().lower() if isinstance(body_doc, dict) else ""
+    body_ops_lower = {str(op).strip().lower() for op in body_ops}
+    has_recurrent_graph = body_type == "hybrid_recurrent_attention" or any(
+        op.startswith("recurrent_") for op in body_ops_lower
+    )
     attention_contract = contract_doc.get("attention_contract") if isinstance(contract_doc.get("attention_contract"), dict) else {}
     contract_qk_norm = _coerce_bool(attention_contract.get("qk_norm"))
     template_has_qk_norm_op = "qk_norm" in body_ops
-    if has_template_graph:
+    if has_recurrent_graph:
+        warnings.append(
+            "Hybrid recurrent/attention template detected; skipped dense-only qkv/qk-norm semantic checks."
+        )
+    elif has_template_graph:
         template_has_qkv_proj = any(op in {"qkv_proj", "q_proj", "k_proj", "v_proj"} for op in body_ops)
         if has_qkv_bias and not template_has_qkv_proj:
             errors.append(
@@ -7150,6 +7229,15 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
     run_dir_arg = getattr(args, "run_dir", None)
     run_dir = Path(run_dir_arg) if run_dir_arg else None
     if run_dir is not None:
+        try:
+            run_dir = _enforce_training_run_dir_policy(
+                run_dir,
+                allow_non_cache_run_dir=bool(getattr(args, "allow_non_cache_run_dir", False)),
+                command_name=str(getattr(args, "command", "train") or "train"),
+            )
+        except ValueError as e:
+            log_error(str(e))
+            sys.exit(2)
         run_dir.mkdir(parents=True, exist_ok=True)
 
     json_out = getattr(args, "train_json_out", None)
@@ -7453,6 +7541,15 @@ def step_run_train_init(args: argparse.Namespace) -> None:
     # Keep default run dirs under the cache tree so IR + dataset + train artifacts stay together.
     default_train_root = DEFAULT_TRAIN_ROOT
     out_dir = Path(out_dir_arg) if out_dir_arg else (default_train_root / run_name)
+    try:
+        out_dir = _enforce_training_run_dir_policy(
+            out_dir,
+            allow_non_cache_run_dir=bool(getattr(args, "allow_non_cache_run_dir", False)),
+            command_name="init",
+        )
+    except ValueError as e:
+        log_error(str(e))
+        sys.exit(2)
 
     cmd = [
         python_exec,
@@ -7975,22 +8072,23 @@ def run_reverse_validation(work_dir: Path, verbose: bool = False) -> bool:
 def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = None):
     """Run chat interface."""
     log_step(6, "Starting chat")
+    runtime_dir = _resolve_chat_runtime_dir(model_dir)
 
     # Ensure libckernel_engine.so is findable
     kernel_lib = BUILD_DIR / "libckernel_engine.so"
-    dst_lib = model_dir / "libckernel_engine.so"
+    dst_lib = runtime_dir / "libckernel_engine.so"
     _sync_runtime_lib(kernel_lib, dst_lib, "libckernel_engine.so")
 
     # Ensure libckernel_tokenizer.so is findable (for BPE tokenizer)
     tokenizer_lib = BUILD_DIR / "libckernel_tokenizer.so"
-    dst_tok = model_dir / "libckernel_tokenizer.so"
+    dst_tok = runtime_dir / "libckernel_tokenizer.so"
     _sync_runtime_lib(tokenizer_lib, dst_tok, "libckernel_tokenizer.so")
 
     if kernel_lib.exists():
         # Also set LD_LIBRARY_PATH for the subprocess
         ld_path = str(BUILD_DIR)
         current_ld = os.environ.get("LD_LIBRARY_PATH", "")
-        os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{model_dir}:{current_ld}"
+        os.environ["LD_LIBRARY_PATH"] = f"{ld_path}:{runtime_dir}:{current_ld}"
 
     # Threading policy:
     # - CK threadpool handles parallelism (CK_NUM_THREADS).
@@ -8005,7 +8103,7 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
         sys.executable,
         str(ROOT_SCRIPTS_DIR / "ck_chat.py"),
         "--model-dir",
-        str(model_dir),
+        str(runtime_dir),
     ]
 
     if gguf_path:
@@ -8950,12 +9048,18 @@ def _template_audit_extract_weight_refs(op: dict[str, Any]) -> set[str]:
     for item in arg_items:
         if not isinstance(item, dict):
             continue
+        resolved_weight_ref = item.get("weight_ref")
+        if isinstance(resolved_weight_ref, str) and resolved_weight_ref.strip():
+            _push_ref(resolved_weight_ref)
         source = item.get("source")
-        if isinstance(source, str) and ":" in source:
+        if (
+            isinstance(source, str)
+            and ":" in source
+            and not (isinstance(resolved_weight_ref, str) and resolved_weight_ref.strip())
+        ):
             prefix, value = source.split(":", 1)
             if prefix.strip().lower() in {"weight", "manifest"}:
                 _push_ref(value)
-        _push_ref(item.get("weight_ref"))
         nested = item.get("weight_refs")
         if isinstance(nested, list):
             for value in nested:
@@ -10248,6 +10352,8 @@ Examples:
     def _add_train_common_args(sp: argparse.ArgumentParser, *, include_profile: bool = True) -> None:
         sp.add_argument('--run', dest='run_dir', default=None,
                         help='Run directory for artifacts (single source of truth)')
+        sp.add_argument('--allow-non-cache-run-dir', action='store_true',
+                        help='Override training run-dir policy for intentional ephemeral smoke work outside the canonical cache train root')
         sp.add_argument('--data', dest='train_data', default=None,
                         help='Path to UTF-8 training text file (repeated to fill token budget)')
         sp.add_argument('--train-token-file', dest='train_token_file', default=None,
@@ -10491,8 +10597,8 @@ Examples:
                            help='Optional external profiler for --train-e2e (none, perf, vtune, advisor)')
     run_parser.add_argument('--train-profile-dir', default=None,
                            help='Output directory for train profiler artifacts (default: run_dir/profile_train_latest)')
-    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'gemma', 'llama'], default='auto',
-                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, gemma, llama)')
+    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'qwen35', 'gemma', 'llama'], default='auto',
+                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, qwen35, gemma, llama)')
     run_parser.add_argument('--no-chat-template', action='store_true',
                            help='Disable chat template formatting (same as --chat-template=none)')
     run_parser.add_argument('--python-tokenizer', action='store_true',
@@ -10619,6 +10725,8 @@ Examples:
                              help=f'Optional explicit run directory. Prefer omitting this and using --run-name so the default {_cache_train_root_hint()}/<run-name> location is used.')
     init_parser.add_argument('--run-name', default='tiny_init',
                              help=f'Preferred run selector. When --run is omitted, the run is created under {_cache_train_root_hint()}/<run-name>.')
+    init_parser.add_argument('--allow-non-cache-run-dir', action='store_true',
+                             help='Override training run-dir policy for intentional ephemeral smoke work outside the canonical cache train root')
     init_parser.add_argument('--init', choices=['normal_0p02', 'xavier_uniform', 'xavier_normal', 'kaiming_uniform', 'zeros'],
                              default='normal_0p02', help='Weight initialization method')
     init_parser.add_argument('--train-mode', choices=['pretrain', 'sft'], default='pretrain')
