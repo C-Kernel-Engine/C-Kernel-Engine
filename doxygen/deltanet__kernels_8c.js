@@ -1,8 +1,6 @@
 var deltanet__kernels_8c =
 [
     [ "CK_DELTANET_MAX_STACK_DIM", "deltanet__kernels_8c.html#ab4de31192bb2a9b88daba6b8693e9483", null ],
-    [ "ck_deltanet_l2_inv_norm_scalar", "deltanet__kernels_8c.html#a7652a812c050d10bc20393354d93107f", null ],
-    [ "ck_deltanet_scaled_l2_norm_backward_ref", "deltanet__kernels_8c.html#a09e8db49e7f0b62bb9211d38f5a732a9", null ],
     [ "ck_deltanet_sigmoidf", "deltanet__kernels_8c.html#a9331ad59b9c6268a1f1d4351db2dca6b", null ],
     [ "gated_deltanet_autoregressive_backward", "deltanet__kernels_8c.html#a13c4e09c2b0eaea0f19c8b162bb9c377", null ],
     [ "gated_deltanet_autoregressive_backward_ref", "deltanet__kernels_8c.html#abcc51da16224e11073d3716c4f18b708", null ],
