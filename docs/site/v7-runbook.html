@@ -1701,7 +1701,7 @@
         <li><a href="#step-7-visualizer"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">7</span> IR Visualizer</a></li>
         <li><a href="#step-7-1-live-monitor"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(71,180,117,0.15);border-color:rgba(71,180,117,0.4);color:#7de59f;">7.1</span> Live Monitor</a></li>
         <li><a href="#step-8-inference"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8</span> GGUF Inference</a></li>
-        <li><a href="#step-8-visualize-hf"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8.1</span> HF Visualizer</a></li>
+        <li><a href="#step-8-visualize-hf"><span class="runbook-pill" style="font-size:0.62rem;padding:0.1rem 0.35rem;background:rgba(7,173,248,0.12);border-color:rgba(7,173,248,0.35);color:#8cb4ff;">8.1</span> Inference + IR Visualizer</a></li>
     </ul>
 
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#a070ff;margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Quality + Tools</div>
@@ -4136,6 +4136,16 @@ make v7-profile-dashboard \
   --generate-visualizer</pre>
     </div>
 
+    <h3>Qwen3.5 0.8B</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v7/scripts/ck_run_v7.py run \
+  /tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --force-inspect --force-convert --force-compile \
+  --context-len 1034</pre>
+    </div>
+    <p class="mini-note">This path confirms the runtime/IR flow is not limited to <code>hf://...</code> URIs. Local GGUF paths such as <code>Qwen3.5-0.8B-Q4_K_M.gguf</code> are supported too.</p>
+
     <div class="alert alert-warning" style="margin-top: 1rem;">
         <div class="alert-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -4157,9 +4167,10 @@ make v7-profile-dashboard \
     </div>
     <p class="mini-note">Current scope: documented inference/parity bring-up. The v7 training preset list still centers on Qwen2/Qwen3/Gemma3 templates.</p>
 
-    <h3 id="step-8-visualize-hf">Step 8.1: Generate IR Visualizer for these HF GGUF runs</h3>
+    <h3 id="step-8-visualize-hf">Step 8.1: Inference + IR Visualizer for GGUF Runs</h3>
     <p style="margin-bottom: 0.4rem;">
-        <code>ck_run_v7.py run hf://...</code> stores each model under
+        Inference runs can come from either <code>hf://...</code> URIs or local GGUF paths.
+        HF-backed runs are stored under
         <code>${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}/&lt;org--repo&gt;</code>.
         If you used <code>--generate-visualizer</code> in Step 8, <code>ir_report.html</code> is already in the same folder.
         Otherwise generate visualizer reports directly from those run directories:
@@ -4170,9 +4181,10 @@ make v7-profile-dashboard \
 GEMMA_RUN="$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF"
 QWEN2_RUN="$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF"
 QWEN3_RUN="$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF"
+QWEN35_RUN="/tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF"
 NANBEIGE_RUN="$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF"
 
-for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN" "$NANBEIGE_RUN"; do
+for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN" "$QWEN35_RUN" "$NANBEIGE_RUN"; do
   if [ ! -d "$RUN_DIR" ]; then
     echo "[Missing] $RUN_DIR (run Step 8 command first)"
     continue
@@ -4188,6 +4200,7 @@ CACHE_MODELS="${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}"
 xdg-open "$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 || true
+xdg-open "/tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">
@@ -5365,7 +5378,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-20</p>
             </div>
         </div>
     </footer>
