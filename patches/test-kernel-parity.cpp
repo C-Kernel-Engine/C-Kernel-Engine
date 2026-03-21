@@ -880,6 +880,9 @@ void test_recurrent_norm_gate(const float * x,
  *   g, beta   [num_heads]
  *   state_*   [num_heads, state_dim, state_dim] row-major per head
  *   out       [num_heads, state_dim]
+ *
+ * Contract:
+ *   q and k arrive pre-normalized by the explicit recurrent_qk_l2_norm graph op.
  */
 void test_gated_deltanet_autoregressive(const float * q,
                                         const float * k,
@@ -911,8 +914,6 @@ void test_gated_deltanet_autoregressive(const float * q,
         float * state_cur = state_out + (size_t) h * state_stride;
         float * out_head = out + (size_t) h * vec_stride;
 
-        const float q_inv_norm = deltanet_l2_inv_norm(q_head, state_dim, norm_eps);
-        const float k_inv_norm = deltanet_l2_inv_norm(k_head, state_dim, norm_eps);
         const float beta_s = deltanet_sigmoid(beta[h]);
         const float gate = std::exp(g[h]);
 
@@ -926,13 +927,13 @@ void test_gated_deltanet_autoregressive(const float * q,
         for (int col = 0; col < state_dim; ++col) {
             float kv_mem = 0.0f;
             for (int row = 0; row < state_dim; ++row) {
-                const float k_hat = k_head[row] * k_inv_norm;
+                const float k_hat = k_head[row];
                 kv_mem += state_cur[(size_t) row * (size_t) state_dim + (size_t) col] * k_hat;
             }
 
             const float delta = (v_head[col] - kv_mem) * beta_s;
             for (int row = 0; row < state_dim; ++row) {
-                const float k_hat = k_head[row] * k_inv_norm;
+                const float k_hat = k_head[row];
                 state_cur[(size_t) row * (size_t) state_dim + (size_t) col] += k_hat * delta;
             }
         }
@@ -940,7 +941,7 @@ void test_gated_deltanet_autoregressive(const float * q,
         for (int col = 0; col < state_dim; ++col) {
             float acc = 0.0f;
             for (int row = 0; row < state_dim; ++row) {
-                const float q_hat = q_head[row] * q_inv_norm * q_scale;
+                const float q_hat = q_head[row] * q_scale;
                 acc += state_cur[(size_t) row * (size_t) state_dim + (size_t) col] * q_hat;
             }
             out_head[col] = acc;

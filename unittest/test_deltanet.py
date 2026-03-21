@@ -1,8 +1,14 @@
 """
-Gated DeltaNet autoregressive kernel parity tests against PyTorch.
+LEGACY DeltaNet parity test.
 
-Validates the FP32 forward pass and reference backward pass used by the
-qwen3next/Qwen3.5 recurrent DeltaNet update.
+This file reflects the older contract where the DeltaNet kernel performed its
+own q/k normalization internally. The current qwen35/qwen3next path normalizes
+q/k explicitly before the DeltaNet kernel, so the authoritative test lives at:
+
+    tests/test_deltanet.py
+
+Keep this file only as a historical reference while older notes/docs still
+point at it; do not use it as the active parity gate.
 """
 import argparse
 import ctypes

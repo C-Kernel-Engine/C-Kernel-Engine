@@ -284,7 +284,7 @@ TEST_SUITES = {
     # Training/backward tests
     "softmax_backward": TestSuite("Softmax Backward", "training", UNITTEST_DIR / "test_softmax_backward.py"),
     "attention_backward": TestSuite("Attention Backward", "training", UNITTEST_DIR / "test_attention_backward.py"),
-    "deltanet_backward": TestSuite("DeltaNet Backward", "training", UNITTEST_DIR / "test_deltanet.py"),
+    "deltanet_backward": TestSuite("DeltaNet Backward", "training", ROOT / "tests" / "test_deltanet.py"),
 
     # Parity tests
     "pytorch_parity": TestSuite("PyTorch Parity", "parity", UNITTEST_DIR / "test_pytorch_parity.py", timeout_sec=300),
