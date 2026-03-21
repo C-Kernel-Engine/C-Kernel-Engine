@@ -34,6 +34,8 @@ class CheckRow:
 
 
 def _read_text(path: Path) -> str:
+    if not path.exists():
+        return ""
     return path.read_text(encoding="utf-8")
 
 
@@ -220,6 +222,7 @@ def run_checks() -> list[CheckRow]:
     # L1: Template -> IR/Parity model-family contract
     required_families = {"gemma", "qwen2", "qwen3", "llama", "mistral"}
     template_names = _extract_template_names(V7 / "templates")
+    supported_present = autocheck_py.exists()
     supported = _extract_dict_constant(autocheck_py, "SUPPORTED_FAMILIES") or {}
     parity_map = _extract_dict_constant(detailed_py, "PARITY_MODEL_MAP") or {}
     profile = _extract_dict_constant(autopsy_py, "FAMILY_PROFILE") or {}
@@ -238,7 +241,9 @@ def run_checks() -> list[CheckRow]:
 
     fam_status = "PASS"
     fam_notes: list[str] = []
-    if missing_supported:
+    if not supported_present:
+        fam_notes.append("autocheck-script-absent")
+    elif missing_supported:
         fam_status = _status_for(fam_status, "FAIL")
         fam_notes.append(f"autocheck-missing={_summarize(missing_supported)}")
     if missing_parity_map:
@@ -399,6 +404,65 @@ def run_checks() -> list[CheckRow]:
             contract="Contract validation runs before heavy tests",
             status=l6_status,
             detail=";".join(notes),
+        )
+    )
+
+    # L7: canonical cache-root contract for IR hub / model artifacts
+    readme = _read_text(V7 / "README.md")
+    ck_run = _read_text(SCRIPTS / "ck_run_v7.py")
+    ir_hub = _read_text(V7 / "tools" / "open_ir_hub.py")
+    canonical_models_root = "~/.cache/ck-engine-v7/models"
+    canonical_train_root = "~/.cache/ck-engine-v7/models/train"
+    path_notes: list[str] = []
+    path_status = "PASS"
+    if canonical_models_root not in readme:
+        path_status = "FAIL"
+        path_notes.append("readme-missing-models-root")
+    if canonical_train_root not in readme:
+        path_status = "FAIL"
+        path_notes.append("readme-missing-train-root")
+    if canonical_models_root not in ck_run:
+        path_status = "FAIL"
+        path_notes.append("ck_run-missing-models-root")
+    if canonical_models_root not in ir_hub:
+        path_status = "FAIL"
+        path_notes.append("ir_hub-missing-models-root")
+    rows.append(
+        CheckRow(
+            layer="L7",
+            handoff="Run layout -> IR Hub/Visualizer",
+            contract="Canonical cache roots stay stable",
+            status=path_status,
+            detail=";".join(path_notes) if path_notes else "models-root=~/.cache/ck-engine-v7/models;train-root=~/.cache/ck-engine-v7/models/train",
+        )
+    )
+
+    # L8: visualizer fixture / nightly stabilization path-policy contract
+    visualizer_e2e = _read_text(SCRIPTS / "test_ir_visualizer_e2e_v7.py")
+    stabilization_py = _read_text(SCRIPTS / "run_v7_stabilization_nightly_v7.py")
+    visualizer_allow_count = visualizer_e2e.count("--allow-non-cache-run-dir")
+    makefile_text = makefile
+    l8_notes: list[str] = []
+    l8_status = "PASS"
+    if visualizer_allow_count < 2:
+        l8_status = "FAIL"
+        l8_notes.append(f"visualizer-non-cache-allow-count={visualizer_allow_count}")
+    if 'Path("/tmp/v7_stabilization_nightly")' in stabilization_py:
+        l8_status = "FAIL"
+        l8_notes.append("stabilization-script-hardcodes-/tmp")
+    if "V7_STABILIZATION_RUN_ROOT ?= /tmp/v7_stabilization_nightly" in makefile_text:
+        l8_status = "FAIL"
+        l8_notes.append("makefile-hardcodes-/tmp-run-root")
+    if '--run-root "$(V7_STABILIZATION_RUN_ROOT)"' in makefile_text:
+        l8_status = "FAIL"
+        l8_notes.append("makefile-unconditionally-passes-run-root")
+    rows.append(
+        CheckRow(
+            layer="L8",
+            handoff="Fixture policy -> Nightly operator jobs",
+            contract="Non-cache fixtures are explicit and nightly training roots stay cache-backed",
+            status=l8_status,
+            detail=";".join(l8_notes) if l8_notes else "visualizer-fixtures-explicit;stabilization-root-cache-backed",
         )
     )
 

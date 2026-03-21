@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import statistics
 import subprocess
 import sys
@@ -31,6 +32,18 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
 TRAIN_PIPELINE = SCRIPT_DIR / "train_data_pipeline_v7.py"
 PARITY_REGIMEN = SCRIPT_DIR / "run_training_parity_regimen_v7.py"
+
+
+def _default_train_run_root() -> Path:
+    cache_env = os.environ.get("CK_CACHE_DIR")
+    if cache_env:
+        base = Path(cache_env).expanduser()
+        if base.name == "train":
+            return base / "nightly_stabilization"
+        if base.name == "models":
+            return base / "train" / "nightly_stabilization"
+        return base / "models" / "train" / "nightly_stabilization"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train" / "nightly_stabilization"
 
 
 def _utc_now_iso() -> str:
@@ -456,7 +469,7 @@ def _render_markdown(payload: Dict[str, Any]) -> str:
 
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Run nightly v7 stabilization matrix and emit scorecard artifacts.")
-    ap.add_argument("--run-root", type=Path, default=Path("/tmp/v7_stabilization_nightly"))
+    ap.add_argument("--run-root", type=Path, default=_default_train_run_root())
     ap.add_argument("--dataset", type=Path, default=ROOT / "version" / "v7" / "data" / "svg_assets_train.txt")
     ap.add_argument("--python-exec", type=str, default=None)
 

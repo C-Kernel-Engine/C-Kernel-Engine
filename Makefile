@@ -3514,7 +3514,7 @@ V7_PIPELINE_WITH_TORCH ?= 1
 V7_PIPELINE_OPEN_VIS ?= 1
 V7_PIPELINE_WORK_DIR ?=
 V7_PIPELINE_JSON ?= $(V7_REPORT_DIR)/train_data_pipeline_latest.json
-V7_STABILIZATION_RUN_ROOT ?= /tmp/v7_stabilization_nightly
+V7_STABILIZATION_RUN_ROOT ?=
 V7_STABILIZATION_DATA ?= version/v7/data/svg_assets_train.txt
 V7_STABILIZATION_LAYERS ?= 1,2,3,4
 V7_STABILIZATION_TOKEN_BUDGETS ?= 2048,4096
@@ -3756,6 +3756,7 @@ v7-inference-smoke:
 
 v7-validate-contracts:
 	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --training-mode --json-out $(V7_REPORT_DIR)/contract_report_latest.json
+	@$(PYTHON) version/v7/scripts/validate_tooling_contracts.py --strict --json-out $(V7_REPORT_DIR)/tooling_contract_report_latest.json
 
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out $(V7_REPORT_DIR)/parity_1token_latest.json
@@ -4238,9 +4239,9 @@ v7-stabilization-nightly:
 	if [ "$(V7_STABILIZATION_RUNTIME_CHECKS)" != "1" ]; then extra_flags="$$extra_flags --no-runtime-checks"; fi; \
 	if [ "$(V7_STABILIZATION_BACKEND_XRAY)" != "1" ]; then extra_flags="$$extra_flags --no-backend-xray"; fi; \
 	if [ "$(V7_STABILIZATION_FORCE)" = "1" ]; then extra_flags="$$extra_flags --force-regimen"; fi; \
+	if [ -n "$(V7_STABILIZATION_RUN_ROOT)" ]; then extra_flags="$$extra_flags --run-root $(V7_STABILIZATION_RUN_ROOT)"; fi; \
 	if [ -n "$(V7_STABILIZATION_MAIN_RUN_DIR)" ]; then extra_flags="$$extra_flags --main-run-dir $(V7_STABILIZATION_MAIN_RUN_DIR)"; fi; \
 	$(PYTHON) version/v7/scripts/run_v7_stabilization_nightly_v7.py \
-		--run-root "$(V7_STABILIZATION_RUN_ROOT)" \
 		--dataset "$(V7_STABILIZATION_DATA)" \
 		--layers "$(V7_STABILIZATION_LAYERS)" \
 		--token-budgets "$(V7_STABILIZATION_TOKEN_BUDGETS)" \
