@@ -2446,6 +2446,9 @@ help:
 	@echo "  │  TESTING                                                            │"
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make test             Run core kernel tests"
+	@echo "  make regression-fast  Run family smoke/coherence regression suite"
+	@echo "  make regression-full  Run family regression suite with stitch/parity triage"
+	@echo "  make regression-family FAMILY=qwen35  Run regression debug for one family"
 	@echo "  make test-attention-sliding  Run sliding-window kernel contract test"
 	@echo "  make test-quant       Run quantization kernel tests"
 	@echo "  make test-bf16        Run BF16 kernel tests"
@@ -3757,6 +3760,22 @@ v7-inference-smoke:
 v7-validate-contracts:
 	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --training-mode --json-out $(V7_REPORT_DIR)/contract_report_latest.json
 	@$(PYTHON) version/v7/scripts/validate_tooling_contracts.py --strict --json-out $(V7_REPORT_DIR)/tooling_contract_report_latest.json
+
+regression-fast:
+	@echo "Running v7 regression fast suite..."
+	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast $(REGRESSION_ARGS)
+
+regression-full:
+	@echo "Running v7 regression full suite..."
+	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode full $(REGRESSION_ARGS)
+
+regression-family:
+	@if [ -z "$(FAMILY)" ]; then \
+		echo "Usage: make regression-family FAMILY=<family_id>"; \
+		exit 2; \
+	fi
+	@echo "Running v7 regression for family: $(FAMILY)"
+	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode full --family "$(FAMILY)" $(REGRESSION_ARGS)
 
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out $(V7_REPORT_DIR)/parity_1token_latest.json
