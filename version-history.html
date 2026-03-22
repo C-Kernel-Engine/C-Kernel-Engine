@@ -1786,7 +1786,7 @@
       <tr>
         <td><strong>v7.1</strong></td>
         <td>Runtime Safety + Diagnostics</td>
-        <td>Contiguous train memory layout, canary diagnostics, CK-vs-PyTorch parity regimen (epoch + grad-accum sweeps), deterministic replay + drift triage artifacts, IR visualizer training-dashboard hardening (artifact ingestion + bug-fix cadence)</td>
+        <td>Contiguous train memory layout, canary diagnostics, CK-vs-PyTorch parity regimen (epoch + grad-accum sweeps), deterministic replay + drift triage artifacts, IR visualizer training-dashboard hardening (artifact ingestion + bug-fix cadence), and GGUF inference contract stabilization across Gemma / Qwen3.5 / Nanbeige bring-up</td>
         <td>v7.0</td>
         <td><span class="version-status status-building">Building</span></td>
       </tr>
@@ -1937,6 +1937,36 @@
           <li class="milestone">
             <span class="milestone-icon done">✓</span>
             <span class="milestone-text done"><strong>IR visualizer training cockpit:</strong> training dashboard, parity tracker, data/tokenizer transparency, and operator runbook command blocks.</span>
+          </li>
+        </ul>
+        <p style="margin:0.85rem 0 0.4rem 0; color:var(--text-muted); font-size:0.85rem;">Recent inference/runtime fixes on the same branch:</p>
+        <ul class="milestone-list">
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>Gemma 3 parity fix:</strong> RoPE was being applied with the wrong Q/K pairing style. Gemma expects split-half RoPE; the runtime now reads exported <code>rope_layout</code> and selects the matching <code>rope_qk</code> kernel automatically.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>Qwen3.5 recurrent bring-up:</strong> hybrid recurrent-attention decode, Gated DeltaNet parity, and contract-driven visible/suppressed thinking now run on the built-in C tokenizer path.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><strong>Nanbeige bring-up lane:</strong> SentencePiece + ChatML contracts stabilized on the C tokenizer path with untied <code>output.weight</code> preserved and long-think output treated as model behavior.</span>
+          </li>
+        </ul>
+        <p style="margin:0.85rem 0 0.4rem 0; color:var(--text-muted); font-size:0.85rem;">Recent v7 milestone commits:</p>
+        <ul class="milestone-list">
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><code>524791c4</code> <strong>fix(v7/regression):</strong> inference-family regression gate hardened, contract audit added, and <code>make regression-fast</code> promoted into nightly CI.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><code>af99d411</code> <strong>fix(v7/inference):</strong> chat contracts unified, Gemma split-half RoPE selected from exported metadata, Qwen families kept on the C tokenizer path, and Nanbeige contract bring-up stabilized.</span>
+          </li>
+          <li class="milestone">
+            <span class="milestone-icon done">✓</span>
+            <span class="milestone-text done"><code>80d88071</code> <strong>docs(v7):</strong> model-kernel matrix, runbook, and version-history pages updated to record the family bring-up fixes and canonical cache-backed bring-up flow.</span>
           </li>
         </ul>
       </div>
@@ -2653,7 +2683,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
             </div>
         </div>
     </footer>

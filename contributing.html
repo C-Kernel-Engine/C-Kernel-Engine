@@ -946,13 +946,13 @@
 <p>This guide explains how to add a new kernel (operation) to the system, from the math implementation to the compiler integration.</p>
 
 <h2>Enable Git Hooks (Required)</h2>
-<p>This repo ships pre-push checks in <code>.githooks/pre-push</code>. Git does <strong>not</strong> enable repo hooks automatically on clone/pull.</p>
+<p>This repo ships both a scoped pre-commit regression gate in <code>.githooks/pre-commit</code> and heavier push-time validation in <code>.githooks/pre-push</code>. Git does <strong>not</strong> enable repo hooks automatically on clone/pull.</p>
 <pre><code>./scripts/setup-hooks.sh
 </code></pre>
 <p>Verify:</p>
 <pre><code>git config core.hooksPath
 </code></pre>
-<p>It should print <code>.githooks</code>. If not, pushes will <strong>not</strong> run the pre-checks/e2e.</p>
+<p>It should print <code>.githooks</code>. If not, commits and pushes will <strong>not</strong> run the repo hooks.</p>
 
 <h2>Workflow: Adding a New Kernel</h2>
 
@@ -1270,7 +1270,7 @@ make test</code></pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
             </div>
         </div>
     </footer>

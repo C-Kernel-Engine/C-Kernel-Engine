@@ -4140,11 +4140,11 @@ make v7-profile-dashboard \
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
 <pre>python3 version/v7/scripts/ck_run_v7.py run \
-  /tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
-  --force-inspect --force-convert --force-compile \
+  hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --force-convert --force-compile \
   --context-len 1034</pre>
     </div>
-    <p class="mini-note">This path confirms the runtime/IR flow is not limited to <code>hf://...</code> URIs. Local GGUF paths such as <code>Qwen3.5-0.8B-Q4_K_M.gguf</code> are supported too.</p>
+    <p class="mini-note">The canonical v7 bring-up path is the <code>hf://...</code> URI. That materializes the run under <code>${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}/unsloth--Qwen3.5-0.8B-GGUF</code>. Local GGUF paths are still supported when you intentionally want an offline or copied artifact.</p>
 
     <div class="alert alert-warning" style="margin-top: 1rem;">
         <div class="alert-icon">
@@ -4162,7 +4162,7 @@ make v7-profile-dashboard \
 <pre>version/v7/scripts/cks-v7-run run \
   hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
   --context-len 1024 --force-compile --force-convert \
-  --python-tokenizer --chat-template auto \
+  --chat-template auto \
   --generate-visualizer</pre>
     </div>
     <p class="mini-note">Current scope: documented inference/parity bring-up. The v7 training preset list still centers on Qwen2/Qwen3/Gemma3 templates.</p>
@@ -4181,7 +4181,7 @@ make v7-profile-dashboard \
 GEMMA_RUN="$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF"
 QWEN2_RUN="$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF"
 QWEN3_RUN="$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF"
-QWEN35_RUN="/tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF"
+QWEN35_RUN="$CACHE_MODELS/unsloth--Qwen3.5-0.8B-GGUF"
 NANBEIGE_RUN="$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF"
 
 for RUN_DIR in "$GEMMA_RUN" "$QWEN2_RUN" "$QWEN3_RUN" "$QWEN35_RUN" "$NANBEIGE_RUN"; do
@@ -4200,7 +4200,7 @@ CACHE_MODELS="${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}"
 xdg-open "$CACHE_MODELS/unsloth--gemma-3-270m-it-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/Qwen--Qwen2-0.5B-Instruct-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/Qwen--Qwen3-0.6B-GGUF/ir_report.html" >/dev/null 2>&1 || true
-xdg-open "/tmp/ck_v7_qwen35/unsloth--Qwen3.5-0.8B-GGUF/ir_report.html" >/dev/null 2>&1 || true
+xdg-open "$CACHE_MODELS/unsloth--Qwen3.5-0.8B-GGUF/ir_report.html" >/dev/null 2>&1 || true
 xdg-open "$CACHE_MODELS/mradermacher--Nanbeige4.1-3B-GGUF/ir_report.html" >/dev/null 2>&1 || true</pre>
     </div>
     <p class="mini-note">
@@ -5378,7 +5378,7 @@ python3 scripts/ck_chat.py --help</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
             </div>
         </div>
     </footer>

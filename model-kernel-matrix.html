@@ -970,6 +970,7 @@
     }
     .model-card.mc-qwen2::before  { background: var(--orange); }
     .model-card.mc-qwen3::before  { background: var(--green); }
+    .model-card.mc-qwen35::before { background: #1abc9c; }
     .model-card.mc-gemma3::before { background: var(--blue); }
     .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
@@ -1233,14 +1234,45 @@
       </div>
     </div>
 
+    <!-- Qwen3.5 -->
+    <div class="model-card mc-qwen35">
+      <span class="model-badge">template: qwen35.json</span>
+      <div class="model-title">Qwen3.5</div>
+      <div class="model-arch">Hybrid recurrent + gated attention · RMSNorm · RoPE<br>QK‑Norm (full‑attn only) · SwiGLU · Gated DeltaNet · BPE tokenizer<br>Block pattern: 3×recurrent → 1×full_attention</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — hybrid recurrent-attention decode, DeltaNet kernel parity</span></div>
+        <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, DeltaNet backward kernels, AdamW, parity gates</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up fix: preserved <code>&lt;think&gt;</code> / <code>&lt;/think&gt;</code> markers on the built-in C tokenizer path and moved visible vs. suppressed thinking into the exported chat contract, instead of relying on Python-tokenizer fallback.
+      </div>
+      <div class="model-tags">
+        <span class="tag learned">hybrid_recurrent_attention</span>
+        <span class="tag learned">gated_deltanet</span>
+        <span class="tag learned">0.8B dense compatible</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">FP32</span>
+      </div>
+    </div>
+
     <!-- Gemma3 -->
     <div class="model-card mc-gemma3">
       <span class="model-badge">template: gemma3.json</span>
       <div class="model-title">Gemma3</div>
-      <div class="model-arch">RMSNorm · RoPE · QK‑Norm · GeGLU · Sliding Window<br>Post-norms · embed scale √dim · SentencePiece</div>
+      <div class="model-arch">RMSNorm · RoPE split-half · QK‑Norm · GeGLU · Sliding Window<br>Post-norms · embed scale √dim · SentencePiece</div>
       <div class="model-pipeline">
-        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, sliding-window attn kernel</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF, sliding-window attn kernel, split-half RoPE parity restored</span></div>
         <div class="mp-row"><span class="mp-dot training"></span><span class="mp-text">v7 training — IR backprop, AdamW, parity gates</span></div>
+      </div>
+      <div class="source-note">
+        Fix detail: Gemma was applying RoPE with the wrong dimension pairing. Gemma expects split-half RoPE, where the first half of Q/K is paired with the second half during the rotation step. The runtime could still choose the other common layout, so attention drifted from the reference path. The fix was to read exported <code>rope_layout</code> metadata and select the matching <code>rope_qk</code> kernel automatically.
+      </div>
+      <div class="model-tags">
+        <span class="tag fixed">first-divergence @ rope_qk</span>
+        <span class="tag fixed">rope_layout contract honored</span>
       </div>
       <div class="model-quant">
         <span class="mq-chip preferred">Q8_0 ★</span>
@@ -1258,6 +1290,9 @@
       <div class="model-pipeline">
         <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — active GGUF bring-up lane on Nanbeige 4.1 3B</span></div>
         <div class="mp-row"><span class="mp-dot no"></span><span class="mp-text dim">v7 training — not yet a documented preset; use template-audit + parity gates first</span></div>
+      </div>
+      <div class="source-note">
+        Current bring-up lane keeps SentencePiece + ChatML on the C-tokenizer path, preserves untied <code>output.weight</code>, and treats Nanbeige long coherent think traces as model behavior instead of a kernel/parity failure.
       </div>
       <div class="model-tags">
         <span class="tag learned">untied output.weight</span>
@@ -1334,6 +1369,16 @@
       <div class="cell dim">No</div>
       <div class="cell ok">LM head</div>
 
+      <div class="cell row-head">Qwen3.5</div>
+      <div class="cell ok">BPE</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Full‑attn only</div>
+      <div class="cell ok">RoPE</div>
+      <div class="cell ok">Hybrid DeltaNet + Gated</div>
+      <div class="cell ok">SwiGLU</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">Tied</div>
+
       <div class="cell row-head">Gemma3</div>
       <div class="cell ok">SentencePiece</div>
       <div class="cell ok">From weights</div>
@@ -1399,6 +1444,16 @@
       <div class="cell ok">Yes</div>
       <div class="cell dim">No</div>
 
+      <div class="cell row-head">Qwen3.5</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell dim">No</div>
+      <div class="cell ok">BPE + vocab</div>
+      <div class="cell ok">hybrid_recurrent + gated_attn</div>
+      <div class="cell ok">silu_mul</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
       <div class="cell row-head">Gemma3</div>
       <div class="cell ok">sqrt(dim)</div>
       <div class="cell ok">Yes</div>
@@ -1451,11 +1506,15 @@
   </div>
 
   <div class="matrix-section">
-    <h2 style="margin: 0; color: var(--orange);">Experimental Architecture Probes</h2>
+    <h2 style="margin: 0; color: var(--orange);">Hybrid Architecture Support</h2>
     <div class="test-grid">
       <div class="test-item">
-        <strong>Qwen3.5 / qwen3next</strong><br>
-        Kernel foothold exists in <code>src/kernels/deltanet_kernels.c</code>: FP32 single-token Gated DeltaNet parity against llama.cpp. Block flow: <code>x -&gt; [q,k,v,z] + [beta,alpha] -&gt; conv(q/k/v) -&gt; DeltaNet state update S_t -&gt; RMSNorm(h) * SiLU(z) -&gt; outproj</code>. This is kernel-level parity, not yet a full template/runtime lane.
+        <strong>Qwen3.5 / qwen3next — Full Template</strong><br>
+        Full <code>qwen35.json</code> template with hybrid block pattern: <code>3×recurrent → 1×full_attention</code>.
+        Recurrent blocks: <code>x → [q,k,v,z] + [beta,alpha] → conv(q/k/v) → DeltaNet state update S_t → RMSNorm(h) * SiLU(z) → outproj</code>.
+        Full-attention blocks: <code>q_gate_proj → split_q_gate → k/v_proj → qk_norm → rope → gated_attention → sigmoid_mul → outproj</code>.
+        Dedicated kernel parity in <code>src/kernels/deltanet_kernels.c</code> (forward + backward).
+        Compatible with <strong>Qwen3.5-0.8B</strong> dense variant.
       </div>
       <div class="test-item">
         <strong>Gated attention</strong><br>
@@ -1499,18 +1558,34 @@
       <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
       <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
       <div class="test-item">mradermacher--Nanbeige4.1-3B-GGUF</div>
+      <div class="test-item">Qwen--Qwen3.5-0.8B-GGUF</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
       Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
       <code>&lt;|im_start|&gt;assistant</code>, the runtime is using the wrong chat wrapper or stop policy.
-      Preserve GGUF-exported ChatML markers and keep <code>output.weight</code> untied.
+      Preserve GGUF-exported ChatML markers and keep <code>output.weight</code> untied. For Gemma, if first-token parity collapses after a clean <code>qk_norm</code> stage, check the exported <code>rope_layout</code> before suspecting tokenizer or stop-token bugs.
     </p>
+  </div>
+
+  <div class="matrix-section">
+    <h2 style="margin: 0; color: var(--orange);">Recent Bring-up Fixes</h2>
+    <div class="test-grid">
+      <div class="test-item">
+        <strong>Gemma 3:</strong> the bug was not in tokenization. We were applying RoPE with the wrong pairing style for Q/K. Gemma expects split-half RoPE, but the runtime could still use the other layout. Fix: read exported <code>rope_layout</code> and choose the matching RoPE kernel automatically.
+      </div>
+      <div class="test-item">
+        <strong>Qwen3.5:</strong> hybrid recurrent-attention decode and Gated DeltaNet parity are now on the normal C-tokenizer route. <code>&lt;think&gt;</code> markers are preserved as special tokens, and visible vs. suppressed thinking is now a generic chat-contract mode instead of ad hoc runtime logic.
+      </div>
+      <div class="test-item">
+        <strong>Llama / Nanbeige:</strong> SentencePiece + ChatML bring-up stabilized with untied <code>output.weight</code> preserved. Nanbeige remains an active inference lane; long coherent think traces are treated as model style, not as evidence of kernel breakage.
+      </div>
+    </div>
   </div>
 
   <div class="matrix-section">
     <h2 style="margin: 0; color: var(--orange);">Validation Commands (v7 inference matrix)</h2>
     <p style="margin-top: 0.6rem; color: var(--text-secondary);">
-      These commands are the current inference readiness gates for Qwen2, Qwen3, Gemma3, and the active Nanbeige bring-up lane.
+      These commands are the current inference readiness gates for Qwen2, Qwen3, Qwen3.5, Gemma3, and the active Nanbeige bring-up lane.
     </p>
     <pre style="margin-top: 0.8rem;"><code>python3 version/v7/scripts/validate_model_matrix_v7.py
 python3 version/v7/scripts/validate_parity_matrix_v7.py
@@ -1526,7 +1601,9 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Gemma3 plus the active Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3 plus the Llama/Nanbeige bring-up lane.
+    Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
+    Gemma now runs on the correct split-half RoPE parity path, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
     This page will keep evolving into a single matrix that shows inference + training coverage per model family.
   </div>
@@ -1767,7 +1844,7 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-20</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
             </div>
         </div>
     </footer>
