@@ -32,16 +32,22 @@ DEFAULT_MODELS = [
         "name": "qwen2-0.5b",
         "family": "qwen2",
         "uri": "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf",
+        "min_decode_runs": 64,
     },
     {
         "name": "qwen3-0.6b",
         "family": "qwen3",
         "uri": "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf",
+        "min_decode_runs": 64,
     },
     {
         "name": "gemma3-270m",
         "family": "gemma",
         "uri": "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf",
+        # Gemma 270M IT is intentionally weak/short-turn on long open-ended prompts.
+        # Keep the gate useful for hangs/crashes and near-zero under-runs without
+        # requiring it to sustain Qwen-length generations.
+        "min_decode_runs": 12,
     },
 ]
 
@@ -184,8 +190,11 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> StabilityRow:
         str(args.max_tokens),
         "--temperature",
         str(args.temperature),
-        "--no-chat-template",
     ]
+    if args.chat_template == "none":
+        cmd.append("--no-chat-template")
+    else:
+        cmd.extend(["--chat-template", args.chat_template])
     if args.force_compile:
         cmd.append("--force-compile")
 
@@ -206,6 +215,7 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> StabilityRow:
     text = ((proc.stdout or "") + "\n" + (proc.stderr or ""))
     fatal = _has_fatal_output(text)
     runs = _decode_runs(text)
+    min_decode_runs = int(model.get("min_decode_runs", args.min_decode_runs))
     if proc.returncode != 0:
         return StabilityRow(
             model=model["name"],
@@ -226,14 +236,14 @@ def _run_model(model: dict[str, str], args: argparse.Namespace) -> StabilityRow:
             note=f"fatal-output={fatal}",
             seconds=time.time() - t0,
         )
-    if runs < args.min_decode_runs:
+    if runs < min_decode_runs:
         return StabilityRow(
             model=model["name"],
             family=model["family"],
             cached=cached_status,
             decode_runs=runs,
             overall="FAIL",
-            note=f"decode-runs={runs}<min={args.min_decode_runs}",
+            note=f"decode-runs={runs}<min={min_decode_runs}",
             seconds=time.time() - t0,
         )
     return StabilityRow(
@@ -273,6 +283,12 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=256, help="Requested decode tokens")
     ap.add_argument("--min-decode-runs", type=int, default=64, help="Minimum decode runs required for pass")
     ap.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature")
+    ap.add_argument(
+        "--chat-template",
+        choices=["auto", "none", "qwen", "gemma"],
+        default="auto",
+        help="Chat-template mode passed to ck_run_v6_6.py (default: auto)",
+    )
     ap.add_argument("--timeout-sec", type=int, default=1800, help="Per-model timeout")
     ap.add_argument("--require-all", action="store_true", help="Fail if any model is skipped")
     ap.add_argument("--json-out", type=Path, default=None, help="Optional JSON report path")
@@ -284,7 +300,10 @@ def main() -> int:
     print("v6.6 LONG DECODE STABILITY REPORT")
     print("=" * 120)
     print(f"Prompt: {args.prompt}")
-    print(f"Settings: ctx={args.context_len}, max_tokens={args.max_tokens}, min_decode_runs={args.min_decode_runs}")
+    print(
+        f"Settings: ctx={args.context_len}, max_tokens={args.max_tokens}, "
+        f"min_decode_runs={args.min_decode_runs}, chat_template={args.chat_template}"
+    )
     print(_table(rows))
     print("=" * 120)
 
@@ -314,6 +333,7 @@ def main() -> int:
                 "max_tokens": args.max_tokens,
                 "min_decode_runs": args.min_decode_runs,
                 "temperature": args.temperature,
+                "chat_template": args.chat_template,
                 "prompt": args.prompt,
             },
         }
@@ -332,4 +352,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
