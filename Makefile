@@ -3350,8 +3350,10 @@ v6.6-validate-matrix:
 # Nightly matrix variant:
 # - skips static preflight that is already covered by v6.6-validate-contracts
 # - allows extra retries for transient build/cache fetch issues
+# - keeps nightly as compatibility coverage instead of requiring every legacy row
+#   to be present in every runner/cache state
 v6.6-validate-matrix-nightly:
-	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --skip-static-contracts --retries 2 --retry-backoff-sec 3 --json-out version/v6.6/tools/model_matrix_report_latest.json
+	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --skip-static-contracts --retries 3 --retry-backoff-sec 5 --json-out version/v6.6/tools/model_matrix_report_latest.json
 
 v6.6-validate-matrix-smoke:
 	@$(PYTHON) version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --with-smoke --require-all --json-out version/v6.6/tools/model_matrix_report_latest.json

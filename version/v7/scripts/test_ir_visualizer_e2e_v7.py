@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import shlex
 import subprocess
@@ -30,6 +31,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 CK_RUN = ROOT / "version" / "v7" / "scripts" / "ck_run_v7.py"
 RESOLVE_MODEL_DIR = ROOT / "version" / "v7" / "scripts" / "resolve_model_dir_v7.py"
+
+
+def _default_train_fixture_run_dir() -> Path:
+    cache_env = os.environ.get("CK_CACHE_DIR")
+    if cache_env:
+        base = Path(cache_env).expanduser()
+        if base.name == "train":
+            return base / "ir_visualizer_train_fixture"
+        if base.name == "models":
+            return base / "train" / "ir_visualizer_train_fixture"
+        return base / "models" / "train" / "ir_visualizer_train_fixture"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train" / "ir_visualizer_train_fixture"
 
 
 @dataclass
@@ -528,7 +541,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--train-fixture-run-dir",
-        default="/tmp/v7_ir_visualizer_train_fixture",
+        default=str(_default_train_fixture_run_dir()),
         help="Run-dir used for optional tiny training-runtime fixture",
     )
     ap.add_argument("--json-out", default=None, help="Optional JSON report path")
