@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,18 @@ from tempfile import TemporaryDirectory
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
+
+
+def _default_train_root() -> Path:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        base = Path(env).expanduser()
+        if base.name == "train":
+            return base
+        if base.name == "models":
+            return base / "train"
+        return base / "models" / "train"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
 
 
 def _run(cmd: list[str]) -> tuple[int, str]:
@@ -58,7 +71,9 @@ def main() -> int:
         print("ERROR: --grad-accum must be >1 for accum replay validation", file=sys.stderr)
         return 2
 
-    with TemporaryDirectory(prefix="v7_replay_accum_") as td:
+    train_root = _default_train_root()
+    train_root.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="v7_replay_accum_", dir=str(train_root)) as td:
         tdir = Path(td)
         run_dir = tdir / "run"
         out_json = tdir / "train_runtime.json"
@@ -69,6 +84,7 @@ def main() -> int:
             "init",
             "--run",
             str(run_dir),
+            "--allow-non-cache-run-dir",
             "--train-seed",
             str(args.seed),
             "--layers",
@@ -94,6 +110,7 @@ def main() -> int:
             "train",
             "--run",
             str(run_dir),
+            "--allow-non-cache-run-dir",
             "--backend",
             "ck",
             "--train-epochs",

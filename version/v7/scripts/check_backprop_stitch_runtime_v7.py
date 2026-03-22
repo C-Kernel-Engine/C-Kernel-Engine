@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -27,6 +28,18 @@ from typing import Any, Dict, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
+
+
+def _default_train_root() -> Path:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        base = Path(env).expanduser()
+        if base.name == "train":
+            return base
+        if base.name == "models":
+            return base / "train"
+        return base / "models" / "train"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
 
 
 def _run(cmd: list[str]) -> Tuple[int, str]:
@@ -76,6 +89,7 @@ def _run_smoke(args: argparse.Namespace, run_dir: Path, report_out: Path) -> Dic
         "init",
         "--run",
         str(run_dir),
+        "--allow-non-cache-run-dir",
         "--train-seed",
         str(args.seed),
         "--layers",
@@ -105,6 +119,7 @@ def _run_smoke(args: argparse.Namespace, run_dir: Path, report_out: Path) -> Dic
         "train",
         "--run",
         str(run_dir),
+        "--allow-non-cache-run-dir",
         "--backend",
         "ck",
         "--train-epochs",
@@ -366,7 +381,9 @@ def main() -> int:
         data = _run_smoke(args, run_dir=run_dir, report_out=report_out)
         manifest_dims = _dims_from_manifest(run_dir)
     else:
-        with TemporaryDirectory(prefix="v7_backprop_stitch_") as td:
+        train_root = _default_train_root()
+        train_root.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(prefix="v7_backprop_stitch_", dir=str(train_root)) as td:
             run_dir = Path(td) / "run"
             report_out = run_dir / "train_e2e_latest.json"
             data = _run_smoke(args, run_dir=run_dir, report_out=report_out)
