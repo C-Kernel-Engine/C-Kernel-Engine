@@ -32,4 +32,4 @@ Enable repo hooks:
 
 This enables:
 - `pre-commit`: runs `make regression-fast` when staged changes touch runtime/regression paths
-- `pre-push`: runs the heavier build/parity/e2e gate
+- `pre-push`: runs the heavier build/parity/e2e gate, plus scoped `regression-fast` and `v6.6` compatibility only when pushed files affect those paths

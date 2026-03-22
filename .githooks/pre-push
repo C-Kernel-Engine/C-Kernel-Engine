@@ -81,6 +81,7 @@ for idx in "${!PUSH_TARGETS[@]}"; do
 done
 
 ck_should_run_regression_fast=0
+ck_should_run_v66_gate=0
 case "${CK_PREPUSH_REGRESSION_FAST:-auto}" in
     1|true|TRUE|yes|YES|always)
         ck_should_run_regression_fast=1
@@ -108,10 +109,43 @@ case "${CK_PREPUSH_REGRESSION_FAST:-auto}" in
         ;;
 esac
 
+case "${CK_PREPUSH_V66_GATE:-auto}" in
+    1|true|TRUE|yes|YES|always)
+        ck_should_run_v66_gate=1
+        ;;
+    0|false|FALSE|no|NO|never)
+        ck_should_run_v66_gate=0
+        ;;
+    *)
+        for path in "${PUSH_CHANGED_FILES[@]}"; do
+            case "$path" in
+                Makefile|.githooks/pre-push|.github/workflows/nightly.yml)
+                    ck_should_run_v66_gate=1
+                    break
+                    ;;
+                include/*|src/*|scripts/*|tests/*)
+                    ck_should_run_v66_gate=1
+                    break
+                    ;;
+                version/v6.6/*)
+                    ck_should_run_v66_gate=1
+                    break
+                    ;;
+            esac
+        done
+        ;;
+esac
+
 if [ "$ck_should_run_regression_fast" = "1" ]; then
     echo -e "${YELLOW}  ↳ regression-fast enabled for pushed runtime/regression changes${NC}"
 else
     echo -e "${YELLOW}  ↳ regression-fast skipped (no pushed runtime/regression changes)${NC}"
+fi
+
+if [ "$ck_should_run_v66_gate" = "1" ]; then
+    echo -e "${YELLOW}  ↳ v6.6 compatibility gate enabled for pushed shared/runtime changes${NC}"
+else
+    echo -e "${YELLOW}  ↳ v6.6 compatibility gate skipped (no pushed shared/v6.6 changes)${NC}"
 fi
 
 # =============================================================================
@@ -392,52 +426,56 @@ fi
 # =============================================================================
 # Test 4: v6.6 required release gate
 # =============================================================================
-echo -e "${YELLOW}[4/6]${NC} Running v6.6 release gate..."
-V66_PREPUSH_CACHE="${CK_V66_PREPUSH_CACHE_DIR:-$HOME/.cache/ck-engine-v6.6/models_prepush}"
-V66_PREPUSH_CLEAN="${CK_V66_PREPUSH_CLEAN:-1}"
-V66_PREPUSH_FULL_GATE="${CK_PREPUSH_V66_FULL_GATE:-0}"
-V66_PY="$ROOT_DIR/.venv/bin/python"
-if [ ! -x "$V66_PY" ]; then
-    V66_PY="$(command -v python3)"
-fi
-if [ "$V66_PREPUSH_CLEAN" = "1" ] && [ -d "$V66_PREPUSH_CACHE" ]; then
-    rm -rf "$V66_PREPUSH_CACHE"
-fi
-mkdir -p "$V66_PREPUSH_CACHE"
+if [ "$ck_should_run_v66_gate" = "1" ]; then
+    echo -e "${YELLOW}[4/6]${NC} Running v6.6 release gate..."
+    V66_PREPUSH_CACHE="${CK_V66_PREPUSH_CACHE_DIR:-$HOME/.cache/ck-engine-v6.6/models_prepush}"
+    V66_PREPUSH_CLEAN="${CK_V66_PREPUSH_CLEAN:-1}"
+    V66_PREPUSH_FULL_GATE="${CK_PREPUSH_V66_FULL_GATE:-0}"
+    V66_PY="$ROOT_DIR/.venv/bin/python"
+    if [ ! -x "$V66_PY" ]; then
+        V66_PY="$(command -v python3)"
+    fi
+    if [ "$V66_PREPUSH_CLEAN" = "1" ] && [ -d "$V66_PREPUSH_CACHE" ]; then
+        rm -rf "$V66_PREPUSH_CACHE"
+    fi
+    mkdir -p "$V66_PREPUSH_CACHE"
 
-if [ "$V66_PREPUSH_FULL_GATE" = "1" ]; then
-    if CK_CACHE_DIR="$V66_PREPUSH_CACHE" make --no-print-directory v6.6-gate > /tmp/ck_v66_gate.log 2>&1; then
-        echo -e "${GREEN}  ✓ v6.6 gate passed (full gate)${NC}"
+    if [ "$V66_PREPUSH_FULL_GATE" = "1" ]; then
+        if CK_CACHE_DIR="$V66_PREPUSH_CACHE" make --no-print-directory v6.6-gate > /tmp/ck_v66_gate.log 2>&1; then
+            echo -e "${GREEN}  ✓ v6.6 gate passed (full gate)${NC}"
+        else
+            echo -e "${RED}  ✗ v6.6 gate failed${NC}"
+            echo "    See /tmp/ck_v66_gate.log for details"
+            failed=1
+        fi
     else
-        echo -e "${RED}  ✗ v6.6 gate failed${NC}"
-        echo "    See /tmp/ck_v66_gate.log for details"
-        failed=1
+        # Stable pre-push v6.6 gate:
+        # - Keep full structural checks
+        # - Use build/artifact matrix (step [3/5] already does runtime smoke)
+        # - Avoid flaky stale-artifact smoke failures in shared caches
+        # - Treat legacy v6.6 parity as warning-only while v6.6 is being phased out
+        if (
+            make --no-print-directory v6.6-kernel-map-gate &&
+            "$V66_PY" version/v6.6/scripts/validate_tooling_contracts.py --strict --json-out version/v6.6/tools/contract_report_latest.json &&
+            CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --skip-static-contracts --json-out version/v6.6/tools/model_matrix_report_latest.json &&
+            (
+                CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_parity_matrix_v6_6.py --allow-download --json-out version/v6.6/tools/parity_matrix_report_latest.json ||
+                {
+                    echo "[warn] v6.6 parity matrix had issues; continuing because v6.6 parity is legacy/decommissioning"
+                    echo "[warn] See version/v6.6/tools/parity_matrix_report_latest.json for details"
+                }
+            ) &&
+            CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_long_decode_stability_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/long_decode_report_latest.json
+        ) > /tmp/ck_v66_gate.log 2>&1; then
+            echo -e "${GREEN}  ✓ v6.6 gate passed (stable pre-push profile)${NC}"
+        else
+            echo -e "${RED}  ✗ v6.6 gate failed${NC}"
+            echo "    See /tmp/ck_v66_gate.log for details"
+            failed=1
+        fi
     fi
 else
-    # Stable pre-push v6.6 gate:
-    # - Keep full structural checks
-    # - Use build/artifact matrix (step [3/5] already does runtime smoke)
-    # - Avoid flaky stale-artifact smoke failures in shared caches
-    # - Treat legacy v6.6 parity as warning-only while v6.6 is being phased out
-    if (
-        make --no-print-directory v6.6-kernel-map-gate &&
-        "$V66_PY" version/v6.6/scripts/validate_tooling_contracts.py --strict --json-out version/v6.6/tools/contract_report_latest.json &&
-        CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_model_matrix_v6_6.py --allow-download --require-all --skip-static-contracts --json-out version/v6.6/tools/model_matrix_report_latest.json &&
-        (
-            CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_parity_matrix_v6_6.py --allow-download --json-out version/v6.6/tools/parity_matrix_report_latest.json ||
-            {
-                echo "[warn] v6.6 parity matrix had issues; continuing because v6.6 parity is legacy/decommissioning"
-                echo "[warn] See version/v6.6/tools/parity_matrix_report_latest.json for details"
-            }
-        ) &&
-        CK_CACHE_DIR="$V66_PREPUSH_CACHE" "$V66_PY" version/v6.6/scripts/validate_long_decode_stability_v6_6.py --allow-download --require-all --json-out version/v6.6/tools/long_decode_report_latest.json
-    ) > /tmp/ck_v66_gate.log 2>&1; then
-        echo -e "${GREEN}  ✓ v6.6 gate passed (stable pre-push profile)${NC}"
-    else
-        echo -e "${RED}  ✗ v6.6 gate failed${NC}"
-        echo "    See /tmp/ck_v66_gate.log for details"
-        failed=1
-    fi
+    echo -e "${YELLOW}[4/6]${NC} Skipping v6.6 release gate (no pushed shared/v6.6 changes)..."
 fi
 
 # =============================================================================

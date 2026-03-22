@@ -946,7 +946,7 @@
 <p>This guide explains how to add a new kernel (operation) to the system, from the math implementation to the compiler integration.</p>
 
 <h2>Enable Git Hooks (Required)</h2>
-<p>This repo ships both a scoped pre-commit regression gate in <code>.githooks/pre-commit</code> and heavier push-time validation in <code>.githooks/pre-push</code>. Git does <strong>not</strong> enable repo hooks automatically on clone/pull.</p>
+<p>This repo ships both a scoped pre-commit regression gate in <code>.githooks/pre-commit</code> and heavier push-time validation in <code>.githooks/pre-push</code>. The fast <code>v7</code> family regression runs in the local loop, while legacy <code>v6.6</code> compatibility is only checked at push time when shared/runtime-sensitive paths changed. Git does <strong>not</strong> enable repo hooks automatically on clone/pull.</p>
 <pre><code>./scripts/setup-hooks.sh
 </code></pre>
 <p>Verify:</p>
