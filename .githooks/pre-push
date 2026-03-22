@@ -36,7 +36,11 @@ cd "$ROOT_DIR"
 
 failed=0
 declare -A CK_PUSH_SHA_SEEN=()
+declare -A CK_PUSH_FILE_SEEN=()
+ZERO_SHA="0000000000000000000000000000000000000000"
 PUSH_TARGETS=()
+PUSH_REMOTE_SHAS=()
+PUSH_CHANGED_FILES=()
 while read -r local_ref local_sha remote_ref remote_sha; do
     if [ -z "${local_sha:-}" ] || [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
         continue
@@ -46,9 +50,68 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fi
     CK_PUSH_SHA_SEEN[$local_sha]=1
     PUSH_TARGETS+=("$local_sha")
+    PUSH_REMOTE_SHAS+=("${remote_sha:-$ZERO_SHA}")
 done
 if [ ${#PUSH_TARGETS[@]} -eq 0 ]; then
     PUSH_TARGETS=("HEAD")
+    PUSH_REMOTE_SHAS=("$ZERO_SHA")
+fi
+
+_record_push_changed_file() {
+    local path="${1:-}"
+    if [ -z "$path" ] || [ -n "${CK_PUSH_FILE_SEEN[$path]:-}" ]; then
+        return 0
+    fi
+    CK_PUSH_FILE_SEEN[$path]=1
+    PUSH_CHANGED_FILES+=("$path")
+}
+
+for idx in "${!PUSH_TARGETS[@]}"; do
+    local_sha="${PUSH_TARGETS[$idx]}"
+    remote_sha="${PUSH_REMOTE_SHAS[$idx]:-$ZERO_SHA}"
+    if [ "$remote_sha" != "$ZERO_SHA" ] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+        while IFS= read -r path; do
+            _record_push_changed_file "$path"
+        done < <(git diff --name-only "$remote_sha" "$local_sha" --)
+    else
+        while IFS= read -r path; do
+            _record_push_changed_file "$path"
+        done < <(git diff-tree --root --no-commit-id --name-only -r "$local_sha" --)
+    fi
+done
+
+ck_should_run_regression_fast=0
+case "${CK_PREPUSH_REGRESSION_FAST:-auto}" in
+    1|true|TRUE|yes|YES|always)
+        ck_should_run_regression_fast=1
+        ;;
+    0|false|FALSE|no|NO|never)
+        ck_should_run_regression_fast=0
+        ;;
+    *)
+        for path in "${PUSH_CHANGED_FILES[@]}"; do
+            case "$path" in
+                Makefile|.githooks/pre-commit|.githooks/pre-push|.github/workflows/nightly.yml)
+                    ck_should_run_regression_fast=1
+                    break
+                    ;;
+                scripts/*|src/*|tests/*)
+                    ck_should_run_regression_fast=1
+                    break
+                    ;;
+                version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/src/*|version/v7/README.md)
+                    ck_should_run_regression_fast=1
+                    break
+                    ;;
+            esac
+        done
+        ;;
+esac
+
+if [ "$ck_should_run_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}  ↳ regression-fast enabled for pushed runtime/regression changes${NC}"
+else
+    echo -e "${YELLOW}  ↳ regression-fast skipped (no pushed runtime/regression changes)${NC}"
 fi
 
 # =============================================================================
@@ -390,6 +453,20 @@ else
     else
         echo -e "${RED}  ✗ v7 inference gate failed${NC}"
         echo "    See /tmp/ck_v7_infer_gate.log for details"
+        failed=1
+    fi
+fi
+
+# =============================================================================
+# Test 5.5: v7 regression fast (conditional on pushed runtime/regression files)
+# =============================================================================
+if [ "$ck_should_run_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}[5.5/6]${NC} Running v7 regression-fast..."
+    if make --no-print-directory regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs --report-root /tmp/ck-prepush-regression/reports" > /tmp/ck_v7_regression_fast.log 2>&1; then
+        echo -e "${GREEN}  ✓ v7 regression-fast passed${NC}"
+    else
+        echo -e "${RED}  ✗ v7 regression-fast failed${NC}"
+        echo "    See /tmp/ck_v7_regression_fast.log for details"
         failed=1
     fi
 fi
