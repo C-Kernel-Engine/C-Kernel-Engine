@@ -173,3 +173,10 @@ When a model looks like gibberish:
 4. then inspect chat-template behavior.
 
 This ordering reduces false leads and keeps debugging deterministic.
+
+## Tokenizer bring-up rule
+
+For GGUF chat/instruct models, the generated built-in C tokenizer is the expected runtime path.
+Python tokenizer fallback is useful for diagnosis, but if it becomes required for coherent chat,
+that indicates a tokenizer/runtime contract bug that should be fixed in conversion/codegen/runtime,
+not accepted as the normal inference path.

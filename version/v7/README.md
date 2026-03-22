@@ -87,7 +87,9 @@ This keeps runtime artifacts self-contained (no external JS build dependency).
   For scene/DSL probes, do not use semantic closers like `[/scene]` as `decode.stop_on_text`; `scripts/ck_chat.py` strips matched stop text from the returned response, so the probe adapter should own truncation at structural end markers instead.
 - When bootstrapping a new training run, prefer `python3 version/v7/scripts/ck_run_v7.py init --run-name <name> ...`.
   In general, let the tool choose the default cache location and provide only the run name; use `--run <path>` only when you intentionally need a nonstandard location.
-- `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
+- Inference + IR Visualizer:
+  `scripts/ck_chat.py` is only for inference/chat. It does not support `--generate-visualizer`.
+  Normal GGUF chat bring-up should stay on the generated built-in C tokenizer path. Treat Python tokenizer fallback as a debugging escape hatch only; if chat requires it, fix the exported/runtime tokenizer contract instead of normalizing the fallback.
   To refresh `ir_report.html`, use `python3 version/v7/tools/open_ir_visualizer.py --generate --run ~/.cache/ck-engine-v7/models/train/<run-name> --html-only --strict-run-artifacts`
   or `python3 version/v7/scripts/ck_run_v7.py run ... --run ~/.cache/ck-engine-v7/models/train/<run-name> --generate-visualizer`.
 - SVG training ablation guidance:

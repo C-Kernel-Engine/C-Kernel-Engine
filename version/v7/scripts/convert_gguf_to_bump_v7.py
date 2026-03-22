@@ -95,9 +95,19 @@ import os
 import struct
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, BinaryIO, Dict, Optional, Sequence, Tuple
 
 import numpy as np
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+ROOT_SCRIPTS_DIR = REPO_ROOT / "scripts"
+if str(ROOT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_SCRIPTS_DIR))
+
+from chat_contract import build_chat_contract
 
 
 # ============================================================================
@@ -252,6 +262,62 @@ def apply_model_contract_overrides(
     return patched
 
 
+def _extract_special_tokens_from_meta(meta: dict) -> dict:
+    special_tokens = {}
+    eos_id = meta.get("tokenizer.ggml.eos_token_id")
+    bos_id = meta.get("tokenizer.ggml.bos_token_id")
+    unk_id = meta.get("tokenizer.ggml.unknown_token_id")
+    pad_id = meta.get("tokenizer.ggml.padding_token_id")
+    if eos_id is not None:
+        special_tokens["eos_token_id"] = int(eos_id)
+    if bos_id is not None:
+        special_tokens["bos_token_id"] = int(bos_id)
+    if unk_id is not None:
+        special_tokens["unk_token_id"] = int(unk_id)
+    if pad_id is not None:
+        special_tokens["pad_token_id"] = int(pad_id)
+
+    add_bos = meta.get("tokenizer.ggml.add_bos_token")
+    add_eos = meta.get("tokenizer.ggml.add_eos_token")
+    add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
+    tokenizer_model = meta.get("tokenizer.ggml.model")
+    if add_bos is not None:
+        special_tokens["add_bos_token"] = bool(add_bos)
+    if add_eos is not None:
+        special_tokens["add_eos_token"] = bool(add_eos)
+    if add_space_prefix is not None:
+        special_tokens["add_space_prefix"] = bool(add_space_prefix)
+    if tokenizer_model is not None:
+        special_tokens["tokenizer_model"] = str(tokenizer_model)
+    return special_tokens
+
+
+def _apply_special_tokenizer_overrides(
+    special_tokens: dict,
+    tokenizer_contract: Optional[dict[str, Any]],
+) -> dict:
+    patched = dict(special_tokens)
+    tokenizer_type = str((tokenizer_contract or {}).get("tokenizer_type") or "").strip().lower()
+    if tokenizer_type in {"bpe", "wordpiece"}:
+        patched["tokenizer_model"] = tokenizer_type
+    elif tokenizer_type == "sentencepiece" and "tokenizer_model" not in patched:
+        patched["tokenizer_model"] = "sentencepiece"
+    return patched
+
+
+def _extract_chat_contract(
+    template_data: Optional[dict],
+    meta: dict,
+) -> Optional[dict]:
+    return build_chat_contract(
+        template_data=template_data,
+        chat_template=meta.get("tokenizer.chat_template"),
+        finetune=meta.get("general.finetune"),
+        model_name=meta.get("general.name"),
+        model_type=meta.get("general.architecture") or meta.get("general.type"),
+    )
+
+
 def _extract_unk_token(data: dict) -> Optional[str]:
     model = data.get("model", {})
     unk_token = model.get("unk_token")
@@ -264,10 +330,53 @@ def _extract_unk_token(data: dict) -> Optional[str]:
     return unk_token if isinstance(unk_token, str) and unk_token else None
 
 
-def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, list[int], list[float], list[int]]:
+def _normalize_tokenizer_type_name(raw: object) -> Optional[str]:
+    if not isinstance(raw, str):
+        return None
+    name = raw.strip().lower()
+    if not name:
+        return None
+    if name in {"bpe", "gpt2", "bytelevel"}:
+        return "bpe"
+    if name in {"wordpiece"}:
+        return "wordpiece"
+    if name in {"unigram", "sentencepiece", "spm", "llama"}:
+        return "sentencepiece"
+    return None
+
+
+def _load_tokenizer_json_doc(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    if not isinstance(data, dict):
+        raise GGUFError("tokenizer.json root must be an object")
+    return data
 
+
+def inspect_tokenizer_json(path: str) -> dict[str, object]:
+    data = _load_tokenizer_json_doc(path)
+    model = data.get("model", {})
+    model_type = _normalize_tokenizer_type_name(model.get("type"))
+    return {
+        "model_type": model_type,
+        "path": str(path),
+    }
+
+
+def _apply_tokenizer_contract_overrides(template_data: dict, tokenizer_type: Optional[str]) -> dict:
+    patched = copy.deepcopy(template_data)
+    if not tokenizer_type:
+        return patched
+    flags = patched.setdefault("flags", {})
+    flags["tokenizer"] = tokenizer_type
+    contract = patched.setdefault("contract", {})
+    tok_contract = contract.setdefault("tokenizer_contract", {})
+    tok_contract["tokenizer_type"] = tokenizer_type
+    return patched
+
+
+def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, list[int], list[float], list[int]]:
+    data = _load_tokenizer_json_doc(path)
     model = data.get("model", {})
     vocab = model.get("vocab", {})
     merges = model.get("merges", [])
@@ -282,6 +391,26 @@ def load_tokenizer_json(path: str, vocab_size: int) -> tuple[list[int], bytes, l
         if idx > max_id:
             max_id = idx
         if 0 <= idx < vocab_size:
+            tokens_by_id[idx] = token
+
+    added_tokens = data.get("added_tokens", [])
+    if isinstance(added_tokens, list):
+        for row in added_tokens:
+            if not isinstance(row, dict):
+                continue
+            token = row.get("content")
+            idx = row.get("id")
+            if not isinstance(token, str) or not isinstance(idx, int):
+                continue
+            if idx > max_id:
+                max_id = idx
+            if not (0 <= idx < vocab_size):
+                continue
+            existing = tokens_by_id[idx]
+            if existing and existing != token:
+                raise GGUFError(
+                    f"tokenizer.json conflicting token id {idx}: {existing!r} vs {token!r}"
+                )
             tokens_by_id[idx] = token
 
     missing_ids = [i for i, t in enumerate(tokens_by_id) if t == ""]
@@ -2040,12 +2169,33 @@ def main() -> None:
         vocab_types = None
         num_merges = 0
         total_vocab_bytes = 0
+        tokenizer_contract: Optional[Dict[str, Any]] = None
+        tokenizer_json_path: Optional[Path] = None
         if args.tokenizer_json:
-            if not os.path.exists(args.tokenizer_json):
+            tokenizer_json_path = Path(args.tokenizer_json)
+            if not tokenizer_json_path.exists():
                 raise GGUFError(f"tokenizer.json not found: {args.tokenizer_json}")
-            vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = load_tokenizer_json(args.tokenizer_json, vocab_size)
+        else:
+            sibling_tokenizer_json = Path(args.gguf).resolve().with_name("tokenizer.json")
+            if sibling_tokenizer_json.exists():
+                tokenizer_json_path = sibling_tokenizer_json
+
+        tokenizer_json_info: Optional[dict[str, object]] = None
+        if tokenizer_json_path is not None:
+            tokenizer_json_info = inspect_tokenizer_json(str(tokenizer_json_path))
+
+        tokenizer_json_type = str(tokenizer_json_info.get("model_type") or "").strip().lower() if tokenizer_json_info else ""
+        use_tokenizer_json = tokenizer_json_type in {"bpe", "wordpiece"}
+
+        if use_tokenizer_json and tokenizer_json_path is not None:
+            vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = load_tokenizer_json(str(tokenizer_json_path), vocab_size)
             num_merges = len(vocab_merges) // 3
             total_vocab_bytes = len(vocab_strings)
+            tokenizer_contract = {
+                "tokenizer_type": tokenizer_json_type,
+                "source": "tokenizer_json",
+                "path": str(tokenizer_json_path),
+            }
             print(f"[tokenizer] loaded {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from tokenizer.json")
         else:
             # Try to extract tokenizer directly from GGUF metadata
@@ -2054,6 +2204,10 @@ def main() -> None:
                 vocab_offsets, vocab_strings, vocab_merges, vocab_scores, vocab_types = gguf_tokenizer
                 num_merges = len(vocab_merges) // 3
                 total_vocab_bytes = len(vocab_strings)
+                tokenizer_contract = {
+                    "tokenizer_type": "sentencepiece" if str(meta.get("tokenizer.ggml.model", "")).strip().lower() in {"llama", "sentencepiece", "spm"} else _normalize_tokenizer_type_name(meta.get("tokenizer.ggml.model")),
+                    "source": "gguf_metadata",
+                }
                 print(f"[tokenizer] extracted {len(vocab_offsets)} tokens, {num_merges} merges, {total_vocab_bytes} bytes from GGUF metadata")
 
         num_layers = meta_int(
@@ -2250,12 +2404,32 @@ def main() -> None:
         rotary_dim = rotary_dim_meta or key_length_meta or head_dim
         embed_kv = num_kv_heads * head_dim
 
-        # Normalize RoPE schema defaults
-        rope_layout = (rope_layout_meta or "split").strip().lower()
+        # Normalize RoPE schema defaults.
+        # Precedence: explicit GGUF metadata -> explicit template contract -> legacy empty.
+        template_attention_contract = {}
+        if isinstance(template_data, dict):
+            template_attention_contract = (
+                (template_data.get("contract") or {}).get("attention_contract") or {}
+            )
+        template_rope_layout_default = str(
+            (template_attention_contract or {}).get("rope_layout") or ""
+        ).strip().lower()
+        if not template_rope_layout_default and isinstance(template_data, dict):
+            template_rope_qk = str(
+                ((template_data.get("kernels") or {}).get("rope_qk") or "")
+            ).strip().lower()
+            if "pairwise" in template_rope_qk:
+                template_rope_layout_default = "pairwise"
+            elif template_rope_qk:
+                template_rope_layout_default = "split"
+
+        rope_layout = (rope_layout_meta or template_rope_layout_default or "").strip().lower()
         rope_layout_aliases = {
             "standard": "split",
             "cos_sin_split": "split",
             "half": "split",
+            "interleaved": "pairwise",
+            "even_odd": "pairwise",
         }
         rope_layout = rope_layout_aliases.get(rope_layout, rope_layout)
         rope_original_context_length = int(rope_original_context_length_meta or context_len)
@@ -2278,7 +2452,7 @@ def main() -> None:
                 if rope_scaling_type == "yarn":
                     if rope_beta_fast <= 0.0 or rope_beta_slow <= 0.0:
                         raise GGUFError("Missing rope_beta_fast/rope_beta_slow for yarn (strict mode)")
-            if rope_layout not in {"split"}:
+            if rope_layout and rope_layout not in {"split", "pairwise"}:
                 raise GGUFError(f"Unsupported rope_layout '{rope_layout}' (strict mode)")
 
         if rotary_dim > head_dim:
@@ -2578,6 +2752,24 @@ def main() -> None:
             }
             qwen35_quant_summary.update(layer_quant_summary)
 
+            if template_data is None:
+                template_data = load_template_for_arch(arch)
+            template_data = apply_model_contract_overrides(
+                template_data,
+                tie_word_embeddings=bool(tie_word_embeddings),
+                has_untied_output_weight=out_weight is not None,
+            )
+            if tokenizer_contract:
+                template_data = _apply_tokenizer_contract_overrides(
+                    template_data,
+                    str(tokenizer_contract.get("tokenizer_type") or "").strip().lower(),
+                )
+            special_tokens = _apply_special_tokenizer_overrides(
+                _extract_special_tokens_from_meta(meta),
+                tokenizer_contract,
+            )
+            chat_contract = _extract_chat_contract(template_data, meta)
+
             if args.config_out:
                 os.makedirs(os.path.dirname(args.config_out) or ".", exist_ok=True)
                 cfg = build_llama_config(
@@ -2598,12 +2790,18 @@ def main() -> None:
                 chat_template = meta.get("tokenizer.chat_template")
                 if isinstance(chat_template, str) and chat_template.strip():
                     cfg["chat_template"] = chat_template
+                if rope_layout:
+                    cfg["rope_layout"] = rope_layout
                 finetune = meta.get("general.finetune")
                 if isinstance(finetune, str) and finetune.strip():
                     cfg["finetune"] = finetune
                 model_name = meta.get("general.name")
                 if isinstance(model_name, str) and model_name.strip():
                     cfg["model_name"] = model_name
+                if chat_contract:
+                    cfg["chat_contract"] = chat_contract
+                if tokenizer_contract:
+                    cfg["tokenizer_contract"] = tokenizer_contract
                 with open(args.config_out, "w", encoding="utf-8") as cf:
                     json.dump(cfg, cf, indent=2)
                     cf.write("\n")
@@ -2674,41 +2872,7 @@ def main() -> None:
                 out_f.flush()
                 out_f.seek(0, os.SEEK_SET)
 
-                special_tokens = {}
-                eos_id = meta.get("tokenizer.ggml.eos_token_id")
-                bos_id = meta.get("tokenizer.ggml.bos_token_id")
-                unk_id = meta.get("tokenizer.ggml.unknown_token_id")
-                pad_id = meta.get("tokenizer.ggml.padding_token_id")
-                if eos_id is not None:
-                    special_tokens["eos_token_id"] = int(eos_id)
-                if bos_id is not None:
-                    special_tokens["bos_token_id"] = int(bos_id)
-                if unk_id is not None:
-                    special_tokens["unk_token_id"] = int(unk_id)
-                if pad_id is not None:
-                    special_tokens["pad_token_id"] = int(pad_id)
-                add_bos = meta.get("tokenizer.ggml.add_bos_token")
-                add_eos = meta.get("tokenizer.ggml.add_eos_token")
-                add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
-                tokenizer_model = meta.get("tokenizer.ggml.model")
-                if add_bos is not None:
-                    special_tokens["add_bos_token"] = bool(add_bos)
-                if add_eos is not None:
-                    special_tokens["add_eos_token"] = bool(add_eos)
-                if add_space_prefix is not None:
-                    special_tokens["add_space_prefix"] = bool(add_space_prefix)
-                if tokenizer_model is not None:
-                    special_tokens["tokenizer_model"] = str(tokenizer_model)
-
                 if args.bump_version == BUMP_VERSION_V5:
-                    if template_data is None:
-                        template_data = load_template_for_arch(arch)
-                    template_data = apply_model_contract_overrides(
-                        template_data,
-                        tie_word_embeddings=bool(tie_word_embeddings),
-                        has_untied_output_weight=out_weight is not None,
-                    )
-
                     manifest_dict = {
                         "version": 5,
                         "model": arch,
@@ -2722,6 +2886,8 @@ def main() -> None:
                         "template": template_data,
                         "quant_summary": qwen35_quant_summary,
                         "special_tokens": special_tokens if special_tokens else None,
+                        "tokenizer_contract": tokenizer_contract if tokenizer_contract else None,
+                        "chat_contract": chat_contract if chat_contract else None,
                         "num_layers": num_layers,
                         "embed_dim": embed_dim,
                         "num_heads": num_heads,
@@ -3253,7 +3419,6 @@ def main() -> None:
                     "rotary_dim": int(rotary_dim),
                     "rope_scaling_type": rope_scaling_type,
                     "rope_scaling_factor": float(rope_scaling_factor),
-                    "rope_layout": rope_layout,
                     "rope_original_context_length": int(rope_original_context_length),
                     "rope_beta_fast": float(rope_beta_fast),
                     "rope_beta_slow": float(rope_beta_slow),
@@ -3265,6 +3430,8 @@ def main() -> None:
                 chat_template = meta.get("tokenizer.chat_template")
                 if isinstance(chat_template, str) and chat_template.strip():
                     config["chat_template"] = chat_template
+                if rope_layout:
+                    config["rope_layout"] = rope_layout
                 finetune = meta.get("general.finetune")
                 if isinstance(finetune, str) and finetune.strip():
                     config["finetune"] = finetune
@@ -3300,33 +3467,20 @@ def main() -> None:
                     tie_word_embeddings=bool(tie_word_embeddings),
                     has_untied_output_weight=out_weight is not None,
                 )
-
-                # Extract special tokens from GGUF metadata for propagation to manifest
-                special_tokens = {}
-                eos_id = meta.get("tokenizer.ggml.eos_token_id")
-                bos_id = meta.get("tokenizer.ggml.bos_token_id")
-                unk_id = meta.get("tokenizer.ggml.unknown_token_id")
-                pad_id = meta.get("tokenizer.ggml.padding_token_id")
-                if eos_id is not None:
-                    special_tokens["eos_token_id"] = int(eos_id)
-                if bos_id is not None:
-                    special_tokens["bos_token_id"] = int(bos_id)
-                if unk_id is not None:
-                    special_tokens["unk_token_id"] = int(unk_id)
-                if pad_id is not None:
-                    special_tokens["pad_token_id"] = int(pad_id)
-                add_bos = meta.get("tokenizer.ggml.add_bos_token")
-                add_eos = meta.get("tokenizer.ggml.add_eos_token")
-                add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
-                tokenizer_model = meta.get("tokenizer.ggml.model")
-                if add_bos is not None:
-                    special_tokens["add_bos_token"] = bool(add_bos)
-                if add_eos is not None:
-                    special_tokens["add_eos_token"] = bool(add_eos)
-                if add_space_prefix is not None:
-                    special_tokens["add_space_prefix"] = bool(add_space_prefix)
-                if tokenizer_model is not None:
-                    special_tokens["tokenizer_model"] = str(tokenizer_model)
+                if tokenizer_contract:
+                    template_data = _apply_tokenizer_contract_overrides(
+                        template_data,
+                        str(tokenizer_contract.get("tokenizer_type") or "").strip().lower(),
+                    )
+                special_tokens = _apply_special_tokenizer_overrides(
+                    _extract_special_tokens_from_meta(meta),
+                    tokenizer_contract,
+                )
+                chat_contract = _extract_chat_contract(template_data, meta)
+                if chat_contract:
+                    config["chat_contract"] = chat_contract
+                if tokenizer_contract:
+                    config["tokenizer_contract"] = tokenizer_contract
 
                 # Calculate hashes
                 if args.manifest_out:
@@ -3345,6 +3499,8 @@ def main() -> None:
                         "quant_summary": quant_summary,
                         # Special tokens from GGUF - used by orchestrator for stopping
                         "special_tokens": special_tokens if special_tokens else None,
+                        "tokenizer_contract": tokenizer_contract if tokenizer_contract else None,
+                        "chat_contract": chat_contract if chat_contract else None,
                         "num_layers": num_layers,
                         "embed_dim": embed_dim,
                         "num_heads": num_heads,
@@ -3432,6 +3588,18 @@ def main() -> None:
 
     if args.config_out:
         os.makedirs(os.path.dirname(args.config_out) or ".", exist_ok=True)
+        if template_data is None:
+            template_data = load_template_for_arch(arch)
+        template_data = apply_model_contract_overrides(
+            template_data,
+            tie_word_embeddings=bool(tie_word_embeddings),
+            has_untied_output_weight=out_weight is not None,
+        )
+        if tokenizer_contract:
+            template_data = _apply_tokenizer_contract_overrides(
+                template_data,
+                str(tokenizer_contract.get("tokenizer_type") or "").strip().lower(),
+            )
         cfg = build_llama_config(
             model_type=arch,
             num_layers=num_layers,
@@ -3450,6 +3618,8 @@ def main() -> None:
         cfg["total_vocab_bytes"] = total_vocab_bytes
         if sliding_window and sliding_window > 0:
             cfg["sliding_window"] = int(sliding_window)
+        if rope_layout:
+            cfg["rope_layout"] = rope_layout
         chat_template = meta.get("tokenizer.chat_template")
         if isinstance(chat_template, str) and chat_template.strip():
             cfg["chat_template"] = chat_template
@@ -3459,6 +3629,11 @@ def main() -> None:
         model_name = meta.get("general.name")
         if isinstance(model_name, str) and model_name.strip():
             cfg["model_name"] = model_name
+        chat_contract = _extract_chat_contract(template_data, meta)
+        if chat_contract:
+            cfg["chat_contract"] = chat_contract
+        if tokenizer_contract:
+            cfg["tokenizer_contract"] = tokenizer_contract
         with open(args.config_out, "w", encoding="utf-8") as cf:
             json.dump(cfg, cf, indent=2)
             cf.write("\n")
@@ -3490,33 +3665,23 @@ def main() -> None:
     # Write manifest JSON if requested
     if args.manifest_out:
         os.makedirs(os.path.dirname(args.manifest_out) or ".", exist_ok=True)
-        # Extract special tokens from GGUF metadata for propagation to generated code
-        special_tokens = {}
-        eos_id = meta.get("tokenizer.ggml.eos_token_id")
-        bos_id = meta.get("tokenizer.ggml.bos_token_id")
-        unk_id = meta.get("tokenizer.ggml.unknown_token_id")
-        pad_id = meta.get("tokenizer.ggml.padding_token_id")
-        if eos_id is not None:
-            special_tokens["eos_token_id"] = int(eos_id)
-        if bos_id is not None:
-            special_tokens["bos_token_id"] = int(bos_id)
-        if unk_id is not None:
-            special_tokens["unk_token_id"] = int(unk_id)
-        if pad_id is not None:
-            special_tokens["pad_token_id"] = int(pad_id)
-        # Also extract tokenizer behavior flags
-        add_bos = meta.get("tokenizer.ggml.add_bos_token")
-        add_eos = meta.get("tokenizer.ggml.add_eos_token")
-        add_space_prefix = meta.get("tokenizer.ggml.add_space_prefix")
-        tokenizer_model = meta.get("tokenizer.ggml.model")
-        if add_bos is not None:
-            special_tokens["add_bos_token"] = bool(add_bos)
-        if add_eos is not None:
-            special_tokens["add_eos_token"] = bool(add_eos)
-        if add_space_prefix is not None:
-            special_tokens["add_space_prefix"] = bool(add_space_prefix)
-        if tokenizer_model is not None:
-            special_tokens["tokenizer_model"] = str(tokenizer_model)
+        if template_data is None:
+            template_data = load_template_for_arch(arch)
+        template_data = apply_model_contract_overrides(
+            template_data,
+            tie_word_embeddings=bool(tie_word_embeddings),
+            has_untied_output_weight=out_weight is not None,
+        )
+        if tokenizer_contract:
+            template_data = _apply_tokenizer_contract_overrides(
+                template_data,
+                str(tokenizer_contract.get("tokenizer_type") or "").strip().lower(),
+            )
+        special_tokens = _apply_special_tokenizer_overrides(
+            _extract_special_tokens_from_meta(meta),
+            tokenizer_contract,
+        )
+        chat_contract = _extract_chat_contract(template_data, meta)
 
         manifest = manifest_dict or {
             "version": 5,
@@ -3533,6 +3698,8 @@ def main() -> None:
             "quant_summary": quant_summary if args.bump_version == BUMP_VERSION_V5 else None,
             # Special tokens from GGUF - used by orchestrator for stopping
             "special_tokens": special_tokens if special_tokens else None,
+            "tokenizer_contract": tokenizer_contract if tokenizer_contract else None,
+            "chat_contract": chat_contract if chat_contract else None,
             "num_layers": num_layers,
             "embed_dim": embed_dim,
             "num_heads": num_heads,

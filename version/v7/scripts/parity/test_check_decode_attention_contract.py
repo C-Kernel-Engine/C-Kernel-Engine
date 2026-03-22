@@ -35,6 +35,16 @@ class CheckDecodeAttentionContractTest(unittest.TestCase):
         manifest = {"template": {"name": "qwen2", "family": "qwen2"}}
         self.assertEqual(MODULE._detect_rope_layout(manifest), "split_half")
 
+    def test_detect_rope_layout_uses_pairwise_for_gemma_template_kernel(self) -> None:
+        manifest = {
+            "template": {
+                "name": "gemma3",
+                "family": "llama",
+                "kernels": {"rope_qk": "rope_forward_qk_pairwise"},
+            }
+        }
+        self.assertEqual(MODULE._detect_rope_layout(manifest), "pairwise")
+
     def test_pairwise_rotation_matches_manual_pairs(self) -> None:
         x = np.array([[1.0, 2.0, 3.0, 4.0]], dtype=np.float32)
         out = MODULE._apply_rope_single(

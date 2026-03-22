@@ -1230,6 +1230,14 @@ def _prepare_runtime_dir_from_local_ck_artifacts(model_dir: Path, work_dir: Path
 
     src_tok = model_dir / "tokenizer.json"
     if not src_tok.exists():
+        tok_contract = normalized.get("tokenizer_contract")
+        if isinstance(tok_contract, dict):
+            contract_path = tok_contract.get("path")
+            if isinstance(contract_path, str) and contract_path.strip():
+                candidate = Path(contract_path).expanduser()
+                if candidate.is_file():
+                    src_tok = candidate
+    if not src_tok.exists():
         pipe_dir = model_dir / ".ck_pipeline"
         if pipe_dir.exists():
             candidates = []
@@ -1460,6 +1468,8 @@ def _template_manifest_semantic_check(manifest_path: Path) -> tuple[bool, dict[s
     manifest_tok_type: Optional[str] = None
     if tok_model in {"gpt2", "bpe"}:
         manifest_tok_type = "bpe"
+    elif tok_model in {"wordpiece"}:
+        manifest_tok_type = "wordpiece"
     elif tok_model in {"llama", "sentencepiece", "spm"}:
         manifest_tok_type = "sentencepiece"
     template_tok_type = ""
@@ -8130,6 +8140,10 @@ def step_run_chat(model_dir: Path, args: argparse.Namespace, gguf_path: Path = N
         cmd.append("--no-chat-template")
     elif getattr(args, "chat_template", None):
         cmd.extend(["--chat-template", args.chat_template])
+    if getattr(args, "allow_raw_prompt", False):
+        cmd.append("--allow-raw-prompt")
+    if getattr(args, "thinking_mode", None):
+        cmd.extend(["--thinking-mode", args.thinking_mode])
     if getattr(args, "python_tokenizer", False):
         cmd.append("--python-tokenizer")
     if getattr(args, "memory", False):
@@ -8591,8 +8605,6 @@ def _run_llamacpp_parity(
     raw_converter = SCRIPTS_DIR / "parity" / "llama_to_ckdmp_converter.py"
     if allow_raw_fallback and raw_converter.exists():
         env_raw = os.environ.copy()
-        env_raw.pop("LLAMA_DUMP_LAYER0", None)
-        env_raw["LLAMA_DUMP_LAYERS"] = "all"
         for key in (
             "CKDMP_DIR",
             "CKDMP_ALL_LAYERS",
@@ -8679,6 +8691,8 @@ def _run_llamacpp_parity(
                 "16",
                 "--decode-mode",
                 "sequential",
+                "--dump-dir",
+                str(raw_dump_dir),
                 "--logits-out",
                 str(raw_parent / "llama_raw_logits.f32"),
             ]
@@ -10597,10 +10611,14 @@ Examples:
                            help='Optional external profiler for --train-e2e (none, perf, vtune, advisor)')
     run_parser.add_argument('--train-profile-dir', default=None,
                            help='Output directory for train profiler artifacts (default: run_dir/profile_train_latest)')
-    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'qwen35', 'gemma', 'llama'], default='auto',
-                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, qwen35, gemma, llama)')
+    run_parser.add_argument('--chat-template', choices=['auto', 'none', 'qwen', 'qwen3', 'qwen35', 'gemma', 'llama'], default='auto',
+                           help='Chat template mode passed to ck_chat.py (auto, none, qwen, qwen3, qwen35, gemma, llama)')
     run_parser.add_argument('--no-chat-template', action='store_true',
                            help='Disable chat template formatting (same as --chat-template=none)')
+    run_parser.add_argument('--allow-raw-prompt', action='store_true',
+                           help='Allow --chat-template=none for instruction/chat models that export a template')
+    run_parser.add_argument('--thinking-mode', choices=['auto', 'visible', 'suppressed'], default='auto',
+                           help='Override chat-contract thinking mode passed to ck_chat.py (auto, visible, suppressed)')
     run_parser.add_argument('--python-tokenizer', action='store_true',
                            help='Explicitly force the Python/HF tokenizer path in ck_chat.py (default uses built-in C tokenizer when available)')
     run_parser.add_argument('--memory', action='store_true',

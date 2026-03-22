@@ -25,7 +25,41 @@
         "source": "manifest_or_gguf"
       }
     },
+    "chat_contract": {
+      "version": 1,
+      "name": "qwen35",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<|im_start|>{role}\n",
+      "turn_suffix": "<|im_end|>\n",
+      "assistant_generation_prefix": "<|im_start|>assistant\n",
+      "role_labels": {
+        "system": "system",
+        "user": "user",
+        "assistant": "assistant"
+      },
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "force_bos_text_if_tokenizer_add_bos_false": "",
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": ["/no_think", "/nothink", "/think"],
+      "thinking_mode_default": "visible",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|im_start|>assistant\n",
+        "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+      },
+      "last_user_prefix_by_thinking_mode": {
+        "visible": "",
+        "suppressed": "/no_think\n"
+      },
+      "stop_text_markers": ["<|im_end|>"],
+      "token_stop_markers": ["<|im_end|>"],
+      "template_markers": ["<|im_start|>", "<|im_end|>", "<think>", "</think>"],
+      "min_response_tokens": 8
+    },
     "attention_contract": {
+      "rope_layout": "split",
       "rope_type": "rope",
       "qk_norm": "hybrid_full_attention_only",
       "kv_layout": "layer_major_kv_cache",

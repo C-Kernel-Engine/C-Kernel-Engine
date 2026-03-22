@@ -100,6 +100,17 @@ def _find_layer_op(
     return None, None
 
 
+def _find_layer_op_any(
+    ops: list[dict[str, Any]],
+    layer: int,
+    op_names: tuple[str, ...],
+) -> tuple[int | None, dict[str, Any] | None]:
+    for i, op in enumerate(ops):
+        if op.get("layer") == layer and op.get("op") in op_names:
+            return i, op
+    return None, None
+
+
 def _resolve_abs_offset(lowered: dict[str, Any], rel_off: int) -> int:
     arena = lowered.get("memory", {}).get("arena", {})
     if str(arena.get("mode", "")) == "region":
@@ -441,12 +452,24 @@ def _infer_bindings(model_dir: Path, layer: int) -> tuple[dict[str, Any], Decode
     macro_offsets = _load_model_macro_offsets(model_dir)
 
     needed = {}
-    for name in ("q_proj", "k_proj", "v_proj", "rope_qk", "kv_cache_store", "attn"):
+    for name in ("q_proj", "k_proj", "v_proj", "rope_qk", "kv_cache_store"):
         idx, op = _find_layer_op(ops, layer, name)
         call_idx, call_op = _find_layer_op(call_ops, layer, name)
         if op is None or call_op is None:
             raise RuntimeError(f"missing decode op for layer={layer}: {name}")
         needed[name] = (idx, op, call_idx, call_op)
+
+    # Dense families lower the decode attention core as `attn`; Gemma and other
+    # sliding-window families lower it as `attn_sliding`. Treat this as an
+    # operator alias at the parity layer rather than hard-coding by model name.
+    attn_aliases = ("attn", "attn_sliding")
+    attn_idx, attn_op = _find_layer_op_any(ops, layer, attn_aliases)
+    attn_call_idx, attn_call = _find_layer_op_any(call_ops, layer, attn_aliases)
+    if attn_op is None or attn_call is None:
+        raise RuntimeError(
+            f"missing decode op for layer={layer}: one of {', '.join(attn_aliases)}"
+        )
+    needed["attn"] = (attn_idx, attn_op, attn_call_idx, attn_call)
 
     q_idx, q_op, _, q_call = needed["q_proj"]
     k_idx, k_op, _, k_call = needed["k_proj"]

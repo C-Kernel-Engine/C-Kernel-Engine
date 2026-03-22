@@ -44,6 +44,24 @@ def _gguf_scalar_size(vtype: int) -> Optional[int]:
     }.get(vtype)
 
 
+def _bytes_to_unicode() -> Dict[int, str]:
+    """OpenAI GPT-2 byte-to-unicode table for ByteLevel BPE tokenizers."""
+    bs = (
+        list(range(ord("!"), ord("~") + 1))
+        + list(range(ord("¡"), ord("¬") + 1))
+        + list(range(ord("®"), ord("ÿ") + 1))
+    )
+    cs = bs[:]
+    n = 0
+    for b in range(256):
+        if b in bs:
+            continue
+        bs.append(b)
+        cs.append(256 + n)
+        n += 1
+    return dict(zip(bs, [chr(c) for c in cs]))
+
+
 class GGUFReader:
     """Minimal GGUF reader for tokenizer extraction."""
 
@@ -140,6 +158,7 @@ def extract_tokenizer_from_gguf(gguf_path: str) -> Dict[str, Any]:
         "tokenizer.ggml.add_bos_token",
         "tokenizer.ggml.add_eos_token",
         "tokenizer.ggml.add_space_prefix",
+        "tokenizer.ggml.special_token_ids",
         "tokenizer.chat_template",
     }
 
@@ -189,6 +208,8 @@ class GGUFTokenizer:
         self.add_eos: bool = False
         self.add_space_prefix: bool = False
         self.model_type: str = "unknown"
+        self._byte_encoder: Dict[int, str] = _bytes_to_unicode()
+        self._byte_decoder: Dict[str, int] = {v: k for k, v in self._byte_encoder.items()}
 
         if vocab_data:
             self._load_vocab(vocab_data)
@@ -290,6 +311,42 @@ class GGUFTokenizer:
                     if bool(item.get("special")):
                         special_ids.add(tid)
 
+            post_processor = data.get("post_processor")
+            if isinstance(post_processor, dict):
+                pp_type = str(post_processor.get("type", "")).lower()
+                if pp_type == "bytelevel":
+                    add_bos = False
+                    add_eos = False
+                    if model_type.lower() == "bpe":
+                        model_type = "gpt2"
+                elif pp_type == "templateprocessing":
+                    single = post_processor.get("single")
+                    if isinstance(single, list):
+                        special_token_ids: List[int] = []
+                        for item in single:
+                            if not isinstance(item, dict):
+                                continue
+                            spec = item.get("SpecialToken")
+                            if isinstance(spec, dict):
+                                ids = spec.get("ids")
+                                if isinstance(ids, list):
+                                    special_token_ids.extend(int(x) for x in ids if isinstance(x, int))
+                                elif isinstance(spec.get("id"), int):
+                                    special_token_ids.append(int(spec["id"]))
+                                continue
+                            if str(item.get("type", "")).lower() == "specialtoken":
+                                item_id = item.get("id")
+                                if isinstance(item_id, int):
+                                    special_token_ids.append(int(item_id))
+                        if special_token_ids and bos_id in special_token_ids:
+                            add_bos = True
+                        else:
+                            add_bos = False
+                        if special_token_ids and eos_id in special_token_ids:
+                            add_eos = True
+                        else:
+                            add_eos = False
+
         # 3) Plain vocab map file (token -> id)
         if vocab_map is None and isinstance(data, dict):
             # Heuristic: most values are integers, and keys are token strings.
@@ -368,8 +425,30 @@ class GGUFTokenizer:
             ids.append(self.bos_id)
 
         # Detect tokenizer type for space handling
-        # GPT-2 uses "Ġ" (U+0120), SentencePiece uses "▁" (U+2581)
-        is_gpt2 = self.model_type == "gpt2" or "\u0120" in "".join(self.tokens[:1000])
+        # GPT-2/ByteLevel uses the OpenAI bytes->unicode map.
+        is_gpt2 = self.model_type.lower() in {"gpt2", "bpe"} or "\u0120" in "".join(self.tokens[:1000])
+
+        if is_gpt2:
+            mapped = "".join(self._byte_encoder[b] for b in text.encode("utf-8"))
+            i = 0
+            while i < len(mapped):
+                best_len = 0
+                best_id = self.unk_id
+                for length in range(min(len(mapped) - i, 128), 0, -1):
+                    chunk = mapped[i:i + length]
+                    if chunk in self.token_to_id:
+                        best_len = length
+                        best_id = self.token_to_id[chunk]
+                        break
+                if best_len == 0:
+                    best_id = self.token_to_id.get(mapped[i], self.unk_id)
+                    best_len = 1
+                ids.append(best_id)
+                i += best_len
+
+            if add_eos:
+                ids.append(self.eos_id)
+            return ids
 
         i = 0
         while i < len(text):
@@ -462,6 +541,50 @@ class GGUFTokenizer:
             Decoded text string
         """
         special_ids = set(self.special_ids)
+        is_gpt2 = self.model_type.lower() in {"gpt2", "bpe"} or "\u0120" in "".join(self.tokens[:1000])
+        if is_gpt2:
+            text_parts: List[str] = []
+            byte_buf = bytearray()
+
+            def _flush_bytes() -> None:
+                nonlocal byte_buf
+                if not byte_buf:
+                    return
+                text_parts.append(byte_buf.decode("utf-8", errors="replace"))
+                byte_buf = bytearray()
+
+            for token_id in ids:
+                if token_id in special_ids:
+                    if skip_special:
+                        continue
+                    _flush_bytes()
+                    if 0 <= token_id < len(self.tokens):
+                        text_parts.append(self.tokens[token_id])
+                    continue
+
+                if not (0 <= token_id < len(self.tokens)):
+                    continue
+
+                token = self.tokens[token_id]
+                if token.startswith("<0x") and token.endswith(">"):
+                    try:
+                        byte_buf.append(int(token[3:-1], 16))
+                    except ValueError:
+                        _flush_bytes()
+                        text_parts.append(token)
+                    continue
+
+                for ch in token:
+                    byte_val = self._byte_decoder.get(ch)
+                    if byte_val is None:
+                        _flush_bytes()
+                        text_parts.append(ch)
+                    else:
+                        byte_buf.append(byte_val)
+
+            _flush_bytes()
+            return "".join(text_parts)
+
         pieces = []
 
         for token_id in ids:

@@ -24,7 +24,32 @@
         "source": "manifest_or_gguf"
       }
     },
+    "chat_contract": {
+      "version": 1,
+      "name": "gemma",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<start_of_turn>{role}\n",
+      "turn_suffix": "<end_of_turn>\n",
+      "assistant_generation_prefix": "<start_of_turn>model\n",
+      "role_labels": {
+        "system": "system",
+        "user": "user",
+        "assistant": "model"
+      },
+      "system_prompt_mode": "prepend_first_user",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "force_bos_text_if_tokenizer_add_bos_false": "<bos>",
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": [],
+      "stop_text_markers": ["<end_of_turn>"],
+      "token_stop_markers": ["<end_of_turn>"],
+      "template_markers": ["<start_of_turn>", "<end_of_turn>"],
+      "min_response_tokens": 8
+    },
     "attention_contract": {
+      "rope_layout": "split",
       "rope_type": "rope",
       "qk_norm": true,
       "kv_layout": "layer_major_kv_cache",
@@ -59,7 +84,7 @@
     }
   },
   "kernels": {
-    "rope_qk": "rope_forward_qk_pairwise",
+    "rope_qk": "rope_forward_qk",
     "rope_init": "rope_precompute_cache_split"
   },
   "sequence": ["decoder"],

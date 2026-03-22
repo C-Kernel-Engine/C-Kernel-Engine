@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <set>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -27,9 +29,12 @@ struct Args {
 
 struct DumpState {
     std::filesystem::path dump_dir;
+    std::filesystem::path index_path;
     std::unordered_set<std::string> names;
     bool dump_all = false;
     int dumped = 0;
+    int32_t current_token_id = 0;
+    std::unordered_map<std::string, int> occurrences;
 };
 
 static std::vector<std::string> split_csv(const std::string & s) {
@@ -207,6 +212,64 @@ static bool should_dump_tensor(const DumpState * state, const ggml_tensor * t) {
     return state->names.find(raw_name) != state->names.end();
 }
 
+static std::string json_escape(const std::string & s) {
+    std::ostringstream out;
+    for (char c : s) {
+        if (c == '"' || c == '\\') {
+            out << '\\' << c;
+        } else if (c == '\n') {
+            out << "\\n";
+        } else {
+            out << c;
+        }
+    }
+    return out.str();
+}
+
+static void begin_dump_batch(DumpState * state, int32_t token_id) {
+    if (!state) {
+        return;
+    }
+    state->current_token_id = std::max<int32_t>(0, token_id);
+    state->occurrences.clear();
+}
+
+static std::string make_dump_name(const std::string & base_name, int32_t token_id, int occurrence) {
+    std::ostringstream name;
+    name << base_name
+         << "-token-" << std::setw(6) << std::setfill('0') << std::max<int32_t>(0, token_id)
+         << "-occ-" << std::setw(3) << std::setfill('0') << std::max(0, occurrence);
+    return name.str();
+}
+
+static bool append_index_entry(
+    const DumpState * state,
+    const std::string & dump_name,
+    const std::string & base_name,
+    const ggml_tensor * t,
+    int occurrence
+) {
+    if (!state || state->index_path.empty()) {
+        return false;
+    }
+    std::ofstream index(state->index_path, std::ios::binary | std::ios::app);
+    if (!index) {
+        return false;
+    }
+    index << "{"
+          << "\"name\":\"" << json_escape(dump_name) << "\","
+          << "\"base_name\":\"" << json_escape(base_name) << "\","
+          << "\"token_id\":" << std::max<int32_t>(0, state->current_token_id) << ","
+          << "\"occurrence\":" << std::max(0, occurrence) << ","
+          << "\"dtype\":" << static_cast<int>(t->type) << ","
+          << "\"rank\":" << ggml_n_dims(t) << ","
+          << "\"shape\":[" << t->ne[0] << "," << t->ne[1] << "," << t->ne[2] << "," << t->ne[3] << "],"
+          << "\"elem_count\":" << ggml_nelements(t) << ","
+          << "\"nbytes\":" << ggml_nbytes(t)
+          << "}\n";
+    return index.good();
+}
+
 static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_data) {
     const DumpState * state = static_cast<const DumpState *>(user_data);
     if (!should_dump_tensor(state, t)) {
@@ -220,6 +283,7 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
     if (!raw_name || !raw_name[0]) {
         return true;
     }
+    std::string base_name(raw_name);
 
     const int64_t nbytes = ggml_nbytes(t);
     if (nbytes <= 0) {
@@ -229,8 +293,12 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
     std::vector<uint8_t> raw(static_cast<size_t>(nbytes));
     ggml_backend_tensor_get(t, raw.data(), 0, static_cast<size_t>(nbytes));
 
-    std::filesystem::create_directories(state->dump_dir);
-    const std::filesystem::path bin_path = state->dump_dir / (std::string(raw_name) + ".bin");
+    DumpState * mut = static_cast<DumpState *>(user_data);
+    const int occurrence = mut->occurrences[base_name]++;
+    const std::string dump_name = make_dump_name(base_name, mut->current_token_id, occurrence);
+
+    std::filesystem::create_directories(mut->dump_dir);
+    const std::filesystem::path bin_path = mut->dump_dir / (dump_name + ".bin");
     std::ofstream f(bin_path, std::ios::binary | std::ios::trunc);
     if (!f) {
         return false;
@@ -240,19 +308,25 @@ static bool dump_eval_callback(struct ggml_tensor * t, bool ask, void * user_dat
         return false;
     }
 
-    const std::filesystem::path meta_path = state->dump_dir / (std::string(raw_name) + ".json");
+    const std::filesystem::path meta_path = mut->dump_dir / (dump_name + ".json");
     std::ofstream meta(meta_path, std::ios::binary | std::ios::trunc);
     if (meta) {
         meta << "{";
-        meta << "\"name\":\"" << raw_name << "\",";
+        meta << "\"name\":\"" << json_escape(dump_name) << "\",";
+        meta << "\"base_name\":\"" << json_escape(base_name) << "\",";
+        meta << "\"token_id\":" << std::max<int32_t>(0, mut->current_token_id) << ",";
+        meta << "\"occurrence\":" << std::max(0, occurrence) << ",";
         meta << "\"type\":" << static_cast<int>(t->type) << ",";
         meta << "\"nbytes\":" << nbytes << ",";
+        meta << "\"elem_count\":" << ggml_nelements(t) << ",";
         meta << "\"ne\":[" << t->ne[0] << "," << t->ne[1] << "," << t->ne[2] << "," << t->ne[3] << "],";
         meta << "\"nb\":[" << t->nb[0] << "," << t->nb[1] << "," << t->nb[2] << "," << t->nb[3] << "]";
         meta << "}\n";
     }
 
-    DumpState * mut = static_cast<DumpState *>(user_data);
+    if (!append_index_entry(mut, dump_name, base_name, t, occurrence)) {
+        return false;
+    }
     mut->dumped += 1;
     return true;
 }
@@ -303,10 +377,12 @@ static bool tokenize_prompt(
 static int32_t decode_tokens(
     llama_context * ctx,
     const std::vector<llama_token> & tokens,
-    const std::string & decode_mode
+    const std::string & decode_mode,
+    DumpState * dump_state
 ) {
     if (decode_mode == "sequential") {
         for (size_t i = 0; i < tokens.size(); ++i) {
+            begin_dump_batch(dump_state, static_cast<int32_t>(i));
             llama_token tok = tokens[i];
             llama_batch batch = llama_batch_get_one(&tok, 1);
             const int32_t rc = llama_decode(ctx, batch);
@@ -317,6 +393,7 @@ static int32_t decode_tokens(
         return 0;
     }
 
+    begin_dump_batch(dump_state, static_cast<int32_t>(tokens.size()) - 1);
     llama_batch batch = llama_batch_get_one(
         const_cast<llama_token *>(tokens.data()),
         static_cast<int32_t>(tokens.size())
@@ -374,6 +451,7 @@ int main(int argc, char ** argv) {
     DumpState dump_state;
     if (!args.dump_dir.empty()) {
         dump_state.dump_dir = args.dump_dir;
+        dump_state.index_path = dump_state.dump_dir / "index.json";
         dump_state.dump_all = args.dump_names.empty();
         for (const std::string & name : args.dump_names) {
             if (!name.empty()) {
@@ -381,6 +459,9 @@ int main(int argc, char ** argv) {
             }
         }
         if (dump_state.dump_all || !dump_state.names.empty()) {
+            std::filesystem::create_directories(dump_state.dump_dir);
+            std::error_code ec;
+            std::filesystem::remove(dump_state.index_path, ec);
             cparams.cb_eval = dump_eval_callback;
             cparams.cb_eval_user_data = &dump_state;
         }
@@ -395,7 +476,7 @@ int main(int argc, char ** argv) {
     }
 
     std::vector<llama_token> tokens(args.tokens.begin(), args.tokens.end());
-    int32_t rc = decode_tokens(ctx, tokens, args.decode_mode);
+    int32_t rc = decode_tokens(ctx, tokens, args.decode_mode, dump_state.dump_dir.empty() ? nullptr : &dump_state);
     if (rc != 0) {
         std::ostringstream oss;
         oss << "llama_decode failed rc=" << rc << " mode=" << args.decode_mode;
@@ -416,7 +497,9 @@ int main(int argc, char ** argv) {
     }
 
     const float * logits = nullptr;
-    logits = llama_get_logits_ith(ctx, static_cast<int32_t>(tokens.size()) - 1);
+    if (args.decode_mode != "sequential") {
+        logits = llama_get_logits_ith(ctx, static_cast<int32_t>(tokens.size()) - 1);
+    }
     if (!logits) {
         logits = llama_get_logits_ith(ctx, -1);
     }

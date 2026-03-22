@@ -14,6 +14,8 @@ from __future__ import annotations  # Python 3.9 compatibility
 import argparse
 import ctypes
 import json
+import os
+import re
 import struct
 import sys
 import time
@@ -43,6 +45,7 @@ except ImportError:
     pass
 
 # Always have GGUF tokenizer available
+from chat_contract import build_chat_contract, hydrate_chat_contract, normalize_chat_contract, resolve_chat_template_mode
 from gguf_tokenizer import GGUFTokenizer, Tokenizer as GGUFTokenizerWrapper
 
 
@@ -51,6 +54,24 @@ class _SimpleEncoding:
 
     def __init__(self, ids: List[int]):
         self.ids = ids
+
+
+def _ensure_interactive_stdin() -> Optional[object]:
+    """Best-effort reattach stdin to the controlling TTY for interactive chat."""
+    stdin = sys.stdin
+    try:
+        if stdin is not None and not stdin.closed and stdin.isatty():
+            return None
+    except Exception:
+        pass
+
+    try:
+        tty_stream = open("/dev/tty", "r", encoding=getattr(stdin, "encoding", None) or "utf-8", errors="replace")
+    except OSError:
+        return None
+
+    sys.stdin = tty_stream
+    return tty_stream
 
 
 def _iter_true_bpe_special_tokens(tokenizer_json: Path | None) -> List[tuple[str, int]]:
@@ -93,6 +114,16 @@ class CKTrueBPETokenizer:
         self._bpe = None
         self._vocab_size = 0
         self._num_merges = 0
+        self.add_bos = False
+        self.add_eos = False
+        self.add_space_prefix = False
+        self.bos_id = -1
+        self.eos_id = -1
+        self.unk_id = 0
+        self.pad_id = -1
+        self.model_type = "bpe"
+        self.special_ids: set[int] = set()
+        self._special_token_text_by_id: dict[int, str] = {}
         self._setup_api()
         self._load_from_binary_artifacts()
 
@@ -188,6 +219,8 @@ class CKTrueBPETokenizer:
                 self._lib.ck_true_bpe_free(self._bpe)
                 self._bpe = None
                 raise RuntimeError(f"ck_true_bpe_add_special_token failed rc={rc} token={content!r}")
+            self.special_ids.add(int(tid))
+            self._special_token_text_by_id[int(tid)] = content
 
         self._vocab_size = vocab_size
         self._num_merges = num_merges
@@ -196,9 +229,29 @@ class CKTrueBPETokenizer:
     def vocab_size(self) -> int:
         return self._vocab_size
 
+    def apply_contract(self, special: dict) -> None:
+        if "add_bos_token" in special:
+            self.add_bos = bool(special["add_bos_token"])
+        if "add_eos_token" in special:
+            self.add_eos = bool(special["add_eos_token"])
+        if "add_space_prefix" in special:
+            self.add_space_prefix = bool(special["add_space_prefix"])
+        if "bos_token_id" in special:
+            self.bos_id = int(special["bos_token_id"])
+            self.special_ids.add(self.bos_id)
+        if "eos_token_id" in special:
+            self.eos_id = int(special["eos_token_id"])
+            self.special_ids.add(self.eos_id)
+        if "unk_token_id" in special:
+            self.unk_id = int(special["unk_token_id"])
+            self.special_ids.add(self.unk_id)
+        if "pad_token_id" in special:
+            self.pad_id = int(special["pad_token_id"])
+            self.special_ids.add(self.pad_id)
+        if "tokenizer_model" in special:
+            self.model_type = str(special["tokenizer_model"])
+
     def encode(self, text: str, add_special_tokens: bool = True) -> _SimpleEncoding:
-        # true_bpe special-token behavior is configured from tokenizer artifacts.
-        _ = add_special_tokens
         if not self._bpe:
             return _SimpleEncoding([])
         text_bytes = text.encode("utf-8")
@@ -207,10 +260,15 @@ class CKTrueBPETokenizer:
         n = int(self._lib.ck_true_bpe_encode(self._bpe, text_bytes, -1, out, max_ids))
         if n <= 0:
             return _SimpleEncoding([])
-        return _SimpleEncoding([int(out[i]) for i in range(n)])
+        ids = [int(out[i]) for i in range(n)]
+        if add_special_tokens:
+            if self.add_bos and self.bos_id >= 0:
+                ids.insert(0, int(self.bos_id))
+            if self.add_eos and self.eos_id >= 0:
+                ids.append(int(self.eos_id))
+        return _SimpleEncoding(ids)
 
-    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
-        _ = skip_special_tokens
+    def _decode_ids_raw(self, ids: List[int]) -> str:
         if not self._bpe or not ids:
             return ""
         arr = (ctypes.c_int32 * len(ids))(*[int(x) for x in ids])
@@ -219,7 +277,6 @@ class CKTrueBPETokenizer:
         n = int(self._lib.ck_true_bpe_decode(self._bpe, arr, len(ids), out, cap))
         if n <= 0:
             return ""
-        # Retry with larger buffer if decode appears truncated.
         if n >= cap - 1:
             cap = max(cap * 4, 4096)
             out = ctypes.create_string_buffer(cap)
@@ -227,6 +284,36 @@ class CKTrueBPETokenizer:
             if n <= 0:
                 return ""
         return out.raw[:n].decode("utf-8", errors="replace")
+
+    def decode(self, ids: List[int], skip_special_tokens: bool = True) -> str:
+        if not self._bpe or not ids:
+            return ""
+
+        parts: List[str] = []
+        chunk: List[int] = []
+
+        def _flush_chunk() -> None:
+            nonlocal chunk
+            if not chunk:
+                return
+            parts.append(self._decode_ids_raw(chunk))
+            chunk = []
+
+        for raw_id in ids:
+            token_id = int(raw_id)
+            if token_id in self.special_ids:
+                _flush_chunk()
+                if skip_special_tokens:
+                    continue
+                token_text = self._special_token_text_by_id.get(token_id)
+                if token_text is None:
+                    token_text = self.id_to_token(token_id) or ""
+                parts.append(token_text)
+                continue
+            chunk.append(token_id)
+
+        _flush_chunk()
+        return "".join(parts)
 
     def id_to_token(self, token_id: int) -> Optional[str]:
         if not self._bpe:
@@ -322,8 +409,66 @@ class CKModel:
         self.logits_stride = None  # Optional: logits stride in floats (0 = last-only)
         self.use_chat_template = True
         self.chat_template_mode = "auto"
+        self.chat_contract = None
+        self._cached_chat_contract = None
+        self._chat_contract_loaded = False
         self.default_system_prompt = "You are a helpful assistant."
         self.prefill_policy = "batched"
+        self.thinking_mode = "auto"
+
+    def _iter_runtime_json_docs(self) -> List[dict]:
+        docs: List[dict] = []
+        candidates = [
+            self.model_dir / "config.json",
+            self.model_dir / "weights_manifest.json",
+            (self.model_dir.parent / "config.json") if self.model_dir.name == ".ck_build" else None,
+            (self.model_dir.parent / "weights_manifest.json") if self.model_dir.name == ".ck_build" else None,
+        ]
+        for path in candidates:
+            if path is None or not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                docs.append(data)
+        return docs
+
+    def _load_chat_contract(self) -> Optional[dict]:
+        if self._chat_contract_loaded:
+            return self._cached_chat_contract
+
+        template_data = None
+        explicit_contract = None
+        for data in self._iter_runtime_json_docs():
+            explicit_contract = data.get("chat_contract")
+            if explicit_contract is not None:
+                break
+
+            cfg = data.get("config")
+            if isinstance(cfg, dict):
+                explicit_contract = cfg.get("chat_contract")
+                if explicit_contract is not None:
+                    break
+
+            template = data.get("template")
+            if template_data is None and isinstance(template, dict):
+                template_data = template
+
+        if explicit_contract is None:
+            meta = self._load_model_meta()
+            explicit_contract = build_chat_contract(
+                template_data=template_data,
+                chat_template=meta.get("chat_template"),
+                finetune=meta.get("finetune"),
+                model_name=meta.get("model_name") or meta.get("name"),
+                model_type=meta.get("model_type") or meta.get("model") or meta.get("arch"),
+            )
+
+        self._cached_chat_contract = hydrate_chat_contract(explicit_contract)
+        self._chat_contract_loaded = True
+        return self._cached_chat_contract
 
     def _runtime_artifact_staleness_errors(self, lib_path: Path) -> List[str]:
         """Return fatal staleness diagnostics for an out-of-date compiled runtime."""
@@ -363,7 +508,7 @@ class CKModel:
         return errors
 
     def load(self, gguf_path: str = None, force_python_tokenizer: bool = False,
-             chat_template: str = "auto") -> bool:
+             chat_template: str = "auto", allow_raw_prompt: bool = False) -> bool:
         """Load model library and tokenizer.
 
         Tokenizer priority (unless force_python_tokenizer=True):
@@ -528,25 +673,56 @@ class CKModel:
         self._configure_chat_template(chat_template)
         self.prefill_policy = str(self._load_runtime_contract().get("prefill_policy") or "batched")
 
-        # Keep the built-in C tokenizer as the default unless the user explicitly
-        # requested the Python/HF tokenizer path.
+        raw_prompt_risk = self._raw_prompt_mode_risk(chat_template)
+        if raw_prompt_risk:
+            if not allow_raw_prompt:
+                print(f"Error: {raw_prompt_risk}")
+                return False
+            print(f"Warning: {raw_prompt_risk}")
+
+        # Fall back to the Python tokenizer when the built-in tokenizer cannot
+        # roundtrip template markers faithfully. Otherwise the model can end up
+        # seeing literal role markers like "assistant" instead of the intended
+        # chat contract.
         if self.use_c_tokenizer and self.use_chat_template and not self._chat_template_markers_supported():
-            print(
-                "Warning: built-in C tokenizer may not roundtrip chat template markers "
-                "perfectly; continuing with C tokenizer. Use --python-tokenizer to "
-                "force the Python/HF path."
-            )
+            if not force_python_tokenizer and self._load_python_tokenizer(gguf_path=gguf_path):
+                self.use_c_tokenizer = False
+                print(
+                    "Switched to Python tokenizer: built-in C tokenizer does not "
+                    "roundtrip chat template markers cleanly."
+                )
+            else:
+                print(
+                    "Warning: built-in C tokenizer may not roundtrip chat template markers "
+                    "perfectly; continuing with C tokenizer. Use --python-tokenizer to "
+                    "force the Python/HF path."
+                )
 
         # Detect EOS/stop tokens from active tokenizer + template mode.
         self._detect_eos_tokens()
 
         return True
 
+    def _raw_prompt_mode_risk(self, requested_mode: str) -> Optional[str]:
+        """Return a diagnostic when raw prompt mode is unsafe for a chat/instruct model."""
+        mode = str(requested_mode or "auto").strip().lower()
+        if mode != "none":
+            return None
+        contract = self._load_chat_contract()
+        if not isinstance(contract, dict):
+            return None
+        if bool(contract.get("raw_prompt_allowed", False)):
+            return None
+        return (
+            "chat-template=none disables the exported conversation contract for an instruction/chat model. "
+            "Use --chat-template=auto (recommended) or pass --allow-raw-prompt if you intentionally want raw continuation mode."
+        )
+
     def _load_python_tokenizer(self, gguf_path: Optional[str] = None) -> bool:
         """Load Python tokenizer stack (true_bpe / HF / GGUF wrapper)."""
         # Tokenizer files may live either in model root or .ck_build output dir.
         model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
-        tokenizer_candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
+        tokenizer_candidates = self._tokenizer_json_candidates(model_root)
         vocab_candidates = [self.model_dir / "vocab.json", model_root / "vocab.json"]
 
         tokenizer_json = next((p for p in tokenizer_candidates if p.exists()), tokenizer_candidates[0])
@@ -604,24 +780,69 @@ class CKModel:
             print(f"  - {gguf_path}")
         return False
 
-    def _load_tokenizer_contract(self) -> dict:
-        """Read tokenizer-special metadata saved next to the generated runtime."""
+    def _runtime_json_candidates(self) -> List[Path]:
+        model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
         candidates = [
             self.model_dir / "weights_manifest.json",
             self.model_dir / "config.json",
-            (self.model_dir.parent / "weights_manifest.json") if self.model_dir.name == ".ck_build" else None,
-            (self.model_dir.parent / "config.json") if self.model_dir.name == ".ck_build" else None,
+            model_root / "weights_manifest.json",
+            model_root / "config.json",
         ]
+        out: List[Path] = []
+        seen: set[Path] = set()
         for path in candidates:
-            if path is None or not path.exists():
+            if path in seen:
+                continue
+            seen.add(path)
+            out.append(path)
+        return out
+
+    def _iter_runtime_json_docs(self) -> List[dict]:
+        docs: List[dict] = []
+        for path in self._runtime_json_candidates():
+            if not path.exists():
                 continue
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except Exception:
                 continue
-            if not isinstance(data, dict):
+            if isinstance(data, dict):
+                docs.append(data)
+        return docs
+
+    def _load_tokenizer_runtime_contract(self) -> dict:
+        """Read tokenizer runtime contract saved next to the generated runtime."""
+        for data in self._iter_runtime_json_docs():
+            tok_contract = data.get("tokenizer_contract")
+            if isinstance(tok_contract, dict):
+                return tok_contract
+            cfg = data.get("config")
+            if isinstance(cfg, dict):
+                nested = cfg.get("tokenizer_contract")
+                if isinstance(nested, dict):
+                    return nested
+        return {}
+
+    def _tokenizer_json_candidates(self, model_root: Path) -> List[Path]:
+        candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
+        tok_contract = self._load_tokenizer_runtime_contract()
+        contract_path = tok_contract.get("path") if isinstance(tok_contract, dict) else None
+        if isinstance(contract_path, str) and contract_path.strip():
+            candidates.append(Path(contract_path).expanduser())
+
+        out: List[Path] = []
+        seen: set[Path] = set()
+        for path in candidates:
+            if path in seen:
                 continue
+            seen.add(path)
+            out.append(path)
+        return out
+
+    def _load_tokenizer_contract(self) -> dict:
+        """Read tokenizer-special metadata saved next to the generated runtime."""
+        for data in self._iter_runtime_json_docs():
             special = data.get("special_tokens")
             if isinstance(special, dict):
                 return special
@@ -644,40 +865,40 @@ class CKModel:
         """Align GGUF fallback tokenizer behavior with manifest/ GGUF tokenizer flags."""
         if self.tokenizer is None:
             return
-        inner = getattr(self.tokenizer, "_tokenizer", None)
-        if inner is None:
-            return
         special = self._load_tokenizer_contract()
         if not special:
             return
+        target = getattr(self.tokenizer, "_tokenizer", self.tokenizer)
 
-        if hasattr(inner, "add_bos") and "add_bos_token" in special:
-            inner.add_bos = bool(special["add_bos_token"])
-        if hasattr(inner, "add_eos") and "add_eos_token" in special:
-            inner.add_eos = bool(special["add_eos_token"])
-        if hasattr(inner, "add_space_prefix") and "add_space_prefix" in special:
-            inner.add_space_prefix = bool(special["add_space_prefix"])
-        if hasattr(inner, "bos_id") and "bos_token_id" in special:
-            inner.bos_id = int(special["bos_token_id"])
-        if hasattr(inner, "eos_id") and "eos_token_id" in special:
-            inner.eos_id = int(special["eos_token_id"])
-        if hasattr(inner, "unk_id") and "unk_token_id" in special:
-            inner.unk_id = int(special["unk_token_id"])
-        if hasattr(inner, "pad_id") and "pad_token_id" in special:
-            inner.pad_id = int(special["pad_token_id"])
-        if hasattr(inner, "model_type") and "tokenizer_model" in special:
-            inner.model_type = str(special["tokenizer_model"])
+        apply_contract = getattr(target, "apply_contract", None)
+        if callable(apply_contract):
+            apply_contract(special)
+            return
+
+        if hasattr(target, "add_bos") and "add_bos_token" in special:
+            target.add_bos = bool(special["add_bos_token"])
+        if hasattr(target, "add_eos") and "add_eos_token" in special:
+            target.add_eos = bool(special["add_eos_token"])
+        if hasattr(target, "add_space_prefix") and "add_space_prefix" in special:
+            target.add_space_prefix = bool(special["add_space_prefix"])
+        if hasattr(target, "bos_id") and "bos_token_id" in special:
+            target.bos_id = int(special["bos_token_id"])
+        if hasattr(target, "eos_id") and "eos_token_id" in special:
+            target.eos_id = int(special["eos_token_id"])
+        if hasattr(target, "unk_id") and "unk_token_id" in special:
+            target.unk_id = int(special["unk_token_id"])
+        if hasattr(target, "pad_id") and "pad_token_id" in special:
+            target.pad_id = int(special["pad_token_id"])
+        if hasattr(target, "model_type") and "tokenizer_model" in special:
+            target.model_type = str(special["tokenizer_model"])
 
     def _chat_template_markers_supported(self) -> bool:
         """Return True if active C tokenizer can faithfully roundtrip template markers."""
         if not self.use_c_tokenizer or not self.use_chat_template:
             return True
 
-        markers: List[str] = []
-        if self.chat_template_mode == "gemma":
-            markers = ["<start_of_turn>", "<end_of_turn>"]
-        elif self.chat_template_mode in {"qwen", "qwen35"}:
-            markers = ["<|im_start|>", "<|im_end|>"]
+        contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract()
+        markers = list((contract or {}).get("template_markers") or [])
 
         for marker in markers:
             try:
@@ -697,11 +918,11 @@ class CKModel:
                     eos_id = special.get("eos_token_id")
                     if token_ids and eos_id is not None and token_ids[-1] == int(eos_id):
                         token_ids = token_ids[:-1]
-                if len(token_ids) != 1:
+                if len(token_ids) != 1 or int(token_ids[0]) != token_id:
                     return False
-                decoded = self.decode(token_ids)
-                if marker not in decoded:
-                    return False
+                # Some chat markers are also exported as BOS/EOS IDs. Those decode
+                # paths intentionally hide special tokens, so atomic encode parity
+                # is the real condition we care about here.
             except Exception:
                 return False
         return True
@@ -781,92 +1002,24 @@ class CKModel:
 
     def _configure_chat_template(self, mode: str) -> None:
         """Select chat template based on metadata or explicit override."""
-        mode = (mode or "auto").lower()
-        self.chat_template_mode = mode
+        requested_mode = str(mode or "auto").strip().lower()
+        fallback_contract = self._load_chat_contract()
+        resolved_contract = resolve_chat_template_mode(requested_mode, fallback_contract)
+        self.chat_contract = normalize_chat_contract(resolved_contract)
 
-        if mode == "none":
+        if self.chat_contract is None:
             self.use_chat_template = False
-            return
-        if mode == "qwen":
-            self.use_chat_template = True
-            return
-        if mode == "qwen35":
-            self.use_chat_template = True
-            return
-        if mode == "gemma":
-            self.use_chat_template = True
+            self.chat_template_mode = "none"
+            self.default_system_prompt = ""
             return
 
-        # Auto mode: require chat_template metadata + instruct finetune
-        meta = self._load_model_meta()
-        chat_template = meta.get("chat_template") or ""
-        finetune = str(meta.get("finetune") or "").lower()
-        model_name = str(meta.get("model_name") or meta.get("name") or "").lower()
-        model_type = str(meta.get("model_type") or "").lower()
-        default_system = meta.get("default_system_prompt")
-
-        # If the GGUF exports an explicit chat template, trust its markers first.
-        # Nanbeige exposes ChatML markers but does not advertise "instruct"/"it".
-        if chat_template:
-            if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
-                self.use_chat_template = True
-                self.chat_template_mode = "qwen35" if model_type == "qwen35" else "qwen"
-                if isinstance(default_system, str) and default_system.strip():
-                    self.default_system_prompt = default_system
-                elif model_type == "qwen35":
-                    self.default_system_prompt = ""
-                elif model_type == "qwen3":
-                    self.default_system_prompt = ""
-                elif model_type.startswith("qwen"):
-                    self.default_system_prompt = "You are a helpful assistant."
-                else:
-                    self.default_system_prompt = ""
-                return
-
-            if "<start_of_turn>" in chat_template and "<end_of_turn>" in chat_template:
-                self.use_chat_template = True
-                self.chat_template_mode = "gemma"
-                if isinstance(default_system, str) and default_system.strip():
-                    self.default_system_prompt = default_system
-                else:
-                    self.default_system_prompt = ""
-                return
-
-        if chat_template and (
-            "instruct" in finetune or "chat" in finetune or "instruct" in model_name or "it" in finetune
-            or "gemma" in model_type
-        ):
-            # ChatML-style templates (Qwen)
-            if "<|im_start|>" in chat_template and "<|im_end|>" in chat_template:
-                self.use_chat_template = True
-                self.chat_template_mode = "qwen35" if model_type == "qwen35" else "qwen"
-                # Default system prompt behavior:
-                # - Qwen2 templates inject a default system prompt if none is provided.
-                # - Qwen3 templates do NOT inject a default system prompt.
-                # - Qwen3.5 should not inject a synthetic default system prompt here.
-                if isinstance(default_system, str) and default_system.strip():
-                    self.default_system_prompt = default_system
-                elif model_type == "qwen35":
-                    self.default_system_prompt = ""
-                elif model_type == "qwen3":
-                    self.default_system_prompt = ""
-                else:
-                    self.default_system_prompt = "You are a helpful assistant."
-                return
-
-            # Gemma-style templates
-            if "<start_of_turn>" in chat_template and "<end_of_turn>" in chat_template:
-                self.use_chat_template = True
-                self.chat_template_mode = "gemma"
-                if isinstance(default_system, str) and default_system.strip():
-                    self.default_system_prompt = default_system
-                else:
-                    self.default_system_prompt = ""
-                return
-
-        # Default: no chat template (base models or unknown templates)
-        self.use_chat_template = False
-        self.chat_template_mode = "none"
+        self.use_chat_template = True
+        if requested_mode in {"", "auto"}:
+            resolved_name = str(self.chat_contract.get("name") or "auto").strip().lower()
+            self.chat_template_mode = resolved_name or "auto"
+        else:
+            self.chat_template_mode = requested_mode
+        self.default_system_prompt = str(self.chat_contract.get("default_system_prompt") or "")
 
     def _detect_eos_tokens(self):
         """Detect EOS (End-Of-Sequence) token IDs from tokenizer vocabulary.
@@ -962,17 +1115,16 @@ class CKModel:
                         if token_id >= 0:
                             self.eos_tokens.add(token_id)
 
-        # Model-family specific EOS tokens (when C tokenizer lookup fails)
-        # These are hardcoded because special tokens like <|im_end|> may not
-        # be findable via direct vocab lookup (encoding/string differences)
-        QWEN_EOS_TOKENS = {151643, 151645}  # <|endoftext|>, <|im_end|>
-        LLAMA_EOS_TOKENS = {128001, 128009}  # <|end_of_text|>, <|eot_id|>
-
-        # Add model-specific EOS tokens based on vocab size
-        if self.vocab_size > 150000:  # Qwen family (151936 vocab)
-            self.eos_tokens.update(QWEN_EOS_TOKENS)
-        elif self.vocab_size > 127000:  # Llama 3 family (128256 vocab)
-            self.eos_tokens.update(LLAMA_EOS_TOKENS)
+        # Prefer explicit exported special-token metadata before falling back to
+        # generic lookup. Runtime chat policy should come from the exported
+        # sidecar contract, not family-specific heuristics in ck_chat.py.
+        special = self._load_tokenizer_contract()
+        explicit_eos_id = special.get("eos_token_id")
+        if explicit_eos_id is not None:
+            try:
+                self.eos_tokens.add(int(explicit_eos_id))
+            except Exception:
+                pass
 
         # Chat template specific turn-end stops (fallback path).
         self._add_chat_template_stop_tokens()
@@ -1023,17 +1175,11 @@ class CKModel:
 
     def _add_chat_template_stop_tokens(self):
         """Add template-specific turn delimiters to stop token set."""
-        mode = getattr(self, "chat_template_mode", "none")
-        if mode == "gemma":
-            for marker in ("<end_of_turn>",):
-                token_id = self._lookup_single_token_id(marker)
-                if token_id >= 0:
-                    self.eos_tokens.add(token_id)
-        elif mode in {"qwen", "qwen35"}:
-            for marker in ("<|im_end|>",):
-                token_id = self._lookup_single_token_id(marker)
-                if token_id >= 0:
-                    self.eos_tokens.add(token_id)
+        contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract()
+        for marker in list((contract or {}).get("token_stop_markers") or []):
+            token_id = self._lookup_single_token_id(str(marker or ""))
+            if token_id >= 0:
+                self.eos_tokens.add(token_id)
 
     def is_eos_token(self, token_id: int) -> bool:
         """Check if token is an EOS token."""
@@ -1087,8 +1233,15 @@ class CKModel:
             token_ids = self.tokenizer.encode(text).ids
             return len(token_ids)
 
-    def decode(self, token_ids: list) -> str:
-        """Decode token IDs to text."""
+    def decode(self, token_ids: list, skip_special_tokens: bool = True) -> str:
+        """Decode token IDs to text.
+
+        Default to the cleaned decode path for user-visible generation. Some of
+        the current fallback tokenizers still reconstruct raw special-token bytes
+        imperfectly, so forcing raw decode on the main chat path can make an
+        otherwise-coherent model look catastrophically broken. Callers that need
+        raw markers must pass ``skip_special_tokens=False`` explicitly.
+        """
         if self.use_c_tokenizer:
             # Use C tokenizer for decoding
             num_ids = len(token_ids)
@@ -1098,7 +1251,11 @@ class CKModel:
             out_len = self.lib.ck_model_decode_tokens(ids_array, num_ids, out_buf, len(out_buf))
             return out_buf.value[:out_len].decode('utf-8', errors='replace')
         else:
-            return self.tokenizer.decode(token_ids)
+            decode_fn = getattr(self.tokenizer, "decode")
+            try:
+                return decode_fn(token_ids, skip_special_tokens=skip_special_tokens)
+            except TypeError:
+                return decode_fn(token_ids)
 
     def token_piece(self, token_id: int) -> Optional[str]:
         """Return raw vocabulary piece for a token ID when Python tokenizer is active."""
@@ -1159,6 +1316,28 @@ class CKModel:
         """
         return self.format_chat_conversation([("user", user_message)], system_prompt=system_prompt)
 
+    def _resolve_contract_thinking_overrides(self, contract: dict) -> tuple[str, str]:
+        """Resolve contract-driven assistant/user prefix overrides for thinking mode."""
+        assistant_generation_prefix = str(contract.get("assistant_generation_prefix") or "")
+        last_user_prefix = str(contract.get("last_user_prefix") or "")
+        thinking_mode = str(getattr(self, "thinking_mode", "auto") or "auto").strip().lower()
+        default_mode = str(contract.get("thinking_mode_default") or "").strip().lower()
+        resolved_mode = default_mode if thinking_mode in {"", "auto"} else thinking_mode
+
+        assistant_by_mode = contract.get("assistant_generation_prefix_by_thinking_mode")
+        if isinstance(assistant_by_mode, dict):
+            override = assistant_by_mode.get(resolved_mode)
+            if isinstance(override, str):
+                assistant_generation_prefix = override
+
+        last_user_prefix_by_mode = contract.get("last_user_prefix_by_thinking_mode")
+        if isinstance(last_user_prefix_by_mode, dict):
+            override = last_user_prefix_by_mode.get(resolved_mode)
+            if isinstance(override, str):
+                last_user_prefix = override
+
+        return assistant_generation_prefix, last_user_prefix
+
     def format_chat_conversation(
         self,
         messages: List[tuple[str, str]],
@@ -1170,43 +1349,91 @@ class CKModel:
                 return ""
             return messages[-1][1]
 
-        if system_prompt is None:
-            if self.chat_template_mode == "gemma":
-                system_prompt = ""
-            else:
-                system_prompt = self.default_system_prompt
+        contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract() or {}
+        role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
+        turn_prefix = str(contract.get("turn_prefix") or "")
+        turn_suffix = str(contract.get("turn_suffix") or "")
+        assistant_generation_prefix, last_user_prefix = self._resolve_contract_thinking_overrides(contract)
+        system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
+        system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
+        default_system_prompt = str(contract.get("default_system_prompt") or "")
+        inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
+        suppression_markers = [
+            str(marker).lower()
+            for marker in list(contract.get("last_user_prefix_suppression_markers") or [])
+            if str(marker or "").strip()
+        ]
+        bos_prefix = str(contract.get("force_bos_text_if_tokenizer_add_bos_false") or "")
 
+        system_messages: List[str] = []
         clean_messages: List[tuple[str, str]] = []
         for role, content in messages:
             role = str(role or "").strip().lower()
+            if role == "system":
+                text = str(content or "")
+                if text:
+                    system_messages.append(text)
+                continue
             if role not in {"user", "assistant"}:
                 continue
             clean_messages.append((role, str(content or "")))
 
-        if self.chat_template_mode in {"qwen", "qwen35"}:
-            prompt = ""
-            if system_prompt:
-                prompt += f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-            for role, content in clean_messages:
-                label = "assistant" if role == "assistant" else "user"
-                prompt += f"<|im_start|>{label}\n{content}<|im_end|>\n"
-            if self.chat_template_mode == "qwen35":
-                prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        if system_prompt is None:
+            if system_messages:
+                system_prompt = system_prompt_separator.join(system_messages)
+            elif inject_default_system_prompt:
+                system_prompt = default_system_prompt
             else:
-                prompt += "<|im_start|>assistant\n"
-            return prompt
+                system_prompt = ""
+        else:
+            system_prompt = str(system_prompt or "")
+            if system_messages:
+                if system_prompt:
+                    system_prompt = system_prompt_separator.join([system_prompt] + system_messages)
+                else:
+                    system_prompt = system_prompt_separator.join(system_messages)
 
-        if self.chat_template_mode == "gemma":
-            special = self._load_tokenizer_contract()
-            prompt = ""
-            if not bool(special.get("add_bos_token", False)):
-                prompt = "<bos>"
+        if last_user_prefix:
+            for idx in range(len(clean_messages) - 1, -1, -1):
+                role, content = clean_messages[idx]
+                if role != "user":
+                    continue
+                lowered = content.lower()
+                if last_user_prefix.lower() not in lowered and not any(marker in lowered for marker in suppression_markers):
+                    clean_messages[idx] = (role, f"{last_user_prefix}{content}")
+                break
+
+        if system_prompt and system_prompt_mode == "prepend_first_user":
             for idx, (role, content) in enumerate(clean_messages):
-                turn_role = "model" if role == "assistant" else "user"
-                if idx == 0 and turn_role == "user" and system_prompt:
-                    content = f"{system_prompt}\n\n{content}"
-                prompt += f"<start_of_turn>{turn_role}\n{content}<end_of_turn>\n"
-            prompt += "<start_of_turn>model\n"
+                if role != "user":
+                    continue
+                if content:
+                    content = f"{system_prompt}{system_prompt_separator}{content}"
+                else:
+                    content = system_prompt
+                clean_messages[idx] = (role, content)
+                system_prompt = ""
+                break
+
+        def _render_turn(role: str, content: str) -> str:
+            label = str(role_labels.get(role) or role)
+            prefix = turn_prefix.replace("{role}", label)
+            return f"{prefix}{content}{turn_suffix}"
+
+        prompt = ""
+        if bos_prefix:
+            special = self._load_tokenizer_contract()
+            if not bool(special.get("add_bos_token", False)):
+                prompt += bos_prefix
+
+        if system_prompt and system_prompt_mode == "dedicated_turn":
+            prompt += _render_turn("system", system_prompt)
+
+        for role, content in clean_messages:
+            prompt += _render_turn(role, content)
+
+        prompt += assistant_generation_prefix
+        if prompt:
             return prompt
 
         if not clean_messages:
@@ -1215,12 +1442,16 @@ class CKModel:
 
     def default_stop_text_markers(self) -> List[str]:
         """Return decoded-text stop markers implied by the active chat template."""
-        mode = getattr(self, "chat_template_mode", "none")
-        if mode == "gemma":
-            return ["<end_of_turn>"]
-        if mode in {"qwen", "qwen35"}:
-            return ["<|im_end|>"]
-        return []
+        contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract()
+        return [str(marker) for marker in list((contract or {}).get("stop_text_markers") or []) if str(marker or "")]
+
+    def default_min_new_tokens(self) -> int:
+        """Return the contract-driven minimum response length before allowing stop tokens."""
+        contract = normalize_chat_contract(self.chat_contract) or self._load_chat_contract()
+        try:
+            return max(0, int((contract or {}).get("min_response_tokens") or 0))
+        except Exception:
+            return 0
 
     def forward(self, token_ids: list) -> np.ndarray:
         """Run forward pass and return logits for last position."""
@@ -1371,6 +1602,49 @@ def _escape_text_for_display(text: str, ascii_only: bool = False, escape_newline
     return "".join(out)
 
 
+def _trim_repeated_suffix(text: str) -> Optional[tuple[str, str]]:
+    """Trim one obviously repeated trailing line/paragraph block from generated text."""
+    normalized = text.rstrip()
+    if len(normalized) < 48:
+        return None
+
+    for sep, label in (("\n\n", "paragraph"), ("\n", "line")):
+        parts = normalized.split(sep)
+        if len(parts) < 3:
+            continue
+        last = str(parts[-1]).strip()
+        if len(last) < 12:
+            continue
+        repeat_count = 1
+        idx = len(parts) - 2
+        while idx >= 0 and str(parts[idx]).strip() == last:
+            repeat_count += 1
+            idx -= 1
+        if repeat_count < 3:
+            continue
+        trimmed = sep.join(parts[:-1]).rstrip()
+        if not trimmed:
+            continue
+        return trimmed, f"{label} repetition"
+    return None
+
+
+def _normalize_visible_chat_markup(text: str) -> str:
+    """Collapse obviously duplicated visible chat markers into a cleaner display form."""
+    if not text or "<think>" not in text:
+        return text
+
+    normalized = text
+    leading_think = re.match(r"^(?P<lead>\s*)(?:<think>\s*)+", normalized)
+    if leading_think is not None:
+        lead = str(leading_think.group("lead") or "")
+        remainder = normalized[leading_think.end():].lstrip("\n")
+        normalized = f"{lead}<think>\n{remainder}"
+
+    normalized = re.sub(r"(?:\s*</think>\s*){2,}", "\n</think>\n\n", normalized)
+    return normalized
+
+
 def _piece_for_debug(piece: str) -> str:
     """Render raw vocab pieces in a byte/escape form for easier debugging."""
     if not piece:
@@ -1414,7 +1688,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              top_k: int = 40,
              top_p: float = 1.0,
              min_p: float = 0.0,
-             repeat_penalty: float = 1.0,
+             repeat_penalty: float = 1.05,
              repeat_last_n: int = 64,
              min_new_tokens: int = 0,
              stop_on_text: Optional[List[str]] = None) -> str:
@@ -1434,6 +1708,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     gibberish_detected: bool = False
     stop_markers = [m for m in (stop_on_text or []) if isinstance(m, str) and m]
     stopped_on_text: Optional[str] = None
+    stop_reason: Optional[str] = None
     displayed_chars = 0
 
     if verbose:
@@ -1464,15 +1739,15 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
     def _response_text() -> str:
         hit = _first_text_stop()
         if hit is None:
-            return generated_text
-        return generated_text[:hit[0]]
+            return _normalize_visible_chat_markup(generated_text)
+        return _normalize_visible_chat_markup(generated_text[:hit[0]])
 
     def _displayable_text(force: bool = False) -> str:
         hit = _first_text_stop()
         if hit is not None:
-            return generated_text[:hit[0]]
+            return _normalize_visible_chat_markup(generated_text[:hit[0]])
         if force or not stop_markers:
-            return generated_text
+            return _normalize_visible_chat_markup(generated_text)
 
         overlap = 0
         for marker in stop_markers:
@@ -1482,8 +1757,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
                     overlap = max(overlap, prefix_len)
                     break
         if overlap:
-            return generated_text[:-overlap]
-        return generated_text
+            return _normalize_visible_chat_markup(generated_text[:-overlap])
+        return _normalize_visible_chat_markup(generated_text)
 
     def _flush_text_output(force: bool = False) -> None:
         nonlocal displayed_chars
@@ -1502,11 +1777,23 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
         displayed_chars = len(visible_text)
 
     def _check_text_stop() -> bool:
-        nonlocal stopped_on_text
+        nonlocal stopped_on_text, stop_reason
         hit = _first_text_stop()
         if hit is None:
             return False
         stopped_on_text = hit[1]
+        stop_reason = f"text marker {hit[1]!r}"
+        return True
+
+    def _check_repetition_stop() -> bool:
+        nonlocal generated_text, stop_reason
+        if show_token_ids:
+            return False
+        trimmed = _trim_repeated_suffix(generated_text)
+        if trimmed is None:
+            return False
+        generated_text = trimmed[0]
+        stop_reason = trimmed[1]
         return True
 
     def _sample_next_token(logits: np.ndarray, step_idx: int) -> int:
@@ -1569,12 +1856,15 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             sample_times.append(time.time() - t_sample)
 
             if model.is_eos_token(next_token):
+                stop_reason = f"eos token {int(next_token)}"
                 break
             generated.append(next_token)
             generated_tokens.append(next_token)
             token_ids.append(next_token)
             token_text = model.decode([next_token])
             generated_text = model.decode(generated_tokens)
+            if _check_repetition_stop():
+                break
             if show_token_ids:
                 display_text = _escape_text_for_display(
                     token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
@@ -1601,6 +1891,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
                         break
 
             if len(token_ids) >= model.context_window - 1:
+                stop_reason = "context window reached"
                 break
 
             # Set parity token index before decode
@@ -1629,6 +1920,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
             # Check for EOS token
             if model.is_eos_token(next_token):
+                stop_reason = f"eos token {int(next_token)}"
                 break
 
             generated.append(next_token)
@@ -1638,6 +1930,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             # Decode and print incrementally
             token_text = model.decode([next_token])
             generated_text = model.decode(generated_tokens)
+            if _check_repetition_stop():
+                break
             if show_token_ids:
                 display_text = _escape_text_for_display(
                     token_text, ascii_only=ascii_display, escape_newlines=escape_newlines
@@ -1665,11 +1959,14 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
 
             # Check context limit
             if len(token_ids) >= model.context_window - 1:
+                stop_reason = "context window reached"
                 break
 
     total_time = time.time() - start_time
     gen_count = len(generated)
     _flush_text_output(force=True)
+    if stop_reason is None and gen_count >= int(max_tokens):
+        stop_reason = "max_tokens reached"
 
     # Final gibberish check and validation
     if validator and not gibberish_detected and len(generated_tokens) >= 10:
@@ -1725,6 +2022,8 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
         print(f"\n[Generated {gen_count} tokens in {total_time:.2f}s ({tokens_per_sec:.1f} tok/s)]")
     if verbose and stopped_on_text:
         print(f"[Stop marker hit: {stopped_on_text!r}]")
+    if (verbose or show_stats) and stop_reason:
+        print(f"\033[90mstop: {stop_reason}\033[0m")
 
     return _response_text()
 
@@ -1813,7 +2112,7 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
                           min_p=min_p,
                           repeat_penalty=repeat_penalty,
                           repeat_last_n=repeat_last_n,
-                          min_new_tokens=1 if model.use_chat_template else 0,
+                          min_new_tokens=model.default_min_new_tokens() if model.use_chat_template else 0,
                           stop_on_text=stop_on_text)
         print()
         if memory_enabled:
@@ -1830,7 +2129,7 @@ def main():
     parser.add_argument("--top-k", type=int, default=40, help="Top-k sampling size (default: 40)")
     parser.add_argument("--top-p", type=float, default=1.0, help="Top-p nucleus sampling (default: 1.0)")
     parser.add_argument("--min-p", type=float, default=0.0, help="Min-p filter as fraction of max prob (default: 0.0)")
-    parser.add_argument("--repeat-penalty", type=float, default=1.0, help="Repeat penalty >1.0 reduces looping (default: 1.0)")
+    parser.add_argument("--repeat-penalty", type=float, default=1.05, help="Repeat penalty >1.0 reduces looping (default: 1.05)")
     parser.add_argument("--repeat-last-n", type=int, default=64, help="Window size for repeat penalty (default: 64)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--stats", action="store_true", default=True,
@@ -1863,10 +2162,14 @@ def main():
                        help="Stop generation when '<eos>' appears in decoded text")
     parser.add_argument("--stop-on-text", action="append", default=[],
                        help="Stop generation when this decoded text marker appears (repeatable)")
-    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen35", "gemma"], default="auto",
-                       help="Chat template mode: auto (from GGUF), none, qwen, qwen35, or gemma")
+    parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen3", "qwen35", "gemma"], default="auto",
+                       help="Chat template mode: auto (from GGUF), none, qwen, qwen3, qwen35, or gemma")
     parser.add_argument("--no-chat-template", action="store_true",
                        help="Disable chat template formatting (same as --chat-template=none)")
+    parser.add_argument("--allow-raw-prompt", action="store_true",
+                       help="Allow --chat-template=none even when the model exports an instruction/chat template")
+    parser.add_argument("--thinking-mode", choices=["auto", "visible", "suppressed"], default="auto",
+                       help="Override contract thinking mode for chat-capable models (auto, visible, or suppressed)")
     parser.add_argument("--memory", action="store_true",
                        help="Keep previous prompts/responses in interactive chat (default: off)")
     args = parser.parse_args()
@@ -1902,8 +2205,10 @@ def main():
 
     chat_template = "none" if args.no_chat_template else args.chat_template
     if not model.load(gguf_path=args.gguf, force_python_tokenizer=args.python_tokenizer,
-                      chat_template=chat_template):
+                      chat_template=chat_template,
+                      allow_raw_prompt=args.allow_raw_prompt):
         sys.exit(1)
+    model.thinking_mode = str(args.thinking_mode or "auto")
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")
     stop_markers = list(args.stop_on_text or [])
@@ -1913,6 +2218,7 @@ def main():
     if args.stop_at_eos:
         stop_markers.append("<eos>")
 
+    tty_stdin = None
     try:
         if args.prompt:
             # Single prompt mode
@@ -1942,11 +2248,23 @@ def main():
                     min_p=args.min_p,
                     repeat_penalty=args.repeat_penalty,
                     repeat_last_n=args.repeat_last_n,
-                    min_new_tokens=1 if model.use_chat_template else 0,
+                    min_new_tokens=model.default_min_new_tokens() if model.use_chat_template else 0,
                     stop_on_text=stop_markers)
             print()
         else:
             # Interactive chat mode
+            tty_stdin = _ensure_interactive_stdin()
+            try:
+                stdin_ok = sys.stdin is not None and not sys.stdin.closed and sys.stdin.isatty()
+            except Exception:
+                stdin_ok = False
+            if not stdin_ok:
+                print(
+                    "Error: interactive chat requires a TTY on stdin. "
+                    "This invocation would exit immediately on EOF. "
+                    "Run from a terminal or pass --prompt for one-shot generation."
+                )
+                sys.exit(2)
             chat_loop(model, temperature=args.temperature, max_tokens=args.max_tokens,
                      show_stats=args.stats, validator=validator,
                      no_prefill=args.no_prefill,
@@ -1963,6 +2281,11 @@ def main():
                      memory_enabled=args.memory,
                      stop_on_text=stop_markers)
     finally:
+        if tty_stdin is not None:
+            try:
+                tty_stdin.close()
+            except Exception:
+                pass
         model.free()
 
 

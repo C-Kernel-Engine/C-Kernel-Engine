@@ -79,6 +79,32 @@ def _entry_size(entry: Dict[str, Any]) -> int:
         return 0
 
 
+def _c_string_literal(text: str) -> str:
+    return json.dumps(str(text))
+
+
+def _collect_chat_marker_strings(chat_contract: Optional[Dict[str, Any]]) -> List[str]:
+    if not isinstance(chat_contract, dict):
+        return []
+
+    out: List[str] = []
+    seen: set[str] = set()
+
+    for field in ("template_markers", "token_stop_markers", "stop_text_markers"):
+        values = chat_contract.get(field)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if not isinstance(value, str):
+                continue
+            text = value.strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            out.append(text)
+    return out
+
+
 def _coerce_bool(value: Any) -> Optional[bool]:
     if isinstance(value, bool):
         return value
@@ -478,10 +504,51 @@ OP_DATAFLOW = {
 #   3. Clean separation of concerns
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _resolve_tokenizer_type(
+    template: Dict[str, Any],
+    config: Dict[str, Any],
+    manifest: Dict[str, Any],
+) -> Optional[str]:
+    flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
+    template_type = str(flags.get("tokenizer") or "").strip().lower()
+
+    explicit_contract = None
+    for doc in (manifest, config):
+        if not isinstance(doc, dict):
+            continue
+        tok_contract = doc.get("tokenizer_contract")
+        if isinstance(tok_contract, dict):
+            explicit_contract = tok_contract
+            break
+        nested = doc.get("config")
+        if isinstance(nested, dict):
+            tok_contract = nested.get("tokenizer_contract")
+            if isinstance(tok_contract, dict):
+                explicit_contract = tok_contract
+                break
+
+    if isinstance(explicit_contract, dict):
+        explicit_type = str(explicit_contract.get("tokenizer_type") or "").strip().lower()
+        if explicit_type:
+            return explicit_type
+
+    special_tokens = manifest.get("special_tokens", {}) if isinstance(manifest.get("special_tokens"), dict) else {}
+    tok_model = str(special_tokens.get("tokenizer_model") or "").strip().lower()
+    if tok_model in {"bpe", "gpt2"}:
+        return "bpe"
+    if tok_model in {"wordpiece"}:
+        return "wordpiece"
+    if tok_model in {"llama", "sentencepiece", "spm"}:
+        return "sentencepiece"
+
+    return template_type or None
+
+
 def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges: int,
                                special_tokens: Optional[Dict] = None,
                                model_type: Optional[str] = None,
-                               template_name: Optional[str] = None) -> Optional[Dict]:
+                               template_name: Optional[str] = None,
+                               chat_contract: Optional[Dict[str, Any]] = None) -> Optional[Dict]:
     """
     Generate tokenizer-specific C code based on tokenizer type from template.
 
@@ -491,6 +558,64 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
     For future tokenizer types, add a new elif branch here.
     """
     if tokenizer_type == "bpe":
+        add_bos = None
+        add_eos = None
+        unk_id = None
+        bos_id = None
+        eos_id = None
+        pad_id = None
+        if special_tokens:
+            add_bos = special_tokens.get("add_bos_token")
+            add_eos = special_tokens.get("add_eos_token")
+            unk_id = special_tokens.get("unk_token_id")
+            bos_id = special_tokens.get("bos_token_id")
+            eos_id = special_tokens.get("eos_token_id")
+            pad_id = special_tokens.get("pad_token_id")
+
+        bpe_contract_lines = []
+        if any(v is not None for v in [unk_id, bos_id, eos_id, pad_id]):
+            bpe_contract_lines.append(
+                "        ck_true_bpe_set_special_ids(g_model->tokenizer,"
+            )
+            bpe_contract_lines.append(
+                "            " + (str(unk_id) if unk_id is not None else "-1") + ","
+            )
+            bpe_contract_lines.append(
+                "            " + (str(bos_id) if bos_id is not None else "-1") + ","
+            )
+            bpe_contract_lines.append(
+                "            " + (str(eos_id) if eos_id is not None else "-1") + ","
+            )
+            bpe_contract_lines.append(
+                "            " + (str(pad_id) if pad_id is not None else "-1") + ");"
+            )
+        if add_bos is not None or add_eos is not None:
+            bpe_contract_lines.extend(
+                [
+                    "        {",
+                    "            CKBPEConfig cfg = {0};",
+                    f"            cfg.add_bos = {'true' if add_bos else 'false'};",
+                    f"            cfg.add_eos = {'true' if add_eos else 'false'};",
+                    "            cfg.byte_fallback = true;",
+                    "            cfg.space_prefix_style = CK_SPACE_PREFIX_AUTO;",
+                    "            ck_true_bpe_set_config(g_model->tokenizer, &cfg);",
+                    "        }",
+                ]
+            )
+        bpe_contract_block = "\n".join(bpe_contract_lines)
+        special_marker_candidates = [
+            "<|im_start|>", "<|im_end|>", "<|endoftext|>",
+            "<|eot_id|>", "<|begin_of_text|>", "<|end_of_text|>",
+            "</s>", "<s>", "<bos>", "<eos>",
+            "<start_of_turn>", "<end_of_turn>",
+        ]
+        for marker in _collect_chat_marker_strings(chat_contract):
+            if marker not in special_marker_candidates:
+                special_marker_candidates.append(marker)
+        special_token_lines = "\n".join(
+            f"            {_c_string_literal(marker)},"
+            for marker in special_marker_candidates
+        )
         return {
             "type": "bpe",
             "include": '#include "tokenizer/true_bpe.h"',
@@ -507,14 +632,13 @@ def _generate_tokenizer_c_code(tokenizer_type: str, vocab_size: int, num_merges:
             {num_merges},
             (const int32_t*)(g_model->bump + W_VOCAB_MERGES)
         );
+{bpe_contract_block}
 
         /* Register special tokens for pre-BPE matching.
          * Without this, <|im_end|> gets broken into characters by BPE.
          */
         static const char *special_tokens[] = {{
-            "<|im_start|>", "<|im_end|>", "<|endoftext|>",
-            "<|eot_id|>", "<|begin_of_text|>", "<|end_of_text|>",
-            "</s>", "<s>",
+{special_token_lines}
             NULL
         }};
         for (int i = 0; special_tokens[i] != NULL; i++) {{
@@ -866,7 +990,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
         # RoPE scaling (for extended context models like Llama 3.1)
         rope_scaling_type = config["rope_scaling_type"]
         rope_scaling_factor = config["rope_scaling_factor"]
-        rope_layout = config.get("rope_layout", "split")
+        rope_layout = config.get("rope_layout", "")
         rope_original_context_length = config.get("rope_original_context_length", max_seq_len)
         rope_beta_fast = config.get("rope_beta_fast", 0.0)
         rope_beta_slow = config.get("rope_beta_slow", 0.0)
@@ -916,8 +1040,9 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
     # ═══════════════════════════════════════════════════════════
     # TOKENIZER INIT: Load tokenizer from bump data
     # ═══════════════════════════════════════════════════════════
-    # Tokenizer type comes from template flags: "bpe", "wordpiece", "sentencepiece", etc.
-    tokenizer_type = flags.get("tokenizer", None)
+    # Prefer the explicit tokenizer contract emitted during conversion. Falling
+    # back to template flags keeps older manifests working.
+    tokenizer_type = _resolve_tokenizer_type(template, config, manifest)
 
     # Check if vocab data is in manifest (entries list, not weights dict)
     entries = manifest.get("entries", [])
@@ -940,6 +1065,15 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
         num_merges = merges_size // 12  # 3 * sizeof(int32_t)
 
         # Generate tokenizer-specific c_code based on type from template
+        explicit_chat_contract = config.get("chat_contract") if isinstance(config.get("chat_contract"), dict) else None
+        if explicit_chat_contract is None:
+            template_contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
+            explicit_chat_contract = (
+                template_contract.get("chat_contract")
+                if isinstance(template_contract.get("chat_contract"), dict)
+                else None
+            )
+
         c_code = _generate_tokenizer_c_code(
             tokenizer_type,
             vocab_size,
@@ -947,6 +1081,7 @@ def generate_init_ops(manifest: Dict, config: Dict) -> List[Dict]:
             special_tokens,
             config.get("model_type"),
             template.get("name"),
+            explicit_chat_contract,
         )
 
         if c_code:
@@ -1791,7 +1926,9 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     out["rotary_dim"] = int(_pick("rotary_dim", default=out.get("head_dim", 64)))
     out["rope_scaling_type"] = str(_pick("rope_scaling_type", default="none"))
     out["rope_scaling_factor"] = float(_pick("rope_scaling_factor", default=1.0))
-    out["rope_layout"] = str(_pick("rope_layout", default="split"))
+    rope_layout_value = _pick("rope_layout")
+    if rope_layout_value is not None and str(rope_layout_value).strip():
+        out["rope_layout"] = str(rope_layout_value)
     out["rope_original_context_length"] = int(
         _pick("rope_original_context_length", default=out.get("context_length", 0))
     )
@@ -1844,6 +1981,38 @@ def _normalize_manifest_config(config: Dict) -> Dict:
         out["attn_gate_dim"] = int(out["attn_out_dim"])
     out.setdefault("num_seqs", 1)
     return out
+
+
+def _normalize_rope_layout_value(value: Any) -> str:
+    rope_layout = str(value or "").strip().lower()
+    aliases = {
+        "standard": "split",
+        "cos_sin_split": "split",
+        "half": "split",
+        "pairwise": "pairwise",
+        "interleaved": "pairwise",
+        "even_odd": "pairwise",
+    }
+    return aliases.get(rope_layout, rope_layout)
+
+
+def _resolve_rope_qk_kernel(config: Dict, template_kernels: Dict[str, Any]) -> str:
+    rope_layout = _normalize_rope_layout_value(config.get("rope_layout"))
+    override = str(template_kernels.get("rope_qk", "") or "").strip()
+
+    if rope_layout == "pairwise":
+        if override:
+            return override
+        return "rope_forward_qk_pairwise"
+
+    if rope_layout == "split":
+        if override and "pairwise" not in override.lower():
+            return override
+        return "rope_forward_qk"
+
+    if override:
+        return override
+    return "rope_forward_qk"
 
 
 def _resolve_logical_buffer_name(
@@ -2797,9 +2966,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
         # Template-specified kernel overrides (keeps IR dumb and data-driven)
         if op == "rope_qk":
-            rope_kernel = template_kernels.get("rope_qk")
-            if rope_kernel:
-                return [rope_kernel]
+            return [_resolve_rope_qk_kernel(config, template_kernels)]
 
         if op in ("attn", "attn_sliding"):
             mode_key = f"{op}_{mode}"

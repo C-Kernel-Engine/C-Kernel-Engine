@@ -3,7 +3,7 @@
 Sequence-aware hidden-state checker against raw llama.cpp dumps.
 
 This runs explicit token IDs through:
-  1) llama.cpp helper in sequential decode mode with LLAMA_DUMP_LAYER0=1
+  1) llama.cpp helper in sequential decode mode with token-aware raw dumps
   2) CK runtime via ck_model_decode() with CK_STOP_OP stop-points
 
 It compares layer-0 and footer hidden-state probes per token step to locate
@@ -269,6 +269,13 @@ def run_llama_raw_dumps(
     work_dir: Path,
 ) -> tuple[dict[str, Any], dict[int, dict[str, list[RawDumpEntry]]], dict[tuple[int, str], int]]:
     helper = ensure_llama_helper()
+    dump_dir = work_dir / "llama_dump"
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    for stale in dump_dir.glob("*"):
+        try:
+            stale.unlink()
+        except OSError:
+            pass
     cmd = [
         str(helper),
         "--model",
@@ -281,17 +288,16 @@ def run_llama_raw_dumps(
         str(int(top_k)),
         "--decode-mode",
         "sequential",
+        "--dump-dir",
+        str(dump_dir),
         "--logits-out",
         str(work_dir / "llama_logits.f32"),
     ]
     if threads > 0:
         cmd.extend(["--threads", str(int(threads))])
-    env = os.environ.copy()
-    env["LLAMA_DUMP_LAYER0"] = "1"
     proc = subprocess.run(
         cmd,
         cwd=str(work_dir),
-        env=env,
         text=True,
         capture_output=True,
         check=False,
@@ -307,7 +313,7 @@ def run_llama_raw_dumps(
     meta = json.loads(proc.stdout.strip())
     if not isinstance(meta, dict) or not meta.get("ok"):
         raise RuntimeError(f"llama_token_replay returned invalid payload: {proc.stdout.strip()}")
-    index_path = work_dir / "llama_dump" / "index.json"
+    index_path = dump_dir / "index.json"
     if not index_path.exists():
         raise RuntimeError(f"llama raw dump index missing: {index_path}")
     dump_map, duplicates = parse_raw_index(index_path)
