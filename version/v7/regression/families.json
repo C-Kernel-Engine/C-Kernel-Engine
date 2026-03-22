@@ -10,8 +10,11 @@
         "--chat-template",
         "auto",
         "--temperature",
-        "0"
+        "0",
+        "--repeat-penalty",
+        "1.1"
       ],
+      "coherence_gate": false,
       "response_contract": {
         "stop_text_markers": [
           "<end_of_turn>"
@@ -21,12 +24,38 @@
       },
       "smoke_prompts": [
         "hello",
-        "code_bundle"
+        "france_capital"
       ],
+      "runtime_expect": {
+        "stdout_contains": [
+          "Using built-in C tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "rope_layout": "split",
+          "chat_contract.name": "gemma"
+        },
+        "manifest": {
+          "config.rope_layout": "split",
+          "config.chat_contract.name": "gemma"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      },
       "parity": {
         "prompt_id": "hello",
         "ctx_len": 256,
         "top_k": 16,
+        "always_run": true,
         "require_top1_match": true,
         "min_topk_overlap": 0.5
       }
@@ -41,7 +70,9 @@
         "--chat-template",
         "auto",
         "--temperature",
-        "0"
+        "0",
+        "--repeat-penalty",
+        "1.1"
       ],
       "response_contract": {
         "stop_text_markers": [
@@ -53,12 +84,34 @@
       },
       "smoke_prompts": [
         "hello",
+        "france_capital",
         "code_bundle"
       ],
+      "runtime_expect": {
+        "stdout_contains": [
+          "Using built-in C tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen2"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      },
       "parity": {
         "prompt_id": "hello",
         "ctx_len": 256,
         "top_k": 16,
+        "always_run": true,
         "require_top1_match": true,
         "min_topk_overlap": 0.5
       }
@@ -72,8 +125,12 @@
       "runtime_args": [
         "--chat-template",
         "auto",
+        "--thinking-mode",
+        "suppressed",
         "--temperature",
-        "0"
+        "0",
+        "--repeat-penalty",
+        "1.1"
       ],
       "response_contract": {
         "stop_text_markers": [
@@ -85,8 +142,29 @@
       },
       "smoke_prompts": [
         "hello",
+        "france_capital",
         "code_bundle"
       ],
+      "runtime_expect": {
+        "stdout_contains": [
+          "Using built-in C tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen3"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      },
       "parity": {
         "prompt_id": "hello",
         "ctx_len": 256,
@@ -105,7 +183,9 @@
         "--chat-template",
         "auto",
         "--temperature",
-        "0"
+        "0",
+        "--repeat-penalty",
+        "1.1"
       ],
       "response_contract": {
         "stop_text_markers": [
@@ -117,8 +197,28 @@
       },
       "smoke_prompts": [
         "hello",
-        "code_bundle"
+        "france_capital"
       ],
+      "runtime_expect": {
+        "stdout_contains": [
+          "Using built-in C tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen35"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      },
       "parity": {
         "prompt_id": "hello",
         "ctx_len": 256,
@@ -137,8 +237,11 @@
         "--chat-template",
         "auto",
         "--temperature",
-        "0"
+        "0",
+        "--repeat-penalty",
+        "1.1"
       ],
+      "coherence_gate": false,
       "response_contract": {
         "stop_text_markers": [
           "<|im_end|>"
@@ -148,13 +251,38 @@
         "trim_whitespace": true
       },
       "smoke_prompts": [
-        "hello",
-        "code_bundle"
+        "hello"
       ],
+      "runtime_expect": {
+        "stdout_contains": [
+          "Using built-in C tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "rope_layout": "pairwise",
+          "chat_contract.name": "llama_chatml"
+        },
+        "manifest": {
+          "config.rope_layout": "pairwise",
+          "config.chat_contract.name": "llama_chatml"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_pairwise_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      },
       "parity": {
         "prompt_id": "hello",
         "ctx_len": 256,
         "top_k": 16,
+        "always_run": true,
         "require_top1_match": true,
         "min_topk_overlap": 0.5
       }

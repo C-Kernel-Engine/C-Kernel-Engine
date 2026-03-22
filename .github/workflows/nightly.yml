@@ -121,6 +121,15 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/llama.cpp/build/bin:$LD_LIBRARY_PATH"
           ./scripts/run_parity_smoketest.sh --quick 2>&1 | tee build/parity_test.log
 
+      - name: Run v7 Fast Regression
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          CK_CACHE_DIR: ${{ runner.temp }}/ck-engine-v7/models
+        run: |
+          echo "=== Running v7 Fast Regression ==="
+          mkdir -p build/v7-regression-runs build/v7-regression-reports
+          make regression-fast REGRESSION_ARGS="--run-root build/v7-regression-runs --report-root build/v7-regression-reports" 2>&1 | tee build/v7_regression_fast.log
+
       - name: Run Nightly Test Suite
         run: |
           echo "=== Running Full Nightly Test Suite ==="
@@ -175,6 +184,7 @@ jobs:
           path: |
             build/*.log
             build/*.json
+            build/v7-regression-reports/**
           retention-days: 7
 
       - name: Prepare nightly results for deployment

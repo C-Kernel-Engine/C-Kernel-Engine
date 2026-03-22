@@ -3763,7 +3763,7 @@ v7-validate-contracts:
 
 regression-fast:
 	@echo "Running v7 regression fast suite..."
-	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast $(REGRESSION_ARGS)
+	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
 regression-full:
 	@echo "Running v7 regression full suite..."

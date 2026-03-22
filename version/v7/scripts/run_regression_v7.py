@@ -71,6 +71,8 @@ class FamilySpec:
     smoke_prompts: list[str]
     parity: dict[str, Any]
     response_contract: dict[str, Any]
+    coherence_gate: bool
+    runtime_expect: dict[str, Any]
 
 
 def _cache_root() -> Path:
@@ -190,6 +192,8 @@ def load_families(path: Path, prompts: dict[str, PromptSpec]) -> list[FamilySpec
                 smoke_prompts=smoke_prompts,
                 parity=parity,
                 response_contract=dict(row.get("response_contract") or {}),
+                coherence_gate=bool(row.get("coherence_gate", True)),
+                runtime_expect=dict(row.get("runtime_expect") or {}),
             )
         )
     return out
@@ -207,7 +211,8 @@ def _extract_assistant_output(stdout: str) -> str:
 
 
 def _strip_think_blocks(text: str) -> str:
-    return re.sub(r"<think>\s*.*?\s*</think>\s*", "", text, flags=re.S | re.I)
+    out = re.sub(r"<think>\s*.*?\s*</think>\s*", "", text, flags=re.S | re.I)
+    return re.sub(r"<think>\s*.*\Z", "", out, flags=re.S | re.I)
 
 
 def normalize_assistant_output(text: str, response_contract: dict[str, Any]) -> str:
@@ -239,14 +244,20 @@ def _resolve_gguf_path(model_spec: str) -> Path | None:
         return None
     if text.startswith("hf://"):
         payload = text[len("hf://") :]
-        repo, _, filename = payload.partition("/")
         if "/" not in payload:
             return None
         repo = payload.rsplit("/", 1)[0]
         filename = payload.rsplit("/", 1)[1]
-        cache_dir = _cache_root() / "models" / repo.replace("/", "--")
-        candidate = cache_dir / filename
-        return candidate if candidate.exists() else None
+        repo_dir = repo.replace("/", "--")
+        roots = [
+            _cache_root() / "models" / repo_dir,
+            _cache_root() / repo_dir,
+        ]
+        for cache_dir in roots:
+            candidate = cache_dir / filename
+            if candidate.exists():
+                return candidate
+        return None
     candidate = Path(text).expanduser()
     return candidate if candidate.exists() else None
 
@@ -257,7 +268,11 @@ def _tokenize_words(text: str) -> list[str]:
 
 def _collect_keyword_hits(text: str, expected_keywords: list[str]) -> list[str]:
     text_lower = text.lower()
-    token_set = set(_tokenize_words(text))
+    token_set = {
+        token.strip(".,!?;:()[]{}\"'`")
+        for token in _tokenize_words(text)
+        if token.strip(".,!?;:()[]{}\"'`")
+    }
     hits: list[str] = []
     for kw in expected_keywords:
         kw_norm = str(kw).lower()
@@ -382,6 +397,20 @@ def _resolve_artifact(run_dir: Path, runtime_dir: Path, name: str) -> Path | Non
         if path.exists():
             return path
     return None
+
+
+_MISSING = object()
+
+
+def _lookup_path(doc: Any, dotted_path: str) -> Any:
+    current = doc
+    for part in str(dotted_path or "").split("."):
+        if not part:
+            continue
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING
+        current = current[part]
+    return current
 
 
 def _load_kernel_registry() -> set[str]:
@@ -612,11 +641,115 @@ def run_prompt(
     }
 
 
+def audit_runtime_contract(
+    run_dir: Path,
+    runtime_dir: Path,
+    prompt_rows: list[dict[str, Any]],
+    expectations: dict[str, Any],
+    report_path: Path,
+) -> dict[str, Any]:
+    expect = dict(expectations or {})
+    if not expect:
+        return {"status": SKIP}
+
+    reasons: list[str] = []
+    details: dict[str, Any] = {}
+    stdout = "\n".join(str(row.get("stdout") or "") for row in prompt_rows)
+
+    required_stdout = [str(x) for x in expect.get("stdout_contains") or []]
+    forbidden_stdout = [str(x) for x in expect.get("stdout_not_contains") or []]
+    for needle in required_stdout:
+        if needle and needle not in stdout:
+            reasons.append(f"stdout_missing:{needle}")
+    for needle in forbidden_stdout:
+        if needle and needle in stdout:
+            reasons.append(f"stdout_forbidden:{needle}")
+
+    config_checks = dict(expect.get("config") or {})
+    manifest_checks = dict(expect.get("manifest") or {})
+    lowered_checks = list(expect.get("lowered_ops") or [])
+
+    config_path = _resolve_artifact(run_dir, runtime_dir, "config.json")
+    manifest_path = _resolve_artifact(run_dir, runtime_dir, "weights_manifest.json")
+    lowered_path = _resolve_artifact(run_dir, runtime_dir, "lowered_decode_call.json")
+
+    if config_checks:
+        if config_path is None:
+            reasons.append("missing_artifact:config.json")
+        else:
+            config_doc = _load_json(config_path)
+            details["config_path"] = str(config_path)
+            for dotted_path, expected in config_checks.items():
+                actual = _lookup_path(config_doc, str(dotted_path))
+                if actual is _MISSING:
+                    reasons.append(f"config_missing:{dotted_path}")
+                elif actual != expected:
+                    reasons.append(f"config_mismatch:{dotted_path}:{actual!r}!={expected!r}")
+
+    if manifest_checks:
+        if manifest_path is None:
+            reasons.append("missing_artifact:weights_manifest.json")
+        else:
+            manifest_doc = _load_json(manifest_path)
+            details["manifest_path"] = str(manifest_path)
+            for dotted_path, expected in manifest_checks.items():
+                actual = _lookup_path(manifest_doc, str(dotted_path))
+                if actual is _MISSING:
+                    reasons.append(f"manifest_missing:{dotted_path}")
+                elif actual != expected:
+                    reasons.append(f"manifest_mismatch:{dotted_path}:{actual!r}!={expected!r}")
+
+    if lowered_checks:
+        if lowered_path is None:
+            reasons.append("missing_artifact:lowered_decode_call.json")
+        else:
+            lowered_doc = _load_json(lowered_path)
+            operations = lowered_doc.get("operations")
+            if not isinstance(operations, list):
+                reasons.append("lowered_missing:operations")
+            else:
+                details["lowered_path"] = str(lowered_path)
+                lowered_summary: list[dict[str, Any]] = []
+                for row in lowered_checks:
+                    if not isinstance(row, dict):
+                        continue
+                    op_name = str(row.get("op") or "").strip()
+                    function_prefix = str(row.get("function_prefix") or "").strip()
+                    min_matches = int(row.get("min_matches") or 1)
+                    matches = [
+                        str(op.get("function") or op.get("kernel") or "")
+                        for op in operations
+                        if str(op.get("op") or op.get("name") or "") == op_name
+                    ]
+                    lowered_summary.append({"op": op_name, "functions": sorted(set(matches))})
+                    if len(matches) < min_matches:
+                        reasons.append(f"lowered_missing_op:{op_name}:{len(matches)}<{min_matches}")
+                        continue
+                    if function_prefix:
+                        bad = sorted({fn for fn in matches if not fn.startswith(function_prefix)})
+                        if bad:
+                            reasons.append(f"lowered_function_mismatch:{op_name}:{bad!r}")
+                details["lowered_summary"] = lowered_summary
+
+    result = {
+        "status": PASS if not reasons else FAIL,
+        "reasons": reasons,
+        "expectations": expect,
+        "stdout_contains": required_stdout,
+        "stdout_not_contains": forbidden_stdout,
+    }
+    result.update(details)
+    report_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result
+
+
 def classify_family_result(
     *,
     build_status: str,
     smoke_status: str,
     coherence_status: str,
+    coherence_gate: bool,
+    contract_result: dict[str, Any],
     stitch_result: dict[str, Any],
     kernel_result: dict[str, Any],
     first_token_result: dict[str, Any],
@@ -627,25 +760,27 @@ def classify_family_result(
         return "build_failure", failure_reason or "build/runtime command failed"
     if smoke_status != PASS:
         return "smoke_failure", failure_reason or "prompt execution failed"
+    if contract_result.get("status") == FAIL:
+        return "contract_failure", "runtime contract/artifact audit failed"
     if stitch_result.get("status") == FAIL:
         return "stitch_failure", "lowered IR handoff validation failed"
     if kernel_result.get("status") == FAIL:
         return "kernel_selection_failure", "kernel registry/binding audit failed"
     if first_token_result.get("status") == FAIL or divergence_result.get("status") == FAIL:
         return "parity_divergence", "llama.cpp parity diverged"
-    if coherence_status != PASS:
+    if coherence_gate and coherence_status != PASS:
         return "coherence_failure", failure_reason or "generated text failed coherence heuristics"
     return "pass", ""
 
 
-def _display_rows(rows: list[tuple[str, str, str, str, str, str, str, str]]) -> str:
+def _display_rows(rows: list[tuple[str, ...]]) -> str:
     widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
     return "\n".join("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)) for row in rows)
 
 
 def render_terminal_matrix(summary: dict[str, Any]) -> str:
-    rows: list[tuple[str, str, str, str, str, str, str, str]] = [
-        ("Family", "Build", "Smoke", "Coherence", "Stitch", "Kernel", "1stTok", "Status/Class")
+    rows: list[tuple[str, ...]] = [
+        ("Family", "Build", "Smoke", "Coherence", "Contract", "Stitch", "Kernel", "1stTok", "Status/Class")
     ]
     for family in summary.get("families", []):
         rows.append(
@@ -654,6 +789,7 @@ def render_terminal_matrix(summary: dict[str, Any]) -> str:
                 str(family.get("build_status", SKIP)),
                 str(family.get("smoke_status", SKIP)),
                 str(family.get("coherence_status", SKIP)),
+                str(family.get("contract_status", SKIP)),
                 str(family.get("stitch_status", SKIP)),
                 str(family.get("kernel_status", SKIP)),
                 str(family.get("first_token_status", SKIP)),
@@ -672,12 +808,12 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         f"- overall: `{summary.get('status')}`",
         f"- failure_classes: `{summary.get('failure_classes')}`",
         "",
-        "| Family | Build | Smoke | Coherence | Stitch | Kernel | 1stTok | Status |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Family | Build | Smoke | Coherence | Contract | Stitch | Kernel | 1stTok | Status |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for family in summary.get("families", []):
         lines.append(
-            "| {family_id} | {build_status} | {smoke_status} | {coherence_status} | {stitch_status} | {kernel_status} | {first_token_status} | {status} |".format(
+            "| {family_id} | {build_status} | {smoke_status} | {coherence_status} | {contract_status} | {stitch_status} | {kernel_status} | {first_token_status} | {status} |".format(
                 **family
             )
         )
@@ -691,6 +827,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
                 f"- run_dir: `{family['run_dir']}`",
                 f"- status: `{family['status']}`",
                 f"- failure_class: `{family.get('failure_class', 'pass')}`",
+                f"- contract_status: `{family.get('contract_status', SKIP)}`",
             ]
         )
         if family.get("failure_reason"):
@@ -751,13 +888,24 @@ def run_family(
             failure_reason = f"coherence_failed:{prompt_id}:{reasons}"
 
     runtime_dir = _resolve_runtime_dir(run_dir)
-    gguf_path = _resolve_gguf_path(family.model)
-
+    contract_result: dict[str, Any] = {"status": SKIP}
     stitch_result: dict[str, Any] = {"status": SKIP}
     kernel_result: dict[str, Any] = {"status": SKIP}
     first_token_result: dict[str, Any] = {"status": SKIP}
     divergence_result: dict[str, Any] = {"status": SKIP}
-    needs_debug = build_status == PASS and (smoke_status != PASS or coherence_status != PASS)
+    parity_cfg = dict(family.parity or {})
+    always_run_parity = bool(parity_cfg.get("always_run"))
+    if build_status == PASS and smoke_status == PASS:
+        contract_result = audit_runtime_contract(
+            run_dir,
+            runtime_dir,
+            prompt_rows,
+            family.runtime_expect,
+            family_report_dir / "contract_audit.json",
+        )
+    needs_debug = build_status == PASS and (
+        smoke_status != PASS or (family.coherence_gate and coherence_status != PASS)
+    )
 
     if mode == "full" and needs_debug:
         stitch_result = run_stitch_audit(run_dir, runtime_dir, family_report_dir / "stitch_audit.json")
@@ -766,22 +914,24 @@ def run_family(
             kernel_result = audit_kernel_selection(lowered)
             (family_report_dir / "kernel_audit.json").write_text(json.dumps(kernel_result, indent=2), encoding="utf-8")
 
-    parity_prompt_id = str(family.parity.get("prompt_id") or "").strip()
+    parity_prompt_id = str(parity_cfg.get("prompt_id") or "").strip()
     kernel_path_clean = kernel_result.get("status") in {SKIP, PASS}
     stitch_path_clean = stitch_result.get("status") in {SKIP, PASS}
-    if parity_prompt_id and needs_debug and stitch_path_clean and kernel_path_clean:
+    if parity_prompt_id and (needs_debug or always_run_parity) and stitch_path_clean and kernel_path_clean:
+        gguf_path = _resolve_gguf_path(family.model)
         first_token_result = run_first_token_parity(
             runtime_dir,
             gguf_path,
-            family.parity,
+            parity_cfg,
             prompts[parity_prompt_id],
             family_report_dir / "first_token_parity.json",
         )
         if mode == "full" and first_token_result.get("status") != PASS:
+            gguf_path = _resolve_gguf_path(family.model)
             divergence_result = run_first_divergence(
                 runtime_dir,
                 gguf_path,
-                family.parity,
+                parity_cfg,
                 prompts[parity_prompt_id],
                 family_report_dir / "first_divergence.json",
             )
@@ -790,6 +940,8 @@ def run_family(
         build_status=build_status,
         smoke_status=smoke_status,
         coherence_status=coherence_status,
+        coherence_gate=family.coherence_gate,
+        contract_result=contract_result,
         stitch_result=stitch_result,
         kernel_result=kernel_result,
         first_token_result=first_token_result,
@@ -807,6 +959,7 @@ def run_family(
         "build_status": build_status,
         "smoke_status": smoke_status,
         "coherence_status": coherence_status,
+        "contract_status": contract_result.get("status", SKIP),
         "stitch_status": stitch_result.get("status", SKIP),
         "kernel_status": kernel_result.get("status", SKIP),
         "first_token_status": first_token_result.get("status", SKIP),
@@ -814,7 +967,9 @@ def run_family(
         "failure_reason": failure_reason,
         "failure_class": failure_class,
         "failure_detail": failure_detail,
+        "coherence_gate": family.coherence_gate,
         "prompts": prompt_rows,
+        "contract_audit": contract_result,
         "stitch_audit": stitch_result,
         "kernel_audit": kernel_result,
         "first_token": first_token_result,
