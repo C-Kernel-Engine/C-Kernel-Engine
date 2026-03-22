@@ -151,6 +151,72 @@ jobs:
             python3 -c "import json; d=json.load(open('docs/site/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
           fi
 
+      - name: Attach v7 Fast Regression Summary
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          latest_path = Path("docs/site/site/nightly-results/latest.json")
+          if not latest_path.exists():
+            raise SystemExit("missing nightly latest.json")
+
+          data = json.loads(latest_path.read_text(encoding="utf-8"))
+          reports_root = Path("build/v7-regression-reports")
+          summary_files = sorted(reports_root.glob("*/summary.json"))
+
+          regression_payload = {
+              "status": "not_run",
+              "mode": "fast",
+              "families_total": 0,
+              "families_passed": 0,
+              "families_failed": 0,
+              "family_rows": [],
+              "note": "make regression-fast did not run for this workflow event.",
+          }
+
+          if summary_files:
+              latest_summary = max(summary_files, key=lambda p: p.stat().st_mtime)
+              summary = json.loads(latest_summary.read_text(encoding="utf-8"))
+              families = summary.get("families") or []
+              family_rows = []
+              for fam in families:
+                  if not isinstance(fam, dict):
+                      continue
+                  family_rows.append({
+                      "family_id": fam.get("family_id"),
+                      "label": fam.get("label"),
+                      "status": "PASS" if str(fam.get("failure_class", "pass")) == "pass" else "FAIL",
+                      "build_status": fam.get("build_status"),
+                      "smoke_status": fam.get("smoke_status"),
+                      "coherence_status": fam.get("coherence_status"),
+                      "contract_status": fam.get("contract_status"),
+                      "first_token_status": fam.get("first_token_status"),
+                      "failure_reason": fam.get("failure_reason"),
+                      "failure_detail": fam.get("failure_detail"),
+                  })
+              families_passed = sum(1 for row in family_rows if row.get("status") == "PASS")
+              regression_payload = {
+                  "status": "pass" if str(summary.get("status", "")).upper() == "PASS" else "fail",
+                  "mode": summary.get("mode", "fast"),
+                  "generated_at": summary.get("generated_at"),
+                  "report_dir": summary.get("report_dir"),
+                  "summary_path": str(latest_summary),
+                  "families_total": len(family_rows),
+                  "families_passed": families_passed,
+                  "families_failed": max(0, len(family_rows) - families_passed),
+                  "failure_classes": summary.get("failure_classes", {}),
+                  "family_rows": family_rows,
+                  "note": f"Source: {latest_summary}",
+              }
+
+          data["regression_fast"] = regression_payload
+          latest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+          Path("build/nightly_report.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+          print("Attached regression_fast to nightly latest.json")
+          PY
+
       - name: Run v6.6 E2E Tests
         run: |
           echo "=== Running v6.6 E2E Tests ==="

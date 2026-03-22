@@ -162,6 +162,7 @@ def _run_tokenizer_gate(
         str(TRAIN_PIPELINE),
         "--run",
         str(mode_dir),
+        "--allow-non-cache-run-dir",
         "--init-if-missing",
         "--init",
         "xavier_uniform",
@@ -517,6 +518,11 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(line_buffering=True)
 
     if not TRAIN_PIPELINE.exists():
         raise SystemExit(f"Missing script: {TRAIN_PIPELINE}")

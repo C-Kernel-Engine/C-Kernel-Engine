@@ -368,7 +368,7 @@ MAKE_TARGETS = {
         "timeout_sec": 1800,
     },
     "v7_ir_visualizer_e2e": {
-        "name": "v7 IR Visualizer E2E (full)",
+        "name": "v7 IR Visualizer E2E (nightly)",
         "category": "parity",
         "target": "v7-ir-visualizer-e2e-nightly",
         "timeout_sec": 5400,

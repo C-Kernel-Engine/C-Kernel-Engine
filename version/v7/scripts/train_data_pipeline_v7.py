@@ -4025,9 +4025,18 @@ def _run_ck_train(
         str(args.seed),
         "--train-json-out",
         str(ck_json),
+        "--analysis-checkpoints",
+        str(getattr(args, "analysis_checkpoints", "log") or "log"),
     ]
+    if bool(getattr(args, "allow_non_cache_run_dir", False)):
+        cmd.append("--allow-non-cache-run-dir")
     if args.enforce_production_safety:
         cmd.append("--enforce-production-safety")
+    train_save_every = int(getattr(args, "train_save_every", 0) or 0)
+    if train_save_every > 0:
+        cmd.extend(["--train-save-every", str(train_save_every)])
+    if not bool(getattr(args, "train_save_final", True)):
+        cmd.append("--no-train-save-final")
     if token_file is not None:
         cmd.extend(["--train-token-file", str(token_file)])
     else:
@@ -4100,7 +4109,7 @@ def _run_v7_init(args: argparse.Namespace, run_dir: Path) -> None:
             str(args.template),
             "--train-seed",
             str(args.seed),
-        ],
+        ] + (["--allow-non-cache-run-dir"] if bool(getattr(args, "allow_non_cache_run_dir", False)) else []),
         cwd=ROOT,
     )
 
@@ -4115,6 +4124,11 @@ def main() -> int:
             f"Recommended: {_cache_train_root_hint()}/<run-name> so IR, dataset viewer, "
             "training telemetry, and parity/perf artifacts stay in one operator-visible folder."
         ),
+    )
+    ap.add_argument(
+        "--allow-non-cache-run-dir",
+        action="store_true",
+        help="Permit ephemeral run dirs outside the canonical ~/.cache/ck-engine-v7/models/train root.",
     )
     ap.add_argument(
         "--init-if-missing",
@@ -4263,9 +4277,10 @@ def main() -> int:
         default="ck_run",
         help=(
             "Training executor "
-            "(ck_run=python ctypes runtime for prototyping/debug, "
-            "ck_cli=native C CLI runtime for real training with lower overhead "
-            "and live CLI loss/progress logs)"
+            "(prefer ck_cli for full/stable/production training: native C CLI "
+            "runtime with lower overhead and live step/epoch loss logs; use "
+            "ck_run for prototyping/debug/parity orchestration around the same "
+            "generated C math path)"
         ),
     )
     ap.add_argument(
@@ -4273,6 +4288,25 @@ def main() -> int:
         type=int,
         default=0,
         help="When --train-driver ck_cli, print progress every N steps (0=auto cadence)",
+    )
+    ap.add_argument(
+        "--analysis-checkpoints",
+        choices=["log", "off"],
+        default="log",
+        help="CK runtime analysis checkpoint mode forwarded to ck_run train",
+    )
+    ap.add_argument(
+        "--train-save-every",
+        type=int,
+        default=0,
+        help="When --train-driver ck_run, write runtime weight checkpoints every N steps (0 disables)",
+    )
+    ap.set_defaults(train_save_final=True)
+    ap.add_argument(
+        "--no-train-save-final",
+        dest="train_save_final",
+        action="store_false",
+        help="When --train-driver ck_run, do not write a final runtime checkpoint at train end",
     )
     ap.add_argument(
         "--token-file-out",
@@ -4383,6 +4417,8 @@ def main() -> int:
         )
     if args.grad_accum < 1:
         _errors.append(f"--grad-accum must be >= 1, got {args.grad_accum}")
+    if args.train_save_every < 0:
+        _errors.append(f"--train-save-every must be >= 0, got {args.train_save_every}")
     if args.lr <= 0:
         _errors.append(f"--lr must be > 0, got {args.lr}")
     if args.max_grad_norm <= 0:
