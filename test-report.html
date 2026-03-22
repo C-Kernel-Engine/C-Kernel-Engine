@@ -1116,6 +1116,40 @@
       color: var(--text-muted);
       font-size: 0.9rem;
     }
+
+    .regression-section {
+      margin: 2rem 0;
+      padding: 1.25rem;
+      background: var(--dark-card);
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+    }
+    .regression-section h2 {
+      margin-top: 0;
+      margin-bottom: 0.4rem;
+    }
+    .regression-meta {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .regression-badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-right: 0.6rem;
+    }
+    .regression-badge.pass { background: rgba(72, 187, 120, 0.16); color: #48bb78; }
+    .regression-badge.fail { background: rgba(245, 101, 101, 0.16); color: #f56565; }
+    .regression-badge.skip { background: rgba(160, 174, 192, 0.18); color: #cbd5e0; }
+    .regression-family-note {
+      max-width: 420px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      white-space: normal;
+    }
   </style>
 
   <div id="loading-state" class="active">
@@ -1155,6 +1189,50 @@
         <div class="value" id="duration">0s</div>
         <div class="label">Duration</div>
       </div>
+    </div>
+
+    <div class="regression-section">
+      <h2>v7 Fast Regression</h2>
+      <p class="regression-meta" id="regression-fast-meta">
+        `make regression-fast` status is not available in this report yet.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card">
+          <div class="value" id="regression-fast-status">-</div>
+          <div class="label">Overall</div>
+        </div>
+        <div class="summary-card passed">
+          <div class="value" id="regression-fast-passed">0</div>
+          <div class="label">Families Passed</div>
+        </div>
+        <div class="summary-card failed">
+          <div class="value" id="regression-fast-failed">0</div>
+          <div class="label">Families Failed</div>
+        </div>
+        <div class="summary-card">
+          <div class="value" id="regression-fast-total">0</div>
+          <div class="label">Families Total</div>
+        </div>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Family</th>
+            <th>Status</th>
+            <th>Build</th>
+            <th>Smoke</th>
+            <th>Coherence</th>
+            <th>Contract</th>
+            <th>1stTok</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="regression-fast-tbody">
+          <tr><td colspan="8" class="updated-time">No regression-fast data published in this report.</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <h2>30-Day History</h2>
@@ -1316,6 +1394,8 @@
       (<code>make visualizer</code>, <code>make visualizer-full</code>)</li>
     <li><strong>v7 Visualizer Health Gate</strong>: Contract-driven static analysis (160 checks) + JS unit tests (100 test vectors) for IR visualizer, dataset viewer, and IR hub
       (<code>make v7-visualizer-health</code>)</li>
+    <li><strong>v7 Fast Regression</strong>: Family bring-up gate for Gemma, Qwen2, Qwen3, Qwen3.5, and Nanbeige with build/smoke/contract/first-token checks
+      (<code>make regression-fast</code>)</li>
     <li><strong>v7 Regression Ledger</strong>: Canonical root-cause log for fixed and monitored bugs, consumed by operators in the visualizer
       (<code>version/v7/reports/REGRESSION_LEDGER.md</code>, <code>version/v7/reports/REGRESSION_LEDGER.json</code>)</li>
     <li><strong>llama.cpp Parity</strong>: CK vs llama.cpp kernel parity flow
@@ -1330,7 +1410,7 @@
     <div>
       <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
-      <span style="color: var(--text-muted);">Nightly coverage now includes v7 backprop kernel parity and visualizer runbook regression checks.</span>
+      <span style="color: var(--text-muted);">Nightly coverage now includes v7 backprop kernel parity, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
     </div>
   </div>
 
@@ -1593,6 +1673,7 @@ function renderResults(data) {
   const subFailed = summary.sub_tests_failed || 0;
   document.getElementById('sub-tests-passed').textContent = subPassed;
   document.getElementById('sub-tests-failed').textContent = subFailed;
+  renderRegressionFast(data.regression_fast || null);
 
   const statusEl = document.getElementById('overall-status');
   if (failed > 0) {
@@ -1672,6 +1753,60 @@ function renderResults(data) {
       `;
       tbody.appendChild(subTr);
     }
+  });
+}
+
+function renderRegressionFast(data) {
+  const metaEl = document.getElementById('regression-fast-meta');
+  const statusEl = document.getElementById('regression-fast-status');
+  const passedEl = document.getElementById('regression-fast-passed');
+  const failedEl = document.getElementById('regression-fast-failed');
+  const totalEl = document.getElementById('regression-fast-total');
+  const tbody = document.getElementById('regression-fast-tbody');
+
+  if (!data) {
+    metaEl.textContent = 'make regression-fast status is not available in this report yet.';
+    statusEl.textContent = '-';
+    passedEl.textContent = '0';
+    failedEl.textContent = '0';
+    totalEl.textContent = '0';
+    tbody.innerHTML = '<tr><td colspan="8" class="updated-time">No regression-fast data published in this report.</td></tr>';
+    return;
+  }
+
+  const rows = data.family_rows || [];
+  const status = String(data.status || 'not_run').toLowerCase();
+  const familiesPassed = Number.isFinite(data.families_passed) ? data.families_passed : rows.filter(r => String(r.status || '').toUpperCase() === 'PASS').length;
+  const familiesFailed = Number.isFinite(data.families_failed) ? data.families_failed : Math.max(0, rows.length - familiesPassed);
+  const familiesTotal = Number.isFinite(data.families_total) ? data.families_total : rows.length;
+
+  metaEl.textContent = data.note || `Mode: ${data.mode || 'fast'}${data.generated_at ? ' · Generated: ' + new Date(data.generated_at).toLocaleString() : ''}`;
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'N/R';
+  passedEl.textContent = String(familiesPassed);
+  failedEl.textContent = String(familiesFailed);
+  totalEl.textContent = String(familiesTotal);
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="updated-time">No family rows were published for regression-fast.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    const rowStatus = String(row.status || 'SKIP').toUpperCase();
+    const badgeClass = rowStatus === 'PASS' ? 'pass' : rowStatus === 'FAIL' ? 'fail' : 'skip';
+    tr.innerHTML = `
+      <td><code>${row.label || row.family_id || '-'}</code></td>
+      <td><span class="regression-badge ${badgeClass}">${rowStatus}</span></td>
+      <td>${row.build_status || '-'}</td>
+      <td>${row.smoke_status || '-'}</td>
+      <td>${row.coherence_status || '-'}</td>
+      <td>${row.contract_status || '-'}</td>
+      <td>${row.first_token_status || '-'}</td>
+      <td class="regression-family-note">${row.failure_detail || row.failure_reason || ''}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
 
@@ -2004,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', loadResults);
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-21</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
             </div>
         </div>
     </footer>
