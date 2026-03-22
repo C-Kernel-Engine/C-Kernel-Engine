@@ -24,8 +24,12 @@ The code generator (`build/ck_ir_demo`) can emit a `libmodel.so` that supports:
 
 ## Git Hooks (Recommended)
 
-Enable pre-push checks (build, parity, e2e):
+Enable repo hooks:
 
 ```bash
 ./scripts/setup-hooks.sh
 ```
+
+This enables:
+- `pre-commit`: runs `make regression-fast` when staged changes touch runtime/regression paths
+- `pre-push`: runs the heavier build/parity/e2e gate
