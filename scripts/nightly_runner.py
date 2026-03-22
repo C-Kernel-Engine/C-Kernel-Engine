@@ -320,10 +320,10 @@ MAKE_TARGETS = {
     #     "timeout_sec": 600,
     # },
     "llamacpp_parity": {
-        "name": "llama.cpp Parity (Full)",
+        "name": "llama.cpp Parity (Nightly)",
         "category": "parity",
-        "target": "llamacpp-parity-full",
-        "timeout_sec": 900,  # Full test takes longer
+        "target": "llamacpp-parity-nightly",
+        "timeout_sec": 600,
     },
     "flash_attention": {
         "name": "Flash Attention (50K+)",

@@ -1827,6 +1827,24 @@ llamacpp-parity-full:
 	@echo "Running DeltaNet ISA benchmark..."
 	@$(MAKE) --no-print-directory test-deltanet-avx-bench
 
+# Nightly parity profile: keep correctness coverage, but use quick ISA parity
+# benches so nightly does not block on long benchmark loops.
+llamacpp-parity-nightly:
+	@echo "Running nightly llama.cpp parity test..."
+	@./scripts/run_parity_smoketest.sh --skip-build
+	@echo ""
+	@echo "Running OpenMP GEMV parity tests (serial vs parallel)..."
+	@$(MAKE) --no-print-directory test-gemv-omp
+	@echo ""
+	@echo "Running Thread Pool GEMV parity tests (serial vs dispatch)..."
+	@$(MAKE) --no-print-directory test-threadpool-parity
+	@echo ""
+	@echo "Running GEMM AVX vs scalar benchmark (quick)..."
+	@$(MAKE) --no-print-directory test-gemm-avx-bench-quick
+	@echo ""
+	@echo "Running DeltaNet ISA benchmark (quick)..."
+	@$(MAKE) --no-print-directory test-deltanet-avx-bench-quick
+
 # Full parity + ISA variant sweep for GEMM AVX benchmarks
 llamacpp-parity-full-all-isa-variants:
 	@echo "Running ISA variant sweep (AVX/AVX2/AVX-512) + full parity..."
