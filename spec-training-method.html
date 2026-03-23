@@ -2828,7 +2828,7 @@ Next run:</pre>
         <tr>
             <td>Capacity</td>
             <td>Is the model too small, or is the task still badly shaped?</td>
-            <td>Only scale after grammar, compiler, and data are stable</td>
+            <td>Only scale after grammar, compiler, data, and probe paths are stable; large rung-to-rung swings on one small model usually mean recipe trouble before capacity trouble</td>
         </tr>
         <tr>
             <td>Evaluation</td>
@@ -2882,6 +2882,8 @@ Next run:</pre>
     <li>If the model confuses two families, add contrast rows and family-local anchors.</li>
     <li>If the DSL is too verbose or ambiguous, start a new spec instead of piling on more data.</li>
     <li>If the compiler cannot express the target asset, fix the compiler before retraining.</li>
+    <li>If a seeded checkpoint suddenly probes as all-zero before any new training, stop and verify seed/probe integrity before blaming the curriculum.</li>
+    <li>If "negative" cleanup rows are added under ordinary cross-entropy supervision, remember they are still positive targets for the model; treat contamination rows as hazardous, not automatically corrective.</li>
 </ul>
 
 <p>
@@ -2939,6 +2941,13 @@ Next run:</pre>
             <td>special-token leak rate</td>
             <td>tokenizer boundary contamination, bad row boundaries</td>
             <td>strip/control special tokens and strengthen scene-only targets</td>
+        </tr>
+        <tr>
+            <td><code>contamination_supervision</code></td>
+            <td>cleanup or restart rows teach junk surfaces directly; outputs collapse to empty strings, stray single tokens, or contaminated prefixes after a repair push</td>
+            <td>empty-response rate, missing-scene-start rate, contamination-token frequency in training rows, before/after repair-row deltas</td>
+            <td>synthetic corruption was mixed into ordinary CE targets and learned as part of the distribution</td>
+            <td>remove contamination rows, protect full-scene replay anchors, and rerun a tiny canary before any broader repair pass</td>
         </tr>
         <tr>
             <td><code>layout_drift</code></td>
@@ -3002,6 +3011,20 @@ Next run:</pre>
             <td>mismatch between exact, renderable, and materialized evidence</td>
             <td>reporting or probe bug</td>
             <td>fix probe/report path first</td>
+        </tr>
+        <tr>
+            <td><code>seed_probe_integrity_gap</code></td>
+            <td>a copied "good" checkpoint probes as broken before any new training</td>
+            <td>seed-only probe result, artifact hash equality, tokenizer/template sidecar parity, live-vs-historic baseline repro</td>
+            <td>seed staging bug, probe-runner drift, or decode/runtime drift rather than new training damage</td>
+            <td>add a seed-only probe gate and repair staging/probe integrity before launching another rung</td>
+        </tr>
+        <tr>
+            <td><code>capacity_misdiagnosis</code></td>
+            <td>operators want a bigger model because a few repair runs failed, but the same architecture already moved from near-zero to strong probe scores on cleaner recipes</td>
+            <td>best-vs-worst rung spread on the same architecture, family stability under recipe changes, plateau across multiple clean canaries</td>
+            <td>recipe or evaluation instability is being mistaken for a hard parameter limit</td>
+            <td>stabilize the curriculum and probes first; scale only after several clean recipes plateau on the same failure class</td>
         </tr>
     </tbody>
 </table>
@@ -3073,6 +3096,24 @@ Next run:</pre>
 
 <p>
     A simple interpretation rule helps keep the read honest: low exact with high renderable usually means semantic or ordering drift; low renderable with low truncation usually means grammar corruption; high truncation is a budget problem; high exact with low materialized exact is a compiler or probe bug.
+</p>
+
+<h3>Repair Ladder Lessons</h3>
+
+<p>
+    A recurring mistake in small-to-medium DSL runs is to treat every bad output as a direct template for the next repair row. That is too naive. The model does not understand that a row was meant as a warning; under ordinary supervised training it only sees another target distribution to imitate.
+</p>
+
+<ul>
+    <li>Do not treat synthetic corruption rows as automatically "negative data." Under cross-entropy, they are still positive supervision unless a different objective is used.</li>
+    <li>Protect full-scene replay anchors from the last good rung. Local continuation repairs should stay subordinate to full canonical scenes.</li>
+    <li>Separate three gates before training: probe-path integrity, seed-copy integrity, and then curriculum quality. A broken probe can look exactly like a broken rung.</li>
+    <li>If one small architecture already spans a wide quality range across runs, the next bottleneck is usually recipe shape, not model size.</li>
+    <li>Use tiny seeded canaries after a failure. If a <code>0.1x</code> or <code>0.2x</code> corrective run still destabilizes the same contract, pause rung-chasing and rethink the materializer itself.</li>
+</ul>
+
+<p>
+    In other words: do not use bigger models to paper over a broken supervision surface. Scale capacity when the contract is stable and the same clean failure persists across multiple disciplined canaries. Until then, the higher-signal move is to improve the curriculum, replay anchors, and measurement path.
 </p>
 
 <h3>What To Copy From Frontier Practice</h3>
@@ -3453,7 +3494,7 @@ Next run:</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-22</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-23</p>
             </div>
         </div>
     </footer>
