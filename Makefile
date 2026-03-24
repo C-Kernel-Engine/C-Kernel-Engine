@@ -3557,6 +3557,7 @@ V7_STABILIZATION_RUNTIME_CHECKS ?= 1
 V7_STABILIZATION_BACKEND_XRAY ?= 1
 V7_STABILIZATION_FORCE ?= 1
 V7_STABILIZATION_MAIN_RUN_DIR ?=
+V7_STABILIZATION_FAMILY_TEMPLATES ?= qwen2
 V7_STABILIZATION_JSON ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_latest.json
 V7_STABILIZATION_MD ?= $(V7_REPORT_DIR)/training_stabilization_scorecard_latest.md
 V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.jsonl
@@ -3617,7 +3618,7 @@ v7-help:
 	@echo "  make v7-train-data-pipeline"
 	@echo "  make v7-stabilization-nightly"
 	@echo "     knobs: V7_PIPELINE_TOKENIZER=byte|bpe V7_PIPELINE_WITH_TORCH=0|1 V7_PIPELINE_OPEN_VIS=0|1 (default: 1)"
-	@echo "     knobs: V7_STABILIZATION_LAYERS=1,2,3,4 V7_STABILIZATION_TOKEN_BUDGETS=2048,4096 V7_STABILIZATION_GRAD_ACCUM_SWEEP=2,4,8 V7_STABILIZATION_MAIN_RUN_DIR=/path/to/run"
+	@echo "     knobs: V7_STABILIZATION_LAYERS=1,2,3,4 V7_STABILIZATION_TOKEN_BUDGETS=2048,4096 V7_STABILIZATION_GRAD_ACCUM_SWEEP=2,4,8 V7_STABILIZATION_FAMILY_TEMPLATES=qwen2 V7_STABILIZATION_MAIN_RUN_DIR=/path/to/run"
 	@echo "  make v7-train-parity-drift-smoke"
 	@echo "  make v7-train-parity-drift-localize"
 	@echo "  make v7-train-parity-long-horizon"
@@ -4280,6 +4281,7 @@ v7-stabilization-nightly:
 	if [ "$(V7_STABILIZATION_FORCE)" = "1" ]; then extra_flags="$$extra_flags --force-regimen"; fi; \
 	if [ -n "$(V7_STABILIZATION_RUN_ROOT)" ]; then extra_flags="$$extra_flags --run-root $(V7_STABILIZATION_RUN_ROOT)"; fi; \
 	if [ -n "$(V7_STABILIZATION_MAIN_RUN_DIR)" ]; then extra_flags="$$extra_flags --main-run-dir $(V7_STABILIZATION_MAIN_RUN_DIR)"; fi; \
+	if [ -n "$(V7_STABILIZATION_FAMILY_TEMPLATES)" ]; then extra_flags="$$extra_flags --family-templates $(V7_STABILIZATION_FAMILY_TEMPLATES)"; fi; \
 	$(PYTHON) version/v7/scripts/run_v7_stabilization_nightly_v7.py \
 		--dataset "$(V7_STABILIZATION_DATA)" \
 		--layers "$(V7_STABILIZATION_LAYERS)" \

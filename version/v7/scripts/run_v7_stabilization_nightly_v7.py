@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = Path(__file__).resolve().parent
 TRAIN_PIPELINE = SCRIPT_DIR / "train_data_pipeline_v7.py"
 PARITY_REGIMEN = SCRIPT_DIR / "run_training_parity_regimen_v7.py"
+CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
 
 
 def _default_train_run_root() -> Path:
@@ -72,6 +73,20 @@ def _parse_csv_ints(spec: str, *, name: str, min_value: int = 1) -> List[int]:
     if not out:
         raise ValueError(f"Empty {name} list")
     return sorted(set(out))
+
+
+def _parse_csv_strings(spec: str, *, name: str) -> List[str]:
+    out: List[str] = []
+    seen = set()
+    for tok in [t.strip() for t in str(spec).split(",") if t.strip()]:
+        key = tok.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(tok)
+    if not out:
+        raise ValueError(f"Empty {name} list")
+    return out
 
 
 def _json_dump(path: Path, payload: Dict[str, Any]) -> None:
@@ -375,6 +390,8 @@ def _run_regimen_case(
 
     return {
         "case_id": case_id,
+        "case_kind": "matrix",
+        "template": None,
         "layers": int(layer),
         "token_budget": int(token_budget),
         "seq_len": int(seq_len),
@@ -399,6 +416,64 @@ def _run_regimen_case(
             "final_ck_loss": float(final_ck_loss),
             "final_torch_loss": float(final_torch_loss),
         },
+    }
+
+
+def _pick_head_layout(d_model: int) -> tuple[int, int]:
+    if d_model >= 8 and (d_model % 8) == 0:
+        return 8, 4
+    if d_model >= 4 and (d_model % 4) == 0:
+        return 4, 4
+    return 1, 1
+
+
+def _init_family_run(
+    *,
+    python_exec: str,
+    run_root: Path,
+    template: str,
+    num_layers: int,
+    vocab: int,
+    d_model: int,
+    hidden: int,
+    seq_len: int,
+) -> Dict[str, Any]:
+    family_dir = run_root / "family_runs" / str(template)
+    family_dir.mkdir(parents=True, exist_ok=True)
+    init_log = family_dir / "init.log"
+    num_heads, num_kv_heads = _pick_head_layout(int(d_model))
+    cmd = [
+        python_exec,
+        str(CK_RUN),
+        "init",
+        "--run",
+        str(family_dir),
+        "--allow-non-cache-run-dir",
+        "--template",
+        str(template),
+        "--layers",
+        str(num_layers),
+        "--vocab-size",
+        str(vocab),
+        "--embed-dim",
+        str(d_model),
+        "--hidden-dim",
+        str(hidden),
+        "--num-heads",
+        str(num_heads),
+        "--num-kv-heads",
+        str(num_kv_heads),
+        "--context-len",
+        str(max(128, int(seq_len))),
+        "--init",
+        "xavier_uniform",
+    ]
+    init_info = _run_cmd(cmd, log_path=init_log)
+    return {
+        "run_dir": family_dir,
+        "log": str(init_log),
+        "rc": int(init_info["rc"]),
+        "duration_s": float(init_info["duration_s"]),
     }
 
 
@@ -432,8 +507,8 @@ def _render_markdown(payload: Dict[str, Any]) -> str:
 
     lines.append("## Parity Matrix")
     lines.append("")
-    lines.append("| Case | Status | Layers | Token Budget | Final CK Loss | Replay | Failed Stages |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+    lines.append("| Case | Template | Kind | Status | Layers | Token Budget | Final CK Loss | Replay | Failed Stages |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for row in payload.get("matrix_cases", []):
         if not isinstance(row, dict):
             continue
@@ -444,7 +519,7 @@ def _render_markdown(payload: Dict[str, Any]) -> str:
         if isinstance(ck_loss, (int, float)) and math.isfinite(float(ck_loss)):
             ck_loss_txt = f"{float(ck_loss):.6f}"
         lines.append(
-            f"| {row.get('case_id','')} | {row.get('status','')} | {row.get('layers','')} | {row.get('token_budget','')} | {ck_loss_txt} | {m.get('replay_determinism_pass','-')} | {failed} |"
+            f"| {row.get('case_id','')} | {row.get('template','-') or '-'} | {row.get('case_kind','matrix')} | {row.get('status','')} | {row.get('layers','')} | {row.get('token_budget','')} | {ck_loss_txt} | {m.get('replay_determinism_pass','-')} | {failed} |"
         )
 
     lines.append("")
@@ -513,6 +588,12 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--md-out", type=Path, default=None)
     ap.add_argument("--history-jsonl", type=Path, default=None)
     ap.add_argument("--main-run-dir", type=Path, default=None, help="Optional run-dir to validate current main weights as an extra case.")
+    ap.add_argument(
+        "--family-templates",
+        type=str,
+        default="qwen2",
+        help="Comma list of tiny training templates to validate as explicit family cases (default: qwen2). Use 'none' to disable.",
+    )
     return ap.parse_args()
 
 
@@ -532,12 +613,16 @@ def main() -> int:
     python_exec = _pick_python(args.python_exec)
     run_root = args.run_root.expanduser().resolve()
     run_root.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("CK_CACHE_DIR", str((run_root / ".cache" / "models").resolve()))
     dataset_path = args.dataset.expanduser().resolve()
     if not dataset_path.exists():
         raise SystemExit(f"Dataset not found: {dataset_path}")
 
     layers = _parse_csv_ints(args.layers, name="layers", min_value=1)
     token_budgets = _parse_csv_ints(args.token_budgets, name="token_budgets", min_value=args.seq_len + 1)
+    family_templates: List[str] = []
+    if str(args.family_templates).strip().lower() not in {"", "none", "off"}:
+        family_templates = _parse_csv_strings(args.family_templates, name="family_templates")
 
     json_out = args.json_out.expanduser().resolve() if args.json_out else (run_root / "training_stabilization_scorecard_latest.json")
     md_out = args.md_out.expanduser().resolve() if args.md_out else (run_root / "training_stabilization_scorecard_latest.md")
@@ -598,6 +683,84 @@ def main() -> int:
             )
             matrix_cases.append(case)
 
+    if family_templates:
+        family_layers = int(layers[-1])
+        family_token_budget = int(token_budgets[-1])
+        family_accum_values = _parse_csv_ints(args.grad_accum_sweep, name="grad_accum_sweep", min_value=1)
+        for template_name in family_templates:
+            case_id = f"family_{template_name}"
+            print(f"[family-case] template={template_name} case={case_id}")
+            init_info = _init_family_run(
+                python_exec=python_exec,
+                run_root=run_root,
+                template=template_name,
+                num_layers=family_layers,
+                vocab=int(args.vocab),
+                d_model=int(args.d_model),
+                hidden=int(args.hidden),
+                seq_len=int(args.seq_len),
+            )
+            if int(init_info["rc"]) != 0:
+                matrix_cases.append(
+                    {
+                        "case_id": case_id,
+                        "case_kind": "family",
+                        "template": str(template_name),
+                        "layers": family_layers,
+                        "token_budget": family_token_budget,
+                        "seq_len": int(args.seq_len),
+                        "sweep_steps_per_epoch": 0,
+                        "stability_grid": None,
+                        "grad_accum_sweep": [int(v) for v in family_accum_values],
+                        "status": "FAIL",
+                        "rc": int(init_info["rc"]),
+                        "duration_s": float(init_info["duration_s"]),
+                        "artifact_json": None,
+                        "artifact_md": None,
+                        "artifact_log": str(init_info["log"]),
+                        "metrics": {
+                            "total_stages": 0,
+                            "passed_stages": 0,
+                            "failed_stage_ids": ["init"],
+                            "a1_max_loss_abs_diff": math.nan,
+                            "a1_mean_loss_abs_diff": math.nan,
+                            "a1_final_param_max_abs_diff": math.nan,
+                            "replay_determinism_pass": None,
+                            "replay_accum_pass": None,
+                            "final_ck_loss": math.nan,
+                            "final_torch_loss": math.nan,
+                        },
+                    }
+                )
+                continue
+            family_case = _run_regimen_case(
+                python_exec=python_exec,
+                case_dir=run_root / "matrix" / case_id,
+                case_id=case_id,
+                layer=family_layers,
+                token_budget=family_token_budget,
+                seq_len=int(args.seq_len),
+                grad_accum_sweep=str(args.grad_accum_sweep),
+                sweep_epochs=int(args.sweep_epochs),
+                forward_epochs=int(args.forward_epochs),
+                lr=float(args.lr),
+                seed=int(args.seed),
+                vocab=int(args.vocab),
+                d_model=int(args.d_model),
+                hidden=int(args.hidden),
+                loss_tol=float(args.loss_tol),
+                param_tol=float(args.param_tol),
+                ck_loss_backend=str(args.ck_loss_backend),
+                train_text=str(args.train_text),
+                runtime_checks=bool(args.runtime_checks),
+                backend_xray=bool(args.backend_xray),
+                force_regimen=bool(args.force_regimen),
+                run_dir=Path(init_info["run_dir"]),
+            )
+            family_case["case_kind"] = "family"
+            family_case["template"] = str(template_name)
+            matrix_cases.append(family_case)
+
     if args.main_run_dir is not None:
         main_run_dir = args.main_run_dir.expanduser().resolve()
         if not main_run_dir.exists():
@@ -628,6 +791,7 @@ def main() -> int:
             force_regimen=bool(args.force_regimen),
             run_dir=main_run_dir,
         )
+        main_case["case_kind"] = "main_run"
         matrix_cases.append(main_case)
 
     main_run_quality: Dict[str, Any] = {}
@@ -711,6 +875,7 @@ def main() -> int:
             "backend_xray": bool(args.backend_xray),
             "force_regimen": bool(args.force_regimen),
             "main_run_dir": (str(args.main_run_dir.expanduser().resolve()) if args.main_run_dir is not None else None),
+            "family_templates": list(family_templates),
         },
         "tokenizer_gates": tokenizer_gates,
         "matrix_cases": matrix_cases,
