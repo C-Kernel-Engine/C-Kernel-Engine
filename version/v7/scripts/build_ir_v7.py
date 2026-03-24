@@ -2015,6 +2015,21 @@ def _resolve_rope_qk_kernel(config: Dict, template_kernels: Dict[str, Any]) -> s
     return "rope_forward_qk"
 
 
+def _resolve_rope_backward_qk_kernel(config: Dict, default_kernel: str = "rope_backward_qk_f32") -> str:
+    rope_layout = _normalize_rope_layout_value(config.get("rope_layout"))
+
+    if rope_layout == "pairwise":
+        return "rope_backward_qk_pairwise_f32"
+
+    if rope_layout == "split":
+        return "rope_backward_qk_f32"
+
+    fallback = str(default_kernel or "").strip()
+    if fallback:
+        return fallback
+    return "rope_backward_qk_f32"
+
+
 def _resolve_logical_buffer_name(
     planner_buffer: str,
     slot: Any,

@@ -17,6 +17,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import build_ir_v7
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 V7_ROOT = SCRIPT_DIR.parent
@@ -59,12 +61,27 @@ def _binding_ids(bindings_doc: Dict[str, Any]) -> Dict[str, Any]:
     return dict(bindings_doc.get("bindings", {}))
 
 
-def _resolve_backward_kernel_id(spec: Dict[str, Any], fwd: Dict[str, Any]) -> str:
+def _resolve_ir1_config(ir1: Dict[str, Any]) -> Dict[str, Any]:
+    config = deepcopy(ir1.get("config", {}))
+    rope_layout = build_ir_v7._normalize_rope_layout_value(config.get("rope_layout"))
+    if rope_layout:
+        config["rope_layout"] = rope_layout
+        return config
+
+    template_name = str(ir1.get("template_name", "") or "").strip().lower()
+    template_doc = build_ir_v7._load_builtin_template_doc(template_name)
+    if isinstance(template_doc, dict):
+        attention_contract = ((template_doc.get("contract") or {}).get("attention_contract") or {})
+        template_rope_layout = build_ir_v7._normalize_rope_layout_value(attention_contract.get("rope_layout"))
+        if template_rope_layout:
+            config["rope_layout"] = template_rope_layout
+    return config
+
+
+def _resolve_backward_kernel_id(spec: Dict[str, Any], config: Dict[str, Any]) -> str:
     kernel_id = str(spec.get("kernel_id", ""))
-    if kernel_id == "rope_backward_qk_f32":
-        forward_kernel_id = str(fwd.get("kernel_id", "")).strip().lower()
-        if "pairwise" in forward_kernel_id:
-            return "rope_backward_qk_pairwise_f32"
+    if kernel_id in {"rope_backward_qk_f32", "rope_backward_qk_pairwise_f32"}:
+        return build_ir_v7._resolve_rope_backward_qk_kernel(config, kernel_id)
     return kernel_id
 
 
@@ -190,7 +207,7 @@ def synthesize_ir2_backward(
     kernels = _kernel_ids(registry)
     bindings = _binding_ids(bindings_doc)
     rules = grad_rules.get("rules", {}) or {}
-    config = deepcopy(ir1.get("config", {}))
+    config = _resolve_ir1_config(ir1)
     activation_default_numel = _default_activation_numel(config)
 
     forward_ops = list(ir1.get("ops", []))
@@ -420,7 +437,7 @@ def synthesize_ir2_backward(
         fwd_weights = fwd.get("weights", {}) or {}
 
         for spec in backward_specs:
-            kernel_id = _resolve_backward_kernel_id(spec, fwd)
+            kernel_id = _resolve_backward_kernel_id(spec, config)
             role = str(spec.get("role", "core"))
 
             if kernel_id not in kernels:

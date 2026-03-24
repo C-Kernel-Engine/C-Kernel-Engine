@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 
@@ -102,6 +103,7 @@ class TrainRopeFixTests(unittest.TestCase):
             strict=False,
         )
         self.assertEqual(_first_rope_kernel(ir1), "rope_forward_qk_pairwise")
+        self.assertEqual((ir1.get("config") or {}).get("rope_layout"), "pairwise")
 
     def test_ropefix_builder_preserves_split_rope_for_qwen3(self) -> None:
         ir1 = build_ir_train_ropefix_v7.build_ir1_train_ropefix(
@@ -124,6 +126,7 @@ class TrainRopeFixTests(unittest.TestCase):
             strict=False,
         )
         self.assertEqual(_first_rope_kernel(ir1), "rope_forward_qk")
+        self.assertEqual((ir1.get("config") or {}).get("rope_layout"), "split")
 
     def test_ropefix_builder_restores_stable_kernel_map_after_use(self) -> None:
         self.assertEqual(build_ir_train_v7.FORWARD_KERNEL_BY_OP["rope_qk"], "rope_forward_qk")
@@ -181,6 +184,38 @@ class TrainRopeFixTests(unittest.TestCase):
         )
         ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
             ir1=ir1,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            strict=False,
+            allow_partial=True,
+            checkpoint_policy="none",
+        )
+        rope_backward_kernels = [
+            str(op.get("kernel_id"))
+            for op in ir2.get("backward", [])
+            if str(op.get("op", "")).startswith("rope_qk_backward_")
+        ]
+        self.assertIn("rope_backward_qk_f32", rope_backward_kernels)
+        self.assertNotIn("rope_backward_qk_pairwise_f32", rope_backward_kernels)
+
+    def test_lower_ir2_uses_config_rope_layout_not_forward_kernel_name(self) -> None:
+        ir1 = build_ir_train_ropefix_v7.build_ir1_train_ropefix(
+            manifest=_test_manifest("llama"),
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+        )
+        tampered = deepcopy(ir1)
+        tampered["config"]["rope_layout"] = "split"
+        for op in tampered.get("ops", []):
+            if str(op.get("op")) == "rope_qk":
+                op["kernel_id"] = "rope_forward_qk_pairwise"
+                break
+        ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
+            ir1=tampered,
             registry=self.registry,
             bindings_doc=self.bindings,
             grad_rules=self.grad_rules,

@@ -122,6 +122,69 @@ def _load_lib() -> ctypes.CDLL:
     except Exception:
         pass
 
+    lib.rope_forward_qk_with_rotary_dim.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    lib.rope_forward_qk_with_rotary_dim.restype = None
+
+    lib.rope_forward_qk_pairwise_with_rotary_dim.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    lib.rope_forward_qk_pairwise_with_rotary_dim.restype = None
+
+    lib.rope_backward_qk.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    lib.rope_backward_qk.restype = None
+
+    lib.rope_backward_qk_pairwise_with_rotary_dim.argtypes = [
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    lib.rope_backward_qk_pairwise_with_rotary_dim.restype = None
+
     return lib
 
 
@@ -300,6 +363,269 @@ def c_cross_entropy(
     return CCrossEntropyFn.apply(logits, targets, lib, kernel_variant)
 
 
+def _normalize_rope_layout(name: str) -> str:
+    layout = str(name or "").strip().lower()
+    aliases = {
+        "": "none",
+        "off": "none",
+        "disabled": "none",
+        "none": "none",
+        "split": "split",
+        "standard": "split",
+        "half": "split",
+        "pairwise": "pairwise",
+        "interleaved": "pairwise",
+        "even_odd": "pairwise",
+    }
+    return aliases.get(layout, layout)
+
+
+def _auto_rope_heads(d_model: int, requested: int) -> int:
+    if int(requested) > 0:
+        heads = int(requested)
+        if d_model % heads != 0:
+            raise ValueError(f"Invalid rope heads: d_model={d_model} not divisible by rope_heads={heads}")
+        return heads
+    for heads in (16, 8, 4, 2, 1):
+        if d_model % heads == 0:
+            return heads
+    return 1
+
+
+def _resolve_rope_cfg(d_model: int, rope_layout: str, rope_heads: int, rope_rotary_dim: int) -> dict[str, int | str]:
+    layout = _normalize_rope_layout(rope_layout)
+    if layout == "none":
+        return {"layout": "none", "enabled": 0}
+    heads = _auto_rope_heads(int(d_model), int(rope_heads))
+    head_dim = int(d_model) // heads
+    rotary_dim = int(rope_rotary_dim) if int(rope_rotary_dim) > 0 else head_dim
+    rotary_dim = max(0, min(rotary_dim, head_dim))
+    rotary_dim -= rotary_dim % 2
+    if rotary_dim <= 0:
+        return {"layout": "none", "enabled": 0}
+    return {
+        "layout": layout,
+        "enabled": 1,
+        "num_heads": heads,
+        "num_kv_heads": heads,
+        "head_dim": head_dim,
+        "rotary_dim": rotary_dim,
+    }
+
+
+def _precompute_freqs_cis_pytorch(head_dim: int, max_seq_len: int, base: float = 10000.0) -> tuple[torch.Tensor, torch.Tensor]:
+    half_dim = head_dim // 2
+    freqs = 1.0 / (base ** (torch.arange(0, half_dim, dtype=torch.float32) * 2.0 / float(head_dim)))
+    t = torch.arange(max_seq_len, dtype=torch.float32)
+    angles = torch.outer(t, freqs)
+    return torch.cos(angles), torch.sin(angles)
+
+
+def _rope_forward_pytorch_vectorized(x: torch.Tensor, cos_cache: torch.Tensor, sin_cache: torch.Tensor) -> torch.Tensor:
+    _, t, d = x.shape
+    half_dim = d // 2
+    cos = cos_cache[:t]
+    sin = sin_cache[:t]
+    x1 = x[..., :half_dim]
+    x2 = x[..., half_dim:]
+    out1 = x1 * cos - x2 * sin
+    out2 = x1 * sin + x2 * cos
+    return torch.cat([out1, out2], dim=-1)
+
+
+def _rope_backward_pytorch_vectorized(d_out: torch.Tensor, cos_cache: torch.Tensor, sin_cache: torch.Tensor) -> torch.Tensor:
+    _, t, d = d_out.shape
+    half_dim = d // 2
+    cos = cos_cache[:t]
+    sin = sin_cache[:t]
+    d1 = d_out[..., :half_dim]
+    d2 = d_out[..., half_dim:]
+    out1 = d1 * cos + d2 * sin
+    out2 = -d1 * sin + d2 * cos
+    return torch.cat([out1, out2], dim=-1)
+
+
+def _rope_forward_pytorch_pairwise_vectorized(
+    x: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    rotary_dim: int,
+) -> torch.Tensor:
+    _, t, d = x.shape
+    rotary = min(int(rotary_dim), d)
+    rotary -= rotary % 2
+    if rotary <= 0:
+        return x.clone()
+    half_dim = rotary // 2
+    cos = cos_cache[:t, :half_dim]
+    sin = sin_cache[:t, :half_dim]
+    out = x.clone()
+    even = x[..., 0:rotary:2]
+    odd = x[..., 1:rotary:2]
+    out[..., 0:rotary:2] = even * cos - odd * sin
+    out[..., 1:rotary:2] = even * sin + odd * cos
+    return out
+
+
+def _rope_backward_pytorch_pairwise_vectorized(
+    d_out: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    rotary_dim: int,
+) -> torch.Tensor:
+    _, t, d = d_out.shape
+    rotary = min(int(rotary_dim), d)
+    rotary -= rotary % 2
+    if rotary <= 0:
+        return d_out.clone()
+    half_dim = rotary // 2
+    cos = cos_cache[:t, :half_dim]
+    sin = sin_cache[:t, :half_dim]
+    out = d_out.clone()
+    d_even = d_out[..., 0:rotary:2]
+    d_odd = d_out[..., 1:rotary:2]
+    out[..., 0:rotary:2] = d_even * cos + d_odd * sin
+    out[..., 1:rotary:2] = -d_even * sin + d_odd * cos
+    return out
+
+
+def _token_major_to_head_major(x: torch.Tensor, num_heads: int, head_dim: int) -> torch.Tensor:
+    tokens, width = x.shape
+    if width != num_heads * head_dim:
+        raise ValueError(f"RoPE shape mismatch: width={width} != num_heads*head_dim={num_heads * head_dim}")
+    return x.reshape(tokens, num_heads, head_dim).permute(1, 0, 2).contiguous()
+
+
+def _head_major_to_token_major(x: torch.Tensor) -> torch.Tensor:
+    heads, tokens, head_dim = x.shape
+    return x.permute(1, 0, 2).contiguous().reshape(tokens, heads * head_dim)
+
+
+class CRopeQKFn(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        x: torch.Tensor,
+        cos_cache: torch.Tensor,
+        sin_cache: torch.Tensor,
+        rope_layout: str,
+        num_heads: int,
+        num_kv_heads: int,
+        head_dim: int,
+        rotary_dim: int,
+        lib: ctypes.CDLL,
+    ):
+        if x.device.type != "cpu":
+            raise RuntimeError("CRopeQKFn supports CPU tensors only")
+        layout = _normalize_rope_layout(rope_layout)
+        if layout == "none":
+            ctx.layout = "none"
+            return x
+
+        x_np = x.detach().contiguous().numpy().astype(np.float32, copy=False)
+        q_np = x_np.reshape(x.shape[0], int(num_heads), int(head_dim)).transpose(1, 0, 2).copy()
+        k_np = q_np.copy()
+        cos_np = cos_cache.detach().contiguous().numpy().astype(np.float32, copy=False)
+        sin_np = sin_cache.detach().contiguous().numpy().astype(np.float32, copy=False)
+
+        if layout == "pairwise":
+            lib.rope_forward_qk_pairwise_with_rotary_dim(
+                _float_ptr(q_np), _float_ptr(k_np), _float_ptr(cos_np), _float_ptr(sin_np),
+                ctypes.c_int(num_heads), ctypes.c_int(num_kv_heads), ctypes.c_int(x.shape[0]),
+                ctypes.c_int(head_dim), ctypes.c_int(head_dim), ctypes.c_int(0), ctypes.c_int(rotary_dim),
+            )
+        else:
+            lib.rope_forward_qk_with_rotary_dim(
+                _float_ptr(q_np), _float_ptr(k_np), _float_ptr(cos_np), _float_ptr(sin_np),
+                ctypes.c_int(num_heads), ctypes.c_int(num_kv_heads), ctypes.c_int(x.shape[0]),
+                ctypes.c_int(head_dim), ctypes.c_int(head_dim), ctypes.c_int(0), ctypes.c_int(rotary_dim),
+            )
+
+        q_out = torch.from_numpy(q_np.transpose(1, 0, 2).reshape(x.shape[0], x.shape[1]).copy())
+        k_out = torch.from_numpy(k_np.transpose(1, 0, 2).reshape(x.shape[0], x.shape[1]).copy())
+        ctx.layout = layout
+        ctx.num_heads = int(num_heads)
+        ctx.num_kv_heads = int(num_kv_heads)
+        ctx.head_dim = int(head_dim)
+        ctx.rotary_dim = int(rotary_dim)
+        ctx.lib = lib
+        ctx.save_for_backward(cos_cache.detach(), sin_cache.detach())
+        return 0.5 * (q_out + k_out)
+
+    @staticmethod
+    def backward(ctx, grad_out: torch.Tensor):
+        if str(getattr(ctx, "layout", "none")) == "none":
+            return grad_out, None, None, None, None, None, None, None, None
+
+        cos_cache, sin_cache = ctx.saved_tensors
+        grad_np = grad_out.detach().contiguous().numpy().astype(np.float32, copy=False)
+        d_q_out_np = (0.5 * grad_np).reshape(grad_out.shape[0], ctx.num_heads, ctx.head_dim).transpose(1, 0, 2).copy()
+        d_k_out_np = d_q_out_np.copy()
+        d_q_np = np.zeros_like(d_q_out_np, dtype=np.float32)
+        d_k_np = np.zeros_like(d_k_out_np, dtype=np.float32)
+        cos_np = cos_cache.detach().contiguous().numpy().astype(np.float32, copy=False)
+        sin_np = sin_cache.detach().contiguous().numpy().astype(np.float32, copy=False)
+
+        if ctx.layout == "pairwise":
+            ctx.lib.rope_backward_qk_pairwise_with_rotary_dim(
+                _float_ptr(d_q_out_np), _float_ptr(d_k_out_np), _float_ptr(d_q_np), _float_ptr(d_k_np),
+                _float_ptr(cos_np), _float_ptr(sin_np), ctypes.c_int(ctx.num_heads), ctypes.c_int(ctx.num_kv_heads),
+                ctypes.c_int(grad_out.shape[0]), ctypes.c_int(ctx.head_dim), ctypes.c_int(ctx.head_dim),
+                ctypes.c_int(0), ctypes.c_int(ctx.rotary_dim),
+            )
+        else:
+            ctx.lib.rope_backward_qk(
+                _float_ptr(d_q_out_np), _float_ptr(d_k_out_np), _float_ptr(d_q_np), _float_ptr(d_k_np),
+                _float_ptr(cos_np), _float_ptr(sin_np), ctypes.c_int(ctx.num_heads), ctypes.c_int(ctx.num_kv_heads),
+                ctypes.c_int(grad_out.shape[0]), ctypes.c_int(ctx.head_dim), ctypes.c_int(ctx.head_dim), ctypes.c_int(0),
+            )
+
+        dx_np = (
+            d_q_np.transpose(1, 0, 2).reshape(grad_out.shape[0], grad_out.shape[1])
+            + d_k_np.transpose(1, 0, 2).reshape(grad_out.shape[0], grad_out.shape[1])
+        )
+        return torch.from_numpy(dx_np.copy()), None, None, None, None, None, None, None, None
+
+
+def c_rope_qk_probe(
+    x: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    rope_layout: str,
+    num_heads: int,
+    num_kv_heads: int,
+    head_dim: int,
+    rotary_dim: int,
+    lib: ctypes.CDLL,
+) -> torch.Tensor:
+    return CRopeQKFn.apply(
+        x, cos_cache, sin_cache, rope_layout, int(num_heads), int(num_kv_heads), int(head_dim), int(rotary_dim), lib
+    )
+
+
+def _torch_rope_qk_probe(
+    x: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    rope_layout: str,
+    num_heads: int,
+    head_dim: int,
+    rotary_dim: int,
+) -> torch.Tensor:
+    layout = _normalize_rope_layout(rope_layout)
+    if layout == "none":
+        return x
+    q = _token_major_to_head_major(x, int(num_heads), int(head_dim))
+    k = q.clone()
+    if layout == "pairwise":
+        q_rot = _rope_forward_pytorch_pairwise_vectorized(q, cos_cache, sin_cache, rotary_dim)
+        k_rot = _rope_forward_pytorch_pairwise_vectorized(k, cos_cache, sin_cache, rotary_dim)
+    else:
+        q_rot = _rope_forward_pytorch_vectorized(q, cos_cache, sin_cache)
+        k_rot = _rope_forward_pytorch_vectorized(k, cos_cache, sin_cache)
+    return 0.5 * (_head_major_to_token_major(q_rot) + _head_major_to_token_major(k_rot))
+
+
 def _rmsnorm_apply_torch(x: torch.Tensor, gamma: torch.Tensor, eps: float) -> torch.Tensor:
     var = x.pow(2).mean(dim=-1, keepdim=True)
     rstd = (var + eps).rsqrt()
@@ -319,7 +645,55 @@ class _MLPResidualBlock(nn.Module):
         self.fc2 = nn.Linear(hidden, d_model)
 
 
-class TinyCKModel(nn.Module):
+class _RoPEProbeMixin:
+    def _init_rope_probe(self, d_model: int, rope_layout: str, rope_heads: int, rope_rotary_dim: int) -> None:
+        cfg = _resolve_rope_cfg(int(d_model), rope_layout, int(rope_heads), int(rope_rotary_dim))
+        self.rope_layout = str(cfg.get("layout", "none"))
+        self.rope_enabled = bool(int(cfg.get("enabled", 0)))
+        self.rope_num_heads = int(cfg.get("num_heads", 1))
+        self.rope_num_kv_heads = int(cfg.get("num_kv_heads", self.rope_num_heads))
+        self.rope_head_dim = int(cfg.get("head_dim", int(d_model)))
+        self.rope_rotary_dim = int(cfg.get("rotary_dim", 0))
+        self._rope_cache_store: dict[int, tuple[torch.Tensor, torch.Tensor]] = {}
+
+    def _get_rope_cache(self, num_tokens: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if not bool(getattr(self, "rope_enabled", False)):
+            raise RuntimeError("RoPE cache requested while rope probe is disabled")
+        key = int(num_tokens)
+        cached = self._rope_cache_store.get(key)
+        if cached is None:
+            cached = tuple(t.contiguous() for t in _precompute_freqs_cis_pytorch(self.rope_head_dim, key))  # type: ignore[assignment]
+            self._rope_cache_store[key] = cached  # type: ignore[assignment]
+        return cached
+
+    def _apply_rope_probe(self, x: torch.Tensor, lib: ctypes.CDLL | None) -> torch.Tensor:
+        if not bool(getattr(self, "rope_enabled", False)):
+            return x
+        cos_cache, sin_cache = self._get_rope_cache(int(x.shape[0]))
+        if lib is None:
+            return _torch_rope_qk_probe(
+                x,
+                cos_cache,
+                sin_cache,
+                str(self.rope_layout),
+                int(self.rope_num_heads),
+                int(self.rope_head_dim),
+                int(self.rope_rotary_dim),
+            )
+        return c_rope_qk_probe(
+            x,
+            cos_cache,
+            sin_cache,
+            str(self.rope_layout),
+            int(self.rope_num_heads),
+            int(self.rope_num_kv_heads),
+            int(self.rope_head_dim),
+            int(self.rope_rotary_dim),
+            lib,
+        )
+
+
+class TinyCKModel(_RoPEProbeMixin, nn.Module):
     def __init__(
         self,
         vocab: int,
@@ -329,6 +703,9 @@ class TinyCKModel(nn.Module):
         lib: ctypes.CDLL,
         use_c_rmsnorm: bool = True,
         use_c_swiglu: bool = True,
+        rope_layout: str = "none",
+        rope_heads: int = 0,
+        rope_rotary_dim: int = 0,
     ):
         super().__init__()
         self.vocab = vocab
@@ -338,6 +715,7 @@ class TinyCKModel(nn.Module):
         self.lib = lib
         self.use_c_rmsnorm = bool(use_c_rmsnorm)
         self.use_c_swiglu = bool(use_c_swiglu)
+        self._init_rope_probe(d_model, rope_layout, rope_heads, rope_rotary_dim)
 
         self.embedding = nn.Embedding(vocab, d_model)
         self.rms_gamma = nn.Parameter(torch.ones(d_model, dtype=torch.float32))
@@ -347,6 +725,7 @@ class TinyCKModel(nn.Module):
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         # input_ids: [B, T] -> logits: [B*T, V]
         x = self.embedding(input_ids).reshape(-1, self.d_model)
+        x = self._apply_rope_probe(x, self.lib)
         if self.use_c_rmsnorm:
             x = c_rmsnorm(x, self.rms_gamma, self.eps, self.lib)
         else:
@@ -360,13 +739,15 @@ class TinyCKModel(nn.Module):
         return logits
 
 
-class TinyTorchModel(nn.Module):
-    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float):
+class TinyTorchModel(_RoPEProbeMixin, nn.Module):
+    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float,
+                 rope_layout: str = "none", rope_heads: int = 0, rope_rotary_dim: int = 0):
         super().__init__()
         self.vocab = vocab
         self.d_model = d_model
         self.hidden = hidden
         self.eps = eps
+        self._init_rope_probe(d_model, rope_layout, rope_heads, rope_rotary_dim)
 
         self.embedding = nn.Embedding(vocab, d_model)
         self.rms_gamma = nn.Parameter(torch.ones(d_model, dtype=torch.float32))
@@ -375,6 +756,7 @@ class TinyTorchModel(nn.Module):
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids).reshape(-1, self.d_model)
+        x = self._apply_rope_probe(x, None)
         x = _rmsnorm_apply_torch(x, self.rms_gamma, self.eps)
         x = self.fc1(x)
         x = _swiglu_apply_torch(x, self.hidden)
@@ -382,7 +764,7 @@ class TinyTorchModel(nn.Module):
         return logits
 
 
-class StackedCKModel(nn.Module):
+class StackedCKModel(_RoPEProbeMixin, nn.Module):
     def __init__(
         self,
         vocab: int,
@@ -393,6 +775,9 @@ class StackedCKModel(nn.Module):
         num_layers: int,
         use_c_rmsnorm: bool = True,
         use_c_swiglu: bool = True,
+        rope_layout: str = "none",
+        rope_heads: int = 0,
+        rope_rotary_dim: int = 0,
     ):
         super().__init__()
         self.vocab = int(vocab)
@@ -403,6 +788,7 @@ class StackedCKModel(nn.Module):
         self.num_layers = int(num_layers)
         self.use_c_rmsnorm = bool(use_c_rmsnorm)
         self.use_c_swiglu = bool(use_c_swiglu)
+        self._init_rope_probe(d_model, rope_layout, rope_heads, rope_rotary_dim)
 
         self.embedding = nn.Embedding(self.vocab, self.d_model)
         self.blocks = nn.ModuleList([_MLPResidualBlock(self.d_model, self.hidden) for _ in range(self.num_layers)])
@@ -411,6 +797,7 @@ class StackedCKModel(nn.Module):
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids).reshape(-1, self.d_model)
+        x = self._apply_rope_probe(x, self.lib)
         for blk in self.blocks:
             residual = x
             if self.use_c_rmsnorm:
@@ -431,14 +818,16 @@ class StackedCKModel(nn.Module):
         return self.lm_head(x)
 
 
-class StackedTorchModel(nn.Module):
-    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float, num_layers: int):
+class StackedTorchModel(_RoPEProbeMixin, nn.Module):
+    def __init__(self, vocab: int, d_model: int, hidden: int, eps: float, num_layers: int,
+                 rope_layout: str = "none", rope_heads: int = 0, rope_rotary_dim: int = 0):
         super().__init__()
         self.vocab = int(vocab)
         self.d_model = int(d_model)
         self.hidden = int(hidden)
         self.eps = float(eps)
         self.num_layers = int(num_layers)
+        self._init_rope_probe(d_model, rope_layout, rope_heads, rope_rotary_dim)
 
         self.embedding = nn.Embedding(self.vocab, self.d_model)
         self.blocks = nn.ModuleList([_MLPResidualBlock(self.d_model, self.hidden) for _ in range(self.num_layers)])
@@ -447,6 +836,7 @@ class StackedTorchModel(nn.Module):
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         x = self.embedding(input_ids).reshape(-1, self.d_model)
+        x = self._apply_rope_probe(x, None)
         for blk in self.blocks:
             residual = x
             h = _rmsnorm_apply_torch(x, blk.rms_gamma, self.eps)
@@ -748,6 +1138,27 @@ def _load_init_state_from_bump(
         dims.setdefault("num_layers", 1)
         return state, dims, "tiny"
 
+
+def _manifest_rope_defaults(weights_manifest: Path) -> dict[str, int | str]:
+    manifest = json.loads(weights_manifest.read_text(encoding="utf-8"))
+    config = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
+    template = manifest.get("template") if isinstance(manifest.get("template"), dict) else {}
+    attention_contract = ((template.get("contract") or {}).get("attention_contract") or {})
+
+    rope_layout = _normalize_rope_layout(
+        str(config.get("rope_layout") or attention_contract.get("rope_layout") or "none")
+    )
+    num_heads = int(config.get("num_heads", 0) or 0)
+    head_dim = int(config.get("head_dim", 0) or 0)
+    rotary_dim = int(config.get("rotary_dim", 0) or 0)
+    if rope_layout == "none":
+        return {"rope_layout": "none", "rope_heads": 0, "rope_rotary_dim": 0}
+    return {
+        "rope_layout": rope_layout,
+        "rope_heads": num_heads,
+        "rope_rotary_dim": rotary_dim if rotary_dim > 0 else head_dim,
+    }
+
 def _global_grad_norm(params: Iterable[torch.nn.Parameter]) -> float:
     total = 0.0
     for p in params:
@@ -884,8 +1295,20 @@ def _optimizer_state_diff_stats(
     }
 
 
-_STAGE_ORDER = ["embedding", "rmsnorm", "fc1", "swiglu", "logits", "loss"]
-_BWD_STAGE_ORDER = ["logits", "swiglu", "fc1", "rmsnorm", "embedding"]
+_BASE_STAGE_ORDER = ["embedding", "rmsnorm", "fc1", "swiglu", "logits", "loss"]
+_BASE_BWD_STAGE_ORDER = ["logits", "swiglu", "fc1", "rmsnorm", "embedding"]
+
+
+def _stage_order_for_model(model: nn.Module) -> list[str]:
+    if bool(getattr(model, "rope_enabled", False)):
+        return ["embedding", "rope", "rmsnorm", "fc1", "swiglu", "logits", "loss"]
+    return list(_BASE_STAGE_ORDER)
+
+
+def _backward_stage_order_for_model(model: nn.Module) -> list[str]:
+    if bool(getattr(model, "rope_enabled", False)):
+        return ["logits", "swiglu", "fc1", "rmsnorm", "rope", "embedding"]
+    return list(_BASE_BWD_STAGE_ORDER)
 
 
 def _forward_stages_ck(
@@ -900,12 +1323,18 @@ def _forward_stages_ck(
     emb = model_ck.embedding(x).reshape(-1, model_ck.d_model)
     stages["embedding"] = emb
 
-    if model_ck.use_c_rmsnorm:
-        rms = c_rmsnorm(emb, model_ck.rms_gamma, eps, lib)
+    rope = model_ck._apply_rope_probe(emb, model_ck.lib)
+    if bool(getattr(model_ck, "rope_enabled", False)):
+        stages["rope"] = rope
     else:
-        var = emb.pow(2).mean(dim=-1, keepdim=True)
+        rope = emb
+
+    if model_ck.use_c_rmsnorm:
+        rms = c_rmsnorm(rope, model_ck.rms_gamma, eps, lib)
+    else:
+        var = rope.pow(2).mean(dim=-1, keepdim=True)
         rstd = (var + eps).rsqrt()
-        rms = emb * rstd * model_ck.rms_gamma
+        rms = rope * rstd * model_ck.rms_gamma
     stages["rmsnorm"] = rms
 
     fc1 = model_ck.fc1(rms)
@@ -944,9 +1373,15 @@ def _forward_stages_torch(
     emb = model_torch.embedding(x).reshape(-1, model_torch.d_model)
     stages["embedding"] = emb
 
-    var = emb.pow(2).mean(dim=-1, keepdim=True)
+    rope = model_torch._apply_rope_probe(emb, None)
+    if bool(getattr(model_torch, "rope_enabled", False)):
+        stages["rope"] = rope
+    else:
+        rope = emb
+
+    var = rope.pow(2).mean(dim=-1, keepdim=True)
     rstd = (var + eps).rsqrt()
-    rms = emb * rstd * model_torch.rms_gamma
+    rms = rope * rstd * model_torch.rms_gamma
     stages["rmsnorm"] = rms
 
     fc1 = model_torch.fc1(rms)
@@ -986,6 +1421,9 @@ def _localize_step_divergence(
     ck_rmsnorm_backend: str,
     ck_swiglu_backend: str,
     ck_loss_backend: str,
+    rope_layout: str,
+    rope_heads: int,
+    rope_rotary_dim: int,
     pre_ck_model_state: Dict[str, torch.Tensor],
     pre_ck_opt_state: dict,
     pre_torch_model_state: Dict[str, torch.Tensor],
@@ -993,11 +1431,13 @@ def _localize_step_divergence(
     source: str,
     tol: float,
 ) -> dict:
+    stage_order = list(_BASE_STAGE_ORDER)
+    bwd_stage_order = list(_BASE_BWD_STAGE_ORDER)
     report: dict = {
         "same_state_source": str(source),
         "tol": float(tol),
         "micro_steps": int(len(window_samples)),
-        "stage_order": list(_STAGE_ORDER),
+        "stage_order": stage_order,
     }
 
     if not window_samples:
@@ -1012,8 +1452,22 @@ def _localize_step_divergence(
         lib=lib,
         use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
         use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+        rope_layout=rope_layout,
+        rope_heads=rope_heads,
+        rope_rotary_dim=rope_rotary_dim,
     )
-    torch_probe = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
+    torch_probe = TinyTorchModel(
+        vocab=vocab,
+        d_model=d_model,
+        hidden=hidden,
+        eps=eps,
+        rope_layout=rope_layout,
+        rope_heads=rope_heads,
+        rope_rotary_dim=rope_rotary_dim,
+    )
+    stage_order = _stage_order_for_model(ck_probe)
+    bwd_stage_order = _backward_stage_order_for_model(ck_probe)
+    report["stage_order"] = list(stage_order)
 
     opt_ck_probe = _make_optimizer(
         optimizer,
@@ -1056,8 +1510,8 @@ def _localize_step_divergence(
     opt_ck_probe.zero_grad(set_to_none=True)
     opt_torch_probe.zero_grad(set_to_none=True)
 
-    stage_max_global = {name: 0.0 for name in _STAGE_ORDER}
-    stage_grad_max_global = {name: 0.0 for name in _BWD_STAGE_ORDER}
+    stage_max_global = {name: 0.0 for name in stage_order}
+    stage_grad_max_global = {name: 0.0 for name in bwd_stage_order}
     per_micro: list[dict] = []
 
     for idx, (x_i, targets_i) in enumerate(window_samples, start=1):
@@ -1066,7 +1520,7 @@ def _localize_step_divergence(
 
         stage_diffs: dict[str, float] = {}
         first_stage_over_tol = "none"
-        for stage in _STAGE_ORDER:
+        for stage in stage_order:
             diff = _scalar_or_max_abs_diff(stages_ck[stage], stages_torch[stage])
             stage_diffs[stage] = float(diff)
             if diff > stage_max_global[stage]:
@@ -1074,7 +1528,7 @@ def _localize_step_divergence(
             if first_stage_over_tol == "none" and diff > tol:
                 first_stage_over_tol = stage
 
-        for stage in _BWD_STAGE_ORDER:
+        for stage in bwd_stage_order:
             t_ck = stages_ck.get(stage)
             t_torch = stages_torch.get(stage)
             if isinstance(t_ck, torch.Tensor) and t_ck.requires_grad:
@@ -1087,7 +1541,7 @@ def _localize_step_divergence(
 
         stage_grad_diffs: dict[str, float] = {}
         first_grad_stage_over_tol = "none"
-        for stage in _BWD_STAGE_ORDER:
+        for stage in bwd_stage_order:
             t_ck = stages_ck.get(stage)
             t_torch = stages_torch.get(stage)
             g_ck = t_ck.grad if isinstance(t_ck, torch.Tensor) else None
@@ -1181,6 +1635,9 @@ def _localize_step_divergence(
 class RunStats:
     model_kind: str
     num_layers: int
+    rope_layout: str
+    rope_heads: int
+    rope_rotary_dim: int
     epochs: int
     seq_len: int
     total_tokens: int
@@ -1234,6 +1691,9 @@ def run_training_parity(
     ck_rmsnorm_backend: str = "c",
     ck_swiglu_backend: str = "c",
     ck_loss_backend: str = "c",
+    rope_layout: str = "none",
+    rope_heads: int = 0,
+    rope_rotary_dim: int = 0,
     drift_localize_step: int = 0,
     drift_localize_tol: float = 1e-6,
     drift_localize_source: str = "ck",
@@ -1264,6 +1724,9 @@ def run_training_parity(
             num_layers=int(num_layers),
             use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
             use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+            rope_layout=rope_layout,
+            rope_heads=rope_heads,
+            rope_rotary_dim=rope_rotary_dim,
         )
         model_torch: nn.Module = StackedTorchModel(
             vocab=vocab,
@@ -1271,6 +1734,9 @@ def run_training_parity(
             hidden=hidden,
             eps=eps,
             num_layers=int(num_layers),
+            rope_layout=rope_layout,
+            rope_heads=rope_heads,
+            rope_rotary_dim=rope_rotary_dim,
         )
     else:
         model_ck = TinyCKModel(
@@ -1281,8 +1747,19 @@ def run_training_parity(
             lib=lib,
             use_c_rmsnorm=(str(ck_rmsnorm_backend).lower() == "c"),
             use_c_swiglu=(str(ck_swiglu_backend).lower() == "c"),
+            rope_layout=rope_layout,
+            rope_heads=rope_heads,
+            rope_rotary_dim=rope_rotary_dim,
         )
-        model_torch = TinyTorchModel(vocab=vocab, d_model=d_model, hidden=hidden, eps=eps)
+        model_torch = TinyTorchModel(
+            vocab=vocab,
+            d_model=d_model,
+            hidden=hidden,
+            eps=eps,
+            rope_layout=rope_layout,
+            rope_heads=rope_heads,
+            rope_rotary_dim=rope_rotary_dim,
+        )
     if init_state is not None:
         model_ck.load_state_dict(init_state, strict=True)
         model_torch.load_state_dict(init_state, strict=True)
@@ -1568,6 +2045,9 @@ def run_training_parity(
                     ck_rmsnorm_backend=ck_rmsnorm_backend,
                     ck_swiglu_backend=ck_swiglu_backend,
                     ck_loss_backend=ck_loss_backend,
+                    rope_layout=rope_layout,
+                    rope_heads=rope_heads,
+                    rope_rotary_dim=rope_rotary_dim,
                     pre_ck_model_state=pre_ck_model_state,
                     pre_ck_opt_state=pre_ck_opt_state,
                     pre_torch_model_state=pre_torch_model_state,
@@ -1871,6 +2351,9 @@ def run_training_parity(
     return RunStats(
         model_kind=str(resolved_model_kind),
         num_layers=int(num_layers),
+        rope_layout=str(getattr(model_ck, "rope_layout", "none")),
+        rope_heads=int(getattr(model_ck, "rope_num_heads", 0) if getattr(model_ck, "rope_enabled", False) else 0),
+        rope_rotary_dim=int(getattr(model_ck, "rope_rotary_dim", 0) if getattr(model_ck, "rope_enabled", False) else 0),
         epochs=epochs,
         seq_len=seq_len,
         total_tokens=total_tokens,
@@ -1943,6 +2426,13 @@ def main() -> int:
     parser.add_argument("--vocab", type=int, default=256)
     parser.add_argument("--d-model", type=int, default=64)
     parser.add_argument("--hidden", type=int, default=128)
+    parser.add_argument("--rope-layout", type=str, default="auto",
+                        choices=["auto", "none", "split", "pairwise"],
+                        help="Optional RoPE probe inserted after embedding (default: auto from manifest, else none)")
+    parser.add_argument("--rope-heads", type=int, default=0,
+                        help="RoPE probe head count (0 = auto)")
+    parser.add_argument("--rope-rotary-dim", type=int, default=0,
+                        help="RoPE probe rotary dim (0 = auto/head_dim)")
     parser.add_argument("--eps", type=float, default=1e-5)
     parser.add_argument("--grad-accum", type=int, default=8)
     parser.add_argument("--optimizer", type=str, default="adamw", choices=["adamw", "sgd"])
@@ -2060,6 +2550,12 @@ def main() -> int:
     if args.max_steps < 0:
         print("ERROR: --max-steps must be >= 0", file=sys.stderr)
         return 2
+    if args.rope_heads < 0:
+        print("ERROR: --rope-heads must be >= 0", file=sys.stderr)
+        return 2
+    if args.rope_rotary_dim < 0:
+        print("ERROR: --rope-rotary-dim must be >= 0", file=sys.stderr)
+        return 2
     if args.diag_every < 0:
         print("ERROR: --diag-every must be >= 0", file=sys.stderr)
         return 2
@@ -2135,6 +2631,9 @@ def main() -> int:
         print(f"WARNING: {safety['message']}", file=sys.stderr)
     resolved_model_kind = "tiny" if str(args.model_kind).lower().strip() == "auto" else str(args.model_kind).lower().strip()
     init_state = None
+    resolved_rope_layout = _normalize_rope_layout(args.rope_layout if str(args.rope_layout).lower().strip() != "auto" else "none")
+    resolved_rope_heads = int(args.rope_heads)
+    resolved_rope_rotary_dim = int(args.rope_rotary_dim)
     if (args.weights_bump is None) != (args.weights_manifest is None):
         print("ERROR: --weights-bump and --weights-manifest must be provided together", file=sys.stderr)
         return 2
@@ -2159,6 +2658,11 @@ def main() -> int:
         args.d_model = int(dims["d_model"])
         args.hidden = int(dims["hidden"])
         args.num_layers = int(dims.get("num_layers", args.num_layers))
+        if str(args.rope_layout).lower().strip() == "auto":
+            rope_defaults = _manifest_rope_defaults(args.weights_manifest)
+            resolved_rope_layout = str(rope_defaults.get("rope_layout", "none"))
+            resolved_rope_heads = int(rope_defaults.get("rope_heads", 0) or 0)
+            resolved_rope_rotary_dim = int(rope_defaults.get("rope_rotary_dim", 0) or 0)
         print(
             "Loaded parity init from bump: "
             f"model_kind={resolved_model_kind} "
@@ -2168,6 +2672,11 @@ def main() -> int:
         )
     elif str(args.model_kind).lower().strip() != "auto":
         resolved_model_kind = str(args.model_kind).lower().strip()
+
+    if str(args.rope_layout).lower().strip() != "auto":
+        resolved_rope_layout = _normalize_rope_layout(args.rope_layout)
+        resolved_rope_heads = int(args.rope_heads)
+        resolved_rope_rotary_dim = int(args.rope_rotary_dim)
 
     lib = _load_lib()
     stats = run_training_parity(
@@ -2198,6 +2707,9 @@ def main() -> int:
         ck_rmsnorm_backend=args.ck_rmsnorm_backend,
         ck_swiglu_backend=args.ck_swiglu_backend,
         ck_loss_backend=args.ck_loss_backend,
+        rope_layout=resolved_rope_layout,
+        rope_heads=resolved_rope_heads,
+        rope_rotary_dim=resolved_rope_rotary_dim,
         drift_localize_step=args.drift_localize_step,
         drift_localize_tol=args.drift_localize_tol,
         drift_localize_source=args.drift_localize_source,
@@ -2215,6 +2727,7 @@ def main() -> int:
     print("v7 TRAIN PARITY (multi-epoch)")
     print("=" * 100)
     print(f"model_kind={stats.model_kind} num_layers={stats.num_layers}")
+    print(f"rope_layout={stats.rope_layout} rope_heads={stats.rope_heads} rope_rotary_dim={stats.rope_rotary_dim}")
     print(f"epochs={stats.epochs} seq_len={stats.seq_len} total_tokens={stats.total_tokens} "
           f"grad_accum={stats.grad_accum} optimizer={stats.optimizer} lr={stats.lr}")
     if str(stats.optimizer).lower() == "adamw":

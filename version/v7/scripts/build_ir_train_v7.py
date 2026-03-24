@@ -317,6 +317,20 @@ def _resolve_forward_kernels(config: Dict[str, Any], template: Dict[str, Any]) -
     return resolved
 
 
+def _resolve_train_config(manifest_config: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
+    config = dict(manifest_config or {})
+    rope_layout = build_ir_v7._normalize_rope_layout_value(config.get("rope_layout"))
+    if rope_layout:
+        config["rope_layout"] = rope_layout
+        return config
+
+    attention_contract = ((template.get("contract") or {}).get("attention_contract") or {})
+    template_rope_layout = build_ir_v7._normalize_rope_layout_value(attention_contract.get("rope_layout"))
+    if template_rope_layout:
+        config["rope_layout"] = template_rope_layout
+    return config
+
+
 def build_ir1_train(
     manifest: Dict[str, Any],
     registry: Dict[str, Any],
@@ -325,7 +339,8 @@ def build_ir1_train(
     max_layers: Optional[int],
     strict: bool
 ) -> Dict[str, Any]:
-    config = dict(manifest.get("config", {}))
+    template = _choose_template(manifest, explicit_template=None)
+    config = _resolve_train_config(manifest.get("config", {}), template)
     num_layers = int(config.get("num_layers", 0) or 0)
     if max_layers is not None:
         num_layers = min(num_layers, int(max_layers))
@@ -334,7 +349,6 @@ def build_ir1_train(
 
     token_count = int(_train_dims(config).get("tokens", 1) or 1)
 
-    template = _choose_template(manifest, explicit_template=None)
     header_ops, body_ops, footer_ops = _template_sections(template)
     forward_kernels = _resolve_forward_kernels(config, template)
     weight_index = _manifest_weight_index(manifest)
