@@ -903,6 +903,27 @@ def _choose_numel_expr(
     return "1"
 
 
+def _is_rope_forward_qk_kernel(kernel_id: Any) -> bool:
+    kid = str(kernel_id or "").strip()
+    return kid in ("rope_forward_qk", "rope_forward_qk_pairwise")
+
+
+def _rope_forward_qk_bridge_function(kernel_id: Any) -> str:
+    kid = str(kernel_id or "").strip()
+    if kid == "rope_forward_qk_pairwise":
+        return "rope_forward_qk_pairwise_with_rotary_dim"
+    return "rope_forward_qk_with_rotary_dim"
+
+
+def _is_rope_backward_qk_kernel(kernel_id: Any) -> bool:
+    kid = str(kernel_id or "").strip()
+    return kid in ("rope_backward_qk_f32", "rope_backward_qk_pairwise_f32")
+
+
+def _is_pairwise_rope_backward_qk_kernel(kernel_id: Any) -> bool:
+    return str(kernel_id or "").strip() == "rope_backward_qk_pairwise_f32"
+
+
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     cfg = dict(ir2.get("config") or {})
     tensors = _collect_tensors(ir2)
@@ -921,9 +942,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     op_by_id = {int(op["op_id"]): op for op in all_ops if isinstance(op, dict) and "op_id" in op}
     exec_plan_info = _load_train_exec_plan(exec_plan)
     exec_plan_by_op = exec_plan_info["by_op_id"]
-    # rope_forward_qk expects precomputed cos/sin caches. If present in IR,
+    # RoPE forward kernels expect precomputed cos/sin caches. If present in IR,
     # ck_train_init must seed deterministic caches before the first forward call.
-    has_rope_forward_qk = any(str(op.get("kernel_id", "")) == "rope_forward_qk" for op in forward_ops)
+    has_rope_forward_qk = any(_is_rope_forward_qk_kernel(op.get("kernel_id", "")) for op in forward_ops)
 
     tvars_f32: Dict[str, str] = {}
     tvars_i32: Dict[str, str] = {}
@@ -1967,9 +1988,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    call_count++;")
                 continue
 
-            # rope_forward_qk is in-place and head-major, while IR tensors are token-major.
+            # rope_forward_qk* kernels are in-place and head-major, while IR tensors are token-major.
             # Keep IR-visible tensors token-major by converting around kernel invocation.
-            if kid == "rope_forward_qk":
+            if _is_rope_forward_qk_kernel(kid):
+                rope_bridge_fn = _rope_forward_qk_bridge_function(kid)
                 q_in_tid = io_inputs.get("q")
                 k_in_tid = io_inputs.get("k")
                 q_out_tid = io_outputs.get("q") or q_in_tid
@@ -2002,8 +2024,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
                     ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
                     ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
-                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
-                        q_scratch, k_scratch
+                    ap("    %s(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                        rope_bridge_fn,
+                        q_scratch,
+                        k_scratch,
                     ))
                     ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
                     ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
@@ -2013,8 +2037,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
                     if k_numel > 0:
                         ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                    ap("    rope_forward_qk_with_rotary_dim(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
-                        q_out_var, k_out_var
+                    ap("    %s(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                        rope_bridge_fn,
+                        q_out_var,
+                        k_out_var,
                     ))
                 ap("    call_count++;")
                 continue
@@ -2196,8 +2222,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
 
-            # rope_backward_qk expects head-major q/k gradient tensors.
-            if kid == "rope_backward_qk_f32":
+            # rope_backward_qk* expects head-major q/k gradient tensors.
+            if _is_rope_backward_qk_kernel(kid):
                 dq_out_tid = io_inputs.get("in_0")
                 dk_out_tid = io_inputs.get("in_1")
                 dq_tid = io_outputs.get("d_q")
@@ -2242,9 +2268,14 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
                     ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
                     ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
-                    ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
-                        dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
-                    ))
+                    if _is_pairwise_rope_backward_qk_kernel(kid):
+                        ap("    rope_backward_qk_pairwise_with_rotary_dim(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                            dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
+                        ))
+                    else:
+                        ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
+                            dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
+                        ))
                     ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
                     ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
                     ap("#if CK_ABLATE_ROPE_BACKWARD_QK")
@@ -2598,7 +2629,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                                 atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
                                 fallback_state=ptr_fallback_state,
                             )
-                    elif kid == "rope_backward_qk_f32":
+                    elif _is_rope_backward_qk_kernel(kid):
                         # rope_backward_qk(d_q_out, d_k_out, d_q, d_k, cos_cache, sin_cache, ...)
                         lname = str(aname).lower()
                         mapped = None
@@ -2614,6 +2645,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                             mapped = "g_rope_cos_cache"
                         elif lname in ("sin_cache", "sin"):
                             mapped = "g_rope_sin_cache"
+                        elif _is_pairwise_rope_backward_qk_kernel(kid) and lname in ("rotary_dim",):
+                            mapped = "CK_ROPE_ROTARY_DIM"
                         if mapped is not None:
                             expr = mapped
                         else:

@@ -3242,6 +3242,57 @@
         }
       ]
     },
+    "rope_forward_qk_pairwise": {
+      "note": "Pairwise RoPE for Llama-family layouts; input q,k are rotated in-place",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "rotary_dim",
+          "source": "dim:rotary_dim"
+        }
+      ]
+    },
     "rope_forward_qk_pairwise_with_rotary_dim": {
       "note": "Pairwise RoPE for Llama-family layouts; input q,k are rotated in-place",
       "params": [
@@ -3549,6 +3600,69 @@
         {
           "name": "pos_offset",
           "source": "runtime:pos"
+        }
+      ]
+    },
+    "rope_backward_qk_pairwise_f32": {
+      "note": "v7 training backward: inverse pairwise RoPE for q/k",
+      "params": [
+        {
+          "name": "d_q_out",
+          "source": "activation:d_q_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_k_out",
+          "source": "activation:d_k_out",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_q",
+          "source": "output:d_q",
+          "cast": "float*"
+        },
+        {
+          "name": "d_k",
+          "source": "output:d_k",
+          "cast": "float*"
+        },
+        {
+          "name": "cos_cache",
+          "source": "runtime:rope_cos",
+          "cast": "const float*"
+        },
+        {
+          "name": "sin_cache",
+          "source": "runtime:rope_sin",
+          "cast": "const float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:aligned_head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "rotary_dim",
+          "source": "dim:rotary_dim"
         }
       ]
     },

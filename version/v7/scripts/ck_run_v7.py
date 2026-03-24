@@ -10768,7 +10768,7 @@ Examples:
     init_parser.add_argument('--adamw-weight-decay', type=float, default=0.01,
                              help='AdamW weight_decay embedded into run manifest training defaults')
     init_parser.add_argument('--template', default='qwen3',
-                             help='Training graph template name (built-ins: qwen3, qwen2, gemma3)')
+                             help='Training graph template name (built-ins: qwen3, qwen2, gemma3, llama)')
     init_parser.add_argument('--template-file', default=None,
                              help='Optional custom template JSON path (embedded into weights_manifest.json)')
     init_parser.add_argument('--generate-ir', action='store_true',

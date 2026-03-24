@@ -2076,6 +2076,20 @@ void rope_backward_qk(const float *d_q_out,
                       int aligned_head_dim,
                       int pos_offset);
 
+void rope_backward_qk_pairwise_with_rotary_dim(const float *d_q_out,
+                                               const float *d_k_out,
+                                               float *d_q,
+                                               float *d_k,
+                                               const float *cos_cache,
+                                               const float *sin_cache,
+                                               int num_heads,
+                                               int num_kv_heads,
+                                               int num_tokens,
+                                               int head_dim,
+                                               int aligned_head_dim,
+                                               int pos_offset,
+                                               int rotary_dim);
+
 /* BF16 RoPE forward for Q and K - caller provides scratch buffers */
 void rope_forward_qk_bf16(uint16_t *q,
                           uint16_t *k,

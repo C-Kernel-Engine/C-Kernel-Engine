@@ -157,6 +157,19 @@ def _train_runtime_exists(run_dir: Path) -> bool:
     return (run_dir / "libtrain.so").exists() or (run_dir / ".ck_build" / "libtrain.so").exists()
 
 
+def _train_runtime_contains_pairwise_rope(run_dir: Path) -> bool:
+    for candidate in (run_dir / "generated_train_runtime_v7.c", run_dir / ".ck_build" / "generated_train_runtime_v7.c"):
+        if not candidate.exists():
+            continue
+        text = candidate.read_text(encoding="utf-8", errors="replace")
+        if (
+            "rope_forward_qk_pairwise_with_rotary_dim" in text
+            and "rope_backward_qk_pairwise_with_rotary_dim" in text
+        ):
+            return True
+    return False
+
+
 def _is_renderable_profile_summary(payload: Any) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -470,6 +483,8 @@ def _prepare_tiny_train_fixture(run_dir: Path, python_exec: str) -> None:
         "--run",
         str(run_dir),
         "--allow-non-cache-run-dir",
+        "--template",
+        "llama",
         "--layers",
         "2",
         "--vocab-size",
@@ -671,6 +686,12 @@ def main() -> int:
                 "train_fixture_libtrain_exists",
                 _train_runtime_exists(fixture_run_dir),
                 f"libtrain under {fixture_run_dir} or {fixture_run_dir / '.ck_build'}",
+            )
+            _record(
+                checks,
+                "train_fixture_pairwise_rope_runtime_present",
+                _train_runtime_contains_pairwise_rope(fixture_run_dir),
+                "generated_train_runtime_v7.c contains pairwise forward/backward rope calls",
             )
             if _train_runtime_exists(fixture_run_dir):
                 _run_operator_asan_capture_cmd(fixture_run_dir)

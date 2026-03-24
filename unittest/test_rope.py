@@ -90,6 +90,23 @@ lib.rope_forward_qk_pairwise_with_rotary_dim.argtypes = [
 ]
 lib.rope_forward_qk_pairwise_with_rotary_dim.restype = None
 
+lib.rope_backward_qk_pairwise_with_rotary_dim.argtypes = [
+    ctypes.POINTER(ctypes.c_float),  # d_q_out
+    ctypes.POINTER(ctypes.c_float),  # d_k_out
+    ctypes.POINTER(ctypes.c_float),  # d_q
+    ctypes.POINTER(ctypes.c_float),  # d_k
+    ctypes.POINTER(ctypes.c_float),  # cos_cache
+    ctypes.POINTER(ctypes.c_float),  # sin_cache
+    ctypes.c_int,                    # num_heads
+    ctypes.c_int,                    # num_kv_heads
+    ctypes.c_int,                    # num_tokens
+    ctypes.c_int,                    # head_dim
+    ctypes.c_int,                    # aligned_head_dim
+    ctypes.c_int,                    # pos_offset
+    ctypes.c_int,                    # rotary_dim
+]
+lib.rope_backward_qk_pairwise_with_rotary_dim.restype = None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reference implementations
@@ -216,6 +233,32 @@ def rope_forward_pairwise_numpy(
         pos_offset=pos_offset,
         rotary_dim=rotary_dim,
     ).numpy()
+
+
+def rope_backward_pytorch_pairwise_vectorized(
+    d_out: torch.Tensor,
+    cos_cache: torch.Tensor,
+    sin_cache: torch.Tensor,
+    pos_offset: int = 0,
+    rotary_dim: int | None = None,
+):
+    """Vectorized PyTorch reference for inverse Llama-style even/odd RoPE."""
+    H, T, D = d_out.shape
+    rotary = D if rotary_dim is None else min(int(rotary_dim), D)
+    rotary -= rotary % 2
+    if rotary <= 0:
+        return d_out.clone()
+
+    half_dim = rotary // 2
+    cos = cos_cache[pos_offset:pos_offset + T, :half_dim]
+    sin = sin_cache[pos_offset:pos_offset + T, :half_dim]
+
+    out = d_out.clone()
+    d_even = d_out[..., 0:rotary:2]
+    d_odd = d_out[..., 1:rotary:2]
+    out[..., 0:rotary:2] = d_even * cos + d_odd * sin
+    out[..., 1:rotary:2] = -d_even * sin + d_odd * cos
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -878,6 +921,76 @@ def run_pairwise_forward_tests(q_heads=20, kv_heads=4, T=16, D=128, warmup=5, it
     return report
 
 
+def run_pairwise_backward_tests(q_heads=20, kv_heads=4, T=16, D=128, warmup=5, iterations=100):
+    """Run pairwise backward pass tests with accuracy and timing."""
+    np.random.seed(321)
+    half_dim = D // 2
+
+    d_q_out_np = np.random.randn(q_heads, T, D).astype(np.float32)
+    d_k_out_np = np.random.randn(kv_heads, T, D).astype(np.float32)
+    d_q_np = np.zeros((q_heads, T, D), dtype=np.float32)
+    d_k_np = np.zeros((kv_heads, T, D), dtype=np.float32)
+    cos_np = np.zeros((T, half_dim), dtype=np.float32)
+    sin_np = np.zeros((T, half_dim), dtype=np.float32)
+
+    lib.rope_precompute_cache(
+        numpy_to_ptr(cos_np), numpy_to_ptr(sin_np),
+        ctypes.c_int(T), ctypes.c_int(D), ctypes.c_float(70000000.0),
+        ctypes.c_int(D), ctypes.c_char_p(b"none"), ctypes.c_float(1.0),
+    )
+
+    d_q_out = torch.from_numpy(d_q_out_np.copy())
+    d_k_out = torch.from_numpy(d_k_out_np.copy())
+    cos_cache = torch.from_numpy(cos_np.copy())
+    sin_cache = torch.from_numpy(sin_np.copy())
+
+    report = TestReport(
+        test_name="RoPE Pairwise Backward",
+        dtype="fp32",
+        shape=f"QH={q_heads}, KVH={kv_heads}, T={T}, D={D}",
+        cpu_info=get_cpu_info()
+    )
+
+    def pytorch_pairwise():
+        d_q_ref = rope_backward_pytorch_pairwise_vectorized(d_q_out, cos_cache, sin_cache)
+        d_k_ref = rope_backward_pytorch_pairwise_vectorized(d_k_out, cos_cache, sin_cache)
+        return torch.cat([d_q_ref.reshape(-1), d_k_ref.reshape(-1)], dim=0)
+
+    d_q_ptr = numpy_to_ptr(d_q_np)
+    d_k_ptr = numpy_to_ptr(d_k_np)
+    d_q_out_ptr = numpy_to_ptr(d_q_out_np)
+    d_k_out_ptr = numpy_to_ptr(d_k_out_np)
+    cos_ptr = numpy_to_ptr(cos_np)
+    sin_ptr = numpy_to_ptr(sin_np)
+
+    def c_pairwise():
+        d_q_np.fill(0.0)
+        d_k_np.fill(0.0)
+        lib.rope_backward_qk_pairwise_with_rotary_dim(
+            d_q_out_ptr, d_k_out_ptr, d_q_ptr, d_k_ptr, cos_ptr, sin_ptr,
+            ctypes.c_int(q_heads), ctypes.c_int(kv_heads), ctypes.c_int(T),
+            ctypes.c_int(D), ctypes.c_int(D), ctypes.c_int(0), ctypes.c_int(D),
+        )
+        return torch.cat([torch.from_numpy(d_q_np.reshape(-1).copy()), torch.from_numpy(d_k_np.reshape(-1).copy())], dim=0)
+
+    ref = pytorch_pairwise()
+    out = c_pairwise()
+    diff = max_diff(out, ref)
+    pytorch_time = time_function(pytorch_pairwise, warmup=warmup, iterations=iterations, name="PyTorch Pairwise Bwd")
+    kernel_time = time_function(c_pairwise, warmup=warmup, iterations=iterations, name="C RoPE Pairwise Bwd")
+
+    report.add_result(TestResult(
+        name="RoPE Pairwise Backward QK",
+        passed=diff <= 1e-5,
+        max_diff=diff,
+        tolerance=1e-5,
+        pytorch_time=pytorch_time,
+        kernel_time=kernel_time
+    ))
+
+    return report
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -931,6 +1044,10 @@ if __name__ == "__main__":
     pairwise_fwd_report = run_pairwise_forward_tests()
     pairwise_fwd_report.print_report()
     all_reports.append(pairwise_fwd_report)
+
+    pairwise_bwd_report = run_pairwise_backward_tests()
+    pairwise_bwd_report.print_report()
+    all_reports.append(pairwise_bwd_report)
 
     # Backward tests
     bwd_report = run_backward_tests(H=8, T=64, D=64, warmup=10, iterations=500)

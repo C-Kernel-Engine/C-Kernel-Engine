@@ -59,6 +59,15 @@ def _binding_ids(bindings_doc: Dict[str, Any]) -> Dict[str, Any]:
     return dict(bindings_doc.get("bindings", {}))
 
 
+def _resolve_backward_kernel_id(spec: Dict[str, Any], fwd: Dict[str, Any]) -> str:
+    kernel_id = str(spec.get("kernel_id", ""))
+    if kernel_id == "rope_backward_qk_f32":
+        forward_kernel_id = str(fwd.get("kernel_id", "")).strip().lower()
+        if "pairwise" in forward_kernel_id:
+            return "rope_backward_qk_pairwise_f32"
+    return kernel_id
+
+
 def _shape_numel(shape: Any) -> Optional[int]:
     if not isinstance(shape, list) or not shape:
         return None
@@ -411,7 +420,7 @@ def synthesize_ir2_backward(
         fwd_weights = fwd.get("weights", {}) or {}
 
         for spec in backward_specs:
-            kernel_id = str(spec.get("kernel_id", ""))
+            kernel_id = _resolve_backward_kernel_id(spec, fwd)
             role = str(spec.get("role", "core"))
 
             if kernel_id not in kernels:

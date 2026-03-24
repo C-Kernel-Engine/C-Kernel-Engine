@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import build_ir_v7
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 V7_ROOT = SCRIPT_DIR.parent
@@ -308,6 +310,13 @@ def _make_saved_tensor_id(op_id: int, key: str) -> str:
     return "saved.op%d.%s" % (op_id, key)
 
 
+def _resolve_forward_kernels(config: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, str]:
+    resolved = dict(FORWARD_KERNEL_BY_OP)
+    template_kernels = dict(template.get("kernels") or {})
+    resolved["rope_qk"] = build_ir_v7._resolve_rope_qk_kernel(config, template_kernels)
+    return resolved
+
+
 def build_ir1_train(
     manifest: Dict[str, Any],
     registry: Dict[str, Any],
@@ -327,6 +336,7 @@ def build_ir1_train(
 
     template = _choose_template(manifest, explicit_template=None)
     header_ops, body_ops, footer_ops = _template_sections(template)
+    forward_kernels = _resolve_forward_kernels(config, template)
     weight_index = _manifest_weight_index(manifest)
     kernels = _kernel_ids(registry)
     binding_ids = _binding_ids(bindings_doc)
@@ -660,7 +670,7 @@ def build_ir1_train(
         if raw_op == "dense_embedding_lookup":
             out = add_op(
                 logical_op="dense_embedding_lookup",
-                kernel_id=FORWARD_KERNEL_BY_OP["dense_embedding_lookup"],
+                kernel_id=forward_kernels["dense_embedding_lookup"],
                 section="header",
                 layer=-1,
                 inputs={
@@ -693,7 +703,7 @@ def build_ir1_train(
                     residual_slot = dict(current_main)
                 out = add_op(
                     logical_op="rmsnorm",
-                    kernel_id=FORWARD_KERNEL_BY_OP["rmsnorm"],
+                    kernel_id=forward_kernels["rmsnorm"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -706,7 +716,7 @@ def build_ir1_train(
                 # Keep q/k/v as explicit ops so backward can map per-projection dW paths.
                 q_out = add_op(
                     logical_op="q_proj",
-                    kernel_id=FORWARD_KERNEL_BY_OP["q_proj"],
+                    kernel_id=forward_kernels["q_proj"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -714,7 +724,7 @@ def build_ir1_train(
                 )
                 k_out = add_op(
                     logical_op="k_proj",
-                    kernel_id=FORWARD_KERNEL_BY_OP["k_proj"],
+                    kernel_id=forward_kernels["k_proj"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -722,7 +732,7 @@ def build_ir1_train(
                 )
                 v_out = add_op(
                     logical_op="v_proj",
-                    kernel_id=FORWARD_KERNEL_BY_OP["v_proj"],
+                    kernel_id=forward_kernels["v_proj"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -737,7 +747,7 @@ def build_ir1_train(
                     continue
                 qk_out = add_op(
                     logical_op="qk_norm",
-                    kernel_id=FORWARD_KERNEL_BY_OP["qk_norm"],
+                    kernel_id=forward_kernels["qk_norm"],
                     section="body",
                     layer=layer,
                     inputs={"q": q_ref, "k": k_ref},
@@ -751,7 +761,7 @@ def build_ir1_train(
                     continue
                 rope_out = add_op(
                     logical_op="rope_qk",
-                    kernel_id=FORWARD_KERNEL_BY_OP["rope_qk"],
+                    kernel_id=forward_kernels["rope_qk"],
                     section="body",
                     layer=layer,
                     inputs={"q": q_ref, "k": k_ref},
@@ -764,7 +774,7 @@ def build_ir1_train(
                     issues.append("attention missing q/k/v inputs at layer=%d" % layer)
                     continue
                 op_name = "attn_sliding" if raw_op == "attn_sliding" else "attn"
-                kid = FORWARD_KERNEL_BY_OP[op_name]
+                kid = forward_kernels[op_name]
                 attn_out = add_op(
                     logical_op=op_name,
                     kernel_id=kid,
@@ -777,7 +787,7 @@ def build_ir1_train(
             elif raw_op == "out_proj":
                 op_out = add_op(
                     logical_op="out_proj",
-                    kernel_id=FORWARD_KERNEL_BY_OP["out_proj"],
+                    kernel_id=forward_kernels["out_proj"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -790,7 +800,7 @@ def build_ir1_train(
                     continue
                 res_out = add_op(
                     logical_op="residual_add",
-                    kernel_id=FORWARD_KERNEL_BY_OP["residual_add"],
+                    kernel_id=forward_kernels["residual_add"],
                     section="body",
                     layer=layer,
                     inputs={"a": current_main, "b": residual_slot},
@@ -800,7 +810,7 @@ def build_ir1_train(
             elif raw_op == "mlp_gate_up":
                 mlp_up = add_op(
                     logical_op="mlp_gate_up",
-                    kernel_id=FORWARD_KERNEL_BY_OP["mlp_gate_up"],
+                    kernel_id=forward_kernels["mlp_gate_up"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -811,7 +821,7 @@ def build_ir1_train(
                 logical = "silu_mul" if raw_op == "silu_mul" else "geglu"
                 act_out = add_op(
                     logical_op=logical,
-                    kernel_id=FORWARD_KERNEL_BY_OP[logical],
+                    kernel_id=forward_kernels[logical],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -821,7 +831,7 @@ def build_ir1_train(
             elif raw_op == "mlp_down":
                 down_out = add_op(
                     logical_op="mlp_down",
-                    kernel_id=FORWARD_KERNEL_BY_OP["mlp_down"],
+                    kernel_id=forward_kernels["mlp_down"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -854,7 +864,7 @@ def build_ir1_train(
         if raw_op in ("rmsnorm", "final_rmsnorm"):
             out = add_op(
                 logical_op="rmsnorm",
-                kernel_id=FORWARD_KERNEL_BY_OP["rmsnorm"],
+                kernel_id=forward_kernels["rmsnorm"],
                 section="footer",
                 layer=-1,
                 inputs={"input": current_main},
@@ -865,7 +875,7 @@ def build_ir1_train(
         elif raw_op == "logits":
             logits_out = add_op(
                 logical_op="logits",
-                kernel_id=FORWARD_KERNEL_BY_OP["logits"],
+                kernel_id=forward_kernels["logits"],
                 section="footer",
                 layer=-1,
                 inputs={"input": current_main},

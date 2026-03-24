@@ -3,9 +3,9 @@
     "description": "Kernel registry generated from v7 kernel maps",
     "version": "v7",
     "generated_by": "gen_kernel_registry_from_maps.py",
-    "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v7/kernel_maps",
+    "source_dir": "version/v7/kernel_maps",
     "counts": {
-      "total": 100,
+      "total": 101,
       "by_op": {
         "add_backward": 1,
         "attention": 5,
@@ -46,7 +46,7 @@
         "residual_save": 1,
         "rmsnorm": 2,
         "rope": 3,
-        "rope_backward": 1,
+        "rope_backward": 2,
         "rope_init": 2,
         "softmax": 1,
         "split_q_gate": 1,
@@ -10467,6 +10467,156 @@
       "notes": "RoPE backward kernel for Q/K in v7 training IR.",
       "name": "rope_backward_qk_f32",
       "_source_file": "rope_backward_qk_f32.json"
+    },
+    {
+      "id": "rope_backward_qk_pairwise_f32",
+      "op": "rope_backward",
+      "variant": "fp32_qk_pairwise",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_q_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Gradient on pairwise-rotated Q"
+        },
+        {
+          "name": "d_k_out",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Gradient on pairwise-rotated K"
+        },
+        {
+          "name": "cos_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D/2"
+          ],
+          "desc": "RoPE cosine cache"
+        },
+        {
+          "name": "sin_cache",
+          "dtype": "fp32",
+          "shape": [
+            "max_T",
+            "D/2"
+          ],
+          "desc": "RoPE sine cache"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Gradient on pre-RoPE Q"
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "T",
+            "D"
+          ],
+          "desc": "Gradient on pre-RoPE K"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "D",
+        "rotary_dim"
+      ],
+      "params": [
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension"
+        },
+        {
+          "name": "pos_offset",
+          "dtype": "int32",
+          "desc": "Position offset"
+        },
+        {
+          "name": "rotary_dim",
+          "dtype": "int32",
+          "desc": "RoPE rotary dimensions (only inverse-rotate first rotary_dim channels)"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head",
+          "token"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Head-parallel inverse pairwise RoPE."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Inverse consecutive-pair RoPE backward for Q/K."
+      },
+      "impl": {
+        "function": "rope_backward_qk_pairwise_with_rotary_dim",
+        "c_declaration": "void rope_backward_qk_pairwise_with_rotary_dim(const float *d_q_out, const float *d_k_out, float *d_q, float *d_k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim);",
+        "sources": [
+          "src/kernels/rope_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": "python unittest/test_rope.py",
+            "tolerance": "5e-5",
+            "notes": "Pairwise RoPE backward parity."
+          }
+        ]
+      },
+      "notes": "Pairwise RoPE backward kernel for Llama-family Q/K in v7 training IR.",
+      "name": "rope_backward_qk_pairwise_f32",
+      "_source_file": "rope_backward_qk_pairwise_f32.json"
     },
     {
       "id": "rope_forward_qk",

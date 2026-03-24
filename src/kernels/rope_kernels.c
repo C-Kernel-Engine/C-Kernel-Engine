@@ -338,6 +338,50 @@ static inline void rope_apply_head_pairwise(float *x,
     }
 }
 
+static inline void rope_backward_apply_head_pairwise(const float *d_out,
+                                                     float *d_x,
+                                                     const float *cos_cache,
+                                                     const float *sin_cache,
+                                                     int num_tokens,
+                                                     int head_dim,
+                                                     int aligned_head_dim,
+                                                     int pos_offset,
+                                                     int rotary_dim)
+{
+    if (rotary_dim <= 0 || rotary_dim > head_dim) {
+        rotary_dim = head_dim;
+    }
+
+    int rotary_even = rotary_dim - (rotary_dim % 2);
+    int rotary_half = rotary_even / 2;
+
+    for (int t = 0; t < num_tokens; ++t) {
+        int pos = pos_offset + t;
+        const float *cos_row = cos_cache + pos * rotary_half;
+        const float *sin_row = sin_cache + pos * rotary_half;
+        const float *d_out_row = d_out + (size_t)t * (size_t)aligned_head_dim;
+        float *d_x_row = d_x + (size_t)t * (size_t)aligned_head_dim;
+
+        for (int i = 0; i < rotary_half; ++i) {
+            const int idx0 = 2 * i;
+            const int idx1 = idx0 + 1;
+            float d0 = d_out_row[idx0];
+            float d1 = d_out_row[idx1];
+            float c = cos_row[i];
+            float s = sin_row[i];
+            d_x_row[idx0] = d0 * c + d1 * s;
+            d_x_row[idx1] = -d0 * s + d1 * c;
+        }
+
+        for (int i = rotary_even; i < head_dim; ++i) {
+            d_x_row[i] = d_out_row[i];
+        }
+        for (int i = head_dim; i < aligned_head_dim; ++i) {
+            d_x_row[i] = 0.0f;
+        }
+    }
+}
+
 /**
  * RoPE forward (head-major layout, in-place)
  * @test test_rope.py::TestRoPEForward::test_rope_forward
@@ -780,4 +824,50 @@ void rope_backward_qk(const float *d_q_out,
 {
     rope_backward(d_q_out, d_q, cos_cache, sin_cache, num_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
     rope_backward(d_k_out, d_k, cos_cache, sin_cache, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset);
+}
+
+void rope_backward_qk_pairwise_with_rotary_dim(const float *d_q_out,
+                                               const float *d_k_out,
+                                               float *d_q,
+                                               float *d_k,
+                                               const float *cos_cache,
+                                               const float *sin_cache,
+                                               int num_heads,
+                                               int num_kv_heads,
+                                               int num_tokens,
+                                               int head_dim,
+                                               int aligned_head_dim,
+                                               int pos_offset,
+                                               int rotary_dim)
+{
+    size_t q_head_stride = (size_t)num_tokens * (size_t)aligned_head_dim;
+    size_t k_head_stride = (size_t)num_tokens * (size_t)aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        rope_backward_apply_head_pairwise(
+            d_q_out + (size_t)h * q_head_stride,
+            d_q + (size_t)h * q_head_stride,
+            cos_cache,
+            sin_cache,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            rotary_dim
+        );
+    }
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        rope_backward_apply_head_pairwise(
+            d_k_out + (size_t)h * k_head_stride,
+            d_k + (size_t)h * k_head_stride,
+            cos_cache,
+            sin_cache,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            rotary_dim
+        );
+    }
 }

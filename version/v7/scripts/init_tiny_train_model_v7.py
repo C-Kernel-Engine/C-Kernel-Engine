@@ -231,6 +231,7 @@ def build_tiny_model(
         "artifacts": {
             "weights_bump": "weights.bump",
             "weights_manifest": "weights_manifest.json",
+            "train_init_config": "train_init_config.json",
         },
         "tiny_parity": {
             "vocab": vocab_size,
@@ -259,9 +260,10 @@ def build_tiny_model(
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "weights.bump").write_bytes(bytes(blob))
     (out_dir / "weights_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    (out_dir / "train_init_config.json").write_text(json.dumps(run_cfg, indent=2), encoding="utf-8")
     if isinstance(template_doc, dict) and template_doc:
+        run_cfg["artifacts"]["template_train"] = "template_train.json"
         (out_dir / "template_train.json").write_text(json.dumps(template_doc, indent=2), encoding="utf-8")
+    (out_dir / "train_init_config.json").write_text(json.dumps(run_cfg, indent=2), encoding="utf-8")
 
     print(f"Created tiny v7 training model at: {out_dir}")
     print(f"  entries={len(entries)}  bump_bytes={len(blob)}")
@@ -297,7 +299,7 @@ def main() -> int:
         "--template",
         type=str,
         default="qwen3",
-        help="Architecture template name (default: qwen3). Built-ins: qwen3, qwen2, gemma3.",
+        help="Architecture template name (default: qwen3). Built-ins include qwen3, qwen2, gemma3, llama.",
     )
     ap.add_argument(
         "--template-file",
