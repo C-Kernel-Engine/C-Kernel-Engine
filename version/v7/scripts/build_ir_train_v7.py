@@ -59,6 +59,8 @@ WEIGHT_PATTERNS = {
     "final_ln_bias": ["final_ln_bias", "norm.bias"],
     "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight"],
     "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight"],
+    "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
+    "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight", "layers.{L}.post_ffw_norm.weight"],
     "wq": ["layer.{L}.wq", "layers.{L}.attention.wq"],
     "wk": ["layer.{L}.wk", "layers.{L}.attention.wk"],
     "wv": ["layer.{L}.wv", "layers.{L}.attention.wv"],
@@ -281,15 +283,24 @@ def _op_base_name(op_name: str, layer: int, instance: int, section: str) -> str:
     return "L%d.%s.%d" % (layer, op_name, instance)
 
 
-def _weight_key_override(op_name: str, alias: str, layer: int, rmsnorm_idx: int, section: str) -> str:
+def _weight_key_override(op_name: str, alias: str, layer: int, rmsnorm_idx: int, section: str, norm_variant: Optional[str] = None) -> str:
     # Route rmsnorm aliases by position.
     if op_name != "rmsnorm":
         return alias
+    variant = str(norm_variant or "rmsnorm")
     if section == "footer":
         if alias in ("gamma", "ln1_gamma", "ln2_gamma"):
             return "final_ln_weight"
         return alias
     if alias in ("gamma", "ln1_gamma", "ln2_gamma"):
+        if variant == "attn_norm":
+            return "ln1_gamma"
+        if variant == "ffn_norm":
+            return "ln2_gamma"
+        if variant == "post_attention_norm":
+            return "post_attention_norm"
+        if variant == "post_ffn_norm":
+            return "post_ffn_norm"
         return "ln1_gamma" if rmsnorm_idx == 0 else "ln2_gamma"
     return alias
 
@@ -422,14 +433,15 @@ def build_ir1_train(
         logical_op: str,
         layer: int,
         section: str,
-        rmsnorm_idx: int
+        rmsnorm_idx: int,
+        norm_variant: Optional[str] = None,
     ) -> Dict[str, Dict[str, Any]]:
         # Resolve template aliases -> concrete manifest tensors.
         # This keeps IR1 data-driven and avoids model-family conditionals later.
         resolved = {}
         specs = WEIGHTS_BY_LOGICAL_OP.get(logical_op, [])
         for kernel_alias, logical_weight_key, required in specs:
-            weight_key = _weight_key_override(logical_op, logical_weight_key, layer, rmsnorm_idx, section)
+            weight_key = _weight_key_override(logical_op, logical_weight_key, layer, rmsnorm_idx, section, norm_variant)
             weight_name = _resolve_weight_name(weight_index, weight_key, None if weight_key in ("token_emb", "output_weight", "final_ln_weight", "final_ln_bias") else layer)
             # logits prefers output_weight when present; otherwise tied token_emb.
             if logical_op == "logits" and logical_weight_key == "output_weight" and weight_name is None:
@@ -567,7 +579,8 @@ def build_ir1_train(
         layer: int,
         inputs: Dict[str, Dict[str, Any]],
         output_specs: Dict[str, str],
-        rmsnorm_idx: int = 0
+        rmsnorm_idx: int = 0,
+        norm_variant: Optional[str] = None,
     ) -> Dict[str, Dict[str, Any]]:
         nonlocal op_id
         instance = next_instance(logical_op, layer, section)
@@ -578,7 +591,7 @@ def build_ir1_train(
             if kernel_id not in binding_ids:
                 issues.append("Kernel `%s` missing bindings entry for op=%s" % (kernel_id, logical_op))
 
-        weights = resolve_weights_for_op(logical_op, layer, section, rmsnorm_idx)
+        weights = resolve_weights_for_op(logical_op, layer, section, rmsnorm_idx, norm_variant)
         grad_rule = _op_family_grad_rule(grad_rules, logical_op)
 
         op_base = _op_base_name(logical_op, layer, instance, section)
@@ -711,10 +724,14 @@ def build_ir1_train(
         k_ref = None
         v_ref = None
         for raw_op in body_ops:
-            if raw_op == "rmsnorm":
-                if rmsnorm_count in (0, 1):
-                    # Snapshot pre-block activation for both residual additions in layer body.
+            if raw_op in ("rmsnorm", "attn_norm", "ffn_norm", "post_attention_norm", "post_ffn_norm"):
+                if raw_op in ("rmsnorm", "attn_norm", "ffn_norm"):
+                    # Snapshot the branch input before norms that start an attention/MLP branch.
                     residual_slot = dict(current_main)
+                if raw_op in ("post_attention_norm", "post_ffn_norm"):
+                    opt_key = raw_op
+                    if _resolve_weight_name(weight_index, opt_key, layer) is None:
+                        continue
                 out = add_op(
                     logical_op="rmsnorm",
                     kernel_id=forward_kernels["rmsnorm"],
@@ -722,10 +739,12 @@ def build_ir1_train(
                     layer=layer,
                     inputs={"input": current_main},
                     output_specs={"output": "fp32", "rstd_cache": "fp32"},
-                    rmsnorm_idx=rmsnorm_count
+                    rmsnorm_idx=rmsnorm_count,
+                    norm_variant=raw_op,
                 )
                 current_main = out["output"]
-                rmsnorm_count += 1
+                if raw_op == "rmsnorm":
+                    rmsnorm_count += 1
             elif raw_op == "qkv_proj":
                 # Keep q/k/v as explicit ops so backward can map per-projection dW paths.
                 q_out = add_op(
