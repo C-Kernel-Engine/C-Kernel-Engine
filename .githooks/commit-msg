@@ -5,6 +5,8 @@
 #
 # Example:
 #   fix(v7/perf): resolve profile summary path fallback for .ck_build
+#   feat(v8/vision): add patch frontend lowering
+#   chore(hooks): require scoped commit headers
 #
 # Optional body (required for key change types):
 #   Why: explain intent and impact
@@ -33,7 +35,7 @@ case "$HEADER" in
 esac
 
 TYPES='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
-HEADER_RE="^(${TYPES})(\\([a-z0-9._/-]+\\))?(!)?: .+$"
+HEADER_RE="^(${TYPES})(\\([a-z0-9._/-]+\\))(!)?: .+$"
 
 if ! printf '%s\n' "$HEADER" | grep -Eq "$HEADER_RE"; then
   cat >&2 <<'MSG'
@@ -44,8 +46,25 @@ Required format:
 
 Examples:
   feat(v7/train): add run-dir based train suite command
+  feat(v8/vision): add patch frontend lowering
   fix(v6.6/rope): keep rotary_dim defaults for missing metadata
   chore(hooks): enforce commit quality checks
+MSG
+  exit 1
+fi
+
+SCOPE="$(printf '%s' "$HEADER" | sed -nE 's/^[a-z]+\(([a-z0-9._/-]+)\)(!)?: .*/\1/p')"
+if [ -z "$SCOPE" ]; then
+  cat >&2 <<'MSG'
+Commit scope is required.
+
+Use:
+  type(scope): summary
+
+Examples:
+  feat(v8): start vision encoder bring-up
+  fix(v7/train): add pairwise rope backward
+  perf(kernels): improve q8 gemm dispatch
 MSG
   exit 1
 fi
