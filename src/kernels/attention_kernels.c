@@ -944,93 +944,17 @@ static void attention_flash_query_causal_exact_f16kv(const float *q_vec,
  *
  * After changes: make test && make llamacpp-parity-full
  */
-void attention_forward_causal_head_major_gqa_flash(const float *q,
-                                                   const float *k,
-                                                   const float *v,
-                                                   float *output,
-                                                   int num_heads,
-                                                   int num_kv_heads,
-                                                   int num_tokens,
-                                                   int head_dim,
-                                                   int aligned_head_dim)
-{
-    if (!q || !k || !v || !output) {
-        return;
-    }
-    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
-        return;
-    }
-
-    const float scale = 1.0f / sqrtf((float)head_dim);
-    const int T = num_tokens;
-
-    if (ck_strict_parity_enabled()) {
-        for (int h = 0; h < num_heads; ++h) {
-            int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
-            const float *k_head = k + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
-            const float *v_head = v + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
-
-            for (int i = 0; i < T; ++i) {
-                const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
-                float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
-                attention_flash_query_causal_exact(q_vec, k_head, v_head,
-                                                   /*kv_tokens=*/i + 1,
-                                                   head_dim, aligned_head_dim,
-                                                   scale, out_vec);
-            }
-        }
-        return;
-    }
-
-    // Select SIMD implementation based on compile-time CPU features
-#if defined(__AVX512F__)
-    #define FLASH_QUERY_IMPL attention_flash_query_causal_avx512
-#elif defined(__AVX2__)
-    #define FLASH_QUERY_IMPL attention_flash_query_causal_avx2
-#elif defined(__AVX__)
-    #define FLASH_QUERY_IMPL attention_flash_query_causal_avx
-#else
-    #define FLASH_QUERY_IMPL attention_flash_query_causal
-#endif
-
-    for (int h = 0; h < num_heads; ++h) {
-        int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
-        const float *k_head = k + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
-        const float *v_head = v + (size_t)kv_head * (size_t)T * (size_t)aligned_head_dim;
-
-        for (int i = 0; i < T; ++i) {
-            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
-            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
-            FLASH_QUERY_IMPL(q_vec, k_head, v_head,
-                             /*kv_tokens=*/i + 1,
-                             head_dim, aligned_head_dim,
-                             scale, out_vec);
-        }
-    }
-
-#undef FLASH_QUERY_IMPL
-}
-
-/**
- * Flash attention forward with custom KV stride (for KV cache)
- * @test test_flash_attention.py::TestFlashAttention::test_flash_strided
- * @test test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention
- *
- * Variant with configurable kv_stride_tokens for KV cache layouts
- * where K/V may not be contiguous in memory.
- *
- * After changes: make test
- */
-void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
-                                                           const float *k,
-                                                           const float *v,
-                                                           float *output,
-                                                           int num_heads,
-                                                           int num_kv_heads,
-                                                           int num_tokens,
-                                                           int head_dim,
-                                                           int aligned_head_dim,
-                                                           int kv_stride_tokens)
+static void attention_forward_head_major_gqa_flash_impl(const float *q,
+                                                        const float *k,
+                                                        const float *v,
+                                                        float *output,
+                                                        int num_heads,
+                                                        int num_kv_heads,
+                                                        int num_tokens,
+                                                        int head_dim,
+                                                        int aligned_head_dim,
+                                                        int kv_stride_tokens,
+                                                        int causal)
 {
     if (!q || !k || !v || !output) {
         return;
@@ -1055,8 +979,9 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
             for (int i = 0; i < T; ++i) {
                 const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
                 float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+                const int kv_tokens = causal ? (i + 1) : T;
                 attention_flash_query_causal_exact(q_vec, k_head, v_head,
-                                                   /*kv_tokens=*/i + 1,
+                                                   kv_tokens,
                                                    head_dim, aligned_head_dim,
                                                    scale, out_vec);
             }
@@ -1083,14 +1008,99 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
         for (int i = 0; i < T; ++i) {
             const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
             float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            const int kv_tokens = causal ? (i + 1) : T;
             FLASH_QUERY_IMPL(q_vec, k_head, v_head,
-                             /*kv_tokens=*/i + 1,
+                             kv_tokens,
                              head_dim, aligned_head_dim,
                              scale, out_vec);
         }
     }
 
 #undef FLASH_QUERY_IMPL
+}
+
+void attention_forward_causal_head_major_gqa_flash(const float *q,
+                                                   const float *k,
+                                                   const float *v,
+                                                   float *output,
+                                                   int num_heads,
+                                                   int num_kv_heads,
+                                                   int num_tokens,
+                                                   int head_dim,
+                                                   int aligned_head_dim)
+{
+    attention_forward_head_major_gqa_flash_impl(q, k, v, output,
+                                                num_heads, num_kv_heads,
+                                                num_tokens, head_dim,
+                                                aligned_head_dim,
+                                                /*kv_stride_tokens=*/num_tokens,
+                                                /*causal=*/1);
+}
+
+void attention_forward_full_head_major_gqa_flash(const float *q,
+                                                 const float *k,
+                                                 const float *v,
+                                                 float *output,
+                                                 int num_heads,
+                                                 int num_kv_heads,
+                                                 int num_tokens,
+                                                 int head_dim,
+                                                 int aligned_head_dim)
+{
+    attention_forward_head_major_gqa_flash_impl(q, k, v, output,
+                                                num_heads, num_kv_heads,
+                                                num_tokens, head_dim,
+                                                aligned_head_dim,
+                                                /*kv_stride_tokens=*/num_tokens,
+                                                /*causal=*/0);
+}
+
+/**
+ * Flash attention forward with custom KV stride (for KV cache)
+ * @test test_flash_attention.py::TestFlashAttention::test_flash_strided
+ * @test test_kv_cache_attention.py::TestKVCacheAttention::test_flash_attention
+ *
+ * Variant with configurable kv_stride_tokens for KV cache layouts
+ * where K/V may not be contiguous in memory.
+ *
+ * After changes: make test
+ */
+void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
+                                                           const float *k,
+                                                           const float *v,
+                                                           float *output,
+                                                           int num_heads,
+                                                           int num_kv_heads,
+                                                           int num_tokens,
+                                                           int head_dim,
+                                                           int aligned_head_dim,
+                                                           int kv_stride_tokens)
+{
+    attention_forward_head_major_gqa_flash_impl(q, k, v, output,
+                                                num_heads, num_kv_heads,
+                                                num_tokens, head_dim,
+                                                aligned_head_dim,
+                                                kv_stride_tokens,
+                                                /*causal=*/1);
+}
+
+void attention_forward_full_head_major_gqa_flash_strided(const float *q,
+                                                         const float *k,
+                                                         const float *v,
+                                                         float *output,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int num_tokens,
+                                                         int head_dim,
+                                                         int aligned_head_dim,
+                                                         int kv_stride_tokens)
+{
+    attention_forward_head_major_gqa_flash_impl(q, k, v, output,
+                                                num_heads, num_kv_heads,
+                                                num_tokens, head_dim,
+                                                aligned_head_dim,
+                                                kv_stride_tokens,
+                                                /*causal=*/0);
 }
 
 void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,

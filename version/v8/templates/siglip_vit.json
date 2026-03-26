@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "name": "siglip_vit",
+  "family": "vision_transformer",
+  "flags": {
+    "patch_frontend": "im2patch",
+    "activation": "geglu",
+    "normalization": "rmsnorm"
+  },
+  "contract": {
+    "vision_contract": {
+      "input_modality": "image",
+      "image_size": 224,
+      "patch_size": 16,
+      "position_encoding": "absolute_2d",
+      "output": "vision_tokens"
+    },
+    "attention_contract": {
+      "rope_layout": "none",
+      "position_encoding": "absolute_2d",
+      "kv_layout": "ephemeral_full_context",
+      "attn_variant": "dense_bidirectional",
+      "causal": false
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> geglu -> down",
+      "activation": "geglu",
+      "qkv_bias": false
+    }
+  },
+  "sequence": [
+    "vision_encoder"
+  ],
+  "block_types": {
+    "vision_encoder": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        "patch_embeddings"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "attn_norm",
+          "qkv_proj",
+          "attn",
+          "out_proj",
+          "residual_add",
+          "ffn_norm",
+          "mlp_gate_up",
+          "geglu",
+          "mlp_down",
+          "residual_add"
+        ]
+      },
+      "footer": []
+    }
+  }
+}

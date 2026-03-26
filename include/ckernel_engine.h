@@ -1089,6 +1089,17 @@ void attention_forward_causal_head_major_gqa_flash(const float *q,
                                                    int head_dim,
                                                    int aligned_head_dim);
 
+// Flash-style full / bidirectional attention for encoder-style prefill.
+void attention_forward_full_head_major_gqa_flash(const float *q,
+                                                 const float *k,
+                                                 const float *v,
+                                                 float *output,
+                                                 int num_heads,
+                                                 int num_kv_heads,
+                                                 int num_tokens,
+                                                 int head_dim,
+                                                 int aligned_head_dim);
+
 void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
                                                            const float *k,
                                                            const float *v,
@@ -1099,6 +1110,17 @@ void attention_forward_causal_head_major_gqa_flash_strided(const float *q,
                                                            int head_dim,
                                                            int aligned_head_dim,
                                                            int kv_stride_tokens);
+
+void attention_forward_full_head_major_gqa_flash_strided(const float *q,
+                                                         const float *k,
+                                                         const float *v,
+                                                         float *output,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int num_tokens,
+                                                         int head_dim,
+                                                         int aligned_head_dim,
+                                                         int kv_stride_tokens);
 
 // Llama-parity flash attention variant that rounds K/V through FP16 before use.
 void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,

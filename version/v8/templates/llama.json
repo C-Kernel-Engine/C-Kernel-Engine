@@ -1,0 +1,91 @@
+{
+  "version": 2,
+  "name": "llama",
+  "family": "llama",
+  "flags": {
+    "use_qkv_bias": "from_weights",
+    "activation": "swiglu",
+    "rope": "rope",
+    "tokenizer": "sentencepiece"
+  },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "sentencepiece",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "attention_contract": {
+      "rope_layout": "pairwise",
+      "rope_type": "rope",
+      "qk_norm": false,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "dense"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> silu_mul -> down",
+      "activation": "swiglu",
+      "qkv_bias": "from_weights"
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "weight_tying",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "kv_cache_batch_copy": [
+          "activation:k_src",
+          "activation:v_src",
+          "output:k_dst",
+          "output:v_dst",
+          "dim:_kv_copy_bytes"
+        ]
+      }
+    }
+  },
+  "kernels": {
+    "rope_qk": "rope_forward_qk_pairwise",
+    "attn_prefill": "attention_forward_causal_head_major_gqa_flash_strided_f16kv",
+    "attn_decode": "attention_forward_decode_head_major_gqa_flash_f16kv"
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "rmsnorm",
+          "qkv_proj",
+          "rope_qk",
+          "attn",
+          "out_proj",
+          "residual_add",
+          "rmsnorm",
+          "mlp_gate_up",
+          "silu_mul",
+          "mlp_down",
+          "residual_add"
+        ]
+      },
+      "footer": [
+        "rmsnorm",
+        "weight_tying",
+        "logits"
+      ]
+    }
+  }
+}

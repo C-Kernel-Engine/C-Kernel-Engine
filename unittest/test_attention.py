@@ -23,8 +23,9 @@ from test_utils import (
 )
 
 
-# Load the library
-lib = load_lib("libckernel_attention.so", "libckernel_engine.so")
+# Prefer the full engine build because it already carries the attention kernels
+# and avoids standalone shared-library dependency drift.
+lib = load_lib("libckernel_engine.so", "libckernel_attention.so")
 
 # ===============================================================================
 # Function signatures

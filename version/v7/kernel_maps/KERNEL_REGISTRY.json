@@ -5,10 +5,10 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "version/v7/kernel_maps",
     "counts": {
-      "total": 101,
+      "total": 103,
       "by_op": {
         "add_backward": 1,
-        "attention": 5,
+        "attention": 6,
         "attention_projection": 1,
         "attention_sliding": 2,
         "attn_gate_sigmoid_mul": 1,
@@ -54,7 +54,8 @@
         "ssm_conv1d": 1,
         "ssm_conv1d_backward": 1,
         "swiglu": 2,
-        "tokenizer": 1
+        "tokenizer": 1,
+        "vision_patchify": 1
       }
     }
   },
@@ -1151,6 +1152,182 @@
       "notes": "Flash attention for decode mode with sliding window: single query token attends to the last W KV cache entries.",
       "name": "attention_forward_decode_head_major_gqa_flash_sliding",
       "_source_file": "attention_forward_decode_head_major_gqa_flash_sliding.json"
+    },
+    {
+      "id": "attention_forward_full_head_major_gqa_flash_strided",
+      "op": "attention",
+      "variant": "full_flash_fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Query tensor [heads, tokens, head_dim]"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "runtime_buffers": [
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "Key tensor [kv_heads, seq_len, head_dim], strided layout"
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "KV",
+            "S",
+            "D"
+          ],
+          "desc": "Value tensor [kv_heads, seq_len, head_dim], strided layout"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "T",
+            "D"
+          ],
+          "desc": "Attention output [heads, tokens, head_dim]"
+        }
+      ],
+      "scratch": [
+        {
+          "name": "qkv_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * D * 4",
+          "desc": "QKV tiles for flash attention"
+        },
+        {
+          "name": "attn_scratch",
+          "dtype": "fp32",
+          "size_bytes": "H * T * T * 4",
+          "desc": "Attention scores [heads, T, T]"
+        }
+      ],
+      "dims": [
+        "H",
+        "KV",
+        "T",
+        "S",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "kv_stride_tokens",
+          "dtype": "int32",
+          "desc": "Stride in tokens for KV layout"
+        },
+        {
+          "name": "head_dim",
+          "dtype": "int32",
+          "desc": "Head dimension (unpadded)"
+        },
+        {
+          "name": "aligned_head_dim",
+          "dtype": "int32",
+          "desc": "Aligned head dimension for SIMD"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Parallelize across heads; each thread handles one or more heads."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "D": 64,
+          "T": 32
+        },
+        "notes": "Flash attention uses SIMD paths when available. This variant is full / bidirectional and applies no causal mask."
+      },
+      "impl": {
+        "function": "attention_forward_full_head_major_gqa_flash_strided",
+        "c_declaration": "void attention_forward_full_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+        "sources": [
+          "src/kernels/attention_kernels.c",
+          "src/kernels/softmax_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "avx512",
+            "requires": [
+              "avx512f",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx512f",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx2",
+            "requires": [
+              "avx2",
+              "fma"
+            ],
+            "compile_flags": [
+              "-mavx2",
+              "-mfma"
+            ]
+          },
+          {
+            "name": "avx",
+            "requires": [
+              "avx"
+            ],
+            "compile_flags": [
+              "-mavx"
+            ]
+          },
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_attention_full.py"
+        ],
+        "bench": [
+          "unittest/test_attention.py"
+        ]
+      },
+      "notes": "Full / bidirectional multi-head attention with GQA support. Intended for encoder-style prefill where every token attends to the full sequence.",
+      "name": "attention_forward_full_head_major_gqa_flash_strided",
+      "_source_file": "attention_forward_full_head_major_gqa_flash_strided.json"
     },
     {
       "id": "attn_gate_sigmoid_mul_backward_f32",
@@ -6277,6 +6454,74 @@
       "notes": "FP32 in-place gradient scale kernel.",
       "name": "gradient_scale_f32",
       "_source_file": "gradient_scale_f32.json"
+    },
+    {
+      "id": "im2patch",
+      "op": "vision_patchify",
+      "variant": "fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "image",
+          "dtype": "fp32",
+          "shape": [
+            "C",
+            "H",
+            "W"
+          ],
+          "desc": "Input image tensor [C, H, W]"
+        },
+        {
+          "name": "patches",
+          "dtype": "fp32",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Flattened patches [num_patches, C*P*P]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patches",
+          "dtype": "fp32",
+          "shape": [
+            "N",
+            "K"
+          ],
+          "desc": "Flattened patches [num_patches, C*P*P]"
+        }
+      ],
+      "dims": [
+        "C",
+        "H",
+        "W",
+        "P"
+      ],
+      "impl": {
+        "function": "im2patch",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ],
+        "c_declaration": "void im2patch(const float *image, float *patches, int C, int H, int W, int P);"
+      },
+      "modes": {
+        "inference": true,
+        "training": true,
+        "backward": false
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_vision.py"
+        ]
+      },
+      "notes": "Vision frontend patch extraction. Produces flattened patches before linear patch projection.",
+      "name": "im2patch",
+      "_source_file": "im2patch.json"
     },
     {
       "id": "kv_cache_store",

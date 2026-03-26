@@ -17,6 +17,36 @@
     }
   },
   "bindings": {
+    "im2patch": {
+      "params": [
+        {
+          "name": "image",
+          "source": "activation:image",
+          "cast": "const float*"
+        },
+        {
+          "name": "patches",
+          "source": "output:patches",
+          "cast": "float*"
+        },
+        {
+          "name": "C",
+          "source": "dim:vision_channels"
+        },
+        {
+          "name": "H",
+          "source": "dim:image_size"
+        },
+        {
+          "name": "W",
+          "source": "dim:image_size"
+        },
+        {
+          "name": "P",
+          "source": "dim:patch_size"
+        }
+      ]
+    },
     "embedding_forward": {
       "params": [
         {
@@ -1382,6 +1412,55 @@
     },
     "attention_forward_causal_head_major_gqa_flash_strided": {
       "note": "Prefill: all tokens process together with causal mask",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
+        }
+      ]
+    },
+    "attention_forward_full_head_major_gqa_flash_strided": {
+      "note": "Prefill: full / bidirectional attention across the entire sequence",
       "params": [
         {
           "name": "q",
