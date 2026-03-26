@@ -1150,7 +1150,7 @@
       <h3>New: CK-Native Training Curriculum</h3>
       <p>
         Use the curriculum page to see how <strong>v7 training foundations</strong> feed the rest of the roadmap:
-        <code>v8-v9</code> sparse scale, <code>v10</code> adapters, <code>v11-v14</code> multimodal training,
+        <code>v8-v11</code> multimodal training, <code>v12-v13</code> sparse scale, <code>v14</code> adapters,
         <code>v15</code> embedded runtime, and <code>v16-v17</code> interpretability plus control integration.
       </p>
     </div>
@@ -1188,31 +1188,25 @@
     <div class="arch-arrow-right">→</div>
     <div class="arch-node">
       <div class="arch-node-badge arch-v8">v8-9</div>
-      <div class="arch-node-label">MoE</div>
-      <div class="arch-node-dot"></div>
-    </div>
-    <div class="arch-arrow-right">→</div>
-    <div class="arch-node">
-      <div class="arch-node-badge arch-v10">v10</div>
-      <div class="arch-node-label">LoRA</div>
-      <div class="arch-node-dot"></div>
-    </div>
-    <div class="arch-arrow-right">→</div>
-    <div class="arch-node">
-      <div class="arch-node-badge arch-v11">v11</div>
       <div class="arch-node-label">Vision</div>
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
     <div class="arch-node">
-      <div class="arch-node-badge arch-v13">v13</div>
+      <div class="arch-node-badge arch-v10">v10-11</div>
       <div class="arch-node-label">Audio</div>
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
     <div class="arch-node">
+      <div class="arch-node-badge arch-v11">v12-13</div>
+      <div class="arch-node-label">MoE</div>
+      <div class="arch-node-dot"></div>
+    </div>
+    <div class="arch-arrow-right">→</div>
+    <div class="arch-node">
       <div class="arch-node-badge arch-v14">v14</div>
-      <div class="arch-node-label">Audio Train</div>
+      <div class="arch-node-label">LoRA</div>
       <div class="arch-node-dot"></div>
     </div>
     <div class="arch-arrow-right">→</div>
@@ -1799,51 +1793,51 @@
       </tr>
       <tr>
         <td><strong>v8.0</strong></td>
-        <td>MoE - Mixture of Experts</td>
-        <td>Expert selection kernels, router computation, load balancing loss</td>
+        <td>Vision Encoder</td>
+        <td>Patch embedding lowering, image positional encoding, ViT support, and block-local multimodal stitching groundwork</td>
         <td>v7.x training</td>
-        <td><span class="version-status status-planned">Planned</span></td>
+        <td><span class="version-status status-building">Building</span></td>
       </tr>
       <tr>
         <td><strong>v9.0</strong></td>
-        <td>MoE Backward</td>
-        <td>Backward pass through MoE gates and experts</td>
+        <td>Vision Training</td>
+        <td>Backward through vision encoder, image classification fine-tuning</td>
         <td>v8.0</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
         <td><strong>v10.0</strong></td>
-        <td>LoRA / QLoRA</td>
-        <td>Adapter injection, low-rank decomposition, 4-bit LoRA support</td>
-        <td>v7.x training</td>
-        <td><span class="version-status status-planned">Planned</span></td>
-      </tr>
-      <tr>
-        <td><strong>v11.0</strong></td>
-        <td>Vision Encoder</td>
-        <td>Patch embedding, image positional encoding, ViT support</td>
-        <td>v7.x training</td>
-        <td><span class="version-status status-planned">Planned</span></td>
-      </tr>
-      <tr>
-        <td><strong>v12.0</strong></td>
-        <td>Vision Training</td>
-        <td>Backward through vision encoder, image classification fine-tuning</td>
-        <td>v11.0</td>
-        <td><span class="version-status status-planned">Planned</span></td>
-      </tr>
-      <tr>
-        <td><strong>v13.0</strong></td>
         <td>Audio Encoder</td>
         <td>Conformer/Whisper-style encoder, spectrogram preprocessing</td>
         <td>v7.x training</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
-        <td><strong>v14.0</strong></td>
+        <td><strong>v11.0</strong></td>
         <td>Audio Training</td>
         <td>Backward through audio encoder, speech recognition training</td>
-        <td>v13.0</td>
+        <td>v10.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v12.0</strong></td>
+        <td>MoE - Mixture of Experts</td>
+        <td>Expert selection kernels, router computation, load balancing loss</td>
+        <td>v7.x training</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v13.0</strong></td>
+        <td>MoE Backward</td>
+        <td>Backward pass through MoE gates and experts</td>
+        <td>v12.0</td>
+        <td><span class="version-status status-planned">Planned</span></td>
+      </tr>
+      <tr>
+        <td><strong>v14.0</strong></td>
+        <td>LoRA / QLoRA</td>
+        <td>Adapter injection, low-rank decomposition, 4-bit LoRA support</td>
+        <td>v7.x training</td>
         <td><span class="version-status status-planned">Planned</span></td>
       </tr>
       <tr>
@@ -2394,13 +2388,13 @@
     Version numbers follow this convention:
   </p>
   <ul style="color: var(--text-secondary);">
-    <li><strong>Current priority (2026):</strong> Complete v7.x training sign-off end-to-end before opening v15 implementation</li>
+    <li><strong>Current priority (2026):</strong> Complete v7.x training sign-off while actively bringing up v8.x vision inference foundations before opening v15 implementation</li>
     <li><strong>v6.x:</strong> Inference-only (forward pass)</li>
     <li><strong>v7.x:</strong> Training foundation (forward + backward)</li>
-    <li><strong>v8.x:</strong> MoE architecture (efficient large models)</li>
-    <li><strong>v10.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
-    <li><strong>v11.x:</strong> Vision encoding (ViT)</li>
-    <li><strong>v13.x:</strong> Audio encoding (Whisper/Conformer)</li>
+    <li><strong>v8.x:</strong> Vision encoding and image training foundations, now in active bring-up</li>
+    <li><strong>v10.x:</strong> Audio encoding and audio training foundations</li>
+    <li><strong>v12.x:</strong> MoE architecture (efficient large models)</li>
+    <li><strong>v14.x:</strong> Parameter-efficient fine-tuning (LoRA)</li>
     <li><strong>v15.x:</strong> Embedded AI inference on constrained hardware (enabled by v1-v14 groundwork)</li>
     <li><strong>v16.x:</strong> Mechanistic interpretability (SAE feature learning, IR feature mapping, causal intervention tooling)</li>
     <li><strong>v17.x:</strong> LLM + vision policy integration for realtime autonomy loops</li>
@@ -2439,13 +2433,13 @@ const versionData = {
     { major: 7, minor: 0, phase: "Training IR Foundation", building: true },
     { major: 7, minor: 1, phase: "Runtime Safety + Diagnostics", building: true },
     { major: 7, minor: 2, phase: "Threaded Train Runtime", planned: true },
-    { major: 8, minor: 0, phase: "MoE Architecture", planned: true },
-    { major: 9, minor: 0, phase: "MoE Backward", planned: true },
-    { major: 10, minor: 0, phase: "LoRA / QLoRA", planned: true },
-    { major: 11, minor: 0, phase: "Vision Encoder", planned: true },
-    { major: 12, minor: 0, phase: "Vision Training", planned: true },
-    { major: 13, minor: 0, phase: "Audio Encoder", planned: true },
-    { major: 14, minor: 0, phase: "Audio Training", planned: true },
+    { major: 8, minor: 0, phase: "Vision Encoder", planned: true },
+    { major: 9, minor: 0, phase: "Vision Training", planned: true },
+    { major: 10, minor: 0, phase: "Audio Encoder", planned: true },
+    { major: 11, minor: 0, phase: "Audio Training", planned: true },
+    { major: 12, minor: 0, phase: "MoE Architecture", planned: true },
+    { major: 13, minor: 0, phase: "MoE Backward", planned: true },
+    { major: 14, minor: 0, phase: "LoRA / QLoRA", planned: true },
     { major: 15, minor: 0, phase: "Embedded AI Inference", planned: true },
     { major: 16, minor: 0, phase: "Mechanistic Interpretability", planned: true },
     { major: 17, minor: 0, phase: "LLM + Vision Policy Integration", planned: true }
@@ -2683,7 +2677,7 @@ console.log('Roadmap: ' + versionData.roadmap.map(v => 'v' + v.major).join(' →
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-26</p>
             </div>
         </div>
     </footer>
