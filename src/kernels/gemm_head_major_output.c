@@ -41,6 +41,7 @@
 #endif
 
 /* Forward declaration from dequant_kernels.c */
+void dequant_q5_0_block(const block_q5_0 *block, float *output);
 void dequant_q5_0_row(const void *src, float *dst, size_t n_elements);
 
 /* ============================================================================
@@ -134,28 +135,78 @@ void gemv_nt_q5_0_head_major_output(float *output,
 }
 
 /* ============================================================================
- * Vectorized version with AVX (8 floats at a time)
+ * Vectorized version with AVX (dot product over decoded 32-wide blocks)
  * ============================================================================ */
 
-#if defined(__AVX__) && defined(__F16C__)
-#include <immintrin.h>
+#if defined(__AVX__)
 
-/**
- * @brief Optimized version with AVX SIMD
- *
- * Key optimizations:
- * 1. Process 8 output rows at a time using AVX
- * 2. Accumulate across heads for better cache utilization
- * 3. Use FMAC for multiply-accumulate
- */
+static inline float hsum256_ps_head_major(__m256 v)
+{
+    __m128 lo = _mm256_castps256_ps128(v);
+    __m128 hi = _mm256_extractf128_ps(v, 1);
+    __m128 sum128 = _mm_add_ps(lo, hi);
+    __m128 shuf = _mm_movehdup_ps(sum128);
+    __m128 sums = _mm_add_ps(sum128, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+
+static inline float dot_fp32_q5_0_block_avx(const block_q5_0 *block,
+                                            const float *x)
+{
+    float w[QK5_0];
+    dequant_q5_0_block(block, w);
+
+    __m256 acc = _mm256_setzero_ps();
+    for (int i = 0; i < QK5_0; i += 8) {
+        const __m256 wv = _mm256_loadu_ps(w + i);
+        const __m256 xv = _mm256_loadu_ps(x + i);
+        acc = _mm256_add_ps(acc, _mm256_mul_ps(wv, xv));
+    }
+    return hsum256_ps_head_major(acc);
+}
+
+static inline void accum_8rows_q5_0_block_avx(float *out,
+                                              const block_q5_0 *w0,
+                                              const block_q5_0 *w1,
+                                              const block_q5_0 *w2,
+                                              const block_q5_0 *w3,
+                                              const block_q5_0 *w4,
+                                              const block_q5_0 *w5,
+                                              const block_q5_0 *w6,
+                                              const block_q5_0 *w7,
+                                              const float *x)
+{
+    float w_dec[8][QK5_0];
+    dequant_q5_0_block(w0, w_dec[0]);
+    dequant_q5_0_block(w1, w_dec[1]);
+    dequant_q5_0_block(w2, w_dec[2]);
+    dequant_q5_0_block(w3, w_dec[3]);
+    dequant_q5_0_block(w4, w_dec[4]);
+    dequant_q5_0_block(w5, w_dec[5]);
+    dequant_q5_0_block(w6, w_dec[6]);
+    dequant_q5_0_block(w7, w_dec[7]);
+
+    __m256 acc = _mm256_loadu_ps(out);
+    for (int i = 0; i < QK5_0; i++) {
+        const __m256 wv = _mm256_setr_ps(
+            w_dec[0][i], w_dec[1][i], w_dec[2][i], w_dec[3][i],
+            w_dec[4][i], w_dec[5][i], w_dec[6][i], w_dec[7][i]);
+        const __m256 xv = _mm256_set1_ps(x[i]);
+        acc = _mm256_add_ps(acc, _mm256_mul_ps(wv, xv));
+    }
+    _mm256_storeu_ps(out, acc);
+}
+
 void gemv_nt_q5_0_head_major_output_avx(float *output,
-                                         const float *attn_out,
-                                         const void *wo,
-                                         const float *bias,
-                                         int tokens,
-                                         int embed_dim,
-                                         int num_heads,
-                                         int head_dim)
+                                        const float *attn_out,
+                                        const void *wo,
+                                        const float *bias,
+                                        int tokens,
+                                        int embed_dim,
+                                        int num_heads,
+                                        int head_dim)
 {
     if (!output || !attn_out || !wo) return;
     if (tokens <= 0 || embed_dim <= 0 || num_heads <= 0 || head_dim <= 0) return;
@@ -167,7 +218,6 @@ void gemv_nt_q5_0_head_major_output_avx(float *output,
     const size_t token_stride = head_dim;
     const size_t head_stride = (size_t)tokens * token_stride;
 
-    /* Initialize output */
     if (bias) {
         for (int t = 0; t < tokens; t++) {
             float *out_row = output + (size_t)t * embed_dim;
@@ -179,134 +229,40 @@ void gemv_nt_q5_0_head_major_output_avx(float *output,
         memset(output, 0, (size_t)tokens * embed_dim * sizeof(float));
     }
 
-    /* Process heads sequentially, accumulating into output */
     for (int h = 0; h < num_heads; h++) {
         const float *head_data = attn_out + (size_t)h * head_stride;
         const int head_offset = h * blocks_per_head;
 
-        /* Process output rows in chunks of 8 for AVX */
         int n = 0;
         for (; n + 7 < embed_dim; n += 8) {
-            /* Process 8 output rows at once */
             for (int n_block = 0; n_block < blocks_per_head; n_block++) {
-                const size_t w_offset = (size_t)(n + head_offset + n_block) * blocks_per_row + n_block;
+                const block_q5_0 *w0 = weights + (size_t)(n + 0) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w1 = weights + (size_t)(n + 1) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w2 = weights + (size_t)(n + 2) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w3 = weights + (size_t)(n + 3) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w4 = weights + (size_t)(n + 4) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w5 = weights + (size_t)(n + 5) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w6 = weights + (size_t)(n + 6) * blocks_per_row + head_offset + n_block;
+                const block_q5_0 *w7 = weights + (size_t)(n + 7) * blocks_per_row + head_offset + n_block;
 
-                __m256 acc0 = _mm256_setzero_ps();
-                __m256 acc1 = _mm256_setzero_ps();
-                __m256 acc2 = _mm256_setzero_ps();
-                __m256 acc3 = _mm256_setzero_ps();
-                __m256 acc4 = _mm256_setzero_ps();
-                __m256 acc5 = _mm256_setzero_ps();
-                __m256 acc6 = _mm256_setzero_ps();
-                __m256 acc7 = _mm256_setzero_ps();
-
-                /* For each token */
                 for (int t = 0; t < tokens; t++) {
-                    const float *token_vec = head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
-
-                    /* Load 8 weight blocks */
-                    const block_q5_0 *w0 = weights + w_offset;
-                    const block_q5_0 *w1 = w0 + blocks_per_row;
-                    const block_q5_0 *w2 = w1 + blocks_per_row;
-                    const block_q5_0 *w3 = w2 + blocks_per_row;
-                    const block_q5_0 *w4 = w3 + blocks_per_row;
-                    const block_q5_0 *w5 = w4 + blocks_per_row;
-                    const block_q5_0 *w6 = w5 + blocks_per_row;
-                    const block_q5_0 *w7 = w6 + blocks_per_row;
-
-                    const float d0 = CK_FP16_TO_FP32(w0->d);
-                    const float d1 = CK_FP16_TO_FP32(w1->d);
-                    const float d2 = CK_FP16_TO_FP32(w2->d);
-                    const float d3 = CK_FP16_TO_FP32(w3->d);
-                    const float d4 = CK_FP16_TO_FP32(w4->d);
-                    const float d5 = CK_FP16_TO_FP32(w5->d);
-                    const float d6 = CK_FP16_TO_FP32(w6->d);
-                    const float d7 = CK_FP16_TO_FP32(w7->d);
-
-                    /* Dot products for each output row */
-                    for (int j = 0; j < 16; j++) {
-                        const uint8_t p0 = w0->qs[j];
-                        const uint8_t p1 = w1->qs[j];
-                        const uint8_t p2 = w2->qs[j];
-                        const uint8_t p3 = w3->qs[j];
-                        const uint8_t p4 = w4->qs[j];
-                        const uint8_t p5 = w5->qs[j];
-                        const uint8_t p6 = w6->qs[j];
-                        const uint8_t p7 = w7->qs[j];
-
-                        const float tv0 = token_vec[j];
-                        const float tv1 = token_vec[j + 16];
-
-                        /* Extract low nibbles */
-                        const int lo0 = (p0 & 0x0F) - 8;
-                        const int lo1 = (p1 & 0x0F) - 8;
-                        const int lo2 = (p2 & 0x0F) - 8;
-                        const int lo3 = (p3 & 0x0F) - 8;
-                        const int lo4 = (p4 & 0x0F) - 8;
-                        const int lo5 = (p5 & 0x0F) - 8;
-                        const int lo6 = (p6 & 0x0F) - 8;
-                        const int lo7 = (p7 & 0x0F) - 8;
-
-                        __m256 xv = _mm256_set1_ps(tv0);
-                        __m256 qw = _mm256_setr_ps(lo0, lo1, lo2, lo3, lo4, lo5, lo6, lo7);
-                        __m256 vw = _mm256_setr_ps(d0, d1, d2, d3, d4, d5, d6, d7);
-                        acc0 = _mm256_add_ps(acc0, _mm256_mul_ps(_mm256_mul_ps(qw, vw), xv));
-
-                        /* Extract high nibbles */
-                        const int hi0 = (p0 >> 4) - 8;
-                        const int hi1 = (p1 >> 4) - 8;
-                        const int hi2 = (p2 >> 4) - 8;
-                        const int hi3 = (p3 >> 4) - 8;
-                        const int hi4 = (p4 >> 4) - 8;
-                        const int hi5 = (p5 >> 4) - 8;
-                        const int hi6 = (p6 >> 4) - 8;
-                        const int hi7 = (p7 >> 4) - 8;
-
-                        xv = _mm256_set1_ps(tv1);
-                        qw = _mm256_setr_ps(hi0, hi1, hi2, hi3, hi4, hi5, hi6, hi7);
-                        vw = _mm256_setr_ps(d0, d1, d2, d3, d4, d5, d6, d7);
-                        acc1 = _mm256_add_ps(acc1, _mm256_mul_ps(_mm256_mul_ps(qw, vw), xv));
-                    }
-
-                    /* Combine low and high accumulators */
-                    __m256 total = _mm256_add_ps(acc0, acc1);
-
-                    /* Store to output */
+                    const float *token_vec =
+                        head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
                     float *out_row = output + (size_t)t * embed_dim + n;
-                    __m256 out_val = _mm256_loadu_ps(out_row);
-                    out_val = _mm256_add_ps(out_val, total);
-                    _mm256_storeu_ps(out_row, out_val);
+                    accum_8rows_q5_0_block_avx(out_row, w0, w1, w2, w3, w4, w5, w6, w7, token_vec);
                 }
             }
         }
 
-        /* Handle remaining output rows with scalar */
         for (; n < embed_dim; n++) {
+            const block_q5_0 *w_row = weights + (size_t)n * blocks_per_row + head_offset;
             for (int n_block = 0; n_block < blocks_per_head; n_block++) {
-                const block_q5_0 *w_row = weights + (size_t)(n + head_offset + n_block) * blocks_per_row + n_block;
-                const float d = CK_FP16_TO_FP32(w_row->d);
-
-                uint32_t qh;
-                memcpy(&qh, w_row->qh, sizeof(qh));
-
+                const block_q5_0 *w_block = w_row + n_block;
                 for (int t = 0; t < tokens; t++) {
-                    const float *token_vec = head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
-                    float sum = 0.0f;
-
-                    for (int j = 0; j < QK5_0 / 2; j++) {
-                        const uint8_t packed = w_row->qs[j];
-                        const int lo = (packed & 0x0F);
-                        const int hi = (packed >> 4);
-                        const int xh_0 = ((qh >> (j + 0)) << 4) & 0x10;
-                        const int xh_1 = ((qh >> (j + 12))) & 0x10;
-                        const int q0 = (lo | xh_0) - 16;
-                        const int q1 = (hi | xh_1) - 16;
-
-                        sum += d * (float)q0 * token_vec[j];
-                        sum += d * (float)q1 * token_vec[j + 16];
-                    }
-
-                    output[(size_t)t * embed_dim + n] += sum;
+                    const float *token_vec =
+                        head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
+                    output[(size_t)t * embed_dim + n] +=
+                        dot_fp32_q5_0_block_avx(w_block, token_vec);
                 }
             }
         }
@@ -334,7 +290,7 @@ void ck_gemm_nt_head_major_q5_0(const float *attn_out,  /* [num_heads, tokens, h
                                  int num_heads,
                                  int head_dim)
 {
-#if defined(__AVX__) && defined(__F16C__)
+#if defined(__AVX__)
     gemv_nt_q5_0_head_major_output_avx(output, attn_out, wo, bias,
                                        tokens, embed_dim, num_heads, head_dim);
 #else

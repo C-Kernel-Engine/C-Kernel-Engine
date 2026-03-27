@@ -112,34 +112,12 @@ static inline float silu_scalar(float x) {
 
 #ifdef __AVX2__
 static inline __m256 silu_avx2(__m256 x) {
-    /* Approximate sigmoid using fast exp */
-    __m256 neg_x = _mm256_sub_ps(_mm256_setzero_ps(), x);
-
-    /* Clamp to avoid overflow */
-    neg_x = _mm256_max_ps(neg_x, _mm256_set1_ps(-88.0f));
-    neg_x = _mm256_min_ps(neg_x, _mm256_set1_ps(88.0f));
-
-    /* Polynomial approximation for exp(-x) */
-    __m256 one = _mm256_set1_ps(1.0f);
-    __m256 c1 = _mm256_set1_ps(0.5f);
-    __m256 c2 = _mm256_set1_ps(0.166666667f);
-    __m256 c3 = _mm256_set1_ps(0.041666667f);
-    __m256 c4 = _mm256_set1_ps(0.008333333f);
-
-    __m256 x2 = _mm256_mul_ps(neg_x, neg_x);
-    __m256 x3 = _mm256_mul_ps(x2, neg_x);
-    __m256 x4 = _mm256_mul_ps(x2, x2);
-
-    __m256 exp_neg = _mm256_add_ps(one, neg_x);
-    exp_neg = _mm256_fmadd_ps(c1, x2, exp_neg);
-    exp_neg = _mm256_fmadd_ps(c2, x3, exp_neg);
-    exp_neg = _mm256_fmadd_ps(c3, x4, exp_neg);
-
-    /* sigmoid = 1 / (1 + exp(-x)) */
-    __m256 sigmoid = _mm256_div_ps(one, _mm256_add_ps(one, exp_neg));
-
-    /* silu = x * sigmoid */
-    return _mm256_mul_ps(x, sigmoid);
+    float lanes[8];
+    _mm256_storeu_ps(lanes, x);
+    for (int i = 0; i < 8; i++) {
+        lanes[i] = silu_scalar(lanes[i]);
+    }
+    return _mm256_loadu_ps(lanes);
 }
 #endif
 

@@ -126,6 +126,7 @@ BENCH_CXX ?= $(CXX)
 
 BUILD_DIR := build
 BUILD_STAMP := $(BUILD_DIR)/.ck_build_flags
+V8_QWEN3VL_MMPROJ ?= $(CURDIR)/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
 
 # =============================================================================
 # Intel oneAPI Integration (MKL / oneDNN)
@@ -454,6 +455,7 @@ PY_TESTS := unittest/test_layernorm.py \
             unittest/test_fused_rmsnorm_qkv.py \
             unittest/test_prefill_fused_rmsnorm_qkv_quant.py \
             unittest/test_prefill_fused_mlp_quant.py \
+            unittest/test_head_major_q5_outproj.py \
             unittest/fusion/test_mega_fused_attention_prefill.py \
             unittest/fusion/test_mega_fused_attention_prefill_q8_0.py \
             unittest/fusion/test_mega_fused_outproj_mlp_prefill.py \
@@ -936,8 +938,8 @@ ck-emit: emit
 $(LIB_GELU): $(BUILD_STAMP) src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/gelu_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/gelu_kernels_bf16.c -lm
 
-$(LIB_RMSNORM): $(BUILD_STAMP) src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c -lm
+$(LIB_RMSNORM): $(BUILD_STAMP) src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rmsnorm_kernels.c src/kernels/rmsnorm_kernels_bf16.c src/kernels/rmsnorm_kernels_int8.c src/kernels/rmsnorm_kernels_int4.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
 $(LIB_LN): $(BUILD_STAMP) src/kernels/layernorm_kernels.c src/kernels/layernorm_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/layernorm_kernels.c src/kernels/layernorm_kernels_bf16.c -lm
@@ -945,8 +947,8 @@ $(LIB_LN): $(BUILD_STAMP) src/kernels/layernorm_kernels.c src/kernels/layernorm_
 $(LIB_SOFT): $(BUILD_STAMP) src/kernels/softmax_kernels.c src/kernels/softmax_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/softmax_kernels.c src/kernels/softmax_kernels_bf16.c -lm
 
-$(LIB_SWIGLU): $(BUILD_STAMP) src/kernels/swiglu_kernels.c src/kernels/swiglu_kernels_bf16.c src/kernels/sigmoid_kernels.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/swiglu_kernels.c src/kernels/swiglu_kernels_bf16.c src/kernels/sigmoid_kernels.c -lm
+$(LIB_SWIGLU): $(BUILD_STAMP) src/kernels/swiglu_kernels.c src/kernels/swiglu_kernels_bf16.c src/kernels/sigmoid_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/swiglu_kernels.c src/kernels/swiglu_kernels_bf16.c src/kernels/sigmoid_kernels.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
 $(LIB_SIGMOID): $(BUILD_STAMP) src/kernels/sigmoid_kernels.c src/kernels/sigmoid_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/sigmoid_kernels.c src/kernels/sigmoid_kernels_bf16.c -lm
@@ -954,8 +956,8 @@ $(LIB_SIGMOID): $(BUILD_STAMP) src/kernels/sigmoid_kernels.c src/kernels/sigmoid
 $(LIB_RELU): $(BUILD_STAMP) src/kernels/relu_kernels.c src/kernels/relu_kernels_bf16.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/relu_kernels.c src/kernels/relu_kernels_bf16.c -lm
 
-$(LIB_VISION): $(BUILD_STAMP) src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c -lm
+$(LIB_VISION): $(BUILD_STAMP) src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c -lm
 
 $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
@@ -999,6 +1001,29 @@ test-relu: $(LIB_RELU)
 
 test-vision: $(LIB_VISION)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
+
+test-v8-vision: $(LIB_VISION)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) tests/test_v8_siglip_template.py
+
+test-v8-vision-kernels: $(LIB_VISION)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
+
+test-head-major-q5-outproj: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_head_major_q5_outproj.py
+
+test-head-major-q5-outproj-quick: $(LIB)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_head_major_q5_outproj.py --quick
+
+test-v8-qwen3vl: $(LIB_VISION)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) tests/test_v8_qwen3vl_template.py
+
+parity-v8-qwen3vl-mmproj:
+	@if [ ! -f "$(V8_QWEN3VL_MMPROJ)" ]; then \
+		echo "Skipping v8 Qwen3-VL mmproj parity: $(V8_QWEN3VL_MMPROJ) not found"; \
+		exit 0; \
+	fi
+	$(PYTHON) $(PYTHONFLAGS) version/v8/scripts/parity_qwen3vl_mmproj_v8.py --gguf "$(V8_QWEN3VL_MMPROJ)"
 
 test-deltanet: $(LIB)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) tests/test_deltanet.py $(ARGS)
@@ -1503,6 +1528,7 @@ test: $(LIB) test-libs
 	  extra_env=""; \
 	  case "$$t" in \
 	    *test_gemm_microkernel.py|*test_gemv_kernels_comprehensive.py) extra_args="--quick";; \
+	    *test_head_major_q5_outproj.py) extra_args="--quick";; \
 	    *test_qk_norm.py) extra_args="--quick";; \
 	    *test_mega_fused_attention.py) extra_args="--correctness";; \
 	    *test_orchestration_layer.py) extra_args="--strict-ref";; \
@@ -1510,7 +1536,7 @@ test: $(LIB) test-libs
 	  case "$$t" in \
 	    *test_gemv_kernels_comprehensive.py) extra_env="CK_SKIP_IF_MISSING=1";; \
 	  esac; \
-	  LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $$extra_env $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
+		  env LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(TEST_ENV) $$extra_env $(PYTHON) $(PYTHONFLAGS) $$t $$extra_args; \
 	done; \
 	echo "All Python kernel tests completed."
 	@echo ""
@@ -1810,7 +1836,10 @@ llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
 	@./scripts/run_parity_smoketest.sh --quick
 
-# Full parity test (assumes already built) — includes OMP kernel parity
+# Full parity test (assumes already built) — kernel parity only
+# IMPORTANT: keep this target restricted to kernel-level parity/ISA coverage.
+# Do not add model-family, template, or end-to-end compatibility checks here.
+# Those belong in llamacpp-e2e / regression lanes so kernel testing stays clean.
 llamacpp-parity-full:
 	@echo "Running full llama.cpp parity test..."
 	@./scripts/run_parity_smoketest.sh --skip-build
@@ -1826,6 +1855,20 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running DeltaNet ISA benchmark..."
 	@$(MAKE) --no-print-directory test-deltanet-avx-bench
+	@echo ""
+	@echo "Running v8 vision kernel oracle tests..."
+	@$(MAKE) --no-print-directory test-v8-vision-kernels
+	@echo ""
+	@echo "Running head-major Q5 out-proj parity benchmark..."
+	@$(MAKE) --no-print-directory test-head-major-q5-outproj
+
+# End-to-end llama.cpp compatibility suite
+# This lane is where model-family and stitched graph checks belong.
+llamacpp-e2e:
+	@echo "Running llama.cpp end-to-end compatibility suite..."
+	@echo ""
+	@echo "Running v8 Qwen3-VL mmproj contract/codegen parity..."
+	@$(MAKE) --no-print-directory parity-v8-qwen3vl-mmproj
 
 # Nightly parity profile: keep correctness coverage, but use quick ISA parity
 # benches so nightly does not block on long benchmark loops.
@@ -1844,6 +1887,9 @@ llamacpp-parity-nightly:
 	@echo ""
 	@echo "Running DeltaNet ISA benchmark (quick)..."
 	@$(MAKE) --no-print-directory test-deltanet-avx-bench-quick
+	@echo ""
+	@echo "Running head-major Q5 out-proj parity benchmark..."
+	@$(MAKE) --no-print-directory test-head-major-q5-outproj-quick
 
 # Full parity + ISA variant sweep for GEMM AVX benchmarks
 llamacpp-parity-full-all-isa-variants:
@@ -2476,6 +2522,8 @@ help:
 	@echo "  Parity Tests:"
 	@echo "  make layer-parity         PyTorch parity (fp32/bf16)"
 	@echo "  make llamacpp-parity      llama.cpp parity (Q4_K)"
+	@echo "  make llamacpp-parity-full llama.cpp kernel parity suite"
+	@echo "  make llamacpp-e2e         llama.cpp end-to-end compatibility suite"
 	@echo "  make smollm-train-parity  Full training parity"
 	@echo ""
 	@echo "  ┌─────────────────────────────────────────────────────────────────────┐"
