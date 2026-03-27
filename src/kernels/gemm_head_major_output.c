@@ -152,12 +152,9 @@ static inline float hsum256_ps_head_major(__m256 v)
     return _mm_cvtss_f32(sums);
 }
 
-static inline float dot_fp32_q5_0_block_avx(const block_q5_0 *block,
-                                            const float *x)
+static inline float dot_fp32_q5_0_block_decoded_avx(const float *w,
+                                                    const float *x)
 {
-    float w[QK5_0];
-    dequant_q5_0_block(block, w);
-
     __m256 acc = _mm256_setzero_ps();
     for (int i = 0; i < QK5_0; i += 8) {
         const __m256 wv = _mm256_loadu_ps(w + i);
@@ -167,18 +164,16 @@ static inline float dot_fp32_q5_0_block_avx(const block_q5_0 *block,
     return hsum256_ps_head_major(acc);
 }
 
-static inline void accum_8rows_q5_0_block_avx(float *out,
-                                              const block_q5_0 *w0,
-                                              const block_q5_0 *w1,
-                                              const block_q5_0 *w2,
-                                              const block_q5_0 *w3,
-                                              const block_q5_0 *w4,
-                                              const block_q5_0 *w5,
-                                              const block_q5_0 *w6,
-                                              const block_q5_0 *w7,
-                                              const float *x)
+static inline void decode_8rows_q5_0_block(const block_q5_0 *w0,
+                                           const block_q5_0 *w1,
+                                           const block_q5_0 *w2,
+                                           const block_q5_0 *w3,
+                                           const block_q5_0 *w4,
+                                           const block_q5_0 *w5,
+                                           const block_q5_0 *w6,
+                                           const block_q5_0 *w7,
+                                           float w_dec[8][QK5_0])
 {
-    float w_dec[8][QK5_0];
     dequant_q5_0_block(w0, w_dec[0]);
     dequant_q5_0_block(w1, w_dec[1]);
     dequant_q5_0_block(w2, w_dec[2]);
@@ -187,7 +182,12 @@ static inline void accum_8rows_q5_0_block_avx(float *out,
     dequant_q5_0_block(w5, w_dec[5]);
     dequant_q5_0_block(w6, w_dec[6]);
     dequant_q5_0_block(w7, w_dec[7]);
+}
 
+static inline void accum_8rows_q5_0_block_decoded_avx(float *out,
+                                                      const float w_dec[8][QK5_0],
+                                                      const float *x)
+{
     __m256 acc = _mm256_loadu_ps(out);
     for (int i = 0; i < QK5_0; i++) {
         const __m256 wv = _mm256_setr_ps(
@@ -244,12 +244,15 @@ void gemv_nt_q5_0_head_major_output_avx(float *output,
                 const block_q5_0 *w5 = weights + (size_t)(n + 5) * blocks_per_row + head_offset + n_block;
                 const block_q5_0 *w6 = weights + (size_t)(n + 6) * blocks_per_row + head_offset + n_block;
                 const block_q5_0 *w7 = weights + (size_t)(n + 7) * blocks_per_row + head_offset + n_block;
+                float w_dec[8][QK5_0];
+
+                decode_8rows_q5_0_block(w0, w1, w2, w3, w4, w5, w6, w7, w_dec);
 
                 for (int t = 0; t < tokens; t++) {
                     const float *token_vec =
                         head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
                     float *out_row = output + (size_t)t * embed_dim + n;
-                    accum_8rows_q5_0_block_avx(out_row, w0, w1, w2, w3, w4, w5, w6, w7, token_vec);
+                    accum_8rows_q5_0_block_decoded_avx(out_row, w_dec, token_vec);
                 }
             }
         }
@@ -258,11 +261,14 @@ void gemv_nt_q5_0_head_major_output_avx(float *output,
             const block_q5_0 *w_row = weights + (size_t)n * blocks_per_row + head_offset;
             for (int n_block = 0; n_block < blocks_per_head; n_block++) {
                 const block_q5_0 *w_block = w_row + n_block;
+                float w_dec[QK5_0];
+
+                dequant_q5_0_block(w_block, w_dec);
                 for (int t = 0; t < tokens; t++) {
                     const float *token_vec =
                         head_data + (size_t)t * token_stride + (size_t)n_block * QK5_0;
                     output[(size_t)t * embed_dim + n] +=
-                        dot_fp32_q5_0_block_avx(w_block, token_vec);
+                        dot_fp32_q5_0_block_decoded_avx(w_dec, token_vec);
                 }
             }
         }

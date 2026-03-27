@@ -1861,6 +1861,9 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running head-major Q5 out-proj parity benchmark..."
 	@$(MAKE) --no-print-directory test-head-major-q5-outproj
+	@echo ""
+	@echo "Running head-major Q5 CK vs llama.cpp benchmark..."
+	@$(MAKE) --no-print-directory test-head-major-q5-vs-llama
 
 # End-to-end llama.cpp compatibility suite
 # This lane is where model-family and stitched graph checks belong.
@@ -1890,6 +1893,9 @@ llamacpp-parity-nightly:
 	@echo ""
 	@echo "Running head-major Q5 out-proj parity benchmark..."
 	@$(MAKE) --no-print-directory test-head-major-q5-outproj-quick
+	@echo ""
+	@echo "Running head-major Q5 CK vs llama.cpp benchmark..."
+	@$(MAKE) --no-print-directory test-head-major-q5-vs-llama-quick
 
 # Full parity + ISA variant sweep for GEMM AVX benchmarks
 llamacpp-parity-full-all-isa-variants:
@@ -2145,6 +2151,7 @@ test-threadpool-parity-verbose: $(THREADPOOL_BIN)
 #   make test-gemm-avx-bench-quick Quick parity + benchmark (3 configs, 3 iters)
 
 GEMM_AVX_BENCH_BIN := $(BUILD_DIR)/test_gemm_avx_bench
+HEAD_MAJOR_Q5_LLAMA_BENCH_BIN := $(BUILD_DIR)/test_head_major_q5_llama_bench
 
 $(GEMM_AVX_BENCH_BIN): $(LIB) tests/test_gemm_avx_bench.c
 	@mkdir -p $(BUILD_DIR)
@@ -2163,6 +2170,28 @@ test-gemm-avx-bench-quick: $(GEMM_AVX_BENCH_BIN)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(GEMM_AVX_BENCH_BIN) --quick
 
 .PHONY: test-gemm-avx-bench test-gemm-avx-bench-quick
+
+$(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN): $(LIB) tests/test_head_major_q5_llama_bench.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(BENCH_CXX) -O3 -march=native \
+		-Iinclude -Illama.cpp/ggml/include -Illama.cpp/ggml/src \
+		tests/test_head_major_q5_llama_bench.cpp \
+		-L$(BUILD_DIR) -lckernel_engine \
+		-Lllama.cpp/build/bin -lggml-cpu -lggml-base -lggml \
+		-lm -lpthread -ldl \
+		-Wl,-rpath,$(BUILD_DIR) \
+		-Wl,-rpath,$(CURDIR)/llama.cpp/build/bin \
+		-o $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
+
+test-head-major-q5-vs-llama: $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
+	@echo "Running head-major Q5 CK vs llama.cpp benchmark (full)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):llama.cpp/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
+
+test-head-major-q5-vs-llama-quick: $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
+	@echo "Running head-major Q5 CK vs llama.cpp benchmark (quick)..."
+	LD_LIBRARY_PATH=$(BUILD_DIR):llama.cpp/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN) --quick
+
+.PHONY: test-head-major-q5-vs-llama test-head-major-q5-vs-llama-quick
 
 # =============================================================================
 # Gated DeltaNet ISA benchmark

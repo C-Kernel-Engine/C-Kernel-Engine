@@ -1022,6 +1022,51 @@ void vec_dot_q5_0_q8_0_avx512(int n, float *s, const void *vx, const void *vy)
 }
 #endif
 
+#if defined(__AVX2__) && !defined(__AVX512F__)
+static inline __m256i bytes_from_bits_32_avx(const uint8_t *qh);
+static inline __m256i bytes_from_nibbles_32_avx(const uint8_t *qs);
+static inline __m256 mul_sum_i8_pairs_float_avx(const __m256i x, const __m256i y);
+static inline float hsum_float_8_avx(const __m256 x);
+
+/**
+ * @brief Quantized dot product Q5_0 x Q8_0 (AVX2/FMA)
+ *
+ * Mirrors the local llama.cpp AVX2 structure on machines like this one: unpack
+ * Q5_0 into signed int8 lanes, multiply against Q8_0 int8 lanes, and fuse the
+ * per-block scale into the FP32 accumulator.
+ */
+void vec_dot_q5_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
+{
+    const int qk = QK5_0;
+    const int nb = n / qk;
+
+    const block_q5_0 *x = (const block_q5_0 *)vx;
+    const block_q8_0 *y = (const block_q8_0 *)vy;
+
+    __m256 acc = _mm256_setzero_ps();
+
+    for (int ib = 0; ib < nb; ++ib) {
+        const __m256 d =
+            _mm256_set1_ps(CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+
+        __m256i qx = bytes_from_nibbles_32_avx(x[ib].qs);
+        __m256i bxhi = bytes_from_bits_32_avx(x[ib].qh);
+        bxhi = _mm256_andnot_si256(bxhi, _mm256_set1_epi8((char)0xF0));
+        qx = _mm256_or_si256(qx, bxhi);
+
+        const __m256i qy = _mm256_loadu_si256((const __m256i *)y[ib].qs);
+        const __m256 q = mul_sum_i8_pairs_float_avx(qx, qy);
+#if defined(__FMA__)
+        acc = _mm256_fmadd_ps(d, q, acc);
+#else
+        acc = _mm256_add_ps(_mm256_mul_ps(d, q), acc);
+#endif
+    }
+
+    *s = hsum_float_8_avx(acc);
+}
+#endif
+
 #if defined(__SSSE3__)
 /**
  * @brief Spread 32 bits to 32 bytes { 0x00, 0xFF }
@@ -1499,6 +1544,8 @@ void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)
 {
 #if defined(__AVX512F__)
     vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);
+#elif defined(__AVX2__)
+    vec_dot_q5_0_q8_0_avx2(n, s, vx, vy);
 #elif defined(__AVX__)
     /* AVX for 256-bit float ops (works on Ivy Bridge and newer) */
     vec_dot_q5_0_q8_0_avx(n, s, vx, vy);
