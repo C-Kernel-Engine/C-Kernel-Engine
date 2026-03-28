@@ -145,6 +145,8 @@ Functions</h2></td></tr>
 <tr class="separator:a3f02cdb7838789a010d2fb34b94f2a61"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adc53b91db62ed02dfdfee0b9d086b9e2" id="r_adc53b91db62ed02dfdfee0b9d086b9e2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__split__kernels_8c.html#adc53b91db62ed02dfdfee0b9d086b9e2">recurrent_split_qkv_forward</a> (const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim)</td></tr>
 <tr class="separator:adc53b91db62ed02dfdfee0b9d086b9e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9525efb4fcb62c7c88e7f4bc369ca1b8" id="r_a9525efb4fcb62c7c88e7f4bc369ca1b8"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="recurrent__split__kernels_8c.html#a9525efb4fcb62c7c88e7f4bc369ca1b8">split_qkv_packed_head_major_forward</a> (const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim, int num_heads, int num_kv_heads)</td></tr>
+<tr class="separator:a9525efb4fcb62c7c88e7f4bc369ca1b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
 <a id="a147c4ce1106e978ae62cdc54eff7002d" name="a147c4ce1106e978ae62cdc54eff7002d"></a>
@@ -209,13 +211,13 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00056">56</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   63</span>                                                  {</div>
-<div class="line"><span class="lineno">   64</span>    <a class="code hl_function" href="recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61">recurrent_split_qkv_backward</a>(d_q, d_k, d_v, d_packed_qkv, rows, q_dim, k_dim, v_dim);</div>
-<div class="line"><span class="lineno">   65</span>}</div>
-<div class="ttc" id="arecurrent__split__kernels_8c_html_a3f02cdb7838789a010d2fb34b94f2a61"><div class="ttname"><a href="recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61">recurrent_split_qkv_backward</a></div><div class="ttdeci">void recurrent_split_qkv_backward(const float *d_q, const float *d_k, const float *d_v, float *d_packed_qkv, int rows, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__split__kernels_8c_source.html#l00025">recurrent_split_kernels.c:25</a></div></div>
+<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00108">108</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  115</span>                                                  {</div>
+<div class="line"><span class="lineno">  116</span>    <a class="code hl_function" href="recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61">recurrent_split_qkv_backward</a>(d_q, d_k, d_v, d_packed_qkv, rows, q_dim, k_dim, v_dim);</div>
+<div class="line"><span class="lineno">  117</span>}</div>
+<div class="ttc" id="arecurrent__split__kernels_8c_html_a3f02cdb7838789a010d2fb34b94f2a61"><div class="ttname"><a href="recurrent__split__kernels_8c.html#a3f02cdb7838789a010d2fb34b94f2a61">recurrent_split_qkv_backward</a></div><div class="ttdeci">void recurrent_split_qkv_backward(const float *d_q, const float *d_k, const float *d_v, float *d_packed_qkv, int rows, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__split__kernels_8c_source.html#l00077">recurrent_split_kernels.c:77</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="recurrent__split__kernels_8c_source.html#l00025">recurrent_split_qkv_backward()</a>.</p>
+<p class="reference">References <a class="el" href="recurrent__split__kernels_8c_source.html#l00077">recurrent_split_qkv_backward()</a>.</p>
 
 </div>
 </div>
@@ -281,10 +283,10 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00045">45</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   52</span>                                                 {</div>
-<div class="line"><span class="lineno">   53</span>    <a class="code hl_function" href="recurrent__split__kernels_8c.html#adc53b91db62ed02dfdfee0b9d086b9e2">recurrent_split_qkv_forward</a>(packed_qkv, q, k, v, rows, q_dim, k_dim, v_dim);</div>
-<div class="line"><span class="lineno">   54</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00097">97</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  104</span>                                                 {</div>
+<div class="line"><span class="lineno">  105</span>    <a class="code hl_function" href="recurrent__split__kernels_8c.html#adc53b91db62ed02dfdfee0b9d086b9e2">recurrent_split_qkv_forward</a>(packed_qkv, q, k, v, rows, q_dim, k_dim, v_dim);</div>
+<div class="line"><span class="lineno">  106</span>}</div>
 <div class="ttc" id="arecurrent__split__kernels_8c_html_adc53b91db62ed02dfdfee0b9d086b9e2"><div class="ttname"><a href="recurrent__split__kernels_8c.html#adc53b91db62ed02dfdfee0b9d086b9e2">recurrent_split_qkv_forward</a></div><div class="ttdeci">void recurrent_split_qkv_forward(const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim)</div><div class="ttdef"><b>Definition</b> <a href="recurrent__split__kernels_8c_source.html#l00005">recurrent_split_kernels.c:5</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="recurrent__split__kernels_8c_source.html#l00005">recurrent_split_qkv_forward()</a>.</p>
@@ -355,21 +357,21 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00025">25</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   32</span>                                             {</div>
-<div class="line"><span class="lineno">   33</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + k_dim + v_dim;</div>
-<div class="line"><span class="lineno">   34</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">   35</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dq_src = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
-<div class="line"><span class="lineno">   36</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dk_src = d_k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
-<div class="line"><span class="lineno">   37</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dv_src = d_v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
-<div class="line"><span class="lineno">   38</span>        <span class="keywordtype">float</span> *dst = d_packed_qkv + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
-<div class="line"><span class="lineno">   39</span>        memcpy(dst, dq_src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   40</span>        memcpy(dst + q_dim, dk_src, (<span class="keywordtype">size_t</span>) k_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   41</span>        memcpy(dst + q_dim + k_dim, dv_src, (<span class="keywordtype">size_t</span>) v_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">   42</span>    }</div>
-<div class="line"><span class="lineno">   43</span>}</div>
+<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00077">77</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   84</span>                                             {</div>
+<div class="line"><span class="lineno">   85</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + k_dim + v_dim;</div>
+<div class="line"><span class="lineno">   86</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   87</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dq_src = d_q + (size_t) row * (<span class="keywordtype">size_t</span>) q_dim;</div>
+<div class="line"><span class="lineno">   88</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dk_src = d_k + (size_t) row * (<span class="keywordtype">size_t</span>) k_dim;</div>
+<div class="line"><span class="lineno">   89</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *dv_src = d_v + (size_t) row * (<span class="keywordtype">size_t</span>) v_dim;</div>
+<div class="line"><span class="lineno">   90</span>        <span class="keywordtype">float</span> *dst = d_packed_qkv + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
+<div class="line"><span class="lineno">   91</span>        memcpy(dst, dq_src, (<span class="keywordtype">size_t</span>) q_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   92</span>        memcpy(dst + q_dim, dk_src, (<span class="keywordtype">size_t</span>) k_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   93</span>        memcpy(dst + q_dim + k_dim, dv_src, (<span class="keywordtype">size_t</span>) v_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   94</span>    }</div>
+<div class="line"><span class="lineno">   95</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="recurrent__split__kernels_8c_source.html#l00056">recurrent_split_conv_qkv_backward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="recurrent__split__kernels_8c_source.html#l00108">recurrent_split_conv_qkv_backward()</a>.</p>
 
 </div>
 </div>
@@ -449,8 +451,128 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   22</span>    }</div>
 <div class="line"><span class="lineno">   23</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00766">ck_test_recurrent_split_qkv()</a>, and <a class="el" href="recurrent__split__kernels_8c_source.html#l00045">recurrent_split_conv_qkv_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00766">ck_test_recurrent_split_qkv()</a>, and <a class="el" href="recurrent__split__kernels_8c_source.html#l00097">recurrent_split_conv_qkv_forward()</a>.</p>
 
+</div>
+</div>
+<a id="a9525efb4fcb62c7c88e7f4bc369ca1b8" name="a9525efb4fcb62c7c88e7f4bc369ca1b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9525efb4fcb62c7c88e7f4bc369ca1b8">&#9670;&#160;</a></span>split_qkv_packed_head_major_forward()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void split_qkv_packed_head_major_forward </td>
+          <td>(</td>
+          <td class="paramtype">const float *&#160;</td>
+          <td class="paramname"><em>packed_qkv</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>q</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>k</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">float *&#160;</td>
+          <td class="paramname"><em>v</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>rows</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>q_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>k_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>v_dim</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>num_kv_heads</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="recurrent__split__kernels_8c_source.html#l00025">25</a> of file <a class="el" href="recurrent__split__kernels_8c_source.html">recurrent_split_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">   34</span>                                                           {</div>
+<div class="line"><span class="lineno">   35</span>    <span class="keywordflow">if</span> (!packed_qkv || !q || !k || !v || rows &lt;= 0 || q_dim &lt;= 0 || k_dim &lt;= 0 || v_dim &lt;= 0 ||</div>
+<div class="line"><span class="lineno">   36</span>        num_heads &lt;= 0 || num_kv_heads &lt;= 0) {</div>
+<div class="line"><span class="lineno">   37</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   38</span>    }</div>
+<div class="line"><span class="lineno">   39</span> </div>
+<div class="line"><span class="lineno">   40</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> q_head_dim = q_dim / num_heads;</div>
+<div class="line"><span class="lineno">   41</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> k_head_dim = k_dim / num_kv_heads;</div>
+<div class="line"><span class="lineno">   42</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> v_head_dim = v_dim / num_kv_heads;</div>
+<div class="line"><span class="lineno">   43</span>    <span class="keywordflow">if</span> (q_head_dim &lt;= 0 || k_head_dim &lt;= 0 || v_head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno">   44</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   45</span>    }</div>
+<div class="line"><span class="lineno">   46</span>    <span class="keywordflow">if</span> (q_head_dim * num_heads != q_dim || k_head_dim * num_kv_heads != k_dim || v_head_dim * num_kv_heads != v_dim) {</div>
+<div class="line"><span class="lineno">   47</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">   48</span>    }</div>
+<div class="line"><span class="lineno">   49</span> </div>
+<div class="line"><span class="lineno">   50</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_dim = q_dim + k_dim + v_dim;</div>
+<div class="line"><span class="lineno">   51</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> q_head_stride = (size_t) rows * (<span class="keywordtype">size_t</span>) q_head_dim;</div>
+<div class="line"><span class="lineno">   52</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> k_head_stride = (size_t) rows * (<span class="keywordtype">size_t</span>) k_head_dim;</div>
+<div class="line"><span class="lineno">   53</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> v_head_stride = (size_t) rows * (<span class="keywordtype">size_t</span>) v_head_dim;</div>
+<div class="line"><span class="lineno">   54</span> </div>
+<div class="line"><span class="lineno">   55</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">   56</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src = packed_qkv + (size_t) row * (<span class="keywordtype">size_t</span>) packed_dim;</div>
+<div class="line"><span class="lineno">   57</span> </div>
+<div class="line"><span class="lineno">   58</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_heads; ++head) {</div>
+<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src_q = src + (size_t) head * (<span class="keywordtype">size_t</span>) q_head_dim;</div>
+<div class="line"><span class="lineno">   60</span>            <span class="keywordtype">float</span> *dst_q = q + (size_t) head * q_head_stride + (<span class="keywordtype">size_t</span>) row * (size_t) q_head_dim;</div>
+<div class="line"><span class="lineno">   61</span>            memcpy(dst_q, src_q, (<span class="keywordtype">size_t</span>) q_head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   62</span>        }</div>
+<div class="line"><span class="lineno">   63</span> </div>
+<div class="line"><span class="lineno">   64</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_k_base = src + (size_t) q_dim;</div>
+<div class="line"><span class="lineno">   65</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *src_v_base = src + (size_t) q_dim + (<span class="keywordtype">size_t</span>) k_dim;</div>
+<div class="line"><span class="lineno">   66</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> head = 0; head &lt; num_kv_heads; ++head) {</div>
+<div class="line"><span class="lineno">   67</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src_k = src_k_base + (size_t) head * (<span class="keywordtype">size_t</span>) k_head_dim;</div>
+<div class="line"><span class="lineno">   68</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *src_v = src_v_base + (size_t) head * (<span class="keywordtype">size_t</span>) v_head_dim;</div>
+<div class="line"><span class="lineno">   69</span>            <span class="keywordtype">float</span> *dst_k = k + (size_t) head * k_head_stride + (<span class="keywordtype">size_t</span>) row * (size_t) k_head_dim;</div>
+<div class="line"><span class="lineno">   70</span>            <span class="keywordtype">float</span> *dst_v = v + (size_t) head * v_head_stride + (<span class="keywordtype">size_t</span>) row * (size_t) v_head_dim;</div>
+<div class="line"><span class="lineno">   71</span>            memcpy(dst_k, src_k, (<span class="keywordtype">size_t</span>) k_head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   72</span>            memcpy(dst_v, src_v, (<span class="keywordtype">size_t</span>) v_head_dim * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">   73</span>        }</div>
+<div class="line"><span class="lineno">   74</span>    }</div>
+<div class="line"><span class="lineno">   75</span>}</div>
+</div><!-- fragment -->
 </div>
 </div>
 </div><!-- contents -->
