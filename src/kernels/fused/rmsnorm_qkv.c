@@ -38,6 +38,15 @@
 
 #include "ckernel_quant.h"
 
+extern void rmsnorm_forward(const float *input,
+                            const float *gamma,
+                            float *output,
+                            float *rstd_cache,
+                            int tokens,
+                            int d_model,
+                            int aligned_embed_dim,
+                            float eps);
+
 /* ============================================================================
  * HELPER: RMSNorm computation (inline, result stays in registers)
  * ============================================================================ */
@@ -224,10 +233,9 @@ void rmsnorm_qkv_q4k_fused(
     int kv_dim,               /* KV output dimension */
     float eps                 /* RMSNorm epsilon */
 ) {
-    /* Step 1: Compute RMS scale */
-    float scale = compute_rms_scale(x, embed_dim, eps);
-
-    /* Step 2: Compute normalized input (we need this for Q4_K dequant fusion)
+    /* Compute normalized input once using the same tuned kernel as the
+     * separate baseline. This keeps the fused-vs-separate comparison focused
+     * on avoiding extra call boundaries and keeping normed[] hot for the 3 GEMVs.
      *
      * For Q4_K, we can't easily fuse the normalization into the dequant loop
      * because the block structure is complex. So we compute normed[] first,
@@ -237,31 +245,18 @@ void rmsnorm_qkv_q4k_fused(
      * that dequantizes and multiplies by normed[i] in the same loop.
      */
 
-    /* Allocate normed on stack (fits in L1 for typical embed_dim <= 4096) */
-    float normed[4096];  /* Max supported embed_dim */
+    /* Allocate normed on stack (fits in L1 for typical embed_dim <= 4096). */
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((aligned(64))) float normed[4096];
+#else
+    float normed[4096];
+#endif
     if (embed_dim > 4096) {
         /* Fallback for very large models */
         return;  /* TODO: heap allocation */
     }
 
-    /* Compute normed = x * rms_weight * scale */
-#ifdef __AVX2__
-    __m256 vscale = _mm256_set1_ps(scale);
-    int i = 0;
-    for (; i + 7 < embed_dim; i += 8) {
-        __m256 vx = _mm256_loadu_ps(x + i);
-        __m256 vrms = _mm256_loadu_ps(rms_weight + i);
-        __m256 vn = _mm256_mul_ps(_mm256_mul_ps(vx, vrms), vscale);
-        _mm256_storeu_ps(normed + i, vn);
-    }
-    for (; i < embed_dim; i++) {
-        normed[i] = x[i] * rms_weight[i] * scale;
-    }
-#else
-    for (int i = 0; i < embed_dim; i++) {
-        normed[i] = x[i] * rms_weight[i] * scale;
-    }
-#endif
+    rmsnorm_forward(x, rms_weight, normed, NULL, 1, embed_dim, embed_dim, eps);
 
     /* Step 3: Q4_K GEMV with normed input
      *
