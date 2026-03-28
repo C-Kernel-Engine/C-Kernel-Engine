@@ -1,0 +1,43 @@
+{
+  "id": "feature_slice_copy",
+  "op": "feature_slice_copy",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "src",
+      "dtype": "fp32",
+      "shape": ["rows", "src_dim"],
+      "desc": "Source rows"
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "dst",
+      "dtype": "fp32",
+      "shape": ["rows", "dst_dim"],
+      "desc": "Destination rows with copied feature slice"
+    }
+  ],
+  "scratch": [],
+  "dims": ["rows", "src_dim", "dst_dim", "dst_feature_offset"],
+  "params": [],
+  "constraints": {
+    "notes": "Copies a contiguous source row into a feature-axis slice of a wider destination row."
+  },
+  "impl": {
+    "function": "feature_slice_copy",
+    "c_declaration": "void feature_slice_copy(const float *src, float *dst, int rows, int src_dim, int dst_dim, int dst_feature_offset);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_vision.py"]
+  },
+  "notes": "Generic row-wise feature slice copy used for branch collect/stitch lowering."
+}

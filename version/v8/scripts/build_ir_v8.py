@@ -42,6 +42,14 @@ USAGE:
 OUTPUTS:
     - IR1 JSON: Simple kernel sequence (before fusion)
     - Layout JSON: Fused kernels + memory layout with explicit offsets
+
+LOWERING CONTRACT:
+    - The builder must stay architecture-agnostic.
+    - Templates declare operations, graph structure, and stitch points.
+    - The lowerer only expands declared operations into kernel ops / kernel IDs.
+    - Do not teach the lowerer model names such as MoE, DeepStack, SSM, etc.
+    - If a model needs branching, routing, collect, or stitch behavior, that
+      contract belongs in the template as explicit operations or graph edges.
 """
 
 import argparse
@@ -224,6 +232,12 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
 #   - "recurrent_*"     : Recurrent packed/split intermediate slots
 #   - "attn_scratch"    : Attention output
 #   - "mlp_scratch"     : MLP gate_up output
+#   - "branch_stream"   : Branch-local merged token stream (fp32)
+#   - "branch_normed"   : Branch-local normalized stream (fp32)
+#   - "branch_mlp"      : Branch-local MLP scratch (fp32)
+#   - "branch_collect"  : Collected branch outputs awaiting stitch
+#   - "vision_output"   : Final stitched vision embedding output
+#   - "vision_positions": Vision-side position IDs / route metadata (i32)
 #   - "kv_cache"        : KV cache (persistent across tokens)
 #   - "external:X"      : External input (token_ids, etc.)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -242,9 +256,40 @@ OP_DATAFLOW = {
         "inputs": {"x": "patch_scratch"},
         "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
     },
+    "patch_proj_aux": {
+        "inputs": {"x": "patch_scratch"},
+        "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "add_stream": {
+        "inputs": {
+            "a": "main_stream",
+            "b": "mlp_scratch",
+        },
+        "outputs": {"out": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "position_embeddings": {
+        "inputs": {"x": "main_stream"},
+        "outputs": {"x": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "vision_position_ids": {
+        "inputs": {},
+        "outputs": {"positions": {"slot": "vision_positions", "dtype": "i32"}},
+    },
+    "position_ids_2d": {
+        "inputs": {},
+        "outputs": {"positions": {"slot": "vision_positions", "dtype": "i32"}},
+    },
+    "patch_bias_add": {
+        "inputs": {"x": "main_stream"},
+        "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+    },
 
     # Attention block
     "rmsnorm": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "layernorm": {
         "inputs": {"input": "main_stream"},
         "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
     },
@@ -284,6 +329,10 @@ OP_DATAFLOW = {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "q_scratch", "dtype": "fp32"}},
     },
+    "qkv_packed_proj": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "qkv_packed", "dtype": "fp32"}},
+    },
     "q_gate_proj": {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "attn_q_gate_packed", "dtype": "fp32"}},
@@ -319,6 +368,14 @@ OP_DATAFLOW = {
             "k": {"slot": "recurrent_k_preconv", "dtype": "fp32"},
             "v": {"slot": "recurrent_v_preconv", "dtype": "fp32"},
         },
+    },
+    "split_qkv_packed": {
+        "inputs": {"packed_qkv": "qkv_packed"},
+        "outputs": {
+            "q": {"slot": "q_scratch", "dtype": "fp32"},
+            "k": {"slot": "k_scratch", "dtype": "fp32"},
+            "v": {"slot": "v_scratch", "dtype": "fp32"}
+        }
     },
     "split_q_gate": {
         "inputs": {"packed_qg": "attn_q_gate_packed"},
@@ -410,6 +467,13 @@ OP_DATAFLOW = {
             "k": {"slot": "k_scratch", "dtype": "fp32"},
         },
     },
+    "mrope_qk": {
+        "inputs": {"q": "q_scratch", "k": "k_scratch", "positions": "vision_positions"},
+        "outputs": {
+            "q": {"slot": "q_scratch", "dtype": "fp32"},
+            "k": {"slot": "k_scratch", "dtype": "fp32"},
+        },
+    },
     "kv_cache_store": {
         "inputs": {"k": "k_scratch", "v": "v_scratch"},
         "outputs": {
@@ -467,6 +531,10 @@ OP_DATAFLOW = {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
     },
+    "mlp_up": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
     "bias_add_mlp": {
         "inputs": {"x": "mlp_scratch"},
         "outputs": {"x": {"slot": "mlp_scratch", "dtype": "fp32"}},
@@ -479,6 +547,10 @@ OP_DATAFLOW = {
         "inputs": {"x": "mlp_scratch"},
         "outputs": {"out": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
     },
+    "gelu": {
+        "inputs": {"x": "mlp_scratch"},
+        "outputs": {"out": {"slot": "mlp_scratch", "dtype": "fp32"}},  # In-place
+    },
     "quantize_mlp_down_input": {
         "inputs": {"input": "mlp_scratch"},
         "outputs": {"output": {"slot": "main_stream_q8", "dtype": "q8_k"}},
@@ -486,6 +558,49 @@ OP_DATAFLOW = {
     "mlp_down": {
         "inputs": {"x": "main_stream_q8"},
         "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "spatial_merge": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "branch_spatial_merge": {
+        "inputs": {"input": "main_stream"},
+        "outputs": {"output": {"slot": "branch_stream", "dtype": "fp32"}},
+    },
+    "branch_layernorm": {
+        "inputs": {"input": "branch_stream"},
+        "outputs": {"output": {"slot": "branch_normed", "dtype": "fp32"}},
+    },
+    "projector_fc1": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "projector_gelu": {
+        "inputs": {"x": "mlp_scratch"},
+        "outputs": {"out": {"slot": "mlp_scratch", "dtype": "fp32"}},
+    },
+    "projector_fc2": {
+        "inputs": {"x": "main_stream_q8"},
+        "outputs": {"y": {"slot": "main_stream", "dtype": "fp32"}},
+    },
+    "branch_fc1": {
+        "inputs": {"x": "branch_normed"},
+        "outputs": {"y": {"slot": "branch_mlp", "dtype": "fp32"}},
+    },
+    "branch_gelu": {
+        "inputs": {"x": "branch_mlp"},
+        "outputs": {"out": {"slot": "branch_mlp", "dtype": "fp32"}},
+    },
+    "branch_fc2": {
+        "inputs": {"x": "branch_mlp"},
+        "outputs": {"y": {"slot": "branch_collect", "dtype": "fp32"}},
+    },
+    "branch_concat": {
+        "inputs": {
+            "main_input": "main_stream",
+            "branch_input": "branch_collect",
+        },
+        "outputs": {"output": {"slot": "vision_output", "dtype": "fp32"}},
     },
 
     # Footer ops
@@ -1204,7 +1319,8 @@ class DataflowTracker:
         pass  # Slots persist, residual_save will update the residual slot
 
     def record_op(self, op_id: int, op_type: str, layer: int, instance: int,
-                  input_slot_override: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+                  input_slot_override: Optional[Dict[str, str]] = None,
+                  output_slot_override: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Record an op's dataflow and return the dataflow info to embed in IR1.
 
@@ -1261,6 +1377,8 @@ class DataflowTracker:
                 # Legacy format - just slot name
                 slot_name = output_info
                 dtype = "fp32"
+            if output_slot_override and output_name in output_slot_override:
+                slot_name = output_slot_override[output_name]
 
             outputs[output_name] = {"dtype": dtype, "slot": slot_name}
 
@@ -1367,7 +1485,14 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     patch_size = int(config.get("patch_size", 0) or 0)
     vision_channels = int(config.get("vision_channels", 3) or 3)
     patch_dim = int(config.get("patch_dim", vision_channels * patch_size * patch_size) or 0)
-    vision_num_patches = int(config.get("vision_num_patches", 0) or 0)
+    vision_grid_h = int(config.get("vision_grid_h", (image_size // patch_size) if image_size and patch_size else 0) or 0)
+    vision_grid_w = int(config.get("vision_grid_w", (image_size // patch_size) if image_size and patch_size else 0) or 0)
+    vision_num_patches = int(
+        config.get(
+            "vision_num_patches",
+            (vision_grid_h * vision_grid_w) if vision_grid_h and vision_grid_w else 0,
+        ) or 0
+    )
 
     specs = {}
 
@@ -1393,6 +1518,8 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     if vision_num_patches > 0 and patch_dim > 0:
         patch_scratch_size = vision_num_patches * patch_dim * 4
         add("patch_scratch", patch_scratch_size, f"[{vision_num_patches}, {patch_dim}]")
+    if vision_num_patches > 0:
+        add("vision_positions", vision_num_patches * 4 * 4, f"[4, {vision_num_patches}]", "i32")
 
     # Embedding + layer buffers
     embedded_size = seq_len * embed_dim * 4
@@ -1443,6 +1570,27 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     layer_out_size = seq_len * embed_dim * 4
     add("layer_output", layer_out_size, f"[{seq_len}, {embed_dim}]")
 
+    projector_in_dim = int(config.get("projector_in_dim", 0) or 0)
+    projector_hidden_dim = int(config.get("projector_hidden_dim", 0) or 0)
+    projector_out_dim = int(config.get("projector_out_dim", 0) or 0)
+    projector_total_out_dim = int(config.get("projector_total_out_dim", projector_out_dim) or 0)
+    num_deepstack_layers = int(config.get("num_deepstack_layers", 0) or 0)
+    merged_tokens = int(config.get("vision_merged_tokens", 0) or 0)
+    if num_deepstack_layers > 0 and merged_tokens > 0:
+        if projector_in_dim > 0:
+            add("branch_stream", merged_tokens * projector_in_dim * 4, f"[{merged_tokens}, {projector_in_dim}]")
+            add("branch_normed", merged_tokens * projector_in_dim * 4, f"[{merged_tokens}, {projector_in_dim}]")
+        if projector_hidden_dim > 0:
+            add("branch_mlp", merged_tokens * projector_hidden_dim * 4, f"[{merged_tokens}, {projector_hidden_dim}]")
+        if projector_out_dim > 0:
+            add(
+                "branch_collect",
+                merged_tokens * projector_out_dim * num_deepstack_layers * 4,
+                f"[{merged_tokens}, {projector_out_dim * num_deepstack_layers}]",
+            )
+    if projector_total_out_dim > 0 and merged_tokens > 0:
+        add("vision_output", merged_tokens * projector_total_out_dim * 4, f"[{merged_tokens}, {projector_total_out_dim}]")
+
     if any(v > 0 for v in (
         recurrent_q, recurrent_k, recurrent_v, recurrent_inner,
         recurrent_gate, recurrent_conv_channels, recurrent_state_size,
@@ -1486,7 +1634,10 @@ V8_ROOT = REPO_ROOT / "version" / "v8"
 V7_ROOT = REPO_ROOT / "version" / "v7"
 
 # Template Op → Kernel Op Mapping
-# This is the single source of truth for how template ops map to kernel registry ops
+# This is the single source of truth for how template ops map to kernel registry ops.
+# Keep this mapping semantic, not architecture-named: the builder should only see
+# declared operations to lower and kernels to stitch, regardless of whether the
+# source model is dense, recurrent, DeepStack-style, MoE, SSM, or something else.
 # Note: "matmul" is a logical op that maps to gemv (decode) or gemm (prefill) based on mode
 TEMPLATE_TO_KERNEL_OP = {
     # Header ops
@@ -1496,16 +1647,24 @@ TEMPLATE_TO_KERNEL_OP = {
     "patch_embeddings": None,  # Vision model patches - init handled separately
     "patchify": "vision_patchify",
     "patch_proj": "matmul",
+    "patch_proj_aux": "matmul",
+    "add_stream": "add_stream",
+    "position_embeddings": "position_embeddings",
+    "vision_position_ids": "position_ids",
+    "position_ids_2d": "position_ids",
+    "patch_bias_add": "rowwise_bias_add",
     "dense_embedding_lookup": "embedding",  # Token embedding lookup
     "embedding": "embedding",
 
     # Attention block
     "rmsnorm": "rmsnorm",
+    "layernorm": "layernorm",
     "attn_norm": "rmsnorm",
     "post_attention_norm": "rmsnorm",
     "ffn_norm": "rmsnorm",
     "post_ffn_norm": "rmsnorm",
     "qkv_proj": "qkv_projection",  # Or fallback to 3x matmul
+    "qkv_packed_proj": "matmul",
     "q_proj": "matmul",
     "q_gate_proj": "matmul",
     "k_proj": "matmul",
@@ -1516,6 +1675,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "recurrent_beta_proj": "matmul",
     "split_q_gate": "split_q_gate",
     "recurrent_split_qkv": "recurrent_split_qkv",
+    "split_qkv_packed": "split_qkv_packed_head_major",
     "recurrent_dt_gate": "recurrent_dt_gate",
     "recurrent_conv_state_update": "recurrent_conv_state_update",
     "recurrent_ssm_conv": "ssm_conv1d",
@@ -1527,6 +1687,7 @@ TEMPLATE_TO_KERNEL_OP = {
     "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul",
     "recurrent_out_proj": "matmul",
     "rope_qk": "rope",
+    "mrope_qk": "rope",
     "kv_cache_store": "kv_cache_store",  # Store K,V to KV cache at pos
     "attn": "attention",
     "attn_sliding": "attention_sliding",
@@ -1540,9 +1701,21 @@ TEMPLATE_TO_KERNEL_OP = {
     # which conflicts with the current pipeline where attention is followed by OutProj.
     # Use simple matmul for mlp_gate_up to avoid the mismatch.
     "mlp_gate_up": "matmul",  # gemv (decode) or gemm (prefill) - use unfused MLP
+    "mlp_up": "matmul",
     "silu_mul": "swiglu",
     "geglu": "geglu",
+    "gelu": "gelu",
     "mlp_down": "matmul",  # gemv (decode) or gemm (prefill)
+    "spatial_merge": "spatial_merge",
+    "branch_spatial_merge": "spatial_merge",
+    "branch_layernorm": "layernorm",
+    "projector_fc1": "matmul",
+    "projector_gelu": "gelu",
+    "projector_fc2": "matmul",
+    "branch_fc1": "matmul",
+    "branch_gelu": "gelu",
+    "branch_fc2": "matmul",
+    "branch_concat": "feature_concat",
 
     # QK norm (Qwen3-style: per-head RMSNorm on Q and K after projection)
     "qk_norm": "qk_norm",  # Dedicated kernel wrapping rmsnorm_forward twice
@@ -1563,14 +1736,19 @@ WEIGHT_TO_KERNEL_INPUT = {
     "w1": "W", "w2": "W", "w3": "W",
     "attn_qkv": "W", "attn_gate": "W",
     "ssm_alpha": "W", "ssm_beta": "W", "ssm_out": "W",
-    "patch_emb": "W",
+    "patch_emb": "W", "patch_emb_aux": "W",
+    "mm0_w": "W", "mm1_w": "W",
+    "branch_fc1_w": "W", "branch_fc2_w": "W",
     # Biases → bias (if kernel has it)
     "bq": "bias", "bk": "bias", "bv": "bias", "bo": "bias",
     "b1": "bias", "b2": "bias",
     "ssm_dt_bias": "bias",
-    "patch_bias": "bias",
-    # Layer norms → gamma
+    "patch_bias": "bias", "bqkv": "bias", "mm0_b": "bias", "mm1_b": "bias",
+    "branch_fc1_b": "bias", "branch_fc2_b": "bias",
+    # Layer norms → gamma/beta
     "ln1_gamma": "gamma", "ln2_gamma": "gamma",
+    "ln1_beta": "beta", "ln2_beta": "beta",
+    "branch_norm_gamma": "gamma", "branch_norm_beta": "beta",
     "attn_norm": "gamma", "post_attention_norm": "gamma",
     "ffn_norm": "gamma", "post_ffn_norm": "gamma",
     "ssm_norm": "gamma",
@@ -1581,6 +1759,7 @@ WEIGHT_TO_KERNEL_INPUT = {
     "ssm_a": "A",
     # Embeddings
     "token_emb": "weight",
+    "pos_emb": "pos_emb",
     "lm_head": "W",
     # Footer
     "final_ln_weight": "gamma", "final_ln_bias": "bias",
@@ -1615,17 +1794,40 @@ def _resolve_config_layer_kind(
     return default_kind
 
 
-def _extract_template_ops(section: Any) -> List[str]:
-    out: List[str] = []
-    if isinstance(section, list):
-        for item in section:
-            if isinstance(item, dict):
-                op = item.get("op")
-                if isinstance(op, str) and op:
-                    out.append(op)
-            elif isinstance(item, str):
-                out.append(item)
+def _template_item_is_active(item: Dict[str, Any]) -> bool:
+    lowering = item.get("lowering") if isinstance(item.get("lowering"), dict) else {}
+    enabled = lowering.get("enabled")
+    if enabled is False:
+        return False
+    status = str(item.get("status", "active") or "active").strip().lower()
+    return status not in {"planned", "disabled", "metadata_only"}
+
+
+def _normalize_template_op_items(section: Any, include_inactive: bool = False) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    if not isinstance(section, list):
+        return out
+    for item in section:
+        if isinstance(item, str):
+            candidate = {"op": item}
+        elif isinstance(item, dict):
+            candidate = copy.deepcopy(item)
+        else:
+            continue
+        op = candidate.get("op")
+        if not isinstance(op, str) or not op:
+            continue
+        if include_inactive or _template_item_is_active(candidate):
+            out.append(candidate)
     return out
+
+
+def _extract_template_ops(section: Any, include_inactive: bool = False) -> List[str]:
+    # Template sections are the graph contract. The lowerer should consume the
+    # declared operations exactly as written here; future branching/routing
+    # support should surface as explicit template ops/subgraphs rather than
+    # family-specific conditionals in the lowerer.
+    return [item["op"] for item in _normalize_template_op_items(section, include_inactive=include_inactive)]
 
 
 def _dedupe_preserve_order(items: List[str]) -> List[str]:
@@ -1639,10 +1841,10 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
     return out
 
 
-PRE_NORM_OP_NAMES = {"rmsnorm", "attn_norm", "ffn_norm", "post_attention_norm"}
+PRE_NORM_OP_NAMES = {"rmsnorm", "layernorm", "attn_norm", "ffn_norm", "post_attention_norm"}
 RESIDUAL_SOURCE_BRANCH_STARTERS = {
     # Attention branches
-    "q_proj", "q_gate_proj", "qkv_proj",
+    "q_proj", "q_gate_proj", "qkv_proj", "qkv_packed_proj",
     "recurrent_qkv_proj", "recurrent_gate_proj",
     "recurrent_alpha_proj", "recurrent_beta_proj",
     # Feed-forward branches
@@ -1670,16 +1872,24 @@ def should_insert_residual_save(layer_ops: List[str], op_idx: int) -> bool:
     return layer_ops[op_idx + 1] in RESIDUAL_SOURCE_BRANCH_STARTERS
 
 
-def _resolve_body_ops_for_layer(body_def: Dict[str, Any], config: Dict[str, Any], layer_idx: int) -> List[str]:
+def _resolve_body_items_for_layer(
+    body_def: Dict[str, Any],
+    config: Dict[str, Any],
+    layer_idx: int,
+    include_inactive: bool = False,
+) -> List[Dict[str, Any]]:
     ops_by_kind = body_def.get("ops_by_kind")
     if not isinstance(ops_by_kind, dict):
-        return _extract_template_ops(body_def.get("ops", []))
+        return _normalize_template_op_items(body_def.get("ops", []), include_inactive=include_inactive)
 
     # Contract note:
     #   Do not hard-code family-specific graph stitching here.
     #   The template must declare the per-kind body graph explicitly.
     #   The lowerer is only allowed to select the declared variant and then
     #   lower those explicit ops one by one.
+    #   This function should not care whether a kind represents dense, MoE,
+    #   DeepStack, SSM, or some future block family. It only resolves the
+    #   declared operation list for the current layer.
     layer_kind = _resolve_config_layer_kind(
         config,
         layer_idx,
@@ -1699,16 +1909,37 @@ def _resolve_body_ops_for_layer(body_def: Dict[str, Any], config: Dict[str, Any]
         raise RuntimeError(
             f"Template body missing ops_by_kind['{layer_kind}'] for layer {layer_idx}."
         )
-    return _extract_template_ops(ops)
+    return _normalize_template_op_items(ops, include_inactive=include_inactive)
 
 
-def _collect_body_ops_for_validation(body_def: Any, config: Dict[str, Any]) -> List[str]:
+def _resolve_body_ops_for_layer(
+    body_def: Dict[str, Any],
+    config: Dict[str, Any],
+    layer_idx: int,
+    include_inactive: bool = False,
+) -> List[str]:
+    return [
+        item["op"]
+        for item in _resolve_body_items_for_layer(
+            body_def,
+            config,
+            layer_idx,
+            include_inactive=include_inactive,
+        )
+    ]
+
+
+def _collect_body_items_for_validation(
+    body_def: Any,
+    config: Dict[str, Any],
+    include_inactive: bool = False,
+) -> List[Dict[str, Any]]:
     if not isinstance(body_def, dict):
-        return _extract_template_ops(body_def)
+        return _normalize_template_op_items(body_def, include_inactive=include_inactive)
 
     ops_by_kind = body_def.get("ops_by_kind")
     if not isinstance(ops_by_kind, dict):
-        return _extract_template_ops(body_def.get("ops", []))
+        return _normalize_template_op_items(body_def.get("ops", []), include_inactive=include_inactive)
 
     kinds: List[str] = []
     configured_kinds = config.get(str(body_def.get("kind_config_key", "layer_kinds") or "layer_kinds"))
@@ -1723,8 +1954,334 @@ def _collect_body_ops_for_validation(body_def: Any, config: Dict[str, Any]) -> L
 
     collected: List[str] = []
     for kind in kinds:
-        collected.extend(_extract_template_ops(ops_by_kind.get(kind, [])))
-    return _dedupe_preserve_order(collected)
+        collected.extend(_normalize_template_op_items(ops_by_kind.get(kind, []), include_inactive=include_inactive))
+
+    seen: set[Tuple[str, str]] = set()
+    out: List[Dict[str, Any]] = []
+    for item in collected:
+        key = (
+            str(item.get("id", "") or ""),
+            str(item.get("op", "") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _collect_body_ops_for_validation(
+    body_def: Any,
+    config: Dict[str, Any],
+    include_inactive: bool = False,
+) -> List[str]:
+    return [
+        item["op"]
+        for item in _collect_body_items_for_validation(
+            body_def,
+            config,
+            include_inactive=include_inactive,
+        )
+    ]
+
+
+def _normalize_block_branches(block_def: Dict[str, Any]) -> List[Dict[str, Any]]:
+    raw = block_def.get("branches")
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "") or "").strip()
+        if not name:
+            continue
+        out.append(copy.deepcopy(item))
+    return out
+
+
+def _template_section_id_map(section: Any, include_inactive: bool = True) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for item in _normalize_template_op_items(section, include_inactive=include_inactive):
+        op_id = str(item.get("id", "") or "").strip()
+        if not op_id:
+            continue
+        out[op_id] = copy.deepcopy(item)
+    return out
+
+
+def _parse_template_value_ref(ref: Any) -> Optional[Dict[str, str]]:
+    if not isinstance(ref, str):
+        return None
+    raw = ref.strip()
+    if not raw:
+        return None
+    parts = raw.split(".")
+    if len(parts) < 2:
+        return None
+    section = str(parts[0] or "").strip().lower()
+    if section not in {"header", "body", "footer"}:
+        return None
+    op_id = str(parts[1] or "").strip()
+    if not op_id:
+        return None
+    output_name = str(parts[2] or "").strip() if len(parts) >= 3 else "out"
+    return {
+        "section": section,
+        "op_id": op_id,
+        "output": output_name or "out",
+        "ref": raw,
+    }
+
+
+def _lookup_template_output_slot(op_name: str, output_name: str = "out") -> Optional[str]:
+    dataflow = OP_DATAFLOW.get(str(op_name or "").strip(), {})
+    outputs = dataflow.get("outputs", {}) if isinstance(dataflow, dict) else {}
+    info = outputs.get(output_name)
+    if isinstance(info, dict):
+        return str(info.get("slot", "") or "").strip() or None
+    if isinstance(info, str):
+        return info.strip() or None
+    if outputs:
+        first = next(iter(outputs.values()))
+        if isinstance(first, dict):
+            return str(first.get("slot", "") or "").strip() or None
+        if isinstance(first, str):
+            return first.strip() or None
+    return None
+
+
+def _resolve_branch_layers(branch_def: Dict[str, Any], config: Dict[str, Any]) -> List[int]:
+    tap = branch_def.get("tap") if isinstance(branch_def.get("tap"), dict) else {}
+    explicit_layers = tap.get("layers")
+    if isinstance(explicit_layers, list):
+        out = []
+        for raw in explicit_layers:
+            try:
+                out.append(int(raw))
+            except Exception:
+                continue
+        return sorted({layer for layer in out if layer >= 0})
+
+    cfg_key = str(tap.get("layers_from_config", "") or "").strip()
+    if not cfg_key:
+        return []
+    cfg_value = config.get(cfg_key)
+    if isinstance(cfg_value, list):
+        if cfg_value and all(isinstance(v, bool) for v in cfg_value):
+            return [idx for idx, enabled in enumerate(cfg_value) if enabled]
+        out = []
+        for raw in cfg_value:
+            try:
+                out.append(int(raw))
+            except Exception:
+                continue
+        return sorted({layer for layer in out if layer >= 0})
+    return []
+
+
+def _template_int_param(
+    params: Dict[str, Any],
+    key: str,
+    config: Dict[str, Any],
+    default: int = 0,
+) -> int:
+    if not isinstance(params, dict):
+        return int(default)
+    raw = params.get(key)
+    if raw is not None:
+        try:
+            return int(raw)
+        except Exception:
+            pass
+    cfg_key = str(params.get(f"{key}_from_config", "") or "").strip()
+    if cfg_key:
+        try:
+            return int(config.get(cfg_key, default) or 0)
+        except Exception:
+            return int(default)
+    return int(default)
+
+
+def _required_template_int_param(
+    params: Dict[str, Any],
+    key: str,
+    config: Dict[str, Any],
+    op_name: str,
+) -> int:
+    if not isinstance(params, dict):
+        raise RuntimeError(
+            f"Template op '{op_name}' must declare '{key}' or '{key}_from_config'."
+        )
+
+    raw = params.get(key)
+    if raw is not None:
+        try:
+            value = int(raw)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Template op '{op_name}' has invalid '{key}' value: {raw!r}"
+            ) from exc
+    else:
+        cfg_key = str(params.get(f"{key}_from_config", "") or "").strip()
+        if not cfg_key:
+            raise RuntimeError(
+                f"Template op '{op_name}' must declare '{key}' or '{key}_from_config'."
+            )
+        if cfg_key not in config or config.get(cfg_key) is None:
+            raise RuntimeError(
+                f"Template op '{op_name}' requires config['{cfg_key}'] to resolve '{key}'."
+            )
+        try:
+            value = int(config.get(cfg_key))
+        except Exception as exc:
+            raise RuntimeError(
+                f"Template op '{op_name}' could not parse config['{cfg_key}'] for '{key}'."
+            ) from exc
+
+    if value <= 0:
+        raise RuntimeError(
+            f"Template op '{op_name}' requires positive '{key}', got {value}."
+        )
+    return value
+
+
+def _template_str_param(
+    params: Dict[str, Any],
+    key: str,
+    config: Dict[str, Any],
+    default: str = "",
+) -> str:
+    if not isinstance(params, dict):
+        return str(default)
+    raw = params.get(key)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    cfg_key = str(params.get(f"{key}_from_config", "") or "").strip()
+    if cfg_key:
+        cfg_value = config.get(cfg_key, default)
+        if cfg_value is None:
+            return str(default)
+        return str(cfg_value)
+    return str(default)
+
+
+def _dtype_size_bytes(dtype: str) -> int:
+    return {
+        "fp32": 4,
+        "f32": 4,
+        "bf16": 2,
+        "fp16": 2,
+        "f16": 2,
+        "i32": 4,
+        "int32": 4,
+        "q8_0": 1,
+        "q8_k": 1,
+    }.get(str(dtype or "").strip().lower(), 4)
+
+
+def _resolve_branch_collect_contract(
+    branch_def: Dict[str, Any],
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    collect = branch_def.get("collect") if isinstance(branch_def.get("collect"), dict) else {}
+    layers = branch_def.get("layers") if isinstance(branch_def.get("layers"), list) else []
+    default_rows = int(config.get("vision_merged_tokens", config.get("vision_num_patches", 0)) or 0)
+    default_slice_dim = int(
+        config.get("projector_out_dim", config.get("projection_dim", config.get("embed_dim", 0))) or 0
+    )
+    dtype = _template_str_param(collect, "dtype", config, "fp32") or "fp32"
+    return {
+        "target": _template_str_param(
+            collect,
+            "target",
+            config,
+            f"branch.{str(branch_def.get('name', '') or 'collect').strip() or 'collect'}",
+        ),
+        "mode": _template_str_param(collect, "mode", config, "concat") or "concat",
+        "axis": _template_str_param(collect, "axis", config, "feature") or "feature",
+        "rows": _template_int_param(collect, "rows", config, default_rows),
+        "slice_dim": _template_int_param(collect, "slice_dim", config, default_slice_dim),
+        "num_slices": _template_int_param(collect, "num_slices", config, len(layers)),
+        "dtype": dtype,
+        "bytes_per_elem": _dtype_size_bytes(dtype),
+    }
+
+
+def _resolve_branch_weight_ref_alias(weight_key: str) -> str:
+    return {
+        "branch_norm_gamma": "gamma",
+        "branch_norm_beta": "beta",
+        "branch_fc1_w": "W",
+        "branch_fc1_b": "bias",
+        "branch_fc2_w": "W",
+        "branch_fc2_b": "bias",
+    }.get(str(weight_key or ""), str(weight_key or ""))
+
+
+def _build_block_branch_plan(block_def: Dict[str, Any], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    body_ids = _template_section_id_map(block_def.get("body", {}).get("ops", []))
+    header_ids = _template_section_id_map(block_def.get("header", []))
+    footer_ids = _template_section_id_map(block_def.get("footer", []))
+    section_ids = {
+        "header": header_ids,
+        "body": body_ids,
+        "footer": footer_ids,
+    }
+    footer_stitches: List[Dict[str, Any]] = []
+    for item in _normalize_template_op_items(block_def.get("footer", []), include_inactive=True):
+        op_name = str(item.get("op", "") or "").strip()
+        inputs = item.get("inputs")
+        has_branch_input = isinstance(inputs, list) and any(
+            isinstance(value, str) and value.strip().startswith("branch.")
+            for value in inputs
+        )
+        if op_name.startswith("branch_") or has_branch_input:
+            footer_stitches.append(copy.deepcopy(item))
+
+    plan: List[Dict[str, Any]] = []
+    for branch in _normalize_block_branches(block_def):
+        producer = branch.get("producer") if isinstance(branch.get("producer"), dict) else {}
+        collect = branch.get("collect") if isinstance(branch.get("collect"), dict) else {}
+        tap = copy.deepcopy(branch.get("tap", {})) if isinstance(branch.get("tap"), dict) else {}
+        resolved_layers = _resolve_branch_layers(branch, config)
+        tap_ref = _parse_template_value_ref(tap.get("from"))
+        if tap_ref is not None:
+            declared = section_ids.get(tap_ref["section"], {})
+            if tap_ref["op_id"] not in declared:
+                raise RuntimeError(
+                    f"Branch '{branch.get('name', '')}' taps '{tap_ref['ref']}', "
+                    f"but that op id is not declared in the template."
+                )
+        plan.append(
+            {
+                "name": str(branch.get("name", "") or ""),
+                "kind": str(branch.get("kind", "fixed_branch") or "fixed_branch"),
+                "status": str(branch.get("status", "active") or "active"),
+                "tap": tap,
+                "tap_ref": tap_ref,
+                "layers": resolved_layers,
+                "producer_ops": _extract_template_ops(
+                    producer.get("ops", []),
+                    include_inactive=True,
+                ),
+                "producer_items": _normalize_template_op_items(
+                    producer.get("ops", []),
+                    include_inactive=True,
+                ),
+                "collect": copy.deepcopy(collect),
+                "collect_contract": _resolve_branch_collect_contract(
+                    {
+                        "name": branch.get("name"),
+                        "collect": collect,
+                        "layers": resolved_layers,
+                    },
+                    config,
+                ),
+                "stitches": copy.deepcopy(footer_stitches),
+            }
+        )
+    return plan
 
 
 def _collect_template_ops(template: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> List[str]:
@@ -1740,6 +2297,8 @@ def _collect_template_ops(template: Dict[str, Any], config: Optional[Dict[str, A
             continue
         collected.extend(_extract_template_ops(block.get("header", [])))
         collected.extend(_collect_body_ops_for_validation(block.get("body", {}), cfg))
+        for branch in _build_block_branch_plan(block, cfg):
+            collected.extend(branch.get("producer_ops", []))
         collected.extend(_extract_template_ops(block.get("footer", [])))
     return _dedupe_preserve_order(collected)
 
@@ -1754,9 +2313,10 @@ def _template_uses_rope(template: Dict[str, Any], config: Optional[Dict[str, Any
     rope_layout = _normalize_rope_layout_value(attention_contract.get("rope_layout"))
     if rope_layout == "none":
         return False
-    if rope_layout in {"split", "pairwise"}:
+    if rope_layout in {"split", "pairwise", "multi_section_2d"}:
         return True
-    return "rope_qk" in _collect_template_ops(template, config)
+    template_ops = _collect_template_ops(template, config)
+    return "rope_qk" in template_ops or "mrope_qk" in template_ops
 
 
 def _template_uses_kv_cache(template: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> bool:
@@ -1789,16 +2349,31 @@ def _backfill_vision_contract_config(manifest: Dict[str, Any]) -> None:
     template = manifest.get("template") if isinstance(manifest.get("template"), dict) else {}
     contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
     vision_contract = contract.get("vision_contract") if isinstance(contract.get("vision_contract"), dict) else {}
+    vision_position_contract = contract.get("vision_position_contract") if isinstance(contract.get("vision_position_contract"), dict) else {}
+    attention_contract = contract.get("attention_contract") if isinstance(contract.get("attention_contract"), dict) else {}
 
     image_size = int(vision_contract.get("image_size", 0) or 0)
     patch_size = int(vision_contract.get("patch_size", 0) or 0)
     vision_channels = int(vision_contract.get("channels", 3) or 3)
+    rope_layout = (
+        attention_contract.get("rope_layout")
+        if attention_contract.get("rope_layout") is not None
+        else vision_position_contract.get("rope_layout")
+    )
+    rope_mode = attention_contract.get("rope_mode")
+    position_rank = vision_position_contract.get("position_rank")
 
     if image_size > 0:
         config.setdefault("image_size", image_size)
     if patch_size > 0:
         config.setdefault("patch_size", patch_size)
     config.setdefault("vision_channels", vision_channels)
+    if rope_layout is not None and str(rope_layout).strip():
+        config.setdefault("rope_layout", str(rope_layout))
+    if rope_mode is not None and str(rope_mode).strip():
+        config.setdefault("rope_mode", str(rope_mode))
+    if position_rank is not None:
+        config.setdefault("position_rank", int(position_rank))
 
     if image_size > 0 and patch_size > 0:
         patches_h = image_size // patch_size
@@ -1869,11 +2444,16 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
     inter = config.get("intermediate_size", config.get("intermediate_dim", 4864))
     vocab = config.get("vocab_size", 0)
     patch_dim = int(config.get("patch_dim", 0) or 0)
+    projector_in = int(config.get("projector_in_dim", embed * int(config.get("spatial_merge_factor", 1) or 1)) or 0)
+    projector_hidden = int(config.get("projector_hidden_dim", projector_in) or 0)
+    projector_out = int(config.get("projector_out_dim", config.get("projection_dim", embed)) or 0)
 
     q_gate_proj = int(config.get("q_gate_proj_dim", config.get("attn_q_gate_proj_dim", 0)) or 0)
     attn_gate_dim = int(config.get("attn_gate_dim", 0) or 0)
     if op_name in ("q_proj",):
         return heads * head_dim, embed
+    if op_name in ("qkv_packed_proj",):
+        return (heads * head_dim) + 2 * (kv_heads * head_dim), embed
     if op_name in ("q_gate_proj",):
         if q_gate_proj <= 0:
             q_gate_proj = 2 * (heads * head_dim)
@@ -1897,16 +2477,26 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
         return embed, attn_out
     if op_name in ("recurrent_out_proj",):
         return embed, int(config.get("ssm_inner_size", attn_out))
-    if op_name in ("mlp_gate_up", "mlp_up"):
+    if op_name in ("mlp_gate_up",):
         return inter * 2, embed
+    if op_name in ("mlp_up",):
+        return inter, embed
     if op_name in ("mlp_gate",):
         return inter, embed
     if op_name in ("mlp_down",):
         return embed, inter
     if op_name in ("logits",):
         return vocab, embed
-    if op_name in ("patch_proj",):
+    if op_name in ("patch_proj", "patch_proj_aux"):
         return embed, patch_dim
+    if op_name in ("projector_fc1",):
+        return projector_hidden, projector_in
+    if op_name in ("projector_fc2",):
+        return projector_out, projector_hidden
+    if op_name in ("branch_fc1",):
+        return projector_hidden, projector_in
+    if op_name in ("branch_fc2",):
+        return projector_out, projector_hidden
     # Quantize ops: _input_dim is the size to quantize
     # quantize_input_0/1: quantize embed_dim (rmsnorm output before projections)
     # quantize_out_proj_input: quantize embed_dim (attention output)
@@ -1933,10 +2523,46 @@ def _align_up(value: int, alignment: int) -> int:
 
 
 def load_kernel_registry() -> Dict:
-    """Load kernel registry. v8 currently reuses the stable v7 kernel maps."""
+    """Load kernel registry with optional v8 overlay kernel maps."""
     registry_path = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
     with open(registry_path, 'r') as f:
-        return json.load(f)
+        registry = json.load(f)
+
+    kernels = registry.get("kernels", [])
+    if not isinstance(kernels, list):
+        kernels = []
+        registry["kernels"] = kernels
+
+    overlay_dir = V8_ROOT / "kernel_maps"
+    if not overlay_dir.exists():
+        return registry
+
+    by_id = {
+        str(kernel.get("id", "") or ""): kernel
+        for kernel in kernels
+        if isinstance(kernel, dict) and str(kernel.get("id", "") or "").strip()
+    }
+    for overlay_path in sorted(overlay_dir.glob("*.json")):
+        if overlay_path.name in {"kernel_bindings.overlay.json"}:
+            continue
+        try:
+            with open(overlay_path, "r", encoding="utf-8") as f:
+                doc = json.load(f)
+        except Exception:
+            continue
+        if not isinstance(doc, dict):
+            continue
+        kernel_id = str(doc.get("id", "") or "").strip()
+        kernel_op = str(doc.get("op", "") or "").strip()
+        if not kernel_id or not kernel_op:
+            continue
+        doc = copy.deepcopy(doc)
+        doc.setdefault("name", kernel_id)
+        doc.setdefault("_source_file", overlay_path.name)
+        by_id[kernel_id] = doc
+
+    registry["kernels"] = [by_id[key] for key in sorted(by_id.keys())]
+    return registry
 
 
 def load_manifest(manifest_path: Path) -> Dict:
@@ -2220,6 +2846,35 @@ def build_stitch_plan(manifest: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def build_template_branch_plan(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    manifest = _hydrate_manifest_template(copy.deepcopy(manifest))
+    template = manifest.get("template", {})
+    if not isinstance(template, dict):
+        raise RuntimeError("Manifest template is missing or invalid")
+
+    config = manifest.get("config", {}) if isinstance(manifest.get("config"), dict) else {}
+    blocks: List[Dict[str, Any]] = []
+    for index, block_name in enumerate(_template_sequence(template)):
+        block_def = _template_block_def(template, block_name)
+        block_cfg = copy.deepcopy(config)
+        block_cfg.update(_block_config_overrides(template, block_name))
+        blocks.append(
+            {
+                "name": block_name,
+                "index": index,
+                "branches": _build_block_branch_plan(block_def, block_cfg),
+            }
+        )
+
+    return {
+        "format": "v8-template-branch-plan",
+        "version": 1,
+        "template_name": str(template.get("name", "") or ""),
+        "sequence": _template_sequence(template),
+        "blocks": blocks,
+    }
+
+
 def _block_artifact_dirname(block_index: int, block_name: str) -> str:
     safe_name = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in block_name)
     return f"{block_index + 1:02d}_{safe_name}"
@@ -2275,6 +2930,11 @@ def _resolve_rope_qk_kernel(config: Dict, template_kernels: Dict[str, Any]) -> s
         if override and "pairwise" not in override.lower():
             return override
         return "rope_forward_qk"
+
+    if rope_layout == "multi_section_2d":
+        if override:
+            return override
+        return "mrope_qk_vision"
 
     if override:
         return override
@@ -2358,6 +3018,10 @@ def _resolve_planner_io_name(
     declared_slot = _get_declared_dataflow_slot(ir_op, io_kind, io_name, io_name)
     if declared_slot:
         return io_name
+    dataflow = ir_op.get("dataflow", {}) if isinstance(ir_op.get("dataflow"), dict) else {}
+    declared_ios = dataflow.get(io_kind, {}) if isinstance(dataflow.get(io_kind), dict) else {}
+    if len(declared_ios) == 1:
+        return next(iter(declared_ios.keys()))
     return legacy_name_map.get(io_name, io_name)
 
 
@@ -2525,7 +3189,8 @@ def unsupported_template_lowering_reason(manifest: Dict[str, Any]) -> Optional[s
 
     return (
         f"Template body.type='{body_type}' is not implemented in build_ir_v8 yet. "
-        "Only dense decoder templates are lowerable today."
+        "Only the active flat body graph is lowerable today; non-dense body kernels "
+        "and explicit branch/routing execution still need lowering support."
     )
 
 
@@ -2651,9 +3316,10 @@ def find_kernel(
         matches.append(candidate)
 
     if not matches:
-        # Fallback: decode with fp32/bf16 weights has no native gemv path in v7 yet.
+        # Fallback: decode with dense fp32/bf16/fp16 weights has no native gemv
+        # path in the registry yet. Use GEMM with M=1 for correctness.
         # Use gemm with M=1 for decode correctness.
-        if op == "matmul" and mode == "decode" and quant.get("weight") in ("fp32", "bf16"):
+        if op == "matmul" and mode == "decode" and quant.get("weight") in ("fp32", "bf16", "fp16", "f16"):
             return find_kernel(
                 registry,
                 op="gemm",
@@ -2662,12 +3328,6 @@ def find_kernel(
                 prefer_q8_activation=prefer_q8_activation,
                 prefer_parallel=prefer_parallel,
             )
-
-        # Fallback: fp16 weights can be dequantized to fp32 at load time
-        # Pass original op (not actual_op) since matmul→gemv/gemm mapping happens inside
-        if "weight" in quant and quant["weight"] == "fp16":
-            return find_kernel(registry, op=op, quant={**quant, "weight": "fp32"}, mode=mode,
-                             prefer_q8_activation=prefer_q8_activation, prefer_parallel=prefer_parallel)
 
         # Fallback: Q4_0 → Q4_K (similar K-quant format)
         # Q4_0 GEMV kernels don't exist in the library, but Q4_K does
@@ -2911,6 +3571,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             entry_dtype[n] = d.lower()
 
     if isinstance(quant_summary, dict):
+        # Carry all top-level scalar quant declarations through header/footer
+        # lowering. This covers projector weights (`mm0_w` / `mm1_w`) in the
+        # vision path in addition to token/patch embeddings.
+        for key, value in quant_summary.items():
+            if isinstance(key, str) and isinstance(value, str) and value:
+                header_quant[key] = value
         token_q = quant_summary.get("token_emb")
         if isinstance(token_q, str) and token_q:
             header_quant["token_emb"] = token_q
@@ -3048,16 +3714,53 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         scale_embeddings_sqrt_dim = is_gemma_family
     config["scale_embeddings_sqrt_dim"] = scale_embeddings_sqrt_dim
 
-    # Extract ops sequences from v2 template (header, body, footer)
+    # Extract active op sequences from the template. Planned branch/stitch ops
+    # may already exist in the schema, but only active ops are lowerable here.
     block_name = template["sequence"][0]
     block = template["block_types"][block_name]
 
-    header_ops = _extract_template_ops(block.get("header", []))
-    body_ops = _collect_body_ops_for_validation(block.get("body", {}), config)
-    footer_ops = _extract_template_ops(block.get("footer", []))
+    header_items = _normalize_template_op_items(block.get("header", []))
+    body_items = _collect_body_items_for_validation(block.get("body", {}), config)
+    footer_items = _normalize_template_op_items(block.get("footer", []))
+    header_ops = [item["op"] for item in header_items]
+    body_ops = [item["op"] for item in body_items]
+    footer_ops = [item["op"] for item in footer_items]
+    branch_plan = _build_block_branch_plan(block, config)
+    branch_tap_targets: Dict[Tuple[str, int, str], List[Dict[str, Any]]] = {}
+    for branch in branch_plan:
+        tap_ref = branch.get("tap_ref") if isinstance(branch.get("tap_ref"), dict) else None
+        if not isinstance(tap_ref, dict):
+            continue
+        section_name = str(tap_ref.get("section", "") or "").strip().lower()
+        tap_op_id = str(tap_ref.get("op_id", "") or "").strip()
+        if not section_name or not tap_op_id:
+            continue
+        active_layers = branch.get("layers", []) if section_name == "body" else [-1]
+        for collect_index, layer_idx in enumerate(active_layers):
+            try:
+                normalized_layer = int(layer_idx) if section_name == "body" else -1
+            except Exception:
+                continue
+            branch_tap_targets.setdefault((section_name, normalized_layer, tap_op_id), []).append(
+                {
+                    "name": branch.get("name", ""),
+                    "kind": branch.get("kind", "fixed_branch"),
+                    "tap": copy.deepcopy(branch.get("tap", {})),
+                    "tap_ref": copy.deepcopy(tap_ref),
+                    "producer_ops": copy.deepcopy(branch.get("producer_ops", [])),
+                    "producer_items": copy.deepcopy(branch.get("producer_items", [])),
+                    "collect": copy.deepcopy(branch.get("collect", {})),
+                    "collect_contract": copy.deepcopy(branch.get("collect_contract", {})),
+                    "stitches": copy.deepcopy(branch.get("stitches", [])),
+                    "collect_index": collect_index,
+                }
+            )
 
     # For validation, we need all ops
-    all_template_ops = header_ops + body_ops + footer_ops
+    branch_template_ops: List[str] = []
+    for branch in branch_plan:
+        branch_template_ops.extend(branch.get("producer_ops", []))
+    all_template_ops = _dedupe_preserve_order(header_ops + body_ops + footer_ops + branch_template_ops)
 
     print(f"\n{'='*60}")
     print("VALIDATION PHASE")
@@ -3068,6 +3771,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     print(f"  Header: {header_ops}")
     print(f"  Body: {body_ops}")
     print(f"  Footer: {footer_ops}")
+    if branch_plan:
+        print("  Branches:")
+        for branch in branch_plan:
+            producer_ops = ", ".join(branch.get("producer_ops", [])) or "(none)"
+            print(
+                f"    - {branch.get('name', '')}: status={branch.get('status', 'active')} "
+                f"layers={branch.get('layers', [])} producer=[{producer_ops}]"
+            )
 
     unmapped_ops = validate_template_ops(all_template_ops)
     if unmapped_ops:
@@ -3153,10 +3864,16 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         if not kernel_id:
             return None
         act = kernel_act_dtype.get(kernel_id, "fp32")
-        if op_type in ("q_proj", "q_gate_proj", "k_proj", "v_proj", "mlp_gate_up"):
+        if op_type in ("q_proj", "q_gate_proj", "k_proj", "v_proj", "qkv_packed_proj", "mlp_gate_up", "mlp_up", "projector_fc1"):
             return {"x": "main_stream" if act == "fp32" else "main_stream_q8"}
         if op_type == "out_proj":
             return {"x": "attn_scratch" if act == "fp32" else "main_stream_q8"}
+        if op_type == "projector_fc2":
+            return {"x": "mlp_scratch" if act == "fp32" else "main_stream_q8"}
+        if op_type == "branch_fc1":
+            return {"x": "branch_normed" if act == "fp32" else "branch_normed"}
+        if op_type == "branch_fc2":
+            return {"x": "branch_mlp" if act == "fp32" else "branch_mlp"}
         if op_type == "recurrent_out_proj":
             return {"x": "recurrent_normed" if act == "fp32" else "main_stream_q8"}
         if op_type == "mlp_down":
@@ -3203,6 +3920,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     OP_TO_WEIGHT_KEYS = {
         # Ops with quantized weights - look up in quant_summary
         "patch_proj": ["patch_emb"],
+        "patch_proj_aux": ["patch_emb_aux"],
+        "patch_bias_add": None,
+    "vision_position_ids": None,
+    "position_ids_2d": None,
+        "qkv_packed_proj": ["attn_qkv"],
         "qkv_proj": ["wq", "wk", "wv"],  # Split into 3 matmuls if no fused kernel
         "q_proj": ["wq"],
         "q_gate_proj": ["wq"],
@@ -3216,12 +3938,18 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "recurrent_out_proj": ["ssm_out"],
         "out_proj": ["wo"],
         "mlp_gate_up": ["w1"],
+        "mlp_up": ["w3"],
         "mlp_down": ["w2"],
+        "projector_fc1": ["mm0_w"],
+        "projector_fc2": ["mm1_w"],
+        "branch_fc1": ["branch_fc1_w"],
+        "branch_fc2": ["branch_fc2_w"],
         "dense_embedding_lookup": [],  # Uses token_emb, usually q8_0
         "logits": [],  # Uses lm_head/token_emb, usually q8_0
 
         # Ops with fp32 weights (no quant lookup needed)
         "rmsnorm": None,  # gamma is always fp32
+        "layernorm": None,  # gamma/beta are fp32
         "attn_norm": None,
         "post_attention_norm": None,
         "ffn_norm": None,
@@ -3231,6 +3959,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
         # Ops without weights (compute-only)
         "patchify": None,
+        "position_embeddings": None,
+        "vision_position_ids": None,
+        "position_ids_2d": None,
+        "split_qkv_packed": None,
+        "mrope_qk": None,
         "rope_qk": None,
         "kv_cache_store": None,  # Store K,V to KV cache (no weights)
         "attn": None,
@@ -3246,8 +3979,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         "recurrent_norm_gate": None,
         "attn_gate_sigmoid_mul": None,
         "residual_add": None,
+        "add_stream": None,
         "silu_mul": None,
         "geglu": None,
+        "spatial_merge": None,
+        "branch_spatial_merge": None,
+        "branch_layernorm": None,
+        "projector_gelu": None,
+        "branch_gelu": None,
+        "branch_concat": None,
 
         # Metadata ops (no kernel)
         "tokenizer": "metadata",  # Deprecated, use bpe_tokenizer
@@ -3283,6 +4023,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # Template-specified kernel overrides (keeps IR dumb and data-driven)
         if op == "rope_qk":
             return [_resolve_rope_qk_kernel(config, template_kernels)]
+        if op == "mrope_qk":
+            override = str(template_kernels.get("mrope_qk", "") or "").strip()
+            return [override or "mrope_qk_vision"]
 
         if op in ("attn", "attn_sliding"):
             mode_key = f"{op}_{mode}"
@@ -3291,6 +4034,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 return [attn_kernel]
             if op == "attn" and mode == "prefill" and not _attention_contract_is_causal(template, config):
                 return ["attention_forward_full_head_major_gqa_flash_strided"]
+
+        explicit_kernel = str(template_kernels.get(op, "") or "").strip()
+        if explicit_kernel:
+            return [explicit_kernel]
 
         kernel_op = TEMPLATE_TO_KERNEL_OP.get(op)
         if not kernel_op:
@@ -3319,7 +4066,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if weight_dtype == "fp32":
                 weight_dtype = header_quant.get(weight_info[0], weight_dtype)
             kernel_prefer_q8_activation = _prefer_q8_activation_for_op(op, prefer_q8_activation)
-            if op in ("mlp_gate_up", "mlp_down") and prefer_fp32_mlp_matmuls:
+            if op in ("mlp_gate_up", "mlp_up", "mlp_down") and prefer_fp32_mlp_matmuls:
                 kernel_prefer_q8_activation = False
             kernel_id = find_kernel(
                 registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
@@ -3419,6 +4166,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
     # ═══════════════════════════════════════════════════════════
     # Parse template → Generate IR1
+    # The builder walks the declared template graph and lowers explicit ops into
+    # kernel calls. Keep the control vocabulary generic: if future templates add
+    # branch/collect/stitch or route/dispatch/combine semantics, those should
+    # arrive here as declared graph constructs, not as architecture-specific
+    # if/else branches keyed on model families.
     # ═══════════════════════════════════════════════════════════
 
     # Track op instance counts during PASS 1 for data flow lookup
@@ -3445,6 +4197,106 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             "instance": instance,
         }
 
+    def annotate_branch_taps(emitted_start: int, section: str, layer: int, op_item: Dict[str, Any]) -> None:
+        op_id = str(op_item.get("id", "") or "").strip()
+        if not op_id or len(arranged_kernels) <= emitted_start:
+            return
+        taps = branch_tap_targets.get((section, layer, op_id))
+        if not taps:
+            return
+        graph = arranged_kernels[-1].setdefault("graph", {})
+        graph["branch_taps"] = copy.deepcopy(taps)
+
+    def emit_branch_producers(section: str, layer_idx: int, op_item: Dict[str, Any], layer_quant: Dict[str, Any]) -> None:
+        op_id = str(op_item.get("id", "") or "").strip()
+        if not op_id:
+            return
+        taps = branch_tap_targets.get((section, layer_idx, op_id))
+        if not taps:
+            return
+
+        merged_tokens = int(config.get("vision_merged_tokens", config.get("vision_num_patches", 0)) or 0)
+        projector_out_dim = int(config.get("projector_out_dim", config.get("projection_dim", config.get("embed_dim", 0))) or 0)
+        branch_op_alias = {
+            "spatial_merge": "branch_spatial_merge",
+            "layernorm": "branch_layernorm",
+        }
+
+        for tap in taps:
+            branch_name = str(tap.get("name", "") or "").strip()
+            collect_contract = tap.get("collect_contract") if isinstance(tap.get("collect_contract"), dict) else {}
+            collect_target = str(
+                collect_contract.get("target", f"branch.{branch_name or 'collect'}") or f"branch.{branch_name or 'collect'}"
+            )
+            collect_index = int(tap.get("collect_index", 0) or 0)
+            collect_rows = int(collect_contract.get("rows", merged_tokens) or 0)
+            collect_slice_dim = int(collect_contract.get("slice_dim", projector_out_dim) or 0)
+            collect_item_bytes = int(collect_contract.get("bytes_per_elem", 4) or 4)
+            collect_offset = collect_rows * collect_slice_dim * collect_index * collect_item_bytes
+            producer_items = tap.get("producer_items", []) if isinstance(tap.get("producer_items"), list) else []
+
+            for producer_item in producer_items:
+                branch_op = str(producer_item.get("op", "") or "").strip()
+                if not branch_op:
+                    continue
+                lowered_op = branch_op_alias.get(branch_op, branch_op)
+                template_weight_refs = (
+                    producer_item.get("weight_refs")
+                    if isinstance(producer_item.get("weight_refs"), dict)
+                    else {}
+                )
+                branch_quant = dict(layer_quant)
+                if lowered_op == "branch_fc1" and "W" in template_weight_refs:
+                    resolved = str(template_weight_refs["W"]).replace("{L}", str(layer_idx))
+                    entry = weight_index.get(resolved)
+                    if isinstance(entry, dict):
+                        branch_quant["branch_fc1_w"] = str(entry.get("dtype", "fp32") or "fp32")
+                if lowered_op == "branch_fc2" and "W" in template_weight_refs:
+                    resolved = str(template_weight_refs["W"]).replace("{L}", str(layer_idx))
+                    entry = weight_index.get(resolved)
+                    if isinstance(entry, dict):
+                        branch_quant["branch_fc2_w"] = str(entry.get("dtype", "fp32") or "fp32")
+                kernels = map_op_to_kernel(lowered_op, branch_quant, mode, header_quant)
+
+                params: Dict[str, Any] = copy.deepcopy(
+                    producer_item.get("params") if isinstance(producer_item.get("params"), dict) else {}
+                )
+                if lowered_op == "branch_fc2":
+                    params["branch_collect_target"] = collect_target
+                    params["branch_collect_offset_bytes"] = collect_offset
+                    params.setdefault("branch_collect_rows", collect_rows)
+                    params.setdefault("branch_collect_slice_dim", collect_slice_dim)
+                    params.setdefault("branch_collect_mode", collect_contract.get("mode", "concat"))
+                    params.setdefault("branch_collect_axis", collect_contract.get("axis", "feature"))
+
+                for k in kernels:
+                    if isinstance(k, tuple):
+                        kernel_id, split_op = k
+                    else:
+                        kernel_id, split_op = k, lowered_op
+                    op_info = get_op_info(split_op, "branch", layer_idx)
+                    arranged_kernels.append({
+                        "op_id": op_info["op_id"],
+                        "kernel": kernel_id,
+                        "op": split_op,
+                        "template_op_id": f"branch.{branch_name}.{producer_item.get('id', split_op)}",
+                        "section": "branch",
+                        "layer": layer_idx,
+                        "instance": op_info["instance"],
+                        "branch_name": branch_name,
+                        "branch_source_layer": layer_idx,
+                        "branch_collect_index": collect_index,
+                        "template_weight_refs": copy.deepcopy(template_weight_refs),
+                        "params": params,
+                    })
+                    print(
+                        f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  "
+                        f"(branch: {branch_name}, layer: {layer_idx})"
+                    )
+
+                if not kernels and OP_TO_WEIGHT_KEYS.get(lowered_op) != "metadata":
+                    print(f"            {lowered_op:20s} → (no kernel)")
+
     for block_name in template["sequence"]:
         block_def = template["block_types"][block_name]
         block_sequence = block_def.get("sequence", ["header", "body", "footer"])
@@ -3456,11 +4308,12 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             if section_def is None:
                 continue
 
-            # Get ops list
+            # Get active ops list. Section items may carry ids/metadata even when
+            # the lowerer only needs the op names today.
             if isinstance(section_def, dict):
-                ops = section_def.get("ops", [])
+                ops = _normalize_template_op_items(section_def.get("ops", []))
             else:
-                ops = section_def if isinstance(section_def, list) else []
+                ops = _normalize_template_op_items(section_def)
 
             # Body: loop over layers
             if section_name == "body":
@@ -3477,12 +4330,15 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                              if k[0] != layer_idx}
 
                     print(f"\n    Layer {layer_idx}:")
-                    layer_ops = _resolve_body_ops_for_layer(block["body"], config, layer_idx)
+                    layer_items = _resolve_body_items_for_layer(block["body"], config, layer_idx)
+                    layer_ops = [item["op"] for item in layer_items]
 
                     # Track pre-norm instance for quantize insertion
                     norm_instance = 0
 
-                    for op_idx, op in enumerate(layer_ops):
+                    for op_idx, op_item in enumerate(layer_items):
+                        op = op_item["op"]
+                        emitted_start = len(arranged_kernels)
 
                         # Check if we need to insert quantize op after rmsnorm
                         # v7 compatibility: quantize activation before Q8_0 activation kernels
@@ -3512,6 +4368,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 "op_id": residual_save_info["op_id"],
                                 "kernel": "memcpy",
                                 "op": residual_save_op_name,
+                                "template_op_id": op_item.get("id"),
                                 "section": "body",
                                 "layer": layer_idx,
                                 "instance": norm_instance,  # Same instance as pre-norm
@@ -3538,6 +4395,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                 "op_id": quant_op_info["op_id"],
                                                 "kernel": quantize_kernel,
                                                 "op": quant_op_name,
+                                                "template_op_id": op_item.get("id"),
                                                 "section": "body",
                                                 "layer": layer_idx,
                                                 "instance": 0,
@@ -3559,11 +4417,18 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                 "op_id": op_info["op_id"],
                                 "kernel": kernel_id,
                                 "op": split_op,
+                                "template_op_id": op_item.get("id"),
                                 "section": "body",
                                 "layer": layer_idx,
                                 "instance": op_info["instance"],
+                                "params": copy.deepcopy(
+                                    op_item.get("params") if isinstance(op_item.get("params"), dict) else {}
+                                ),
                             })
                             print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
+
+                        annotate_branch_taps(emitted_start, "body", layer_idx, op_item)
+                        emit_branch_producers("body", layer_idx, op_item, layer_quant)
 
                         if not kernels and OP_TO_WEIGHT_KEYS.get(op) != "metadata":
                             print(f"            {op:20s} → (no kernel)")
@@ -3591,6 +4456,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                     "op_id": quant_op_info["op_id"],
                                                     "kernel": quantize_kernel,
                                                     "op": quant_op_name,
+                                                    "template_op_id": op_item.get("id"),
                                                     "section": "body",
                                                     "layer": layer_idx,
                                                     "instance": norm_instance,
@@ -3604,7 +4470,9 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             else:
                 print(f"\n    {section_name.capitalize()}:")
                 footer_quantize_inserted = False  # Track if we've inserted quantize for footer
-                for op_idx, op in enumerate(ops):
+                for op_idx, op_item in enumerate(ops):
+                    op = op_item["op"]
+                    emitted_start = len(arranged_kernels)
                     if op == "patch_embeddings":
                         for patch_op in ("patchify", "patch_proj"):
                             kernels = map_op_to_kernel(patch_op, {}, mode, header_quant)
@@ -3618,13 +4486,18 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                     "op_id": op_info["op_id"],
                                     "kernel": kernel_id,
                                     "op": split_op,
+                                    "template_op_id": op_item.get("id"),
                                     "section": section_name,
                                     "layer": -1,
                                     "instance": op_info["instance"],
+                                    "params": copy.deepcopy(
+                                        op_item.get("params") if isinstance(op_item.get("params"), dict) else {}
+                                    ),
                                 })
                                 print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
                             if not kernels:
                                 print(f"            {patch_op:20s} → (no kernel)")
+                        annotate_branch_taps(emitted_start, section_name, -1, op_item)
                         continue
                     kernels = map_op_to_kernel(op, {}, mode, header_quant)
 
@@ -3646,6 +4519,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                                                 "op_id": quant_op_info["op_id"],
                                                 "kernel": quantize_kernel,
                                                 "op": quant_op_name,
+                                                "template_op_id": op_item.get("id"),
                                                 "section": section_name,
                                                 "layer": -1,
                                                 "instance": 0,
@@ -3669,11 +4543,17 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                             "op_id": op_info["op_id"],
                             "kernel": kernel_id,
                             "op": split_op,
+                            "template_op_id": op_item.get("id"),
                             "section": section_name,
                             "layer": -1,
                             "instance": op_info["instance"],
+                            "params": copy.deepcopy(
+                                op_item.get("params") if isinstance(op_item.get("params"), dict) else {}
+                            ),
                         })
                         print(f"      [{op_info['op_id']:3d}] {split_op:20s} → {kernel_id}  (inst: {op_info['instance']})")
+
+                    annotate_branch_taps(emitted_start, section_name, -1, op_item)
 
                     if not kernels:
                         if OP_TO_WEIGHT_KEYS.get(op) == "metadata":
@@ -3705,7 +4585,19 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # Record dataflow for this op (override input slot based on kernel activation dtype)
         kernel_id = ir_op.get("kernel")
         input_override = _input_slot_override_for_kernel(op_type, kernel_id)
-        dataflow_info = dataflow_tracker.record_op(op_id, op_type, layer, instance, input_override)
+        graph_slots = ir_op.get("graph_slots", {}) if isinstance(ir_op.get("graph_slots"), dict) else {}
+        explicit_input_override = graph_slots.get("inputs") if isinstance(graph_slots.get("inputs"), dict) else {}
+        explicit_output_override = graph_slots.get("outputs") if isinstance(graph_slots.get("outputs"), dict) else {}
+        merged_input_override = dict(input_override or {})
+        merged_input_override.update(explicit_input_override)
+        dataflow_info = dataflow_tracker.record_op(
+            op_id,
+            op_type,
+            layer,
+            instance,
+            merged_input_override or None,
+            explicit_output_override or None,
+        )
         ir_op["dataflow"] = dataflow_info
 
     # Print dataflow stats
@@ -3725,6 +4617,8 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         # rmsnorm: 1st (pre-attention) uses ln1_gamma, 2nd (pre-MLP) uses ln2_gamma
         ("rmsnorm", 0): ["ln1_gamma"],      # Pre-attention norm
         ("rmsnorm", 1): ["ln2_gamma"],      # Pre-MLP norm
+        ("layernorm", 0): ["ln1_gamma", "ln1_beta"],  # Pre-attention norm
+        ("layernorm", 1): ["ln2_gamma", "ln2_beta"],  # Pre-MLP norm
         ("attn_norm", 0): ["ln1_gamma"],    # Pre-attention norm (Gemma)
         ("ffn_norm", 0): ["ln2_gamma"],     # Pre-MLP norm (Gemma)
         ("post_attention_norm", 0): ["post_attention_norm"],
@@ -3737,13 +4631,23 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Footer-specific weights (no instance tracking needed)
     FOOTER_OP_WEIGHTS = {
         "rmsnorm": ["final_ln_weight", "final_ln_bias"],
+        "layernorm": ["final_ln_weight", "final_ln_bias"],
         "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
     }
 
     def _footer_weight_keys(op_name: str) -> List[str]:
         if op_name == "logits":
             return ["lm_head"] if logits_weight_source == "lm_head" else ["token_emb"]
-        return FOOTER_OP_WEIGHTS.get(op_name, [])
+        if op_name in FOOTER_OP_WEIGHTS:
+            return FOOTER_OP_WEIGHTS[op_name]
+        return TEMPLATE_OP_WEIGHTS.get(op_name, [])
+
+    def _header_weight_keys(op_name: str) -> List[str]:
+        if op_name == "patch_proj" and "patch_proj_aux" in header_ops and "patch_bias_add" in header_ops:
+            # Qwen3-VL applies the shared patch bias after the dual projection streams
+            # are merged, so keep the first projection weight-only here.
+            return ["patch_emb"]
+        return TEMPLATE_OP_WEIGHTS.get(op_name, [])
 
     def resolve_weight_name(weight_key: str, op_section: str, op_layer: int) -> Optional[str]:
         patterns = WEIGHT_PATTERNS.get(weight_key, [weight_key])
@@ -3764,6 +4668,27 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 return cand
         return None
 
+    def resolve_branch_weight_name(ir_op: Dict[str, Any], weight_key: str) -> Optional[str]:
+        explicit_refs = ir_op.get("template_weight_refs") if isinstance(ir_op.get("template_weight_refs"), dict) else {}
+        branch_layer_raw = ir_op.get("branch_source_layer", ir_op.get("layer", -1))
+        try:
+            branch_layer = int(branch_layer_raw)
+        except Exception:
+            branch_layer = -1
+        explicit = explicit_refs.get(_resolve_branch_weight_ref_alias(weight_key))
+        if isinstance(explicit, str) and explicit.strip():
+            cand = explicit.replace("{L}", str(branch_layer))
+            if cand in weight_index:
+                return cand
+        if branch_layer < 0:
+            return None
+        patterns = WEIGHT_PATTERNS.get(weight_key, [weight_key])
+        for pattern in patterns:
+            cand = str(pattern).replace("{L}", str(branch_layer))
+            if cand in weight_index:
+                return cand
+        return None
+
     for ir_op in arranged_kernels:
         op = ir_op["op"]
         layer = ir_op["layer"]
@@ -3773,8 +4698,21 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         instance_idx = ir_op.get("instance", 0)
 
         # Get weight keys for this op - check repeated op mapping first
-        if section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
+        if section == "branch":
+            explicit_refs = ir_op.get("template_weight_refs") if isinstance(ir_op.get("template_weight_refs"), dict) else {}
+            branch_weight_map = {
+                "layernorm": ["branch_norm_gamma", "branch_norm_beta"],
+                "branch_layernorm": ["branch_norm_gamma", "branch_norm_beta"],
+                "branch_fc1": ["branch_fc1_w", "branch_fc1_b"],
+                "branch_fc2": ["branch_fc2_w", "branch_fc2_b"],
+            }
+            weight_keys = list(branch_weight_map.get(op, []))
+            if not weight_keys and explicit_refs:
+                weight_keys = list(explicit_refs.keys())
+        elif section == "body" and (op, instance_idx) in REPEATED_OP_WEIGHTS:
             weight_keys = REPEATED_OP_WEIGHTS[(op, instance_idx)]
+        elif section == "header":
+            weight_keys = _header_weight_keys(op)
         elif section == "footer":
             weight_keys = _footer_weight_keys(op)
         else:
@@ -3783,7 +4721,10 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         ir_op["weights"] = {}
 
         for wkey in weight_keys:
-            weight_name = resolve_weight_name(str(wkey), section, int(layer))
+            if section == "branch":
+                weight_name = resolve_branch_weight_name(ir_op, str(wkey))
+            else:
+                weight_name = resolve_weight_name(str(wkey), section, int(layer))
 
             # Look up in manifest entries
             if weight_name and weight_name in weight_index:
@@ -3875,7 +4816,11 @@ def _check_ir1_completeness(manifest: Dict, ir1_ops: List[Dict]) -> None:
     body_ops = _collect_body_ops_for_validation(block.get("body", {}), manifest.get("config", {}))
     footer_ops = _extract_template_ops(block.get("footer", []))
 
-    template_ops = header_ops + body_ops + footer_ops
+    branch_ops: List[str] = []
+    for branch in _build_block_branch_plan(block, manifest.get("config", {})):
+        branch_ops.extend(branch.get("producer_ops", []))
+
+    template_ops = header_ops + body_ops + branch_ops + footer_ops
 
     # Determine which optional ops are present in manifest
     manifest_entries = {e.get("name", "") for e in manifest.get("entries", [])}
@@ -4225,13 +5170,17 @@ def insert_bias_add_ops(
             return False
 
     bias_key_by_op = {
+        "qkv_packed_proj": "bqkv",
         "q_proj": "bq",
         "q_gate_proj": "bq",
         "k_proj": "bk",
         "v_proj": "bv",
         "out_proj": "bo",
         "mlp_gate_up": "b1",
+        "mlp_up": "b1",
         "mlp_down": "b2",
+        "projector_fc1": "mm0_b",
+        "projector_fc2": "mm1_b",
     }
 
     config = manifest.get("config", {})
@@ -4537,9 +5486,15 @@ def generate_ir_lower_1(
                 op["inputs"].pop("k", None)
                 op["inputs"].pop("v", None)
 
-        elif mode == "prefill" and uses_kv_cache:
-            # For prefill: after q_proj/k_proj/v_proj, insert transpose from [T, H*D] to [H, T, D]
-            # GEMM outputs token-major but attention expects head-major
+        elif mode == "prefill":
+            # Prefill layout bridges are a graph contract, not a decoder/KV-cache
+            # special case. Keep the lowerer architecture-agnostic: if one op
+            # emits token-major activations but the next declared kernel expects
+            # head-major (or vice versa), insert an explicit bridge op here.
+            #
+            # Standard q/k/v GEMM projections write token-major [T, H*D] while
+            # flash attention consumes head-major [H, T, D]. Packed split paths
+            # that already emit head-major simply never trigger these bridges.
             if op["op"] in ("q_proj", "split_q_gate"):
                 layer = op["layer"]
                 transpose_q_op = {
@@ -4594,11 +5549,12 @@ def generate_ir_lower_1(
                 }
                 final_ops.append(transpose_v_op)
 
-            # For prefill: after attention, transpose output from head-major [H, T, D] to token-major [T, H*D]
-            # Then insert kv_cache_batch_copy to copy K/V from scratch to cache
+            # Flash attention writes head-major [H, T, D], but the unfused
+            # projection/residual path consumes token-major [T, H*D]. Emit the
+            # bridge for all prefill graphs, regardless of whether a KV cache
+            # also exists.
             if op["op"] in ("attn", "attn_sliding"):
                 layer = op["layer"]
-                # First: transpose attention output from head-major to token-major
                 transpose_attn_out_op = {
                     "idx": len(final_ops),
                     "kernel": "transpose_attn_out_to_token_major",
@@ -4613,37 +5569,38 @@ def generate_ir_lower_1(
                     "_auto_inserted": True,
                 }
                 final_ops.append(transpose_attn_out_op)
-                # Second: kv_cache_batch_copy
-                # TODO(contract): validate this op against runtime_invariants contract:
-                # _kv_copy_bytes must exist and match (num_kv_heads * head_dim * seq_len * sizeof(fp32)).
-                kv_batch_copy_op = {
-                    "idx": len(final_ops),
-                    "kernel": "kv_cache_batch_copy",
-                    "op": "kv_cache_batch_copy",
-                    "layer": layer,
-                    "section": op["section"],
-                    "function": "kv_cache_batch_copy",  # Codegen emits two memcpy calls (K and V)
-                    "weights": {},
-                    "inputs": {
-                        "k_src": {"type": "scratch", "source": "k_scratch"},
-                        "v_src": {"type": "scratch", "source": "v_scratch"},
-                    },
-                    "outputs": {
-                        "k_dst": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
-                        "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
-                    },
-                    "scratch": [],
-                    "params": {
-                        "num_kv_heads": int(config.get("num_kv_heads", 1)),
-                        "head_dim": int(config.get("head_dim", 1)),
-                        # Prefill copies a token batch into KV cache; use configured max context
-                        # as the conservative compile-time dimension for call-IR binding.
-                        "seq_len": int(config.get("context_length", config.get("context_len", 1))),
-                    },
-                    "_auto_inserted": True,
-                }
-                final_ops.append(kv_batch_copy_op)
-                kv_store_count += 1
+                if uses_kv_cache:
+                    # TODO(contract): validate this op against runtime_invariants contract:
+                    # _kv_copy_bytes must exist and match
+                    # (num_kv_heads * head_dim * seq_len * sizeof(fp32)).
+                    kv_batch_copy_op = {
+                        "idx": len(final_ops),
+                        "kernel": "kv_cache_batch_copy",
+                        "op": "kv_cache_batch_copy",
+                        "layer": layer,
+                        "section": op["section"],
+                        "function": "kv_cache_batch_copy",  # Codegen emits two memcpy calls (K and V)
+                        "weights": {},
+                        "inputs": {
+                            "k_src": {"type": "scratch", "source": "k_scratch"},
+                            "v_src": {"type": "scratch", "source": "v_scratch"},
+                        },
+                        "outputs": {
+                            "k_dst": {"type": "kv_cache", "buffer": f"kv_cache_k_L{layer}"},
+                            "v_dst": {"type": "kv_cache", "buffer": f"kv_cache_v_L{layer}"},
+                        },
+                        "scratch": [],
+                        "params": {
+                            "num_kv_heads": int(config.get("num_kv_heads", 1)),
+                            "head_dim": int(config.get("head_dim", 1)),
+                            # Prefill copies a token batch into KV cache; use configured max context
+                            # as the conservative compile-time dimension for call-IR binding.
+                            "seq_len": int(config.get("context_length", config.get("context_len", 1))),
+                        },
+                        "_auto_inserted": True,
+                    }
+                    final_ops.append(kv_batch_copy_op)
+                    kv_store_count += 1
 
     # ═══════════════════════════════════════════════════════════════════════════
     # AUTOMATIC LOGITS COPY FOR PREFILL
@@ -4751,12 +5708,14 @@ WEIGHT_PATTERNS = {
     "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1", "layer.{L}.ffn_gate"],
     "w2": ["layer.{L}.w2", "layers.{L}.feed_forward.w2", "layer.{L}.ffn_down"],
     "w3": ["layer.{L}.w3", "layers.{L}.feed_forward.w3", "layer.{L}.ffn_up"],
-    "b1": ["layer.{L}.b1", "layers.{L}.feed_forward.b1"],
-    "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2"],
+    "b1": ["layer.{L}.b1", "layers.{L}.feed_forward.b1", "v.blk.{L}.ffn_up.bias"],
+    "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2", "v.blk.{L}.ffn_down.bias"],
 
     # Layer norms
     "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm"],
     "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm"],
+    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias"],
+    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias"],
     "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
     "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight"],
     "patch_emb": [
@@ -4764,6 +5723,11 @@ WEIGHT_PATTERNS = {
         "patch_embeddings.weight",
         "vision_model.embeddings.patch_embedding.weight",
         "v.patch_embd.weight",
+    ],
+    "patch_emb_aux": [
+        "patch_embeddings.weight.1",
+        "vision_model.embeddings.patch_embedding.weight.1",
+        "v.patch_embd.weight.1",
     ],
     "patch_bias": [
         "patch_bias",
@@ -4775,7 +5739,7 @@ WEIGHT_PATTERNS = {
 
     # Header weights
     "token_emb": ["token_emb", "token_embd.weight", "embed_tokens.weight"],
-    "pos_emb": ["pos_emb", "pos_embd.weight", "position_embedding"],
+    "pos_emb": ["pos_emb", "pos_embd.weight", "position_embedding", "v.position_embd.weight"],
 
     # Vocab/tokenizer data (not model weights, but need to track)
     "vocab_offsets": ["vocab_offsets"],
@@ -4784,9 +5748,30 @@ WEIGHT_PATTERNS = {
 
     # Footer weights
     "lm_head": ["lm_head.weight", "output.weight"],
-    "final_ln_weight": ["final_ln_weight", "norm.weight"],
-    "final_ln_bias": ["final_ln_bias", "norm.bias"],
+    "final_ln_weight": ["final_ln_weight", "norm.weight", "v.post_ln.weight"],
+    "final_ln_bias": ["final_ln_bias", "norm.bias", "v.post_ln.bias"],
     "output_weight": ["output.weight", "lm_head.weight"],
+    "bqkv": ["layer.{L}.attn_qkv.bias", "v.blk.{L}.attn_qkv.bias"],
+    "mm0_w": ["mm.0.weight"],
+    "mm0_b": ["mm.0.bias"],
+    "mm1_w": ["mm.2.weight"],
+    "mm1_b": ["mm.2.bias"],
+    "attn_qkv": ["layer.{L}.attn_qkv", "layer.{L}.attn_qkv.weight", "v.blk.{L}.attn_qkv.weight"],
+    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight", "layer.{L}.attn_norm", "v.blk.{L}.ln1.weight"],
+    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight", "layer.{L}.post_attention_norm", "v.blk.{L}.ln2.weight"],
+    "ln1_beta": ["layer.{L}.ln1_beta", "layers.{L}.attention_norm.bias", "v.blk.{L}.ln1.bias"],
+    "ln2_beta": ["layer.{L}.ln2_beta", "layers.{L}.ffn_norm.bias", "v.blk.{L}.ln2.bias"],
+    "wo": ["layer.{L}.wo", "layers.{L}.attention.wo", "layer.{L}.attn_output", "v.blk.{L}.attn_out.weight"],
+    "bo": ["layer.{L}.bo", "layers.{L}.attention.bo", "v.blk.{L}.attn_out.bias"],
+    "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1", "layer.{L}.ffn_gate", "v.blk.{L}.ffn_gate.weight"],
+    "w2": ["layer.{L}.w2", "layers.{L}.feed_forward.w2", "layer.{L}.ffn_down", "v.blk.{L}.ffn_down.weight"],
+    "w3": ["layer.{L}.w3", "layers.{L}.feed_forward.w3", "layer.{L}.ffn_up", "v.blk.{L}.ffn_up.weight"],
+    "branch_norm_gamma": ["v.deepstack.{L}.norm.weight"],
+    "branch_norm_beta": ["v.deepstack.{L}.norm.bias"],
+    "branch_fc1_w": ["v.deepstack.{L}.fc1.weight"],
+    "branch_fc1_b": ["v.deepstack.{L}.fc1.bias"],
+    "branch_fc2_w": ["v.deepstack.{L}.fc2.weight"],
+    "branch_fc2_b": ["v.deepstack.{L}.fc2.bias"],
 }
 
 # Template op → weight refs it uses
@@ -4799,18 +5784,25 @@ TEMPLATE_OP_WEIGHTS = {
     "patch_embeddings": [],  # Vision model patches handled separately
     "patchify": [],
     "patch_proj": ["patch_emb", "patch_bias"],
+    "patch_proj_aux": ["patch_emb_aux"],
+    "patch_bias_add": ["patch_bias"],
+    "position_embeddings": ["pos_emb"],
+    "vision_position_ids": [],
+    "position_ids_2d": [],
     "dense_embedding_lookup": ["token_emb"],  # Token embeddings only (pos_emb for non-RoPE)
 
     # Attention block (body + footer)
     # Body: uses ln1_gamma, ln2_gamma (per-layer)
     # Footer: uses final_ln_weight, final_ln_bias (once)
     "rmsnorm": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "final_ln_bias"],
+    "layernorm": ["ln1_gamma", "ln1_beta", "ln2_gamma", "ln2_beta", "final_ln_weight", "final_ln_bias"],
     "attn_norm": ["ln1_gamma"],
     "post_attention_norm": ["post_attention_norm"],
     "ffn_norm": ["ln2_gamma"],
     "post_ffn_norm": ["post_ffn_norm"],
     "final_rmsnorm": ["final_ln_weight", "final_ln_bias"],
     "qkv_proj": ["wq", "wk", "wv", "bq", "bk", "bv"],  # QKV + optional biases (for fused kernel)
+    "qkv_packed_proj": ["attn_qkv", "bqkv"],
     "q_proj": ["wq", "bq"],  # Q projection only (when split)
     "q_gate_proj": ["wq", "bq"],  # Joint Q + gate projection
     "k_proj": ["wk", "bk"],  # K projection only (when split)
@@ -4822,6 +5814,7 @@ TEMPLATE_OP_WEIGHTS = {
     "recurrent_alpha_proj": ["ssm_alpha"],
     "recurrent_beta_proj": ["ssm_beta"],
     "recurrent_split_qkv": [],
+    "split_qkv_packed": [],
     "recurrent_dt_gate": ["ssm_dt_bias", "ssm_a"],
     "recurrent_conv_state_update": [],
     "recurrent_ssm_conv": ["ssm_conv1d"],
@@ -4833,17 +5826,31 @@ TEMPLATE_OP_WEIGHTS = {
     "recurrent_out_proj": ["ssm_out"],
     "qk_norm": ["q_norm", "k_norm"],  # Per-head RMSNorm gamma weights for Q and K
     "rope_qk": [],  # No model weights (uses precomputed tables)
+    "mrope_qk": [],  # No model weights (runtime positions + RoPE params)
     "attn": [],  # No model weights
     "attn_sliding": [],  # No model weights (kernel op handles windowing)
     "attn_gate_sigmoid_mul": [],  # No model weights
     "out_proj": ["wo", "bo"],  # Output projection + optional bias
     "residual_add": [],  # No model weights
+    "add_stream": [],
 
     # MLP block
     "mlp_gate_up": ["w1", "w3", "b1"],  # Gate + up projection
+    "mlp_up": ["w3", "b1"],  # Plain up projection
     "silu_mul": [],  # No model weights
     "geglu": [],  # No model weights
+    "gelu": [],  # No model weights
     "mlp_down": ["w2", "b2"],  # Down projection
+    "spatial_merge": [],
+    "branch_spatial_merge": [],
+    "branch_layernorm": ["branch_norm_gamma", "branch_norm_beta"],
+    "projector_fc1": ["mm0_w", "mm0_b"],
+    "projector_gelu": [],
+    "projector_fc2": ["mm1_w", "mm1_b"],
+    "branch_fc1": ["branch_fc1_w", "branch_fc1_b"],
+    "branch_gelu": [],
+    "branch_fc2": ["branch_fc2_w", "branch_fc2_b"],
+    "branch_concat": [],
 
     # Footer
     "weight_tying": [],  # Metadata only
@@ -4948,10 +5955,11 @@ def generate_memory_layout(
     block_name = template.get("sequence", ["decoder"])[0]
     block = template.get("block_types", {}).get(block_name, {})
 
-    header_ops = block.get("header", [])
+    header_ops = _extract_template_ops(block.get("header", []))
     body_def = block.get("body", {})
     body_ops = _collect_body_ops_for_validation(body_def, config)
-    footer_ops = block.get("footer", [])
+    footer_ops = _extract_template_ops(block.get("footer", []))
+    branch_plan = _build_block_branch_plan(block, config)
 
     print(f"\n📋 Template structure:")
     print(f"  Header ops: {header_ops}")
@@ -4985,6 +5993,35 @@ def generate_memory_layout(
                     if weight_name in all_weights:
                         expected_weights.add(weight_name)
                         weight_to_op[weight_name] = f"layer.{layer_idx}:{op}"
+
+    # Branch producer weights (run for selected layers only)
+    for branch in branch_plan:
+        branch_name = str(branch.get("name", "") or "")
+        for layer_idx in branch.get("layers", []):
+            for producer_item in branch.get("producer_items", []):
+                if not isinstance(producer_item, dict):
+                    continue
+                op = str(producer_item.get("op", "") or "").strip()
+                if not op:
+                    continue
+                explicit_refs = producer_item.get("weight_refs") if isinstance(producer_item.get("weight_refs"), dict) else {}
+                if explicit_refs:
+                    refs = explicit_refs.items()
+                    for ref_name, pattern in refs:
+                        if not isinstance(pattern, str):
+                            continue
+                        weight_name = pattern.replace("{L}", str(int(layer_idx)))
+                        if weight_name in all_weights:
+                            expected_weights.add(weight_name)
+                            weight_to_op[weight_name] = f"branch:{branch_name}:{layer_idx}:{op}:{ref_name}"
+                    continue
+                for ref in TEMPLATE_OP_WEIGHTS.get(op, []):
+                    patterns = WEIGHT_PATTERNS.get(ref, [ref])
+                    for pattern in patterns:
+                        weight_name = str(pattern).replace("{L}", str(int(layer_idx)))
+                        if weight_name in all_weights:
+                            expected_weights.add(weight_name)
+                            weight_to_op[weight_name] = f"branch:{branch_name}:{layer_idx}:{op}"
 
     # Footer weights (run once)
     for op in footer_ops:
@@ -5079,7 +6116,7 @@ def generate_memory_layout(
 
             validation_errors.append(
                 f"Footer weights not used: {len(footer_unused)} weights\n"
-                f"   FIX: Add footer ops to IR1 generation (final_norm, logits)"
+                f"   FIX: Add footer ops to IR1 generation (final_norm, projector, logits)"
             )
 
         if body_unused:
@@ -5201,6 +6238,8 @@ def generate_memory_layout(
         add_buffer("image_input", vision_channels * image_size * image_size * 4, f"[{vision_channels}, {image_size}, {image_size}]")
     if vision_num_patches > 0 and patch_dim > 0:
         add_buffer("patch_scratch", vision_num_patches * patch_dim * 4, f"[{vision_num_patches}, {patch_dim}]")
+    if vision_num_patches > 0:
+        add_buffer("vision_positions", vision_num_patches * 4 * 4, f"[4, {vision_num_patches}]", "i32")
 
     # Embedded input: embedding lookup output [seq_len, embed_dim]
     # For decode: [1, embed_dim], for prefill: [context_len, embed_dim]
@@ -5275,6 +6314,27 @@ def generate_memory_layout(
     # Layer output: [seq_len, embed_dim]
     layer_out_size = seq_len * embed_dim * 4
     add_buffer("layer_output", layer_out_size, f"[{seq_len}, {embed_dim}]")
+
+    projector_in_dim = int(config.get("projector_in_dim", 0) or 0)
+    projector_hidden_dim = int(config.get("projector_hidden_dim", 0) or 0)
+    projector_out_dim = int(config.get("projector_out_dim", 0) or 0)
+    projector_total_out_dim = int(config.get("projector_total_out_dim", projector_out_dim) or 0)
+    num_deepstack_layers = int(config.get("num_deepstack_layers", 0) or 0)
+    merged_tokens = int(config.get("vision_merged_tokens", 0) or 0)
+    if num_deepstack_layers > 0 and merged_tokens > 0:
+        if projector_in_dim > 0:
+            add_buffer("branch_stream", merged_tokens * projector_in_dim * 4, f"[{merged_tokens}, {projector_in_dim}]")
+            add_buffer("branch_normed", merged_tokens * projector_in_dim * 4, f"[{merged_tokens}, {projector_in_dim}]")
+        if projector_hidden_dim > 0:
+            add_buffer("branch_mlp", merged_tokens * projector_hidden_dim * 4, f"[{merged_tokens}, {projector_hidden_dim}]")
+        if projector_out_dim > 0:
+            add_buffer(
+                "branch_collect",
+                merged_tokens * projector_out_dim * num_deepstack_layers * 4,
+                f"[{merged_tokens}, {projector_out_dim * num_deepstack_layers}]",
+            )
+    if projector_total_out_dim > 0 and merged_tokens > 0:
+        add_buffer("vision_output", merged_tokens * projector_total_out_dim * 4, f"[{merged_tokens}, {projector_total_out_dim}]")
 
     recurrent_q = int(config.get("q_dim", 0) or 0)
     recurrent_k = int(config.get("k_dim", 0) or 0)
@@ -5571,6 +6631,12 @@ def generate_memory_layout_packed(
             alloc_act("q_scratch")
             alloc_act("k_scratch")
             alloc_act("rope_cache")
+        if op_type == "mrope_qk" or (op_type == "rope_qk" and kernel_type == "mrope_qk_vision"):
+            alloc_act("q_scratch")
+            alloc_act("k_scratch")
+            alloc_act("vision_positions")
+        if op_type in ("vision_position_ids", "position_ids_2d"):
+            alloc_act("vision_positions")
 
         if op_type == "kv_cache_store":
             alloc_act("k_scratch")
@@ -5597,7 +6663,7 @@ def generate_memory_layout_packed(
         if "embedding" in kernel_type.lower():
             current_input_buffer = "embedded_input"
             current_output_buffer = "layer_input"
-        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "rope_qk", "bias_add") or \
+        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "rope_qk", "mrope_qk", "vision_position_ids", "position_ids_2d", "bias_add") or \
                 (mode == "prefill" and op_type in ("attn", "attn_sliding")):
             pass
         else:
@@ -5803,6 +6869,11 @@ def generate_ir_lower_2(
         "A_ATTN_GATE": "attn_gate",
         "A_MLP_SCRATCH": "mlp_scratch",
         "A_LAYER_OUTPUT": "layer_output",
+        "A_BRANCH_STREAM": "branch_stream",
+        "A_BRANCH_NORMED": "branch_normed",
+        "A_BRANCH_MLP": "branch_mlp",
+        "A_BRANCH_COLLECT": "branch_collect",
+        "A_VISION_OUTPUT": "vision_output",
         "A_LOGITS": "logits",
         "A_RECURRENT_PACKED": "recurrent_packed",
         "A_RECURRENT_Z": "recurrent_z",
@@ -5872,6 +6943,12 @@ def generate_ir_lower_2(
                     "k_proj": "k_scratch",
                     "v_proj": "v_scratch",
                 }.get(bias_for)
+            elif bias_for == "qkv_packed_proj":
+                target_buf = "mlp_scratch"
+            elif bias_for == "projector_fc1":
+                target_buf = "mlp_scratch"
+            elif bias_for == "projector_fc2":
+                target_buf = "embedded_input"
             else:
                 target_buf = last_output_buffer or current_output_buffer
             buf = activation_buffers.get(target_buf) if target_buf else None
@@ -6126,6 +7203,164 @@ def generate_ir_lower_2(
                     "ptr_expr": f"activations + {embed_buf['offset']}",
                 }
                 last_output_buffer = "embedded_input"
+        elif op_type == "patch_proj_aux":
+            patch_buf = activation_buffers.get("patch_scratch")
+            aux_buf = activation_buffers.get("mlp_scratch")
+            if patch_buf:
+                lowered_op["activations"]["A"] = {
+                    "buffer": "patch_scratch",
+                    "activation_offset": patch_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {patch_buf['offset']}",
+                }
+            if aux_buf:
+                lowered_op["outputs"]["C"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": aux_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {aux_buf['offset']}",
+                }
+                last_output_buffer = "mlp_scratch"
+        elif op_type == "add_stream":
+            main_buf = activation_buffers.get("embedded_input")
+            aux_buf = activation_buffers.get("mlp_scratch")
+            if aux_buf:
+                lowered_op["activations"]["b"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": aux_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {aux_buf['offset']}",
+                }
+            if main_buf:
+                lowered_op["outputs"]["out"] = {
+                    "buffer": "embedded_input",
+                    "activation_offset": main_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {main_buf['offset']}",
+                }
+                last_output_buffer = "embedded_input"
+        elif op_type in ("vision_position_ids", "position_ids_2d"):
+            pos_buf = activation_buffers.get("vision_positions")
+            if pos_buf:
+                lowered_op["outputs"]["positions"] = {
+                    "buffer": "vision_positions",
+                    "activation_offset": pos_buf["offset"],
+                    "dtype": "i32",
+                    "ptr_expr": f"activations + {pos_buf['offset']}",
+                }
+        elif op_type == "mrope_qk" or (op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_vision"):
+            q_buf = activation_buffers.get("q_scratch")
+            k_buf = activation_buffers.get("k_scratch")
+            pos_buf = activation_buffers.get("vision_positions")
+            if q_buf:
+                lowered_op["activations"]["q"] = {
+                    "buffer": "q_scratch",
+                    "activation_offset": q_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {q_buf['offset']}",
+                }
+                lowered_op["outputs"]["q"] = {
+                    "buffer": "q_scratch",
+                    "activation_offset": q_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {q_buf['offset']}",
+                }
+            if k_buf:
+                lowered_op["activations"]["k"] = {
+                    "buffer": "k_scratch",
+                    "activation_offset": k_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {k_buf['offset']}",
+                }
+                lowered_op["outputs"]["k"] = {
+                    "buffer": "k_scratch",
+                    "activation_offset": k_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {k_buf['offset']}",
+                }
+            if pos_buf:
+                lowered_op["activations"]["positions"] = {
+                    "buffer": "vision_positions",
+                    "activation_offset": pos_buf["offset"],
+                    "dtype": "i32",
+                    "ptr_expr": f"activations + {pos_buf['offset']}",
+                }
+            last_output_buffer = "q_scratch"
+        elif op_type == "spatial_merge":
+            input_buf_name = last_output_buffer or current_input_buffer
+            output_buf_name = "layer_input" if input_buf_name == "embedded_input" else "embedded_input"
+            src_buf = activation_buffers.get(input_buf_name)
+            dst_buf = activation_buffers.get(output_buf_name)
+            if src_buf:
+                lowered_op["activations"]["input"] = {
+                    "buffer": input_buf_name,
+                    "activation_offset": src_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {src_buf['offset']}",
+                }
+            if dst_buf:
+                lowered_op["outputs"]["output"] = {
+                    "buffer": output_buf_name,
+                    "activation_offset": dst_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {dst_buf['offset']}",
+                }
+                last_output_buffer = output_buf_name
+                current_input_buffer = output_buf_name
+                current_output_buffer = "embedded_input" if output_buf_name == "layer_input" else "layer_input"
+        elif op_type == "projector_fc1":
+            input_buf_name = last_output_buffer or "embedded_input"
+            src_buf = activation_buffers.get(input_buf_name)
+            dst_buf = activation_buffers.get("mlp_scratch")
+            if src_buf:
+                lowered_op["activations"]["A"] = {
+                    "buffer": input_buf_name,
+                    "activation_offset": src_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {src_buf['offset']}",
+                }
+            if dst_buf:
+                lowered_op["outputs"]["C"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": dst_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {dst_buf['offset']}",
+                }
+                last_output_buffer = "mlp_scratch"
+        elif op_type == "projector_gelu":
+            mlp_buf = activation_buffers.get("mlp_scratch")
+            if mlp_buf:
+                lowered_op["activations"]["x"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": mlp_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {mlp_buf['offset']}",
+                }
+                lowered_op["outputs"]["out"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": mlp_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {mlp_buf['offset']}",
+                }
+                last_output_buffer = "mlp_scratch"
+        elif op_type == "projector_fc2":
+            src_buf = activation_buffers.get("mlp_scratch")
+            dst_buf = activation_buffers.get("embedded_input")
+            if src_buf:
+                lowered_op["activations"]["A"] = {
+                    "buffer": "mlp_scratch",
+                    "activation_offset": src_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {src_buf['offset']}",
+                }
+            if dst_buf:
+                lowered_op["outputs"]["C"] = {
+                    "buffer": "embedded_input",
+                    "activation_offset": dst_buf["offset"],
+                    "dtype": "fp32",
+                    "ptr_expr": f"activations + {dst_buf['offset']}",
+                }
+                last_output_buffer = "embedded_input"
         elif op_type == "logits":
             # Footer logits projection: input buffer must match kernel activation dtype.
             # - fp32 activation kernels (gemv_q8_0 / gemm_nt_q8_0) read embedded_input
@@ -6356,6 +7591,7 @@ def generate_ir_lower_2(
                 kernel_to_dataflow_output = {
                     "C": "y",       # Matrix output for gemm/gemv
                     "y": "y",       # Direct match
+                    "x": "x",       # In-place stream updates (bias/pos add, etc.)
                     "output": "output",  # Quantize output
                     "dst": "dst",   # memcpy destination
                     # Attention decode output name -> dataflow output
@@ -6399,11 +7635,14 @@ def generate_ir_lower_2(
 
                 buf = activation_buffers.get(output_buf_name)
                 if buf:
+                    activation_offset = buf["offset"]
+                    if op_type == "branch_fc2" and output_buf_name == "branch_collect":
+                        activation_offset += int(ir_op.get("params", {}).get("branch_collect_offset_bytes", 0) or 0)
                     lowered_op["outputs"][output_name] = {
                         "buffer": output_buf_name,
-                        "activation_offset": buf["offset"],
+                        "activation_offset": activation_offset,
                         "dtype": output_info.get("dtype", "fp32"),
-                        "ptr_expr": f"activations + {buf['offset']}",
+                        "ptr_expr": f"activations + {activation_offset}",
                     }
                     if not last_output_buffer:
                         last_output_buffer = output_buf_name
@@ -6462,6 +7701,19 @@ def generate_ir_lower_2(
                     "dtype": "fp32",
                     "ptr_expr": f"activations + {k_buf['offset']}",
                 })
+        if ir_op.get("op", "") == "mrope_qk" or (
+            ir_op.get("op", "") == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_vision"
+        ):
+            for scratch_name in ["q_scratch", "k_scratch"]:
+                buf = activation_buffers.get(scratch_name)
+                if buf:
+                    lowered_op["scratch"].append({
+                        "name": scratch_name,
+                        "scratch_offset": buf["offset"],
+                        "size": buf["size"],
+                        "dtype": "fp32",
+                        "ptr_expr": f"activations + {buf['offset']}",
+                    })
 
         # Special handling for kv_cache_store: add k_scratch and v_scratch buffers
         if ir_op.get("op", "") == "kv_cache_store":
@@ -6556,6 +7808,94 @@ def generate_ir_lower_2(
             params.setdefault("vision_channels", config.get("vision_channels", 3))
             params.setdefault("vision_num_patches", config.get("vision_num_patches", 0))
             params.setdefault("patch_dim", config.get("patch_dim", 0))
+        if op_type in (
+            "vision_position_ids",
+            "position_ids_2d",
+            "add_stream",
+            "patch_proj_aux",
+            "position_embeddings",
+            "patch_bias_add",
+            "spatial_merge",
+            "branch_spatial_merge",
+            "branch_layernorm",
+            "mrope_qk",
+            "projector_fc1",
+            "projector_gelu",
+            "projector_fc2",
+            "branch_fc1",
+            "branch_gelu",
+            "branch_fc2",
+            "branch_concat",
+            "gelu",
+        ):
+            params.setdefault("vision_num_patches", config.get("vision_num_patches", 0))
+            params.setdefault("vision_grid_h", config.get("vision_grid_h", 0))
+            params.setdefault("vision_grid_w", config.get("vision_grid_w", 0))
+            spatial_merge_factor = config.get("spatial_merge_factor")
+            if spatial_merge_factor is not None:
+                params.setdefault("spatial_merge_factor", spatial_merge_factor)
+            params.setdefault("vision_merged_tokens", config.get("vision_merged_tokens", config.get("vision_num_patches", 0)))
+            params.setdefault("projector_in_dim", config.get("projector_in_dim", 0))
+            params.setdefault("projector_hidden_dim", config.get("projector_hidden_dim", 0))
+            params.setdefault("projector_out_dim", config.get("projector_out_dim", 0))
+            params.setdefault("projector_total_out_dim", config.get("projector_total_out_dim", config.get("projector_out_dim", 0)))
+            params.setdefault("num_deepstack_layers", config.get("num_deepstack_layers", 0))
+        if op_type == "branch_layernorm":
+            params.setdefault("vision_merged_tokens", config.get("vision_merged_tokens", config.get("vision_num_patches", 0)))
+            params.setdefault("projector_in_dim", config.get("projector_in_dim", 0))
+        if op_type == "add_stream":
+            stream_rows = int(config.get("vision_num_patches", params.get("seq_len", 0)) or 0)
+            stream_dim = int(config.get("embed_dim", 0) or 0)
+            params.setdefault("stream_elems", stream_rows * stream_dim)
+            params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
+        if op_type == "patch_bias_add":
+            params.setdefault("rows", int(config.get("vision_num_patches", params.get("seq_len", 0)) or 0))
+            params.setdefault("dim", int(config.get("embed_dim", 0) or 0))
+        if op_type in ("vision_position_ids", "position_ids_2d"):
+            params.setdefault("rows", int(config.get("vision_num_patches", 0) or 0))
+            params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
+        if op_type == "position_embeddings":
+            params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
+        if op_type in ("spatial_merge", "branch_spatial_merge"):
+            params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
+        if op_type in ("projector_gelu", "branch_gelu"):
+            merged_tokens = int(params.get("vision_merged_tokens", 0) or 0)
+            hidden_dim = int(params.get("projector_hidden_dim", 0) or 0)
+            params.setdefault("gelu_elems", merged_tokens * hidden_dim)
+        if op_type == "branch_concat":
+            params.setdefault(
+                "rows",
+                _template_int_param(params, "rows", config, int(params.get("vision_merged_tokens", 0) or 0)),
+            )
+            params.setdefault(
+                "main_dim",
+                _template_int_param(params, "main_dim", config, int(params.get("projector_out_dim", 0) or 0)),
+            )
+            params.setdefault(
+                "branch_slice_dim",
+                _template_int_param(params, "branch_slice_dim", config, int(params.get("projector_out_dim", 0) or 0)),
+            )
+            params.setdefault(
+                "num_branch_slices",
+                _template_int_param(params, "num_branch_slices", config, int(params.get("num_deepstack_layers", 0) or 0)),
+            )
+        if op_type == "mrope_qk" or (op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_vision"):
+            sections = config.get("vision_mrope_sections")
+            if not isinstance(sections, list) or len(sections) != 4:
+                default_section = max(1, int(params.get("head_dim", 0) or 0) // 4)
+                sections = [default_section, default_section, default_section, default_section]
+            params.setdefault("n_dims", int(config.get("vision_mrope_n_dims", max(1, int(params.get("head_dim", 0) or 0) // 2))))
+            params.setdefault("section_0", int(sections[0]))
+            params.setdefault("section_1", int(sections[1]))
+            params.setdefault("section_2", int(sections[2]))
+            params.setdefault("section_3", int(sections[3]))
+            params.setdefault("freq_base", float(config.get("vision_mrope_freq_base", 10000.0)))
+            params.setdefault("freq_scale", float(config.get("vision_mrope_freq_scale", 1.0)))
+            params.setdefault("ext_factor", float(config.get("vision_mrope_ext_factor", 0.0)))
+            params.setdefault("attn_factor", float(config.get("vision_mrope_attn_factor", 1.0)))
+            params.setdefault("beta_fast", float(config.get("vision_mrope_beta_fast", 32.0)))
+            params.setdefault("beta_slow", float(config.get("vision_mrope_beta_slow", 1.0)))
+            params.setdefault("n_ctx_orig", int(config.get("vision_mrope_original_context_length", 32768)))
 
         if mode == "decode":
             effective_seq_len = 1
@@ -6567,6 +7907,9 @@ def generate_ir_lower_2(
         # Override stale seq_len injected earlier in the pipeline (IR1 may still carry
         # model max_seq_len). Lowered IR must always reflect runtime-effective length.
         params["seq_len"] = effective_seq_len
+        if op_type == "branch_layernorm":
+            params["seq_len"] = int(params.get("vision_merged_tokens", params["seq_len"]) or params["seq_len"])
+            params["embed_dim"] = int(params.get("projector_in_dim", params.get("embed_dim", 0)) or params.get("embed_dim", 0))
 
         # Add matmul dims for IR Lower 3 bindings (_input_dim/_output_dim/_m)
         out_dim, in_dim = compute_matmul_dims(op_type, config)
@@ -6584,8 +7927,34 @@ def generate_ir_lower_2(
 
         # Keep _m aligned with effective seq_len for token-major kernels.
         params["_m"] = params.get("seq_len", 1)
-        if op_type == "patch_proj":
+        if op_type in ("patch_proj", "patch_proj_aux"):
             params["_m"] = int(params.get("vision_num_patches", params.get("_m", 1)) or 1)
+        if op_type in (
+            "spatial_merge",
+            "branch_spatial_merge",
+            "projector_fc1",
+            "projector_gelu",
+            "projector_fc2",
+            "branch_fc1",
+            "branch_gelu",
+            "branch_fc2",
+            "branch_concat",
+        ) or op_type == "branch_layernorm":
+            params["_m"] = int(params.get("vision_merged_tokens", params.get("_m", 1)) or 1)
+        if op_type in ("vision_position_ids", "position_ids_2d", "mrope_qk") or (
+            op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_vision"
+        ):
+            params["_m"] = int(params.get("vision_num_patches", params.get("_m", 1)) or 1)
+        if op_type in ("projector_gelu", "branch_gelu"):
+            params["gelu_elems"] = (
+                int(params.get("_m", 0) or 0)
+                * int(params.get("projector_hidden_dim", 0) or 0)
+            )
+        if op_type == "gelu":
+            params["gelu_elems"] = (
+                int(params.get("_m", params.get("seq_len", 0)) or 0)
+                * int(params.get("intermediate_size", 0) or 0)
+            )
         lowered_op["params"] = params
 
         lowered_ops.append(lowered_op)
@@ -6605,12 +7974,13 @@ def generate_ir_lower_2(
             current_output_buffer = "layer_input"
         elif op_type == "patchify":
             pass
-        elif op_type == "patch_proj":
+        elif op_type in ("patch_proj", "patch_proj_aux", "position_embeddings", "patch_bias_add", "vision_position_ids", "position_ids_2d", "add_stream"):
             current_input_buffer = "embedded_input"
             current_output_buffer = "layer_input"
-        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "rope_qk",
+        elif op_type in ("q_proj", "q_gate_proj", "split_q_gate", "split_qkv_packed", "attn_gate_sigmoid_mul", "k_proj", "v_proj", "qkv_proj", "qkv_packed_proj", "rope_qk", "mrope_qk",
                          "recurrent_qk_l2_norm",
-                         "mlp_gate_up", "silu_mul", "mlp_down", "bias_add") or \
+                         "mlp_gate_up", "mlp_up", "silu_mul", "geglu", "gelu", "mlp_down", "projector_fc1", "projector_gelu", "projector_fc2", "branch_fc1", "branch_gelu", "branch_fc2", "branch_concat", "spatial_merge", "bias_add") or \
+                (ir_op.get("section", "") == "branch" and op_type == "layernorm") or \
                 (mode == "prefill" and op_type in ("attn", "attn_sliding")):
             # Ops that don't advance the token-major stream, don't ping-pong
             pass
@@ -6704,7 +8074,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
                     )
 
         # ===== ROPE QK =====
-        elif op_name in ("rope_qk", "rope"):
+        elif op_name in ("rope_qk", "rope", "mrope_qk"):
             outputs = op.get("outputs", {})
             activations = op.get("activations", {})
 
@@ -6816,11 +8186,22 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
 
 
 def load_kernel_bindings() -> Dict[str, Dict]:
-    """Load kernel parameter bindings for IR Lower 3."""
+    """Load kernel parameter bindings for IR Lower 3, with optional v8 overlays."""
     bindings_path = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
     with open(bindings_path, "r") as f:
         data = json.load(f)
-    return data.get("bindings", {})
+    bindings = data.get("bindings", {})
+    if not isinstance(bindings, dict):
+        bindings = {}
+
+    overlay_path = V8_ROOT / "kernel_maps" / "kernel_bindings.overlay.json"
+    if overlay_path.exists():
+        with open(overlay_path, "r", encoding="utf-8") as f:
+            overlay_doc = json.load(f)
+        overlay_bindings = overlay_doc.get("bindings", overlay_doc)
+        if isinstance(overlay_bindings, dict):
+            bindings.update(copy.deepcopy(overlay_bindings))
+    return bindings
 
 
 def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
@@ -6880,6 +8261,26 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             return next(iter(dct.values()))
         return None
 
+    def is_bias_weight_binding(key: str, winfo: Dict) -> bool:
+        if WEIGHT_TO_KERNEL_INPUT.get(key) == "bias":
+            return True
+        key_lc = str(key or "").lower()
+        explicit_bias_aliases = {
+            "bq",
+            "bk",
+            "bv",
+            "bo",
+            "b1",
+            "b2",
+            "bqkv",
+            "final_ln_bias",
+            "patch_bias",
+        }
+        if key_lc in explicit_bias_aliases or key_lc.endswith("_b") or "bias" in key_lc:
+            return True
+        weight_name = str((winfo or {}).get("name", "")).lower()
+        return ".bias" in weight_name or weight_name.endswith("bias")
+
     def select_weight(name: str, weights: Dict, alt: Optional[List[str]] = None) -> Optional[Tuple[str, Dict]]:
         if name in weights:
             return name, weights[name]
@@ -6893,11 +8294,12 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 return k, weights[k]
         if name == "_bias":
             for k, v in weights.items():
-                if k.startswith("b") or "bias" in k:
+                if is_bias_weight_binding(k, v):
                     return k, v
         # Try reverse map: kernel input name -> IR weight key
         for k, v in weights.items():
-            if WEIGHT_TO_KERNEL_INPUT.get(k) == name:
+            mapped = WEIGHT_TO_KERNEL_INPUT.get(k)
+            if mapped == name or (name == "_bias" and mapped == "bias"):
                 return k, v
         return None
 
@@ -7623,6 +9025,7 @@ def main(args: List[str]) -> int:
 
     template = manifest.get("template", {})
     sequence = _template_sequence(template) if isinstance(template, dict) else []
+    branch_plan = build_template_branch_plan(manifest) if isinstance(template, dict) else None
     wrote_split_artifacts = False
 
     if parsed_args.block_manifests_dir:
@@ -7774,7 +9177,8 @@ def main(args: List[str]) -> int:
             "format": "ir1-dataflow",
             "version": 3,
             "mode": parsed_args.mode,
-            "ops": ir1  # Now a list of {kernel, op, section, layer, weights, dataflow}
+            "ops": ir1,  # Now a list of {kernel, op, section, layer, weights, dataflow}
+            "branch_plan": branch_plan,
         }
         with open(parsed_args.output, 'w') as f:
             json.dump(output_data, f, indent=2)

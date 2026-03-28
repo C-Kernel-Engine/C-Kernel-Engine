@@ -1,0 +1,293 @@
+{
+  "version": 3,
+  "name": "qwen3_vl_vision",
+  "family": "vision_transformer_with_branches",
+  "flags": {
+    "patch_frontend": "dual_patch_proj_sum",
+    "activation": "gelu",
+    "normalization": "layernorm",
+    "activation_preference_by_op": {
+      "qkv_packed_proj": "fp32",
+      "out_proj": "fp32",
+      "mlp_up": "fp32",
+      "mlp_down": "fp32",
+      "branch_fc1": "fp32",
+      "branch_fc2": "fp32",
+      "projector_fc1": "fp32",
+      "projector_fc2": "fp32"
+    }
+  },
+  "contract": {
+    "vision_contract": {
+      "input_modality": "image",
+      "position_encoding": "absolute_2d",
+      "output": "vision_embeddings",
+      "projector": "qwen3vl_merger"
+    },
+    "vision_position_contract": {
+      "absolute_embeddings": true,
+      "rope_layout": "multi_section_2d",
+      "position_rank": 4,
+      "status": "lowered_v8"
+    },
+    "attention_contract": {
+      "rope_layout": "multi_section_2d",
+      "rope_mode": "vision",
+      "position_encoding": "absolute_2d",
+      "kv_layout": "ephemeral_full_context",
+      "attn_variant": "dense_bidirectional",
+      "causal": false
+    },
+    "block_contract": {
+      "norm_type": "layernorm",
+      "mlp_formula": "up -> gelu -> down",
+      "activation": "gelu",
+      "qkv_bias": true,
+      "body_type": "dense_bidirectional"
+    },
+    "logits_contract": {
+      "final_norm": "layernorm",
+      "lm_head": "none",
+      "logits_layout": "none"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "image_input": true
+      }
+    }
+  },
+  "kernels": {
+    "add_stream": "add_stream_reorder_2d",
+    "position_embeddings": "position_embeddings_add_tiled_2d",
+    "spatial_merge": "spatial_merge_contiguous_tiled",
+    "branch_spatial_merge": "spatial_merge_contiguous_tiled"
+  },
+  "sequence": [
+    "vision_encoder"
+  ],
+  "block_types": {
+    "vision_encoder": {
+      "sequence": [
+        "header",
+        "body",
+        "footer"
+      ],
+      "header": [
+        {
+          "id": "patchify",
+          "op": "patchify"
+        },
+        {
+          "id": "patch_proj",
+          "op": "patch_proj"
+        },
+        {
+          "id": "patch_proj_aux",
+          "op": "patch_proj_aux"
+        },
+        {
+          "id": "patch_sum",
+          "op": "add_stream",
+          "params": {
+            "merge_size_from_config": "spatial_merge_size"
+          }
+        },
+        {
+          "id": "patch_bias",
+          "op": "patch_bias_add"
+        },
+        {
+          "id": "position_embeddings",
+          "op": "position_embeddings",
+          "params": {
+            "merge_size_from_config": "spatial_merge_size"
+          }
+        },
+        {
+          "id": "vision_position_ids",
+          "op": "position_ids_2d",
+          "params": {
+            "position_rank": 4,
+            "merge_size_from_config": "spatial_merge_size"
+          }
+        }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          {
+            "id": "attn_norm",
+            "op": "layernorm"
+          },
+          {
+            "id": "qkv_packed_proj",
+            "op": "qkv_packed_proj"
+          },
+          {
+            "id": "split_qkv",
+            "op": "split_qkv_packed"
+          },
+          {
+            "id": "vision_mrope",
+            "op": "rope_qk",
+            "params": {
+              "rope_mode": "vision",
+              "position_rank": 4,
+              "section_policy": "equal_4way"
+            }
+          },
+          {
+            "id": "attn",
+            "op": "attn"
+          },
+          {
+            "id": "attn_out_proj",
+            "op": "out_proj"
+          },
+          {
+            "id": "attn_residual",
+            "op": "residual_add"
+          },
+          {
+            "id": "ffn_norm",
+            "op": "layernorm"
+          },
+          {
+            "id": "mlp_up",
+            "op": "mlp_up"
+          },
+          {
+            "id": "mlp_gelu",
+            "op": "gelu"
+          },
+          {
+            "id": "mlp_down",
+            "op": "mlp_down"
+          },
+          {
+            "id": "mlp_residual",
+            "op": "residual_add"
+          }
+        ]
+      },
+      "branches": [
+        {
+          "name": "deepstack",
+          "kind": "fixed_branch",
+          "tap": {
+            "from": "body.mlp_residual.out",
+            "layers_from_config": "deepstack_layer_indices"
+          },
+          "producer": {
+            "ops": [
+              {
+                "id": "merge",
+                "op": "branch_spatial_merge",
+                "params": {
+                  "merge_size_from_config": "spatial_merge_size",
+                  "rows_from_config": "vision_merged_tokens",
+                  "out_dim_from_config": "projector_in_dim"
+                }
+              },
+              {
+                "id": "norm",
+                "op": "branch_layernorm",
+                "params": {
+                  "rows_from_config": "vision_merged_tokens",
+                  "out_dim_from_config": "projector_in_dim"
+                },
+                "weight_refs": {
+                  "gamma": "v.deepstack.{L}.norm.weight",
+                  "beta": "v.deepstack.{L}.norm.bias"
+                }
+              },
+              {
+                "id": "fc1",
+                "op": "branch_fc1",
+                "params": {
+                  "rows_from_config": "vision_merged_tokens",
+                  "out_dim_from_config": "projector_hidden_dim"
+                },
+                "weight_refs": {
+                  "W": "v.deepstack.{L}.fc1.weight",
+                  "bias": "v.deepstack.{L}.fc1.bias"
+                }
+              },
+              {
+                "id": "gelu",
+                "op": "branch_gelu"
+              },
+              {
+                "id": "fc2",
+                "op": "branch_fc2",
+                "params": {
+                  "rows_from_config": "vision_merged_tokens",
+                  "out_dim_from_config": "projector_out_dim"
+                },
+                "weight_refs": {
+                  "W": "v.deepstack.{L}.fc2.weight",
+                  "bias": "v.deepstack.{L}.fc2.bias"
+                }
+              }
+            ]
+          },
+          "collect": {
+            "mode": "concat",
+            "axis": "feature",
+            "target": "branch.deepstack",
+            "rows_from_config": "vision_merged_tokens",
+            "slice_dim_from_config": "projector_out_dim",
+            "num_slices_from_config": "num_deepstack_layers",
+            "dtype": "fp32"
+          }
+        }
+      ],
+      "footer": [
+        {
+          "id": "final_norm",
+          "op": "layernorm"
+        },
+        {
+          "id": "merge_main",
+          "op": "spatial_merge",
+          "params": {
+            "merge_size_from_config": "spatial_merge_size"
+          }
+        },
+        {
+          "id": "projector_fc1",
+          "op": "projector_fc1"
+        },
+        {
+          "id": "projector_gelu",
+          "op": "projector_gelu"
+        },
+        {
+          "id": "projector_fc2",
+          "op": "projector_fc2"
+        },
+        {
+          "id": "deepstack_concat",
+          "op": "branch_concat",
+          "inputs": [
+            "footer.projector_fc2.out",
+            "branch.deepstack"
+          ],
+          "params": {
+            "rows_from_config": "vision_merged_tokens",
+            "main_dim_from_config": "projector_out_dim",
+            "branch_slice_dim_from_config": "projector_out_dim",
+            "num_branch_slices_from_config": "num_deepstack_layers"
+          },
+          "axis": "feature",
+          "output": "vision_embeddings"
+        }
+      ]
+    }
+  }
+}

@@ -216,6 +216,40 @@ void gemm_f16(float *Y,
 #endif
 }
 
+/**
+ * @brief NT GEMM wrapper for FP16 weights with the engine's standard ABI.
+ *
+ * Contract:
+ *   A: [M, K] fp32 activation matrix
+ *   B: [N, K] fp16 weight matrix stored row-major (transposed layout)
+ *   C: [M, N] fp32 output matrix
+ *
+ * Internally gemm_f16 expects:
+ *   W: [output_rows, K]
+ *   X: batch-major [batch, K]
+ *   Y: batch-major [batch, output_rows]
+ * so we swap the output/batch dimensions when dispatching.
+ */
+void gemm_nt_f16(const float *A,
+                 const void *B,
+                 const float *bias,
+                 float *C,
+                 int M, int N, int K)
+{
+    gemm_f16(C, (const uint16_t *)B, A, N, M, K);
+
+    if (!bias) {
+        return;
+    }
+
+    for (int i = 0; i < M; ++i) {
+        float *c_row = C + (size_t)i * (size_t)N;
+        for (int j = 0; j < N; ++j) {
+            c_row[j] += bias[j];
+        }
+    }
+}
+
 /* ============================================================================
  * FP16 Tensor Conversion Utilities
  * ============================================================================ */

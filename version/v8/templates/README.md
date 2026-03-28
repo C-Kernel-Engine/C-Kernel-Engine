@@ -25,8 +25,12 @@ These files describe compute graphs.
 
 - Defines the forward pass op sequence for each block.
 - Allows per-layer overrides (for MoE or hybrid blocks).
+- Declares branch taps, branch-local subgraphs, and stitch points when a model
+  has fixed side paths such as DeepStack.
 - Encodes architecture flags (bias usage, rope type, activation type).
 - Provides a stable op vocabulary for IR1.
+- Declares graph control primitives such as branch/collect/stitch without
+  teaching the lowerer model-family names.
 
 ## What a template does not do
 
@@ -34,6 +38,20 @@ These files describe compute graphs.
 - It does not store weights or offsets (that is `weights_manifest.json`).
 - It does not choose kernels (that is done by kernel registry + selection).
 - It does not define memory layout (that is IR2 + memory planner).
+
+## Design Contract
+
+- The template language should stay architecture-agnostic.
+- The lowerer should only see declared operations, graph edges, and stitch
+  points. It should not branch on names like DeepStack, MoE, SSM, encoder, or
+  decoder.
+- If a model needs side paths, the template should express them via generic
+  control primitives such as `branch`, `collect`, and `stitch`.
+- If a model needs routed experts later, that should extend the same contract
+  with `route`, `dispatch`, and `combine`.
+- Operation objects may carry `id`, `status`, `inputs`, or other metadata. The
+  lowerer can consume the active subset while planned ops remain declared in the
+  schema for future bring-up.
 
 ## File naming
 
@@ -201,6 +219,162 @@ Extended schema for multi-modal models with explicit execution sequences.
 - For per-layer type mixing (e.g., layers 2,6 are MoE), define separate blocks
   in `block_types` and list them explicitly in `sequence`
 - Both sequence arrays are critical: JSON objects have no guaranteed order
+
+### Version 3 (Current Direction - Branch-Aware Graphs)
+
+Version 3 keeps the v2 block/phase structure but allows op objects with stable
+`id` fields plus block-local `branches` declarations.
+
+```json
+{
+  "version": 3,
+  "sequence": ["vision_encoder"],
+  "block_types": {
+    "vision_encoder": {
+      "sequence": ["header", "body", "footer"],
+      "body": {
+        "type": "dense",
+        "ops": [
+          { "id": "attn_norm", "op": "attn_norm" },
+          { "id": "mlp_residual", "op": "residual_add" }
+        ]
+      },
+      "branches": [
+        {
+          "name": "deepstack",
+          "kind": "fixed_branch",
+          "tap": {
+            "from": "body.mlp_residual.out",
+            "layers_from_config": "deepstack_layer_indices"
+          },
+          "producer": {
+            "ops": [
+              { "id": "merge", "op": "spatial_merge" },
+              { "id": "norm", "op": "layernorm" },
+              { "id": "fc1", "op": "branch_fc1" },
+              { "id": "gelu", "op": "branch_gelu" },
+              { "id": "fc2", "op": "branch_fc2" }
+            ]
+          },
+          "collect": {
+            "mode": "concat",
+            "axis": "feature",
+            "target": "branch.deepstack",
+            "rows_from_config": "vision_merged_tokens",
+            "slice_dim_from_config": "projector_out_dim",
+            "num_slices_from_config": "num_deepstack_layers"
+          }
+        }
+      ],
+      "footer": [
+        { "id": "proj2", "op": "projector_fc2" },
+        {
+          "id": "deepstack_concat",
+          "op": "branch_concat",
+          "inputs": ["footer.proj2.out", "branch.deepstack"],
+          "params": {
+            "rows_from_config": "vision_merged_tokens",
+            "main_dim_from_config": "projector_out_dim",
+            "branch_slice_dim_from_config": "projector_out_dim",
+            "num_branch_slices_from_config": "num_deepstack_layers"
+          },
+          "axis": "feature",
+          "output": "vision_embeddings"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Design rules for v3:**
+- Use stable op ids and reference them from branch taps (`body.mlp_residual.out`)
+  instead of ordinal selectors like "second residual add".
+- Keep the lowerer architecture-agnostic. Templates declare branch/collect/stitch;
+  the builder only lowers declared operations and records graph metadata.
+- Keep per-op sizing or stitch metadata in `params`, ideally via
+  `*_from_config` keys, so the lowerer does not infer encoder/decoder-specific
+  dims out of band.
+- Use `branches` for orthogonal side paths. Keep `body.type` / `ops_by_kind` for
+  genuinely different mainline block families.
+- Future routed patterns such as MoE should extend the same style with explicit
+  control ops (`route`, `dispatch`, `combine`) instead of model-specific branches
+  in the IR builder.
+
+### Version 3 (Current Evolution - Op Objects + Branch Planning)
+
+Version 3 keeps the v2 block/phase structure, but allows op objects and
+block-local branch declarations. This is the direction for vision side branches,
+future routed experts, and other non-linear graph features.
+
+```json
+{
+  "version": 3,
+  "name": "qwen3_vl_vision",
+  "sequence": ["vision_encoder"],
+  "block_types": {
+    "vision_encoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        { "id": "patchify", "op": "patchify" },
+        { "id": "patch_proj", "op": "patch_proj" }
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          { "id": "attn_norm", "op": "attn_norm" },
+          { "id": "mlp_residual", "op": "residual_add" }
+        ]
+      },
+      "branches": [
+        {
+          "name": "deepstack",
+          "status": "planned",
+          "kind": "fixed_branch",
+          "tap": {
+            "from": "body.mlp_residual.out",
+            "layers_from_config": "deepstack_layer_indices"
+          },
+          "producer": {
+            "collect_target": "branch.deepstack",
+            "ops": [
+              { "id": "merge", "op": "spatial_merge" },
+              { "id": "norm", "op": "layernorm" },
+              { "id": "fc1", "op": "deepstack_fc1" },
+              { "id": "gelu", "op": "deepstack_gelu" },
+              { "id": "fc2", "op": "deepstack_fc2" }
+            ]
+          },
+          "collect": {
+            "mode": "concat",
+            "axis": "feature",
+            "target": "branch.deepstack"
+          }
+        }
+      ],
+      "footer": [
+        { "id": "projector_fc2", "op": "projector_fc2" },
+        {
+          "id": "deepstack_concat",
+          "op": "branch_concat",
+          "status": "planned",
+          "inputs": ["footer.projector_fc2.out", "branch.deepstack"],
+          "axis": "feature",
+          "output": "vision_embeddings"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Version 3 rules:**
+- Strings and op objects are both valid in `header`, `body.ops`, and `footer`.
+- Use op objects when a stable `id` is needed for taps or future rewrites.
+- `status: "planned"` keeps a declared op/branch in the schema without claiming
+  that the current runtime can already lower it.
+- `branches` are block-local side paths, not separate top-level blocks.
+- `footer` stitch ops should explicitly name their symbolic inputs.
 
 ## Optional fields
 

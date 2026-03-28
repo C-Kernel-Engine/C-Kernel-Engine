@@ -1,0 +1,49 @@
+{
+  "id": "feature_concat",
+  "op": "feature_concat",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "main_input",
+      "dtype": "fp32",
+      "shape": ["rows", "main_dim"],
+      "desc": "Main output rows"
+    },
+    {
+      "name": "branch_input",
+      "dtype": "fp32",
+      "shape": ["num_branch_slices", "rows", "branch_slice_dim"],
+      "desc": "Collected branch slices laid out as contiguous [slice][row][feature] blocks"
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["rows", "main_dim + num_branch_slices * branch_slice_dim"],
+      "desc": "Final stitched output"
+    }
+  ],
+  "scratch": [],
+  "dims": ["rows", "main_dim", "branch_slice_dim", "num_branch_slices"],
+  "params": [],
+  "constraints": {
+    "notes": "Concatenates main rows with collected fixed-width branch slices along the feature axis."
+  },
+  "impl": {
+    "function": "feature_concat",
+    "c_declaration": "void feature_concat(const float *main_input, const float *branch_input, float *output, int rows, int main_dim, int branch_slice_dim, int num_branch_slices);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_vision.py"]
+  },
+  "notes": "Generic feature-axis concat for fixed branch collections."
+}

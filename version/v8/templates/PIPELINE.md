@@ -2,12 +2,22 @@
 
 This document explains how templates flow through the IR generation pipeline.
 
+## Contract
+
+The builder must stay architecture-agnostic:
+- Templates declare operations, graph structure, branch taps, collect targets,
+  and stitch points.
+- The lowerer only expands declared operations into kernel ops / kernel IDs.
+- It should not learn model-family names such as DeepStack, MoE, or SSM.
+- If a model needs branching or routing semantics, that belongs in the template
+  as explicit graph constructs.
+
 ## Overview: The Three-Stage Pipeline
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
 │  Template   │  →   │  GraphIR    │  →   │  LoweredIR  │
-│   (v2 JSON) │      │ (Symbolic)  │      │ (Concrete)  │
+│   (v3 JSON) │      │ (Symbolic)  │      │ (Concrete)  │
 └─────────────┘      └─────────────┘      └─────────────┘
     Stage 1              Stage 2              Stage 3
    Parser           Op Builders          Kernel Selection
@@ -15,7 +25,7 @@ This document explains how templates flow through the IR generation pipeline.
 
 ## Stage 1: Template Parsing
 
-**Input:** Template v2 JSON (e.g., `qwen2.json`)
+**Input:** Template v3 JSON (e.g., `qwen3_vl_vision.json`)
 **Tool:** `parse_template_v2.py`
 **Output:** List of `OpNode` objects
 
@@ -40,7 +50,14 @@ Template JSON                    →    OpNode Objects
 }                                      ...
 ```
 
-**Purpose:** Parse template structure and generate flat operation sequence.
+**Purpose:** Parse template structure and generate the declared graph contract.
+
+This parser should stay architecture-agnostic:
+- It should see operations, graph edges, and stitch points.
+- It should not care whether a branch comes from a vision encoder, a decoder,
+  DeepStack, MoE, SSM, or some future family.
+- Branch/routing ideas should surface as generic control primitives such as
+  `branch`, `collect`, `stitch`, and later `route`, `dispatch`, `combine`.
 
 ## Stage 2: GraphIR Generation (Op Builders)
 
@@ -77,7 +94,65 @@ The template says **WHAT** operations to do, but not **HOW** they wire together:
 | - | Weight name: `"layer.0.ln1_gamma"` (from manifest) |
 | - | Parameters: `{"eps": 1e-5}` (from config) |
 
-**Key Point:** GraphIR uses **symbolic names** (strings), not memory addresses!
+**Key Point:** GraphIR uses **symbolic names** (strings), not memory addresses.
+That is what allows branch taps, branch-local buffers, and stitch ops to remain
+generic instead of becoming encoder/decoder-specific special cases.
+
+### Branch-Aware Templates
+
+Templates may declare fixed side branches with explicit tap references:
+
+```json
+{
+  "branches": [
+    {
+      "name": "deepstack",
+      "tap": {
+        "from": "body.mlp_residual.out",
+        "layers_from_config": "deepstack_layer_indices"
+      },
+      "producer": {
+        "ops": [
+          { "id": "merge", "op": "spatial_merge" },
+          { "id": "norm", "op": "layernorm" },
+          { "id": "fc1", "op": "branch_fc1" },
+          { "id": "gelu", "op": "branch_gelu" },
+          { "id": "fc2", "op": "branch_fc2" }
+        ]
+      },
+      "collect": {
+        "mode": "concat",
+        "target": "branch.deepstack",
+        "rows_from_config": "vision_merged_tokens",
+        "slice_dim_from_config": "projector_out_dim",
+        "num_slices_from_config": "num_deepstack_layers"
+      }
+    }
+  ],
+  "footer": [
+    { "id": "proj2", "op": "projector_fc2" },
+    {
+      "id": "deepstack_concat",
+      "op": "branch_concat",
+      "inputs": ["footer.proj2.out", "branch.deepstack"],
+      "params": {
+        "rows_from_config": "vision_merged_tokens",
+        "main_dim_from_config": "projector_out_dim",
+        "branch_slice_dim_from_config": "projector_out_dim",
+        "num_branch_slices_from_config": "num_deepstack_layers"
+      },
+      "output": "vision_embeddings"
+    }
+  ]
+}
+```
+
+In the pipeline this means:
+- the tap reference points at a stable op id, not an ordinal occurrence
+- the branch producer is a declared subgraph
+- the collect target is a symbolic branch buffer
+- sizing metadata stays attached to the collect/stitch ops via `params`
+- the stitch op merges the branch buffer back into the main graph
 
 ### Example: Full Layer Wiring
 
@@ -116,6 +191,33 @@ Template Ops:          GraphIR Ops:                              Tensor Flow:
 1. Tracking previous op's output → use as next op's input
 2. Generating consistent tensor names
 3. Mapping to weight names from manifest
+
+### Branch Example: Fixed Side Path
+
+When a template declares a block-local branch, the GraphIR lane should still
+stay operation-driven:
+
+```
+Mainline body op                      Branch producer ops
+───────────────                       ───────────────────
+Op(name="body.mlp_residual", ...)     Op(name="branch.deepstack.merge", ...)
+          │                           Op(name="branch.deepstack.norm", ...)
+          └──── tap edge ───────→     Op(name="branch.deepstack.fc1", ...)
+                                      Op(name="branch.deepstack.fc2", ...)
+                                              │
+                                              └── collect buffer: "branch.deepstack"
+
+Footer stitch op:
+Op(name="footer.deepstack_concat",
+   inputs=["footer.projector_fc2.out", "branch.deepstack"])
+```
+
+The important part is the contract:
+- the template declares the tap
+- GraphIR names the branch-local tensors
+- Lowering later chooses kernels
+
+The lowerer should never need to know that this branch is called "DeepStack".
 
 ## Stage 3: Lowering (Kernel Selection)
 
@@ -172,6 +274,12 @@ for op in graph_ir.ops:
 | **Template** | What ops, what order | Model architecture |
 | **GraphIR** | How ops wire together | Tensor flow, weight names |
 | **LoweredIR** | Which kernels to use | Hardware, quantization |
+
+Lowering must remain graph-oriented:
+- consume declared active ops
+- map logical ops to kernel families
+- keep planned ops/branches visible in metadata until the runtime path exists
+- avoid family-named Python branches
 
 ### Benefits:
 

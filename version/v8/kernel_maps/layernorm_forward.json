@@ -1,0 +1,62 @@
+{
+  "id": "layernorm_forward",
+  "op": "layernorm",
+  "variant": "fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Input activations [tokens, embed_dim]"
+    }
+  ],
+  "weights": [
+    {
+      "name": "gamma",
+      "dtype": "fp32",
+      "shape": ["E"],
+      "desc": "LayerNorm scale weight"
+    },
+    {
+      "name": "beta",
+      "dtype": "fp32",
+      "shape": ["E"],
+      "desc": "LayerNorm bias weight"
+    }
+  ],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Normalized output"
+    }
+  ],
+  "scratch": [],
+  "dims": ["T", "E"],
+  "params": [
+    {
+      "name": "eps",
+      "dtype": "float32",
+      "desc": "Epsilon for numerical stability"
+    }
+  ],
+  "constraints": {
+    "notes": "Generic LayerNorm with learned gamma and beta."
+  },
+  "impl": {
+    "function": "layernorm_forward_unrolled_slice",
+    "c_declaration": "void layernorm_forward_unrolled_slice(const float *input_slice_base, const float *gamma, const float *beta, float *output_slice_base, float *mean_cache_slice, float *rstd_cache_slice, int num_tokens_in_slice, int d_model, float eps);",
+    "sources": ["src/kernels/layernorm_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_layernorm.py"]
+  },
+  "notes": "LayerNorm. Computes: output = ((input - mean) / sqrt(var + eps)) * gamma + beta"
+}

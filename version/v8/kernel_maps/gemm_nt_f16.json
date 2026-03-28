@@ -1,0 +1,53 @@
+{
+  "id": "gemm_nt_f16",
+  "op": "gemm",
+  "variant": "f16_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "fp16|f16",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "A",
+      "dtype": "fp32",
+      "shape": ["M", "K"],
+      "desc": "Activation matrix [M, K] (FP32)"
+    },
+    {
+      "name": "B",
+      "dtype": "fp16",
+      "shape": ["N", "K"],
+      "desc": "Weight matrix [N, K] (FP16 row-major, transposed logical layout)"
+    },
+    {
+      "name": "bias",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "optional": true,
+      "desc": "Bias [N] (optional)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "C",
+      "dtype": "fp32",
+      "shape": ["M", "N"],
+      "desc": "Result [M, N]"
+    }
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "constraints": {
+    "notes": "Dense FP16-weight GEMM using the standard NT matmul ABI."
+  },
+  "impl": {
+    "function": "gemm_nt_f16",
+    "c_declaration": "void gemm_nt_f16(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": ["src/kernels/gemm_kernels_f16.c"]
+  },
+  "tests": {
+    "unit": ["tests/test_v8_qwen3vl_template.py"]
+  },
+  "notes": "Generic FP16-weight GEMM wrapper for dense NT matmul lowering."
+}

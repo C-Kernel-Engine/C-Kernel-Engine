@@ -92,6 +92,42 @@ PHYSICAL_BUFFERS = {
         last_writer=-1,
         can_hold=["fp32"]
     ),
+    "A_BRANCH_STREAM": PhysicalBuffer(
+        name="A_BRANCH_STREAM",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_BRANCH_NORMED": PhysicalBuffer(
+        name="A_BRANCH_NORMED",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_BRANCH_MLP": PhysicalBuffer(
+        name="A_BRANCH_MLP",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_BRANCH_COLLECT": PhysicalBuffer(
+        name="A_BRANCH_COLLECT",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
+    "A_VISION_POSITIONS": PhysicalBuffer(
+        name="A_VISION_POSITIONS",
+        dtype="i32",
+        last_writer=-1,
+        can_hold=["i32"]
+    ),
+    "A_VISION_OUTPUT": PhysicalBuffer(
+        name="A_VISION_OUTPUT",
+        dtype="fp32",
+        last_writer=-1,
+        can_hold=["fp32"]
+    ),
     "A_LAYER_OUTPUT": PhysicalBuffer(
         name="A_LAYER_OUTPUT",
         dtype="fp32",
@@ -188,9 +224,16 @@ SLOT_TO_BUFFER_DEFAULT = {
     "attn_scratch": "A_ATTN_SCRATCH",
     "attn_q_gate_packed": "A_ATTN_Q_GATE_PACKED",
     "attn_gate": "A_ATTN_GATE",
+    "qkv_packed": "A_MLP_SCRATCH",
 
     # MLP scratch
     "mlp_scratch": "A_MLP_SCRATCH",
+    "branch_stream": "A_BRANCH_STREAM",
+    "branch_normed": "A_BRANCH_NORMED",
+    "branch_mlp": "A_BRANCH_MLP",
+    "branch_collect": "A_BRANCH_COLLECT",
+    "vision_positions": "A_VISION_POSITIONS",
+    "vision_output": "A_VISION_OUTPUT",
     "recurrent_qkv_packed": "A_RECURRENT_PACKED",
     "recurrent_conv_input": "A_RECURRENT_PACKED",
     "recurrent_conv_qkv_raw": "A_RECURRENT_PACKED",
@@ -430,6 +473,8 @@ class MemoryPlanner:
                 return "kv_cache", "fp32"
 
         elif op_type == "rope_qk":
+            if input_name == "positions":
+                return "A_VISION_POSITIONS", "i32"
             # RoPE reads Q and K from attention scratch
             return "A_ATTN_SCRATCH", "fp32"
 
@@ -499,6 +544,11 @@ class MemoryPlanner:
                 buffer = "A_ATTN_SCRATCH"
             self.state.record_write(buffer, op_id, "fp32")
             return buffer, "fp32"
+
+        elif op_type in ("vision_position_ids", "position_ids_2d"):
+            buffer = "A_VISION_POSITIONS"
+            self.state.record_write(buffer, op_id, "i32")
+            return buffer, "i32"
 
         elif op_type == "rope_qk":
             # RoPE writes in-place to attention scratch

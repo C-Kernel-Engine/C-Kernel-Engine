@@ -752,6 +752,207 @@ void rope_forward_qk_pairwise_with_rotary_dim(float *q,
     }
 }
 
+static float vision_mrope_yarn_corr_dim(int n_dims, int n_ctx_orig, float n_rot, float base) {
+    return n_dims * logf((float) n_ctx_orig / (n_rot * 2.0f * (float) M_PI)) / (2.0f * logf(base));
+}
+
+static void vision_mrope_yarn_corr_dims(
+    int n_dims,
+    int n_ctx_orig,
+    float freq_base,
+    float beta_fast,
+    float beta_slow,
+    float dims[2]
+) {
+    float start = floorf(vision_mrope_yarn_corr_dim(n_dims, n_ctx_orig, beta_fast, freq_base));
+    float end = ceilf(vision_mrope_yarn_corr_dim(n_dims, n_ctx_orig, beta_slow, freq_base));
+    dims[0] = start < 0.0f ? 0.0f : start;
+    dims[1] = end > (float) (n_dims - 1) ? (float) (n_dims - 1) : end;
+}
+
+static float vision_mrope_yarn_ramp(float low, float high, int chan) {
+    const float y = ((float) chan - low) / fmaxf(0.001f, high - low);
+    return 1.0f - fminf(1.0f, fmaxf(0.0f, y));
+}
+
+static void vision_mrope_yarn(
+    float theta_extrap,
+    float freq_scale,
+    const float corr_dims[2],
+    int chan,
+    float ext_factor,
+    float attn_factor,
+    float *cos_theta,
+    float *sin_theta
+) {
+    float theta_interp = freq_scale * theta_extrap;
+    float theta = theta_interp;
+    float mscale = attn_factor;
+
+    if (ext_factor != 0.0f) {
+        const float ramp_mix = vision_mrope_yarn_ramp(corr_dims[0], corr_dims[1], chan) * ext_factor;
+        theta = theta_interp * (1.0f - ramp_mix) + theta_extrap * ramp_mix;
+        mscale *= 1.0f + 0.1f * logf(1.0f / fmaxf(freq_scale, 1e-6f));
+    }
+
+    *cos_theta = cosf(theta) * mscale;
+    *sin_theta = sinf(theta) * mscale;
+}
+
+static void vision_mrope_apply_head(
+    float *x,
+    const int32_t *positions,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int n_dims,
+    const int sections[4],
+    int n_ctx_orig,
+    float freq_base,
+    float freq_scale,
+    float ext_factor,
+    float attn_factor,
+    float beta_fast,
+    float beta_slow
+) {
+    if (!x || !positions || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim || n_dims <= 0) {
+        return;
+    }
+
+    if (n_dims > head_dim) {
+        n_dims = head_dim;
+    }
+
+    const int num_pos = num_tokens;
+    const int sec_w = sections[0] + sections[1];
+    const int sec_e = sec_w + sections[2];
+    const int sect_dims = sections[0] + sections[1] + sections[2] + sections[3];
+    const float theta_scale = powf(freq_base, -2.0f / (float) n_dims);
+    float corr_dims[2] = {0.0f, (float) (n_dims - 1)};
+    vision_mrope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
+
+    for (int tok = 0; tok < num_tokens; ++tok) {
+        float theta_t = (float) positions[tok];
+        float theta_h = (float) positions[tok + num_pos];
+        float theta_w = (float) positions[tok + 2 * num_pos];
+        float theta_e = (float) positions[tok + 3 * num_pos];
+        float *row = x + (size_t) tok * (size_t) aligned_head_dim;
+
+        for (int chan = 0; chan < n_dims; ++chan) {
+            const int sector = sect_dims > 0 ? (chan % sect_dims) : chan;
+            if (sector == 0) {
+                theta_t = (float) positions[tok];
+            } else if (sector == sections[0]) {
+                theta_h = (float) positions[tok + num_pos];
+            } else if (sector == sec_w) {
+                theta_w = (float) positions[tok + 2 * num_pos];
+            } else if (sector == sec_e) {
+                theta_e = (float) positions[tok + 3 * num_pos];
+            }
+
+            float theta = theta_t;
+            if (sector >= sections[0] && sector < sec_w) {
+                theta = theta_h;
+            } else if (sector >= sec_w && sector < sec_e) {
+                theta = theta_w;
+            } else if (sector >= sec_e) {
+                theta = theta_e;
+            }
+
+            float cos_theta = 0.0f;
+            float sin_theta = 0.0f;
+            vision_mrope_yarn(
+                theta,
+                freq_scale,
+                corr_dims,
+                chan,
+                ext_factor,
+                attn_factor,
+                &cos_theta,
+                &sin_theta
+            );
+
+            const float x0 = row[chan];
+            const float x1 = row[chan + n_dims];
+            row[chan] = x0 * cos_theta - x1 * sin_theta;
+            row[chan + n_dims] = x0 * sin_theta + x1 * cos_theta;
+
+            theta_t *= theta_scale;
+            theta_h *= theta_scale;
+            theta_w *= theta_scale;
+            theta_e *= theta_scale;
+        }
+    }
+}
+
+void mrope_qk_vision(float *q,
+                     float *k,
+                     const int32_t *positions,
+                     int num_heads,
+                     int num_kv_heads,
+                     int num_tokens,
+                     int head_dim,
+                     int aligned_head_dim,
+                     int n_dims,
+                     int section_0,
+                     int section_1,
+                     int section_2,
+                     int section_3,
+                     int n_ctx_orig,
+                     float freq_base,
+                     float freq_scale,
+                     float ext_factor,
+                     float attn_factor,
+                     float beta_fast,
+                     float beta_slow)
+{
+    if (!q || !k || !positions || num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+
+    const int sections[4] = {section_0, section_1, section_2, section_3};
+    const size_t q_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+    const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        vision_mrope_apply_head(
+            q + (size_t) h * q_head_stride,
+            positions,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow
+        );
+    }
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        vision_mrope_apply_head(
+            k + (size_t) h * k_head_stride,
+            positions,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow
+        );
+    }
+}
+
 /**
  * RoPE forward for both Q and K with custom strides (KV cache layouts)
  * @test test_rope.py::TestRoPEForward::test_rope_forward_qk_strided

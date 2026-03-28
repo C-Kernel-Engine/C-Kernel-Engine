@@ -1,0 +1,46 @@
+{
+  "id": "vision_position_ids_2d_merge",
+  "op": "position_ids",
+  "variant": "i32_grid_2d_merge",
+  "quant": {
+    "weight": "none",
+    "activation": "none",
+    "output": "i32"
+  },
+  "inputs": [],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "positions",
+      "dtype": "i32",
+      "shape": [4, "T"],
+      "desc": "Merged 2D position streams [y | x | y | x] flattened over tokens"
+    }
+  ],
+  "scratch": [],
+  "dims": ["grid_h", "grid_w", "merge_size", "T"],
+  "params": [
+    {
+      "name": "grid_h",
+      "dtype": "int32",
+      "desc": "Patch grid height"
+    },
+    {
+      "name": "grid_w",
+      "dtype": "int32",
+      "desc": "Patch grid width"
+    },
+    {
+      "name": "merge_size",
+      "dtype": "int32",
+      "desc": "Spatial merge traversal width/height"
+    }
+  ],
+  "impl": {
+    "function": "vision_position_ids_2d_merge",
+    "c_declaration": "void vision_position_ids_2d_merge(int32_t *positions, int grid_h, int grid_w, int merge_size);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "notes": "Build merged vision position IDs for 2D M-RoPE style encoders."
+}

@@ -1,0 +1,39 @@
+{
+  "id": "add_stream_reorder_2d",
+  "op": "add_stream",
+  "variant": "fp32_tile_reorder_2d",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "main_inout",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Primary stream buffer updated in-place after tile-order sum"
+    },
+    {
+      "name": "aux_scratch",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Secondary stream reused as temporary storage"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Tile-ordered sum written back to the primary stream"
+    }
+  ],
+  "dims": ["grid_h", "grid_w", "embed_dim", "merge_size"],
+  "impl": {
+    "function": "add_stream_reorder_2d",
+    "c_declaration": "void add_stream_reorder_2d(float *main_inout, float *aux_scratch, int grid_h, int grid_w, int embed_dim, int merge_size);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "notes": "Sum two token-major streams and reorder them into merged-tile traversal using the auxiliary stream as scratch."
+}

@@ -1,0 +1,516 @@
+{
+  "bindings": {
+    "gemm_nt_f16": {
+      "note": "FP16-weight dense GEMM wrapper with the standard matmul ABI.",
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "rowwise_bias_add": {
+      "note": "Explicit in-place rowwise bias binding for vision/header bring-up.",
+      "params": [
+        {
+          "name": "x",
+          "source": "output:x",
+          "cast": "float*"
+        },
+        {
+          "name": "bias",
+          "source": "weight:bias",
+          "cast": "const float*"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
+        },
+        {
+          "name": "dim",
+          "source": "dim:dim"
+        }
+      ]
+    },
+    "add_stream_reorder_2d": {
+      "note": "Sum two token-major streams and reorder the result into merged-tile traversal.",
+      "params": [
+        {
+          "name": "main_inout",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "aux_scratch",
+          "source": "activation:b",
+          "cast": "float*"
+        },
+        {
+          "name": "grid_h",
+          "source": "dim:vision_grid_h"
+        },
+        {
+          "name": "grid_w",
+          "source": "dim:vision_grid_w"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "merge_size",
+          "source": "dim:merge_size"
+        }
+      ]
+    },
+    "position_embeddings_add_tiled_2d": {
+      "note": "Add position embeddings to an activation stream already laid out in merged-tile order.",
+      "params": [
+        {
+          "name": "x",
+          "source": "output:x",
+          "cast": "float*"
+        },
+        {
+          "name": "position_embd",
+          "source": "weight:pos_emb",
+          "cast": "const float*"
+        },
+        {
+          "name": "grid_h",
+          "source": "dim:vision_grid_h"
+        },
+        {
+          "name": "grid_w",
+          "source": "dim:vision_grid_w"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "merge_size",
+          "source": "dim:merge_size"
+        }
+      ]
+    },
+    "spatial_merge_contiguous_tiled": {
+      "note": "Merge contiguous groups of merge_size^2 tokens from a merged-tile-ordered stream.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "grid_h",
+          "source": "dim:vision_grid_h"
+        },
+        {
+          "name": "grid_w",
+          "source": "dim:vision_grid_w"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "merge_size",
+          "source": "dim:merge_size"
+        }
+      ]
+    },
+    "layernorm_forward": {
+      "note": "Generic LayerNorm binding with explicit gamma and beta.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+        },
+        {
+          "name": "beta",
+          "source": "weight_f:beta",
+          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "mean_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "rstd_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "num_tokens_in_slice",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "layernorm_forward_unrolled_slice": {
+      "note": "Direct function-name alias for the generic LayerNorm binding.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight"]
+        },
+        {
+          "name": "beta",
+          "source": "weight_f:beta",
+          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias"]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "mean_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "rstd_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "num_tokens_in_slice",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "layernorm_forward_unrolled_slice": {
+      "note": "Generic LayerNorm binding with explicit gamma and beta.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+        },
+        {
+          "name": "beta",
+          "source": "weight_f:beta",
+          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "mean_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "rstd_cache_slice",
+          "source": "null"
+        },
+        {
+          "name": "num_tokens_in_slice",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "feature_slice_copy": {
+      "note": "Generic row-wise copy into a feature-axis slice of a wider destination tensor.",
+      "params": [
+        {
+          "name": "src",
+          "source": "activation:src",
+          "cast": "const float*"
+        },
+        {
+          "name": "dst",
+          "source": "output:dst",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
+        },
+        {
+          "name": "src_dim",
+          "source": "dim:src_dim"
+        },
+        {
+          "name": "dst_dim",
+          "source": "dim:dst_dim"
+        },
+        {
+          "name": "dst_feature_offset",
+          "source": "dim:dst_feature_offset"
+        }
+      ]
+    },
+    "feature_concat": {
+      "note": "Concatenate a main output with fixed-width collected branch slices.",
+      "params": [
+        {
+          "name": "main_input",
+          "source": "activation:main_input",
+          "cast": "const float*"
+        },
+        {
+          "name": "branch_input",
+          "source": "activation:branch_input",
+          "cast": "const float*"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
+        },
+        {
+          "name": "main_dim",
+          "source": "dim:main_dim"
+        },
+        {
+          "name": "branch_slice_dim",
+          "source": "dim:branch_slice_dim"
+        },
+        {
+          "name": "num_branch_slices",
+          "source": "dim:num_branch_slices"
+        }
+      ]
+    },
+    "split_qkv_packed_head_major_forward": {
+      "note": "Split packed token-major QKV rows into head-major Q/K/V buffers for transformer attention.",
+      "params": [
+        {
+          "name": "packed_qkv",
+          "source": "activation:packed_qkv",
+          "cast": "const float*"
+        },
+        {
+          "name": "q",
+          "source": "output:q",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "output:k",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "output:v",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "q_dim",
+          "source": "dim:q_dim"
+        },
+        {
+          "name": "k_dim",
+          "source": "dim:k_dim"
+        },
+        {
+          "name": "v_dim",
+          "source": "dim:v_dim"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        }
+      ]
+    },
+    "vision_position_ids_2d_merge": {
+      "note": "Materialize merged-tile vision position IDs for position-driven M-RoPE.",
+      "params": [
+        {
+          "name": "positions",
+          "source": "output:positions",
+          "cast": "int32_t*"
+        },
+        {
+          "name": "grid_h",
+          "source": "dim:vision_grid_h"
+        },
+        {
+          "name": "grid_w",
+          "source": "dim:vision_grid_w"
+        },
+        {
+          "name": "merge_size",
+          "source": "dim:merge_size"
+        }
+      ]
+    },
+    "mrope_qk_vision": {
+      "note": "Vision multi-section RoPE driven by explicit per-token position IDs.",
+      "params": [
+        {
+          "name": "q",
+          "source": "output:q",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "output:k",
+          "cast": "float*"
+        },
+        {
+          "name": "positions",
+          "source": "activation:positions",
+          "cast": "const int32_t*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "n_dims",
+          "source": "dim:n_dims"
+        },
+        {
+          "name": "section_0",
+          "source": "dim:section_0"
+        },
+        {
+          "name": "section_1",
+          "source": "dim:section_1"
+        },
+        {
+          "name": "section_2",
+          "source": "dim:section_2"
+        },
+        {
+          "name": "section_3",
+          "source": "dim:section_3"
+        },
+        {
+          "name": "n_ctx_orig",
+          "source": "dim:n_ctx_orig"
+        },
+        {
+          "name": "freq_base",
+          "source": "dim:freq_base"
+        },
+        {
+          "name": "freq_scale",
+          "source": "dim:freq_scale"
+        },
+        {
+          "name": "ext_factor",
+          "source": "dim:ext_factor"
+        },
+        {
+          "name": "attn_factor",
+          "source": "dim:attn_factor"
+        },
+        {
+          "name": "beta_fast",
+          "source": "dim:beta_fast"
+        },
+        {
+          "name": "beta_slow",
+          "source": "dim:beta_slow"
+        }
+      ]
+    }
+  }
+}

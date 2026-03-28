@@ -1,0 +1,33 @@
+{
+  "id": "spatial_merge_contiguous_tiled",
+  "op": "spatial_merge",
+  "variant": "fp32_contiguous_tile_merge",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Token-major activation stream already arranged in merged-tile order"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["T/M", "E*M"],
+      "desc": "Merged stream formed by grouping each contiguous run of merge_size^2 tokens"
+    }
+  ],
+  "dims": ["grid_h", "grid_w", "embed_dim", "merge_size"],
+  "impl": {
+    "function": "spatial_merge_contiguous_tiled",
+    "c_declaration": "void spatial_merge_contiguous_tiled(const float *input, float *output, int grid_h, int grid_w, int embed_dim, int merge_size);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "notes": "Merge contiguous groups of merge_size^2 tokens from an activation stream that already uses merged-tile traversal order."
+}

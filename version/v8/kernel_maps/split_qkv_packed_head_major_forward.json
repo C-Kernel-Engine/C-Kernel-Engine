@@ -1,0 +1,55 @@
+{
+  "id": "split_qkv_packed_head_major_forward",
+  "op": "split_qkv_packed_head_major",
+  "variant": "fp32_head_major",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "packed_qkv",
+      "dtype": "fp32",
+      "shape": ["rows", "q_dim + k_dim + v_dim"],
+      "desc": "Packed token-major QKV rows"
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": ["num_heads", "rows", "q_dim / num_heads"],
+      "desc": "Head-major Q tensor"
+    },
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": ["num_kv_heads", "rows", "k_dim / num_kv_heads"],
+      "desc": "Head-major K tensor"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": ["num_kv_heads", "rows", "v_dim / num_kv_heads"],
+      "desc": "Head-major V tensor"
+    }
+  ],
+  "scratch": [],
+  "dims": ["rows", "q_dim", "k_dim", "v_dim", "num_heads", "num_kv_heads"],
+  "params": [],
+  "constraints": {
+    "notes": "Converts packed token-major QKV rows into the head-major layout consumed by transformer attention kernels."
+  },
+  "impl": {
+    "function": "split_qkv_packed_head_major_forward",
+    "c_declaration": "void split_qkv_packed_head_major_forward(const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim, int num_heads, int num_kv_heads);",
+    "sources": ["src/kernels/recurrent_split_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_split_qkv_packed_head_major.py"]
+  },
+  "notes": "Head-major packed QKV split for dense transformer attention paths."
+}

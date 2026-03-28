@@ -156,6 +156,12 @@ void gemm_blocked_serial_bf16(const uint16_t *A,
                               uint16_t *C,
                               int M, int N, int K);
 
+void gemm_nt_f16(const float *A,
+                 const void *B,
+                 const float *bias,
+                 float *C,
+                 int M, int N, int K);
+
 // =============================================================================
 // Quantized (GGML-style) GEMM/GEMV helpers
 // =============================================================================
@@ -781,6 +787,21 @@ void layernorm_backward_kernel_bf16(const uint16_t *d_output,
                                     float *scratch_input,    /* [tokens * aligned_embed_dim] */
                                     float *scratch_d_input); /* [tokens * aligned_embed_dim] */
 
+void feature_slice_copy(const float *src,
+                        float *dst,
+                        int rows,
+                        int src_dim,
+                        int dst_dim,
+                        int dst_feature_offset);
+
+void feature_concat(const float *main_input,
+                    const float *branch_input,
+                    float *output,
+                    int rows,
+                    int main_dim,
+                    int branch_slice_dim,
+                    int num_branch_slices);
+
 // RMSNorm forward/backward kernels.
 void rmsnorm_forward(const float *input,
                      const float *gamma,
@@ -1273,6 +1294,24 @@ void recurrent_split_qkv_forward(const float *packed_qkv,
                                  int q_dim,
                                  int k_dim,
                                  int v_dim);
+
+// Split packed QKV rows into head-major Q/K/V buffers used by transformer
+// attention kernels.
+// Layout:
+//   packed_qkv : [rows, q_dim + k_dim + v_dim] token-major
+//   q          : [num_heads, rows, q_dim / num_heads] head-major
+//   k          : [num_kv_heads, rows, k_dim / num_kv_heads] head-major
+//   v          : [num_kv_heads, rows, v_dim / num_kv_heads] head-major
+void split_qkv_packed_head_major_forward(const float *packed_qkv,
+                                         float *q,
+                                         float *k,
+                                         float *v,
+                                         int rows,
+                                         int q_dim,
+                                         int k_dim,
+                                         int v_dim,
+                                         int num_heads,
+                                         int num_kv_heads);
 
 // Backward for the packed recurrent QKV split.
 // Layout:
@@ -2058,6 +2097,27 @@ void rope_forward_qk_pairwise_with_rotary_dim(float *q,
                                               int pos_offset,
                                               int rotary_dim);
 
+void mrope_qk_vision(float *q,
+                     float *k,
+                     const int32_t *positions,
+                     int num_heads,
+                     int num_kv_heads,
+                     int num_tokens,
+                     int head_dim,
+                     int aligned_head_dim,
+                     int n_dims,
+                     int section_0,
+                     int section_1,
+                     int section_2,
+                     int section_3,
+                     int n_ctx_orig,
+                     float freq_base,
+                     float freq_scale,
+                     float ext_factor,
+                     float attn_factor,
+                     float beta_fast,
+                     float beta_slow);
+
 void rope_forward_qk_strided(float *q,
                              float *k,
                              const float *cos_cache,
@@ -2286,6 +2346,52 @@ void embedding_forward_q8_0(const int32_t *token_ids,
 	void patch2im(const float *d_patches,
 	              float *d_image,
 	              int C, int H, int W, int P);
+	void position_embeddings_add(float *x,
+	                            const float *position_embd,
+	                            int num_tokens,
+	                            int embed_dim,
+	                            int num_positions);
+	void position_embeddings_add_tiled_2d(float *x,
+	                                      const float *position_embd,
+	                                      int grid_h,
+	                                      int grid_w,
+	                                      int embed_dim,
+	                                      int merge_size);
+	void vision_position_ids_2d_merge(int32_t *positions,
+	                                 int grid_h,
+	                                 int grid_w,
+	                                 int merge_size);
+	void rowwise_bias_add(float *x,
+	                      const float *bias,
+	                      int rows,
+	                      int dim);
+	void add_stream_inplace(float *a,
+	                       const float *b,
+	                       size_t n);
+	void add_stream_reorder_2d(float *main_inout,
+	                           float *aux_scratch,
+	                           int grid_h,
+	                           int grid_w,
+	                           int embed_dim,
+	                           int merge_size);
+	void spatial_merge_2x2(const float *input,
+	                      float *output,
+	                      int grid_h,
+	                      int grid_w,
+	                       int embed_dim);
+	void spatial_merge_contiguous_tiled(const float *input,
+	                                    float *output,
+	                                    int grid_h,
+	                                    int grid_w,
+	                                    int embed_dim,
+	                                    int merge_size);
+	void feature_concat_2way(const float *main_input,
+	                         const float *branch_input,
+	                         float *output,
+	                         int rows,
+	                         int main_dim,
+	                         int branch_slice_dim,
+	                         int num_branch_slices);
 
 	void im2patch_bf16(const uint16_t *image,
 	                   uint16_t *patches,
