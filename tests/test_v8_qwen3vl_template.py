@@ -327,11 +327,16 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             mlp_up_n = next(arg for arg in mlp_up.get("args", []) if arg.get("name") == "N")
             self.assertEqual(mlp_up_n.get("expr"), str(manifest["config"]["intermediate_size"]))
             gelu = next(op for op in call_ops if op.get("op") == "gelu")
+            self.assertEqual(gelu.get("function"), "gelu_exact_inplace")
             gelu_n = next(arg for arg in gelu.get("args", []) if arg.get("name") == "n")
             self.assertEqual(
                 gelu_n.get("expr"),
                 str(manifest["config"]["context_length"] * manifest["config"]["intermediate_size"]),
             )
+            projector_gelu = next(op for op in call_ops if op.get("op") == "projector_gelu")
+            self.assertEqual(projector_gelu.get("function"), "gelu_exact_inplace")
+            branch_gelu = next(op for op in call_ops if op.get("op") == "branch_gelu")
+            self.assertEqual(branch_gelu.get("function"), "gelu_exact_inplace")
             mlp_down = next(op for op in call_ops if op.get("op") == "mlp_down")
             self.assertEqual(mlp_down.get("function"), "gemm_nt_f16")
 
@@ -353,7 +358,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertIn("position_embeddings_add_tiled_2d", text)
             self.assertIn("spatial_merge_contiguous_tiled", text)
             self.assertIn("add_stream_reorder_2d", text)
-            self.assertIn("gelu_fast_inplace", text)
+            self.assertIn("gelu_exact_inplace", text)
             self.assertIn("feature_concat", text)
             self.assertIn("transpose_attn_out_to_token_major", text)
             self.assertNotIn("transpose_inplace();", text)
