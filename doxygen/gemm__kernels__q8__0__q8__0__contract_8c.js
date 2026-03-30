@@ -1,6 +1,32 @@
 var gemm__kernels__q8__0__q8__0__contract_8c =
 [
     [ "CK_Q80_STACK_Q8_BLOCKS", "gemm__kernels__q8__0__q8__0__contract_8c.html#ae652b58c404faf0f62f6b794572f367c", null ],
+    [ "ck_q80_ggml_build_forward_expand_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7de54de0a60eba16519c23edd29168d7", null ],
+    [ "ck_q80_ggml_cpu_init_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#aa0a465b3eedb7b68e16124898097d1c7", null ],
+    [ "ck_q80_ggml_free_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a0a8eeb713239db691e41d4bc2f683ac0", null ],
+    [ "ck_q80_ggml_graph_compute_with_ctx_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#aa32a508112da30be4826197e10e2263f", null ],
+    [ "ck_q80_ggml_init_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#ab6cc98961491d512c50d122d1d47cce7", null ],
+    [ "ck_q80_ggml_mul_mat_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a956b3c6fd3d197b884ba427d3be92fdf", null ],
+    [ "ck_q80_ggml_new_graph_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a6296f3866d58b42e143aaf21e2509c8f", null ],
+    [ "ck_q80_ggml_new_tensor_2d_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a6c25d0733e4f9ace3a767371e49564c1", null ],
+    [ "ck_nearest_int_q8_0_ref", "gemm__kernels__q8__0__q8__0__contract_8c.html#ad714da1097f9f5e5350822940e6e4c9c", null ],
+    [ "ck_q80_contract_dump_enabled", "gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b", null ],
+    [ "ck_q80_contract_dump_tensor", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1", null ],
+    [ "ck_q80_resolve_ggml_build_forward_expand", "gemm__kernels__q8__0__q8__0__contract_8c.html#add423511874de78a3bdc671bdaac6464", null ],
+    [ "ck_q80_resolve_ggml_cpu_init", "gemm__kernels__q8__0__q8__0__contract_8c.html#a595718e96f38197e8074a12c2acff678", null ],
+    [ "ck_q80_resolve_ggml_free", "gemm__kernels__q8__0__q8__0__contract_8c.html#a4313daf143196030364c4f6bb9257582", null ],
+    [ "ck_q80_resolve_ggml_graph_compute_with_ctx", "gemm__kernels__q8__0__q8__0__contract_8c.html#a649f14915e2a415290e0f0f053c15f8e", null ],
+    [ "ck_q80_resolve_ggml_init", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7f33b99904bf0fecb5ad68a36e493b4d", null ],
+    [ "ck_q80_resolve_ggml_mul_mat", "gemm__kernels__q8__0__q8__0__contract_8c.html#af6a6b1326f1a106a805aa9e0b8f381c6", null ],
+    [ "ck_q80_resolve_ggml_new_graph", "gemm__kernels__q8__0__q8__0__contract_8c.html#a838c8941d90745b4f26517050095176e", null ],
+    [ "ck_q80_resolve_ggml_new_tensor_2d", "gemm__kernels__q8__0__q8__0__contract_8c.html#a02d2a45b409249b9710e6d80b588098b", null ],
     [ "gemm_nt_q8_0_q8_0_contract", "gemm__kernels__q8__0__q8__0__contract_8c.html#afe79cceed7908ec8029cd6db5ea1238d", null ],
-    [ "gemv_q8_0_q8_0_contract", "gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1", null ]
+    [ "gemm_nt_q8_0_q8_0_ggml_strict", "gemm__kernels__q8__0__q8__0__contract_8c.html#a3b0e8de31ffad5dfddb74a0dd7c2a5b0", null ],
+    [ "gemv_q8_0_q8_0_contract", "gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1", null ],
+    [ "gemv_q8_0_q8_0_ref_rows", "gemm__kernels__q8__0__q8__0__contract_8c.html#adfe1cc82f46a53d96fcee312b2368f36", null ],
+    [ "quantize_row_q8_0_ref_local", "gemm__kernels__q8__0__q8__0__contract_8c.html#a38b2a0bae2786e7a3ffda280682a97a3", null ],
+    [ "vec_dot_q8_0_q8_0_ref", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7522a539e09d34bc1298e9d5a3d09692", null ],
+    [ "ck_q80_contract_cached_gemm_seq", "gemm__kernels__q8__0__q8__0__contract_8c.html#acd64f0cd3b293702684699503fd50470", null ],
+    [ "ck_q80_contract_magic", "gemm__kernels__q8__0__q8__0__contract_8c.html#a90eef97daba413f712fd5bbddc2ad70b", null ],
+    [ "ck_q80_contract_version", "gemm__kernels__q8__0__q8__0__contract_8c.html#ab2c73a48ef5c3051bb544184ef2d2ba7", null ]
 ];

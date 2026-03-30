@@ -6,6 +6,8 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "attention_flash_true.c", "attention__flash__true_8c.html", "attention__flash__true_8c" ],
     [ "attention_kernels.c", "attention__kernels_8c.html", "attention__kernels_8c" ],
     [ "attention_kernels_sliding.c", "attention__kernels__sliding_8c.html", "attention__kernels__sliding_8c" ],
+    [ "attention_oracle_ggml.c", "attention__oracle__ggml_8c.html", "attention__oracle__ggml_8c" ],
+    [ "attention_oracle_ggml.h", "attention__oracle__ggml_8h.html", "attention__oracle__ggml_8h" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],
