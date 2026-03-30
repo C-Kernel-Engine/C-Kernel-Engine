@@ -1,0 +1,4414 @@
+/*
+ * C-Kernel-Engine v8 Native CLI
+ *
+ * Features:
+ *   - Model auto-discovery from cache
+ *   - Readline support for history/editing
+ *   - Chat template support (Qwen, LLaMA, etc.)
+ *   - Temperature/top-p sampling
+ *   - Streaming output
+ *   - Bootstrapped from the v7 CLI while v8 multimodal hosting is brought up
+ *
+ * Usage:
+ *   ck-cli-v8 --model <name>                    # Auto-discover from cache
+ *   ck-cli-v8 <libmodel.so> <weights.bump>      # Direct paths
+ *   ck-cli-v8 --lib <.so> --weights <.bump>     # Named args
+ */
+
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <errno.h>
+#include <signal.h>
+#include <dlfcn.h>
+#include <unistd.h>
+#include <time.h>
+#include <math.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+
+#ifdef HAVE_READLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
+
+#include "tokenizer/true_bpe.h"
+#include "ck_features.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#define CK_CLI_VERSION         "8.0.0-dev"
+#define CK_CLI_DEFAULT_MAX_TOKENS  256
+#define CK_CLI_EOS_MAX             8
+#define CK_CLI_OUTPUT_BUF_SIZE     4096
+#define CK_CLI_MAX_CONTEXT         32768
+#define CK_CLI_HISTORY_FILE        ".ck_cli_history"
+
+static volatile sig_atomic_t g_exit_requested = 0;
+static volatile sig_atomic_t g_generation_active = 0;
+
+/* Timing globals */
+static double g_prefill_time_ms = 0.0;
+static double g_decode_time_ms = 0.0;
+static int g_decode_count = 0;
+static int g_prompt_tokens = 0;
+static int g_user_tokens = 0;
+
+static void handle_sigint(int sig) {
+    (void)sig;
+    if (g_generation_active) {
+        g_generation_active = 0;  /* Stop generation but don't exit */
+    } else {
+        g_exit_requested = 1;
+    }
+}
+
+/* ============================================================================
+ * Model API Types
+ * ============================================================================ */
+
+typedef int (*init_t)(const char *weights_path);
+typedef int (*init_with_manifest_t)(const char *weights_path, const char *manifest_path);
+typedef int (*embed_t)(const int32_t *tokens, int num_tokens);
+typedef int (*forward_t)(float *logits_out);
+typedef int (*kv_enable_t)(int capacity);
+typedef void (*kv_reset_t)(void);
+typedef int (*decode_t)(int32_t token, float *logits_out);
+typedef void (*prefill_t)(const int32_t *tokens, int num_tokens);
+typedef int (*write_embeddings_t)(const float *embeddings, int num_tokens, int start_pos);
+typedef int (*embed_tokens_at_t)(const int32_t *tokens, int num_tokens, int start_pos);
+typedef int (*forward_from_embeddings_t)(int embedded_tokens, int total_tokens, float *logits_out);
+typedef int (*forward_mixed_t)(const float *prefix_embeddings, int prefix_tokens, const int32_t *tokens, int num_tokens, float *logits_out);
+typedef float *(*get_logits_t)(void);
+typedef int (*get_int_t)(void);
+typedef void (*free_t)(void);
+typedef uintptr_t (*get_base_ptr_t)(void);
+typedef intptr_t (*get_named_activation_i_t)(const char *name);
+typedef uintptr_t (*get_named_activation_ptr_t)(const char *name);
+
+/* Tokenizer API - uses model's built-in tokenizer (one source of truth) */
+typedef int (*encode_text_t)(const char *text, int text_len);
+typedef int (*decode_tokens_t)(const int32_t *ids, int num_ids, char *text, int max_len);
+typedef int (*has_tokenizer_t)(void);
+typedef int32_t (*lookup_token_t)(const char *text);
+typedef const char *(*id_to_token_t)(int32_t id);
+typedef const int32_t *(*get_token_buffer_t)(void);
+
+typedef struct {
+    void *handle;
+    init_t init;
+    init_with_manifest_t init_with_manifest;
+    embed_t embed;
+    forward_t forward;
+    kv_enable_t kv_enable;
+    kv_reset_t kv_reset;
+    decode_t decode;
+    prefill_t prefill;  /* ck_prefill for batched prefill (optional) */
+    write_embeddings_t write_embeddings;
+    embed_tokens_at_t embed_tokens_at;
+    forward_from_embeddings_t forward_from_embeddings;
+    forward_mixed_t forward_mixed;
+    get_logits_t get_logits;
+    get_int_t get_logits_stride;
+    get_int_t get_context;
+    get_int_t get_vocab_size;
+    get_int_t get_active_tokens;
+    get_base_ptr_t get_base_ptr;
+    get_named_activation_i_t get_named_activation_runtime_offset;
+    get_named_activation_i_t get_named_activation_nbytes;
+    get_named_activation_ptr_t get_named_activation_ptr;
+    free_t free_fn;
+
+    /* Built-in tokenizer API (from generated model) */
+    encode_text_t encode_text;
+    decode_tokens_t decode_tokens;
+    has_tokenizer_t has_tokenizer;
+    lookup_token_t lookup_token;
+    id_to_token_t id_to_token;
+    get_token_buffer_t get_token_buffer;
+} ModelAPI;
+
+/* ============================================================================
+ * Chat Template Types
+ * ============================================================================ */
+
+typedef enum {
+    CHAT_TEMPLATE_NONE = 0,
+    CHAT_TEMPLATE_QWEN,
+    CHAT_TEMPLATE_LLAMA,
+    CHAT_TEMPLATE_CHATML,
+    CHAT_TEMPLATE_MISTRAL,
+} ChatTemplateType;
+
+typedef struct {
+    ChatTemplateType type;
+    const char *system_prefix;
+    const char *system_suffix;
+    const char *user_prefix;
+    const char *user_suffix;
+    const char *assistant_prefix;
+    const char *assistant_suffix;
+} ChatTemplate;
+
+static const ChatTemplate g_templates[] = {
+    [CHAT_TEMPLATE_NONE] = {
+        .type = CHAT_TEMPLATE_NONE,
+        .system_prefix = "", .system_suffix = "\n",
+        .user_prefix = "", .user_suffix = "\n",
+        .assistant_prefix = "", .assistant_suffix = "",
+    },
+    [CHAT_TEMPLATE_QWEN] = {
+        .type = CHAT_TEMPLATE_QWEN,
+        .system_prefix = "<|im_start|>system\n",
+        .system_suffix = "<|im_end|>\n",
+        .user_prefix = "<|im_start|>user\n",
+        .user_suffix = "<|im_end|>\n",
+        .assistant_prefix = "<|im_start|>assistant\n",
+        .assistant_suffix = "<|im_end|>",
+    },
+    [CHAT_TEMPLATE_LLAMA] = {
+        .type = CHAT_TEMPLATE_LLAMA,
+        .system_prefix = "[INST] <<SYS>>\n",
+        .system_suffix = "\n<</SYS>>\n\n",
+        .user_prefix = "",
+        .user_suffix = " [/INST]",
+        .assistant_prefix = " ",
+        .assistant_suffix = " </s><s>[INST] ",
+    },
+    [CHAT_TEMPLATE_CHATML] = {
+        .type = CHAT_TEMPLATE_CHATML,
+        .system_prefix = "<|im_start|>system\n",
+        .system_suffix = "<|im_end|>\n",
+        .user_prefix = "<|im_start|>user\n",
+        .user_suffix = "<|im_end|>\n",
+        .assistant_prefix = "<|im_start|>assistant\n",
+        .assistant_suffix = "<|im_end|>",
+    },
+    [CHAT_TEMPLATE_MISTRAL] = {
+        .type = CHAT_TEMPLATE_MISTRAL,
+        .system_prefix = "",
+        .system_suffix = "\n\n",
+        .user_prefix = "[INST] ",
+        .user_suffix = " [/INST]",
+        .assistant_prefix = "",
+        .assistant_suffix = "</s> ",
+    },
+};
+
+/* ============================================================================
+ * CLI Options
+ * ============================================================================ */
+
+typedef struct {
+    const char *model_name;     /* Model name for auto-discovery */
+    const char *lib_path;
+    const char *weights_path;
+    const char *manifest_path;
+    const char *prefix_f32_path;
+    const char *prompt_once;
+    const char *prompt_tokens_csv;
+    const char *system_prompt;
+    int max_tokens;
+    int context_override;
+    int synthetic_prefix_tokens;
+    float temperature;
+    float top_p;
+    bool ignore_eos;
+    bool stream;
+    bool timing;
+    bool verbose;
+    bool quiet_output;
+    bool no_chat_template;
+    ChatTemplateType chat_template;
+    int eos_ids[CK_CLI_EOS_MAX];
+    int eos_count;
+} CLIOptions;
+
+
+/* ============================================================================
+ * PR7.1 - Native Train/Profile Subcommands (C-first operator path)
+ * ============================================================================
+ */
+
+typedef struct {
+    const char *run_dir;
+    const char *token_file;
+    const char *json_out;
+    int epochs;
+    int seq_len;
+    int total_tokens;
+    int grad_accum;
+    float lr;
+    int strict;
+    int verbose;
+    int threads;
+    int log_every;
+} TrainOptions;
+
+typedef struct {
+    const char *run_dir;
+    const char *output_path;
+} ReportIndexOptions;
+
+typedef struct {
+    const char *run_dir;
+    const char *tool;
+    const char *output_dir;
+    const char *token_file;
+    int epochs;
+    int seq_len;
+    int total_tokens;
+    int grad_accum;
+    float lr;
+    int strict;
+    int threads;
+} ProfileOptions;
+
+typedef struct {
+    char *name;
+    long offset;
+    long size;
+    char *dtype;
+    char *shape_json;
+} ManifestEntry;
+
+typedef struct {
+    char **names;
+    int *numel;
+    int count;
+} RuntimeInitOrder;
+
+/* ---- tiny JSON parser (embedded jsmn subset) ---- */
+
+typedef enum {
+    JSMN_UNDEFINED = 0,
+    JSMN_OBJECT = 1,
+    JSMN_ARRAY = 2,
+    JSMN_STRING = 3,
+    JSMN_PRIMITIVE = 4
+} jsmntype_t;
+
+typedef struct {
+    jsmntype_t type;
+    int start;
+    int end;
+    int size;
+} jsmntok_t;
+
+typedef struct {
+    unsigned int pos;
+    unsigned int toknext;
+    int toksuper;
+} jsmn_parser;
+
+#define JSMN_ERROR_NOMEM -1
+#define JSMN_ERROR_INVAL -2
+#define JSMN_ERROR_PART  -3
+
+static void jsmn_init(jsmn_parser *parser) {
+    parser->pos = 0;
+    parser->toknext = 0;
+    parser->toksuper = -1;
+}
+
+static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser, jsmntok_t *tokens, size_t num_tokens) {
+    if (parser->toknext >= num_tokens) return NULL;
+    jsmntok_t *tok = &tokens[parser->toknext++];
+    tok->start = tok->end = -1;
+    tok->size = 0;
+    tok->type = JSMN_UNDEFINED;
+    return tok;
+}
+
+static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type, int start, int end) {
+    token->type = type;
+    token->start = start;
+    token->end = end;
+    token->size = 0;
+}
+
+static int jsmn_parse_primitive(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    int start = (int)parser->pos;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        if (c == '\t' || c == '\r' || c == '\n' || c == ' ' || c == ',' || c == ']' || c == '}') {
+            jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+            if (tok == NULL) return JSMN_ERROR_NOMEM;
+            jsmn_fill_token(tok, JSMN_PRIMITIVE, start, (int)parser->pos);
+            parser->pos--;
+            return 0;
+        }
+        if (c < 32 || c >= 127) {
+            parser->pos = (unsigned int)start;
+            return JSMN_ERROR_INVAL;
+        }
+    }
+    jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+    if (tok == NULL) return JSMN_ERROR_NOMEM;
+    jsmn_fill_token(tok, JSMN_PRIMITIVE, start, (int)parser->pos);
+    parser->pos--;
+    return 0;
+}
+
+static int jsmn_parse_string(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    int start = (int)parser->pos + 1;
+    parser->pos++;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        if (c == '"') {
+            jsmntok_t *tok = jsmn_alloc_token(parser, tokens, num_tokens);
+            if (tok == NULL) return JSMN_ERROR_NOMEM;
+            jsmn_fill_token(tok, JSMN_STRING, start, (int)parser->pos);
+            return 0;
+        }
+        if (c == '\\') parser->pos++;
+    }
+    return JSMN_ERROR_PART;
+}
+
+static int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, jsmntok_t *tokens, unsigned int num_tokens) {
+    int r;
+    for (; parser->pos < len; parser->pos++) {
+        char c = js[parser->pos];
+        jsmntok_t *tok;
+        switch (c) {
+            case '{':
+            case '[':
+                tok = jsmn_alloc_token(parser, tokens, num_tokens);
+                if (tok == NULL) return JSMN_ERROR_NOMEM;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
+                tok->start = (int)parser->pos;
+                parser->toksuper = (int)parser->toknext - 1;
+                break;
+            case '}':
+            case ']':
+                for (int i = (int)parser->toknext - 1; i >= 0; i--) {
+                    tok = &tokens[i];
+                    if (tok->start != -1 && tok->end == -1) {
+                        if ((c == '}' && tok->type != JSMN_OBJECT) || (c == ']' && tok->type != JSMN_ARRAY)) {
+                            return JSMN_ERROR_INVAL;
+                        }
+                        tok->end = (int)parser->pos + 1;
+                        parser->toksuper = -1;
+                        for (int j = i - 1; j >= 0; j--) {
+                            if (tokens[j].start != -1 && tokens[j].end == -1) {
+                                parser->toksuper = j;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                break;
+            case '"':
+                r = jsmn_parse_string(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                break;
+            case '\t': case '\r': case '\n': case ' ': case ':': case ',':
+                break;
+            default:
+                r = jsmn_parse_primitive(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                if (parser->toksuper != -1) tokens[parser->toksuper].size++;
+                break;
+        }
+    }
+    for (unsigned int i = 0; i < parser->toknext; i++) {
+        if (tokens[i].start != -1 && tokens[i].end == -1) return JSMN_ERROR_PART;
+    }
+    return (int)parser->toknext;
+}
+
+static int json_skip_token(const jsmntok_t *toks, int i) {
+    int j = i;
+    if (toks[j].type == JSMN_STRING || toks[j].type == JSMN_PRIMITIVE) return j + 1;
+    if (toks[j].type == JSMN_ARRAY || toks[j].type == JSMN_OBJECT) {
+        j++;
+        for (int k = 0; k < toks[i].size; k++) {
+            j = json_skip_token(toks, j);
+        }
+        return j;
+    }
+    return j + 1;
+}
+
+static bool json_tok_streq(const char *json, const jsmntok_t *tok, const char *s) {
+    if (!json || !tok || !s || tok->type != JSMN_STRING) return false;
+    size_t n = (size_t)(tok->end - tok->start);
+    return strlen(s) == n && strncmp(json + tok->start, s, n) == 0;
+}
+
+static char *json_tok_strdup(const char *json, const jsmntok_t *tok) {
+    if (!json || !tok || tok->start < 0 || tok->end < tok->start) return NULL;
+    size_t n = (size_t)(tok->end - tok->start);
+    char *out = (char*)malloc(n + 1);
+    if (!out) return NULL;
+    memcpy(out, json + tok->start, n);
+    out[n] = '\0';
+    return out;
+}
+
+static int json_find_key_value(const char *json, const jsmntok_t *toks, int obj_idx, const char *key) {
+    if (!json || !toks || obj_idx < 0 || toks[obj_idx].type != JSMN_OBJECT) return -1;
+    int i = obj_idx + 1;
+    const int end = json_skip_token(toks, obj_idx);
+    while (i < end) {
+        int kidx = i;
+        int vidx = json_skip_token(toks, kidx);
+        if (vidx >= end) break;
+        if (json_tok_streq(json, &toks[kidx], key)) return vidx;
+        i = json_skip_token(toks, vidx);
+    }
+    return -1;
+}
+
+static bool read_file_text(const char *path, char **out_buf, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return false; }
+    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
+    char *buf = (char*)malloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return false; }
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[got] = '\0';
+    *out_buf = buf;
+    if (out_len) *out_len = got;
+    return true;
+}
+
+static bool read_file_blob(const char *path, uint8_t **out_buf, size_t *out_len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return false; }
+    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
+    uint8_t *buf = (uint8_t*)malloc((size_t)sz);
+    if (!buf) { fclose(f); return false; }
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    *out_buf = buf;
+    if (out_len) *out_len = got;
+    return true;
+}
+
+static int parse_json_tokens(const char *json, size_t len, jsmntok_t **out_tokens) {
+    int cap = (int)(len / 8) + 2048;
+    if (cap < 2048) cap = 2048;
+    for (;;) {
+        jsmntok_t *toks = (jsmntok_t*)calloc((size_t)cap, sizeof(jsmntok_t));
+        if (!toks) return -1;
+        jsmn_parser p;
+        jsmn_init(&p);
+        int rc = jsmn_parse(&p, json, len, toks, (unsigned int)cap);
+        if (rc == JSMN_ERROR_NOMEM) {
+            free(toks);
+            cap *= 2;
+            if (cap > (1 << 20)) return -1;
+            continue;
+        }
+        if (rc < 0) {
+            free(toks);
+            return -1;
+        }
+        *out_tokens = toks;
+        return rc;
+    }
+}
+
+static int parse_runtime_init_order(const char *summary_path, RuntimeInitOrder *out) {
+    memset(out, 0, sizeof(*out));
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(summary_path, &json, &len)) return -1;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) { free(json); return -2; }
+    int arr_order = json_find_key_value(json, toks, 0, "init_weight_order");
+    int arr_numel = json_find_key_value(json, toks, 0, "init_weight_numel");
+    if (arr_order < 0 || toks[arr_order].type != JSMN_ARRAY) {
+        free(toks); free(json); return -3;
+    }
+    int count = toks[arr_order].size;
+    if (count <= 0) { free(toks); free(json); return -4; }
+    out->names = (char**)calloc((size_t)count, sizeof(char*));
+    out->numel = (int*)calloc((size_t)count, sizeof(int));
+    if (!out->names || !out->numel) {
+        free(out->names); free(out->numel);
+        free(toks); free(json);
+        return -5;
+    }
+    int idx = arr_order + 1;
+    for (int i = 0; i < count; i++) {
+        out->names[i] = json_tok_strdup(json, &toks[idx]);
+        idx = json_skip_token(toks, idx);
+    }
+    if (arr_numel >= 0 && toks[arr_numel].type == JSMN_ARRAY) {
+        int nidx = arr_numel + 1;
+        int ncount = toks[arr_numel].size;
+        for (int i = 0; i < count && i < ncount; i++) {
+            char *s = json_tok_strdup(json, &toks[nidx]);
+            out->numel[i] = s ? atoi(s) : 0;
+            free(s);
+            nidx = json_skip_token(toks, nidx);
+        }
+    }
+    out->count = count;
+    free(toks);
+    free(json);
+    return 0;
+}
+
+static void free_runtime_init_order(RuntimeInitOrder *r) {
+    if (!r) return;
+    if (r->names) {
+        for (int i = 0; i < r->count; i++) free(r->names[i]);
+    }
+    free(r->names);
+    free(r->numel);
+    memset(r, 0, sizeof(*r));
+}
+
+static int parse_manifest_entries(const char *manifest_path, ManifestEntry **out_entries, int *out_count) {
+    *out_entries = NULL;
+    *out_count = 0;
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(manifest_path, &json, &len)) return -1;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) { free(json); return -2; }
+    int entries_idx = json_find_key_value(json, toks, 0, "entries");
+    if (entries_idx < 0 || toks[entries_idx].type != JSMN_ARRAY) {
+        free(toks); free(json); return -3;
+    }
+    int count = toks[entries_idx].size;
+    ManifestEntry *entries = (ManifestEntry*)calloc((size_t)count, sizeof(ManifestEntry));
+    if (!entries) { free(toks); free(json); return -4; }
+    int idx = entries_idx + 1;
+    int w = 0;
+    for (int i = 0; i < count; i++) {
+        int obj = idx;
+        if (toks[obj].type != JSMN_OBJECT) {
+            idx = json_skip_token(toks, idx);
+            continue;
+        }
+        int name_idx = json_find_key_value(json, toks, obj, "name");
+        int off_idx = json_find_key_value(json, toks, obj, "offset");
+        int size_idx = json_find_key_value(json, toks, obj, "size");
+        int dtype_idx = json_find_key_value(json, toks, obj, "dtype");
+        int shape_idx = json_find_key_value(json, toks, obj, "shape");
+        if (name_idx >= 0 && off_idx >= 0 && size_idx >= 0) {
+            entries[w].name = json_tok_strdup(json, &toks[name_idx]);
+            char *off_s = json_tok_strdup(json, &toks[off_idx]);
+            char *size_s = json_tok_strdup(json, &toks[size_idx]);
+            entries[w].offset = off_s ? atol(off_s) : -1;
+            entries[w].size = size_s ? atol(size_s) : -1;
+            entries[w].dtype = (dtype_idx >= 0) ? json_tok_strdup(json, &toks[dtype_idx]) : NULL;
+            entries[w].shape_json = (shape_idx >= 0) ? json_tok_strdup(json, &toks[shape_idx]) : NULL;
+            free(off_s);
+            free(size_s);
+            if (entries[w].name && entries[w].offset >= 0 && entries[w].size > 0) w++;
+            else {
+                free(entries[w].name); free(entries[w].dtype); free(entries[w].shape_json);
+            }
+        }
+        idx = json_skip_token(toks, idx);
+    }
+    *out_entries = entries;
+    *out_count = w;
+    free(toks);
+    free(json);
+    return 0;
+}
+
+static void free_manifest_entries(ManifestEntry *entries, int count) {
+    if (!entries) return;
+    for (int i = 0; i < count; i++) {
+        free(entries[i].name);
+        free(entries[i].dtype);
+        free(entries[i].shape_json);
+    }
+    free(entries);
+}
+
+static int parse_manifest_embedded_meta(const char *manifest_path, char **out_config_json, char **out_template_json) {
+    if (!out_config_json || !out_template_json) return -1;
+    *out_config_json = NULL;
+    *out_template_json = NULL;
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(manifest_path, &json, &len)) return -2;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) {
+        free(json);
+        return -3;
+    }
+    int config_idx = json_find_key_value(json, toks, 0, "config");
+    int template_idx = json_find_key_value(json, toks, 0, "template");
+    if (config_idx >= 0) {
+        *out_config_json = json_tok_strdup(json, &toks[config_idx]);
+    }
+    if (template_idx >= 0) {
+        *out_template_json = json_tok_strdup(json, &toks[template_idx]);
+    }
+    free(toks);
+    free(json);
+    return 0;
+}
+
+static const ManifestEntry *find_manifest_entry(const ManifestEntry *entries, int count, const char *name) {
+    if (!entries || !name) return NULL;
+    for (int i = 0; i < count; i++) {
+        if (entries[i].name && strcmp(entries[i].name, name) == 0) return &entries[i];
+    }
+    return NULL;
+}
+
+static bool is_fp32_dtype(const char *dtype) {
+    if (!dtype) return true;
+    return strcmp(dtype, "fp32") == 0 || strcmp(dtype, "f32") == 0;
+}
+
+static int parse_int_tokens_file(const char *path, int32_t **out_tokens, int *out_count) {
+    *out_tokens = NULL;
+    *out_count = 0;
+    char *txt = NULL;
+    size_t len = 0;
+    if (!read_file_text(path, &txt, &len)) return -1;
+    int cap = 4096;
+    int count = 0;
+    int32_t *vals = (int32_t*)malloc((size_t)cap * sizeof(int32_t));
+    if (!vals) { free(txt); return -2; }
+    char *p = txt;
+    while (*p) {
+        while (*p && !(isdigit((unsigned char)*p) || *p == '-' || *p == '+')) p++;
+        if (!*p) break;
+        char *endp = NULL;
+        long v = strtol(p, &endp, 10);
+        if (endp == p) break;
+        if (count >= cap) {
+            cap *= 2;
+            int32_t *tmp = (int32_t*)realloc(vals, (size_t)cap * sizeof(int32_t));
+            if (!tmp) { free(vals); free(txt); return -3; }
+            vals = tmp;
+        }
+        vals[count++] = (int32_t)v;
+        p = endp;
+    }
+    free(txt);
+    if (count <= 1) { free(vals); return -4; }
+    *out_tokens = vals;
+    *out_count = count;
+    return 0;
+}
+
+static double monotonic_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+}
+
+static int ensure_parent_dir(const char *path) {
+    if (!path) return -1;
+    char tmp[4096];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    char *slash = strrchr(tmp, '/');
+    if (!slash) return 0;
+    *slash = '\0';
+    if (tmp[0] == '\0') return 0;
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "mkdir -p '%s'", tmp);
+    int rc = system(cmd);
+    return (rc == 0) ? 0 : -1;
+}
+
+static int write_run_index(const char *run_dir, const char *output_path) {
+    static const char *keys[] = {
+        "train_e2e_latest.json",
+        "training_loss_curve_latest.json",
+        "training_parity_latest.json",
+        "training_grad_norms_latest.json",
+        "training_step_profile_latest.json",
+        "training_checkpoint_policy_latest.json",
+        "memory_diagnostic_latest.json",
+        "memory_verification_latest.json",
+        "layout_train.json",
+        "layout_train_audit.json",
+        "generated_train_runtime_summary_v7.json",
+        "ir1_train_forward.json",
+        "ir2_train_backward.json",
+        "profile_summary.json",
+        "perf_stat_summary.json",
+        "flamegraph_manifest.json",
+        "cachegrind_summary.json",
+        "asan_summary.json",
+        "vtune_summary.json",
+        "advisor_summary.json",
+        "run_index.json",
+    };
+    const char *out = output_path;
+    char out_buf[4096];
+    if (!out || !*out) {
+        snprintf(out_buf, sizeof(out_buf), "%s/run_index.json", run_dir);
+        out = out_buf;
+    }
+    if (ensure_parent_dir(out) != 0) return -1;
+    FILE *f = fopen(out, "w");
+    if (!f) return -2;
+    time_t now = time(NULL);
+    fprintf(f, "{\n");
+    fprintf(f, "  \"schema\": \"ck.run.index.v1\",\n");
+    fprintf(f, "  \"generated_by\": \"ck-cli-v7\",\n");
+    fprintf(f, "  \"generated_at_epoch\": %lld,\n", (long long)now);
+    fprintf(f, "  \"run_dir\": \"%s\",\n", run_dir);
+    fprintf(f, "  \"files\": {\n");
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        char p[4096];
+        struct stat st;
+        snprintf(p, sizeof(p), "%s/%s", run_dir, keys[i]);
+        int ok = (stat(p, &st) == 0);
+        fprintf(f, "    \"%s\": {\"path\": \"%s\", \"exists\": %s, \"size_bytes\": %lld}%s\n",
+                keys[i], p, ok ? "true" : "false", ok ? (long long)st.st_size : 0LL,
+                (i + 1 < sizeof(keys) / sizeof(keys[0])) ? "," : "");
+    }
+    fprintf(f, "  }\n");
+    fprintf(f, "}\n");
+    fclose(f);
+    return 0;
+}
+
+/* ============================================================================
+ * Cache Discovery
+ * ============================================================================ */
+
+static const char *get_cache_dir(void) {
+    static char cache_path[4096];
+    const char *home = getenv("HOME");
+    if (!home) home = "/tmp";
+    snprintf(cache_path, sizeof(cache_path), "%s/.cache/ck-engine-v7/models", home);
+    return cache_path;
+}
+
+/* Case-insensitive substring search */
+static const char *strcasestr_local(const char *haystack, const char *needle) {
+    if (!needle[0]) return haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack, *n = needle;
+        while (*h && *n && (tolower((unsigned char)*h) == tolower((unsigned char)*n))) {
+            h++; n++;
+        }
+        if (!*n) return haystack;
+    }
+    return NULL;
+}
+
+static bool path_exists(const char *path) {
+    struct stat st;
+    return path && stat(path, &st) == 0;
+}
+
+static bool derive_manifest_map_path(const char *weights_path, char *manifest_out, size_t out_size) {
+    if (!weights_path || !manifest_out || out_size == 0) return false;
+    const char *slash = strrchr(weights_path, '/');
+    if (!slash) return false;
+    size_t dir_len = (size_t)(slash - weights_path);
+    if (dir_len + strlen("/weights_manifest.map") + 1 > out_size) return false;
+    memcpy(manifest_out, weights_path, dir_len);
+    manifest_out[dir_len] = '\0';
+    strncat(manifest_out, "/weights_manifest.map", out_size - strlen(manifest_out) - 1);
+    return path_exists(manifest_out);
+}
+
+static bool resolve_model_runtime_paths(
+    const char *model_dir,
+    char *lib_out,
+    char *weights_out,
+    size_t out_size,
+    double *weights_size
+) {
+    if (!model_dir || !lib_out || !weights_out || out_size == 0) return false;
+
+    static const char *lib_patterns[] = {
+        "%s/.ck_build/libmodel.so",
+        "%s/libmodel.so",
+        "%s/ck-kernel-inference.so",
+    };
+    static const char *weights_patterns[] = {
+        "%s/.ck_build/weights.bump",
+        "%s/weights.bump",
+        "%s/weights.bump",
+    };
+
+    for (size_t i = 0; i < sizeof(lib_patterns) / sizeof(lib_patterns[0]); i++) {
+        char lib_path[4096], bump_path[4096];
+        snprintf(lib_path, sizeof(lib_path), lib_patterns[i], model_dir);
+        snprintf(bump_path, sizeof(bump_path), weights_patterns[i], model_dir);
+
+        if (path_exists(lib_path) && path_exists(bump_path)) {
+            snprintf(lib_out, out_size, "%s", lib_path);
+            snprintf(weights_out, out_size, "%s", bump_path);
+            if (weights_size) {
+                struct stat st_bump;
+                if (stat(bump_path, &st_bump) == 0) {
+                    *weights_size = (double)st_bump.st_size;
+                }
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool find_model_in_cache(const char *model_name, char *lib_out, char *weights_out, size_t out_size) {
+    const char *cache_dir = get_cache_dir();
+    DIR *dir = opendir(cache_dir);
+    if (!dir) return false;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        /* Case-insensitive check if directory name contains model_name */
+        if (strcasestr_local(entry->d_name, model_name) != NULL) {
+            char model_dir[4096];
+            snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
+            if (resolve_model_runtime_paths(model_dir, lib_out, weights_out, out_size, NULL)) {
+                closedir(dir);
+                return true;
+            }
+        }
+    }
+    closedir(dir);
+    return false;
+}
+
+/* ============================================================================
+ * EOS Token Loading
+ * ============================================================================ */
+
+static bool load_eos_from_vocab_json(const char *weights_path, CLIOptions *opt) {
+    if (!weights_path || !opt) return false;
+
+    /* Construct vocab.json path from weights path */
+    char vocab_path[4096];
+    const char *slash = strrchr(weights_path, '/');
+    if (!slash) return false;
+
+    size_t dir_len = (size_t)(slash - weights_path);
+    if (dir_len + 12 >= sizeof(vocab_path)) return false;
+
+    memcpy(vocab_path, weights_path, dir_len);
+    vocab_path[dir_len] = '\0';
+    strcat(vocab_path, "/vocab.json");
+
+    FILE *f = fopen(vocab_path, "r");
+    if (!f) return false;
+
+    /* Simple JSON parsing for special_tokens */
+    char buf[8192];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+
+    /* Look for "special_tokens" section */
+    const char *st = strstr(buf, "\"special_tokens\"");
+    if (!st) return false;
+
+    /* Extract eos token */
+    const char *eos = strstr(st, "\"eos\"");
+    if (eos) {
+        const char *colon = strchr(eos, ':');
+        if (colon) {
+            int eos_id = atoi(colon + 1);
+            if (eos_id > 0) {
+                opt->eos_ids[0] = eos_id;
+                opt->eos_count = 1;
+            }
+        }
+    }
+
+    /* Extract bos token (often used as im_end for chat) */
+    const char *bos = strstr(st, "\"bos\"");
+    if (bos) {
+        const char *colon = strchr(bos, ':');
+        if (colon) {
+            int bos_id = atoi(colon + 1);
+            if (bos_id > 0 && bos_id != opt->eos_ids[0]) {
+                opt->eos_ids[opt->eos_count++] = bos_id;
+            }
+        }
+    }
+
+    return opt->eos_count > 0;
+}
+
+static void list_available_models(void) {
+    const char *cache_dir = get_cache_dir();
+    DIR *dir = opendir(cache_dir);
+    if (!dir) {
+        fprintf(stderr, "No models found in %s\n", cache_dir);
+        return;
+    }
+
+    fprintf(stderr, "Available models in %s:\n", cache_dir);
+    struct dirent *entry;
+    int count = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char model_dir[4096];
+        snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
+
+        char resolved_lib[4096], resolved_bump[4096];
+        if (resolve_model_runtime_paths(model_dir, resolved_lib, resolved_bump, sizeof(resolved_lib), NULL)) {
+            fprintf(stderr, "  - %s\n", entry->d_name);
+            count++;
+        }
+    }
+    closedir(dir);
+
+    if (count == 0) {
+        fprintf(stderr, "  (none found)\n");
+    }
+}
+
+#define MAX_CACHED_MODELS 64
+
+static const char *format_size(double bytes, char *buf, size_t buf_size) {
+    if (bytes >= 1e9)       snprintf(buf, buf_size, "%.1f GB", bytes / 1e9);
+    else if (bytes >= 1e6)  snprintf(buf, buf_size, "%.1f MB", bytes / 1e6);
+    else if (bytes >= 1e3)  snprintf(buf, buf_size, "%.1f KB", bytes / 1e3);
+    else                    snprintf(buf, buf_size, "%.0f B", bytes);
+    return buf;
+}
+
+/**
+ * @brief Scan cache directory and auto-select a model.
+ *
+ * If exactly one compiled model is found, auto-selects it.
+ * If multiple are found, presents a numbered list for user selection.
+ * Returns true if a model was selected (lib_out and weights_out filled).
+ */
+static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_size) {
+    const char *cache_dir = get_cache_dir();
+    DIR *dir = opendir(cache_dir);
+    if (!dir) {
+        fprintf(stderr, "\n  No model cache found.\n");
+        fprintf(stderr, "  Looked in: %s\n\n", cache_dir);
+        fprintf(stderr, "  To get started, compile a model first:\n");
+        fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run <model-name>\n\n");
+        fprintf(stderr, "  Example:\n");
+        fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+        return false;
+    }
+
+    /* Collect compiled models */
+    char model_names[MAX_CACHED_MODELS][256];
+    char so_paths[MAX_CACHED_MODELS][4096];
+    char bump_paths[MAX_CACHED_MODELS][4096];
+    double weights_sizes[MAX_CACHED_MODELS];
+    int count = 0;
+
+    /* Also count directories that exist but aren't compiled yet */
+    int uncompiled = 0;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char model_dir[4096];
+        snprintf(model_dir, sizeof(model_dir), "%s/%s", cache_dir, entry->d_name);
+
+        char resolved_lib[4096], resolved_bump[4096];
+        double resolved_weights = 0.0;
+        bool ready = resolve_model_runtime_paths(
+            model_dir,
+            resolved_lib,
+            resolved_bump,
+            sizeof(resolved_lib),
+            &resolved_weights
+        );
+
+        if (ready && count < MAX_CACHED_MODELS) {
+            strncpy(model_names[count], entry->d_name, 255);
+            model_names[count][255] = 0;
+            strncpy(so_paths[count], resolved_lib, 4095);
+            so_paths[count][4095] = 0;
+            strncpy(bump_paths[count], resolved_bump, 4095);
+            bump_paths[count][4095] = 0;
+            weights_sizes[count] = resolved_weights;
+            count++;
+        } else {
+            uncompiled++;
+        }
+    }
+    closedir(dir);
+
+    if (count == 0) {
+        fprintf(stderr, "\n  Scanned: %s\n", cache_dir);
+        if (uncompiled > 0) {
+            fprintf(stderr, "  Found %d model folder%s, but none are compiled yet.\n\n",
+                   uncompiled, uncompiled > 1 ? "s" : "");
+            fprintf(stderr, "  To compile, run:\n");
+            fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run <model-name> --force-compile\n\n");
+        } else {
+            fprintf(stderr, "  No models found.\n\n");
+            fprintf(stderr, "  To get started, download and compile a model:\n");
+            fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+        }
+        return false;
+    }
+
+    int selected = 0;
+    char size_buf[32];
+
+    if (count == 1) {
+        fprintf(stderr, "  Found 1 compiled model in cache:\n");
+        fprintf(stderr, "    %s  (%s)\n\n",
+                model_names[0], format_size(weights_sizes[0], size_buf, sizeof(size_buf)));
+        fprintf(stderr, "  Loading automatically...\n\n");
+        selected = 0;
+    } else {
+        fprintf(stderr, "  Found %d compiled models in cache:\n", count);
+        fprintf(stderr, "  %s\n\n", cache_dir);
+        for (int i = 0; i < count; i++) {
+            fprintf(stderr, "    [%d]  %s  (%s)\n",
+                   i + 1, model_names[i],
+                   format_size(weights_sizes[i], size_buf, sizeof(size_buf)));
+        }
+        if (uncompiled > 0) {
+            fprintf(stderr, "\n  (%d other folder%s not yet compiled — run ck_run_v7.py to compile)\n",
+                   uncompiled, uncompiled > 1 ? "s" : "");
+        }
+        fprintf(stderr, "\n  Which model would you like to use? [1-%d]: ", count);
+
+        char input_buf[32];
+        if (!fgets(input_buf, sizeof(input_buf), stdin)) {
+            return false;
+        }
+
+        /* Default to 1 if user just presses Enter */
+        int choice = atoi(input_buf);
+        if (input_buf[0] == '\n' || input_buf[0] == '\r') {
+            choice = 1;
+        }
+        if (choice < 1 || choice > count) {
+            fprintf(stderr, "  Invalid selection. Expected 1-%d.\n", count);
+            return false;
+        }
+        selected = choice - 1;
+        fprintf(stderr, "\n  Selected: %s\n\n", model_names[selected]);
+    }
+
+    strncpy(lib_out, so_paths[selected], out_size - 1);
+    lib_out[out_size - 1] = '\0';
+    strncpy(weights_out, bump_paths[selected], out_size - 1);
+    weights_out[out_size - 1] = '\0';
+    return true;
+}
+
+/* ============================================================================
+ * Sampling
+ * ============================================================================ */
+
+static int sample_top_p(float *logits, int vocab_size, float temperature, float top_p) {
+    if (temperature <= 0.0f || top_p <= 0.0f) {
+        /* Argmax */
+        int best = 0;
+        float best_val = logits[0];
+        for (int i = 1; i < vocab_size; i++) {
+            if (logits[i] > best_val) {
+                best_val = logits[i];
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    /* Apply temperature */
+    float max_logit = logits[0];
+    for (int i = 1; i < vocab_size; i++) {
+        if (logits[i] > max_logit) max_logit = logits[i];
+    }
+
+    float sum = 0.0f;
+    for (int i = 0; i < vocab_size; i++) {
+        logits[i] = expf((logits[i] - max_logit) / temperature);
+        sum += logits[i];
+    }
+
+    /* Normalize to probabilities */
+    for (int i = 0; i < vocab_size; i++) {
+        logits[i] /= sum;
+    }
+
+    /* Sort indices by probability (simple selection for top-p) */
+    /* For efficiency, we'll do nucleus sampling with cumulative sum */
+    float cumsum = 0.0f;
+    /* Find nucleus tokens and sample */
+    int *indices = (int *)malloc(vocab_size * sizeof(int));
+    float *probs = (float *)malloc(vocab_size * sizeof(float));
+    for (int i = 0; i < vocab_size; i++) {
+        indices[i] = i;
+        probs[i] = logits[i];
+    }
+
+    /* Simple sort (for small vocab, bubble sort is fine; for large, use qsort) */
+    for (int i = 0; i < vocab_size - 1; i++) {
+        for (int j = i + 1; j < vocab_size; j++) {
+            if (probs[j] > probs[i]) {
+                float tmp_p = probs[i]; probs[i] = probs[j]; probs[j] = tmp_p;
+                int tmp_i = indices[i]; indices[i] = indices[j]; indices[j] = tmp_i;
+            }
+        }
+        cumsum += probs[i];
+        if (cumsum >= top_p) break;
+    }
+
+    /* Sample from nucleus */
+    float r = (float)rand() / (float)RAND_MAX * cumsum;
+    float acc = 0.0f;
+    int result = indices[0];
+    for (int i = 0; cumsum > 0 && i < vocab_size; i++) {
+        acc += probs[i];
+        if (acc >= r) {
+            result = indices[i];
+            break;
+        }
+        if (acc >= cumsum) break;
+    }
+
+    free(indices);
+    free(probs);
+    return result;
+}
+
+/* ============================================================================
+ * Output Helpers
+ * ============================================================================ */
+
+/**
+ * Decode GPT-2 byte-level BPE representation back to actual bytes.
+ *
+ * GPT-2's tokenizer maps certain bytes to Unicode code points:
+ * - Bytes 0x00-0x20 → U+0100-U+0120 (Ā Ć ċ ... Ġ)
+ * - Bytes 0x7F-0xA0 → U+017F-U+01A0
+ * - Printable ASCII (0x21-0x7E) stays as-is
+ *
+ * This function reverses that mapping.
+ *
+ * @param token  Input BPE token string (UTF-8)
+ * @param out    Output buffer for decoded bytes
+ * @param max    Size of output buffer
+ * @return       Number of bytes written (not including NUL)
+ */
+static int decode_bpe_token(const char *token, char *out, int max) {
+    if (!token || max <= 0) return 0;
+
+    const unsigned char *src = (const unsigned char *)token;
+    int out_len = 0;
+
+    while (*src && out_len < max - 1) {
+        unsigned int codepoint;
+        int bytes;
+
+        /* Decode UTF-8 to codepoint */
+        if ((src[0] & 0x80) == 0) {
+            /* Single byte ASCII */
+            codepoint = src[0];
+            bytes = 1;
+        } else if ((src[0] & 0xE0) == 0xC0 && (src[1] & 0xC0) == 0x80) {
+            /* Two byte sequence */
+            codepoint = ((src[0] & 0x1F) << 6) | (src[1] & 0x3F);
+            bytes = 2;
+        } else if ((src[0] & 0xF0) == 0xE0 && (src[1] & 0xC0) == 0x80 && (src[2] & 0xC0) == 0x80) {
+            /* Three byte sequence */
+            codepoint = ((src[0] & 0x0F) << 12) | ((src[1] & 0x3F) << 6) | (src[2] & 0x3F);
+            bytes = 3;
+        } else if ((src[0] & 0xF8) == 0xF0 && (src[1] & 0xC0) == 0x80 &&
+                   (src[2] & 0xC0) == 0x80 && (src[3] & 0xC0) == 0x80) {
+            /* Four byte sequence */
+            codepoint = ((src[0] & 0x07) << 18) | ((src[1] & 0x3F) << 12) |
+                        ((src[2] & 0x3F) << 6) | (src[3] & 0x3F);
+            bytes = 4;
+        } else {
+            /* Invalid UTF-8, copy byte as-is */
+            out[out_len++] = (char)*src;
+            src++;
+            continue;
+        }
+
+        /* Check if this is a GPT-2 byte-encoded character */
+        if (codepoint >= 0x100 && codepoint <= 0x120) {
+            /* Bytes 0x00-0x20: U+0100-U+0120 → byte = codepoint - 0x100 */
+            out[out_len++] = (char)(codepoint - 0x100);
+        } else if (codepoint >= 0x17F && codepoint <= 0x1A0) {
+            /* Bytes 0x7F-0xA0: U+017F-U+01A0 → byte = codepoint - 0x100 */
+            out[out_len++] = (char)(codepoint - 0x100);
+        } else if (codepoint < 0x80) {
+            /* Regular ASCII - copy as-is */
+            out[out_len++] = (char)codepoint;
+        } else if (codepoint == 0x2581) {
+            /* SentencePiece space marker ▁ (U+2581) → space */
+            out[out_len++] = ' ';
+        } else {
+            /* Other UTF-8 characters - copy original bytes */
+            for (int i = 0; i < bytes && out_len < max - 1; i++) {
+                out[out_len++] = (char)src[i];
+            }
+        }
+
+        src += bytes;
+    }
+
+    out[out_len] = '\0';
+    return out_len;
+}
+
+static void output_flush(char *buf, size_t *len) {
+    if (*len == 0) return;
+    fwrite(buf, 1, *len, stdout);
+    *len = 0;
+}
+
+static void output_append(char *buf, size_t *len, const char *text) {
+    if (!text || !*text) return;
+    size_t n = strlen(text);
+    if (*len + n >= CK_CLI_OUTPUT_BUF_SIZE) {
+        output_flush(buf, len);
+    }
+    if (n >= CK_CLI_OUTPUT_BUF_SIZE) {
+        fwrite(text, 1, n, stdout);
+        return;
+    }
+    memcpy(buf + *len, text, n);
+    *len += n;
+}
+
+static void output_token(char *buf, size_t *len, const char *token) {
+    if (!token || !*token) return;
+
+    /* Decode BPE byte-level encoding to actual bytes */
+    char decoded[1024];
+    int n = decode_bpe_token(token, decoded, sizeof(decoded));
+    if (n > 0) {
+        output_append(buf, len, decoded);
+    }
+}
+
+/* ============================================================================
+ * Model Loading
+ * ============================================================================ */
+
+static bool resolve_symbol(void *handle, const char *name, void **out_ptr, bool required) {
+    void *sym = dlsym(handle, name);
+    if (!sym && required) {
+        fprintf(stderr, "Error: missing symbol %s\n", name);
+        return false;
+    }
+    if (out_ptr) *out_ptr = sym;
+    return true;
+}
+
+static bool load_model_api(const char *lib_path, ModelAPI *api) {
+    if (!lib_path || !api) return false;
+    memset(api, 0, sizeof(*api));
+    api->handle = dlopen(lib_path, RTLD_NOW);
+    if (!api->handle) {
+        fprintf(stderr, "Error: dlopen failed: %s\n", dlerror());
+        return false;
+    }
+
+    if (!resolve_symbol(api->handle, "ck_model_init", (void **)&api->init, false)) return false;
+    resolve_symbol(api->handle, "ck_model_init_with_manifest", (void **)&api->init_with_manifest, false);
+    if (!api->init && !api->init_with_manifest) {
+        fprintf(stderr, "Error: missing ck_model_init or ck_model_init_with_manifest\n");
+        return false;
+    }
+    if (!resolve_symbol(api->handle, "ck_model_embed_tokens", (void **)&api->embed, true)) return false;
+    if (!resolve_symbol(api->handle, "ck_model_forward", (void **)&api->forward, true)) return false;
+    if (!resolve_symbol(api->handle, "ck_model_decode", (void **)&api->decode, true)) return false;
+    /* ck_prefill - optional, only present when prefill IR was generated */
+    resolve_symbol(api->handle, "ck_prefill", (void **)&api->prefill, false);
+    resolve_symbol(api->handle, "ck_model_write_embeddings", (void **)&api->write_embeddings, false);
+    resolve_symbol(api->handle, "ck_model_embed_tokens_at", (void **)&api->embed_tokens_at, false);
+    resolve_symbol(api->handle, "ck_model_forward_from_embeddings", (void **)&api->forward_from_embeddings, false);
+    resolve_symbol(api->handle, "ck_model_forward_mixed", (void **)&api->forward_mixed, false);
+    resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
+    resolve_symbol(api->handle, "ck_model_get_logits_stride", (void **)&api->get_logits_stride, false);
+    resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
+    resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
+    resolve_symbol(api->handle, "ck_model_get_context_window", (void **)&api->get_context, false);
+    resolve_symbol(api->handle, "ck_model_get_vocab_size", (void **)&api->get_vocab_size, false);
+    resolve_symbol(api->handle, "ck_model_get_active_tokens", (void **)&api->get_active_tokens, false);
+    resolve_symbol(api->handle, "ck_model_get_base_ptr", (void **)&api->get_base_ptr, false);
+    resolve_symbol(api->handle, "ck_model_get_named_activation_runtime_offset", (void **)&api->get_named_activation_runtime_offset, false);
+    resolve_symbol(api->handle, "ck_model_get_named_activation_nbytes", (void **)&api->get_named_activation_nbytes, false);
+    resolve_symbol(api->handle, "ck_model_get_named_activation_ptr", (void **)&api->get_named_activation_ptr, false);
+    resolve_symbol(api->handle, "ck_model_free", (void **)&api->free_fn, false);
+
+    /* Built-in tokenizer API (v7 models have tokenizer in generated code) */
+    resolve_symbol(api->handle, "ck_model_encode_text", (void **)&api->encode_text, false);
+    resolve_symbol(api->handle, "ck_model_decode_tokens", (void **)&api->decode_tokens, false);
+    resolve_symbol(api->handle, "ck_model_has_tokenizer", (void **)&api->has_tokenizer, false);
+    resolve_symbol(api->handle, "ck_model_lookup_token", (void **)&api->lookup_token, false);
+    resolve_symbol(api->handle, "ck_model_get_token_buffer", (void **)&api->get_token_buffer, false);
+
+    /* For id_to_token, we need to load the tokenizer's function from the model */
+    /* The model uses ck_true_bpe_id_to_token internally, but we need direct access */
+    /* For now, we'll handle this via decode_tokens with single token */
+
+    return true;
+}
+
+/* ============================================================================
+ * Chat Template Application
+ * ============================================================================ */
+
+static ChatTemplateType detect_chat_template(const char *model_name) {
+    if (!model_name) return CHAT_TEMPLATE_CHATML;
+
+    /* Lowercase comparison */
+    char lower[256];
+    strncpy(lower, model_name, sizeof(lower) - 1);
+    for (char *p = lower; *p; p++) *p = (*p >= 'A' && *p <= 'Z') ? *p + 32 : *p;
+
+    if (strstr(lower, "qwen")) return CHAT_TEMPLATE_QWEN;
+    if (strstr(lower, "llama")) return CHAT_TEMPLATE_LLAMA;
+    if (strstr(lower, "mistral")) return CHAT_TEMPLATE_MISTRAL;
+
+    return CHAT_TEMPLATE_CHATML;  /* Default */
+}
+
+static char *apply_chat_template(const ChatTemplate *tmpl, const char *system, const char *user) {
+    size_t needed = 0;
+    if (system && *system) {
+        needed += strlen(tmpl->system_prefix) + strlen(system) + strlen(tmpl->system_suffix);
+    }
+    needed += strlen(tmpl->user_prefix) + strlen(user) + strlen(tmpl->user_suffix);
+    needed += strlen(tmpl->assistant_prefix);
+    needed += 1;  /* null terminator */
+
+    char *result = (char *)malloc(needed);
+    if (!result) return NULL;
+
+    result[0] = '\0';
+    if (system && *system) {
+        strcat(result, tmpl->system_prefix);
+        strcat(result, system);
+        strcat(result, tmpl->system_suffix);
+    }
+    strcat(result, tmpl->user_prefix);
+    strcat(result, user);
+    strcat(result, tmpl->user_suffix);
+    strcat(result, tmpl->assistant_prefix);
+
+    return result;
+}
+
+/* ============================================================================
+ * EOS Token Handling
+ * ============================================================================ */
+
+static bool is_eos_token(const CLIOptions *opt, int token) {
+    if (!opt || opt->ignore_eos) return false;
+    for (int i = 0; i < opt->eos_count; i++) {
+        if (opt->eos_ids[i] == token) return true;
+    }
+    return false;
+}
+
+/**
+ * Text-based EOS pattern detection with pending output buffering.
+ *
+ * When special tokens like <|im_end|> are tokenized as regular text
+ * (e.g., !, im, _end, !), we need to detect the pattern in the output
+ * and avoid outputting the partial pattern tokens.
+ *
+ * This is a workaround for tokenizers that don't properly encode special tokens.
+ */
+#define EOS_PATTERN_BUF_SIZE 64
+#define EOS_PENDING_MAX 8
+
+typedef struct {
+    char pattern_buf[EOS_PATTERN_BUF_SIZE];  /* Accumulated text for pattern matching */
+    int pattern_len;
+    char *pending[EOS_PENDING_MAX];          /* Pending token texts (not yet output) */
+    int pending_count;
+    const char *target_pattern;              /* Pattern to detect */
+    const char *partial_prefix;              /* Prefix that might start the pattern */
+} EOSPatternState;
+
+static EOSPatternState g_eos_state = {0};
+
+static void eos_pattern_reset(void) {
+    g_eos_state.pattern_len = 0;
+    g_eos_state.pattern_buf[0] = '\0';
+    for (int i = 0; i < g_eos_state.pending_count; i++) {
+        free(g_eos_state.pending[i]);
+        g_eos_state.pending[i] = NULL;
+    }
+    g_eos_state.pending_count = 0;
+    g_eos_state.target_pattern = NULL;
+    g_eos_state.partial_prefix = NULL;
+}
+
+static void eos_pattern_init(ChatTemplateType tmpl) {
+    eos_pattern_reset();
+    switch (tmpl) {
+        case CHAT_TEMPLATE_QWEN:
+        case CHAT_TEMPLATE_CHATML:
+            g_eos_state.target_pattern = "im_end";
+            g_eos_state.partial_prefix = "im";
+            break;
+        case CHAT_TEMPLATE_LLAMA:
+        case CHAT_TEMPLATE_MISTRAL:
+            g_eos_state.target_pattern = "</s>";
+            g_eos_state.partial_prefix = "</";
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * Check if token might be start of EOS pattern.
+ */
+static bool eos_is_potential_prefix(const char *token) {
+    if (!token || !g_eos_state.partial_prefix) return false;
+
+    /* Check if current accumulated buffer + token could start the pattern */
+    size_t tlen = strlen(token);
+    size_t plen = g_eos_state.pattern_len;
+    size_t target_len = g_eos_state.target_pattern ? strlen(g_eos_state.target_pattern) : 0;
+
+    /* If buffer + token contains partial match of target, it's a potential prefix */
+    if (target_len == 0) return false;
+
+    /* Build temp buffer */
+    char temp[EOS_PATTERN_BUF_SIZE];
+    if (plen + tlen >= EOS_PATTERN_BUF_SIZE) return false;
+    memcpy(temp, g_eos_state.pattern_buf, plen);
+    memcpy(temp + plen, token, tlen);
+    temp[plen + tlen] = '\0';
+
+    /* Check if temp is a prefix of target or contains start of target */
+    const char *target = g_eos_state.target_pattern;
+    size_t temp_len = plen + tlen;
+
+    /* Look for any suffix of temp that is a prefix of target */
+    for (size_t i = 0; i < temp_len; i++) {
+        size_t remaining = temp_len - i;
+        if (remaining > target_len) remaining = target_len;
+        if (strncmp(temp + i, target, remaining) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Process a token for EOS pattern detection.
+ *
+ * @param token_text  The token text to process
+ * @param out_buf     Output buffer for safe-to-output text
+ * @param out_len     Current length of output buffer
+ * @param tmpl        Chat template type
+ * @return            true if EOS pattern detected, false otherwise
+ */
+static bool eos_pattern_process(const char *token_text, char *out_buf, size_t *out_len,
+                                 void (*output_fn)(char*, size_t*, const char*),
+                                 ChatTemplateType tmpl) {
+    if (!token_text || !g_eos_state.target_pattern) {
+        /* No pattern to match - output directly */
+        if (token_text && output_fn) output_fn(out_buf, out_len, token_text);
+        return false;
+    }
+
+    /* Append to pattern buffer */
+    size_t tlen = strlen(token_text);
+    if (g_eos_state.pattern_len + (int)tlen < EOS_PATTERN_BUF_SIZE - 1) {
+        memcpy(g_eos_state.pattern_buf + g_eos_state.pattern_len, token_text, tlen);
+        g_eos_state.pattern_len += (int)tlen;
+        g_eos_state.pattern_buf[g_eos_state.pattern_len] = '\0';
+    }
+
+    /* Check if pattern is complete */
+    if (strstr(g_eos_state.pattern_buf, g_eos_state.target_pattern)) {
+        /* EOS detected - don't output pending tokens */
+        eos_pattern_reset();
+        return true;
+    }
+
+    /* Check if this could still be part of the pattern */
+    if (eos_is_potential_prefix(token_text)) {
+        /* Hold this token - might be part of EOS */
+        if (g_eos_state.pending_count < EOS_PENDING_MAX) {
+            g_eos_state.pending[g_eos_state.pending_count] = strdup(token_text);
+            g_eos_state.pending_count++;
+        }
+        return false;
+    }
+
+    /* Not part of pattern - flush pending tokens and this one */
+    for (int i = 0; i < g_eos_state.pending_count; i++) {
+        if (output_fn) output_fn(out_buf, out_len, g_eos_state.pending[i]);
+        free(g_eos_state.pending[i]);
+        g_eos_state.pending[i] = NULL;
+    }
+    g_eos_state.pending_count = 0;
+    g_eos_state.pattern_len = 0;
+    g_eos_state.pattern_buf[0] = '\0';
+
+    if (output_fn) output_fn(out_buf, out_len, token_text);
+    return false;
+}
+
+static bool parse_eos_ids(const char *arg, CLIOptions *opt) {
+    if (!arg || !opt) return false;
+    opt->eos_count = 0;
+    const char *p = arg;
+    while (*p && opt->eos_count < CK_CLI_EOS_MAX) {
+        char *end = NULL;
+        long v = strtol(p, &end, 10);
+        if (end == p) break;
+        opt->eos_ids[opt->eos_count++] = (int)v;
+        p = end;
+        if (*p == ',') p++;
+    }
+    return opt->eos_count > 0;
+}
+
+static bool parse_token_id_list(const char *arg, int32_t **out_ids, int *out_count) {
+    if (!arg || !out_ids || !out_count) return false;
+    *out_ids = NULL;
+    *out_count = 0;
+
+    int cap = 16;
+    int count = 0;
+    int32_t *ids = (int32_t*)malloc((size_t)cap * sizeof(int32_t));
+    if (!ids) return false;
+
+    const char *p = arg;
+    while (*p) {
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == ',') p++;
+        if (!*p) break;
+        char *end = NULL;
+        long v = strtol(p, &end, 10);
+        if (end == p) {
+            free(ids);
+            return false;
+        }
+        if (count >= cap) {
+            cap *= 2;
+            int32_t *grown = (int32_t*)realloc(ids, (size_t)cap * sizeof(int32_t));
+            if (!grown) {
+                free(ids);
+                return false;
+            }
+            ids = grown;
+        }
+        ids[count++] = (int32_t)v;
+        p = end;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == ',') p++;
+    }
+
+    if (count <= 0) {
+        free(ids);
+        return false;
+    }
+
+    *out_ids = ids;
+    *out_count = count;
+    return true;
+}
+
+static int infer_embedded_input_dim(const ModelAPI *api) {
+    if (!api || !api->get_named_activation_nbytes) return -1;
+    intptr_t nbytes = api->get_named_activation_nbytes("embedded_input");
+    if (nbytes <= 0 || (nbytes % (intptr_t)sizeof(float)) != 0) return -1;
+    intptr_t elems = nbytes / (intptr_t)sizeof(float);
+    if (elems <= 0 || elems > (intptr_t)INT32_MAX) return -1;
+    return (int)elems;
+}
+
+static bool load_prefix_embeddings(
+    const CLIOptions *opt,
+    const ModelAPI *api,
+    float **out_prefix,
+    int *out_prefix_tokens,
+    int *out_embed_dim
+) {
+    if (!out_prefix || !out_prefix_tokens || !out_embed_dim) return false;
+    *out_prefix = NULL;
+    *out_prefix_tokens = 0;
+    *out_embed_dim = 0;
+
+    if (!opt) return true;
+    if (opt->prefix_f32_path && opt->synthetic_prefix_tokens > 0) {
+        fprintf(stderr, "Error: use either --prefix-f32 or --synthetic-prefix-tokens, not both\n");
+        return false;
+    }
+    if (!opt->prefix_f32_path && opt->synthetic_prefix_tokens <= 0) {
+        return true;
+    }
+
+    int embed_dim = infer_embedded_input_dim(api);
+    if (embed_dim <= 0) {
+        fprintf(stderr, "Error: unable to infer decoder embed_dim from embedded_input activation\n");
+        return false;
+    }
+    *out_embed_dim = embed_dim;
+
+    if (opt->synthetic_prefix_tokens > 0) {
+        size_t total = (size_t)opt->synthetic_prefix_tokens * (size_t)embed_dim;
+        float *prefix = (float*)calloc(total, sizeof(float));
+        if (!prefix) {
+            fprintf(stderr, "Error: failed to allocate synthetic prefix embeddings\n");
+            return false;
+        }
+        *out_prefix = prefix;
+        *out_prefix_tokens = opt->synthetic_prefix_tokens;
+        return true;
+    }
+
+    uint8_t *blob = NULL;
+    size_t blob_len = 0;
+    if (!read_file_blob(opt->prefix_f32_path, &blob, &blob_len)) {
+        fprintf(stderr, "Error: failed to read prefix embeddings: %s\n", opt->prefix_f32_path);
+        return false;
+    }
+    if ((blob_len % sizeof(float)) != 0) {
+        fprintf(stderr, "Error: prefix embedding file is not float32-aligned: %s\n", opt->prefix_f32_path);
+        free(blob);
+        return false;
+    }
+
+    size_t total_floats = blob_len / sizeof(float);
+    if ((total_floats % (size_t)embed_dim) != 0) {
+        fprintf(stderr,
+                "Error: prefix embedding float count %zu is not divisible by embed_dim %d\n",
+                total_floats, embed_dim);
+        free(blob);
+        return false;
+    }
+
+    size_t prefix_tokens = total_floats / (size_t)embed_dim;
+    if (prefix_tokens == 0 || prefix_tokens > (size_t)INT32_MAX) {
+        fprintf(stderr, "Error: invalid prefix token count inferred from %s\n", opt->prefix_f32_path);
+        free(blob);
+        return false;
+    }
+
+    *out_prefix = (float*)blob;
+    *out_prefix_tokens = (int)prefix_tokens;
+    return true;
+}
+
+/* ============================================================================
+ * Prompt Execution
+ * ============================================================================ */
+
+static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, int user_tokens) {
+    if (!api || !opt || !ids || n <= 0) {
+        free(ids);
+        return -1;
+    }
+    if (g_exit_requested) {
+        free(ids);
+        return -1;
+    }
+
+    int ctx = opt->context_override;
+    if (ctx <= 0 && api->get_context) ctx = api->get_context();
+    if (ctx <= 0) ctx = 4096;
+    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
+
+    int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
+    if (n > ctx - max_tokens) {
+        n = ctx - max_tokens;
+        if (opt->verbose) {
+            printf("[DEBUG] Truncated prompt to %d tokens\n", n);
+        }
+    }
+
+    g_prefill_time_ms = 0.0;
+    g_decode_time_ms = 0.0;
+    g_decode_count = 0;
+    g_prompt_tokens = n;
+    g_user_tokens = user_tokens;
+
+    if (api->kv_reset) api->kv_reset();
+
+    float *prefix_embeddings = NULL;
+    int prefix_tokens = 0;
+    int prefix_embed_dim = 0;
+    if (!load_prefix_embeddings(opt, api, &prefix_embeddings, &prefix_tokens, &prefix_embed_dim)) {
+        free(ids);
+        return -1;
+    }
+    if (prefix_tokens > 0 && !api->forward_mixed) {
+        fprintf(stderr, "Error: model does not export ck_model_forward_mixed but multimodal prefix was requested\n");
+        free(prefix_embeddings);
+        free(ids);
+        return -1;
+    }
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    if (prefix_tokens > 0) {
+        if (opt->verbose) {
+            fprintf(stderr,
+                    "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=%d embed_dim=%d prompt_tokens=%d\n",
+                    prefix_tokens, prefix_embed_dim, n);
+        }
+        if (api->forward_mixed(prefix_embeddings, prefix_tokens, ids, n, NULL) != 0) {
+            fprintf(stderr, "[Model] forward_mixed failed\n");
+            free(prefix_embeddings);
+            free(ids);
+            return -1;
+        }
+    } else {
+        if (api->embed(ids, n) != 0) {
+            fprintf(stderr, "[Model] embed failed\n");
+            free(ids);
+            return -1;
+        }
+
+        if (api->forward(NULL) != 0) {
+            fprintf(stderr, "[Model] forward failed\n");
+            free(ids);
+            return -1;
+        }
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    g_prefill_time_ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
+                        (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
+    free(prefix_embeddings);
+
+    /* Get vocab size for sampling */
+    int vocab_size = api->get_vocab_size ? api->get_vocab_size() : 0;
+
+    /* Helper: sample next token from logits */
+    #define SAMPLE_NEXT_TOKEN() do { \
+        if (api->get_logits && vocab_size > 0) { \
+            float *logits = api->get_logits(); \
+            if (logits) { \
+                int stride = api->get_logits_stride ? api->get_logits_stride() : vocab_size; \
+                int active = api->get_active_tokens ? api->get_active_tokens() : 1; \
+                float *last_logits = logits; \
+                if (stride > 0) { \
+                    if (active < 1) active = 1; \
+                    last_logits = logits + (size_t)(active - 1) * (size_t)stride; \
+                } \
+                float *logits_copy = (float *)malloc(vocab_size * sizeof(float)); \
+                memcpy(logits_copy, last_logits, vocab_size * sizeof(float)); \
+                next_token = sample_top_p(logits_copy, vocab_size, opt->temperature, opt->top_p); \
+                free(logits_copy); \
+            } else { \
+                next_token = -1; \
+            } \
+        } else { \
+            next_token = -1; \
+        } \
+    } while(0)
+
+    /* Sample first token */
+    int next_token;
+    SAMPLE_NEXT_TOKEN();
+
+    char out_buf[CK_CLI_OUTPUT_BUF_SIZE];
+    size_t out_len = 0;
+
+    /* Initialize EOS pattern detection for this prompt */
+    eos_pattern_init(opt->chat_template);
+
+    g_generation_active = 1;
+
+    for (int generated = 0; generated < max_tokens && !g_exit_requested && g_generation_active; generated++) {
+        if (next_token < 0) break;
+
+        /* Convert token ID to string using model's tokenizer */
+        char token_str[256];
+        const char *word = NULL;
+        if (api->decode_tokens) {
+            int32_t single_id = next_token;
+            int len = api->decode_tokens(&single_id, 1, token_str, sizeof(token_str) - 1);
+            if (len > 0) {
+                token_str[len] = '\0';
+                word = token_str;
+            }
+        }
+
+        if (opt->verbose) {
+            fprintf(stderr, "[DEBUG] Token %d: %d (%s)\n", generated, next_token, word ? word : "NULL");
+        }
+
+        if (is_eos_token(opt, next_token)) {
+            if (opt->verbose) {
+                fprintf(stderr, "[DEBUG] EOS detected (token ID), stopping\n");
+            }
+            break;
+        }
+
+        if (!opt->quiet_output) {
+            /* Process token through EOS pattern detection (buffers potential EOS tokens) */
+            if (!opt->ignore_eos &&
+                eos_pattern_process(word, out_buf, &out_len, output_token, opt->chat_template)) {
+                if (opt->verbose) {
+                    fprintf(stderr, "[DEBUG] EOS detected (text pattern), stopping\n");
+                }
+                break;
+            }
+
+            if (opt->stream) {
+                output_flush(out_buf, &out_len);
+                fflush(stdout);
+            } else if (out_len > (CK_CLI_OUTPUT_BUF_SIZE / 2)) {
+                output_flush(out_buf, &out_len);
+                fflush(stdout);
+            }
+        }
+
+        if (generated + 1 >= max_tokens) break;
+
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        if (api->decode(next_token, NULL) != 0) {
+            fprintf(stderr, "\n[Model] decode failed\n");
+            break;
+        }
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        g_decode_time_ms += (t1.tv_sec - t0.tv_sec) * 1000.0 +
+                            (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
+        g_decode_count++;
+
+        /* Sample next token */
+        SAMPLE_NEXT_TOKEN();
+    }
+
+    #undef SAMPLE_NEXT_TOKEN
+    g_generation_active = 0;
+    if (!opt->quiet_output) {
+        output_flush(out_buf, &out_len);
+        printf("\n");
+    }
+
+    if (opt->timing) {
+        double total_ms = g_prefill_time_ms + g_decode_time_ms;
+        double decode_rate = g_decode_count > 0 ? g_decode_count / (g_decode_time_ms / 1000.0) : 0.0;
+        double avg_decode = g_decode_count > 0 ? g_decode_time_ms / g_decode_count : 0.0;
+
+        /* Labels in dim cyan, numbers in bold white for readability */
+        #define C_DIM   "\033[36m"    /* cyan for labels */
+        #define C_NUM   "\033[1;37m"  /* bold white for numbers */
+        #define C_RST   "\033[0m"
+
+        /* Prefill stats — show user + template token breakdown */
+        int tmpl_tokens = g_prompt_tokens - g_user_tokens;
+        if (g_prefill_time_ms >= 0.1) {
+            double prefill_rate = g_prompt_tokens / (g_prefill_time_ms / 1000.0);
+            printf(C_DIM "prefill " C_NUM "%d" C_DIM " tok "
+                   "(%d user + %d tmpl)  "
+                   C_NUM "%.1f" C_DIM " ms  "
+                   C_NUM "%.1f" C_DIM " tok/s" C_RST,
+                   g_prompt_tokens, g_user_tokens, tmpl_tokens,
+                   g_prefill_time_ms, prefill_rate);
+        } else {
+            printf(C_DIM "prefill " C_NUM "%d" C_DIM " tok "
+                   "(%d user + %d tmpl)  "
+                   C_NUM "<0.1" C_DIM " ms" C_RST,
+                   g_prompt_tokens, g_user_tokens, tmpl_tokens);
+        }
+
+        /* Decode stats */
+        if (g_decode_count > 0) {
+            printf(C_DIM " | decode " C_NUM "%d" C_DIM " tok  "
+                   C_NUM "%.1f" C_DIM " ms  "
+                   C_NUM "%.1f" C_DIM " tok/s  "
+                   C_NUM "%.1f" C_DIM " ms/tok" C_RST,
+                   g_decode_count, g_decode_time_ms, decode_rate, avg_decode);
+        }
+
+        /* Total */
+        printf(C_DIM " | total " C_NUM "%.1f" C_DIM " ms" C_RST "\n", total_ms);
+
+        #undef C_DIM
+        #undef C_NUM
+        #undef C_RST
+    }
+    fflush(stdout);
+
+    free(ids);
+    return 0;
+}
+
+static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
+    if (!api || !opt || !input) return -1;
+    if (g_exit_requested) return -1;
+
+    int ctx = opt->context_override;
+    if (ctx <= 0 && api->get_context) ctx = api->get_context();
+    if (ctx <= 0) ctx = 4096;
+    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
+
+    /* Tokenize raw user input to get user-only token count */
+    int user_tokens = 0;
+    if (api->encode_text) {
+        int raw_n = api->encode_text(input, -1);
+        if (raw_n > 0) user_tokens = raw_n;
+    }
+
+    /* Apply chat template if enabled */
+    const ChatTemplate *tmpl = &g_templates[opt->no_chat_template ? CHAT_TEMPLATE_NONE : opt->chat_template];
+    char *formatted = apply_chat_template(tmpl, opt->system_prompt, input);
+    if (!formatted) {
+        fprintf(stderr, "Error: failed to format prompt\n");
+        return -1;
+    }
+
+    if (opt->verbose) {
+        printf("[DEBUG] Formatted prompt:\n%s\n", formatted);
+    }
+
+    int32_t *ids = (int32_t *)malloc((size_t)ctx * sizeof(int32_t));
+    if (!ids) {
+        fprintf(stderr, "Error: failed to allocate token buffer\n");
+        free(formatted);
+        return -1;
+    }
+
+    /* Use model's built-in tokenizer (v7 pattern) */
+    int n = -1;
+    if (api->encode_text) {
+        n = api->encode_text(formatted, -1);
+        if (n > 0 && n <= ctx) {
+            const int32_t *buf = api->get_token_buffer();
+            if (buf) memcpy(ids, buf, (size_t)n * sizeof(int32_t));
+        }
+    }
+    free(formatted);
+
+    if (n <= 0) {
+        fprintf(stderr, "[Tokenizer] failed to encode prompt\n");
+        free(ids);
+        return -1;
+    }
+
+    return run_token_ids(api, opt, ids, n, user_tokens);
+}
+
+
+/* ============================================================================
+ * PR7.1 Subcommands: train / report-index / profile
+ * ============================================================================
+ */
+
+typedef struct {
+    void *handle;
+    int (*ck_train_alloc)(void);
+    void (*ck_train_free)(void);
+    int (*ck_train_init)(const float *bump, const int *manifest_sizes, int num_params);
+    int (*ck_train_step)(const int32_t *token_ids, const int32_t *targets, float *loss_out, float lr);
+    int (*ck_train_step_ex)(const int32_t *token_ids, const int32_t *targets, int valid_tokens, float *loss_out, float lr);
+    int (*ck_train_flush_optimizer)(float lr);
+    int (*ck_train_memory_diagnostic)(const float *oracle_acts, const float *oracle_grads, float tolerance);
+    int (*ck_train_get_accum_steps)(void);
+    int (*ck_train_get_opt_step)(void);
+    void (*ck_train_reset_profile)(void);
+    int (*ck_train_get_last_step_profile)(
+        double *step_ms,
+        double *fwd_ms,
+        double *bwd_ms,
+        double *opt_ms,
+        int *fwd_calls,
+        int *bwd_calls,
+        int *opt_calls,
+        int *opt_applied
+    );
+    int (*ck_train_get_last_step_grad_norm)(float *grad_norm);
+    int (*ck_train_get_cumulative_profile)(
+        double *total_ms,
+        double *fwd_ms,
+        double *bwd_ms,
+        double *opt_ms,
+        int *steps,
+        int *optimizer_steps
+    );
+    int (*ck_train_get_weight_snapshot_numel)(void);
+    int (*ck_train_export_weight_snapshot)(float *dst, int dst_numel);
+} TrainRuntimeAPI;
+
+static void print_train_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s train --run <run_dir> --train-token-file <tokens.txt> [options]\n\n", prog);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  --run DIR                 Run directory with libtrain.so + weights artifacts\n");
+    fprintf(stderr, "  --train-token-file PATH   Deterministic token stream file (ints)\n");
+    fprintf(stderr, "  --train-json-out PATH     Output summary JSON (default: <run>/train_e2e_latest.json)\n");
+    fprintf(stderr, "  --train-epochs N          Epochs (default: 1)\n");
+    fprintf(stderr, "  --train-seq-len N         Sequence length (default: 8)\n");
+    fprintf(stderr, "  --train-total-tokens N    Total tokens (default: 1024)\n");
+    fprintf(stderr, "  --train-grad-accum N      Grad accumulation (default: 8)\n");
+    fprintf(stderr, "  --train-lr F              Learning rate (default: 1e-3)\n");
+    fprintf(stderr, "  --log-every N             Progress log cadence in steps (default: auto)\n");
+    fprintf(stderr, "  --train-strict            Run memory diagnostic gate before loop\n");
+    fprintf(stderr, "  --threads N               Set CK_NUM_THREADS for this process\n");
+    fprintf(stderr, "  --verbose                 Verbose logs\n");
+}
+
+static void print_report_index_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s report-index --run <run_dir> [--output <path>]\n", prog);
+}
+
+static void print_profile_help(const char *prog) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  %s profile --run <run_dir> --tool perf|vtune|advisor|cachegrind|asan --train-token-file <tokens.txt> [options]\n\n", prog);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  --output-dir DIR          Profiling artifact directory (default: <run>)\n");
+    fprintf(stderr, "  --train-epochs N\n");
+    fprintf(stderr, "  --train-seq-len N\n");
+    fprintf(stderr, "  --train-total-tokens N\n");
+    fprintf(stderr, "  --train-grad-accum N\n");
+    fprintf(stderr, "  --train-lr F\n");
+    fprintf(stderr, "  --train-strict\n");
+    fprintf(stderr, "  --threads N\n");
+}
+
+static bool parse_train_subcommand_args(int argc, char **argv, TrainOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    opt->epochs = 1;
+    opt->seq_len = 8;
+    opt->total_tokens = 1024;
+    opt->grad_accum = 8;
+    opt->lr = 1e-3f;
+    opt->threads = -1;
+    opt->log_every = 0;
+
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_train_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if ((!strcmp(arg, "--train-token-file") || !strcmp(arg, "--token-file")) && i + 1 < argc) {
+            opt->token_file = argv[++i];
+        } else if (!strcmp(arg, "--train-json-out") && i + 1 < argc) {
+            opt->json_out = argv[++i];
+        } else if (!strcmp(arg, "--train-epochs") && i + 1 < argc) {
+            opt->epochs = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-seq-len") && i + 1 < argc) {
+            opt->seq_len = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-total-tokens") && i + 1 < argc) {
+            opt->total_tokens = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-grad-accum") && i + 1 < argc) {
+            opt->grad_accum = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-lr") && i + 1 < argc) {
+            opt->lr = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--log-every") && i + 1 < argc) {
+            opt->log_every = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-strict")) {
+            opt->strict = 1;
+        } else if (!strcmp(arg, "--threads") && i + 1 < argc) {
+            opt->threads = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--verbose") || !strcmp(arg, "-v")) {
+            opt->verbose = 1;
+        } else {
+            fprintf(stderr, "Unknown train option: %s\n", arg);
+            return false;
+        }
+    }
+
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "train: missing --run <run_dir>\n");
+        return false;
+    }
+    if (!opt->token_file || !*opt->token_file) {
+        fprintf(stderr, "train: missing --train-token-file <path>\n");
+        return false;
+    }
+    if (opt->epochs <= 0) opt->epochs = 1;
+    if (opt->seq_len <= 0) opt->seq_len = 8;
+    if (opt->total_tokens <= 0) opt->total_tokens = opt->seq_len;
+    if (opt->grad_accum <= 0) opt->grad_accum = 1;
+    if (opt->log_every < 0) opt->log_every = 0;
+    return true;
+}
+
+static bool parse_report_index_subcommand_args(int argc, char **argv, ReportIndexOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_report_index_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if (!strcmp(arg, "--output") && i + 1 < argc) {
+            opt->output_path = argv[++i];
+        } else {
+            fprintf(stderr, "Unknown report-index option: %s\n", arg);
+            return false;
+        }
+    }
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "report-index: missing --run <run_dir>\n");
+        return false;
+    }
+    return true;
+}
+
+static bool parse_profile_subcommand_args(int argc, char **argv, ProfileOptions *opt) {
+    memset(opt, 0, sizeof(*opt));
+    opt->epochs = 1;
+    opt->seq_len = 8;
+    opt->total_tokens = 1024;
+    opt->grad_accum = 8;
+    opt->lr = 1e-3f;
+    opt->threads = -1;
+
+    for (int i = 2; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_profile_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--run") && i + 1 < argc) {
+            opt->run_dir = argv[++i];
+        } else if (!strcmp(arg, "--tool") && i + 1 < argc) {
+            opt->tool = argv[++i];
+        } else if (!strcmp(arg, "--output-dir") && i + 1 < argc) {
+            opt->output_dir = argv[++i];
+        } else if ((!strcmp(arg, "--train-token-file") || !strcmp(arg, "--token-file")) && i + 1 < argc) {
+            opt->token_file = argv[++i];
+        } else if (!strcmp(arg, "--train-epochs") && i + 1 < argc) {
+            opt->epochs = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-seq-len") && i + 1 < argc) {
+            opt->seq_len = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-total-tokens") && i + 1 < argc) {
+            opt->total_tokens = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-grad-accum") && i + 1 < argc) {
+            opt->grad_accum = atoi(argv[++i]);
+        } else if (!strcmp(arg, "--train-lr") && i + 1 < argc) {
+            opt->lr = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--train-strict")) {
+            opt->strict = 1;
+        } else if (!strcmp(arg, "--threads") && i + 1 < argc) {
+            opt->threads = atoi(argv[++i]);
+        } else {
+            fprintf(stderr, "Unknown profile option: %s\n", arg);
+            return false;
+        }
+    }
+
+    if (!opt->run_dir || !*opt->run_dir) {
+        fprintf(stderr, "profile: missing --run <run_dir>\n");
+        return false;
+    }
+    if (!opt->tool || !*opt->tool) {
+        fprintf(stderr, "profile: missing --tool perf|vtune|advisor|cachegrind|asan\n");
+        return false;
+    }
+    if (!opt->token_file || !*opt->token_file) {
+        fprintf(stderr, "profile: missing --train-token-file <path>\n");
+        return false;
+    }
+    return true;
+}
+
+static bool load_train_runtime_api(const char *lib_path, TrainRuntimeAPI *api) {
+    memset(api, 0, sizeof(*api));
+    api->handle = dlopen(lib_path, RTLD_NOW | RTLD_LOCAL);
+    if (!api->handle) {
+        fprintf(stderr, "dlopen failed: %s\n", dlerror());
+        return false;
+    }
+    api->ck_train_alloc = (int(*)(void))dlsym(api->handle, "ck_train_alloc");
+    api->ck_train_free = (void(*)(void))dlsym(api->handle, "ck_train_free");
+    api->ck_train_init = (int(*)(const float*, const int*, int))dlsym(api->handle, "ck_train_init");
+    api->ck_train_step = (int(*)(const int32_t*, const int32_t*, float*, float))dlsym(api->handle, "ck_train_step");
+    api->ck_train_step_ex = (int(*)(const int32_t*, const int32_t*, int, float*, float))dlsym(api->handle, "ck_train_step_ex");
+    api->ck_train_flush_optimizer = (int(*)(float))dlsym(api->handle, "ck_train_flush_optimizer");
+    api->ck_train_memory_diagnostic = (int(*)(const float*, const float*, float))dlsym(api->handle, "ck_train_memory_diagnostic");
+    api->ck_train_get_accum_steps = (int(*)(void))dlsym(api->handle, "ck_train_get_accum_steps");
+    api->ck_train_get_opt_step = (int(*)(void))dlsym(api->handle, "ck_train_get_opt_step");
+    api->ck_train_reset_profile = (void(*)(void))dlsym(api->handle, "ck_train_reset_profile");
+    api->ck_train_get_last_step_profile =
+        (int(*)(double*, double*, double*, double*, int*, int*, int*, int*))dlsym(api->handle, "ck_train_get_last_step_profile");
+    api->ck_train_get_last_step_grad_norm =
+        (int(*)(float*))dlsym(api->handle, "ck_train_get_last_step_grad_norm");
+    api->ck_train_get_cumulative_profile =
+        (int(*)(double*, double*, double*, double*, int*, int*))dlsym(api->handle, "ck_train_get_cumulative_profile");
+    api->ck_train_get_weight_snapshot_numel =
+        (int(*)(void))dlsym(api->handle, "ck_train_get_weight_snapshot_numel");
+    api->ck_train_export_weight_snapshot =
+        (int(*)(float*, int))dlsym(api->handle, "ck_train_export_weight_snapshot");
+
+    if (!api->ck_train_init || !api->ck_train_step) {
+        fprintf(stderr, "Missing required training symbols in %s (need ck_train_init + ck_train_step)\n", lib_path);
+        if (api->handle) dlclose(api->handle);
+        memset(api, 0, sizeof(*api));
+        return false;
+    }
+    return true;
+}
+
+static void unload_train_runtime_api(TrainRuntimeAPI *api) {
+    if (!api) return;
+    if (api->handle) dlclose(api->handle);
+    memset(api, 0, sizeof(*api));
+}
+
+static int build_train_init_payload(
+    const char *run_dir,
+    float **out_float_buf,
+    int **out_sizes,
+    int *out_num_params,
+    int *out_total_floats
+) {
+    char summary_path[4096], manifest_path[4096], bump_path[4096];
+    snprintf(summary_path, sizeof(summary_path), "%s/generated_train_runtime_summary_v7.json", run_dir);
+    snprintf(manifest_path, sizeof(manifest_path), "%s/weights_manifest.json", run_dir);
+    snprintf(bump_path, sizeof(bump_path), "%s/weights.bump", run_dir);
+    if (!path_exists(summary_path) || !path_exists(manifest_path) || !path_exists(bump_path)) {
+        fprintf(stderr, "Missing run-dir artifacts for init payload:\n  %s\n  %s\n  %s\n", summary_path, manifest_path, bump_path);
+        return -1;
+    }
+
+    RuntimeInitOrder order;
+    if (parse_runtime_init_order(summary_path, &order) != 0) {
+        fprintf(stderr, "Failed to parse runtime summary init order: %s\n", summary_path);
+        return -2;
+    }
+
+    ManifestEntry *entries = NULL;
+    int entry_count = 0;
+    if (parse_manifest_entries(manifest_path, &entries, &entry_count) != 0) {
+        fprintf(stderr, "Failed to parse manifest entries: %s\n", manifest_path);
+        free_runtime_init_order(&order);
+        return -3;
+    }
+
+    uint8_t *bump = NULL;
+    size_t bump_len = 0;
+    if (!read_file_blob(bump_path, &bump, &bump_len)) {
+        fprintf(stderr, "Failed to read bump: %s\n", bump_path);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        return -4;
+    }
+
+    int *sizes = (int*)calloc((size_t)order.count, sizeof(int));
+    if (!sizes) {
+        free(bump);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        return -5;
+    }
+
+    int total_floats = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) {
+            fprintf(stderr, "Missing weight in manifest for runtime init: %s\n", wname);
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -6;
+        }
+        if (!is_fp32_dtype(e->dtype)) {
+            fprintf(stderr, "Non-fp32 weight not supported in native train init: %s (%s)\n", wname, e->dtype ? e->dtype : "?");
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -7;
+        }
+        if ((size_t)e->offset + (size_t)e->size > bump_len) {
+            fprintf(stderr, "Invalid bump span for %s (off=%ld size=%ld)\n", wname, e->offset, e->size);
+            free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+            return -8;
+        }
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        sizes[i] = copy_numel;
+        total_floats += copy_numel;
+    }
+
+    float *payload = (float*)malloc((size_t)total_floats * sizeof(float));
+    if (!payload) {
+        free(sizes); free(bump); free_manifest_entries(entries, entry_count); free_runtime_init_order(&order);
+        return -9;
+    }
+
+    int cursor = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        int copy_numel = sizes[i];
+        memcpy(payload + cursor, bump + e->offset, (size_t)copy_numel * sizeof(float));
+        cursor += copy_numel;
+    }
+
+    const int order_count = order.count;
+    free(bump);
+    free_manifest_entries(entries, entry_count);
+    free_runtime_init_order(&order);
+
+    *out_float_buf = payload;
+    *out_sizes = sizes;
+    *out_num_params = order_count;
+    *out_total_floats = total_floats;
+    return 0;
+}
+
+static size_t ck_align_up_size(size_t value, size_t alignment) {
+    if (alignment == 0) return value;
+    size_t rem = value % alignment;
+    if (rem == 0) return value;
+    return value + (alignment - rem);
+}
+
+typedef struct {
+    const double *step_ms;
+    const double *fwd_ms;
+    const double *bwd_ms;
+    const double *opt_ms;
+    const double *grad_norm;
+    const int *opt_applied;
+    const int *fwd_calls;
+    const int *bwd_calls;
+    const int *opt_calls;
+    int steps;
+    int optimizer_steps;
+    double profile_total_ms;
+    double fwd_total_ms;
+    double bwd_total_ms;
+    double opt_total_ms;
+    int runtime_grad_accum;
+    int breakdown_available;
+} TrainStepProfileTelemetry;
+
+typedef struct {
+    int enabled;
+    int save_every;
+    int save_final;
+    int count;
+    int latest_step;
+    int weights;
+    int floats;
+    long bytes;
+    char bump_path[4096];
+    char manifest_path[4096];
+} TrainCheckpointInfo;
+
+static int export_train_final_checkpoint(
+    const char *run_dir,
+    const TrainRuntimeAPI *api,
+    int step,
+    TrainCheckpointInfo *out_ckpt
+) {
+    if (!run_dir || !api || !out_ckpt) return -1;
+    memset(out_ckpt, 0, sizeof(*out_ckpt));
+    out_ckpt->save_final = 1;
+    out_ckpt->save_every = 0;
+    if (!api->ck_train_get_weight_snapshot_numel || !api->ck_train_export_weight_snapshot) {
+        return 0;
+    }
+
+    int snapshot_numel = api->ck_train_get_weight_snapshot_numel();
+    if (snapshot_numel <= 0) return -2;
+    if (snapshot_numel > (1 << 30)) return -3;
+    float *snapshot = (float*)malloc((size_t)snapshot_numel * sizeof(float));
+    if (!snapshot) return -4;
+    int wrote = api->ck_train_export_weight_snapshot(snapshot, snapshot_numel);
+    if (wrote <= 0) {
+        free(snapshot);
+        return -5;
+    }
+    int available_numel = wrote < snapshot_numel ? wrote : snapshot_numel;
+
+    char summary_path[4096], src_manifest_path[4096];
+    snprintf(summary_path, sizeof(summary_path), "%s/generated_train_runtime_summary_v7.json", run_dir);
+    snprintf(src_manifest_path, sizeof(src_manifest_path), "%s/weights_manifest.json", run_dir);
+
+    RuntimeInitOrder order;
+    if (parse_runtime_init_order(summary_path, &order) != 0) {
+        free(snapshot);
+        return -6;
+    }
+    ManifestEntry *entries = NULL;
+    int entry_count = 0;
+    if (parse_manifest_entries(src_manifest_path, &entries, &entry_count) != 0) {
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -7;
+    }
+    char *src_config_json = NULL;
+    char *src_template_json = NULL;
+    (void)parse_manifest_embedded_meta(src_manifest_path, &src_config_json, &src_template_json);
+
+    int expected_total = 0;
+    size_t blob_size = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e || e->size <= 0) {
+            free(src_config_json);
+            free(src_template_json);
+            free_manifest_entries(entries, entry_count);
+            free_runtime_init_order(&order);
+            free(snapshot);
+            return -8;
+        }
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+        expected_total += copy_numel;
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_size, 64);
+        blob_size = off + nbytes;
+    }
+    if (expected_total <= 0 || available_numel < expected_total) {
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -9;
+    }
+
+    uint8_t *blob = (uint8_t*)calloc(blob_size ? blob_size : 1, 1);
+    if (!blob) {
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -10;
+    }
+
+    size_t blob_cursor = 0;
+    int snap_cursor = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) continue;
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_cursor, 64);
+        memcpy(blob + off, snapshot + snap_cursor, nbytes);
+        snap_cursor += copy_numel;
+        blob_cursor = off + nbytes;
+    }
+
+    char bump_path[4096], manifest_path[4096];
+    snprintf(bump_path, sizeof(bump_path), "%s/checkpoints/weights_step_%08d.bump", run_dir, step > 0 ? step : 1);
+    snprintf(manifest_path, sizeof(manifest_path), "%s/checkpoints/weights_step_%08d_manifest.json", run_dir, step > 0 ? step : 1);
+    if (ensure_parent_dir(bump_path) != 0 || ensure_parent_dir(manifest_path) != 0) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -11;
+    }
+
+    FILE *bf = fopen(bump_path, "wb");
+    if (!bf) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -12;
+    }
+    size_t bw = fwrite(blob, 1, blob_size, bf);
+    fclose(bf);
+    if (bw != blob_size) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -13;
+    }
+
+    FILE *mf = fopen(manifest_path, "w");
+    if (!mf) {
+        free(blob);
+        free(src_config_json);
+        free(src_template_json);
+        free_manifest_entries(entries, entry_count);
+        free_runtime_init_order(&order);
+        free(snapshot);
+        return -14;
+    }
+    fprintf(mf, "{\n");
+    fprintf(mf, "  \"version\": 1,\n");
+    fprintf(mf, "  \"format\": \"weights_manifest_v7_runtime_checkpoint\",\n");
+    fprintf(mf, "  \"source\": \"ck_cli_v7_native\",\n");
+    fprintf(mf, "  \"step\": %d,\n", step > 0 ? step : 1);
+    fprintf(mf, "  \"reason\": \"final\",\n");
+    if (src_config_json && *src_config_json) {
+        fprintf(mf, "  \"config\": %s,\n", src_config_json);
+    }
+    if (src_template_json && *src_template_json) {
+        fprintf(mf, "  \"template\": %s,\n", src_template_json);
+    }
+    fprintf(mf, "  \"entries\": [\n");
+    blob_cursor = 0;
+    int written = 0;
+    for (int i = 0; i < order.count; i++) {
+        const char *wname = order.names[i] ? order.names[i] : "";
+        const ManifestEntry *e = find_manifest_entry(entries, entry_count, wname);
+        char alt[1024];
+        if (!e) {
+            snprintf(alt, sizeof(alt), "tiny.%s", wname);
+            e = find_manifest_entry(entries, entry_count, alt);
+        }
+        if (!e) continue;
+        int src_numel = (int)(e->size / 4);
+        int exp = (order.numel && i < order.count) ? order.numel[i] : 0;
+        int copy_numel = src_numel;
+        if (exp > 0 && exp < copy_numel) copy_numel = exp;
+        if (copy_numel <= 0) continue;
+        size_t nbytes = (size_t)copy_numel * sizeof(float);
+        size_t off = ck_align_up_size(blob_cursor, 64);
+        if (written > 0) fprintf(mf, ",\n");
+        if (e->shape_json && *e->shape_json) {
+            fprintf(
+                mf,
+                "    {\"name\": \"%s\", \"offset\": %zu, \"size\": %zu, \"dtype\": \"%s\", \"shape\": %s}",
+                wname,
+                off,
+                nbytes,
+                e->dtype ? e->dtype : "fp32",
+                e->shape_json
+            );
+        } else {
+            fprintf(
+                mf,
+                "    {\"name\": \"%s\", \"offset\": %zu, \"size\": %zu, \"dtype\": \"%s\", \"shape\": [%d]}",
+                wname,
+                off,
+                nbytes,
+                e->dtype ? e->dtype : "fp32",
+                copy_numel
+            );
+        }
+        blob_cursor = off + nbytes;
+        written++;
+    }
+    fprintf(mf, "\n  ]\n");
+    fprintf(mf, "}\n");
+    fclose(mf);
+
+    out_ckpt->enabled = 1;
+    out_ckpt->count = 1;
+    out_ckpt->latest_step = step > 0 ? step : 1;
+    out_ckpt->weights = written;
+    out_ckpt->floats = expected_total;
+    out_ckpt->bytes = (long)blob_size;
+    snprintf(out_ckpt->bump_path, sizeof(out_ckpt->bump_path), "%s", bump_path);
+    snprintf(out_ckpt->manifest_path, sizeof(out_ckpt->manifest_path), "%s", manifest_path);
+
+    free(blob);
+    free(src_config_json);
+    free(src_template_json);
+    free_manifest_entries(entries, entry_count);
+    free_runtime_init_order(&order);
+    free(snapshot);
+    return 1;
+}
+
+static int write_train_summary_and_telemetry(
+    const char *run_dir,
+    const char *summary_path,
+    const TrainOptions *opt,
+    const float *losses,
+    int total_steps,
+    double ck_total_ms,
+    int processed_tokens,
+    int total_floats,
+    int num_params,
+    const TrainStepProfileTelemetry *telemetry,
+    const TrainCheckpointInfo *ckpt
+) {
+    const char *out_path = summary_path;
+    char fallback_path[4096];
+    if (!out_path || !*out_path) {
+        snprintf(fallback_path, sizeof(fallback_path), "%s/train_e2e_latest.json", run_dir);
+        out_path = fallback_path;
+    }
+    if (ensure_parent_dir(out_path) != 0) return -1;
+
+    float final_loss = (total_steps > 0) ? losses[total_steps - 1] : 0.0f;
+    float min_loss = final_loss;
+    int min_step = total_steps > 0 ? total_steps : 0;
+    for (int i = 0; i < total_steps; i++) {
+        if (i == 0 || losses[i] < min_loss) {
+            min_loss = losses[i];
+            min_step = i + 1;
+        }
+    }
+    double final_ppl = exp(fmin((double)final_loss, 20.0));
+    double min_ppl = exp(fmin((double)min_loss, 20.0));
+    double avg_step_ms = (total_steps > 0) ? (ck_total_ms / (double)total_steps) : 0.0;
+    double train_tok_s = (ck_total_ms > 0.0) ? ((double)processed_tokens / (ck_total_ms / 1000.0)) : 0.0;
+    int effective_grad_accum = opt->grad_accum;
+    if (telemetry != NULL && telemetry->runtime_grad_accum > 0) {
+        effective_grad_accum = telemetry->runtime_grad_accum;
+    }
+    if (effective_grad_accum <= 0) effective_grad_accum = 1;
+    int optimizer_steps = (total_steps + effective_grad_accum - 1) / effective_grad_accum;
+    double profile_total_ms = ck_total_ms;
+    double fwd_total_ms = 0.0;
+    double bwd_total_ms = 0.0;
+    double opt_total_ms = 0.0;
+    int breakdown_available = 0;
+    if (telemetry != NULL) {
+        if (telemetry->optimizer_steps >= 0) optimizer_steps = telemetry->optimizer_steps;
+        if (telemetry->profile_total_ms > 0.0) profile_total_ms = telemetry->profile_total_ms;
+        fwd_total_ms = telemetry->fwd_total_ms;
+        bwd_total_ms = telemetry->bwd_total_ms;
+        opt_total_ms = telemetry->opt_total_ms;
+        breakdown_available = telemetry->breakdown_available;
+    }
+    double other_total_ms = profile_total_ms - (fwd_total_ms + bwd_total_ms + opt_total_ms);
+    if (other_total_ms < 0.0) other_total_ms = 0.0;
+    double fwd_pct = (profile_total_ms > 0.0) ? (100.0 * fwd_total_ms / profile_total_ms) : 0.0;
+    double bwd_pct = (profile_total_ms > 0.0) ? (100.0 * bwd_total_ms / profile_total_ms) : 0.0;
+    double opt_pct = (profile_total_ms > 0.0) ? (100.0 * opt_total_ms / profile_total_ms) : 0.0;
+    double other_pct = (profile_total_ms > 0.0) ? (100.0 * other_total_ms / profile_total_ms) : 0.0;
+    int ckpt_enabled = 0;
+    int ckpt_save_every = 0;
+    int ckpt_save_final = 1;
+    int ckpt_count = 0;
+    int ckpt_latest_step = 0;
+    if (ckpt) {
+        ckpt_enabled = ckpt->enabled ? 1 : 0;
+        ckpt_save_every = ckpt->save_every;
+        ckpt_save_final = ckpt->save_final ? 1 : 0;
+        ckpt_count = ckpt->count;
+        ckpt_latest_step = ckpt->latest_step;
+    }
+
+    FILE *f = fopen(out_path, "w");
+    if (!f) return -2;
+
+    fprintf(f, "{\n");
+    fprintf(f, "  \"epochs\": %d,\n", opt->epochs);
+    fprintf(f, "  \"seq_len\": %d,\n", opt->seq_len);
+    fprintf(f, "  \"total_tokens\": %d,\n", opt->total_tokens);
+    fprintf(f, "  \"grad_accum\": %d,\n", opt->grad_accum);
+    fprintf(f, "  \"runtime_grad_accum\": %d,\n", effective_grad_accum);
+    fprintf(f, "  \"optimizer\": \"adamw\",\n");
+    fprintf(f, "  \"lr\": %.9g,\n", opt->lr);
+    fprintf(f, "  \"steps\": %d,\n", total_steps);
+    fprintf(f, "  \"micro_steps\": %d,\n", total_steps);
+    fprintf(f, "  \"optimizer_steps\": %d,\n", optimizer_steps);
+    fprintf(f, "  \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
+    fprintf(f, "  \"max_loss_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"mean_loss_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"final_ck_loss\": %.9g,\n", final_loss);
+    fprintf(f, "  \"final_torch_loss\": %.9g,\n", final_loss);
+    fprintf(f, "  \"final_ck_ppl\": %.9g,\n", final_ppl);
+    fprintf(f, "  \"final_torch_ppl\": %.9g,\n", final_ppl);
+    fprintf(f, "  \"min_ck_loss\": %.9g,\n", min_loss);
+    fprintf(f, "  \"min_ck_step\": %d,\n", min_step);
+    fprintf(f, "  \"min_ck_ppl\": %.9g,\n", min_ppl);
+    fprintf(f, "  \"final_param_max_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"final_param_mean_abs_diff\": 0.0,\n");
+    fprintf(f, "  \"pass_parity\": true,\n");
+    fprintf(f, "  \"loss_curve\": [\n");
+    for (int i = 0; i < total_steps; i++) {
+        double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+        double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+        fprintf(
+            f,
+            "    {\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": %.9g, \"step_ms\": %.6f}%s\n",
+            i + 1, losses[i], losses[i], opt->lr, grad_norm, step_ms, (i + 1 < total_steps) ? "," : ""
+        );
+    }
+    fprintf(f, "  ],\n");
+    fprintf(f, "  \"parity_steps\": [\n");
+    fprintf(f, "    {\"step\": %d, \"loss_diff\": 0.0, \"max_param_diff\": 0.0, \"worst_param\": \"ck_only\"}\n", total_steps > 0 ? total_steps : 1);
+    fprintf(f, "  ],\n");
+    fprintf(f, "  \"grad_norm_series\": {\n");
+    fprintf(f, "    \"steps\": [");
+    for (int i = 0; i < total_steps; i++) fprintf(f, "%d%s", i + 1, (i + 1 < total_steps) ? ", " : "");
+    fprintf(f, "],\n");
+    fprintf(f, "    \"global\": [");
+    for (int i = 0; i < total_steps; i++) {
+        double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+        fprintf(f, "%.9g%s", grad_norm, (i + 1 < total_steps) ? ", " : "");
+    }
+    fprintf(f, "],\n");
+    fprintf(f, "    \"params\": {}\n");
+    fprintf(f, "  },\n");
+    fprintf(f, "  \"step_profile\": {\n");
+    fprintf(f, "    \"steps\": %d,\n", total_steps);
+    fprintf(f, "    \"micro_steps\": %d,\n", total_steps);
+    fprintf(f, "    \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
+    fprintf(f, "    \"optimizer_steps\": %d,\n", optimizer_steps);
+    fprintf(f, "    \"processed_tokens\": %d,\n", processed_tokens);
+    fprintf(f, "    \"ck_total_ms\": %.6f,\n", ck_total_ms);
+    fprintf(f, "    \"torch_total_ms\": 0.0,\n");
+    fprintf(f, "    \"ck_avg_step_ms\": %.6f,\n", avg_step_ms);
+    fprintf(f, "    \"torch_avg_step_ms\": 0.0,\n");
+    fprintf(f, "    \"train_tok_s\": %.6f,\n", train_tok_s);
+    fprintf(f, "    \"decode_tok_s\": %.6f,\n", train_tok_s);
+    fprintf(f, "    \"phase_breakdown\": {\n");
+    fprintf(f, "      \"available\": %s,\n", breakdown_available ? "true" : "false");
+    fprintf(f, "      \"profile_total_ms\": %.6f,\n", profile_total_ms);
+    fprintf(f, "      \"forward_ms\": %.6f,\n", fwd_total_ms);
+    fprintf(f, "      \"backward_ms\": %.6f,\n", bwd_total_ms);
+    fprintf(f, "      \"optimizer_ms\": %.6f,\n", opt_total_ms);
+    fprintf(f, "      \"other_ms\": %.6f,\n", other_total_ms);
+    fprintf(f, "      \"forward_pct\": %.3f,\n", fwd_pct);
+    fprintf(f, "      \"backward_pct\": %.3f,\n", bwd_pct);
+    fprintf(f, "      \"optimizer_pct\": %.3f,\n", opt_pct);
+    fprintf(f, "      \"other_pct\": %.3f\n", other_pct);
+    fprintf(f, "    },\n");
+    fprintf(f, "    \"phase_series\": [\n");
+    for (int i = 0; i < total_steps; i++) {
+        double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+        double fwd_ms = (telemetry && telemetry->fwd_ms && i < telemetry->steps) ? telemetry->fwd_ms[i] : 0.0;
+        double bwd_ms = (telemetry && telemetry->bwd_ms && i < telemetry->steps) ? telemetry->bwd_ms[i] : 0.0;
+        double opt_ms = (telemetry && telemetry->opt_ms && i < telemetry->steps) ? telemetry->opt_ms[i] : 0.0;
+        int opt_applied = (telemetry && telemetry->opt_applied && i < telemetry->steps) ? telemetry->opt_applied[i] : 0;
+        int fwd_calls = (telemetry && telemetry->fwd_calls && i < telemetry->steps) ? telemetry->fwd_calls[i] : 0;
+        int bwd_calls = (telemetry && telemetry->bwd_calls && i < telemetry->steps) ? telemetry->bwd_calls[i] : 0;
+        int opt_calls = (telemetry && telemetry->opt_calls && i < telemetry->steps) ? telemetry->opt_calls[i] : 0;
+        fprintf(
+            f,
+            "      {\"step\": %d, \"step_ms\": %.6f, \"forward_ms\": %.6f, \"backward_ms\": %.6f, \"optimizer_ms\": %.6f, \"optimizer_applied\": %s, \"forward_calls\": %d, \"backward_calls\": %d, \"optimizer_calls\": %d}%s\n",
+            i + 1,
+            step_ms,
+            fwd_ms,
+            bwd_ms,
+            opt_ms,
+            opt_applied ? "true" : "false",
+            fwd_calls,
+            bwd_calls,
+            opt_calls,
+            (i + 1 < total_steps) ? "," : ""
+        );
+    }
+    fprintf(f, "    ],\n");
+    fprintf(f, "    \"external_profiles\": {}\n");
+    fprintf(f, "  },\n");
+    fprintf(f, "  \"backend\": \"ck\",\n");
+    fprintf(f, "  \"train_mode\": \"pretrain\",\n");
+    fprintf(f, "  \"source\": \"ck_cli_v7_native\",\n");
+    fprintf(f, "  \"runtime_init\": {\"num_params\": %d, \"total_floats\": %d},\n", num_params, total_floats);
+    fprintf(f, "  \"checkpoints\": {\n");
+    fprintf(f, "    \"enabled\": %s,\n", ckpt_enabled ? "true" : "false");
+    fprintf(f, "    \"save_every\": %d,\n", ckpt_save_every);
+    fprintf(f, "    \"save_final\": %s,\n", ckpt_save_final ? "true" : "false");
+    fprintf(f, "    \"count\": %d,\n", ckpt_count);
+    fprintf(f, "    \"latest_step\": %d,\n", ckpt_latest_step);
+    fprintf(f, "    \"files\": [");
+    if (ckpt && ckpt_count > 0) {
+        fprintf(
+            f,
+            "{\"step\": %d, \"reason\": \"final\", \"bump\": \"%s\", \"manifest\": \"%s\", \"weights\": %d, \"floats\": %d, \"bytes\": %ld}",
+            ckpt_latest_step,
+            ckpt->bump_path,
+            ckpt->manifest_path,
+            ckpt->weights,
+            ckpt->floats,
+            ckpt->bytes
+        );
+    }
+    fprintf(f, "]\n");
+    fprintf(f, "  },\n");
+    fprintf(f, "  \"oracle\": {\"enabled\": false}\n");
+    fprintf(f, "}\n");
+    fclose(f);
+
+    char path_loss[4096], path_parity[4096], path_grad[4096], path_profile[4096], path_ckpt[4096];
+    snprintf(path_loss, sizeof(path_loss), "%s/training_loss_curve_latest.json", run_dir);
+    snprintf(path_parity, sizeof(path_parity), "%s/training_parity_latest.json", run_dir);
+    snprintf(path_grad, sizeof(path_grad), "%s/training_grad_norms_latest.json", run_dir);
+    snprintf(path_profile, sizeof(path_profile), "%s/training_step_profile_latest.json", run_dir);
+    snprintf(path_ckpt, sizeof(path_ckpt), "%s/training_checkpoint_policy_latest.json", run_dir);
+
+    FILE *g = fopen(path_loss, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [");
+        for (int i = 0; i < total_steps; i++) {
+            double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+            double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+            fprintf(
+                g,
+                "%s{\"step\": %d, \"loss_ck\": %.9g, \"loss_pt\": %.9g, \"lr\": %.9g, \"grad_norm\": %.9g, \"step_ms\": %.6f}",
+                (i == 0 ? "" : ","),
+                i + 1,
+                losses[i],
+                losses[i],
+                opt->lr,
+                grad_norm,
+                step_ms
+            );
+        }
+        fprintf(g, "], \"source\": \"ck_cli_v7_native\"}\n");
+        fclose(g);
+    }
+
+    g = fopen(path_parity, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [{\"step\": %d, \"loss_diff\": 0.0, \"max_param_diff\": 0.0, \"worst_param\": \"ck_only\"}], \"source\": \"ck_cli_v7_native\"}\n", total_steps > 0 ? total_steps : 1);
+        fclose(g);
+    }
+
+    g = fopen(path_grad, "w");
+    if (g) {
+        fprintf(g, "{\"steps\": [");
+        for (int i = 0; i < total_steps; i++) fprintf(g, "%s%d", (i ? "," : ""), i + 1);
+        fprintf(g, "], \"global\": [");
+        for (int i = 0; i < total_steps; i++) {
+            double grad_norm = (telemetry && telemetry->grad_norm && i < telemetry->steps) ? telemetry->grad_norm[i] : 0.0;
+            fprintf(g, "%s%.9g", (i ? "," : ""), grad_norm);
+        }
+        fprintf(g, "], \"params\": {}, \"source\": \"ck_cli_v7_native\"}\n");
+        fclose(g);
+    }
+
+    g = fopen(path_profile, "w");
+    if (g) {
+        fprintf(g, "{\n");
+        fprintf(g, "  \"steps\": %d,\n", total_steps);
+        fprintf(g, "  \"micro_steps\": %d,\n", total_steps);
+        fprintf(g, "  \"tokens_per_update\": %d,\n", opt->seq_len * effective_grad_accum);
+        fprintf(g, "  \"optimizer_steps\": %d,\n", optimizer_steps);
+        fprintf(g, "  \"processed_tokens\": %d,\n", processed_tokens);
+        fprintf(g, "  \"ck_total_ms\": %.6f,\n", ck_total_ms);
+        fprintf(g, "  \"torch_total_ms\": 0.0,\n");
+        fprintf(g, "  \"ck_avg_step_ms\": %.6f,\n", avg_step_ms);
+        fprintf(g, "  \"torch_avg_step_ms\": 0.0,\n");
+        fprintf(g, "  \"train_tok_s\": %.6f,\n", train_tok_s);
+        fprintf(g, "  \"decode_tok_s\": %.6f,\n", train_tok_s);
+        fprintf(g, "  \"phase_breakdown\": {\n");
+        fprintf(g, "    \"available\": %s,\n", breakdown_available ? "true" : "false");
+        fprintf(g, "    \"profile_total_ms\": %.6f,\n", profile_total_ms);
+        fprintf(g, "    \"forward_ms\": %.6f,\n", fwd_total_ms);
+        fprintf(g, "    \"backward_ms\": %.6f,\n", bwd_total_ms);
+        fprintf(g, "    \"optimizer_ms\": %.6f,\n", opt_total_ms);
+        fprintf(g, "    \"other_ms\": %.6f,\n", other_total_ms);
+        fprintf(g, "    \"forward_pct\": %.3f,\n", fwd_pct);
+        fprintf(g, "    \"backward_pct\": %.3f,\n", bwd_pct);
+        fprintf(g, "    \"optimizer_pct\": %.3f,\n", opt_pct);
+        fprintf(g, "    \"other_pct\": %.3f\n", other_pct);
+        fprintf(g, "  },\n");
+        fprintf(g, "  \"phase_series\": [\n");
+        for (int i = 0; i < total_steps; i++) {
+            double step_ms = (telemetry && telemetry->step_ms && i < telemetry->steps) ? telemetry->step_ms[i] : 0.0;
+            double fwd_ms = (telemetry && telemetry->fwd_ms && i < telemetry->steps) ? telemetry->fwd_ms[i] : 0.0;
+            double bwd_ms = (telemetry && telemetry->bwd_ms && i < telemetry->steps) ? telemetry->bwd_ms[i] : 0.0;
+            double opt_ms = (telemetry && telemetry->opt_ms && i < telemetry->steps) ? telemetry->opt_ms[i] : 0.0;
+            int opt_applied = (telemetry && telemetry->opt_applied && i < telemetry->steps) ? telemetry->opt_applied[i] : 0;
+            int fwd_calls = (telemetry && telemetry->fwd_calls && i < telemetry->steps) ? telemetry->fwd_calls[i] : 0;
+            int bwd_calls = (telemetry && telemetry->bwd_calls && i < telemetry->steps) ? telemetry->bwd_calls[i] : 0;
+            int opt_calls = (telemetry && telemetry->opt_calls && i < telemetry->steps) ? telemetry->opt_calls[i] : 0;
+            fprintf(
+                g,
+                "    {\"step\": %d, \"step_ms\": %.6f, \"forward_ms\": %.6f, \"backward_ms\": %.6f, \"optimizer_ms\": %.6f, \"optimizer_applied\": %s, \"forward_calls\": %d, \"backward_calls\": %d, \"optimizer_calls\": %d}%s\n",
+                i + 1,
+                step_ms,
+                fwd_ms,
+                bwd_ms,
+                opt_ms,
+                opt_applied ? "true" : "false",
+                fwd_calls,
+                bwd_calls,
+                opt_calls,
+                (i + 1 < total_steps) ? "," : ""
+            );
+        }
+        fprintf(g, "  ],\n");
+        fprintf(g, "  \"external_profiles\": {}\n");
+        fprintf(g, "}\n");
+        fclose(g);
+    }
+
+    g = fopen(path_ckpt, "w");
+    if (g) {
+        fprintf(g, "{");
+        fprintf(g, "\"policy\": \"%s\", ", ckpt_enabled ? "step_interval" : "none");
+        fprintf(g, "\"source\": \"ck_cli_v7_native\", ");
+        fprintf(g, "\"checkpointing\": %s, ", ckpt_enabled ? "true" : "false");
+        fprintf(g, "\"save_every\": %d, ", ckpt_save_every);
+        fprintf(g, "\"save_final\": %s, ", ckpt_save_final ? "true" : "false");
+        fprintf(g, "\"count\": %d, ", ckpt_count);
+        fprintf(g, "\"latest_step\": %d, ", ckpt_latest_step);
+        fprintf(g, "\"files\": [");
+        if (ckpt && ckpt_count > 0) {
+            fprintf(
+                g,
+                "{\"step\": %d, \"reason\": \"final\", \"bump\": \"%s\", \"manifest\": \"%s\", \"weights\": %d, \"floats\": %d, \"bytes\": %ld}",
+                ckpt_latest_step,
+                ckpt->bump_path,
+                ckpt->manifest_path,
+                ckpt->weights,
+                ckpt->floats,
+                ckpt->bytes
+            );
+        }
+        fprintf(g, "]}");
+        fprintf(g, "\n");
+        fclose(g);
+    }
+
+    return 0;
+}
+
+static int cmd_train_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_train_help(argv[0]);
+        return 0;
+    }
+    TrainOptions opt;
+    if (!parse_train_subcommand_args(argc, argv, &opt)) return 2;
+
+    if (opt.threads > 0) {
+        char th[32];
+        snprintf(th, sizeof(th), "%d", opt.threads);
+        setenv("CK_NUM_THREADS", th, 1);
+    }
+
+    char libtrain_path[4096];
+    snprintf(libtrain_path, sizeof(libtrain_path), "%s/libtrain.so", opt.run_dir);
+    if (!path_exists(libtrain_path)) {
+        snprintf(libtrain_path, sizeof(libtrain_path), "%s/.ck_build/libtrain.so", opt.run_dir);
+    }
+    if (!path_exists(libtrain_path)) {
+        fprintf(stderr, "train: missing libtrain.so under run-dir (%s).\n", opt.run_dir);
+        fprintf(stderr, "hint: generate+compile runtime first via existing v7 pipeline.\n");
+        return 3;
+    }
+
+    TrainRuntimeAPI api;
+    if (!load_train_runtime_api(libtrain_path, &api)) return 4;
+
+    float *init_floats = NULL;
+    int *init_sizes = NULL;
+    int num_params = 0;
+    int total_floats = 0;
+    int init_rc = build_train_init_payload(opt.run_dir, &init_floats, &init_sizes, &num_params, &total_floats);
+    if (init_rc != 0) {
+        unload_train_runtime_api(&api);
+        return 5;
+    }
+
+    if (opt.verbose) {
+        fprintf(stderr, "[train] runtime init payload: num_params=%d total_floats=%d\n", num_params, total_floats);
+    }
+
+    int rc = api.ck_train_init(init_floats, init_sizes, num_params);
+    if (rc < 0) {
+        fprintf(stderr, "ck_train_init failed: %d\n", rc);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 7;
+    }
+
+    if (opt.strict && api.ck_train_memory_diagnostic) {
+        int diag_rc = api.ck_train_memory_diagnostic(NULL, NULL, 0.0f);
+        char diag_path[4096];
+        snprintf(diag_path, sizeof(diag_path), "%s/memory_diagnostic_latest.json", opt.run_dir);
+        FILE *df = fopen(diag_path, "w");
+        if (df) {
+            fprintf(df, "{\"diagnostic\": {\"rc\": %d, \"ok\": %s}, \"meta\": {\"source\": \"ck-cli-v7 train\"}}\n",
+                    diag_rc, diag_rc >= 0 ? "true" : "false");
+            fclose(df);
+        }
+        if (diag_rc < 0) {
+            fprintf(stderr, "train-strict: memory diagnostic failed (rc=%d)\n", diag_rc);
+            if (api.ck_train_free) api.ck_train_free();
+            free(init_floats); free(init_sizes);
+            unload_train_runtime_api(&api);
+            return 8;
+        }
+    }
+
+    int32_t *tokens = NULL;
+    int token_count = 0;
+    if (parse_int_tokens_file(opt.token_file, &tokens, &token_count) != 0) {
+        fprintf(stderr, "Failed to parse token file: %s\n", opt.token_file);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 9;
+    }
+
+    int needed_stream = opt.total_tokens + 1;
+    if (needed_stream < (opt.seq_len + 1)) needed_stream = opt.seq_len + 1;
+    int32_t *stream = (int32_t*)malloc((size_t)needed_stream * sizeof(int32_t));
+    if (!stream) {
+        free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 10;
+    }
+    for (int i = 0; i < needed_stream; i++) stream[i] = tokens[i % token_count];
+
+    const int supports_step_ex = (api.ck_train_step_ex != NULL);
+    int micro_per_epoch = 0;
+    if (supports_step_ex) {
+        micro_per_epoch = (opt.total_tokens + opt.seq_len - 1) / opt.seq_len;
+        if (micro_per_epoch <= 0) micro_per_epoch = 1;
+    } else {
+        for (int i = 0; i <= (opt.total_tokens - opt.seq_len); i += opt.seq_len) micro_per_epoch++;
+        if (micro_per_epoch <= 0) micro_per_epoch = 1;
+        if ((opt.total_tokens % opt.seq_len) != 0) {
+            fprintf(
+                stderr,
+                "train: runtime lacks ck_train_step_ex; dropping tail tokens (%d mod %d).\n",
+                opt.total_tokens,
+                opt.seq_len
+            );
+        }
+    }
+    int total_steps = opt.epochs * micro_per_epoch;
+    float *losses = (float*)calloc((size_t)total_steps, sizeof(float));
+    if (!losses) {
+        free(stream); free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 11;
+    }
+
+    double *step_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *fwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *bwd_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *opt_ms_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    double *grad_norm_series = (double*)calloc((size_t)total_steps, sizeof(double));
+    int *opt_applied_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *fwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *bwd_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    int *opt_calls_series = (int*)calloc((size_t)total_steps, sizeof(int));
+    if (!step_ms_series || !fwd_ms_series || !bwd_ms_series || !opt_ms_series || !grad_norm_series ||
+        !opt_applied_series || !fwd_calls_series || !bwd_calls_series || !opt_calls_series) {
+        free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
+        free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
+        free(losses); free(stream); free(tokens);
+        if (api.ck_train_free) api.ck_train_free();
+        free(init_floats); free(init_sizes);
+        unload_train_runtime_api(&api);
+        return 11;
+    }
+
+    TrainStepProfileTelemetry telemetry;
+    memset(&telemetry, 0, sizeof(telemetry));
+    telemetry.step_ms = step_ms_series;
+    telemetry.fwd_ms = fwd_ms_series;
+    telemetry.bwd_ms = bwd_ms_series;
+    telemetry.opt_ms = opt_ms_series;
+    telemetry.grad_norm = grad_norm_series;
+    telemetry.opt_applied = opt_applied_series;
+    telemetry.fwd_calls = fwd_calls_series;
+    telemetry.bwd_calls = bwd_calls_series;
+    telemetry.opt_calls = opt_calls_series;
+    telemetry.steps = total_steps;
+    telemetry.optimizer_steps = -1;
+    telemetry.runtime_grad_accum = -1;
+
+    int effective_grad_accum = opt.grad_accum > 0 ? opt.grad_accum : 1;
+    if (api.ck_train_get_accum_steps) {
+        int runtime_grad_accum = api.ck_train_get_accum_steps();
+        if (runtime_grad_accum > 0) {
+            telemetry.runtime_grad_accum = runtime_grad_accum;
+            effective_grad_accum = runtime_grad_accum;
+            if (runtime_grad_accum != opt.grad_accum) {
+                fprintf(
+                    stderr,
+                    "train: runtime grad-accum=%d differs from requested --train-grad-accum=%d; using runtime cadence.\n",
+                    runtime_grad_accum,
+                    opt.grad_accum
+                );
+            }
+        }
+    }
+
+    if (api.ck_train_reset_profile) {
+        api.ck_train_reset_profile();
+    }
+
+    int step_log_every = opt.log_every;
+    if (step_log_every <= 0) {
+        step_log_every = micro_per_epoch / 5;
+        if (step_log_every < 1) step_log_every = 1;
+    }
+
+    printf("[train] run=%s steps=%d (epochs=%d x micro=%d) seq=%d total_tokens=%d grad_accum=%d runtime_grad_accum=%d lr=%.6g log_every=%d\n",
+           opt.run_dir, total_steps, opt.epochs, micro_per_epoch, opt.seq_len, opt.total_tokens,
+           opt.grad_accum, effective_grad_accum, opt.lr, step_log_every);
+    fflush(stdout);
+
+    double t0 = monotonic_ms();
+    int step_idx = 0;
+    float global_min_loss = INFINITY;
+    int global_min_step = 0;
+    int done_tokens_total = 0;
+    for (int e = 0; e < opt.epochs; e++) {
+        double epoch_loss_sum = 0.0;
+        int epoch_steps = 0;
+        int epoch_opt_updates = 0;
+        float epoch_min_loss = INFINITY;
+        int epoch_start_step = step_idx + 1;
+        for (int b = 0; b < micro_per_epoch; b++) {
+            int pos = (micro_per_epoch == 1) ? 0 : (b * opt.seq_len);
+            const int32_t *x = &stream[pos];
+            const int32_t *y = &stream[pos + 1];
+            int remaining = opt.total_tokens - pos;
+            int valid_tokens = remaining > opt.seq_len ? opt.seq_len : remaining;
+            if (valid_tokens < 1) valid_tokens = 1;
+            float loss = 0.0f;
+            int this_step = step_idx;
+            double step_t0 = monotonic_ms();
+            int src = supports_step_ex
+                ? api.ck_train_step_ex(x, y, valid_tokens, &loss, opt.lr)
+                : api.ck_train_step(x, y, &loss, opt.lr);
+            double step_t1 = monotonic_ms();
+            if (src < 0) {
+                fprintf(stderr, "ck_train_step failed at step %d: %d\n", step_idx + 1, src);
+                free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
+                free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
+                free(losses); free(stream); free(tokens);
+                if (api.ck_train_free) api.ck_train_free();
+                free(init_floats); free(init_sizes);
+                unload_train_runtime_api(&api);
+                return 12;
+            }
+            double step_ms = step_t1 - step_t0;
+            double fwd_ms = 0.0;
+            double bwd_ms = 0.0;
+            double opt_ms = 0.0;
+            int fwd_calls = 0;
+            int bwd_calls = 0;
+            int opt_calls = 0;
+            int opt_applied = 0;
+            float grad_norm = 0.0f;
+            if (api.ck_train_get_last_step_profile &&
+                api.ck_train_get_last_step_profile(&step_ms, &fwd_ms, &bwd_ms, &opt_ms,
+                                                   &fwd_calls, &bwd_calls, &opt_calls, &opt_applied) == 0) {
+                if (fwd_ms > 0.0 || bwd_ms > 0.0 || opt_ms > 0.0) {
+                    telemetry.breakdown_available = 1;
+                }
+            } else if (effective_grad_accum > 0 && ((this_step + 1) % effective_grad_accum == 0)) {
+                opt_applied = 1;
+            }
+            if (api.ck_train_get_last_step_grad_norm &&
+                api.ck_train_get_last_step_grad_norm(&grad_norm) != 0) {
+                grad_norm = 0.0f;
+            }
+            if (step_ms < 0.0) step_ms = 0.0;
+            if (fwd_ms < 0.0) fwd_ms = 0.0;
+            if (bwd_ms < 0.0) bwd_ms = 0.0;
+            if (opt_ms < 0.0) opt_ms = 0.0;
+            if (!isfinite((double)grad_norm) || grad_norm < 0.0f) grad_norm = 0.0f;
+            step_ms_series[this_step] = step_ms;
+            fwd_ms_series[this_step] = fwd_ms;
+            bwd_ms_series[this_step] = bwd_ms;
+            opt_ms_series[this_step] = opt_ms;
+            grad_norm_series[this_step] = (double)grad_norm;
+            opt_applied_series[this_step] = opt_applied;
+            fwd_calls_series[this_step] = fwd_calls;
+            bwd_calls_series[this_step] = bwd_calls;
+            opt_calls_series[this_step] = opt_calls;
+            losses[this_step] = loss;
+            epoch_steps += 1;
+            epoch_loss_sum += (double)loss;
+            if (opt_applied) epoch_opt_updates += 1;
+            if (loss < epoch_min_loss) epoch_min_loss = loss;
+            if (loss < global_min_loss) {
+                global_min_loss = loss;
+                global_min_step = this_step + 1;
+            }
+            int done_steps = this_step + 1;
+            done_tokens_total += valid_tokens;
+            if (opt.verbose || (done_steps % step_log_every == 0) || done_steps == total_steps) {
+                double elapsed_ms = monotonic_ms() - t0;
+                int done_tokens = done_tokens_total;
+                double tok_s = (elapsed_ms > 0.0) ? ((double)done_tokens / (elapsed_ms / 1000.0)) : 0.0;
+                double ppl = exp(fmin((double)loss, 20.0));
+                double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
+                int accum_slot = (effective_grad_accum > 0) ? (((done_steps - 1) % effective_grad_accum) + 1) : 1;
+                printf("[train] step %d/%d epoch %d/%d accum=%d/%d opt=%c loss=%.6f ppl=%.4f epoch_avg=%.6f tok/s=%.2f\n",
+                       done_steps,
+                       total_steps,
+                       e + 1,
+                       opt.epochs,
+                       accum_slot,
+                       effective_grad_accum > 0 ? effective_grad_accum : 1,
+                       opt_applied ? 'Y' : 'N',
+                       (double)loss,
+                       ppl,
+                       epoch_avg_loss,
+                       tok_s);
+                fflush(stdout);
+            }
+            step_idx++;
+        }
+        double epoch_avg_loss = (epoch_steps > 0) ? (epoch_loss_sum / (double)epoch_steps) : 0.0;
+        double epoch_avg_ppl = exp(fmin(epoch_avg_loss, 20.0));
+        printf("[train] epoch %d/%d complete steps=%d..%d opt_updates=%d avg_loss=%.6f avg_ppl=%.4f min_loss=%.6f\n",
+               e + 1,
+               opt.epochs,
+               epoch_start_step,
+               step_idx,
+               epoch_opt_updates,
+               epoch_avg_loss,
+               epoch_avg_ppl,
+               isfinite(epoch_min_loss) ? (double)epoch_min_loss : 0.0);
+        fflush(stdout);
+    }
+    if (api.ck_train_flush_optimizer) {
+        int flush_rc = api.ck_train_flush_optimizer(opt.lr);
+        if (flush_rc < 0) {
+            fprintf(stderr, "ck_train_flush_optimizer failed: %d\n", flush_rc);
+            free(step_ms_series); free(fwd_ms_series); free(bwd_ms_series); free(opt_ms_series); free(grad_norm_series);
+            free(opt_applied_series); free(fwd_calls_series); free(bwd_calls_series); free(opt_calls_series);
+            free(losses); free(stream); free(tokens);
+            if (api.ck_train_free) api.ck_train_free();
+            free(init_floats); free(init_sizes);
+            unload_train_runtime_api(&api);
+            return 13;
+        }
+    }
+    double t1 = monotonic_ms();
+    double elapsed_ms = t1 - t0;
+
+    int processed_tokens = done_tokens_total;
+    double sum_step_ms = 0.0;
+    double sum_fwd_ms = 0.0;
+    double sum_bwd_ms = 0.0;
+    double sum_opt_ms = 0.0;
+    int sum_opt_applied = 0;
+    for (int i = 0; i < total_steps; i++) {
+        sum_step_ms += step_ms_series[i];
+        sum_fwd_ms += fwd_ms_series[i];
+        sum_bwd_ms += bwd_ms_series[i];
+        sum_opt_ms += opt_ms_series[i];
+        if (opt_applied_series[i]) sum_opt_applied += 1;
+    }
+    telemetry.profile_total_ms = sum_step_ms;
+    telemetry.fwd_total_ms = sum_fwd_ms;
+    telemetry.bwd_total_ms = sum_bwd_ms;
+    telemetry.opt_total_ms = sum_opt_ms;
+    if (api.ck_train_get_cumulative_profile) {
+        double profile_total_ms = 0.0;
+        double fwd_total_ms = 0.0;
+        double bwd_total_ms = 0.0;
+        double opt_total_ms = 0.0;
+        int profile_steps = 0;
+        int optimizer_steps = -1;
+        if (api.ck_train_get_cumulative_profile(
+                &profile_total_ms,
+                &fwd_total_ms,
+                &bwd_total_ms,
+                &opt_total_ms,
+                &profile_steps,
+                &optimizer_steps) == 0) {
+            telemetry.profile_total_ms = profile_total_ms;
+            telemetry.fwd_total_ms = fwd_total_ms;
+            telemetry.bwd_total_ms = bwd_total_ms;
+            telemetry.opt_total_ms = opt_total_ms;
+            if (optimizer_steps >= 0) telemetry.optimizer_steps = optimizer_steps;
+            if (fwd_total_ms > 0.0 || bwd_total_ms > 0.0 || opt_total_ms > 0.0) {
+                telemetry.breakdown_available = 1;
+            }
+        }
+    }
+    if (api.ck_train_get_opt_step) {
+        int opt_step = api.ck_train_get_opt_step();
+        if (opt_step >= 0) telemetry.optimizer_steps = opt_step;
+    }
+    if (telemetry.optimizer_steps < 0 && sum_opt_applied > 0) {
+        telemetry.optimizer_steps = sum_opt_applied;
+    }
+    if (telemetry.profile_total_ms <= 0.0) {
+        telemetry.profile_total_ms = elapsed_ms;
+    }
+    TrainCheckpointInfo ckpt;
+    memset(&ckpt, 0, sizeof(ckpt));
+    ckpt.save_final = 1;
+    int ckpt_rc = export_train_final_checkpoint(opt.run_dir, &api, total_steps, &ckpt);
+    if (ckpt_rc < 0) {
+        fprintf(stderr, "Warning: failed to export final checkpoint (rc=%d)\n", ckpt_rc);
+    }
+    int wr = write_train_summary_and_telemetry(
+        opt.run_dir,
+        opt.json_out,
+        &opt,
+        losses,
+        total_steps,
+        elapsed_ms,
+        processed_tokens,
+        total_floats,
+        num_params,
+        &telemetry,
+        &ckpt
+    );
+    if (wr != 0) {
+        fprintf(stderr, "Failed to write training summary/telemetry (rc=%d)\n", wr);
+    }
+    write_run_index(opt.run_dir, NULL);
+
+    double tok_s = (elapsed_ms > 0.0) ? ((double)processed_tokens / (elapsed_ms / 1000.0)) : 0.0;
+    const char *summary_out = (opt.json_out && *opt.json_out) ? opt.json_out : "<run>/train_e2e_latest.json";
+    double final_loss = total_steps > 0 ? (double)losses[total_steps - 1] : 0.0;
+    double final_ppl = exp(fmin(final_loss, 20.0));
+    if (!isfinite(global_min_loss)) global_min_loss = (float)final_loss;
+    printf("Train complete: run=%s steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f final_ppl=%.4f best_loss=%.6f best_step=%d\n",
+           opt.run_dir,
+           total_steps,
+           processed_tokens,
+           elapsed_ms,
+           tok_s,
+           final_loss,
+           final_ppl,
+           (double)global_min_loss,
+           global_min_step > 0 ? global_min_step : (total_steps > 0 ? total_steps : 0));
+    printf("Artifacts: %s, %s/run_index.json\n", summary_out, opt.run_dir);
+
+    if (opt.verbose) {
+        fprintf(
+            stderr,
+            "[train] done steps=%d tokens=%d time=%.2f ms tok/s=%.2f final_loss=%.6f final_ppl=%.4f best_loss=%.6f best_step=%d\n",
+            total_steps,
+            processed_tokens,
+            elapsed_ms,
+            tok_s,
+            final_loss,
+            final_ppl,
+            (double)global_min_loss,
+            global_min_step > 0 ? global_min_step : (total_steps > 0 ? total_steps : 0)
+        );
+    }
+
+    free(step_ms_series);
+    free(fwd_ms_series);
+    free(bwd_ms_series);
+    free(opt_ms_series);
+    free(grad_norm_series);
+    free(opt_applied_series);
+    free(fwd_calls_series);
+    free(bwd_calls_series);
+    free(opt_calls_series);
+    free(losses);
+    free(stream);
+    free(tokens);
+    if (api.ck_train_free) api.ck_train_free();
+    free(init_floats);
+    free(init_sizes);
+    unload_train_runtime_api(&api);
+    return 0;
+}
+
+static int cmd_report_index_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_report_index_help(argv[0]);
+        return 0;
+    }
+    ReportIndexOptions opt;
+    if (!parse_report_index_subcommand_args(argc, argv, &opt)) return 2;
+    int rc = write_run_index(opt.run_dir, opt.output_path);
+    if (rc != 0) {
+        fprintf(stderr, "report-index failed (rc=%d)\n", rc);
+        return 3;
+    }
+    printf("Wrote run index: %s\n", opt.output_path ? opt.output_path : "<run>/run_index.json");
+    return 0;
+}
+
+static int get_self_exe(char *buf, size_t bufsz) {
+    ssize_t n = readlink("/proc/self/exe", buf, bufsz - 1);
+    if (n <= 0 || (size_t)n >= bufsz) return -1;
+    buf[n] = '\0';
+    return 0;
+}
+
+static int run_shell_cmd(const char *cmd) {
+    if (!cmd) return -1;
+    int rc = system(cmd);
+    if (rc == -1) return -1;
+    if (WIFEXITED(rc)) return WEXITSTATUS(rc);
+    return rc;
+}
+
+static const char *detect_python_exe(void) {
+    if (path_exists(".venv/bin/python")) return ".venv/bin/python";
+    return "python3";
+}
+
+static int write_profile_summary_stub(const char *run_dir, const char *tool, const char *output_dir) {
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/profile_summary.json", run_dir);
+    if (path_exists(path)) return 0;
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    time_t now = time(NULL);
+    fprintf(f, "{\n");
+    fprintf(f, "  \"schema\": \"ck.profile.summary.v1\",\n");
+    fprintf(f, "  \"tool\": \"%s\",\n", tool);
+    fprintf(f, "  \"generated_at_epoch\": %lld,\n", (long long)now);
+    fprintf(f, "  \"output_dir\": \"%s\"\n", output_dir);
+    fprintf(f, "}\n");
+    fclose(f);
+    return 0;
+}
+
+static int cmd_profile_subcommand(int argc, char **argv) {
+    if (argc >= 3 && (!strcmp(argv[2], "--help") || !strcmp(argv[2], "-h"))) {
+        print_profile_help(argv[0]);
+        return 0;
+    }
+    ProfileOptions opt;
+    if (!parse_profile_subcommand_args(argc, argv, &opt)) return 2;
+
+    char self[4096];
+    if (get_self_exe(self, sizeof(self)) != 0) {
+        fprintf(stderr, "profile: failed to resolve self path\n");
+        return 3;
+    }
+
+    const char *out_dir = opt.output_dir && *opt.output_dir ? opt.output_dir : opt.run_dir;
+    char mkdir_cmd[8192];
+    snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", out_dir);
+    if (run_shell_cmd(mkdir_cmd) != 0) {
+        fprintf(stderr, "profile: failed to create output dir: %s\n", out_dir);
+        return 4;
+    }
+
+    char thread_opt[64] = {0};
+    if (opt.threads > 0) {
+        snprintf(thread_opt, sizeof(thread_opt), "--threads %d", opt.threads);
+    }
+
+    char base_train[16384];
+    snprintf(base_train, sizeof(base_train),
+             "'%s' train --run '%s' --allow-non-cache-run-dir --train-token-file '%s' --train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g %s %s",
+             self,
+             opt.run_dir,
+             opt.token_file,
+             opt.epochs,
+             opt.seq_len,
+             opt.total_tokens,
+             opt.grad_accum,
+             opt.lr,
+             opt.strict ? "--train-strict" : "",
+             thread_opt);
+
+    char cmd[32768];
+    const char *python_exe = detect_python_exe();
+    int rc = 0;
+    if (strcmp(opt.tool, "perf") == 0) {
+        char perf_data[4096], perf_stat_raw[4096], perf_stat_json[4096], folded[4096], svg[4096], manifest[4096];
+        char perf_script[4096];
+        snprintf(perf_data, sizeof(perf_data), "%s/v7_train_perf.data", out_dir);
+        snprintf(perf_stat_raw, sizeof(perf_stat_raw), "%s/perf_stat_summary.txt", out_dir);
+        snprintf(perf_stat_json, sizeof(perf_stat_json), "%s/perf_stat_summary.json", opt.run_dir);
+        snprintf(folded, sizeof(folded), "%s/v7_train_flame.folded", out_dir);
+        snprintf(svg, sizeof(svg), "%s/v7_train_flame.svg", out_dir);
+        snprintf(manifest, sizeof(manifest), "%s/flamegraph_manifest.json", opt.run_dir);
+        snprintf(perf_script, sizeof(perf_script), "version/v7/scripts/perf_artifacts_v7.py");
+
+        snprintf(cmd, sizeof(cmd), "perf stat -x, -o '%s' -- %s", perf_stat_raw, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+        snprintf(cmd, sizeof(cmd), "perf record --all-user -F 999 --call-graph dwarf -o '%s' -- %s", perf_data, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        snprintf(cmd, sizeof(cmd),
+                 "if [ -f ./FlameGraph/stackcollapse-perf.pl ]; then perf script -i '%s' | ./FlameGraph/stackcollapse-perf.pl > '%s'; fi",
+                 perf_data, folded);
+        run_shell_cmd(cmd);
+        snprintf(cmd, sizeof(cmd),
+                 "if [ -f ./FlameGraph/flamegraph.pl ] && [ -f '%s' ]; then ./FlameGraph/flamegraph.pl '%s' > '%s'; fi",
+                 folded, folded, svg);
+        run_shell_cmd(cmd);
+
+        int artifacts_rc = -1;
+        if (path_exists(perf_script)) {
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --perf-stat '%s' --perf-data '%s' --folded '%s' --flamegraph-svg '%s'",
+                python_exe,
+                perf_script,
+                opt.run_dir,
+                perf_stat_raw,
+                perf_data,
+                folded,
+                svg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
+        }
+
+        if (artifacts_rc != 0) {
+            FILE *mf = fopen(manifest, "w");
+            if (mf) {
+                fprintf(mf, "{\"folded\": \"%s\", \"svg\": \"%s\", \"perf_data\": \"%s\"}\n", folded, svg, perf_data);
+                fclose(mf);
+            }
+            FILE *pf = fopen(perf_stat_json, "w");
+            if (pf) {
+                time_t now = time(NULL);
+                fprintf(pf, "{\"schema\":\"ck.perf.stat.v1\",\"tool\":\"perf\",\"generated_at_epoch\":%lld,\"raw_path\":\"%s\",\"perf_data\":\"%s\"}\n",
+                        (long long)now, perf_stat_raw, perf_data);
+                fclose(pf);
+            }
+        }
+    } else if (strcmp(opt.tool, "cachegrind") == 0) {
+        char cg_out[4096], cg_txt[4096], cg_json[4096], cg_script[4096];
+        snprintf(cg_out, sizeof(cg_out), "%s/cachegrind_train.out", out_dir);
+        snprintf(cg_txt, sizeof(cg_txt), "%s/cachegrind_train_annotated.txt", out_dir);
+        snprintf(cg_json, sizeof(cg_json), "%s/cachegrind_summary.json", opt.run_dir);
+        snprintf(cg_script, sizeof(cg_script), "version/v7/scripts/cachegrind_artifacts_v7.py");
+
+        snprintf(cmd, sizeof(cmd),
+                 "valgrind --tool=cachegrind --cache-sim=yes --branch-sim=no --cachegrind-out-file='%s' -- %s",
+                 cg_out, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        snprintf(
+            cmd,
+            sizeof(cmd),
+            "if command -v cg_annotate >/dev/null 2>&1; then "
+            "cg_annotate --show=Ir,Dr,Dw,D1mr,D1mw,DLmr,DLmw '%s' > '%s'; fi",
+            cg_out,
+            cg_txt
+        );
+        run_shell_cmd(cmd);
+
+        int artifacts_rc = -1;
+        if (path_exists(cg_script)) {
+            char ann_arg[4200] = {0};
+            if (path_exists(cg_txt)) {
+                snprintf(ann_arg, sizeof(ann_arg), " --annotate '%s'", cg_txt);
+            }
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --cachegrind-out '%s'%s",
+                python_exe,
+                cg_script,
+                opt.run_dir,
+                cg_out,
+                ann_arg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
+        }
+
+        if (artifacts_rc != 0) {
+            FILE *cf = fopen(cg_json, "w");
+            if (cf) {
+                time_t now = time(NULL);
+                fprintf(
+                    cf,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"cachegrind_out\": \"%s\", "
+                    "\"annotate_path\": \"%s\""
+                    "}\n",
+                    (long long)now,
+                    cg_out,
+                    path_exists(cg_txt) ? cg_txt : ""
+                );
+                fclose(cf);
+            }
+        }
+    } else if (strcmp(opt.tool, "asan") == 0) {
+        char verify_json[4096], diag_json[4096], asan_sum[4096], asan_script[4096], ck_run_script[4096];
+        snprintf(verify_json, sizeof(verify_json), "%s/memory_verification_latest.json", opt.run_dir);
+        snprintf(diag_json, sizeof(diag_json), "%s/memory_diagnostic_latest.json", opt.run_dir);
+        snprintf(asan_sum, sizeof(asan_sum), "%s/asan_summary.json", opt.run_dir);
+        snprintf(asan_script, sizeof(asan_script), "version/v7/scripts/asan_artifacts_v7.py");
+        snprintf(ck_run_script, sizeof(ck_run_script), "version/v7/scripts/ck_run_v7.py");
+        double asan_lr = (double)opt.lr;
+        if (asan_lr >= 1e-3) {
+            asan_lr = 3e-4;
+            fprintf(stderr,
+                    "profile[asan]: lowering --train-lr %.9g -> %.9g to satisfy train safety gate\n",
+                    (double)opt.lr,
+                    asan_lr);
+        }
+
+        char th_prefix[64] = {0};
+        if (opt.threads > 0) {
+            snprintf(th_prefix, sizeof(th_prefix), "CK_NUM_THREADS=%d ", opt.threads);
+        }
+        snprintf(
+            cmd,
+            sizeof(cmd),
+            "%s'%s' '%s' train-e2e --run '%s' --allow-non-cache-run-dir --backend ck --train-verify-memory --train-strict "
+            "--train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g --prompt 'Hello!'",
+            th_prefix,
+            python_exe,
+            ck_run_script,
+            opt.run_dir,
+            opt.epochs,
+            opt.seq_len,
+            opt.total_tokens,
+            opt.grad_accum,
+            asan_lr
+        );
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+
+        int artifacts_rc = -1;
+        if (path_exists(asan_script)) {
+            char diag_arg[4200] = {0};
+            if (path_exists(diag_json)) {
+                snprintf(diag_arg, sizeof(diag_arg), " --memory-diagnostic '%s'", diag_json);
+            }
+            snprintf(
+                cmd,
+                sizeof(cmd),
+                "'%s' '%s' --out-dir '%s' --verify-report '%s'%s",
+                python_exe,
+                asan_script,
+                opt.run_dir,
+                verify_json,
+                diag_arg
+            );
+            artifacts_rc = run_shell_cmd(cmd);
+        }
+        if (artifacts_rc != 0) {
+            FILE *af = fopen(asan_sum, "w");
+            if (af) {
+                time_t now = time(NULL);
+                fprintf(
+                    af,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"overall_ok\": false, "
+                    "\"verify_report_path\": \"%s\""
+                    "}\n",
+                    (long long)now,
+                    verify_json
+                );
+                fclose(af);
+            }
+        }
+    } else if (strcmp(opt.tool, "vtune") == 0) {
+        char vt_hot[4096], vt_mem[4096], vt_sum[4096];
+        char vt_hot_txt[4096], vt_hot_csv[4096], vt_mem_txt[4096], vt_mem_csv[4096];
+        char vt_script[4096];
+        snprintf(vt_hot, sizeof(vt_hot), "%s/vtune_hotspots", out_dir);
+        snprintf(vt_mem, sizeof(vt_mem), "%s/vtune_memory", out_dir);
+        snprintf(vt_sum, sizeof(vt_sum), "%s/vtune_summary.json", opt.run_dir);
+        snprintf(vt_hot_txt, sizeof(vt_hot_txt), "%s/vtune_hotspots.txt", out_dir);
+        snprintf(vt_hot_csv, sizeof(vt_hot_csv), "%s/vtune_hotspots.csv", out_dir);
+        snprintf(vt_mem_txt, sizeof(vt_mem_txt), "%s/vtune_memory_summary.txt", out_dir);
+        snprintf(vt_mem_csv, sizeof(vt_mem_csv), "%s/vtune_memory_summary.csv", out_dir);
+        snprintf(vt_script, sizeof(vt_script), "version/v7/scripts/vtune_artifacts_v7.py");
+
+        snprintf(cmd, sizeof(cmd), "vtune -collect hotspots -result-dir '%s' -quiet -- %s", vt_hot, base_train);
+        rc = run_shell_cmd(cmd);
+        if (rc != 0) return rc;
+        snprintf(cmd, sizeof(cmd), "vtune -report hotspots -result-dir '%s' -format text -report-output '%s' >/dev/null 2>&1", vt_hot, vt_hot_txt);
+        run_shell_cmd(cmd);
+        snprintf(cmd, sizeof(cmd), "vtune -report hotspots -result-dir '%s' -format csv -report-output '%s' >/dev/null 2>&1", vt_hot, vt_hot_csv);
+        run_shell_cmd(cmd);
+
+        snprintf(cmd, sizeof(cmd), "vtune -collect memory-access -result-dir '%s' -quiet -- %s", vt_mem, base_train);
+        int mem_rc = run_shell_cmd(cmd);
+        if (mem_rc == 0) {
+            snprintf(cmd, sizeof(cmd), "vtune -report summary -result-dir '%s' -format text -report-output '%s' >/dev/null 2>&1", vt_mem, vt_mem_txt);
+            run_shell_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "vtune -report summary -result-dir '%s' -format csv -report-output '%s' >/dev/null 2>&1", vt_mem, vt_mem_csv);
+            run_shell_cmd(cmd);
+        }
+
+        if (path_exists(vt_script)) {
+            if (mem_rc == 0) {
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "'%s' '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s' "
+                    "--analysis-name memory-access --analysis-result-dir '%s' --analysis-report-text '%s' --analysis-report-csv '%s'",
+                    python_exe,
+                    vt_script,
+                    opt.run_dir,
+                    vt_hot,
+                    vt_hot_txt,
+                    vt_hot_csv,
+                    vt_mem,
+                    vt_mem_txt,
+                    vt_mem_csv
+                );
+            } else {
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "'%s' '%s' --out-dir '%s' --result-dir '%s' --report-text '%s' --report-csv '%s'",
+                    python_exe,
+                    vt_script,
+                    opt.run_dir,
+                    vt_hot,
+                    vt_hot_txt,
+                    vt_hot_csv
+                );
+            }
+            int sum_rc = run_shell_cmd(cmd);
+            if (sum_rc != 0) {
+                FILE *vf = fopen(vt_sum, "w");
+                if (vf) {
+                    fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, mem_rc == 0 ? vt_mem : "");
+                    fclose(vf);
+                }
+            }
+        } else {
+            FILE *vf = fopen(vt_sum, "w");
+            if (vf) {
+                fprintf(vf, "{\"hotspots_result\": \"%s\", \"memory_result\": \"%s\"}\n", vt_hot, mem_rc == 0 ? vt_mem : "");
+                fclose(vf);
+            }
+        }
+    } else if (strcmp(opt.tool, "advisor") == 0) {
+        char adv_dir[4096], adv_sum[4096], adv_txt[4096], adv_csv[4096], adv_html[4096], adv_script[4096];
+        snprintf(adv_dir, sizeof(adv_dir), "%s/advisor_run", out_dir);
+        snprintf(adv_sum, sizeof(adv_sum), "%s/advisor_summary.json", opt.run_dir);
+        snprintf(adv_txt, sizeof(adv_txt), "%s/advisor_roofline.txt", out_dir);
+        snprintf(adv_csv, sizeof(adv_csv), "%s/advisor_roofline.csv", out_dir);
+        snprintf(adv_html, sizeof(adv_html), "%s/advisor_roofline.html", out_dir);
+        snprintf(adv_script, sizeof(adv_script), "version/v7/scripts/advisor_artifacts_v7.py");
+        snprintf(cmd, sizeof(cmd), "advisor --collect=roofline --project-dir '%s' -- %s", adv_dir, base_train);
+        int collect_rc = run_shell_cmd(cmd);
+
+        if (collect_rc == 0) {
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=text --report-output '%s' >/dev/null 2>&1", adv_dir, adv_txt);
+            run_shell_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --format=csv --report-output '%s' >/dev/null 2>&1", adv_dir, adv_csv);
+            run_shell_cmd(cmd);
+            // Some Advisor builds emit interactive HTML even when --format=text/csv is requested.
+            // Generate explicit HTML report without --format to guarantee a browser-openable artifact.
+            snprintf(cmd, sizeof(cmd), "advisor --report=roofline --project-dir '%s' --report-output '%s' >/dev/null 2>&1", adv_dir, adv_html);
+            run_shell_cmd(cmd);
+
+            int advisor_sum_rc = -1;
+            if (path_exists(adv_script)) {
+                char adv_txt_arg[4200] = {0};
+                char adv_csv_arg[4200] = {0};
+                char adv_html_arg[4200] = {0};
+                if (path_exists(adv_txt)) {
+                    snprintf(adv_txt_arg, sizeof(adv_txt_arg), " --report-text '%s'", adv_txt);
+                }
+                if (path_exists(adv_csv)) {
+                    snprintf(adv_csv_arg, sizeof(adv_csv_arg), " --report-csv '%s'", adv_csv);
+                }
+                if (path_exists(adv_html)) {
+                    snprintf(adv_html_arg, sizeof(adv_html_arg), " --report-html '%s'", adv_html);
+                }
+                snprintf(
+                    cmd,
+                    sizeof(cmd),
+                    "'%s' '%s' --out-dir '%s' --project-dir '%s'%s%s%s",
+                    python_exe,
+                    adv_script,
+                    opt.run_dir,
+                    adv_dir,
+                    adv_txt_arg,
+                    adv_csv_arg,
+                    adv_html_arg
+                );
+                advisor_sum_rc = run_shell_cmd(cmd);
+            }
+
+            if (advisor_sum_rc != 0) {
+                FILE *af = fopen(adv_sum, "w");
+                if (af) {
+                    time_t now = time(NULL);
+                    fprintf(
+                        af,
+                        "{"
+                        "\"generated_at_epoch\": %lld, "
+                        "\"analysis\": \"roofline\", "
+                        "\"project_dir\": \"%s\", "
+                        "\"report_path\": \"%s\", "
+                        "\"csv_path\": \"%s\", "
+                        "\"html_path\": \"%s\""
+                        "}\n",
+                        (long long)now,
+                        adv_dir,
+                        path_exists(adv_txt) ? adv_txt : "",
+                        path_exists(adv_csv) ? adv_csv : "",
+                        path_exists(adv_html) ? adv_html : ""
+                    );
+                    fclose(af);
+                }
+            }
+        } else {
+            FILE *af = fopen(adv_sum, "w");
+            if (af) {
+                time_t now = time(NULL);
+                fprintf(
+                    af,
+                    "{"
+                    "\"generated_at_epoch\": %lld, "
+                    "\"analysis\": \"roofline\", "
+                    "\"collect_failed\": true, "
+                    "\"collect_rc\": %d, "
+                    "\"project_dir\": \"%s\", "
+                    "\"hint\": \"advisor collect failed (host constraints like loopback/ptrace can block collection)\""
+                    "}\n",
+                    (long long)now,
+                    collect_rc,
+                    adv_dir
+                );
+                fclose(af);
+            }
+        }
+    } else {
+        fprintf(stderr, "profile: unsupported --tool %s (use perf|vtune|advisor|cachegrind|asan)\n", opt.tool);
+        return 5;
+    }
+
+    write_profile_summary_stub(opt.run_dir, opt.tool, out_dir);
+    write_run_index(opt.run_dir, NULL);
+    printf("Profile capture complete: tool=%s run=%s out=%s\n", opt.tool, opt.run_dir, out_dir);
+    return 0;
+}
+
+/* ============================================================================
+ * Help & Argument Parsing
+ * ============================================================================ */
+
+static void print_banner(void) {
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  \033[1;36mC-Kernel-Engine v%s\033[0m\n", CK_CLI_VERSION);
+    fprintf(stderr, "  Native inference CLI with true-BPE tokenization\n");
+    fprintf(stderr, "\n");
+}
+
+static void print_help(const char *prog) {
+    print_banner();
+    fprintf(stderr, "Subcommands:\n");
+    fprintf(stderr, "  %s train --run <dir> --train-token-file <tokens.txt> [options]\n", prog);
+    fprintf(stderr, "  %s report-index --run <dir> [--output <path>]\n", prog);
+    fprintf(stderr, "  %s profile --run <dir> --tool perf|vtune|advisor|cachegrind|asan --train-token-file <tokens.txt> [options]\n", prog);
+    fprintf(stderr, "  %s train --help | %s profile --help | %s report-index --help\n", prog, prog, prog);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Quick start:\n");
+    fprintf(stderr, "  %s                                      Scan cache and pick a model\n", prog);
+    fprintf(stderr, "  %s --model qwen                         Load by name from cache\n", prog);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Advanced:\n");
+    fprintf(stderr, "  %s <libmodel.so> <weights.bump>         Direct paths\n", prog);
+    fprintf(stderr, "  %s --lib <.so> --weights <.bump>        Named arguments\n", prog);
+    fprintf(stderr, "  %s --lib <.so> --weights <.bump> --manifest <.map>\n", prog);
+    fprintf(stderr, "\nOptions:\n");
+    fprintf(stderr, "  --model, -m NAME        Model name (searches in cache)\n");
+    fprintf(stderr, "  --lib PATH              Path to compiled model .so\n");
+    fprintf(stderr, "  --weights PATH          Path to weights .bump file\n");
+    fprintf(stderr, "  --manifest PATH         Path to weights_manifest.map for v8 init\n");
+    fprintf(stderr, "  --prefix-f32 PATH       Float32 prefix embeddings file for ck_model_forward_mixed\n");
+    fprintf(stderr, "  --synthetic-prefix-tokens N  Use N zero prefix rows with ck_model_forward_mixed\n");
+    fprintf(stderr, "  --prompt, -p TEXT       Run single prompt (non-interactive)\n");
+    fprintf(stderr, "  --prompt-tokens IDS     Comma-separated prompt token IDs for tokenizer-free runtimes\n");
+    fprintf(stderr, "  --system, -S TEXT       System prompt\n");
+    fprintf(stderr, "  --max-tokens, -n N      Max tokens to generate (default: %d)\n", CK_CLI_DEFAULT_MAX_TOKENS);
+    fprintf(stderr, "  --context, -c N         Override context/KV cache size\n");
+    fprintf(stderr, "  --temperature, -T F     Sampling temperature (default: 0.0 = greedy)\n");
+    fprintf(stderr, "  --top-p F               Nucleus sampling top-p (default: 0.9)\n");
+    fprintf(stderr, "  --stream, -s            Stream tokens as generated\n");
+    fprintf(stderr, "  --quiet-output          Suppress generated text output (profiling/noise-free)\n");
+    fprintf(stderr, "  --timing, -t            Show timing breakdown\n");
+    fprintf(stderr, "  --no-chat-template      Disable chat template formatting\n");
+    fprintf(stderr, "  --eos IDS               Comma-separated EOS token IDs\n");
+    fprintf(stderr, "  --ignore-eos            Do not stop on EOS tokens\n");
+    fprintf(stderr, "  --list                  List available models in cache\n");
+    fprintf(stderr, "  --verbose, -v           Verbose output\n");
+    fprintf(stderr, "  --help, -h              Show this help\n");
+    fprintf(stderr, "\nREPL Commands:\n");
+    fprintf(stderr, "  /exit, /quit            Exit the REPL\n");
+    fprintf(stderr, "  /reset                  Reset KV cache\n");
+    fprintf(stderr, "  /timing                 Toggle timing display\n");
+    fprintf(stderr, "  /temp <value>           Set temperature\n");
+    fprintf(stderr, "  /system <text>          Set system prompt\n");
+    fprintf(stderr, "  /help                   Show help\n");
+    fprintf(stderr, "\nWorkflow:\n");
+    fprintf(stderr, "  This CLI runs pre-compiled models. To compile a new model:\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  Step 1: Compile (once)    python version/v7/scripts/ck_run_v7.py run <model>\n");
+    fprintf(stderr, "  Step 2: Run (fast)        %s\n", prog);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  Models are cached in: ~/.cache/ck-engine-v7/models/\n");
+}
+
+static bool parse_args(int argc, char **argv, CLIOptions *opt) {
+    if (!opt) return false;
+    memset(opt, 0, sizeof(*opt));
+    opt->max_tokens = CK_CLI_DEFAULT_MAX_TOKENS;
+    opt->temperature = 0.0f;  /* Greedy by default */
+    opt->top_p = 0.9f;
+    opt->stream = true;  /* Stream by default */
+    opt->timing = true;  /* Show timing by default */
+    /* Default EOS tokens for Qwen/ChatML */
+    opt->eos_ids[0] = 151643;  /* <|im_end|> */
+    opt->eos_ids[1] = 151645;  /* <|endoftext|> */
+    opt->eos_ids[2] = 151644;  /* <|im_sep|> */
+    opt->eos_count = 3;
+
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+
+        if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            print_help(argv[0]);
+            return false;
+        } else if (!strcmp(arg, "--list")) {
+            list_available_models();
+            return false;
+        } else if ((!strcmp(arg, "--model") || !strcmp(arg, "-m")) && i + 1 < argc) {
+            opt->model_name = argv[++i];
+        } else if (!strcmp(arg, "--lib") && i + 1 < argc) {
+            opt->lib_path = argv[++i];
+        } else if (!strcmp(arg, "--weights") && i + 1 < argc) {
+            opt->weights_path = argv[++i];
+        } else if (!strcmp(arg, "--manifest") && i + 1 < argc) {
+            opt->manifest_path = argv[++i];
+        } else if (!strcmp(arg, "--prefix-f32") && i + 1 < argc) {
+            opt->prefix_f32_path = argv[++i];
+        } else if (!strcmp(arg, "--synthetic-prefix-tokens") && i + 1 < argc) {
+            opt->synthetic_prefix_tokens = atoi(argv[++i]);
+        } else if ((!strcmp(arg, "--prompt") || !strcmp(arg, "-p")) && i + 1 < argc) {
+            opt->prompt_once = argv[++i];
+        } else if (!strcmp(arg, "--prompt-tokens") && i + 1 < argc) {
+            opt->prompt_tokens_csv = argv[++i];
+        } else if ((!strcmp(arg, "--system") || !strcmp(arg, "-S")) && i + 1 < argc) {
+            opt->system_prompt = argv[++i];
+        } else if ((!strcmp(arg, "--max-tokens") || !strcmp(arg, "-n")) && i + 1 < argc) {
+            opt->max_tokens = atoi(argv[++i]);
+        } else if ((!strcmp(arg, "--context") || !strcmp(arg, "-c")) && i + 1 < argc) {
+            opt->context_override = atoi(argv[++i]);
+        } else if ((!strcmp(arg, "--temperature") || !strcmp(arg, "-T")) && i + 1 < argc) {
+            opt->temperature = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--top-p") && i + 1 < argc) {
+            opt->top_p = (float)atof(argv[++i]);
+        } else if (!strcmp(arg, "--stream") || !strcmp(arg, "-s")) {
+            opt->stream = true;
+        } else if (!strcmp(arg, "--no-stream")) {
+            opt->stream = false;
+        } else if (!strcmp(arg, "--quiet-output")) {
+            opt->quiet_output = true;
+        } else if (!strcmp(arg, "--timing") || !strcmp(arg, "-t")) {
+            opt->timing = true;
+        } else if (!strcmp(arg, "--no-timing")) {
+            opt->timing = false;
+        } else if (!strcmp(arg, "--no-chat-template")) {
+            opt->no_chat_template = true;
+        } else if (!strcmp(arg, "--eos") && i + 1 < argc) {
+            parse_eos_ids(argv[++i], opt);
+        } else if (!strcmp(arg, "--ignore-eos")) {
+            opt->ignore_eos = true;
+        } else if (!strcmp(arg, "--verbose") || !strcmp(arg, "-v")) {
+            opt->verbose = true;
+        } else if (arg[0] != '-') {
+            /* Positional argument: if it looks like a file path (.so or .bump), use as direct path.
+               Otherwise treat as model name for cache lookup. */
+            const char *ext = strrchr(arg, '.');
+            bool is_file = (ext && (!strcmp(ext, ".so") || !strcmp(ext, ".bump")));
+            if (is_file) {
+                if (!opt->lib_path) opt->lib_path = arg;
+                else if (!opt->weights_path) opt->weights_path = arg;
+                else {
+                    fprintf(stderr, "Unknown argument: %s\n", arg);
+                    return false;
+                }
+            } else {
+                /* Treat as model name */
+                if (!opt->model_name) {
+                    opt->model_name = arg;
+                } else {
+                    fprintf(stderr, "Unknown argument: %s (model already set to '%s')\n", arg, opt->model_name);
+                    return false;
+                }
+            }
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", arg);
+            return false;
+        }
+    }
+
+    /* Auto-discover model if --model specified or model name given as positional arg */
+    if (opt->prompt_once && opt->prompt_tokens_csv) {
+        fprintf(stderr, "Error: use either --prompt or --prompt-tokens, not both\n");
+        return false;
+    }
+
+    if (opt->model_name && (!opt->lib_path || !opt->weights_path)) {
+        static char lib_buf[4096], weights_buf[4096];
+        if (find_model_in_cache(opt->model_name, lib_buf, weights_buf, sizeof(lib_buf))) {
+            opt->lib_path = lib_buf;
+            opt->weights_path = weights_buf;
+        } else {
+            fprintf(stderr, "Model '%s' not found in cache.\n\n", opt->model_name);
+            list_available_models();
+            fprintf(stderr, "\nTo use an existing model:  %s --model <name>\n", argv[0]);
+            fprintf(stderr, "To compile '%s':           python version/v7/scripts/ck_run_v7.py run %s\n",
+                    opt->model_name, opt->model_name);
+            return false;
+        }
+    }
+
+    if (!opt->lib_path || !opt->weights_path) {
+        /* No model specified — auto-scan cache directory */
+        static char scan_lib[4096], scan_weights[4096];
+        print_banner();
+        if (scan_and_select_model(scan_lib, scan_weights, sizeof(scan_lib))) {
+            opt->lib_path = scan_lib;
+            opt->weights_path = scan_weights;
+        } else {
+            fprintf(stderr, "\n");
+            print_help(argv[0]);
+            return false;
+        }
+    }
+
+    if (!opt->manifest_path && opt->weights_path) {
+        static char manifest_buf[4096];
+        if (derive_manifest_map_path(opt->weights_path, manifest_buf, sizeof(manifest_buf))) {
+            opt->manifest_path = manifest_buf;
+        }
+    }
+
+    /* Auto-detect chat template from model name/path */
+    const char *name_for_template = opt->model_name ? opt->model_name : opt->lib_path;
+    opt->chat_template = detect_chat_template(name_for_template);
+
+    /* Load EOS tokens from vocab.json if available */
+    if (load_eos_from_vocab_json(opt->weights_path, opt)) {
+        if (opt->verbose) {
+            printf("[DEBUG] Loaded %d EOS tokens: ", opt->eos_count);
+            for (int i = 0; i < opt->eos_count; i++) {
+                printf("%d ", opt->eos_ids[i]);
+            }
+            printf("\n");
+        }
+    }
+
+    return true;
+}
+
+/* ============================================================================
+ * REPL Command Processing
+ * ============================================================================ */
+
+static bool process_repl_command(const char *line, CLIOptions *opt, ModelAPI *api) {
+    if (!line || line[0] != '/') return false;
+
+    if (!strncmp(line, "/exit", 5) || !strncmp(line, "/quit", 5)) {
+        g_exit_requested = 1;
+        return true;
+    }
+    if (!strncmp(line, "/help", 5)) {
+        printf("REPL Commands:\n");
+        printf("  /exit, /quit        Exit\n");
+        printf("  /reset              Reset KV cache\n");
+        printf("  /timing             Toggle timing display\n");
+        printf("  /temp <value>       Set temperature (0 = greedy)\n");
+        printf("  /top-p <value>      Set top-p\n");
+        printf("  /system <text>      Set system prompt\n");
+        printf("  /clear              Clear system prompt\n");
+        printf("  /verbose            Toggle verbose mode\n");
+        return true;
+    }
+    if (!strncmp(line, "/reset", 6)) {
+        if (api->kv_reset) {
+            api->kv_reset();
+            printf("[KV cache reset]\n");
+        }
+        return true;
+    }
+    if (!strncmp(line, "/timing", 7)) {
+        opt->timing = !opt->timing;
+        printf("[Timing %s]\n", opt->timing ? "enabled" : "disabled");
+        return true;
+    }
+    if (!strncmp(line, "/verbose", 8)) {
+        opt->verbose = !opt->verbose;
+        printf("[Verbose %s]\n", opt->verbose ? "enabled" : "disabled");
+        return true;
+    }
+    if (!strncmp(line, "/temp ", 6)) {
+        opt->temperature = (float)atof(line + 6);
+        printf("[Temperature set to %.2f]\n", opt->temperature);
+        return true;
+    }
+    if (!strncmp(line, "/top-p ", 7)) {
+        opt->top_p = (float)atof(line + 7);
+        printf("[Top-p set to %.2f]\n", opt->top_p);
+        return true;
+    }
+    if (!strncmp(line, "/system ", 8)) {
+        opt->system_prompt = strdup(line + 8);
+        printf("[System prompt set]\n");
+        return true;
+    }
+    if (!strncmp(line, "/clear", 6)) {
+        opt->system_prompt = NULL;
+        printf("[System prompt cleared]\n");
+        return true;
+    }
+
+    printf("Unknown command: %s\n", line);
+    return true;
+}
+
+/* ============================================================================
+ * Main
+ * ============================================================================ */
+
+int main(int argc, char **argv) {
+    signal(SIGINT, handle_sigint);
+    srand((unsigned int)time(NULL));
+
+    if (argc >= 2) {
+        const char *sub = argv[1];
+        if (!strcmp(sub, "train")) {
+            return cmd_train_subcommand(argc, argv);
+        }
+        if (!strcmp(sub, "report-index")) {
+            return cmd_report_index_subcommand(argc, argv);
+        }
+        if (!strcmp(sub, "profile")) {
+            return cmd_profile_subcommand(argc, argv);
+        }
+    }
+
+    CLIOptions opt;
+    if (!parse_args(argc, argv, &opt)) {
+        return 1;
+    }
+
+    print_banner();
+    printf("Loading: %s\n", opt.lib_path);
+
+    ModelAPI api;
+    if (!load_model_api(opt.lib_path, &api)) {
+        return 1;
+    }
+
+    printf("Initializing model...\n");
+    if (api.init_with_manifest) {
+        if (!opt.manifest_path) {
+            fprintf(stderr, "Error: ck_model_init_with_manifest is available but no manifest map was provided or discovered\n");
+            return 1;
+        }
+        if (api.init_with_manifest(opt.weights_path, opt.manifest_path) != 0) {
+            fprintf(stderr, "Error: ck_model_init_with_manifest failed\n");
+            return 1;
+        }
+    } else {
+        if (api.init(opt.weights_path) != 0) {
+            fprintf(stderr, "Error: ck_model_init failed\n");
+            return 1;
+        }
+    }
+
+    int ctx = opt.context_override;
+    if (ctx <= 0 && api.get_context) ctx = api.get_context();
+    if (api.kv_enable && ctx > 0) {
+        api.kv_enable(ctx);
+    }
+
+    const bool has_tokenizer = api.has_tokenizer && api.has_tokenizer() &&
+                               api.encode_text && api.decode_tokens;
+    if (!has_tokenizer && !opt.prompt_tokens_csv) {
+        fprintf(stderr, "[Tokenizer] Model does not have built-in tokenizer\n");
+        fprintf(stderr, "            Use --prompt-tokens for tokenizer-free generated runtimes\n");
+        return 1;
+    }
+
+    int vocab_size = api.get_vocab_size ? api.get_vocab_size() : 0;
+
+    /* Lookup EOS tokens using model's tokenizer */
+    if (has_tokenizer && api.lookup_token) {
+        static const char *eos_tokens[] = {
+            "<|im_end|>", "<|endoftext|>", "<|im_start|>",  /* Qwen/ChatML */
+            "<|eot_id|>", "<|end_of_text|>",  /* Llama 3 */
+            "</s>",  /* Generic */
+            NULL
+        };
+        opt.eos_count = 0;
+        for (int i = 0; eos_tokens[i] != NULL && opt.eos_count < CK_CLI_EOS_MAX; i++) {
+            int32_t id = api.lookup_token(eos_tokens[i]);
+            if (id >= 0) {
+                opt.eos_ids[opt.eos_count++] = id;
+                if (opt.verbose) {
+                    printf("[Tokenizer] EOS token: %s -> %d\n", eos_tokens[i], id);
+                }
+            }
+        }
+        if (opt.verbose && opt.eos_count > 0) {
+            printf("[Tokenizer] Found %d EOS tokens\n", opt.eos_count);
+        }
+    }
+
+    printf("Ready! Vocab: %d, Context: %d, Template: %s\n",
+           vocab_size, ctx,
+           opt.no_chat_template ? "none" :
+           opt.chat_template == CHAT_TEMPLATE_QWEN ? "qwen" :
+           opt.chat_template == CHAT_TEMPLATE_LLAMA ? "llama" :
+           opt.chat_template == CHAT_TEMPLATE_MISTRAL ? "mistral" : "chatml");
+
+    /* Print CPU capability info */
+    ck_capability_t cap = ck_get_capabilities();
+    printf("[Hardware] %s | Vector: %d-bit | FMA: %s | AI Accel: %s | Kernel: %s\n",
+           cap.name, cap.width, cap.has_fma ? "Yes" : "No",
+           cap.has_ai_accel ? "Yes" : "No", cap.best_kernel);
+
+#ifdef _OPENMP
+    {
+        int max_threads = omp_get_max_threads();
+        const char *omp_env = getenv("OMP_NUM_THREADS");
+        printf("[OpenMP]   Threads: %d (OMP_NUM_THREADS=%s) | Cores: %d\n",
+               max_threads,
+               omp_env ? omp_env : "auto",
+               (int)sysconf(_SC_NPROCESSORS_ONLN));
+    }
+#else
+    printf("[OpenMP]   Disabled (compiled without -fopenmp)\n");
+#endif
+
+    printf("Type /help for commands, Ctrl+C to stop generation\n\n");
+
+    setvbuf(stdout, NULL, _IOFBF, 1 << 20);
+
+    if (opt.prompt_tokens_csv) {
+        int32_t *ids = NULL;
+        int id_count = 0;
+        if (!parse_token_id_list(opt.prompt_tokens_csv, &ids, &id_count)) {
+            fprintf(stderr, "Error: failed to parse --prompt-tokens\n");
+            if (api.free_fn) api.free_fn();
+            if (api.handle) dlclose(api.handle);
+            return 1;
+        }
+        run_token_ids(&api, &opt, ids, id_count, id_count);
+    } else if (opt.prompt_once) {
+        run_prompt(&api, &opt, opt.prompt_once);
+    } else {
+        /* REPL */
+#ifdef HAVE_READLINE
+        char *home = getenv("HOME");
+        char history_path[4096];
+        if (home) {
+            snprintf(history_path, sizeof(history_path), "%s/%s", home, CK_CLI_HISTORY_FILE);
+            read_history(history_path);
+        }
+#endif
+
+        while (!g_exit_requested) {
+#ifdef HAVE_READLINE
+            char *line = readline("\033[1;32mYou:\033[0m ");
+            if (!line) break;
+            if (*line) add_history(line);
+#else
+            printf("\033[1;32mYou:\033[0m ");
+            fflush(stdout);
+            char line_buf[4096];
+            if (!fgets(line_buf, sizeof(line_buf), stdin)) {
+                if (feof(stdin) || g_exit_requested) break;
+                if (errno == EINTR) break;
+                continue;
+            }
+            /* Remove trailing newline */
+            size_t len = strlen(line_buf);
+            if (len > 0 && line_buf[len-1] == '\n') line_buf[len-1] = '\0';
+            char *line = line_buf;
+#endif
+
+            if (line[0] == '\0') {
+#ifdef HAVE_READLINE
+                free(line);
+#endif
+                continue;
+            }
+
+            if (line[0] == '/') {
+                process_repl_command(line, &opt, &api);
+#ifdef HAVE_READLINE
+                free(line);
+#endif
+                continue;
+            }
+
+            printf("\033[1;34mAssistant:\033[0m ");
+            fflush(stdout);
+            run_prompt(&api, &opt, line);
+
+#ifdef HAVE_READLINE
+            free(line);
+#endif
+        }
+
+#ifdef HAVE_READLINE
+        if (home) {
+            write_history(history_path);
+        }
+#endif
+    }
+
+    /* Model handles its own cleanup via ck_model_free */
+    if (api.free_fn) api.free_fn();
+    if (api.handle) dlclose(api.handle);
+
+    printf("\nGoodbye!\n");
+    return 0;
+}

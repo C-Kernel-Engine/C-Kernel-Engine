@@ -2781,6 +2781,7 @@ CK_CLI_V6 := src/v6/ck_cli_v6.c
 CK_CLI_V65 := src/v6.5/ck_cli_v6.5.c
 CK_CLI_V66 := version/v6.6/src/ck_cli_v6.6.c
 CK_CLI_V7 := version/v7/src/ck_cli_v7.c
+CK_CLI_V8 := version/v8/src/ck_cli_v8.c
 CK_BPE_TRAIN_V7 := version/v7/src/ck_bpe_train.c
 
 # Main orchestrator (ck run, ck list, etc.)
@@ -2868,6 +2869,22 @@ ck-cli-v7: $(BUILD_DIR)/ck-cli-v7
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --model qwen"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 --list"
 	@echo "    ./$(BUILD_DIR)/ck-cli-v7 <model.so> <weights.bump>"
+	@echo ""
+
+# v8 Native CLI (bootstrapped from v7 while multimodal hosting comes online)
+$(BUILD_DIR)/ck-cli-v8: $(CK_CLI_V8) $(LIB_TOKENIZER)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(CK_CLI_V8) -L$(BUILD_DIR) -lckernel_tokenizer -ldl -lpthread -lm -Wl,-rpath,$(BUILD_DIR)
+
+ck-cli-v8: $(BUILD_DIR)/ck-cli-v8
+	@echo ""
+	@echo "  $(C_CYAN)C-Kernel-Engine v8 CLI$(C_RESET)"
+	@echo "  Features: v7-native CLI bootstrap for upcoming vision/multimodal hosting"
+	@echo ""
+	@echo "  Usage:"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v8 --model qwen"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v8 --list"
+	@echo "    ./$(BUILD_DIR)/ck-cli-v8 <model.so> <weights.bump>"
 	@echo ""
 
 $(BUILD_DIR)/ck-bpe-train: $(CK_BPE_TRAIN_V7)
@@ -3325,7 +3342,7 @@ report-md:
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
 .PHONY: v7-dataset-normalize v7-dataset-classify v7-dataset-embeddings v7-dataset-attention v7-dataset-viewer v7-dataset-all
-.PHONY: ck-cli-v7 ck-bpe-train
+.PHONY: ck-cli-v7 ck-cli-v8 ck-bpe-train
 
 # ============================================================================
 # v6.6 Test Suite (delegates to version/v6.6/test/Makefile)
