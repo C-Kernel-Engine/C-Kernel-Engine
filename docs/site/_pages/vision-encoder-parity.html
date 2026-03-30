@@ -1,0 +1,157 @@
+---
+layout: default
+title: Vision Encoder Parity
+permalink: /vision-encoder-parity/
+---
+
+<div class="container">
+  <h1>Vision Encoder Parity</h1>
+  <p class="lead">
+    Qwen3-VL vision encoder parity was closed on March 30, 2026.
+    The generated C runtime now matches local llama.cpp end to end in native strict mode.
+  </p>
+
+  <div class="alert alert-success">
+    <strong>Current Result:</strong>
+    Native strict parity for the generated v8 Qwen3-VL encoder is exact:
+    <code>max_abs=0.0</code>,
+    <code>mean_abs=0.0</code>,
+    <code>rmse=0.0</code>,
+    <code>cosine=1.0</code>.
+    This is not the temporary mtmd-oracle shortcut.
+  </div>
+
+  <h2>What Was Actually Wrong</h2>
+  <p>
+    The final blocker was not patching, not deepstack stitching, and not a missing attention op.
+    We initially localized the drift to full attention because that was the first place tiny errors became visible.
+    The real remaining seed was later in the layer:
+    <strong>the GGML fp16-table GELU path was not bit-identical to llama.cpp</strong>.
+  </p>
+  <p>
+    Once layer-0 attention became exact, the first remaining mismatch showed up at
+    <code>ffn_gelu</code>, then propagated through <code>ffn_out</code>, residual addition,
+    and the remaining encoder stack.
+  </p>
+
+  <h2>Why This Took Time</h2>
+  <div class="card">
+    <h3 style="margin-top: 0;">Encoder Parity Is Not Just "Correct Math"</h3>
+    <p>
+      For decoder bring-up, mathematically correct kernels were often enough to converge quickly.
+      For this vision encoder, the target was <strong>ggml-exact graph behavior</strong>.
+      Tiny <code>fp32</code> or <code>fp16</code> rounding differences that look harmless in one row
+      compound across full attention, MLP, and 27 layers of residual accumulation.
+    </p>
+    <p>
+      The painful lesson is simple:
+      <strong>if a model is loaded from GGUF and the reference is llama.cpp, "close" is not done.</strong>
+    </p>
+  </div>
+
+  <h2>Method That Worked</h2>
+  <ol>
+    <li>Get end-to-end parity metrics first, so the failure is measurable.</li>
+    <li>Dump per-activation tensors for both CK and llama.cpp.</li>
+    <li>Find the first layer and first tensor that diverges.</li>
+    <li>Replay that tensor boundary in isolation until the drift is explained.</li>
+    <li>Fix the exact seed error, then rerun end-to-end because later layers amplify tiny misses.</li>
+  </ol>
+
+  <div class="alert alert-info">
+    <strong>Do not skip the first-divergence step.</strong>
+    Large final embedding drift does not imply a large bug.
+    In this case, a tiny fp16-table activation mismatch was enough to poison later layers.
+  </div>
+
+  <h2>Major Issues To Watch For On Future Encoder Ports</h2>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3 style="margin-top: 0;">1. GGML-Exact Activation Tables</h3>
+      <p>
+        If the reference path uses lookup-table math, especially fp16 tables,
+        do not assume a "same formula" implementation is enough.
+        The exact table and the exact fp32→fp16 conversion path matter.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">2. Full Attention Is Less Forgiving</h3>
+      <p>
+        Full bidirectional attention spreads tiny row-level differences across the entire layer.
+        Decoder-style causal paths tend to localize drift much more naturally.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">3. Mixed Dtype Boundaries Matter</h3>
+      <p>
+        Even when most activations are <code>fp32</code>, the decisive mismatch may come from an fp16 lookup,
+        quantized projection boundary, or a reference-only conversion convention.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top: 0;">4. Standalone Test Builds Must Track Runtime Splits</h3>
+      <p>
+        Splitting production code into new helper files is safe, but standalone libs and generated harnesses
+        must be updated too. Otherwise the main engine passes while test-only link targets fail.
+      </p>
+    </div>
+  </div>
+
+  <h2>What To Check First On The Next Encoder</h2>
+  <ul>
+    <li>Template contract: make sure the model path is expressed in the template, not hidden in lowering code.</li>
+    <li>Kernel map coverage: verify every required op resolves to a concrete kernel id before codegen.</li>
+    <li>Layer-0 first divergence: do not start with layer 12 or final embeddings.</li>
+    <li>Reference activations: dump both sides and replay isolated seams before editing kernels broadly.</li>
+    <li>Activation-table parity: GELU, RoPE tables, and any special lookup path deserve direct standalone checks.</li>
+  </ul>
+
+  <h2>Is The v8 IR Builder Hard-Coded?</h2>
+  <p>
+    Mostly no, but not perfectly no.
+  </p>
+  <p>
+    The Qwen3-VL encoder path is driven by:
+  </p>
+  <ul>
+    <li>the template in <code>version/v8/templates/qwen3_vl_vision.json</code></li>
+    <li>kernel maps in <code>version/v8/kernel_maps/*.json</code></li>
+    <li>overlay bindings in <code>version/v8/kernel_maps/kernel_bindings.overlay.json</code></li>
+  </ul>
+  <p>
+    That is the correct direction: model structure in the template, kernel identity in maps, runtime function binding in the registry.
+  </p>
+  <p>
+    But <code>build_ir_v8.py</code> still contains real lowering policy:
+    buffer contracts, generic attention selection, fallback rules, and parameter shaping for vision operators.
+    That policy is mostly <strong>generic vision lowering</strong>, not Qwen3-VL-specific hardcoding,
+    but it is still code, not pure data.
+  </p>
+
+  <div class="alert alert-warning">
+    <strong>The honest architectural answer:</strong>
+    the system is <strong>template-driven and kernel-driven</strong>, but not yet <strong>100% declarative</strong>.
+    The builder still owns some generic lowering intelligence.
+  </div>
+
+  <h2>Regression Gates That Matter</h2>
+  <ul>
+    <li><code>make test-v8-qwen3vl</code></li>
+    <li><code>make test-v8-vision-kernels</code></li>
+    <li><code>make llamacpp-parity-full</code></li>
+    <li><code>make test</code></li>
+  </ul>
+
+  <p>
+    These four are the minimum confidence set for future encoder compatibility work.
+    If a parity fix only passes one of them, it is not ready.
+  </p>
+
+  <h2>Bottom Line</h2>
+  <p>
+    The engine did not need a special-case Qwen3-VL runtime.
+    It needed one more round of exactness at the seam where GGML conventions still mattered.
+    That is a good outcome:
+    the path remained template- and kernel-driven, and the final fix improved the shared exactness story instead of adding one-off model glue.
+  </p>
+</div>
