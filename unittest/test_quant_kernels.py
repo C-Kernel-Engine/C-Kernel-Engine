@@ -684,6 +684,40 @@ def test_gemv_f16():
         return False, str(e)
 
 
+def test_gemm_nt_f16():
+    """Test F16 NT GEMM wrapper with FP16-rounded activation contract."""
+    np.random.seed(42)
+    M, N, K = 5, 7, 33
+
+    W_fp32 = np.random.randn(N, K).astype(np.float32)
+    W_f16 = W_fp32.astype(np.float16).view(np.uint16)
+    A = np.random.randn(M, K).astype(np.float32)
+    bias = np.random.randn(N).astype(np.float32)
+
+    ref_y = A.astype(np.float16).astype(np.float32) @ W_fp32.astype(np.float16).astype(np.float32).T + bias
+
+    try:
+        lib.gemm_nt_f16.argtypes = [
+            ctypes.POINTER(ctypes.c_float), ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int, ctypes.c_int, ctypes.c_int
+        ]
+        lib.gemm_nt_f16.restype = None
+
+        c_y = np.zeros((M, N), dtype=np.float32)
+        lib.gemm_nt_f16(
+            A.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            W_f16.ctypes.data_as(ctypes.c_void_p),
+            bias.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            c_y.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            ctypes.c_int(M), ctypes.c_int(N), ctypes.c_int(K)
+        )
+        diff = np.max(np.abs(c_y - ref_y))
+        return diff <= 1e-5, diff
+    except Exception as e:
+        return False, str(e)
+
+
 def test_backward_q4_k():
     """Test Q4_K backward pass accuracy."""
     np.random.seed(42)
@@ -743,6 +777,7 @@ if __name__ == "__main__":
         ("Q4_K GEMV Forward", test_gemv_q4_k),
         ("Q4_K GEMV Backward", test_backward_q4_k),
         ("F16 GEMV Forward", test_gemv_f16),
+        ("F16 NT GEMM Wrapper", test_gemm_nt_f16),
     ]
 
     passed = 0

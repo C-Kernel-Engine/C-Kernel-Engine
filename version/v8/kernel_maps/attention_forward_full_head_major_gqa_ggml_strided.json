@@ -1,0 +1,118 @@
+{
+  "id": "attention_forward_full_head_major_gqa_ggml_strided",
+  "op": "attention",
+  "variant": "full_ggml_cpu_nonflash_fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "q",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "desc": "Query tensor [heads, tokens, head_dim] in head-major layout"
+    }
+  ],
+  "weights": [],
+  "activations": [],
+  "runtime_buffers": [
+    {
+      "name": "k",
+      "dtype": "fp32",
+      "shape": ["KV", "S", "D"],
+      "desc": "Key tensor [kv_heads, seq_len, head_dim] in strided head-major layout"
+    },
+    {
+      "name": "v",
+      "dtype": "fp32",
+      "shape": ["KV", "S", "D"],
+      "desc": "Value tensor [kv_heads, seq_len, head_dim] in strided head-major layout"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["H", "T", "D"],
+      "desc": "Attention output [heads, tokens, head_dim] in head-major layout"
+    }
+  ],
+  "scratch": [],
+  "dims": ["H", "KV", "T", "S", "D"],
+  "params": [
+    {
+      "name": "kv_stride_tokens",
+      "dtype": "int32",
+      "desc": "Stride in tokens for the K/V layout"
+    },
+    {
+      "name": "head_dim",
+      "dtype": "int32",
+      "desc": "Unpadded head dimension"
+    },
+    {
+      "name": "aligned_head_dim",
+      "dtype": "int32",
+      "desc": "Aligned row stride used by the runtime buffers"
+    }
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {
+      "prefill": "head"
+    },
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize independent attention heads."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {
+      "D": 64,
+      "T": 32
+    },
+    "notes": "GGML-compatible non-flash full-sequence GQA attention used for parity-sensitive encoder prefill."
+  },
+  "impl": {
+    "function": "attention_forward_full_head_major_gqa_ggml_strided",
+    "c_declaration": "void attention_forward_full_head_major_gqa_ggml_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens);",
+    "sources": [
+      "src/kernels/attention_kernels.c",
+      "src/kernels/softmax_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "avx512",
+        "requires": ["avx512f", "fma"],
+        "compile_flags": ["-mavx512f", "-mfma"]
+      },
+      {
+        "name": "avx2",
+        "requires": ["avx2", "fma"],
+        "compile_flags": ["-mavx2", "-mfma"]
+      },
+      {
+        "name": "avx",
+        "requires": ["avx"],
+        "compile_flags": ["-mavx"]
+      },
+      {
+        "name": "ref",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "unit": [
+      "unittest/test_attention_full.py"
+    ]
+  },
+  "notes": "Full / bidirectional grouped-query attention that mirrors the ggml CPU non-flash vision path more closely than the exact fused variant."
+}

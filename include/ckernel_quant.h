@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 #include "ckernel_dtype.h"
 
 #ifdef __cplusplus
@@ -292,28 +293,46 @@ static inline float ck_fp16_to_fp32_soft(ck_half h) {
     return u.f;
 }
 
+static inline uint32_t ck_fp32_to_bits(float f) {
+    union { float f; uint32_t u; } u;
+    u.f = f;
+    return u.u;
+}
+
+static inline float ck_fp32_from_bits(uint32_t u32) {
+    union { uint32_t u; float f; } u;
+    u.u = u32;
+    return u.f;
+}
+
 /**
  * @brief Convert FP32 to FP16 (ck_half) — software implementation
  */
 static inline ck_half ck_fp32_to_fp16_soft(float f) {
-    union { uint32_t u; float f; } u;
-    u.f = f;
+#if (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) || defined(__GNUC__) && !defined(__STRICT_ANSI__)) && (!defined(__cplusplus) || __cplusplus >= 201703L)
+    const float scale_to_inf = 0x1.0p+112f;
+    const float scale_to_zero = 0x1.0p-110f;
+#else
+    const float scale_to_inf = ck_fp32_from_bits(UINT32_C(0x77800000));
+    const float scale_to_zero = ck_fp32_from_bits(UINT32_C(0x08800000));
+#endif
+    float base = (fabsf(f) * scale_to_inf) * scale_to_zero;
 
-    uint32_t sign = (u.u >> 16) & 0x8000;
-    int32_t exp = ((u.u >> 23) & 0xFF) - 127 + 15;
-    uint32_t mant = (u.u >> 13) & 0x3FF;
-
-    if (exp <= 0) {
-        if (exp < -10) {
-            return sign;
-        }
-        mant = (mant | 0x400) >> (1 - exp);
-        return sign | mant;
-    } else if (exp >= 31) {
-        return sign | 0x7C00;
+    const uint32_t w = ck_fp32_to_bits(f);
+    const uint32_t shl1_w = w + w;
+    const uint32_t sign = w & UINT32_C(0x80000000);
+    uint32_t bias = shl1_w & UINT32_C(0xFF000000);
+    if (bias < UINT32_C(0x71000000)) {
+        bias = UINT32_C(0x71000000);
     }
 
-    return sign | (exp << 10) | mant;
+    base = ck_fp32_from_bits((bias >> 1) + UINT32_C(0x07800000)) + base;
+    const uint32_t bits = ck_fp32_to_bits(base);
+    const uint32_t exp_bits = (bits >> 13) & UINT32_C(0x00007C00);
+    const uint32_t mantissa_bits = bits & UINT32_C(0x00000FFF);
+    const uint32_t nonsign = exp_bits + mantissa_bits;
+
+    return (ck_half) ((sign >> 16) | (shl1_w > UINT32_C(0xFF000000) ? UINT16_C(0x7E00) : nonsign));
 }
 
 /* --------------------------------------------------------------------------

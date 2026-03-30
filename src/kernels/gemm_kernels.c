@@ -123,6 +123,23 @@ static void gemm_naive_serial_double(const float *A,
     }
 }
 
+static void gemm_naive_serial_float(const float *A,
+                                    const float *B,
+                                    const float *bias,
+                                    float *C,
+                                    int M, int N, int K)
+{
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; k++) {
+                sum += A[i * K + k] * B[j * K + k];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+}
+
 // Naive parallel GEMM (reference baseline) – copied from C-Transformer.
 void gemm_naive_parallel(const float *A,
                          const float *B,
@@ -131,7 +148,7 @@ void gemm_naive_parallel(const float *A,
                          int M, int N, int K)
 {
     if (ck_strict_parity_enabled()) {
-        gemm_naive_serial_double(A, B, bias, C, M, N, K);
+        gemm_naive_serial_float(A, B, bias, C, M, N, K);
         return;
     }
 #pragma omp parallel for
@@ -155,7 +172,7 @@ void gemm_avx512_parallel(const float *A,
                           int M, int N, int K)
 {
     if (ck_strict_parity_enabled()) {
-        gemm_naive_serial_double(A, B, bias, C, M, N, K);
+        gemm_naive_serial_float(A, B, bias, C, M, N, K);
         return;
     }
 #if defined(__AVX512F__)
@@ -211,7 +228,7 @@ void gemm_fine_grained_parallel(const float *A,
                                 int M, int N, int K)
 {
     if (ck_strict_parity_enabled()) {
-        gemm_naive_serial_double(A, B, bias, C, M, N, K);
+        gemm_naive_serial_float(A, B, bias, C, M, N, K);
         return;
     }
 #if defined(__AVX512F__)
@@ -777,7 +794,7 @@ void gemm_blocked_serial(const float *A,
     (void)ck_get_num_threads();
 
     if (ck_strict_parity_enabled()) {
-        gemm_naive_serial_double(A, B, bias, C, M, N, K);
+        gemm_naive_serial_float(A, B, bias, C, M, N, K);
         return;
     }
 

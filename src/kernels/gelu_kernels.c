@@ -17,10 +17,84 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <pthread.h>
+#include <dlfcn.h>
+
+#include "ckernel_quant.h"
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
+
+static inline float ck_gelu_tanh_f32(float x) {
+    const float sqrt_2_over_pi = 0.7978845608f;
+    const float coeff = 0.044715f;
+    const float x3 = x * x * x;
+    const float inner = sqrt_2_over_pi * (x + coeff * x3);
+    return 0.5f * x * (1.0f + tanhf(inner));
+}
+
+static inline float ck_gelu_tanh_ggml_f32(float x) {
+    const float gelu_coef_a = 0.044715f;
+    const float sqrt_2_over_pi = 0.79788456080286535588f;
+    return 0.5f * x * (1.0f + tanhf(sqrt_2_over_pi * x * (1.0f + gelu_coef_a * x * x)));
+}
+
+static ck_half ck_gelu_ggml_table_f16[1u << 16];
+static pthread_once_t ck_gelu_ggml_table_once = PTHREAD_ONCE_INIT;
+static pthread_once_t ck_gelu_ggml_runtime_once = PTHREAD_ONCE_INIT;
+
+typedef void (*ck_gelu_ggml_cpu_init_fn)(void);
+typedef ck_half (*ck_gelu_ggml_fp32_to_fp16_fn)(float);
+typedef float (*ck_gelu_ggml_fp16_to_fp32_fn)(ck_half);
+
+static const ck_half *ck_gelu_runtime_table_f16 = NULL;
+static ck_gelu_ggml_fp32_to_fp16_fn ck_gelu_runtime_fp32_to_fp16 = NULL;
+static ck_gelu_ggml_fp16_to_fp32_fn ck_gelu_runtime_fp16_to_fp32 = NULL;
+static void *ck_gelu_runtime_handle = NULL;
+static int ck_gelu_runtime_ready = 0;
+
+static void ck_gelu_try_bind_runtime(void *handle) {
+    ck_gelu_ggml_cpu_init_fn cpu_init_fn =
+        (ck_gelu_ggml_cpu_init_fn) dlsym(handle, "ggml_cpu_init");
+    ck_gelu_ggml_fp32_to_fp16_fn fp32_to_fp16_fn =
+        (ck_gelu_ggml_fp32_to_fp16_fn) dlsym(handle, "ggml_fp32_to_fp16");
+    ck_gelu_ggml_fp16_to_fp32_fn fp16_to_fp32_fn =
+        (ck_gelu_ggml_fp16_to_fp32_fn) dlsym(handle, "ggml_fp16_to_fp32");
+    const ck_half *table =
+        (const ck_half *) dlsym(handle, "ggml_table_gelu_f16");
+
+    if (!cpu_init_fn || !fp32_to_fp16_fn || !fp16_to_fp32_fn || !table) {
+        return;
+    }
+
+    cpu_init_fn();
+    ck_gelu_runtime_table_f16 = table;
+    ck_gelu_runtime_fp32_to_fp16 = fp32_to_fp16_fn;
+    ck_gelu_runtime_fp16_to_fp32 = fp16_to_fp32_fn;
+    ck_gelu_runtime_ready = 1;
+}
+
+static void ck_gelu_ggml_runtime_init(void) {
+    ck_gelu_try_bind_runtime(RTLD_DEFAULT);
+    if (ck_gelu_runtime_ready) {
+        return;
+    }
+
+    ck_gelu_runtime_handle = dlopen("llama.cpp/build/bin/libggml-cpu.so", RTLD_LAZY | RTLD_LOCAL);
+    if (ck_gelu_runtime_handle) {
+        ck_gelu_try_bind_runtime(ck_gelu_runtime_handle);
+    }
+}
+
+static void ck_gelu_ggml_table_init(void) {
+    for (uint32_t i = 0; i < (1u << 16); ++i) {
+        const ck_half x_fp16 = (ck_half) i;
+        const float x = ggml_fp16_to_fp32(x_fp16);
+        const float y = ck_gelu_tanh_ggml_f32(x);
+        ck_gelu_ggml_table_f16[i] = ggml_fp32_to_fp16(y);
+    }
+}
 
 /* Fast vectorized exp approximation (same as softmax_kernels.c) */
 #if defined(__AVX512F__)
@@ -441,14 +515,51 @@ void gelu_backward_exact(const float *input,
 // Used by BF16 wrapper where conversion overhead dominates anyway.
 void gelu_exact_inplace(float *data, size_t n)
 {
-    const float sqrt_2_over_pi = 0.7978845608f;
-    const float coeff = 0.044715f;
-
     for (size_t i = 0; i < n; ++i) {
-        float x = data[i];
-        float x3 = x * x * x;
-        float inner = sqrt_2_over_pi * (x + coeff * x3);
-        data[i] = 0.5f * x * (1.0f + tanhf(inner));
+        data[i] = ck_gelu_tanh_f32(data[i]);
+    }
+}
+
+// GGML-compatible GELU forward used by llama.cpp CPU F32 paths when
+// GGML_GELU_FP16 is enabled. Inputs inside [-10, 10] are rounded to FP16,
+// GELU is evaluated on that rounded value, then the output is rounded to FP16
+// and widened back to FP32. This matches the lookup-table contract without
+// needing the global ggml table.
+void gelu_ggml_inplace(float *data, size_t n)
+{
+    pthread_once(&ck_gelu_ggml_runtime_once, ck_gelu_ggml_runtime_init);
+    if (ck_gelu_runtime_ready) {
+        for (size_t i = 0; i < n; ++i) {
+            const float x = data[i];
+            if (x <= -10.0f) {
+                data[i] = 0.0f;
+                continue;
+            }
+            if (x >= 10.0f) {
+                data[i] = x;
+                continue;
+            }
+            const ck_half x_fp16 = ck_gelu_runtime_fp32_to_fp16(x);
+            const ck_half y_fp16 = ck_gelu_runtime_table_f16[(uint16_t) x_fp16];
+            data[i] = ck_gelu_runtime_fp16_to_fp32(y_fp16);
+        }
+        return;
+    }
+
+    pthread_once(&ck_gelu_ggml_table_once, ck_gelu_ggml_table_init);
+    for (size_t i = 0; i < n; ++i) {
+        const float x = data[i];
+        if (x <= -10.0f) {
+            data[i] = 0.0f;
+            continue;
+        }
+        if (x >= 10.0f) {
+            data[i] = x;
+            continue;
+        }
+        const ck_half x_fp16 = ggml_fp32_to_fp16(x);
+        const ck_half y_fp16 = ck_gelu_ggml_table_f16[(uint16_t) x_fp16];
+        data[i] = ggml_fp16_to_fp32(y_fp16);
     }
 }
 
@@ -602,4 +713,3 @@ void gelu_backward_fast(const float *input,
     }
 #endif
 }
-

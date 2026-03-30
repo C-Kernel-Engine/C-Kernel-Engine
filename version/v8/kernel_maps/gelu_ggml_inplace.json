@@ -1,0 +1,37 @@
+{
+  "id": "gelu_ggml_inplace",
+  "op": "gelu",
+  "variant": "ggml_inplace_fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "Input/output buffer (in-place)"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "GGML-compatible GELU output (same buffer as input)"
+    }
+  ],
+  "dims": ["N"],
+  "impl": {
+    "function": "gelu_ggml_inplace",
+    "c_declaration": "void gelu_ggml_inplace(float *data, size_t n);",
+    "sources": ["src/kernels/gelu_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_gelu.py"]
+  },
+  "notes": "GGML-compatible FP16-table GELU used for llama.cpp activation parity."
+}

@@ -16,9 +16,13 @@
  */
 
 #include "bf16_utils.h"
+#include "attention_oracle_ggml.h"
 #include "ckernel_engine.h"
+#include "../../llama.cpp/ggml/include/ggml.h"
+#include <dlfcn.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -46,6 +50,770 @@ static inline size_t qkv_index(int h,
 // Match llama.cpp flash-attention input handling where F32 K/V are rounded through F16.
 static inline float ck_round_fp16_scalar(float x) {
     return CK_FP16_TO_FP32(CK_FP32_TO_FP16(x));
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+#define CK_NOINLINE __attribute__((noinline))
+#else
+#define CK_NOINLINE
+#endif
+
+#if defined(__clang__)
+#define CK_OPTNONE __attribute__((optnone))
+#elif defined(__GNUC__)
+#define CK_OPTNONE __attribute__((optimize("O0")))
+#else
+#define CK_OPTNONE
+#endif
+
+static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32_strict(const float *x,
+                                                          const float *y,
+                                                          int n)
+{
+    float sumf = 0.0f;
+    for (int i = 0; i < n; ++i) {
+        volatile float prod = x[i] * y[i];
+        volatile float next = sumf + prod;
+        sumf = next;
+    }
+    return sumf;
+}
+
+static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32x_f32_to_f32_via_f64(const float *x,
+                                                                       const float *y,
+                                                                       int n)
+{
+    double sum = 0.0;
+    for (int i = 0; i < n; ++i) {
+        volatile double prod = (double) x[i] * (double) y[i];
+        volatile double next = sum + prod;
+        sum = next;
+    }
+    return (float) sum;
+}
+
+static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32_reverse_strict(const float *x,
+                                                                  const float *y,
+                                                                  int n)
+{
+    float sumf = 0.0f;
+    for (int i = n - 1; i >= 0; --i) {
+        volatile float prod = x[i] * y[i];
+        volatile float next = sumf + prod;
+        sumf = next;
+    }
+    return sumf;
+}
+
+typedef struct {
+    char magic[8];
+    uint32_t version;
+    int32_t layer_id;
+    char op_name[32];
+    uint32_t dtype;
+    uint32_t rank;
+    int64_t shape[4];
+    uint32_t elem_count;
+    int32_t token_id;
+    uint8_t reserved[32];
+} __attribute__((packed)) ck_attention_vec_dump_header_t;
+
+static const char ck_attention_vec_dump_magic[8] = {'C', 'K', 'D', 'M', 'P', '\0', '\0', '\0'};
+static const uint32_t ck_attention_vec_dump_version = 1u;
+static int ck_attention_vec_dump_layer_seq = 0;
+
+static void ck_attention_trace_query(const char *tag,
+                                     int layer_id,
+                                     int head_id,
+                                     int query_id,
+                                     int value);
+
+static int ck_attention_vec_dump_enabled(void)
+{
+    const char *v = getenv("CK_STRICT_ATTN_VEC_DUMP");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static int ck_attention_vec_dump_vcols_enabled(void)
+{
+    const char *v = getenv("CK_STRICT_ATTN_DUMP_VCOLS");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static int ck_attention_reverse_out_dot_enabled(void)
+{
+    const char *v = getenv("CK_STRICT_ATTN_REVERSE_OUT_DOT");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static int ck_attention_ggml_out_graph_enabled(void)
+{
+    const char *v = getenv("CK_STRICT_ATTN_GGML_OUT_GRAPH");
+    return v && v[0] && strcmp(v, "0") != 0;
+}
+
+static int ck_attention_vec_dump_parse_env_int(const char *name, int *out)
+{
+    const char *v = getenv(name);
+    if (!v || !v[0]) {
+        return 0;
+    }
+    char *end = NULL;
+    long parsed = strtol(v, &end, 10);
+    if (end == v || (end && *end != '\0') || parsed < 0 || parsed > INT32_MAX) {
+        return 0;
+    }
+    if (out) {
+        *out = (int) parsed;
+    }
+    return 1;
+}
+
+static int ck_attention_vec_dump_should_emit(int layer_id, int head_id, int query_id)
+{
+    if (!ck_attention_vec_dump_enabled()) {
+        return 0;
+    }
+    int want_layer = -1;
+    int want_head = -1;
+    int want_query = -1;
+    if (!ck_attention_vec_dump_parse_env_int("CK_STRICT_ATTN_DUMP_LAYER", &want_layer)) {
+        return 0;
+    }
+    const int have_head = ck_attention_vec_dump_parse_env_int("CK_STRICT_ATTN_DUMP_HEAD", &want_head);
+    const int have_query = ck_attention_vec_dump_parse_env_int("CK_STRICT_ATTN_DUMP_QUERY", &want_query);
+    const int trace_target = layer_id == want_layer &&
+                             (!have_head || head_id == want_head) &&
+                             (!have_query || query_id == want_query);
+    if (layer_id != want_layer) {
+        return 0;
+    }
+    if (have_head && head_id != want_head) {
+        return 0;
+    }
+    if (have_query && query_id != want_query) {
+        return 0;
+    }
+    if (trace_target) {
+        ck_attention_trace_query("vec_dump_should_emit", layer_id, head_id, query_id, 1);
+    }
+    return 1;
+}
+
+static int ck_attention_vec_dump_next_layer_id(void)
+{
+    const int layer_id = ck_attention_vec_dump_layer_seq;
+    ck_attention_vec_dump_layer_seq += 1;
+    return layer_id;
+}
+
+static void ck_attention_vec_dump_tensor(const char *name,
+                                         int layer_id,
+                                         int query_id,
+                                         const float *data,
+                                         size_t elem_count)
+{
+    const char *dir = getenv("CK_PARITY_DIR");
+    if (!dir || !dir[0] || !name || !name[0] || !data || elem_count == 0) {
+        return;
+    }
+
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", dir, "strict_internal.bin");
+    FILE *f = fopen(path, "ab");
+    if (!f) {
+        return;
+    }
+
+    ck_attention_vec_dump_header_t h;
+    memset(&h, 0, sizeof(h));
+    memcpy(h.magic, ck_attention_vec_dump_magic, sizeof(ck_attention_vec_dump_magic));
+    h.version = ck_attention_vec_dump_version;
+    h.layer_id = layer_id;
+    strncpy(h.op_name, name, sizeof(h.op_name) - 1);
+    h.dtype = 0u;
+    h.rank = 1u;
+    h.shape[0] = (int64_t) elem_count;
+    h.elem_count = (uint32_t) elem_count;
+    h.token_id = query_id;
+
+    fwrite(&h, sizeof(h), 1, f);
+    fwrite(data, sizeof(float), elem_count, f);
+    fclose(f);
+}
+
+static void ck_attention_trace(const char *branch, int layer_id, int head_id)
+{
+    const char *enabled = getenv("CK_STRICT_ATTN_TRACE");
+    const char *dir = getenv("CK_PARITY_DIR");
+    if (!enabled || !enabled[0] || strcmp(enabled, "0") == 0 || !dir || !dir[0] || !branch || !branch[0]) {
+        return;
+    }
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", dir, "strict_trace.txt");
+    FILE *f = fopen(path, "a");
+    if (!f) {
+        return;
+    }
+    fprintf(f, "layer=%d head=%d branch=%s\n", layer_id, head_id, branch);
+    fclose(f);
+}
+
+static void ck_attention_trace_query(const char *tag,
+                                     int layer_id,
+                                     int head_id,
+                                     int query_id,
+                                     int value)
+{
+    const char *enabled = getenv("CK_STRICT_ATTN_TRACE");
+    const char *dir = getenv("CK_PARITY_DIR");
+    if (!enabled || !enabled[0] || strcmp(enabled, "0") == 0 || !dir || !dir[0] || !tag || !tag[0]) {
+        return;
+    }
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", dir, "strict_trace.txt");
+    FILE *f = fopen(path, "a");
+    if (!f) {
+        return;
+    }
+    fprintf(f, "layer=%d head=%d query=%d tag=%s value=%d\n", layer_id, head_id, query_id, tag, value);
+    fclose(f);
+}
+
+static void ck_attention_trace_float(const char *tag,
+                                     int layer_id,
+                                     int head_id,
+                                     float value)
+{
+    const char *enabled = getenv("CK_STRICT_ATTN_TRACE");
+    const char *dir = getenv("CK_PARITY_DIR");
+    if (!enabled || !enabled[0] || strcmp(enabled, "0") == 0 || !dir || !dir[0] || !tag || !tag[0]) {
+        return;
+    }
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", dir, "strict_trace.txt");
+    FILE *f = fopen(path, "a");
+    if (!f) {
+        return;
+    }
+    fprintf(f, "layer=%d head=%d tag=%s float=%.17g\n", layer_id, head_id, tag, (double) value);
+    fclose(f);
+}
+
+static void ck_attention_vec_dump_selected_query(const float *raw_scores,
+                                                 const float *probs,
+                                                 const float *out_vec,
+                                                 const float *v_cols,
+                                                 int kv_tokens,
+                                                 int head_dim,
+                                                 int layer_id,
+                                                 int head_id,
+                                                 int query_id)
+{
+    if (!ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+        return;
+    }
+    ck_attention_trace_query("vec_dump_selected_query", layer_id, head_id, query_id, 1);
+    char name[32];
+    snprintf(name, sizeof(name), "kq_scores_h%d_q%d", head_id, query_id);
+    ck_attention_vec_dump_tensor(name, layer_id, query_id, raw_scores, (size_t) kv_tokens);
+    snprintf(name, sizeof(name), "kq_soft_h%d_q%d", head_id, query_id);
+    ck_attention_vec_dump_tensor(name, layer_id, query_id, probs, (size_t) kv_tokens);
+    snprintf(name, sizeof(name), "kqv_out_h%d_q%d", head_id, query_id);
+    ck_attention_vec_dump_tensor(name, layer_id, query_id, out_vec, (size_t) head_dim);
+    if (v_cols && ck_attention_vec_dump_vcols_enabled()) {
+        snprintf(name, sizeof(name), "vcols_h%d_q%d", head_id, query_id);
+        ck_attention_vec_dump_tensor(name, layer_id, query_id, v_cols, (size_t) kv_tokens * (size_t) head_dim);
+    }
+}
+
+typedef void (*ck_ggml_vec_dot_f32_fn)(int, float *, size_t, const float *, size_t, const float *, size_t, int);
+typedef double (*ck_ggml_vec_soft_max_f32_fn)(int, float *, const float *, float);
+typedef void (*ck_ggml_compute_forward_mul_mat_fn)(const struct ggml_compute_params *, struct ggml_tensor *);
+typedef void (*ck_ggml_compute_forward_soft_max_fn)(const struct ggml_compute_params *, struct ggml_tensor *);
+typedef void (*ck_ggml_cpu_init_fn)(void);
+typedef struct ggml_context *(*ck_ggml_init_fn)(struct ggml_init_params);
+typedef void (*ck_ggml_free_fn)(struct ggml_context *);
+typedef struct ggml_tensor *(*ck_ggml_new_tensor_2d_fn)(struct ggml_context *, enum ggml_type, int64_t, int64_t);
+typedef struct ggml_tensor *(*ck_ggml_mul_mat_graph_fn)(struct ggml_context *, struct ggml_tensor *, struct ggml_tensor *);
+typedef struct ggml_cgraph *(*ck_ggml_new_graph_fn)(struct ggml_context *);
+typedef void (*ck_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
+typedef enum ggml_status (*ck_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
+typedef void (*ck_ggml_set_input_fn)(struct ggml_tensor *);
+
+static inline void ck_vec_scale_f32_inplace(float *x, int n, float scale);
+static inline float ck_vec_max_f32_contig(const float *x, int n);
+
+struct ggml_threadpool;
+struct ggml_compute_params {
+    int ith, nth;
+    size_t wsize;
+    void * wdata;
+    struct ggml_threadpool * threadpool;
+    bool use_ref;
+};
+
+static void *ck_resolve_ggml_cpu_so_handle(void)
+{
+    static int tried = 0;
+    static void *handle = NULL;
+    if (!tried) {
+        tried = 1;
+        const char *env_path = getenv("CK_GGML_CPU_SO");
+        const char *candidates[] = {
+            env_path && env_path[0] ? env_path : NULL,
+            "libggml-cpu.so",
+            "libggml-cpu.so.0",
+            "./llama.cpp/build/bin/libggml-cpu.so",
+            "./llama.cpp/build/bin/libggml-cpu.so.0",
+            "llama.cpp/build/bin/libggml-cpu.so",
+            "llama.cpp/build/bin/libggml-cpu.so.0",
+            NULL,
+        };
+        for (int i = 0; candidates[i] != NULL; ++i) {
+            handle = dlopen(candidates[i], RTLD_NOW | RTLD_LOCAL);
+            if (handle) {
+                break;
+            }
+        }
+    }
+    return handle;
+}
+
+static void *ck_resolve_ggml_symbol(const char *name)
+{
+    void *sym = dlsym(RTLD_DEFAULT, name);
+    if (sym) {
+        return sym;
+    }
+    void *handle = ck_resolve_ggml_cpu_so_handle();
+    if (!handle) {
+        return NULL;
+    }
+    return dlsym(handle, name);
+}
+
+static ck_ggml_vec_dot_f32_fn ck_resolve_ggml_vec_dot_f32(void)
+{
+    static int tried = 0;
+    static ck_ggml_vec_dot_f32_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_vec_dot_f32_fn) ck_resolve_ggml_symbol("ggml_vec_dot_f32");
+    }
+    return fn;
+}
+
+static ck_ggml_vec_soft_max_f32_fn ck_resolve_ggml_vec_soft_max_f32(void)
+{
+    static int tried = 0;
+    static ck_ggml_vec_soft_max_f32_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_vec_soft_max_f32_fn) ck_resolve_ggml_symbol("ggml_vec_soft_max_f32");
+    }
+    return fn;
+}
+
+static ck_ggml_compute_forward_mul_mat_fn ck_resolve_ggml_compute_forward_mul_mat(void)
+{
+    static int tried = 0;
+    static ck_ggml_compute_forward_mul_mat_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_compute_forward_mul_mat_fn) ck_resolve_ggml_symbol("ggml_compute_forward_mul_mat");
+    }
+    return fn;
+}
+
+static ck_ggml_compute_forward_soft_max_fn ck_resolve_ggml_compute_forward_soft_max(void)
+{
+    static int tried = 0;
+    static ck_ggml_compute_forward_soft_max_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_compute_forward_soft_max_fn) ck_resolve_ggml_symbol("ggml_compute_forward_soft_max");
+    }
+    return fn;
+}
+
+static ck_ggml_cpu_init_fn ck_resolve_ggml_cpu_init(void)
+{
+    static int tried = 0;
+    static ck_ggml_cpu_init_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_cpu_init_fn) ck_resolve_ggml_symbol("ggml_cpu_init");
+    }
+    return fn;
+}
+
+static ck_ggml_init_fn ck_resolve_ggml_init(void)
+{
+    static int tried = 0;
+    static ck_ggml_init_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_init_fn) ck_resolve_ggml_symbol("ggml_init");
+    }
+    return fn;
+}
+
+static ck_ggml_free_fn ck_resolve_ggml_free(void)
+{
+    static int tried = 0;
+    static ck_ggml_free_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_free_fn) ck_resolve_ggml_symbol("ggml_free");
+    }
+    return fn;
+}
+
+static ck_ggml_new_tensor_2d_fn ck_resolve_ggml_new_tensor_2d(void)
+{
+    static int tried = 0;
+    static ck_ggml_new_tensor_2d_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_new_tensor_2d_fn) ck_resolve_ggml_symbol("ggml_new_tensor_2d");
+    }
+    return fn;
+}
+
+static ck_ggml_mul_mat_graph_fn ck_resolve_ggml_mul_mat_graph(void)
+{
+    static int tried = 0;
+    static ck_ggml_mul_mat_graph_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_mul_mat_graph_fn) ck_resolve_ggml_symbol("ggml_mul_mat");
+    }
+    return fn;
+}
+
+static ck_ggml_new_graph_fn ck_resolve_ggml_new_graph(void)
+{
+    static int tried = 0;
+    static ck_ggml_new_graph_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_new_graph_fn) ck_resolve_ggml_symbol("ggml_new_graph");
+    }
+    return fn;
+}
+
+static ck_ggml_build_forward_expand_fn ck_resolve_ggml_build_forward_expand(void)
+{
+    static int tried = 0;
+    static ck_ggml_build_forward_expand_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_build_forward_expand_fn) ck_resolve_ggml_symbol("ggml_build_forward_expand");
+    }
+    return fn;
+}
+
+static ck_ggml_graph_compute_with_ctx_fn ck_resolve_ggml_graph_compute_with_ctx(void)
+{
+    static int tried = 0;
+    static ck_ggml_graph_compute_with_ctx_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_graph_compute_with_ctx_fn) ck_resolve_ggml_symbol("ggml_graph_compute_with_ctx");
+    }
+    return fn;
+}
+
+static ck_ggml_set_input_fn ck_resolve_ggml_set_input(void)
+{
+    static int tried = 0;
+    static ck_ggml_set_input_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_ggml_set_input_fn) ck_resolve_ggml_symbol("ggml_set_input");
+    }
+    return fn;
+}
+
+static inline void ck_ggml_init_tensor_f32(struct ggml_tensor *t,
+                                           int64_t ne0,
+                                           int64_t ne1,
+                                           int64_t ne2,
+                                           int64_t ne3,
+                                           size_t nb0,
+                                           size_t nb1,
+                                           size_t nb2,
+                                           size_t nb3,
+                                           void *data)
+{
+    memset(t, 0, sizeof(*t));
+    t->type = GGML_TYPE_F32;
+    t->buffer = NULL;
+    t->ne[0] = ne0;
+    t->ne[1] = ne1;
+    t->ne[2] = ne2;
+    t->ne[3] = ne3;
+    t->nb[0] = nb0;
+    t->nb[1] = nb1;
+    t->nb[2] = nb2;
+    t->nb[3] = nb3;
+    t->op = GGML_OP_NONE;
+    t->data = data;
+}
+
+#if defined(__FMA__)
+#define CK_MADD128(x, y, z) _mm_fmadd_ps(x, y, z)
+#define CK_NMADD128(x, y, z) _mm_fnmadd_ps(x, y, z)
+#else
+#define CK_MADD128(x, y, z) _mm_add_ps(_mm_mul_ps(x, y), z)
+#define CK_NMADD128(x, y, z) _mm_sub_ps(z, _mm_mul_ps(x, y))
+#endif
+
+static inline float ck_hsum128_ps(__m128 v) {
+    v = _mm_add_ps(v, _mm_movehl_ps(v, v));
+    v = _mm_add_ss(v, _mm_movehdup_ps(v));
+    return _mm_cvtss_f32(v);
+}
+
+#if defined(__AVX__) || defined(__AVX2__)
+static inline float ck_hsum256_ps(__m256 v) {
+    const __m128 lo = _mm256_castps256_ps128(v);
+    const __m128 hi = _mm256_extractf128_ps(v, 1);
+    return ck_hsum128_ps(_mm_add_ps(lo, hi));
+}
+#endif
+
+#if defined(__AVX2__) && defined(__FMA__)
+static inline __m256 ck_ggml_v_expf256(__m256 x) {
+    const __m256 r = _mm256_set1_ps(0x1.8p23f);
+    const __m256 z = _mm256_fmadd_ps(x, _mm256_set1_ps(0x1.715476p+0f), r);
+    const __m256 n = _mm256_sub_ps(z, r);
+    const __m256 b = _mm256_fnmadd_ps(n, _mm256_set1_ps(0x1.7f7d1cp-20f),
+                                      _mm256_fnmadd_ps(n, _mm256_set1_ps(0x1.62e4p-1f), x));
+    const __m256i e = _mm256_slli_epi32(_mm256_castps_si256(z), 23);
+    const __m256 k = _mm256_castsi256_ps(
+        _mm256_add_epi32(e, _mm256_castps_si256(_mm256_set1_ps(1))));
+    const __m256i c = _mm256_castps_si256(
+        _mm256_cmp_ps(_mm256_andnot_ps(_mm256_set1_ps(-0.f), n),
+                      _mm256_set1_ps(126), _CMP_GT_OQ));
+    const __m256 u = _mm256_mul_ps(b, b);
+    const __m256 j = _mm256_fmadd_ps(
+        _mm256_fmadd_ps(
+            _mm256_fmadd_ps(_mm256_set1_ps(0x1.0e4020p-7f), b, _mm256_set1_ps(0x1.573e2ep-5f)),
+            u,
+            _mm256_fmadd_ps(_mm256_set1_ps(0x1.555e66p-3f), b, _mm256_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm256_mul_ps(_mm256_set1_ps(0x1.ffffecp-1f), b));
+    if (!_mm256_movemask_ps(_mm256_castsi256_ps(c))) {
+        return _mm256_fmadd_ps(j, k, k);
+    }
+    const __m256i g = _mm256_and_si256(
+        _mm256_castps_si256(_mm256_cmp_ps(n, _mm256_setzero_ps(), _CMP_LE_OQ)),
+        _mm256_set1_epi32(0x82000000u));
+    const __m256 s1 =
+        _mm256_castsi256_ps(_mm256_add_epi32(g, _mm256_set1_epi32(0x7f000000u)));
+    const __m256 s2 = _mm256_castsi256_ps(_mm256_sub_epi32(e, g));
+    const __m256i d = _mm256_castps_si256(
+        _mm256_cmp_ps(_mm256_andnot_ps(_mm256_set1_ps(-0.f), n),
+                      _mm256_set1_ps(192), _CMP_GT_OQ));
+    return _mm256_or_ps(
+        _mm256_and_ps(_mm256_castsi256_ps(d), _mm256_mul_ps(s1, s1)),
+        _mm256_andnot_ps(
+            _mm256_castsi256_ps(d),
+            _mm256_or_ps(
+                _mm256_and_ps(_mm256_castsi256_ps(c),
+                              _mm256_mul_ps(_mm256_fmadd_ps(s2, j, s2), s1)),
+                _mm256_andnot_ps(_mm256_castsi256_ps(c), _mm256_fmadd_ps(k, j, k)))));
+}
+#endif
+
+#if defined(__SSE2__)
+static inline __m128 ck_ggml_v_expf128(__m128 x) {
+    const __m128 r = _mm_set1_ps(0x1.8p23f);
+    const __m128 z = CK_MADD128(x, _mm_set1_ps(0x1.715476p+0f), r);
+    const __m128 n = _mm_sub_ps(z, r);
+    const __m128 b = CK_NMADD128(n, _mm_set1_ps(0x1.7f7d1cp-20f),
+                                 CK_NMADD128(n, _mm_set1_ps(0x1.62e4p-1f), x));
+    const __m128i e = _mm_slli_epi32(_mm_castps_si128(z), 23);
+    const __m128 k = _mm_castsi128_ps(
+        _mm_add_epi32(e, _mm_castps_si128(_mm_set1_ps(1))));
+    const __m128i c = _mm_castps_si128(
+        _mm_cmpgt_ps(_mm_andnot_ps(_mm_set1_ps(-0.f), n), _mm_set1_ps(126)));
+    const __m128 u = _mm_mul_ps(b, b);
+    const __m128 j = CK_MADD128(
+        CK_MADD128(
+            CK_MADD128(_mm_set1_ps(0x1.0e4020p-7f), b, _mm_set1_ps(0x1.573e2ep-5f)),
+            u,
+            CK_MADD128(_mm_set1_ps(0x1.555e66p-3f), b, _mm_set1_ps(0x1.fffdb6p-2f))),
+        u,
+        _mm_mul_ps(_mm_set1_ps(0x1.ffffecp-1f), b));
+    if (!_mm_movemask_ps(_mm_castsi128_ps(c))) {
+        return CK_MADD128(j, k, k);
+    }
+    const __m128i g = _mm_and_si128(
+        _mm_castps_si128(_mm_cmple_ps(n, _mm_setzero_ps())),
+        _mm_set1_epi32(0x82000000u));
+    const __m128 s1 = _mm_castsi128_ps(_mm_add_epi32(g, _mm_set1_epi32(0x7f000000u)));
+    const __m128 s2 = _mm_castsi128_ps(_mm_sub_epi32(e, g));
+    const __m128i d = _mm_castps_si128(
+        _mm_cmpgt_ps(_mm_andnot_ps(_mm_set1_ps(-0.f), n), _mm_set1_ps(192)));
+    return _mm_or_ps(
+        _mm_and_ps(_mm_castsi128_ps(d), _mm_mul_ps(s1, s1)),
+        _mm_andnot_ps(
+            _mm_castsi128_ps(d),
+            _mm_or_ps(
+                _mm_and_ps(_mm_castsi128_ps(c), _mm_mul_ps(CK_MADD128(s2, j, s2), s1)),
+                _mm_andnot_ps(_mm_castsi128_ps(c), CK_MADD128(k, j, k)))));
+}
+#endif
+
+static CK_NOINLINE CK_OPTNONE float ck_ggml_vec_dot_f32_contig(const float *x,
+                                                               const float *y,
+                                                               int n)
+{
+    // Keep this a literal port of ggml_vec_dot_f32 so strict parity can match
+    // llama.cpp's CPU attention path instead of merely approximating it.
+#if defined(__AVX__)
+    float sumf = 0.0f;
+    const int np = (n & ~31);
+    __m256 sum[4] = {
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+    };
+
+    for (int i = 0; i < np; i += 32) {
+        for (int j = 0; j < 4; ++j) {
+            const __m256 ax = _mm256_loadu_ps(x + i + j * 8);
+            const __m256 ay = _mm256_loadu_ps(y + i + j * 8);
+#if defined(__FMA__)
+            sum[j] = _mm256_fmadd_ps(ax, ay, sum[j]);
+#else
+            sum[j] = _mm256_add_ps(_mm256_mul_ps(ax, ay), sum[j]);
+#endif
+        }
+    }
+
+    sum[0] = _mm256_add_ps(sum[0], sum[2]);
+    sum[1] = _mm256_add_ps(sum[1], sum[3]);
+    sum[0] = _mm256_add_ps(sum[0], sum[1]);
+    const __m128 t0 = _mm_add_ps(_mm256_castps256_ps128(sum[0]),
+                                 _mm256_extractf128_ps(sum[0], 1));
+    const __m128 t1 = _mm_hadd_ps(t0, t0);
+    sumf = _mm_cvtss_f32(_mm_hadd_ps(t1, t1));
+
+    for (int i = np; i < n; ++i) {
+        sumf += x[i] * y[i];
+    }
+    return sumf;
+#elif defined(__SSE2__)
+    float sumf = 0.0f;
+    const int np = (n & ~15);
+    __m128 sum[4] = {
+        _mm_setzero_ps(),
+        _mm_setzero_ps(),
+        _mm_setzero_ps(),
+        _mm_setzero_ps(),
+    };
+
+    for (int i = 0; i < np; i += 16) {
+        for (int j = 0; j < 4; ++j) {
+            const __m128 ax = _mm_loadu_ps(x + i + j * 4);
+            const __m128 ay = _mm_loadu_ps(y + i + j * 4);
+#if defined(__FMA__)
+            sum[j] = _mm_fmadd_ps(ax, ay, sum[j]);
+#else
+            sum[j] = _mm_add_ps(_mm_mul_ps(ax, ay), sum[j]);
+#endif
+        }
+    }
+
+    sum[0] = _mm_add_ps(sum[0], sum[2]);
+    sum[1] = _mm_add_ps(sum[1], sum[3]);
+    sum[0] = _mm_add_ps(sum[0], sum[1]);
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
+    sum[0] = _mm_add_ps(sum[0], _mm_movehl_ps(sum[0], sum[0]));
+    sum[0] = _mm_add_ss(sum[0], _mm_movehdup_ps(sum[0]));
+#else
+    __m128 tmp = _mm_shuffle_ps(sum[0], sum[0], _MM_SHUFFLE(2, 3, 0, 1));
+    sum[0] = _mm_add_ps(sum[0], tmp);
+    tmp = _mm_movehl_ps(tmp, sum[0]);
+    sum[0] = _mm_add_ss(sum[0], tmp);
+#endif
+    sumf = _mm_cvtss_f32(sum[0]);
+
+    for (int i = np; i < n; ++i) {
+        sumf += x[i] * y[i];
+    }
+    return sumf;
+#else
+    double sumf = 0.0;
+    for (int i = 0; i < n; ++i) {
+        sumf += (double) (x[i] * y[i]);
+    }
+    return (float) sumf;
+#endif
+}
+
+static CK_NOINLINE CK_OPTNONE float ck_attention_strict_scale_f32(int head_dim)
+{
+    // Keep strict parity on the precise libm sqrtf path. icx -O3 on AVX2 was
+    // lowering 1/sqrtf(d) to a slightly smaller effective scale, which is
+    // enough to move layer-0 vision softmax by ~2e-7 and snowball later.
+    volatile float hd = (float) head_dim;
+    float (*sqrtf_fn)(float) = sqrtf;
+    volatile float root = sqrtf_fn(hd);
+    volatile float one = 1.0f;
+    volatile float scale = one / root;
+    return scale;
+}
+
+static CK_NOINLINE CK_OPTNONE double ck_ggml_vec_soft_max_row(int n,
+                                                              float *y,
+                                                              const float *x,
+                                                              float max)
+{
+    int i = 0;
+    double sum = 0.0;
+
+#if defined(__AVX2__) && defined(__FMA__)
+    for (; i + 7 < n; i += 8) {
+        const __m256 val = ck_ggml_v_expf256(
+            _mm256_sub_ps(_mm256_loadu_ps(x + i), _mm256_set1_ps(max)));
+        _mm256_storeu_ps(y + i, val);
+        __m128 val2 = _mm_add_ps(_mm256_extractf128_ps(val, 1),
+                                 _mm256_castps256_ps128(val));
+        val2 = _mm_add_ps(val2, _mm_movehl_ps(val2, val2));
+        val2 = _mm_add_ss(val2, _mm_movehdup_ps(val2));
+        sum += (double) _mm_cvtss_f32(val2);
+    }
+#elif defined(__SSE2__)
+    for (; i + 3 < n; i += 4) {
+        const __m128 val = ck_ggml_v_expf128(
+            _mm_sub_ps(_mm_loadu_ps(x + i), _mm_set1_ps(max)));
+        _mm_storeu_ps(y + i, val);
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
+        __m128 acc = _mm_add_ps(val, _mm_movehl_ps(val, val));
+        acc = _mm_add_ss(acc, _mm_movehdup_ps(acc));
+#else
+        __m128 tmp = _mm_shuffle_ps(val, val, _MM_SHUFFLE(2, 3, 0, 1));
+        __m128 acc = _mm_add_ps(val, tmp);
+        tmp = _mm_movehl_ps(tmp, acc);
+        acc = _mm_add_ss(acc, tmp);
+#endif
+        sum += (double) _mm_cvtss_f32(acc);
+    }
+#endif
+
+    for (; i < n; ++i) {
+        const float val = expf(x[i] - max);
+        y[i] = val;
+        sum += (double) val;
+    }
+
+    return sum;
 }
 
 // Scores layout matches causal_softmax_head_major:
@@ -932,6 +1700,1042 @@ static void attention_flash_query_causal_exact_f16kv(const float *q_vec,
     }
 }
 
+static CK_NOINLINE CK_OPTNONE void attention_query_full_exact_regular(const float *q_vec,
+                                                                      const float *k_head,
+                                                                      const float *v_cols,
+                                                                      int kv_tokens,
+                                                                      int head_dim,
+                                                                      int aligned_head_dim,
+                                                                      float scale,
+                                                                      float *score_row,
+                                                                      float *out_vec,
+                                                                      int layer_id,
+                                                                      int head_id,
+                                                                      int query_id)
+{
+    if (kv_tokens <= 0) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+        score_row[j] = ck_vec_dot_f32_strict(q_vec, k_vec, head_dim);
+    }
+    float *raw_dump = NULL;
+    if (ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+        raw_dump = (float *) alloca((size_t) kv_tokens * sizeof(float));
+        memcpy(raw_dump, score_row, (size_t) kv_tokens * sizeof(float));
+    }
+
+    float max_score = -INFINITY;
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float score = score_row[j] * scale;
+        score_row[j] = score;
+        if (score > max_score) {
+            max_score = score;
+        }
+    }
+
+    double sum = 0.0;
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float w = expf(score_row[j] - max_score);
+        score_row[j] = w;
+        volatile double next = sum + (double) w;
+        sum = next;
+    }
+
+    if (sum > 0.0) {
+        const float inv_sum = (float) (1.0 / sum);
+        for (int j = 0; j < kv_tokens; ++j) {
+            score_row[j] *= inv_sum;
+        }
+        for (int d = 0; d < head_dim; ++d) {
+            const float *v_col = v_cols + (size_t) d * (size_t) kv_tokens;
+            const float dot = ck_vec_dot_f32x_f32_to_f32_via_f64(score_row, v_col, kv_tokens);
+            out_vec[d] = dot;
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+    if (raw_dump) {
+        ck_attention_vec_dump_selected_query(raw_dump, score_row, out_vec, v_cols, kv_tokens, head_dim,
+                                             layer_id, head_id, query_id);
+    }
+}
+
+static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_regular(const float *q_vec,
+                                                                     const float *k_head,
+                                                                     const float *v_cols,
+                                                                     int kv_tokens,
+                                                                     int head_dim,
+                                                                     int aligned_head_dim,
+                                                                     float scale,
+                                                                     float *score_row,
+                                                                     float *out_vec,
+                                                                     int layer_id,
+                                                                     int head_id,
+                                                                     int query_id)
+{
+    if (kv_tokens <= 0) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+        score_row[j] = ck_ggml_vec_dot_f32_contig(q_vec, k_vec, head_dim);
+    }
+    float *raw_dump = NULL;
+    if (ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+        raw_dump = (float *) alloca((size_t) kv_tokens * sizeof(float));
+        memcpy(raw_dump, score_row, (size_t) kv_tokens * sizeof(float));
+    }
+
+    float *logit_row = (float *) alloca((size_t) kv_tokens * sizeof(float));
+    memcpy(logit_row, score_row, (size_t) kv_tokens * sizeof(float));
+    ck_vec_scale_f32_inplace(logit_row, kv_tokens, scale);
+    const float max_score = ck_vec_max_f32_contig(logit_row, kv_tokens);
+    const double sum = ck_ggml_vec_soft_max_row(kv_tokens, score_row, logit_row, max_score);
+    if (sum > 0.0) {
+        const float inv_sum = (float) (1.0 / sum);
+        ck_vec_scale_f32_inplace(score_row, kv_tokens, inv_sum);
+        for (int d = 0; d < head_dim; ++d) {
+            const float *v_col = v_cols + (size_t) d * (size_t) kv_tokens;
+            out_vec[d] = ck_ggml_vec_dot_f32_contig(score_row, v_col, kv_tokens);
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+    if (raw_dump) {
+        ck_attention_vec_dump_selected_query(raw_dump, score_row, out_vec, v_cols, kv_tokens, head_dim,
+                                             layer_id, head_id, query_id);
+    }
+}
+
+static CK_NOINLINE CK_OPTNONE void attention_query_full_dyn_ggml_regular(const float *q_vec,
+                                                                         const float *k_head,
+                                                                         const float *v_cols,
+                                                                         int kv_tokens,
+                                                                         int head_dim,
+                                                                         int aligned_head_dim,
+                                                                         float scale,
+                                                                         float *score_row,
+                                                                         float *prob_row,
+                                                                         float *out_vec,
+                                                                         ck_ggml_vec_dot_f32_fn dot_fn,
+                                                                         ck_ggml_vec_soft_max_f32_fn softmax_fn,
+                                                                         int layer_id,
+                                                                         int head_id,
+                                                                         int query_id)
+{
+    if (kv_tokens <= 0 || !dot_fn || !softmax_fn || !score_row || !prob_row) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+        float dot = 0.0f;
+        dot_fn(head_dim, &dot, 0, q_vec, 0, k_vec, 0, 1);
+        score_row[j] = dot;
+    }
+    float *raw_dump = NULL;
+    if (ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+        raw_dump = (float *) alloca((size_t) kv_tokens * sizeof(float));
+        memcpy(raw_dump, score_row, (size_t) kv_tokens * sizeof(float));
+    }
+
+    // Mirror ggml_compute_forward_soft_max_f32:
+    // copy raw scores to scratch, scale the scratch buffer, compute the max from
+    // that scaled buffer, then emit exp/logits into a separate output buffer.
+    memcpy(prob_row, score_row, (size_t) kv_tokens * sizeof(float));
+    ck_vec_scale_f32_inplace(prob_row, kv_tokens, scale);
+    const float max_score = ck_vec_max_f32_contig(prob_row, kv_tokens);
+    const double sum = softmax_fn(kv_tokens, score_row, prob_row, max_score);
+    if (sum > 0.0) {
+        const float inv_sum = (float) (1.0 / sum);
+        ck_vec_scale_f32_inplace(score_row, kv_tokens, inv_sum);
+        const int reverse_out_dot = ck_attention_reverse_out_dot_enabled();
+        for (int d = 0; d < head_dim; ++d) {
+            const float *v_col = v_cols + (size_t) d * (size_t) kv_tokens;
+            if (reverse_out_dot) {
+                out_vec[d] = ck_vec_dot_f32_reverse_strict(score_row, v_col, kv_tokens);
+            } else {
+                float dot = 0.0f;
+                dot_fn(kv_tokens, &dot, 0, score_row, 0, v_col, 0, 1);
+                out_vec[d] = dot;
+            }
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+    if (raw_dump) {
+        ck_attention_vec_dump_selected_query(raw_dump, score_row, out_vec, v_cols, kv_tokens, head_dim,
+                                             layer_id, head_id, query_id);
+    }
+}
+
+static int attention_out_mul_mat_graph_block(const float *v_cols,
+                                             const float *prob_block,
+                                             int kv_tokens,
+                                             int head_dim,
+                                             int query_block,
+                                             float *out_block)
+{
+    ck_ggml_cpu_init_fn ggml_cpu_init_fn = ck_resolve_ggml_cpu_init();
+    ck_ggml_init_fn ggml_init_fn = ck_resolve_ggml_init();
+    ck_ggml_free_fn ggml_free_fn = ck_resolve_ggml_free();
+    ck_ggml_new_tensor_2d_fn ggml_new_tensor_2d_fn = ck_resolve_ggml_new_tensor_2d();
+    ck_ggml_mul_mat_graph_fn ggml_mul_mat_fn = ck_resolve_ggml_mul_mat_graph();
+    ck_ggml_new_graph_fn ggml_new_graph_fn = ck_resolve_ggml_new_graph();
+    ck_ggml_build_forward_expand_fn ggml_build_forward_expand_fn = ck_resolve_ggml_build_forward_expand();
+    ck_ggml_graph_compute_with_ctx_fn ggml_graph_compute_with_ctx_fn = ck_resolve_ggml_graph_compute_with_ctx();
+    ck_ggml_set_input_fn ggml_set_input_fn = ck_resolve_ggml_set_input();
+
+    if (!ggml_cpu_init_fn || !ggml_init_fn || !ggml_free_fn ||
+        !ggml_new_tensor_2d_fn || !ggml_mul_mat_fn || !ggml_new_graph_fn ||
+        !ggml_build_forward_expand_fn || !ggml_graph_compute_with_ctx_fn ||
+        !ggml_set_input_fn || !v_cols || !prob_block || !out_block ||
+        kv_tokens <= 0 || head_dim <= 0 || query_block <= 0) {
+        return 0;
+    }
+
+    ggml_cpu_init_fn();
+
+    const size_t out_bytes = (size_t) head_dim * (size_t) query_block * sizeof(float);
+    const size_t mem_size = (size_t) 8 * 1024 * 1024 + out_bytes + (size_t) 512 * 1024;
+    struct ggml_init_params params = {
+        .mem_size = mem_size,
+        .mem_buffer = NULL,
+        .no_alloc = false,
+    };
+    struct ggml_context *ctx = ggml_init_fn(params);
+    if (!ctx) {
+        return 0;
+    }
+
+    int ok = 0;
+    struct ggml_tensor *v_tensor = ggml_new_tensor_2d_fn(ctx, GGML_TYPE_F32, kv_tokens, head_dim);
+    struct ggml_tensor *prob_tensor = ggml_new_tensor_2d_fn(ctx, GGML_TYPE_F32, kv_tokens, query_block);
+    if (!v_tensor || !prob_tensor) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    v_tensor->data = (void *) v_cols;
+    prob_tensor->data = (void *) prob_block;
+    ggml_set_input_fn(v_tensor);
+    ggml_set_input_fn(prob_tensor);
+
+    struct ggml_tensor *out_tensor = ggml_mul_mat_fn(ctx, v_tensor, prob_tensor);
+    struct ggml_cgraph *gf = out_tensor ? ggml_new_graph_fn(ctx) : NULL;
+    if (!out_tensor || !gf) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    ggml_build_forward_expand_fn(gf, out_tensor);
+    if (ggml_graph_compute_with_ctx_fn(ctx, gf, 1) == GGML_STATUS_SUCCESS) {
+        memcpy(out_block, out_tensor->data, out_bytes);
+        ok = 1;
+    }
+
+    ggml_free_fn(ctx);
+    return ok;
+}
+
+static CK_NOINLINE CK_OPTNONE int attention_head_full_dyn_ggml_regular_graph_out(const float *q_head,
+                                                                                  const float *k_head,
+                                                                                  const float *v_cols,
+                                                                                  int kv_tokens,
+                                                                                  int head_dim,
+                                                                                  int aligned_head_dim,
+                                                                                  float scale,
+                                                                                  float *score_row,
+                                                                                  float *prob_row,
+                                                                                  float *out_head,
+                                                                                  ck_ggml_vec_dot_f32_fn dot_fn,
+                                                                                  ck_ggml_vec_soft_max_f32_fn softmax_fn,
+                                                                                  int layer_id,
+                                                                                  int head_id)
+{
+    if (!q_head || !k_head || !v_cols || !out_head || !dot_fn || !softmax_fn ||
+        kv_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim) {
+        return 0;
+    }
+
+    enum { CK_STRICT_OUT_BLOCK = 64 };
+    float *prob_block = (float *) alloca((size_t) CK_STRICT_OUT_BLOCK * (size_t) kv_tokens * sizeof(float));
+    float *out_block = (float *) alloca((size_t) CK_STRICT_OUT_BLOCK * (size_t) head_dim * sizeof(float));
+    float *raw_dump = (float *) alloca((size_t) kv_tokens * sizeof(float));
+    for (int q0 = 0; q0 < kv_tokens; q0 += CK_STRICT_OUT_BLOCK) {
+        const int qn = (q0 + CK_STRICT_OUT_BLOCK <= kv_tokens) ? CK_STRICT_OUT_BLOCK : (kv_tokens - q0);
+        float *block_probs = prob_block;
+        float *block_out = out_block;
+        int have_raw_dump = 0;
+        int dump_query = -1;
+        int dump_qi = -1;
+
+        for (int qi = 0; qi < qn; ++qi) {
+            const int query_id = q0 + qi;
+            const float *q_vec = q_head + (size_t) query_id * (size_t) aligned_head_dim;
+            float *prob_col = block_probs + (size_t) qi * (size_t) kv_tokens;
+
+            for (int j = 0; j < kv_tokens; ++j) {
+                const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+                float dot = 0.0f;
+                dot_fn(head_dim, &dot, 0, q_vec, 0, k_vec, 0, 1);
+                score_row[j] = dot;
+            }
+
+            if (ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+                memcpy(raw_dump, score_row, (size_t) kv_tokens * sizeof(float));
+                have_raw_dump = 1;
+                dump_query = query_id;
+                dump_qi = qi;
+            }
+
+            memcpy(prob_row, score_row, (size_t) kv_tokens * sizeof(float));
+            ck_vec_scale_f32_inplace(prob_row, kv_tokens, scale);
+            const float max_score = ck_vec_max_f32_contig(prob_row, kv_tokens);
+            const double sum = softmax_fn(kv_tokens, prob_col, prob_row, max_score);
+            if (sum > 0.0) {
+                const float inv_sum = (float) (1.0 / sum);
+                ck_vec_scale_f32_inplace(prob_col, kv_tokens, inv_sum);
+            } else {
+                memset(prob_col, 0, (size_t) kv_tokens * sizeof(float));
+            }
+        }
+
+        if (!attention_out_mul_mat_graph_block(v_cols, block_probs, kv_tokens, head_dim, qn, block_out)) {
+            return 0;
+        }
+
+        for (int qi = 0; qi < qn; ++qi) {
+            float *dst = out_head + (size_t) (q0 + qi) * (size_t) aligned_head_dim;
+            const float *src = block_out + (size_t) qi * (size_t) head_dim;
+            memcpy(dst, src, (size_t) head_dim * sizeof(float));
+            for (int d = head_dim; d < aligned_head_dim; ++d) {
+                dst[d] = 0.0f;
+            }
+        }
+
+        if (have_raw_dump && dump_qi >= 0) {
+            ck_attention_vec_dump_selected_query(raw_dump,
+                                                 block_probs + (size_t) dump_qi * (size_t) kv_tokens,
+                                                 block_out + (size_t) dump_qi * (size_t) head_dim,
+                                                 v_cols,
+                                                 kv_tokens,
+                                                 head_dim,
+                                                 layer_id,
+                                                 head_id,
+                                                 dump_query);
+        }
+    }
+
+    return 1;
+}
+
+static CK_NOINLINE CK_OPTNONE void attention_query_full_dyn_ggml_regular_matmul_out(const float *q_vec,
+                                                                                     const float *k_head,
+                                                                                     const float *v_cols,
+                                                                                     int kv_tokens,
+                                                                                     int head_dim,
+                                                                                     int aligned_head_dim,
+                                                                                     float scale,
+                                                                                     float *score_row,
+                                                                                     float *prob_row,
+                                                                                     float *out_vec,
+                                                                                     ck_ggml_vec_dot_f32_fn dot_fn,
+                                                                                     ck_ggml_vec_soft_max_f32_fn softmax_fn,
+                                                                                     ck_ggml_compute_forward_mul_mat_fn mul_mat_fn,
+                                                                                     int layer_id,
+                                                                                     int head_id,
+                                                                                     int query_id)
+{
+    if (kv_tokens <= 0 || !dot_fn || !softmax_fn || !mul_mat_fn || !score_row || !prob_row) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+        float dot = 0.0f;
+        dot_fn(head_dim, &dot, 0, q_vec, 0, k_vec, 0, 1);
+        score_row[j] = dot;
+    }
+    float *raw_dump = NULL;
+    if (ck_attention_vec_dump_should_emit(layer_id, head_id, query_id)) {
+        raw_dump = (float *) alloca((size_t) kv_tokens * sizeof(float));
+        memcpy(raw_dump, score_row, (size_t) kv_tokens * sizeof(float));
+    }
+
+    memcpy(prob_row, score_row, (size_t) kv_tokens * sizeof(float));
+    ck_vec_scale_f32_inplace(prob_row, kv_tokens, scale);
+    const float max_score = ck_vec_max_f32_contig(prob_row, kv_tokens);
+    const double sum = softmax_fn(kv_tokens, score_row, prob_row, max_score);
+    if (sum > 0.0) {
+        const float inv_sum = (float) (1.0 / sum);
+        ck_vec_scale_f32_inplace(score_row, kv_tokens, inv_sum);
+
+        const size_t prob_row_bytes = (size_t) kv_tokens * sizeof(float);
+        const size_t out_row_bytes = (size_t) head_dim * sizeof(float);
+
+        struct ggml_tensor v_tensor;
+        struct ggml_tensor prob_tensor;
+        struct ggml_tensor out_tensor;
+
+        ck_ggml_init_tensor_f32(&v_tensor,
+                                kv_tokens, head_dim, 1, 1,
+                                sizeof(float),
+                                prob_row_bytes,
+                                prob_row_bytes * (size_t) head_dim,
+                                prob_row_bytes * (size_t) head_dim,
+                                (void *) v_cols);
+        ck_ggml_init_tensor_f32(&prob_tensor,
+                                kv_tokens, 1, 1, 1,
+                                sizeof(float),
+                                prob_row_bytes,
+                                prob_row_bytes,
+                                prob_row_bytes,
+                                score_row);
+        ck_ggml_init_tensor_f32(&out_tensor,
+                                head_dim, 1, 1, 1,
+                                sizeof(float),
+                                out_row_bytes,
+                                out_row_bytes,
+                                out_row_bytes,
+                                out_vec);
+        out_tensor.src[0] = &v_tensor;
+        out_tensor.src[1] = &prob_tensor;
+
+        memset(out_vec, 0, (size_t) head_dim * sizeof(float));
+        struct ggml_compute_params mul_params = {
+            .ith = 0,
+            .nth = 1,
+            .wsize = 0,
+            .wdata = NULL,
+            .threadpool = NULL,
+            .use_ref = false,
+        };
+        mul_mat_fn(&mul_params, &out_tensor);
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+    if (raw_dump) {
+        ck_attention_vec_dump_selected_query(raw_dump, score_row, out_vec, v_cols, kv_tokens, head_dim,
+                                             layer_id, head_id, query_id);
+    }
+}
+
+static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_compute_regular(const float *q_vec,
+                                                                             const float *k_head,
+                                                                             const float *v_cols,
+                                                                             int kv_tokens,
+                                                                             int head_dim,
+                                                                             int aligned_head_dim,
+                                                                             float scale,
+                                                                             float *score_row,
+                                                                             float *prob_row,
+                                                                             float *out_vec,
+                                                                             ck_ggml_vec_dot_f32_fn dot_fn,
+                                                                             ck_ggml_compute_forward_mul_mat_fn mul_mat_fn,
+                                                                             ck_ggml_compute_forward_soft_max_fn softmax_compute_fn)
+{
+    if (kv_tokens <= 0 || !dot_fn || !mul_mat_fn || !softmax_compute_fn) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    const size_t k_row_bytes = (size_t) aligned_head_dim * sizeof(float);
+    const size_t q_row_bytes = (size_t) head_dim * sizeof(float);
+    const size_t score_row_bytes = (size_t) kv_tokens * sizeof(float);
+    const size_t softmax_work_elems = (size_t) kv_tokens + 16u;
+    float *softmax_work = (float *) alloca(softmax_work_elems * sizeof(float));
+
+    struct ggml_tensor k_tensor;
+    struct ggml_tensor q_tensor;
+    struct ggml_tensor score_tensor;
+    struct ggml_tensor soft_tensor;
+
+    ck_ggml_init_tensor_f32(&k_tensor,
+                            head_dim, kv_tokens, 1, 1,
+                            sizeof(float),
+                            k_row_bytes,
+                            k_row_bytes * (size_t) kv_tokens,
+                            k_row_bytes * (size_t) kv_tokens,
+                            (void *) k_head);
+    ck_ggml_init_tensor_f32(&q_tensor,
+                            head_dim, 1, 1, 1,
+                            sizeof(float),
+                            q_row_bytes,
+                            q_row_bytes,
+                            q_row_bytes,
+                            (void *) q_vec);
+    ck_ggml_init_tensor_f32(&score_tensor,
+                            kv_tokens, 1, 1, 1,
+                            sizeof(float),
+                            score_row_bytes,
+                            score_row_bytes,
+                            score_row_bytes,
+                            score_row);
+    score_tensor.src[0] = &k_tensor;
+    score_tensor.src[1] = &q_tensor;
+
+    struct ggml_compute_params mul_params = {
+        .ith = 0,
+        .nth = 1,
+        .wsize = 0,
+        .wdata = NULL,
+        .threadpool = NULL,
+        .use_ref = false,
+    };
+    mul_mat_fn(&mul_params, &score_tensor);
+
+    ck_ggml_init_tensor_f32(&soft_tensor,
+                            kv_tokens, 1, 1, 1,
+                            sizeof(float),
+                            score_row_bytes,
+                            score_row_bytes,
+                            score_row_bytes,
+                            prob_row);
+    soft_tensor.src[0] = &score_tensor;
+    {
+        const float max_bias = 0.0f;
+        memcpy((char *) soft_tensor.op_params + 0, &scale, sizeof(float));
+        memcpy((char *) soft_tensor.op_params + sizeof(float), &max_bias, sizeof(float));
+    }
+
+    struct ggml_compute_params soft_params = {
+        .ith = 0,
+        .nth = 1,
+        .wsize = softmax_work_elems * sizeof(float),
+        .wdata = softmax_work,
+        .threadpool = NULL,
+        .use_ref = false,
+    };
+    softmax_compute_fn(&soft_params, &soft_tensor);
+
+    for (int d = 0; d < head_dim; ++d) {
+        const float *v_col = v_cols + (size_t) d * (size_t) kv_tokens;
+        float dot = 0.0f;
+        dot_fn(kv_tokens, &dot, 0, prob_row, 0, v_col, 0, 1);
+        out_vec[d] = dot;
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+}
+
+/* Strict ggml-backed full-attention oracles live in attention_oracle_ggml.c. */
+
+#define CK_GGML_FA_TILE_Q 64
+#define CK_GGML_FA_TILE_KV 64
+
+static inline void ck_vec_scale_f32_inplace(float *x, int n, float scale)
+{
+    for (int i = 0; i < n; ++i) {
+        x[i] *= scale;
+    }
+}
+
+static inline float ck_vec_max_f32_contig(const float *x, int n)
+{
+    float max_val = -INFINITY;
+    for (int i = 0; i < n; ++i) {
+        if (x[i] > max_val) {
+            max_val = x[i];
+        }
+    }
+    return max_val;
+}
+
+#if defined(__AVX__) || defined(__AVX2__)
+static inline void ck_attention_simd_gemm_ukernel_6x2(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m256 acc[6][2];
+    for (int i = 0; i < 6; ++i) {
+        acc[i][0] = _mm256_loadu_ps(c + (size_t) i * (size_t) n + 0);
+        acc[i][1] = _mm256_loadu_ps(c + (size_t) i * (size_t) n + 8);
+    }
+
+    for (int kk = 0; kk < k; ++kk) {
+        const __m256 bv0 = _mm256_loadu_ps(b + (size_t) kk * (size_t) n + 0);
+        const __m256 bv1 = _mm256_loadu_ps(b + (size_t) kk * (size_t) n + 8);
+        for (int i = 0; i < 6; ++i) {
+            const __m256 p = _mm256_set1_ps(a[(size_t) i * (size_t) k + (size_t) kk]);
+#if defined(__FMA__)
+            acc[i][0] = _mm256_fmadd_ps(bv0, p, acc[i][0]);
+            acc[i][1] = _mm256_fmadd_ps(bv1, p, acc[i][1]);
+#else
+            acc[i][0] = _mm256_add_ps(_mm256_mul_ps(bv0, p), acc[i][0]);
+            acc[i][1] = _mm256_add_ps(_mm256_mul_ps(bv1, p), acc[i][1]);
+#endif
+        }
+    }
+
+    for (int i = 0; i < 6; ++i) {
+        _mm256_storeu_ps(c + (size_t) i * (size_t) n + 0, acc[i][0]);
+        _mm256_storeu_ps(c + (size_t) i * (size_t) n + 8, acc[i][1]);
+    }
+}
+
+static inline void ck_attention_simd_gemm_ukernel_6x1(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m256 acc[6];
+    for (int i = 0; i < 6; ++i) {
+        acc[i] = _mm256_loadu_ps(c + (size_t) i * (size_t) n);
+    }
+
+    for (int kk = 0; kk < k; ++kk) {
+        const __m256 bv = _mm256_loadu_ps(b + (size_t) kk * (size_t) n);
+        for (int i = 0; i < 6; ++i) {
+            const __m256 p = _mm256_set1_ps(a[(size_t) i * (size_t) k + (size_t) kk]);
+#if defined(__FMA__)
+            acc[i] = _mm256_fmadd_ps(bv, p, acc[i]);
+#else
+            acc[i] = _mm256_add_ps(_mm256_mul_ps(bv, p), acc[i]);
+#endif
+        }
+    }
+
+    for (int i = 0; i < 6; ++i) {
+        _mm256_storeu_ps(c + (size_t) i * (size_t) n, acc[i]);
+    }
+}
+
+static inline void ck_attention_simd_gemm_ukernel_1x2(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m256 acc0 = _mm256_loadu_ps(c + 0);
+    __m256 acc1 = _mm256_loadu_ps(c + 8);
+    for (int kk = 0; kk < k; ++kk) {
+        const __m256 bv0 = _mm256_loadu_ps(b + (size_t) kk * (size_t) n + 0);
+        const __m256 bv1 = _mm256_loadu_ps(b + (size_t) kk * (size_t) n + 8);
+        const __m256 p = _mm256_set1_ps(a[kk]);
+#if defined(__FMA__)
+        acc0 = _mm256_fmadd_ps(bv0, p, acc0);
+        acc1 = _mm256_fmadd_ps(bv1, p, acc1);
+#else
+        acc0 = _mm256_add_ps(_mm256_mul_ps(bv0, p), acc0);
+        acc1 = _mm256_add_ps(_mm256_mul_ps(bv1, p), acc1);
+#endif
+    }
+    _mm256_storeu_ps(c + 0, acc0);
+    _mm256_storeu_ps(c + 8, acc1);
+}
+
+static inline void ck_attention_simd_gemm_ukernel_1x1(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m256 acc = _mm256_loadu_ps(c);
+    for (int kk = 0; kk < k; ++kk) {
+        const __m256 bv = _mm256_loadu_ps(b + (size_t) kk * (size_t) n);
+        const __m256 p = _mm256_set1_ps(a[kk]);
+#if defined(__FMA__)
+        acc = _mm256_fmadd_ps(bv, p, acc);
+#else
+        acc = _mm256_add_ps(_mm256_mul_ps(bv, p), acc);
+#endif
+    }
+    _mm256_storeu_ps(c, acc);
+}
+
+static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
+                                                                 const float *a,
+                                                                 const float *b,
+                                                                 int m,
+                                                                 int k,
+                                                                 int n)
+{
+    int ii = 0;
+    for (; ii + 6 <= m; ii += 6) {
+        int jj = 0;
+        for (; jj + 16 <= n; jj += 16) {
+            ck_attention_simd_gemm_ukernel_6x2(c + jj, a, b + jj, k, n);
+        }
+        for (; jj + 8 <= n; jj += 8) {
+            ck_attention_simd_gemm_ukernel_6x1(c + jj, a, b + jj, k, n);
+        }
+        for (; jj < n; ++jj) {
+            for (int i = 0; i < 6; ++i) {
+                float sum = c[(size_t) i * (size_t) n + (size_t) jj];
+                for (int kk = 0; kk < k; ++kk) {
+                    sum += a[(size_t) i * (size_t) k + (size_t) kk] * b[(size_t) kk * (size_t) n + (size_t) jj];
+                }
+                c[(size_t) i * (size_t) n + (size_t) jj] = sum;
+            }
+        }
+        a += (size_t) 6 * (size_t) k;
+        c += (size_t) 6 * (size_t) n;
+    }
+
+    for (; ii < m; ++ii) {
+        int jj = 0;
+        for (; jj + 16 <= n; jj += 16) {
+            ck_attention_simd_gemm_ukernel_1x2(c + jj, a, b + jj, k, n);
+        }
+        for (; jj + 8 <= n; jj += 8) {
+            ck_attention_simd_gemm_ukernel_1x1(c + jj, a, b + jj, k, n);
+        }
+        for (; jj < n; ++jj) {
+            float sum = c[jj];
+            for (int kk = 0; kk < k; ++kk) {
+                sum += a[kk] * b[(size_t) kk * (size_t) n + (size_t) jj];
+            }
+            c[jj] = sum;
+        }
+        a += k;
+        c += n;
+    }
+}
+#elif defined(__SSE2__)
+static inline void ck_attention_simd_gemm_ukernel_2x2(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m128 acc[2][2];
+    for (int i = 0; i < 2; ++i) {
+        acc[i][0] = _mm_loadu_ps(c + (size_t) i * (size_t) n + 0);
+        acc[i][1] = _mm_loadu_ps(c + (size_t) i * (size_t) n + 4);
+    }
+
+    for (int kk = 0; kk < k; ++kk) {
+        const __m128 bv0 = _mm_loadu_ps(b + (size_t) kk * (size_t) n + 0);
+        const __m128 bv1 = _mm_loadu_ps(b + (size_t) kk * (size_t) n + 4);
+        for (int i = 0; i < 2; ++i) {
+            const __m128 p = _mm_set1_ps(a[(size_t) i * (size_t) k + (size_t) kk]);
+#if defined(__FMA__)
+            acc[i][0] = _mm_fmadd_ps(bv0, p, acc[i][0]);
+            acc[i][1] = _mm_fmadd_ps(bv1, p, acc[i][1]);
+#else
+            acc[i][0] = _mm_add_ps(_mm_mul_ps(bv0, p), acc[i][0]);
+            acc[i][1] = _mm_add_ps(_mm_mul_ps(bv1, p), acc[i][1]);
+#endif
+        }
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        _mm_storeu_ps(c + (size_t) i * (size_t) n + 0, acc[i][0]);
+        _mm_storeu_ps(c + (size_t) i * (size_t) n + 4, acc[i][1]);
+    }
+}
+
+static inline void ck_attention_simd_gemm_ukernel_2x1(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m128 acc[2];
+    for (int i = 0; i < 2; ++i) {
+        acc[i] = _mm_loadu_ps(c + (size_t) i * (size_t) n);
+    }
+
+    for (int kk = 0; kk < k; ++kk) {
+        const __m128 bv = _mm_loadu_ps(b + (size_t) kk * (size_t) n);
+        for (int i = 0; i < 2; ++i) {
+            const __m128 p = _mm_set1_ps(a[(size_t) i * (size_t) k + (size_t) kk]);
+#if defined(__FMA__)
+            acc[i] = _mm_fmadd_ps(bv, p, acc[i]);
+#else
+            acc[i] = _mm_add_ps(_mm_mul_ps(bv, p), acc[i]);
+#endif
+        }
+    }
+
+    for (int i = 0; i < 2; ++i) {
+        _mm_storeu_ps(c + (size_t) i * (size_t) n, acc[i]);
+    }
+}
+
+static inline void ck_attention_simd_gemm_ukernel_1x2(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m128 acc0 = _mm_loadu_ps(c + 0);
+    __m128 acc1 = _mm_loadu_ps(c + 4);
+    for (int kk = 0; kk < k; ++kk) {
+        const __m128 bv0 = _mm_loadu_ps(b + (size_t) kk * (size_t) n + 0);
+        const __m128 bv1 = _mm_loadu_ps(b + (size_t) kk * (size_t) n + 4);
+        const __m128 p = _mm_set1_ps(a[kk]);
+#if defined(__FMA__)
+        acc0 = _mm_fmadd_ps(bv0, p, acc0);
+        acc1 = _mm_fmadd_ps(bv1, p, acc1);
+#else
+        acc0 = _mm_add_ps(_mm_mul_ps(bv0, p), acc0);
+        acc1 = _mm_add_ps(_mm_mul_ps(bv1, p), acc1);
+#endif
+    }
+    _mm_storeu_ps(c + 0, acc0);
+    _mm_storeu_ps(c + 4, acc1);
+}
+
+static inline void ck_attention_simd_gemm_ukernel_1x1(float *c,
+                                                       const float *a,
+                                                       const float *b,
+                                                       int k,
+                                                       int n)
+{
+    __m128 acc = _mm_loadu_ps(c);
+    for (int kk = 0; kk < k; ++kk) {
+        const __m128 bv = _mm_loadu_ps(b + (size_t) kk * (size_t) n);
+        const __m128 p = _mm_set1_ps(a[kk]);
+#if defined(__FMA__)
+        acc = _mm_fmadd_ps(bv, p, acc);
+#else
+        acc = _mm_add_ps(_mm_mul_ps(bv, p), acc);
+#endif
+    }
+    _mm_storeu_ps(c, acc);
+}
+
+static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
+                                                                 const float *a,
+                                                                 const float *b,
+                                                                 int m,
+                                                                 int k,
+                                                                 int n)
+{
+    int ii = 0;
+    for (; ii + 2 <= m; ii += 2) {
+        int jj = 0;
+        for (; jj + 8 <= n; jj += 8) {
+            ck_attention_simd_gemm_ukernel_2x2(c + jj, a, b + jj, k, n);
+        }
+        for (; jj + 4 <= n; jj += 4) {
+            ck_attention_simd_gemm_ukernel_2x1(c + jj, a, b + jj, k, n);
+        }
+        for (; jj < n; ++jj) {
+            for (int i = 0; i < 2; ++i) {
+                float sum = c[(size_t) i * (size_t) n + (size_t) jj];
+                for (int kk = 0; kk < k; ++kk) {
+                    sum += a[(size_t) i * (size_t) k + (size_t) kk] * b[(size_t) kk * (size_t) n + (size_t) jj];
+                }
+                c[(size_t) i * (size_t) n + (size_t) jj] = sum;
+            }
+        }
+        a += (size_t) 2 * (size_t) k;
+        c += (size_t) 2 * (size_t) n;
+    }
+
+    for (; ii < m; ++ii) {
+        int jj = 0;
+        for (; jj + 8 <= n; jj += 8) {
+            ck_attention_simd_gemm_ukernel_1x2(c + jj, a, b + jj, k, n);
+        }
+        for (; jj + 4 <= n; jj += 4) {
+            ck_attention_simd_gemm_ukernel_1x1(c + jj, a, b + jj, k, n);
+        }
+        for (; jj < n; ++jj) {
+            float sum = c[jj];
+            for (int kk = 0; kk < k; ++kk) {
+                sum += a[kk] * b[(size_t) kk * (size_t) n + (size_t) jj];
+            }
+            c[jj] = sum;
+        }
+        a += k;
+        c += n;
+    }
+}
+#else
+static CK_NOINLINE CK_OPTNONE void ck_attention_matmul_f32_accum(float *c,
+                                                                 const float *a,
+                                                                 const float *b,
+                                                                 int m,
+                                                                 int k,
+                                                                 int n)
+{
+    for (int i = 0; i < m; ++i) {
+        float *c_row = c + (size_t) i * (size_t) n;
+        const float *a_row = a + (size_t) i * (size_t) k;
+        for (int kk = 0; kk < k; ++kk) {
+            const float a_ik = a_row[kk];
+            const float *b_row = b + (size_t) kk * (size_t) n;
+            for (int j = 0; j < n; ++j) {
+                c_row[j] += a_ik * b_row[j];
+            }
+        }
+    }
+}
+#endif
+
+static CK_NOINLINE CK_OPTNONE void attention_forward_full_head_major_gqa_ggml_tiled_strict(const float *q,
+                                                                                             const float *k,
+                                                                                             const float *v,
+                                                                                             float *output,
+                                                                                             int num_heads,
+                                                                                             int num_kv_heads,
+                                                                                             int num_tokens,
+                                                                                             int head_dim,
+                                                                                             int aligned_head_dim,
+                                                                                             int kv_stride_tokens)
+{
+    const float scale = ck_strict_parity_enabled()
+        ? ck_attention_strict_scale_f32(head_dim)
+        : 1.0f / sqrtf((float) head_dim);
+    const int T = num_tokens;
+    const size_t kv_head_stride = (size_t) kv_stride_tokens * (size_t) aligned_head_dim;
+
+    float *q_tile = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+    float *k_tile = (float *) alloca((size_t) head_dim * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+    float *v_tile = (float *) alloca((size_t) CK_GGML_FA_TILE_KV * (size_t) head_dim * sizeof(float));
+    float *kq = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+    float *vkq = (float *) alloca((size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+
+    for (int h = 0; h < num_heads; ++h) {
+        const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
+        const float *k_head = k + (size_t) kv_head * kv_head_stride;
+        const float *v_head = v + (size_t) kv_head * kv_head_stride;
+
+        for (int iq = 0; iq < T; iq += CK_GGML_FA_TILE_Q) {
+            const int tile_rows = (T - iq) < CK_GGML_FA_TILE_Q ? (T - iq) : CK_GGML_FA_TILE_Q;
+            float sum_row[CK_GGML_FA_TILE_Q];
+            float max_row[CK_GGML_FA_TILE_Q];
+
+            for (int tq = 0; tq < CK_GGML_FA_TILE_Q; ++tq) {
+                sum_row[tq] = 0.0f;
+                max_row[tq] = -INFINITY;
+            }
+
+            memset(vkq, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+            memset(q_tile, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) head_dim * sizeof(float));
+            memset(v_tile, 0, (size_t) CK_GGML_FA_TILE_KV * (size_t) head_dim * sizeof(float));
+
+            for (int tq = 0; tq < tile_rows; ++tq) {
+                const float *q_vec = q + qkv_index(h, iq + tq, 0, T, aligned_head_dim);
+                memcpy(q_tile + (size_t) tq * (size_t) head_dim, q_vec, (size_t) head_dim * sizeof(float));
+            }
+
+            for (int ik = 0; ik < T; ik += CK_GGML_FA_TILE_KV) {
+                const int kv_tile = (T - ik) < CK_GGML_FA_TILE_KV ? (T - ik) : CK_GGML_FA_TILE_KV;
+                memset(kq, 0, (size_t) CK_GGML_FA_TILE_Q * (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+
+                for (int tk = 0; tk < kv_tile; ++tk) {
+                    const float *k_vec = k_head + (size_t) (ik + tk) * (size_t) aligned_head_dim;
+                    const float *v_vec = v_head + (size_t) (ik + tk) * (size_t) aligned_head_dim;
+                    for (int d = 0; d < head_dim; ++d) {
+                        k_tile[(size_t) d * (size_t) CK_GGML_FA_TILE_KV + (size_t) tk] = k_vec[d];
+                        v_tile[(size_t) tk * (size_t) head_dim + (size_t) d] = v_vec[d];
+                    }
+                }
+
+                ck_attention_matmul_f32_accum(kq,
+                                              q_tile,
+                                              k_tile,
+                                              CK_GGML_FA_TILE_Q,
+                                              head_dim,
+                                              CK_GGML_FA_TILE_KV);
+                ck_vec_scale_f32_inplace(kq,
+                                         CK_GGML_FA_TILE_Q * CK_GGML_FA_TILE_KV,
+                                         scale);
+
+                if (kv_tile < CK_GGML_FA_TILE_KV) {
+                    for (int tq = 0; tq < CK_GGML_FA_TILE_Q; ++tq) {
+                        float *kq_row = kq + (size_t) tq * (size_t) CK_GGML_FA_TILE_KV;
+                        for (int tk = kv_tile; tk < CK_GGML_FA_TILE_KV; ++tk) {
+                            kq_row[tk] = -INFINITY;
+                        }
+                    }
+                }
+
+                for (int tq = 0; tq < tile_rows; ++tq) {
+                    float *kq_row = kq + (size_t) tq * (size_t) CK_GGML_FA_TILE_KV;
+                    const float tile_max = ck_vec_max_f32_contig(kq_row, CK_GGML_FA_TILE_KV);
+                    if (tile_max == -INFINITY) {
+                        memset(kq_row, 0, (size_t) CK_GGML_FA_TILE_KV * sizeof(float));
+                        continue;
+                    }
+
+                    const float old_max = max_row[tq];
+                    const float new_max = old_max > tile_max ? old_max : tile_max;
+                    if (new_max > old_max) {
+                        const float ms = expf(old_max - new_max);
+                        ck_vec_scale_f32_inplace(vkq + (size_t) tq * (size_t) head_dim,
+                                                 head_dim,
+                                                 ms);
+                        sum_row[tq] *= ms;
+                    }
+                    max_row[tq] = new_max;
+                    sum_row[tq] += (float) ck_ggml_vec_soft_max_row(CK_GGML_FA_TILE_KV, kq_row, kq_row, new_max);
+                }
+
+                ck_attention_matmul_f32_accum(vkq,
+                                              kq,
+                                              v_tile,
+                                              CK_GGML_FA_TILE_Q,
+                                              CK_GGML_FA_TILE_KV,
+                                              head_dim);
+            }
+
+            for (int tq = 0; tq < tile_rows; ++tq) {
+                float *out_vec = output + qkv_index(h, iq + tq, 0, T, aligned_head_dim);
+                const float inv_sum = sum_row[tq] == 0.0f ? 0.0f : (1.0f / sum_row[tq]);
+                for (int d = 0; d < head_dim; ++d) {
+                    out_vec[d] = vkq[(size_t) tq * (size_t) head_dim + (size_t) d] * inv_sum;
+                }
+                for (int d = head_dim; d < aligned_head_dim; ++d) {
+                    out_vec[d] = 0.0f;
+                }
+            }
+        }
+    }
+}
+
 /**
  * Flash attention forward for GQA (prefill, no score materialization)
  * @test test_flash_attention.py::TestFlashAttention::test_flash_forward
@@ -1140,6 +2944,246 @@ void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,
                                                      /*kv_tokens=*/i + 1,
                                                      head_dim, aligned_head_dim,
                                                      scale, out_vec);
+        }
+    }
+}
+
+void attention_forward_full_head_major_gqa_exact_strided(const float *q,
+                                                         const float *k,
+                                                         const float *v,
+                                                         float *output,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int num_tokens,
+                                                         int head_dim,
+                                                         int aligned_head_dim,
+                                                         int kv_stride_tokens)
+{
+    if (!q || !k || !v || !output) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+    if (kv_stride_tokens < num_tokens) {
+        return;
+    }
+
+    const float scale = ck_strict_parity_enabled()
+        ? ck_attention_strict_scale_f32(head_dim)
+        : 1.0f / sqrtf((float) head_dim);
+    const int T = num_tokens;
+    const size_t kv_head_stride = (size_t) kv_stride_tokens * (size_t) aligned_head_dim;
+    const int debug_layer_id = ck_strict_parity_enabled() ? ck_attention_vec_dump_next_layer_id() : -1;
+    float *score_row = (float *) alloca((size_t) T * sizeof(float));
+    float *v_cols = (float *) alloca((size_t) head_dim * (size_t) T * sizeof(float));
+    for (int h = 0; h < num_heads; ++h) {
+        const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
+        const float *k_head = k + (size_t) kv_head * kv_head_stride;
+        const float *v_head = v + (size_t) kv_head * kv_head_stride;
+        float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
+
+        if (ck_strict_parity_enabled() &&
+            ck_attention_head_full_ggml_graph_oracle_regular(
+                q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
+                k_head,
+                v_head,
+                out_head,
+                T,
+                head_dim,
+                aligned_head_dim,
+                scale)) {
+            ck_attention_trace("regular_graph_oracle", debug_layer_id, h);
+            continue;
+        }
+
+        for (int d = 0; d < head_dim; ++d) {
+            float *dst_col = v_cols + (size_t) d * (size_t) T;
+            for (int j = 0; j < T; ++j) {
+                dst_col[j] = v_head[(size_t) j * (size_t) aligned_head_dim + (size_t) d];
+            }
+        }
+
+        for (int i = 0; i < T; ++i) {
+            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            attention_query_full_exact_regular(q_vec,
+                                               k_head,
+                                               v_cols,
+                                               T,
+                                               head_dim,
+                                               aligned_head_dim,
+                                               scale,
+                                               score_row,
+                                               out_vec,
+                                               debug_layer_id,
+                                               h,
+                                               i);
+        }
+    }
+}
+
+void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
+                                                        const float *k,
+                                                        const float *v,
+                                                        float *output,
+                                                        int num_heads,
+                                                        int num_kv_heads,
+                                                        int num_tokens,
+                                                        int head_dim,
+                                                        int aligned_head_dim,
+                                                        int kv_stride_tokens)
+{
+    if (!q || !k || !v || !output) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+    if (kv_stride_tokens < num_tokens) {
+        return;
+    }
+
+    const float scale = ck_strict_parity_enabled()
+        ? ck_attention_strict_scale_f32(head_dim)
+        : 1.0f / sqrtf((float) head_dim);
+    const int T = num_tokens;
+    const size_t kv_head_stride = (size_t) kv_stride_tokens * (size_t) aligned_head_dim;
+    const int debug_layer_id = ck_strict_parity_enabled() ? ck_attention_vec_dump_next_layer_id() : -1;
+    float *score_row = (float *) alloca((size_t) T * sizeof(float));
+    float *prob_row = (float *) alloca((size_t) T * sizeof(float));
+    float *v_cols = (float *) alloca((size_t) head_dim * (size_t) T * sizeof(float));
+    ck_ggml_vec_dot_f32_fn dot_fn = NULL;
+    ck_ggml_vec_soft_max_f32_fn softmax_fn = NULL;
+    ck_ggml_compute_forward_mul_mat_fn mul_mat_fn = NULL;
+    ck_ggml_compute_forward_soft_max_fn softmax_compute_fn = NULL;
+    if (ck_strict_parity_enabled()) {
+        if (ck_attention_full_ggml_graph_oracle_multihead(q,
+                                                          k,
+                                                          v,
+                                                          output,
+                                                          num_heads,
+                                                          num_kv_heads,
+                                                          num_tokens,
+                                                          head_dim,
+                                                          aligned_head_dim,
+                                                          kv_stride_tokens,
+                                                          scale)) {
+            return;
+        }
+        dot_fn = ck_resolve_ggml_vec_dot_f32();
+        softmax_fn = ck_resolve_ggml_vec_soft_max_f32();
+        mul_mat_fn = ck_resolve_ggml_compute_forward_mul_mat();
+        softmax_compute_fn = ck_resolve_ggml_compute_forward_soft_max();
+    }
+
+    for (int h = 0; h < num_heads; ++h) {
+        const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
+        const float *k_head = k + (size_t) kv_head * kv_head_stride;
+        const float *v_head = v + (size_t) kv_head * kv_head_stride;
+        float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
+
+        if (ck_strict_parity_enabled() &&
+            ck_attention_head_full_ggml_graph_oracle_regular(
+                q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
+                k_head,
+                v_head,
+                out_head,
+                T,
+                head_dim,
+                aligned_head_dim,
+                scale)) {
+            continue;
+        }
+
+        for (int d = 0; d < head_dim; ++d) {
+            float *dst_col = v_cols + (size_t) d * (size_t) T;
+            for (int j = 0; j < T; ++j) {
+                dst_col[j] = v_head[(size_t) j * (size_t) aligned_head_dim + (size_t) d];
+            }
+        }
+
+        if (dot_fn && softmax_fn && ck_attention_ggml_out_graph_enabled()) {
+            if (attention_head_full_dyn_ggml_regular_graph_out(
+                    q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
+                    k_head,
+                    v_cols,
+                    T,
+                    head_dim,
+                    aligned_head_dim,
+                    scale,
+                    score_row,
+                    prob_row,
+                    out_head,
+                    dot_fn,
+                    softmax_fn,
+                    debug_layer_id,
+                    h)) {
+                if (T > 0) {
+                    ck_attention_trace("dyn_ggml_regular_graph_out", debug_layer_id, h);
+                    ck_attention_trace_float("scale", debug_layer_id, h, scale);
+                }
+                continue;
+            }
+        }
+
+        for (int i = 0; i < T; ++i) {
+            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            if (dot_fn && softmax_fn) {
+                if (i == 0) {
+                    ck_attention_trace("dyn_ggml_regular", debug_layer_id, h);
+                    ck_attention_trace_float("scale", debug_layer_id, h, scale);
+                }
+                attention_query_full_dyn_ggml_regular(q_vec,
+                                                      k_head,
+                                                      v_cols,
+                                                      T,
+                                                      head_dim,
+                                                      aligned_head_dim,
+                                                      scale,
+                                                      score_row,
+                                                      prob_row,
+                                                      out_vec,
+                                                      dot_fn,
+                                                      softmax_fn,
+                                                      debug_layer_id,
+                                                      h,
+                                                      i);
+            } else if (dot_fn && mul_mat_fn && softmax_compute_fn) {
+                if (i == 0) {
+                    ck_attention_trace("ggml_compute_regular", debug_layer_id, h);
+                }
+                attention_query_full_ggml_compute_regular(q_vec,
+                                                          k_head,
+                                                          v_cols,
+                                                          T,
+                                                          head_dim,
+                                                          aligned_head_dim,
+                                                          scale,
+                                                          score_row,
+                                                          prob_row,
+                                                          out_vec,
+                                                          dot_fn,
+                                                          mul_mat_fn,
+                                                          softmax_compute_fn);
+            } else {
+                if (i == 0) {
+                    ck_attention_trace("ggml_regular", debug_layer_id, h);
+                }
+                attention_query_full_ggml_regular(q_vec,
+                                                  k_head,
+                                                  v_cols,
+                                                  T,
+                                                  head_dim,
+                                                  aligned_head_dim,
+                                                  scale,
+                                                  score_row,
+                                                  out_vec,
+                                                  debug_layer_id,
+                                                  h,
+                                                  i);
+            }
         }
     }
 }

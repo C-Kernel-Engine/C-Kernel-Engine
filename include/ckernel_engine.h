@@ -39,6 +39,14 @@ CKMathBackend ckernel_backend_native(void);
 // Enable stricter numeric parity (single-thread + double-accumulation GEMM).
 void ck_set_strict_parity(int enabled);
 int ck_strict_parity_enabled(void);
+void ck_strict_store_next_gemm_a(const float *data, size_t elems);
+const float *ck_strict_consume_next_gemm_a(size_t elems);
+int ck_strict_mtmd_clip_encode_planar_f32(const float *planar,
+                                          int channels,
+                                          int height,
+                                          int width,
+                                          float *out,
+                                          size_t out_elems);
 
 // Thread configuration - call once at startup
 // num_threads: 0 = auto-detect physical cores, >0 = use specified count
@@ -930,6 +938,9 @@ void gelu_fast_inplace(float *data, size_t n);
 // Slower but provides maximum accuracy. Used by BF16 wrapper.
 void gelu_exact_inplace(float *data, size_t n);
 
+// GGML-compatible GELU forward matching llama.cpp's FP16 table semantics.
+void gelu_ggml_inplace(float *data, size_t n);
+
 // GELU backward using tanh-based derivative (vectorized, uses fast tanh approx).
 void gelu_backward_exact(const float *input,
                          const float *d_output,
@@ -1142,6 +1153,34 @@ void attention_forward_full_head_major_gqa_flash_strided(const float *q,
                                                          int head_dim,
                                                          int aligned_head_dim,
                                                          int kv_stride_tokens);
+
+// Regular exact full / bidirectional attention for encoder-style prefill.
+// This matches the non-flash CPU reference path more closely than the online
+// flash reduction used by the causal kernels.
+void attention_forward_full_head_major_gqa_exact_strided(const float *q,
+                                                         const float *k,
+                                                         const float *v,
+                                                         float *output,
+                                                         int num_heads,
+                                                         int num_kv_heads,
+                                                         int num_tokens,
+                                                         int head_dim,
+                                                         int aligned_head_dim,
+                                                         int kv_stride_tokens);
+
+// GGML-compatible non-flash full / bidirectional attention for encoder-style
+// prefill. Mirrors the CPU mul_mat -> softmax -> mul_mat path more closely than
+// the fused exact variant, and is intended for parity-sensitive vision models.
+void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
+                                                        const float *k,
+                                                        const float *v,
+                                                        float *output,
+                                                        int num_heads,
+                                                        int num_kv_heads,
+                                                        int num_tokens,
+                                                        int head_dim,
+                                                        int aligned_head_dim,
+                                                        int kv_stride_tokens);
 
 // Llama-parity flash attention variant that rounds K/V through FP16 before use.
 void attention_forward_causal_head_major_gqa_flash_strided_f16kv(const float *q,

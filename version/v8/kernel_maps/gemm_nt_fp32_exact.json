@@ -1,0 +1,53 @@
+{
+  "id": "gemm_nt_fp32_exact",
+  "op": "gemm",
+  "variant": "fp32_nt_exact",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "A",
+      "dtype": "fp32",
+      "shape": ["M", "K"],
+      "desc": "Activation matrix [M, K] (row-major)"
+    },
+    {
+      "name": "B",
+      "dtype": "fp32",
+      "shape": ["N", "K"],
+      "desc": "Weight matrix [N, K] (row-major, transposed logical layout)"
+    },
+    {
+      "name": "bias",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "optional": true,
+      "desc": "Bias vector [N] (or NULL)"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "C",
+      "dtype": "fp32",
+      "shape": ["M", "N"],
+      "desc": "Output matrix [M, N] = A @ B^T + bias"
+    }
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "constraints": {
+    "notes": "Exact FP32 NT GEMM that preserves the scalar accumulation order used for parity-sensitive header paths."
+  },
+  "impl": {
+    "function": "gemm_naive_parallel",
+    "c_declaration": "void gemm_naive_parallel(const float *A, const float *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": ["src/kernels/gemm_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm.py", "tests/test_v8_qwen3vl_template.py"]
+  },
+  "notes": "Generic exact FP32 NT GEMM for parity-sensitive matmuls such as image patch projection."
+}

@@ -1,0 +1,62 @@
+{
+  "id": "layernorm_fp32_exact",
+  "op": "layernorm",
+  "variant": "fp32_exact",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Input activations [tokens, embed_dim]"
+    }
+  ],
+  "weights": [
+    {
+      "name": "gamma",
+      "dtype": "fp32",
+      "shape": ["E"],
+      "desc": "LayerNorm scale weight"
+    },
+    {
+      "name": "beta",
+      "dtype": "fp32",
+      "shape": ["E"],
+      "desc": "LayerNorm bias weight"
+    }
+  ],
+  "activations": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Normalized output"
+    }
+  ],
+  "scratch": [],
+  "dims": ["T", "E"],
+  "params": [
+    {
+      "name": "eps",
+      "dtype": "float32",
+      "desc": "Epsilon for numerical stability"
+    }
+  ],
+  "constraints": {
+    "notes": "Exact LayerNorm variant matching the scalar ggml accumulation order."
+  },
+  "impl": {
+    "function": "layernorm_naive_serial_matched_precision",
+    "c_declaration": "void layernorm_naive_serial_matched_precision(const float *input, const float *gamma, const float *beta, float *output, float *mean_cache, float *rstd_cache, int tokens, int d_model, float eps);",
+    "sources": ["src/kernels/layernorm_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_layernorm.py"]
+  },
+  "notes": "Exact LayerNorm used for parity-sensitive graphs."
+}

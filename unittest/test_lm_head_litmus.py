@@ -488,10 +488,16 @@ def main():
             norm_sources = {os.path.normpath(s) for s in extra_sources}
             strict_src = os.path.normpath("src/ckernel_strict.c")
             threadpool_src = os.path.normpath("src/ck_threadpool.c")
+            attention_src = os.path.normpath("src/kernels/attention_kernels.c")
+            attention_oracle_src = os.path.normpath("src/kernels/attention_oracle_ggml.c")
             # ckernel_strict.c now references global threadpool helpers.
             # Ensure standalone litmus links the required implementation.
             if strict_src in norm_sources and threadpool_src not in norm_sources:
                 extra_sources.append("src/ck_threadpool.c")
+                norm_sources.add(threadpool_src)
+            # attention_kernels.c now depends on the split strict/oracle helper.
+            if attention_src in norm_sources and attention_oracle_src not in norm_sources:
+                extra_sources.append("src/kernels/attention_oracle_ggml.c")
             cmd.extend(extra_sources)
             cmd.insert(1, openmp_flag(cc))
             if "src/ck_threadpool.c" in extra_sources and "-lpthread" not in cmd:

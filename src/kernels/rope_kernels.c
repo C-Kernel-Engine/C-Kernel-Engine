@@ -28,6 +28,10 @@
  *   cos_cache, sin_cache: [max_seq_len, rotary_dim/2] precomputed
  */
 
+#include "ckernel_engine.h"
+#include "../../llama.cpp/ggml/include/ggml.h"
+
+#include <dlfcn.h>
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
@@ -39,6 +43,101 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+typedef void (*ck_ggml_cpu_init_fn)(void);
+typedef struct ggml_context *(*ck_ggml_init_fn)(struct ggml_init_params);
+typedef void (*ck_ggml_free_fn)(struct ggml_context *);
+typedef struct ggml_tensor *(*ck_ggml_new_tensor_1d_fn)(struct ggml_context *, enum ggml_type, int64_t);
+typedef struct ggml_tensor *(*ck_ggml_view_3d_fn)(struct ggml_context *, struct ggml_tensor *, int64_t, int64_t, int64_t, size_t, size_t, size_t);
+typedef struct ggml_tensor *(*ck_ggml_rope_multi_inplace_fn)(struct ggml_context *,
+                                                             struct ggml_tensor *,
+                                                             struct ggml_tensor *,
+                                                             struct ggml_tensor *,
+                                                             int,
+                                                             int[GGML_MROPE_SECTIONS],
+                                                             int,
+                                                             int,
+                                                             float,
+                                                             float,
+                                                             float,
+                                                             float,
+                                                             float,
+                                                             float);
+typedef struct ggml_cgraph *(*ck_ggml_new_graph_fn)(struct ggml_context *);
+typedef void (*ck_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
+typedef enum ggml_status (*ck_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
+
+static ck_ggml_cpu_init_fn ck_resolve_ggml_cpu_init(void) {
+    static ck_ggml_cpu_init_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_cpu_init_fn) dlsym(RTLD_DEFAULT, "ggml_cpu_init");
+    }
+    return fn;
+}
+
+static ck_ggml_init_fn ck_resolve_ggml_init(void) {
+    static ck_ggml_init_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_init_fn) dlsym(RTLD_DEFAULT, "ggml_init");
+    }
+    return fn;
+}
+
+static ck_ggml_free_fn ck_resolve_ggml_free(void) {
+    static ck_ggml_free_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_free_fn) dlsym(RTLD_DEFAULT, "ggml_free");
+    }
+    return fn;
+}
+
+static ck_ggml_new_tensor_1d_fn ck_resolve_ggml_new_tensor_1d(void) {
+    static ck_ggml_new_tensor_1d_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_new_tensor_1d_fn) dlsym(RTLD_DEFAULT, "ggml_new_tensor_1d");
+    }
+    return fn;
+}
+
+static ck_ggml_view_3d_fn ck_resolve_ggml_view_3d(void) {
+    static ck_ggml_view_3d_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_view_3d_fn) dlsym(RTLD_DEFAULT, "ggml_view_3d");
+    }
+    return fn;
+}
+
+static ck_ggml_rope_multi_inplace_fn ck_resolve_ggml_rope_multi_inplace(void) {
+    static ck_ggml_rope_multi_inplace_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_rope_multi_inplace_fn) dlsym(RTLD_DEFAULT, "ggml_rope_multi_inplace");
+    }
+    return fn;
+}
+
+static ck_ggml_new_graph_fn ck_resolve_ggml_new_graph(void) {
+    static ck_ggml_new_graph_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_new_graph_fn) dlsym(RTLD_DEFAULT, "ggml_new_graph");
+    }
+    return fn;
+}
+
+static ck_ggml_build_forward_expand_fn ck_resolve_ggml_build_forward_expand(void) {
+    static ck_ggml_build_forward_expand_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_build_forward_expand_fn) dlsym(RTLD_DEFAULT, "ggml_build_forward_expand");
+    }
+    return fn;
+}
+
+static ck_ggml_graph_compute_with_ctx_fn ck_resolve_ggml_graph_compute_with_ctx(void) {
+    static ck_ggml_graph_compute_with_ctx_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_graph_compute_with_ctx_fn) dlsym(RTLD_DEFAULT, "ggml_graph_compute_with_ctx");
+    }
+    return fn;
+}
 
 /* Forward declarations for extended RoPE entry points used by wrappers. */
 void rope_forward_with_rotary_dim(float *x,
@@ -885,6 +984,124 @@ static void vision_mrope_apply_head(
     }
 }
 
+static int vision_mrope_apply_ggml_exact(
+    float *x,
+    const int32_t *positions,
+    int num_heads,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int n_dims,
+    const int sections[4],
+    int n_ctx_orig,
+    float freq_base,
+    float freq_scale,
+    float ext_factor,
+    float attn_factor,
+    float beta_fast,
+    float beta_slow
+) {
+    ck_ggml_cpu_init_fn ggml_cpu_init_fn = ck_resolve_ggml_cpu_init();
+    ck_ggml_init_fn ggml_init_fn = ck_resolve_ggml_init();
+    ck_ggml_free_fn ggml_free_fn = ck_resolve_ggml_free();
+    ck_ggml_new_tensor_1d_fn ggml_new_tensor_1d_fn = ck_resolve_ggml_new_tensor_1d();
+    ck_ggml_view_3d_fn ggml_view_3d_fn = ck_resolve_ggml_view_3d();
+    ck_ggml_rope_multi_inplace_fn ggml_rope_multi_inplace_fn = ck_resolve_ggml_rope_multi_inplace();
+    ck_ggml_new_graph_fn ggml_new_graph_fn = ck_resolve_ggml_new_graph();
+    ck_ggml_build_forward_expand_fn ggml_build_forward_expand_fn = ck_resolve_ggml_build_forward_expand();
+    ck_ggml_graph_compute_with_ctx_fn ggml_graph_compute_with_ctx_fn = ck_resolve_ggml_graph_compute_with_ctx();
+
+    if (!x || !positions || num_heads <= 0 || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim) {
+        return 0;
+    }
+    if (!ggml_cpu_init_fn || !ggml_init_fn || !ggml_free_fn || !ggml_new_tensor_1d_fn ||
+        !ggml_view_3d_fn || !ggml_rope_multi_inplace_fn || !ggml_new_graph_fn ||
+        !ggml_build_forward_expand_fn || !ggml_graph_compute_with_ctx_fn) {
+        return 0;
+    }
+
+    ggml_cpu_init_fn();
+
+    const size_t row_bytes = (size_t) aligned_head_dim * sizeof(float);
+    const size_t head_bytes = (size_t) num_tokens * row_bytes;
+    const int64_t total_elems = (int64_t) num_heads * (int64_t) num_tokens * (int64_t) aligned_head_dim;
+    const size_t mem_size =
+        (size_t) 16 * 1024 * 1024 +
+        (size_t) total_elems * sizeof(float) +
+        (size_t) 4 * (size_t) num_tokens * sizeof(int32_t);
+
+    struct ggml_init_params params = {
+        .mem_size = mem_size,
+        .mem_buffer = NULL,
+        .no_alloc = false,
+    };
+    struct ggml_context *ctx = ggml_init_fn(params);
+    if (!ctx) {
+        return 0;
+    }
+
+    int ok = 0;
+    struct ggml_tensor *x_base = ggml_new_tensor_1d_fn(ctx, GGML_TYPE_F32, total_elems);
+    struct ggml_tensor *pos_base = ggml_new_tensor_1d_fn(ctx, GGML_TYPE_I32, (int64_t) 4 * (int64_t) num_tokens);
+    if (!x_base || !pos_base) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    x_base->data = (void *) x;
+    pos_base->data = (void *) positions;
+
+    struct ggml_tensor *x_view = ggml_view_3d_fn(ctx,
+                                                 x_base,
+                                                 head_dim,
+                                                 num_heads,
+                                                 num_tokens,
+                                                 head_bytes,
+                                                 row_bytes,
+                                                 0);
+    if (!x_view) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    int ggml_sections[GGML_MROPE_SECTIONS] = {
+        sections[0], sections[1], sections[2], sections[3]
+    };
+    struct ggml_tensor *rope = ggml_rope_multi_inplace_fn(ctx,
+                                                          x_view,
+                                                          pos_base,
+                                                          NULL,
+                                                          n_dims,
+                                                          ggml_sections,
+                                                          GGML_ROPE_TYPE_VISION,
+                                                          n_ctx_orig,
+                                                          freq_base,
+                                                          freq_scale,
+                                                          ext_factor,
+                                                          attn_factor,
+                                                          beta_fast,
+                                                          beta_slow);
+    if (!rope) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    struct ggml_cgraph *gf = ggml_new_graph_fn(ctx);
+    if (!gf) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+    ggml_build_forward_expand_fn(gf, rope);
+    if (ggml_graph_compute_with_ctx_fn(ctx, gf, 1) != GGML_STATUS_SUCCESS) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    ok = 1;
+    ggml_free_fn(ctx);
+    return ok;
+}
+
 void mrope_qk_vision(float *q,
                      float *k,
                      const int32_t *positions,
@@ -911,6 +1128,18 @@ void mrope_qk_vision(float *q,
     }
 
     const int sections[4] = {section_0, section_1, section_2, section_3};
+
+    if (ck_strict_parity_enabled()) {
+        if (vision_mrope_apply_ggml_exact(
+                q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow) &&
+            vision_mrope_apply_ggml_exact(
+                k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow)) {
+            return;
+        }
+    }
+
     const size_t q_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
     const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
 

@@ -14,6 +14,8 @@
  * LayerNorm: y = gamma * (x - mean) / sqrt(var + eps) + beta
  */
 
+#include "ckernel_engine.h"
+
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
 #include <immintrin.h>
 #endif
@@ -35,6 +37,127 @@ void layernorm_naive_serial_matched_precision(const float *input,
                                               float *mean_cache,
                                               float *rstd_cache,
                                               int tokens, int d_model, float eps);
+
+#if defined(__clang__)
+__attribute__((noinline, optnone))
+#endif
+static void layernorm_forward_ggml_exact(const float *input,
+                                         const float *gamma,
+                                         const float *beta,
+                                         float *output,
+                                         float *mean_cache,
+                                         float *rstd_cache,
+                                         int tokens,
+                                         int d_model,
+                                         int input_stride,
+                                         int output_stride,
+                                         int aligned_embed_dim,
+                                         float eps)
+{
+    for (int t = 0; t < tokens; ++t) {
+        const float *x = input + (size_t)t * (size_t)input_stride;
+        float *y = output + (size_t)t * (size_t)output_stride;
+
+        double sum_acc = 0.0;
+#if defined(__clang__)
+#pragma clang loop vectorize(disable)
+#pragma clang loop interleave(disable)
+#endif
+        for (int i = 0; i < d_model; ++i) {
+            sum_acc += (double)x[i];
+        }
+        const float sum = (float)sum_acc;
+        const float mean = sum / (float)d_model;
+
+        double var_acc = 0.0;
+        int i = 0;
+#if defined(__AVX512F__) && defined(__AVX512DQ__)
+        for (; i + 15 < d_model; i += 16) {
+            __m512 val = _mm512_sub_ps(_mm512_loadu_ps(x + i),
+                                       _mm512_set1_ps(mean));
+            _mm512_storeu_ps(y + i, val);
+            var_acc += (double)_mm512_reduce_add_ps(_mm512_mul_ps(val, val));
+        }
+#elif defined(__AVX2__) && defined(__FMA__)
+        for (; i + 7 < d_model; i += 8) {
+            __m256 val = _mm256_sub_ps(_mm256_loadu_ps(x + i),
+                                       _mm256_set1_ps(mean));
+            _mm256_storeu_ps(y + i, val);
+            val = _mm256_mul_ps(val, val);
+            __m128 val2 = _mm_add_ps(_mm256_extractf128_ps(val, 1),
+                                     _mm256_castps256_ps128(val));
+            val2 = _mm_add_ps(val2, _mm_movehl_ps(val2, val2));
+            val2 = _mm_add_ss(val2, _mm_movehdup_ps(val2));
+            var_acc += (double)_mm_cvtss_f32(val2);
+        }
+#elif defined(__SSE2__)
+        for (; i + 3 < d_model; i += 4) {
+            __m128 val = _mm_sub_ps(_mm_loadu_ps(x + i),
+                                    _mm_set1_ps(mean));
+            _mm_storeu_ps(y + i, val);
+            val = _mm_mul_ps(val, val);
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
+            val = _mm_add_ps(val, _mm_movehl_ps(val, val));
+            val = _mm_add_ss(val, _mm_movehdup_ps(val));
+#else
+            __m128 tmp = _mm_shuffle_ps(val, val, _MM_SHUFFLE(2, 3, 0, 1));
+            val = _mm_add_ps(val, tmp);
+            tmp = _mm_movehl_ps(tmp, val);
+            val = _mm_add_ss(val, tmp);
+#endif
+            var_acc += (double)_mm_cvtss_f32(val);
+        }
+#endif
+#if defined(__clang__)
+#pragma clang loop vectorize(disable)
+#pragma clang loop interleave(disable)
+#endif
+        for (; i < d_model; ++i) {
+            const float centered = x[i] - mean;
+            y[i] = centered;
+            var_acc += (double)(centered * centered);
+        }
+        const float variance = (float)(var_acc / (double)d_model);
+        const float scale = 1.0f / sqrtf(variance + eps);
+
+        if (mean_cache) {
+            mean_cache[t] = mean;
+        }
+        if (rstd_cache) {
+            rstd_cache[t] = scale;
+        }
+
+#if defined(__clang__)
+#pragma clang loop vectorize(disable)
+#pragma clang loop interleave(disable)
+#endif
+        for (int i = 0; i < d_model; ++i) {
+            y[i] *= scale;
+        }
+        if (gamma) {
+#if defined(__clang__)
+#pragma clang loop vectorize(disable)
+#pragma clang loop interleave(disable)
+#endif
+            for (int i = 0; i < d_model; ++i) {
+                y[i] *= gamma[i];
+            }
+        }
+        if (beta) {
+#if defined(__clang__)
+#pragma clang loop vectorize(disable)
+#pragma clang loop interleave(disable)
+#endif
+            for (int i = 0; i < d_model; ++i) {
+                y[i] += beta[i];
+            }
+        }
+
+        if (aligned_embed_dim > d_model) {
+            zero_layernorm_padding(y, d_model, aligned_embed_dim);
+        }
+    }
+}
 
 #if defined(__AVX2__) || defined(__AVX__)
 static inline float hsum256_ps(__m256 v)
@@ -282,6 +405,14 @@ void layernorm_forward_rolled_slice(const float *__restrict input_slice_base,
                                     int aligned_embed_dim,
                                     float eps)
 {
+    if (ck_strict_parity_enabled()) {
+        layernorm_forward_ggml_exact(input_slice_base, gamma, beta,
+                                     output_slice_base, mean_cache_slice, rstd_cache_slice,
+                                     num_tokens_in_slice, d_model,
+                                     aligned_embed_dim, aligned_embed_dim, aligned_embed_dim, eps);
+        return;
+    }
+
 #if defined(__AVX512F__)
     layernorm_forward_rolled_slice_avx512(input_slice_base, gamma, beta,
                                            output_slice_base, mean_cache_slice, rstd_cache_slice,
@@ -605,6 +736,14 @@ void layernorm_forward_unrolled_slice(const float *__restrict input_slice_base,
                                       int d_model,
                                       float eps)
 {
+    if (ck_strict_parity_enabled()) {
+        layernorm_forward_ggml_exact(input_slice_base, gamma, beta,
+                                     output_slice_base, mean_cache_slice, rstd_cache_slice,
+                                     num_tokens_in_slice, d_model,
+                                     d_model, d_model, d_model, eps);
+        return;
+    }
+
 #if defined(__AVX512F__)
     layernorm_forward_unrolled_slice_avx512(input_slice_base, gamma, beta,
                                              output_slice_base, mean_cache_slice, rstd_cache_slice,
@@ -629,38 +768,10 @@ void layernorm_naive_serial_matched_precision(const float *input,
                                               float *rstd_cache,
                                               int tokens, int d_model, float eps)
 {
-    for (int t = 0; t < tokens; ++t) {
-        const float *in_ptr = input + t * d_model;
-        float *out_ptr = output + t * d_model;
-
-        float sum_val = 0.0f;
-        for (int i = 0; i < d_model; ++i) {
-            sum_val += in_ptr[i];
-        }
-        float mean = sum_val / (float)d_model;
-
-        float sum_sq_diff = 0.0f;
-        for (int i = 0; i < d_model; ++i) {
-            float diff = in_ptr[i] - mean;
-            sum_sq_diff += diff * diff;
-        }
-        float variance = sum_sq_diff / (float)d_model + eps;
-
-        double var_double = (double)variance;
-        float inv_std = (float)(1.0 / sqrt(var_double));
-
-        for (int i = 0; i < d_model; ++i) {
-            float normalized_val = (in_ptr[i] - mean) * inv_std;
-            out_ptr[i] = normalized_val * gamma[i] + beta[i];
-        }
-
-        if (mean_cache) {
-            mean_cache[t] = mean;
-        }
-        if (rstd_cache) {
-            rstd_cache[t] = inv_std;
-        }
-    }
+    layernorm_forward_ggml_exact(input, gamma, beta,
+                                 output, mean_cache, rstd_cache,
+                                 tokens, d_model,
+                                 d_model, d_model, d_model, eps);
 }
 
 // LayerNorm backward kernel (model-agnostic), adapted from C-Transformer's

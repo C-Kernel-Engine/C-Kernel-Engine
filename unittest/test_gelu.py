@@ -6,6 +6,7 @@ Reports accuracy, timing, and system information.
 """
 import ctypes
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -31,6 +32,9 @@ lib.gelu_fast_inplace.restype = None
 # Exact version using standard library tanhf (slower but accurate)
 lib.gelu_exact_inplace.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
 lib.gelu_exact_inplace.restype = None
+
+lib.gelu_ggml_inplace.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.c_size_t]
+lib.gelu_ggml_inplace.restype = None
 
 lib.gelu_backward_exact.argtypes = [
     ctypes.POINTER(ctypes.c_float),  # input
@@ -58,6 +62,44 @@ lib.gelu_backward_scalar.argtypes = [
 lib.gelu_backward_scalar.restype = None
 
 
+def ggml_gelu_ref(x_arr):
+    """Reference ggml fp16-table GELU using the local ggml table when available."""
+    ggml_lib_path = Path(__file__).resolve().parents[1] / "llama.cpp" / "build" / "bin" / "libggml-cpu.so"
+    try:
+        ggml = ctypes.CDLL(str(ggml_lib_path))
+        ggml.ggml_cpu_init()
+        ggml.ggml_fp32_to_fp16.argtypes = [ctypes.c_float]
+        ggml.ggml_fp32_to_fp16.restype = ctypes.c_uint16
+        ggml.ggml_fp16_to_fp32.argtypes = [ctypes.c_uint16]
+        ggml.ggml_fp16_to_fp32.restype = ctypes.c_float
+        table_type = ctypes.c_uint16 * (1 << 16)
+        table = table_type.in_dll(ggml, "ggml_table_gelu_f16")
+
+        x = x_arr.astype(np.float32, copy=False)
+        out = np.empty_like(x)
+        for i, xv in enumerate(x):
+            if xv <= -10.0:
+                out[i] = 0.0
+            elif xv >= 10.0:
+                out[i] = xv
+            else:
+                bits = ggml.ggml_fp32_to_fp16(ctypes.c_float(float(xv)))
+                out[i] = ggml.ggml_fp16_to_fp32(table[bits])
+        return out
+    except Exception:
+        x = x_arr.astype(np.float32, copy=True)
+        out = np.empty_like(x)
+        lo = x <= -10.0
+        hi = x >= 10.0
+        mid = ~(lo | hi)
+        out[lo] = 0.0
+        out[hi] = x[hi]
+        mid_x = x[mid].astype(np.float16).astype(np.float32)
+        mid_y = F.gelu(torch.from_numpy(mid_x), approximate="tanh").numpy()
+        out[mid] = mid_y.astype(np.float16).astype(np.float32)
+        return out
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tests
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -70,10 +112,12 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
     x_np = np.random.randn(N).astype(np.float32)
     out_fast_np = x_np.copy()
     out_exact_np = x_np.copy()
+    out_ggml_np = x_np.copy()
 
     # Get pointers
     out_fast_ptr = numpy_to_ptr(out_fast_np)
     out_exact_ptr = numpy_to_ptr(out_exact_np)
+    out_ggml_ptr = numpy_to_ptr(out_ggml_np)
 
     # Torch tensor for PyTorch comparison
     x = torch.from_numpy(x_np.copy())
@@ -132,6 +176,26 @@ def run_forward_tests(N=4096, warmup=10, iterations=1000):
         tolerance=1e-6,
         pytorch_time=None,
         kernel_time=kernel_time_exact
+    ))
+
+    ggml_ref = torch.from_numpy(ggml_gelu_ref(x_np))
+
+    def c_gelu_ggml():
+        np.copyto(out_ggml_np, x_np)
+        lib.gelu_ggml_inplace(out_ggml_ptr, ctypes.c_size_t(N))
+
+    c_gelu_ggml()
+    out_ggml = torch.from_numpy(out_ggml_np.copy())
+    diff_ggml = max_diff(out_ggml, ggml_ref)
+    kernel_time_ggml = time_function(c_gelu_ggml, warmup=warmup, iterations=iterations, name="C GELU GGML")
+
+    report.add_result(TestResult(
+        name="GGML (fp16 table)",
+        passed=diff_ggml <= 1e-6,
+        max_diff=diff_ggml,
+        tolerance=1e-6,
+        pytorch_time=None,
+        kernel_time=kernel_time_ggml
     ))
 
     return report

@@ -1,7 +1,9 @@
 #include "ckernel_engine.h"
 #include "ck_threadpool.h"
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -18,10 +20,18 @@
 // =============================================================================
 
 static int ck_strict_parity = 0;
+static float *ck_strict_next_gemm_a = NULL;
+static size_t ck_strict_next_gemm_a_size = 0;
+static size_t ck_strict_next_gemm_a_cap = 0;
+static int ck_strict_next_gemm_a_valid = 0;
 
 void ck_set_strict_parity(int enabled)
 {
     ck_strict_parity = enabled ? 1 : 0;
+    if (!ck_strict_parity) {
+        ck_strict_next_gemm_a_valid = 0;
+        ck_strict_next_gemm_a_size = 0;
+    }
 #ifdef _OPENMP
     if (ck_strict_parity) {
         omp_set_dynamic(0);
@@ -33,6 +43,104 @@ void ck_set_strict_parity(int enabled)
 int ck_strict_parity_enabled(void)
 {
     return ck_strict_parity;
+}
+
+void ck_strict_store_next_gemm_a(const float *data, size_t elems)
+{
+    if (!ck_strict_parity || !data || elems == 0) {
+        ck_strict_next_gemm_a_valid = 0;
+        ck_strict_next_gemm_a_size = 0;
+        return;
+    }
+    if (elems > ck_strict_next_gemm_a_cap) {
+        float *next = (float *) realloc(ck_strict_next_gemm_a, elems * sizeof(float));
+        if (!next) {
+            ck_strict_next_gemm_a_valid = 0;
+            ck_strict_next_gemm_a_size = 0;
+            return;
+        }
+        ck_strict_next_gemm_a = next;
+        ck_strict_next_gemm_a_cap = elems;
+    }
+    memcpy(ck_strict_next_gemm_a, data, elems * sizeof(float));
+    ck_strict_next_gemm_a_size = elems;
+    ck_strict_next_gemm_a_valid = 1;
+}
+
+const float *ck_strict_consume_next_gemm_a(size_t elems)
+{
+    if (!ck_strict_parity || !ck_strict_next_gemm_a_valid || ck_strict_next_gemm_a_size != elems) {
+        return NULL;
+    }
+    ck_strict_next_gemm_a_valid = 0;
+    return ck_strict_next_gemm_a;
+}
+
+typedef void *(*ck_strict_mtmd_clip_init_fn)(const char *, int, int, int, int, int);
+typedef void (*ck_strict_mtmd_clip_free_fn)(void *);
+typedef size_t (*ck_strict_mtmd_clip_embd_nbytes_by_img_fn)(void *, int, int);
+typedef int (*ck_strict_mtmd_clip_encode_float_image_fn)(void *, int, float *, int, int, float *);
+
+int ck_strict_mtmd_clip_encode_planar_f32(const float *planar,
+                                          int channels,
+                                          int height,
+                                          int width,
+                                          float *out,
+                                          size_t out_elems)
+{
+    const char *gguf_path = getenv("CK_STRICT_GGUF_PATH");
+    const char *shim_path = getenv("CK_STRICT_MTMD_SHIM_SO");
+    if (!gguf_path || !gguf_path[0] || !shim_path || !shim_path[0]) {
+        return 0;
+    }
+    if (!planar || !out || channels != 3 || height <= 0 || width <= 0) {
+        return 0;
+    }
+
+    void *shim = dlopen(shim_path, RTLD_LAZY | RTLD_LOCAL);
+    if (!shim) {
+        return 0;
+    }
+
+    ck_strict_mtmd_clip_init_fn init_fn =
+        (ck_strict_mtmd_clip_init_fn) dlsym(shim, "ck_mtmd_clip_init");
+    ck_strict_mtmd_clip_free_fn free_fn =
+        (ck_strict_mtmd_clip_free_fn) dlsym(shim, "ck_mtmd_clip_free");
+    ck_strict_mtmd_clip_embd_nbytes_by_img_fn embd_nbytes_fn =
+        (ck_strict_mtmd_clip_embd_nbytes_by_img_fn) dlsym(shim, "ck_mtmd_clip_embd_nbytes_by_img");
+    ck_strict_mtmd_clip_encode_float_image_fn encode_fn =
+        (ck_strict_mtmd_clip_encode_float_image_fn) dlsym(shim, "ck_mtmd_clip_encode_float_image");
+
+    if (!init_fn || !free_fn || !embd_nbytes_fn || !encode_fn) {
+        dlclose(shim);
+        return 0;
+    }
+
+    const size_t pixel_count = (size_t) height * (size_t) width;
+    float *interleaved = (float *) malloc(pixel_count * (size_t) channels * sizeof(float));
+    if (!interleaved) {
+        dlclose(shim);
+        return 0;
+    }
+    for (size_t idx = 0; idx < pixel_count; ++idx) {
+        interleaved[idx * 3 + 0] = planar[idx];
+        interleaved[idx * 3 + 1] = planar[pixel_count + idx];
+        interleaved[idx * 3 + 2] = planar[2 * pixel_count + idx];
+    }
+
+    int ok = 0;
+    void *handle = init_fn(gguf_path, 0, 0, 0, 0, 0);
+    if (handle) {
+        const size_t needed_bytes = embd_nbytes_fn(handle, width, height);
+        if (needed_bytes > 0 && needed_bytes <= out_elems * sizeof(float)) {
+            ok = encode_fn(handle, 1, interleaved, height, width, out) ? 1 : 0;
+        }
+        free_fn(handle);
+    }
+
+    free(interleaved);
+    dlclose(shim);
+    return ok;
 }
 
 // =============================================================================

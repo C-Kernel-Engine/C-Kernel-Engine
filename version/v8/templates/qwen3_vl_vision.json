@@ -6,15 +6,9 @@
     "patch_frontend": "dual_patch_proj_sum",
     "activation": "gelu",
     "normalization": "layernorm",
+    "prefer_q8_0_contract": true,
     "activation_preference_by_op": {
-      "qkv_packed_proj": "fp32",
-      "out_proj": "fp32",
-      "mlp_up": "fp32",
-      "mlp_down": "fp32",
-      "branch_fc1": "fp32",
-      "branch_fc2": "fp32",
-      "projector_fc1": "fp32",
-      "projector_fc2": "fp32"
+      "mlp_down": "fp32"
     }
   },
   "contract": {
@@ -62,13 +56,18 @@
     }
   },
   "kernels": {
+    "patch_proj": "gemm_nt_fp32_exact",
+    "patch_proj_aux": "gemm_nt_fp32_exact",
     "add_stream": "add_stream_reorder_2d",
     "position_embeddings": "position_embeddings_add_tiled_2d",
     "spatial_merge": "spatial_merge_contiguous_tiled",
     "branch_spatial_merge": "spatial_merge_contiguous_tiled",
-    "gelu": "gelu_exact_inplace",
-    "projector_gelu": "gelu_exact_inplace",
-    "branch_gelu": "gelu_exact_inplace"
+    "layernorm": "layernorm_fp32_exact",
+    "branch_layernorm": "layernorm_fp32_exact",
+    "gelu": "gelu_ggml_inplace",
+    "projector_gelu": "gelu_ggml_inplace",
+    "branch_gelu": "gelu_ggml_inplace",
+    "attn_prefill": "attention_forward_full_head_major_gqa_ggml_strided"
   },
   "sequence": [
     "vision_encoder"

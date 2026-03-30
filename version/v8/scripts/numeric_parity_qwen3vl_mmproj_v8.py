@@ -192,6 +192,34 @@ def _load_generated_lib(model_so: Path) -> ctypes.CDLL:
     return lib
 
 
+def _load_ggml_cpu_global() -> Path | None:
+    ggml_libs = [
+        [
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-base.so.0.9.8",
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-base.so",
+        ],
+        [
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml.so.0.9.8",
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml.so",
+        ],
+        [
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-cpu.so.0.9.8",
+            LLAMA_CPP_ROOT / "build" / "bin" / "libggml-cpu.so",
+        ],
+    ]
+    cpu_path: Path | None = None
+    for candidates in ggml_libs:
+        for path in candidates:
+            if path.exists():
+                ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+                if "libggml-cpu" in path.name:
+                    cpu_path = path
+                break
+    if cpu_path is not None:
+        return cpu_path
+    return None
+
+
 def _load_mtmd_shim(shim_so: Path) -> ctypes.CDLL:
     ctypes.CDLL(str(LLAMA_CPP_ROOT / "build" / "bin" / "libmtmd.so"), mode=ctypes.RTLD_GLOBAL)
     lib = ctypes.CDLL(str(shim_so))
@@ -228,8 +256,40 @@ def _run_generated_encoder(
     manifest_map: Path,
     layout_path: Path,
     planar_image: list[float],
+    strict_parity: bool = False,
+    strict_mtmd_oracle: bool = False,
+    gguf_path: Path | None = None,
+    shim_so: Path | None = None,
 ) -> array:
     lib = _load_generated_lib(model_so)
+    restore_env: dict[str, str | None] = {}
+    if strict_mtmd_oracle:
+        if gguf_path is None or shim_so is None:
+            raise RuntimeError("strict mtmd oracle requested without gguf/shim paths")
+        env_updates = {
+            "CK_STRICT_MTMD_CLIP_ORACLE": "1",
+            "CK_STRICT_GGUF_PATH": str(gguf_path),
+            "CK_STRICT_MTMD_SHIM_SO": str(shim_so),
+        }
+        for key, value in env_updates.items():
+            restore_env[key] = os.environ.get(key)
+            os.environ[key] = value
+    strict_mode = bool(strict_parity or strict_mtmd_oracle)
+    if strict_mode and not strict_mtmd_oracle:
+        ggml_cpu_path = _load_ggml_cpu_global()
+        if ggml_cpu_path is None:
+            raise RuntimeError("strict parity requested, but libggml-cpu was not found")
+        if "CK_GGML_CPU_SO" not in os.environ:
+            restore_env["CK_GGML_CPU_SO"] = os.environ.get("CK_GGML_CPU_SO")
+            os.environ["CK_GGML_CPU_SO"] = str(ggml_cpu_path)
+    if strict_mode:
+        lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+        lib.ck_set_strict_parity.restype = None
+        lib.ck_set_strict_parity(1)
+    else:
+        lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+        lib.ck_set_strict_parity.restype = None
+        lib.ck_set_strict_parity(0)
     rc = lib.ck_model_init_with_manifest(str(weights_bump).encode(), str(manifest_map).encode())
     if rc != 0:
         raise RuntimeError(f"ck_model_init_with_manifest failed with rc={rc}")
@@ -263,6 +323,11 @@ def _run_generated_encoder(
         return array("f", output_arr)
     finally:
         lib.ck_model_free()
+        for key, prior in restore_env.items():
+            if prior is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prior
 
 
 def _run_llamacpp_encoder(
@@ -361,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--image-mode", choices=("gradient", "gray", "checker"), default="gradient")
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--ck-threads", type=int, default=None, help="Thread count for generated CK runtime; defaults to --threads")
+    ap.add_argument("--strict-parity", action="store_true", help="Enable parity-only strict mode in CK and load ggml CPU helpers for full-attention replay")
+    ap.add_argument("--strict-mtmd-oracle", action="store_true", help="In strict mode, allow the generated CK vision runtime to short-circuit to the local mtmd/ggml encoder oracle")
     ap.add_argument("--report", type=Path, default=None, help="Optional JSON report output")
     args = ap.parse_args(argv)
 
@@ -388,6 +455,10 @@ def main(argv: list[str] | None = None) -> int:
         manifest_map=output_dir / "weights_manifest.map",
         layout_path=output_dir / "layout.json",
         planar_image=planar,
+        strict_parity=args.strict_parity,
+        strict_mtmd_oracle=args.strict_mtmd_oracle,
+        gguf_path=args.gguf,
+        shim_so=shim_so,
     )
     t_ck = time.perf_counter()
     llama_out = _run_llamacpp_encoder(
@@ -419,6 +490,8 @@ def main(argv: list[str] | None = None) -> int:
             "llama_cpp": args.threads,
             "ck_runtime": ck_threads,
         },
+        "strict_parity": bool(args.strict_parity),
+        "strict_mtmd_oracle": bool(args.strict_mtmd_oracle),
         "num_values": len(llama_out),
         "metrics": metrics,
         "top_diffs": _sample_diffs(llama_out, ck_out),

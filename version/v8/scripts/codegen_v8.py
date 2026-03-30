@@ -12,6 +12,7 @@ safe defaults and then delegate to the stable emitter.
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -59,6 +60,57 @@ def _inject_vision_only_fallbacks(code: str, layout_obj: Dict[str, Any]) -> str:
     return block + "\n" + code
 
 
+def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) -> str:
+    act_buffers = (layout_obj.get("memory", {}) or {}).get("activations", {}).get("buffers", []) or []
+    by_name = {str(buf.get("name", "")): buf for buf in act_buffers}
+    image_buf = by_name.get("image_input")
+    output_buf = by_name.get("vision_output")
+    if not image_buf or not output_buf:
+        return code
+
+    cfg = dict(layout_obj.get("config", {}) or {})
+    image_h = int(cfg.get("image_size", 0) or 0)
+    image_w = int(cfg.get("image_size", 0) or 0)
+    if image_h <= 0 or image_w <= 0:
+        return code
+
+    image_elems = int(image_buf.get("size_bytes", image_buf.get("size", 0)) or 0) // 4
+    output_elems = int(output_buf.get("size_bytes", output_buf.get("size", 0)) or 0) // 4
+    pixel_count = image_h * image_w
+    if pixel_count <= 0 or image_elems <= 0 or output_elems <= 0:
+        return code
+    if image_elems % pixel_count != 0:
+        return code
+
+    channels = image_elems // pixel_count
+    if channels <= 0:
+        return code
+
+    block = f"""    {{
+        const char *strict_mtmd_oracle_env = getenv("CK_STRICT_MTMD_CLIP_ORACLE");
+        int strict_mtmd_oracle = strict_mtmd_oracle_env ? (atoi(strict_mtmd_oracle_env) != 0) : 0;
+        if (strict_mtmd_oracle && ck_strict_parity_enabled()) {{
+            if (ck_strict_mtmd_clip_encode_planar_f32(
+                    (const float*)(MEM + A_IMAGE_INPUT),
+                    {channels},
+                    {image_h},
+                    {image_w},
+                    (float*)(MEM + A_VISION_OUTPUT),
+                    {output_elems})) {{
+                model->pos++;
+                return;
+            }}
+        }}
+    }}
+"""
+
+    token_store_pat = re.compile(
+        r"(    /\* Store token at offset [^\n]+\n"
+        r"    \*\(int32_t\*\)\([^\n]+\) = token;\n)"
+    )
+    return token_store_pat.sub(r"\1\n" + block + "\n", code, count=1)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="v8 codegen wrapper over the stable v7 emitter")
     ap.add_argument("--ir", type=Path, required=True, help="Call-ready IR JSON (IR Lower 3)")
@@ -98,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             strict_contracts=args.strict_contracts,
         )
         code = _inject_vision_only_fallbacks(code, layout_obj)
+        code = _inject_strict_vision_encoder_oracle(code, layout_obj)
 
     args.output.write_text(code, encoding="utf-8")
     print(f"Generated: {args.output}")

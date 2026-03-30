@@ -3882,9 +3882,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             return {"x": "main_stream" if act == "fp32" else "main_stream_q8"}
         return None
 
-    def _maybe_apply_q8_contract(kernel_id: Optional[str], weight_dtype: Optional[str]) -> Optional[str]:
+    def _maybe_apply_q8_contract(
+        kernel_id: Optional[str],
+        weight_dtype: Optional[str],
+        *,
+        allow_q8_contract: bool,
+    ) -> Optional[str]:
         """Optionally remap standard Q8_0 kernels to explicit contract adapters."""
-        if not kernel_id or not prefer_q8_contract:
+        if not kernel_id or not prefer_q8_contract or not allow_q8_contract:
             return kernel_id
         if weight_dtype != "q8_0":
             return kernel_id
@@ -4068,12 +4073,25 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             kernel_prefer_q8_activation = _prefer_q8_activation_for_op(op, prefer_q8_activation)
             if op in ("mlp_gate_up", "mlp_up", "mlp_down") and prefer_fp32_mlp_matmuls:
                 kernel_prefer_q8_activation = False
+            allow_q8_contract = bool(
+                prefer_q8_contract
+                and weight_dtype == "q8_0"
+                and kernel_prefer_q8_activation
+            )
+            if allow_q8_contract:
+                # Preserve the reference contract flow: select the FP32-activation
+                # kernel first, then remap to the internal Q8 contract adapter.
+                kernel_prefer_q8_activation = False
             kernel_id = find_kernel(
                 registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
                 prefer_q8_activation=kernel_prefer_q8_activation,
                 prefer_parallel=use_parallel
             )
-            kernel_id = _maybe_apply_q8_contract(kernel_id, weight_dtype)
+            kernel_id = _maybe_apply_q8_contract(
+                kernel_id,
+                weight_dtype,
+                allow_q8_contract=allow_q8_contract,
+            )
             if kernel_id:
                 return [kernel_id]
 
@@ -4097,13 +4115,24 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 split_prefer_q8_activation = _prefer_q8_activation_for_op(split_op, prefer_q8_activation)
                 if split_op in ("mlp_gate_up", "mlp_down", "mlp_gate", "mlp_up") and prefer_fp32_mlp_matmuls:
                     split_prefer_q8_activation = False
+                split_allow_q8_contract = bool(
+                    prefer_q8_contract
+                    and w_dtype == "q8_0"
+                    and split_prefer_q8_activation
+                )
+                if split_allow_q8_contract:
+                    split_prefer_q8_activation = False
                 k = find_kernel(
                     registry, op="matmul", quant={"weight": w_dtype}, mode=mode,
                     prefer_q8_activation=split_prefer_q8_activation,
                     prefer_parallel=use_parallel
                 )
                 if k:
-                    k = _maybe_apply_q8_contract(k, w_dtype)
+                    k = _maybe_apply_q8_contract(
+                        k,
+                        w_dtype,
+                        allow_q8_contract=split_allow_q8_contract,
+                    )
                     kernels.append((k, split_op))
             return kernels
 
@@ -4132,13 +4161,24 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             kernel_prefer_q8_activation = _prefer_q8_activation_for_op(op, prefer_q8_activation)
             if op == "logits" and prefer_fp32_logits:
                 kernel_prefer_q8_activation = False
+            allow_q8_contract = bool(
+                prefer_q8_contract
+                and weight_dtype == "q8_0"
+                and kernel_prefer_q8_activation
+            )
+            if allow_q8_contract:
+                kernel_prefer_q8_activation = False
 
             kernel_id = find_kernel(
                 registry, op=kernel_op, quant={"weight": weight_dtype}, mode=mode,
                 prefer_q8_activation=kernel_prefer_q8_activation,
                 prefer_parallel=use_parallel
             )
-            kernel_id = _maybe_apply_q8_contract(kernel_id, weight_dtype)
+            kernel_id = _maybe_apply_q8_contract(
+                kernel_id,
+                weight_dtype,
+                allow_q8_contract=allow_q8_contract,
+            )
             if op == "logits":
                 print(
                     f"  [debug/logits] mode={mode} weight={weight_dtype} "

@@ -22,10 +22,198 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "ckernel_quant.h"  /* For ck_fp16_to_fp32 */
+#include "ckernel_engine.h"
+#include "../../llama.cpp/ggml/include/ggml.h"
+
+#include <dlfcn.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __AVX512F__
 #include <immintrin.h>
 #endif
+
+typedef struct ggml_context *(*ck_f16_ggml_init_fn)(struct ggml_init_params);
+typedef void (*ck_f16_ggml_free_fn)(struct ggml_context *);
+typedef struct ggml_tensor *(*ck_f16_ggml_new_tensor_2d_fn)(struct ggml_context *, enum ggml_type, int64_t, int64_t);
+typedef struct ggml_tensor *(*ck_f16_ggml_mul_mat_fn)(struct ggml_context *, struct ggml_tensor *, struct ggml_tensor *);
+typedef struct ggml_cgraph *(*ck_f16_ggml_new_graph_fn)(struct ggml_context *);
+typedef void (*ck_f16_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
+typedef enum ggml_status (*ck_f16_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
+typedef void (*ck_f16_ggml_cpu_init_fn)(void);
+
+static ck_f16_ggml_init_fn ck_f16_resolve_ggml_init(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_init_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_init_fn) dlsym(RTLD_DEFAULT, "ggml_init");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_free_fn ck_f16_resolve_ggml_free(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_free_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_free_fn) dlsym(RTLD_DEFAULT, "ggml_free");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_new_tensor_2d_fn ck_f16_resolve_ggml_new_tensor_2d(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_new_tensor_2d_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_new_tensor_2d_fn) dlsym(RTLD_DEFAULT, "ggml_new_tensor_2d");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_mul_mat_fn ck_f16_resolve_ggml_mul_mat(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_mul_mat_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_mul_mat_fn) dlsym(RTLD_DEFAULT, "ggml_mul_mat");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_new_graph_fn ck_f16_resolve_ggml_new_graph(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_new_graph_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_new_graph_fn) dlsym(RTLD_DEFAULT, "ggml_new_graph");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_build_forward_expand_fn ck_f16_resolve_ggml_build_forward_expand(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_build_forward_expand_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_build_forward_expand_fn) dlsym(RTLD_DEFAULT, "ggml_build_forward_expand");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_graph_compute_with_ctx_fn ck_f16_resolve_ggml_graph_compute_with_ctx(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_graph_compute_with_ctx_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_graph_compute_with_ctx_fn) dlsym(RTLD_DEFAULT, "ggml_graph_compute_with_ctx");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_cpu_init_fn ck_f16_resolve_ggml_cpu_init(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_cpu_init_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_cpu_init_fn) dlsym(RTLD_DEFAULT, "ggml_cpu_init");
+    }
+    return fn;
+}
+
+static int gemm_nt_f16_ggml_strict(const float *A,
+                                   const void *B,
+                                   const float *bias,
+                                   float *C,
+                                   int M,
+                                   int N,
+                                   int K)
+{
+    ck_f16_ggml_cpu_init_fn ggml_cpu_init_fn = ck_f16_resolve_ggml_cpu_init();
+    ck_f16_ggml_init_fn ggml_init_fn = ck_f16_resolve_ggml_init();
+    ck_f16_ggml_free_fn ggml_free_fn = ck_f16_resolve_ggml_free();
+    ck_f16_ggml_new_tensor_2d_fn ggml_new_tensor_2d_fn = ck_f16_resolve_ggml_new_tensor_2d();
+    ck_f16_ggml_mul_mat_fn ggml_mul_mat_fn = ck_f16_resolve_ggml_mul_mat();
+    ck_f16_ggml_new_graph_fn ggml_new_graph_fn = ck_f16_resolve_ggml_new_graph();
+    ck_f16_ggml_build_forward_expand_fn ggml_build_forward_expand_fn = ck_f16_resolve_ggml_build_forward_expand();
+    ck_f16_ggml_graph_compute_with_ctx_fn ggml_graph_compute_with_ctx_fn = ck_f16_resolve_ggml_graph_compute_with_ctx();
+
+    if (!ggml_cpu_init_fn || !ggml_init_fn || !ggml_free_fn || !ggml_new_tensor_2d_fn ||
+        !ggml_mul_mat_fn || !ggml_new_graph_fn || !ggml_build_forward_expand_fn ||
+        !ggml_graph_compute_with_ctx_fn) {
+        return 0;
+    }
+
+    ggml_cpu_init_fn();
+
+    const size_t output_bytes = (size_t) M * (size_t) N * sizeof(float);
+    const size_t mem_size = ((size_t) 128 * 1024 * 1024) + output_bytes;
+
+    struct ggml_init_params params = {
+        .mem_size = mem_size,
+        .mem_buffer = NULL,
+        .no_alloc = false,
+    };
+    struct ggml_context *ctx = ggml_init_fn(params);
+    if (!ctx) {
+        return 0;
+    }
+
+    int ok = 0;
+    struct ggml_tensor *w = ggml_new_tensor_2d_fn(ctx, GGML_TYPE_F16, K, N);
+    struct ggml_tensor *x = ggml_new_tensor_2d_fn(ctx, GGML_TYPE_F32, K, M);
+    if (!w || !x) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    w->data = (void *) B;
+    x->data = (void *) A;
+
+    struct ggml_tensor *y = ggml_mul_mat_fn(ctx, w, x);
+    if (!y) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    struct ggml_cgraph *gf = ggml_new_graph_fn(ctx);
+    if (!gf) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+    ggml_build_forward_expand_fn(gf, y);
+    if (ggml_graph_compute_with_ctx_fn(ctx, gf, 1) != GGML_STATUS_SUCCESS) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    {
+        const float *src = (const float *) y->data;
+        for (int m = 0; m < M; ++m) {
+            memcpy(C + (size_t) m * (size_t) N,
+                   src + (size_t) m * (size_t) N,
+                   (size_t) N * sizeof(float));
+            if (bias) {
+                for (int n = 0; n < N; ++n) {
+                    C[(size_t) m * (size_t) N + (size_t) n] += bias[n];
+                }
+            }
+        }
+    }
+
+    ok = 1;
+    ggml_free_fn(ctx);
+    return ok;
+}
 
 /* ============================================================================
  * FP16 Conversion Utilities (if not using F16C)
@@ -216,6 +404,32 @@ void gemm_f16(float *Y,
 #endif
 }
 
+static void gemm_f16_input_fp16_ref(float *Y,
+                                    const uint16_t *W,
+                                    const float *X,
+                                    int M, int N, int K)
+{
+    for (int n = 0; n < N; ++n) {
+        const float *x_row = &X[(size_t)n * (size_t)K];
+        uint16_t x_f16[K];
+
+        for (int k = 0; k < K; ++k) {
+            x_f16[k] = fp32_to_fp16(x_row[k]);
+        }
+
+        for (int row = 0; row < M; ++row) {
+            float sum = 0.0f;
+            const uint16_t *w_row = &W[(size_t)row * (size_t)K];
+
+            for (int k = 0; k < K; ++k) {
+                sum += fp16_to_fp32(w_row[k]) * fp16_to_fp32(x_f16[k]);
+            }
+
+            Y[(size_t)n * (size_t)M + (size_t)row] = sum;
+        }
+    }
+}
+
 /**
  * @brief NT GEMM wrapper for FP16 weights with the engine's standard ABI.
  *
@@ -224,11 +438,10 @@ void gemm_f16(float *Y,
  *   B: [N, K] fp16 weight matrix stored row-major (transposed layout)
  *   C: [M, N] fp32 output matrix
  *
- * Internally gemm_f16 expects:
- *   W: [output_rows, K]
- *   X: batch-major [batch, K]
- *   Y: batch-major [batch, output_rows]
- * so we swap the output/batch dimensions when dispatching.
+ * This wrapper follows llama.cpp's CPU F16 mul_mat contract: activation rows
+ * are rounded to FP16 first, then the dot runs as F16 x F16 with FP32 output
+ * accumulation. The lower-level gemm_f16() helper remains the direct F16-weight
+ * x FP32-activation operator for generic use.
  */
 void gemm_nt_f16(const float *A,
                  const void *B,
@@ -236,7 +449,12 @@ void gemm_nt_f16(const float *A,
                  float *C,
                  int M, int N, int K)
 {
-    gemm_f16(C, (const uint16_t *)B, A, N, M, K);
+    if (ck_strict_parity_enabled() &&
+        gemm_nt_f16_ggml_strict(A, B, bias, C, M, N, K)) {
+        return;
+    }
+
+    gemm_f16_input_fp16_ref(C, (const uint16_t *)B, A, N, M, K);
 
     if (!bias) {
         return;

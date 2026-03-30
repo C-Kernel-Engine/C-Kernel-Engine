@@ -1,5 +1,165 @@
 {
   "bindings": {
+    "gemm_nt_fp32_exact": {
+      "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "gemm_naive_parallel": {
+      "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
+      "params": [
+        {
+          "name": "A",
+          "source": "activation:a",
+          "cast": "const float*"
+        },
+        {
+          "name": "B",
+          "source": "weight:_first_weight"
+        },
+        {
+          "name": "bias",
+          "source": "weight_f:_bias"
+        },
+        {
+          "name": "C",
+          "source": "output:c",
+          "cast": "float*"
+        },
+        {
+          "name": "M",
+          "source": "dim:_m"
+        },
+        {
+          "name": "N",
+          "source": "dim:_output_dim"
+        },
+        {
+          "name": "K",
+          "source": "dim:_input_dim"
+        }
+      ]
+    },
+    "layernorm_fp32_exact": {
+      "note": "Exact LayerNorm binding for parity-sensitive templates.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+        },
+        {
+          "name": "beta",
+          "source": "weight_f:beta",
+          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "mean_cache",
+          "source": "null"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "null"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
+    "layernorm_naive_serial_matched_precision": {
+      "note": "Direct function-name alias for the exact LayerNorm binding.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:gamma",
+          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+        },
+        {
+          "name": "beta",
+          "source": "weight_f:beta",
+          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "mean_cache",
+          "source": "null"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "null"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
     "gemm_nt_f16": {
       "note": "FP16-weight dense GEMM wrapper with the standard matmul ABI.",
       "params": [
@@ -300,6 +460,20 @@
         }
       ]
     },
+    "gelu_ggml_inplace": {
+      "note": "GGML-compatible in-place GELU binding for llama.cpp parity-sensitive v8 paths.",
+      "params": [
+        {
+          "name": "data",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "n",
+          "source": "dim:gelu_elems"
+        }
+      ]
+    },
     "feature_slice_copy": {
       "note": "Generic row-wise copy into a feature-axis slice of a wider destination tensor.",
       "params": [
@@ -413,6 +587,104 @@
         {
           "name": "num_kv_heads",
           "source": "dim:num_kv_heads"
+        }
+      ]
+    },
+    "attention_forward_full_head_major_gqa_exact_strided": {
+      "note": "Prefill: exact full / bidirectional grouped-query attention across the entire sequence",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
+        }
+      ]
+    },
+    "attention_forward_full_head_major_gqa_ggml_strided": {
+      "note": "Prefill: GGML-compatible non-flash full / bidirectional grouped-query attention across the entire sequence",
+      "params": [
+        {
+          "name": "q",
+          "source": "scratch:q_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "kv_stride_tokens",
+          "source": "dim:max_seq_len"
         }
       ]
     },
