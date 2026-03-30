@@ -7,6 +7,7 @@
  * kernels, and are only used from strict parity paths.
  */
 
+#define CK_ENABLE_LLAMA_CPP_PARITY 1
 #include "attention_oracle_ggml.h"
 #include "ckernel_engine.h"
 #include "../../llama.cpp/ggml/include/ggml.h"

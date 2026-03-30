@@ -29,7 +29,7 @@
  */
 
 #include "ckernel_engine.h"
-#include "../../llama.cpp/ggml/include/ggml.h"
+#include "ggml_runtime_compat.h"
 
 #include <dlfcn.h>
 #include <math.h>
@@ -66,6 +66,7 @@ typedef struct ggml_tensor *(*ck_ggml_rope_multi_inplace_fn)(struct ggml_context
 typedef struct ggml_cgraph *(*ck_ggml_new_graph_fn)(struct ggml_context *);
 typedef void (*ck_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
 typedef enum ggml_status (*ck_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
+typedef void *(*ck_ggml_get_data_fn)(const struct ggml_tensor *);
 
 static ck_ggml_cpu_init_fn ck_resolve_ggml_cpu_init(void) {
     static ck_ggml_cpu_init_fn fn = NULL;
@@ -135,6 +136,14 @@ static ck_ggml_graph_compute_with_ctx_fn ck_resolve_ggml_graph_compute_with_ctx(
     static ck_ggml_graph_compute_with_ctx_fn fn = NULL;
     if (!fn) {
         fn = (ck_ggml_graph_compute_with_ctx_fn) dlsym(RTLD_DEFAULT, "ggml_graph_compute_with_ctx");
+    }
+    return fn;
+}
+
+static ck_ggml_get_data_fn ck_resolve_ggml_get_data(void) {
+    static ck_ggml_get_data_fn fn = NULL;
+    if (!fn) {
+        fn = (ck_ggml_get_data_fn) dlsym(RTLD_DEFAULT, "ggml_get_data");
     }
     return fn;
 }
@@ -1010,13 +1019,14 @@ static int vision_mrope_apply_ggml_exact(
     ck_ggml_new_graph_fn ggml_new_graph_fn = ck_resolve_ggml_new_graph();
     ck_ggml_build_forward_expand_fn ggml_build_forward_expand_fn = ck_resolve_ggml_build_forward_expand();
     ck_ggml_graph_compute_with_ctx_fn ggml_graph_compute_with_ctx_fn = ck_resolve_ggml_graph_compute_with_ctx();
+    ck_ggml_get_data_fn ggml_get_data_fn = ck_resolve_ggml_get_data();
 
     if (!x || !positions || num_heads <= 0 || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim) {
         return 0;
     }
     if (!ggml_cpu_init_fn || !ggml_init_fn || !ggml_free_fn || !ggml_new_tensor_1d_fn ||
         !ggml_view_3d_fn || !ggml_rope_multi_inplace_fn || !ggml_new_graph_fn ||
-        !ggml_build_forward_expand_fn || !ggml_graph_compute_with_ctx_fn) {
+        !ggml_build_forward_expand_fn || !ggml_graph_compute_with_ctx_fn || !ggml_get_data_fn) {
         return 0;
     }
 
@@ -1048,8 +1058,15 @@ static int vision_mrope_apply_ggml_exact(
         return 0;
     }
 
-    x_base->data = (void *) x;
-    pos_base->data = (void *) positions;
+    void *x_base_data = ggml_get_data_fn(x_base);
+    void *pos_base_data = ggml_get_data_fn(pos_base);
+    if (!x_base_data || !pos_base_data) {
+        ggml_free_fn(ctx);
+        return 0;
+    }
+
+    memcpy(x_base_data, x, (size_t) total_elems * sizeof(float));
+    memcpy(pos_base_data, positions, (size_t) 4 * (size_t) num_tokens * sizeof(int32_t));
 
     struct ggml_tensor *x_view = ggml_view_3d_fn(ctx,
                                                  x_base,
@@ -1097,6 +1114,7 @@ static int vision_mrope_apply_ggml_exact(
         return 0;
     }
 
+    memcpy(x, x_base_data, (size_t) total_elems * sizeof(float));
     ok = 1;
     ggml_free_fn(ctx);
     return ok;

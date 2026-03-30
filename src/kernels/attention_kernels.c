@@ -15,12 +15,19 @@
  * Supports GQA (grouped-query attention) with head broadcasting.
  */
 
+#ifndef CK_ENABLE_LLAMA_CPP_PARITY
+#define CK_ENABLE_LLAMA_CPP_PARITY 0
+#endif
+
 #include "bf16_utils.h"
 #include "attention_oracle_ggml.h"
 #include "ckernel_engine.h"
+#if CK_ENABLE_LLAMA_CPP_PARITY
 #include "../../llama.cpp/ggml/include/ggml.h"
+#endif
 #include <dlfcn.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -146,11 +153,18 @@ static int ck_attention_reverse_out_dot_enabled(void)
     return v && v[0] && strcmp(v, "0") != 0;
 }
 
+#if CK_ENABLE_LLAMA_CPP_PARITY
 static int ck_attention_ggml_out_graph_enabled(void)
 {
     const char *v = getenv("CK_STRICT_ATTN_GGML_OUT_GRAPH");
     return v && v[0] && strcmp(v, "0") != 0;
 }
+#else
+static int ck_attention_ggml_out_graph_enabled(void)
+{
+    return 0;
+}
+#endif
 
 static int ck_attention_vec_dump_parse_env_int(const char *name, int *out)
 {
@@ -327,6 +341,10 @@ static void ck_attention_vec_dump_selected_query(const float *raw_scores,
     }
 }
 
+static inline void ck_vec_scale_f32_inplace(float *x, int n, float scale);
+static inline float ck_vec_max_f32_contig(const float *x, int n);
+
+#if CK_ENABLE_LLAMA_CPP_PARITY
 typedef void (*ck_ggml_vec_dot_f32_fn)(int, float *, size_t, const float *, size_t, const float *, size_t, int);
 typedef double (*ck_ggml_vec_soft_max_f32_fn)(int, float *, const float *, float);
 typedef void (*ck_ggml_compute_forward_mul_mat_fn)(const struct ggml_compute_params *, struct ggml_tensor *);
@@ -340,9 +358,6 @@ typedef struct ggml_cgraph *(*ck_ggml_new_graph_fn)(struct ggml_context *);
 typedef void (*ck_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
 typedef enum ggml_status (*ck_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
 typedef void (*ck_ggml_set_input_fn)(struct ggml_tensor *);
-
-static inline void ck_vec_scale_f32_inplace(float *x, int n, float scale);
-static inline float ck_vec_max_f32_contig(const float *x, int n);
 
 struct ggml_threadpool;
 struct ggml_compute_params {
@@ -561,6 +576,7 @@ static inline void ck_ggml_init_tensor_f32(struct ggml_tensor *t,
     t->op = GGML_OP_NONE;
     t->data = data;
 }
+#endif
 
 #if defined(__FMA__)
 #define CK_MADD128(x, y, z) _mm_fmadd_ps(x, y, z)
@@ -1829,6 +1845,7 @@ static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_regular(const float
     }
 }
 
+#if CK_ENABLE_LLAMA_CPP_PARITY
 static CK_NOINLINE CK_OPTNONE void attention_query_full_dyn_ggml_regular(const float *q_vec,
                                                                          const float *k_head,
                                                                          const float *v_cols,
@@ -2262,6 +2279,7 @@ static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_compute_regular(con
         out_vec[d] = 0.0f;
     }
 }
+#endif
 
 /* Strict ggml-backed full-attention oracles live in attention_oracle_ggml.c. */
 
@@ -2983,6 +3001,7 @@ void attention_forward_full_head_major_gqa_exact_strided(const float *q,
         const float *v_head = v + (size_t) kv_head * kv_head_stride;
         float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
 
+#if CK_ENABLE_LLAMA_CPP_PARITY
         if (ck_strict_parity_enabled() &&
             ck_attention_head_full_ggml_graph_oracle_regular(
                 q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
@@ -2996,6 +3015,7 @@ void attention_forward_full_head_major_gqa_exact_strided(const float *q,
             ck_attention_trace("regular_graph_oracle", debug_layer_id, h);
             continue;
         }
+#endif
 
         for (int d = 0; d < head_dim; ++d) {
             float *dst_col = v_cols + (size_t) d * (size_t) T;
@@ -3053,6 +3073,7 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
     float *score_row = (float *) alloca((size_t) T * sizeof(float));
     float *prob_row = (float *) alloca((size_t) T * sizeof(float));
     float *v_cols = (float *) alloca((size_t) head_dim * (size_t) T * sizeof(float));
+#if CK_ENABLE_LLAMA_CPP_PARITY
     ck_ggml_vec_dot_f32_fn dot_fn = NULL;
     ck_ggml_vec_soft_max_f32_fn softmax_fn = NULL;
     ck_ggml_compute_forward_mul_mat_fn mul_mat_fn = NULL;
@@ -3076,6 +3097,7 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
         mul_mat_fn = ck_resolve_ggml_compute_forward_mul_mat();
         softmax_compute_fn = ck_resolve_ggml_compute_forward_soft_max();
     }
+#endif
 
     for (int h = 0; h < num_heads; ++h) {
         const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
@@ -3083,6 +3105,7 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
         const float *v_head = v + (size_t) kv_head * kv_head_stride;
         float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
 
+#if CK_ENABLE_LLAMA_CPP_PARITY
         if (ck_strict_parity_enabled() &&
             ck_attention_head_full_ggml_graph_oracle_regular(
                 q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
@@ -3095,6 +3118,7 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
                 scale)) {
             continue;
         }
+#endif
 
         for (int d = 0; d < head_dim; ++d) {
             float *dst_col = v_cols + (size_t) d * (size_t) T;
@@ -3103,6 +3127,7 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
             }
         }
 
+#if CK_ENABLE_LLAMA_CPP_PARITY
         if (dot_fn && softmax_fn && ck_attention_ggml_out_graph_enabled()) {
             if (attention_head_full_dyn_ggml_regular_graph_out(
                     q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
@@ -3126,10 +3151,12 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
                 continue;
             }
         }
+#endif
 
         for (int i = 0; i < T; ++i) {
             const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
             float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+#if CK_ENABLE_LLAMA_CPP_PARITY
             if (dot_fn && softmax_fn) {
                 if (i == 0) {
                     ck_attention_trace("dyn_ggml_regular", debug_layer_id, h);
@@ -3167,7 +3194,9 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
                                                           dot_fn,
                                                           mul_mat_fn,
                                                           softmax_compute_fn);
-            } else {
+            } else
+#endif
+            {
                 if (i == 0) {
                     ck_attention_trace("ggml_regular", debug_layer_id, h);
                 }

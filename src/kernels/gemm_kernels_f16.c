@@ -21,9 +21,10 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include "ckernel_quant.h"  /* For ck_fp16_to_fp32 */
 #include "ckernel_engine.h"
-#include "../../llama.cpp/ggml/include/ggml.h"
+#include "ggml_runtime_compat.h"
 
 #include <dlfcn.h>
 #include <stdlib.h>
@@ -41,6 +42,8 @@ typedef struct ggml_cgraph *(*ck_f16_ggml_new_graph_fn)(struct ggml_context *);
 typedef void (*ck_f16_ggml_build_forward_expand_fn)(struct ggml_cgraph *, struct ggml_tensor *);
 typedef enum ggml_status (*ck_f16_ggml_graph_compute_with_ctx_fn)(struct ggml_context *, struct ggml_cgraph *, int);
 typedef void (*ck_f16_ggml_cpu_init_fn)(void);
+typedef void *(*ck_f16_ggml_get_data_fn)(const struct ggml_tensor *);
+typedef float *(*ck_f16_ggml_get_data_f32_fn)(const struct ggml_tensor *);
 
 static ck_f16_ggml_init_fn ck_f16_resolve_ggml_init(void)
 {
@@ -130,6 +133,28 @@ static ck_f16_ggml_cpu_init_fn ck_f16_resolve_ggml_cpu_init(void)
     return fn;
 }
 
+static ck_f16_ggml_get_data_fn ck_f16_resolve_ggml_get_data(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_get_data_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_get_data_fn) dlsym(RTLD_DEFAULT, "ggml_get_data");
+    }
+    return fn;
+}
+
+static ck_f16_ggml_get_data_f32_fn ck_f16_resolve_ggml_get_data_f32(void)
+{
+    static int tried = 0;
+    static ck_f16_ggml_get_data_f32_fn fn = NULL;
+    if (!tried) {
+        tried = 1;
+        fn = (ck_f16_ggml_get_data_f32_fn) dlsym(RTLD_DEFAULT, "ggml_get_data_f32");
+    }
+    return fn;
+}
+
 static int gemm_nt_f16_ggml_strict(const float *A,
                                    const void *B,
                                    const float *bias,
@@ -146,10 +171,12 @@ static int gemm_nt_f16_ggml_strict(const float *A,
     ck_f16_ggml_new_graph_fn ggml_new_graph_fn = ck_f16_resolve_ggml_new_graph();
     ck_f16_ggml_build_forward_expand_fn ggml_build_forward_expand_fn = ck_f16_resolve_ggml_build_forward_expand();
     ck_f16_ggml_graph_compute_with_ctx_fn ggml_graph_compute_with_ctx_fn = ck_f16_resolve_ggml_graph_compute_with_ctx();
+    ck_f16_ggml_get_data_fn ggml_get_data_fn = ck_f16_resolve_ggml_get_data();
+    ck_f16_ggml_get_data_f32_fn ggml_get_data_f32_fn = ck_f16_resolve_ggml_get_data_f32();
 
     if (!ggml_cpu_init_fn || !ggml_init_fn || !ggml_free_fn || !ggml_new_tensor_2d_fn ||
         !ggml_mul_mat_fn || !ggml_new_graph_fn || !ggml_build_forward_expand_fn ||
-        !ggml_graph_compute_with_ctx_fn) {
+        !ggml_graph_compute_with_ctx_fn || !ggml_get_data_fn || !ggml_get_data_f32_fn) {
         return 0;
     }
 
@@ -176,8 +203,16 @@ static int gemm_nt_f16_ggml_strict(const float *A,
         return 0;
     }
 
-    w->data = (void *) B;
-    x->data = (void *) A;
+    {
+        void *w_data = ggml_get_data_fn(w);
+        void *x_data = ggml_get_data_fn(x);
+        if (!w_data || !x_data) {
+            ggml_free_fn(ctx);
+            return 0;
+        }
+        memcpy(w_data, B, (size_t) K * (size_t) N * sizeof(uint16_t));
+        memcpy(x_data, A, (size_t) K * (size_t) M * sizeof(float));
+    }
 
     struct ggml_tensor *y = ggml_mul_mat_fn(ctx, w, x);
     if (!y) {
@@ -197,7 +232,11 @@ static int gemm_nt_f16_ggml_strict(const float *A,
     }
 
     {
-        const float *src = (const float *) y->data;
+        const float *src = ggml_get_data_f32_fn(y);
+        if (!src) {
+            ggml_free_fn(ctx);
+            return 0;
+        }
         for (int m = 0; m < M; ++m) {
             memcpy(C + (size_t) m * (size_t) N,
                    src + (size_t) m * (size_t) N,

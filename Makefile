@@ -247,7 +247,6 @@ SRCS    := src/backend_native.c \
 	           src/kernels/softmax_kernels.c \
 	           src/kernels/softmax_kernels_bf16.c \
 	           src/kernels/attention_kernels.c \
-	           src/kernels/attention_oracle_ggml.c \
 	           src/kernels/attention_kernels_sliding.c \
 	           src/kernels/attention_flash_true.c \
 	           src/kernels/ssm_kernels.c \
@@ -332,6 +331,7 @@ LIB_VISION   := $(BUILD_DIR)/libckernel_vision.so
 LIB_ATTENTION := $(BUILD_DIR)/libckernel_attention.so
 LIB_ROPE     := $(BUILD_DIR)/libckernel_rope.so
 LIB_PARITY   := $(BUILD_DIR)/libck_parity.so
+LIB_PARITY_LLAMA := $(BUILD_DIR)/libck_parity_llama.so
 
 # Tokenizer library (new - from src/tokenizer/)
 SRCS_TOKENIZER := src/tokenizer/murmurhash3.c \
@@ -960,8 +960,8 @@ $(LIB_RELU): $(BUILD_STAMP) src/kernels/relu_kernels.c src/kernels/relu_kernels_
 $(LIB_VISION): $(BUILD_STAMP) src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/vision_kernels.c src/kernels/vision_kernels_bf16.c src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
-$(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_oracle_ggml.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_oracle_ggml.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
+$(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
+	$(CC) $(CFLAGS) -shared -o $@ src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/softmax_kernels.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
@@ -1845,6 +1845,9 @@ llamacpp-parity-full:
 	@echo "Running full llama.cpp parity test..."
 	@./scripts/run_parity_smoketest.sh --skip-build
 	@echo ""
+	@echo "Building llama.cpp-backed CK attention oracle library..."
+	@$(MAKE) --no-print-directory libck_parity_llama.so
+	@echo ""
 	@echo "Running OpenMP GEMV parity tests (serial vs parallel)..."
 	@$(MAKE) --no-print-directory test-gemv-omp
 	@echo ""
@@ -2637,7 +2640,6 @@ PARITY_SRCS := src/ck_parity_api.c \
 	               src/kernels/gelu_kernels.c \
 	               src/kernels/geglu_kernels.c \
 	               src/kernels/attention_kernels.c \
-	               src/kernels/attention_oracle_ggml.c \
 	               src/kernels/attention_kernels_sliding.c \
 	               src/kernels/attention_flash_true.c \
 	               src/kernels/ssm_kernels.c \
@@ -2653,12 +2655,21 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/fused/gemv_fused_quant_bias.c \
                src/kernels/add_kernels_bf16.c
 
+PARITY_LLAMA_SRCS := $(PARITY_SRCS) \
+                     src/kernels/attention_oracle_ggml.c
+
 # Build CK parity testing library
 $(LIB_PARITY): $(BUILD_DIR) $(PARITY_SRCS)
 	$(CC) $(CFLAGS) -shared -o $@ $(PARITY_SRCS) $(LDFLAGS) -lm -lpthread
 
 libck_parity.so: $(LIB_PARITY)
 	@echo "Built CK parity library: $(LIB_PARITY)"
+
+$(LIB_PARITY_LLAMA): $(BUILD_DIR) $(PARITY_LLAMA_SRCS)
+	$(CC) $(CFLAGS) -DCK_ENABLE_LLAMA_CPP_PARITY=1 -shared -o $@ $(PARITY_LLAMA_SRCS) $(LDFLAGS) -lm -lpthread
+
+libck_parity_llama.so: $(LIB_PARITY_LLAMA)
+	@echo "Built llama.cpp-backed CK parity library: $(LIB_PARITY_LLAMA)"
 
 # Build llama.cpp kernel test library
 # Requires llama.cpp to be cloned in llama.cpp/ subdirectory
@@ -2708,7 +2719,7 @@ test-kernels: parity-libs
 test-kernel-%: parity-libs
 	$(PYTHON) $(PYTHONFLAGS) scripts/test_kernels_vs_llamacpp.py --kernel $*
 
-.PHONY: libck_parity.so llama_kernel_test parity-libs test-kernels
+.PHONY: libck_parity.so libck_parity_llama.so llama_kernel_test parity-libs test-kernels
 
 # Litmus test for full forward pass parity with PyTorch
 # ==============================================================================
@@ -2719,7 +2730,6 @@ TEST_HARNESS_SRCS := src/backend_native.c \
 	src/ckernel_registry.c \
 	src/cpu_features.c \
 	src/kernels/attention_kernels.c \
-	src/kernels/attention_oracle_ggml.c \
 	src/kernels/attention_decode_fused.c \
 	src/kernels/gelu_kernels.c \
 	src/kernels/gemm_kernels.c \
