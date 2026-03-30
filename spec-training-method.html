@@ -1431,7 +1431,7 @@
             compiler-backed training to page DSLs, code/data/tool IR, and eventually mixed coding/scientific tasks.
         </p>
         <p><strong>Outcome:</strong> visual DSL work is treated as foundation-building, not the final destination.</p>
-        <p><strong>Applied here:</strong> move from narrow-family SVG work toward page DSLs, code/data/tool IR, and broader mixed models.</p>
+        <p><strong>Applied here:</strong> move from `spec06-12` SVG work toward page DSLs, code/data/tool IR, and broader mixed models.</p>
         <p><a href="training-curriculum.html">Open training-curriculum.html</a></p>
     </div>
     <div class="report-card">
@@ -2062,76 +2062,6 @@ Better boundary
     and answered Z.”</em>
 </p>
 
-<h2>Restart-Safe Agent Handoff</h2>
-
-<p>
-    Yes, this page is the right umbrella documentation to keep around for restarts. It now has a companion handoff file
-    so a future agent does not need to reconstruct the current plan from scattered reports or stale run logs.
-</p>
-
-<div class="decision-grid">
-    <div class="decision-card">
-        <h3>Why this helps</h3>
-        <p>It preserves the method baseline after a reboot: keep the last good <code>spec[x] rung[y]</code> as the training-method champion, move to a compiler-first successor DSL, and add one new family at a time.</p>
-    </div>
-    <div class="decision-card">
-        <h3>What to copy after restart</h3>
-        <p>Use the markdown handoff file below as the first message to the next agent. It points directly at the live contract and the autopilot policy.</p>
-    </div>
-    <div class="decision-card">
-        <h3>What it prevents</h3>
-        <p>It prevents blind resumption of stale runs, tokenizer guesswork, and launching training before the compiler and tokenizer contract are ready.</p>
-    </div>
-</div>
-
-<table class="axis-table">
-    <thead>
-        <tr>
-            <th>Reference</th>
-            <th>Purpose</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><code>docs/site/_pages/spec-training-method.html</code></td>
-            <td>Human-readable umbrella method page.</td>
-        </tr>
-        <tr>
-            <td><code>docs/site/_pages/agent-handoff-template.md</code></td>
-            <td>Copy-paste restart prompt for future agents.</td>
-        </tr>
-        <tr>
-            <td><code>version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md</code></td>
-            <td>Example shape of the current internal execution contract.</td>
-        </tr>
-        <tr>
-            <td><code>version/v7/reports/spec_family_autopilot_policy.json</code></td>
-            <td>Machine-readable rule for when autonomy is allowed and when it must stop.</td>
-        </tr>
-    </tbody>
-</table>
-
-<div class="card policy-code">
-<pre>Suggested restart prompt
-
-Read these first and treat them as the live source of truth:
-
-1. docs/site/_pages/spec-training-method.html
-2. docs/site/_pages/agent-handoff-template.md
-3. version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md
-4. version/v7/reports/spec_family_autopilot_policy.json
-
-Current intent:
-- keep the last good spec[x] rung[y] as the training-method baseline, not the tokenizer ceiling
-- build the successor DSL/compiler/tokenizer path explicitly
-- keep payload/content external to the model DSL
-- add one capability at a time
-- make the next family[z] the active family-construction line
-- do not launch training until the compiler, tokenizer corpus, launcher, and rung policy checklist are complete
-
-Then continue from the current execution contract checklist and update the repo artifacts before starting any background training or autopilot.</pre>
-</div>
-
 <h2>Recommended Asset-to-DSL Workflow for SVG</h2>
 
 <div class="svg-showcase">
@@ -2452,73 +2382,73 @@ Next run:</pre>
             <td>Low exact across <strong>all</strong> layouts</td>
             <td>Undertrained (too few epochs or too little curriculum pressure)</td>
             <td>Raise midtrain epochs from 1 to 2–3. Keep everything else frozen.</td>
-            <td>Example: 2/35 exact after 1 midtrain epoch, with all 5 layouts weak</td>
+            <td>spec11 r1: 2/35 exact after 1 midtrain epoch, all 5 layouts weak</td>
         </tr>
         <tr class="row-warning">
             <td>Low exact on <strong>some</strong> layouts, others strong</td>
             <td>Curriculum imbalance — weak families got less edit pressure</td>
             <td>Add targeted negative/repair rows for the weak families. Anchor the strong families with replay.</td>
-            <td>Example: one over-weighted slice caused cascading failure across the weak families</td>
+            <td>spec06 r3: 29% — over-weighted one slice caused cascading failure</td>
         </tr>
         <tr class="row-critical">
             <td>High exact match, but <code>rendered_svg_ok: null</code></td>
             <td>Probe/compiler plumbing bug — model output is right but the render path fails silently</td>
             <td>Fix the probe pipeline first. Do not retrain until the eval is trustworthy.</td>
-            <td>Example: exact=true but <code>rendered_svg_ok</code>=null because the accounting path was wrong</td>
+            <td>spec11 r1: pipeline_lane exact=true but rendered_svg=null — accounting bug</td>
         </tr>
         <tr class="row-critical">
             <td>Loss drops below 0.1 but exact match stays low</td>
             <td>The model memorized training distribution but not the DSL contract</td>
             <td>Check tokenizer coverage, holdout prompt diversity, and whether edits cover all layout × topic combinations.</td>
-            <td>Example: loss converged but capability stayed near 0% because the representation was wrong</td>
+            <td>spec03: loss converged but 0% capability — representation was wrong</td>
         </tr>
         <tr class="row-warning">
             <td>Loss stuck above 0.5 after full midtrain</td>
             <td>Capacity wall, LR too low, or data packing issue</td>
             <td>Check grad norms for saturation. Try LR sweep. Verify token packing fill rate (&gt;0.85).</td>
-            <td>Example: 81% loss reduction but final loss stayed at 0.905, signaling a capacity or token-budget wall</td>
+            <td>spec08 r1: 81% reduction but final loss 0.905 — richer DSL needed more capacity/epochs</td>
         </tr>
         <tr class="row-info">
             <td>Good exact on train prompts, bad on dev/test</td>
             <td>Overfitting to train distribution</td>
             <td>Widen holdout prompt coverage. Add more topic × layout combinations. Reduce epoch count if loss is very low.</td>
-            <td>Example: 100% train, 91.7% dev, 83.3% test, showing a visible but still manageable overfit gradient</td>
+            <td>spec06 r6: 100% train, 91.7% dev, 83.3% test — healthy but gradient visible</td>
         </tr>
         <tr class="row-warning">
             <td>Good exact on one spec, regression on next</td>
             <td>DSL contract changed silently, or tokenizer/compiler mismatch</td>
             <td>Diff the DSL grammar, tokenizer vocab, and compiler output between specs. Use canary probes from the previous best.</td>
-            <td>Example: new layout families were introduced and legacy families still passed, but the tokenizer/compiler contract drifted</td>
+            <td>spec05→spec06 r1: new layout families introduced, old families still passed</td>
         </tr>
         <tr class="row-critical">
             <td>100% syntax valid, 0% semantic match</td>
             <td>Model learned token order but not composition choices</td>
             <td>Richer curriculum with edit pairs (wrong→right), not just direct generation examples.</td>
-            <td>Example: 100% syntactically valid DSL, 0% correct scene composition</td>
+            <td>spec04: 100% syntactically valid DSL, 0% correct scene composition</td>
         </tr>
         <tr class="row-info">
             <td>Stage labels wrong in loss curve</td>
             <td>Telemetry bookkeeping bug in pipeline — stage transitions not recorded</td>
             <td>Fix the pipeline stage labeling. Do not trust source_stage field until verified. Use step counts to infer boundaries.</td>
-            <td>Example: all 665 steps were labeled <code>pretrain</code> even though midtrain steps were present</td>
+            <td>spec11 r1: all 665 steps labeled "pretrain" but included midtrain steps</td>
         </tr>
         <tr class="row-info">
             <td>training_plan.json says "active" after run completed</td>
             <td>Pipeline did not finalize stage status</td>
             <td>Fix the plan update logic. Probe report should not depend on plan status for results.</td>
-            <td>Example: <code>training_plan.json</code> still reported <code>midtrain</code> after the run finished</td>
+            <td>spec11 r1: active_stage still "midtrain" after completion</td>
         </tr>
         <tr class="row-critical">
             <td>One layout perfect until truncated — missing closing tags</td>
             <td>Output exceeds context window — model learned the content but runs out of tokens</td>
             <td>Measure output token count vs context length. Either compress the DSL (remove inferable fields) or raise context. Do not add more training data — the model already knows it.</td>
-            <td>Example: one family matched 2208/2606 characters perfectly, then truncated at the same point on every failure</td>
+            <td>spec11 r2: poster_stack matched 2208/2606 chars perfectly, then truncated — 9/9 failures all identical</td>
         </tr>
         <tr class="row-warning">
             <td>Gold mapping token budget far exceeds context window</td>
             <td>DSL is too verbose — carrying fields the compiler could infer</td>
-            <td>Run a DSL compression pass before defining the tokenizer. Target: output tokens &lt; 80% of context length. Measure with a gold-budget report tool.</td>
-            <td>Example gold output: 2793 tokens at ctx = 512, or 5.5x over budget</td>
+            <td>Run a DSL compression pass before defining the tokenizer. Target: output tokens &lt; 80% of context length. Measure with <code>build_spec12_gold_budget_report_v7.py</code>.</td>
+            <td>spec12 gold: memory_map = 2793 tokens, ctx = 512 — 5.5× over budget</td>
         </tr>
     </tbody>
 </table>
@@ -2764,7 +2694,7 @@ Next run:</pre>
         <tr>
             <td>Repair run</td>
             <td>A narrow run that targets a known failure slice without redefining the overall contract.</td>
-            <td>Add transition rows to fix one broken family in the current baseline line.</td>
+            <td>Add table-matrix transition rows to fix one broken family in <code>spec12 r3</code>.</td>
         </tr>
         <tr>
             <td>Replay / anchor rows</td>
@@ -3268,7 +3198,7 @@ Next run:</pre>
         <tr>
             <td>Token budget</td>
             <td>Longest gold output fits within 80% of context window after tokenization</td>
-            <td>Gold-budget report tool or equivalent</td>
+            <td><code>build_spec12_gold_budget_report_v7.py</code> or equivalent</td>
         </tr>
         <tr>
             <td>Tokenizer coverage</td>
@@ -3288,50 +3218,11 @@ Next run:</pre>
     </tbody>
 </table>
 
-<h3>What A Solved Structured-DSL Run Actually Proves</h3>
+<h2>Next Bridge After spec12</h2>
 
-<p>
-    A solved <code>spec[x] rung[y]</code> does not mean the model learned open-ended infographic design. It means something narrower and more useful: the model can reliably map a bounded prompt contract to a compiler-facing scene DSL, and that DSL can then be combined with external <code>content.json</code> to produce exact SVG.
-</p>
+<p>The next step after <code>spec12</code> is not open-ended prose. It is a bounded intent bridge where the prompt still names the topic and goal, but stops prescribing the scene directly.</p>
 
-<ul>
-    <li>The model is responsible for the scene program: layout family, scene components, refs, and top-level style fields.</li>
-    <li>The compiler is responsible for deterministic layout and SVG assembly.</li>
-    <li>The external content payload is responsible for visible copy, data values, and topic-specific facts.</li>
-</ul>
-
-<p>
-    Keep those responsibilities separate. When adding new DSL families, do not blend asset identity into the output grammar unless the structure truly requires it. Case ids, topic-specific facts, and payload-specific copy should stay in prompt text, routing metadata, and external <code>content.json</code> wherever possible. The output DSL should stay as generic as the renderer contract allows.
-</p>
-
-<p>
-    This boundary matters. A strong <code>spec[x] rung[y]</code> result proves the training method can stabilize <em>structured program generation</em>. It does not yet prove arbitrary topic generalization, arbitrary tree depth, free-written infographic copy, or unconstrained scene planning.
-</p>
-
-<h3>Prompt-Surface And Decode-Boundary Discipline</h3>
-
-<p>
-    Hidden eval should cover at least two different generalization surfaces:
-</p>
-
-<ul>
-    <li><strong>Prompt-surface robustness:</strong> paraphrases, wording shifts, and bridge prompts that preserve the same underlying task.</li>
-    <li><strong>Semantic breadth:</strong> new topics, new assets, or new content payloads that test whether the contract scales beyond the first few gold mappings.</li>
-</ul>
-
-<p>
-    Solving prompt paraphrases is not the same as solving new semantics. Treat those as different milestones and report them separately.
-</p>
-
-<p>
-    Also keep decode-boundary hygiene separate from model quality. In raw CLI inference, a scene DSL model may generate a correct <code>[scene] ... [/scene]</code> block and then continue into the next training-style prompt if no structural stop marker is supplied. That is a decode configuration issue, not automatically a training failure. Measure the first valid scene block, then fix stop hygiene at the inference boundary.
-</p>
-
-<h2>Next Bridge After A Solved Explicit-Layout Line</h2>
-
-<p>The next step after a solved explicit-layout line is not open-ended prose. It is a bounded intent bridge where the prompt still names the topic and goal, but stops prescribing the scene directly.</p>
-
-<p>The short rule is:</p>
+<p>The internal design note for that step is <code>version/v7/reports/SPEC13A_INTENT_PROMPT_BRIDGE_2026-03-18.md</code>. The short rule is:</p>
 
 <ul>
     <li>keep <code>content.json</code> external</li>
@@ -3340,24 +3231,11 @@ Next run:</pre>
     <li>measure planning quality separately from syntax and renderability</li>
 </ul>
 
-<p>Example intent-bridge prompt:</p>
+<p>Example <code>spec13a</code> prompt:</p>
 
-<pre><code>[task:svg] [topic:topic_id] [goal:goal_id] [audience:audience_id] [OUT]</code></pre>
+<pre><code>[task:svg] [topic:memory_layout_map] [goal:explain_structure] [audience:engineer] [OUT]</code></pre>
 
 <p>This keeps the task bounded. The model is not being asked to learn open-domain language or free-written infographic copy. It is being asked to choose a good scene plan under weaker prompt control.</p>
-
-<h3>Progress Goal After The Last Good Baseline</h3>
-
-<p>
-    The immediate goal after the last good baseline is not “teach the model English.” It is narrower and more useful: preserve compiler-backed precision while adding more SVG families and better within-family generalization.
-</p>
-
-<ul>
-    <li>Keep the renderer deterministic and visually strong.</li>
-    <li>Keep semantic payloads external until the family contract is stable.</li>
-    <li>Add new families one at a time so failure causes stay legible.</li>
-    <li>Judge progress by exact/materialized SVG quality and held-out family transfer, not by conversational fluency.</li>
-</ul>
 
 <h2>Related Pages</h2>
 
@@ -3616,7 +3494,7 @@ Next run:</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-23</p>
             </div>
         </div>
     </footer>
