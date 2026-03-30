@@ -62,6 +62,7 @@ var annotated_dup =
     [ "CKVocabEntry", "structCKVocabEntry.html", "structCKVocabEntry" ],
     [ "CPUInfo", "structCPUInfo.html", "structCPUInfo" ],
     [ "GEMMParams", "structGEMMParams.html", "structGEMMParams" ],
+    [ "ggml_init_params", "structggml__init__params.html", "structggml__init__params" ],
     [ "MemoryInfo", "structMemoryInfo.html", "structMemoryInfo" ],
     [ "MemorySlot", "structMemorySlot.html", "structMemorySlot" ],
     [ "NetworkInterface", "structNetworkInterface.html", "structNetworkInterface" ],

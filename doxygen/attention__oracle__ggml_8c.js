@@ -1,5 +1,6 @@
 var attention__oracle__ggml_8c =
 [
+    [ "CK_ENABLE_LLAMA_CPP_PARITY", "attention__oracle__ggml_8c.html#a96dde4b4dc0e16ae5dd03bd3fd806975", null ],
     [ "ck_ggml_backend_cpu_set_n_threads_fn", "attention__oracle__ggml_8c.html#a644d448446cd9d27f8ae8dc91086f8df", null ],
     [ "ck_ggml_backend_free_fn", "attention__oracle__ggml_8c.html#a0489c8c8b730d9ce0b0a862e6b373aff", null ],
     [ "ck_ggml_backend_get_default_buffer_type_fn", "attention__oracle__ggml_8c.html#a2a06225bf1de453aae77ef02f2482021", null ],

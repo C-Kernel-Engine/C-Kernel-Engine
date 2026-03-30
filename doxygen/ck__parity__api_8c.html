@@ -436,16 +436,16 @@ Functions</h2></td></tr>
 <p>Variant with configurable kv_stride_tokens for KV cache layouts where K/V may not be contiguous in memory.</p>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l02872">2872</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 2882</span>{</div>
-<div class="line"><span class="lineno"> 2883</span>    <a class="code hl_function" href="attention__kernels_8c.html#aa1217d7695562693be4645458b8b704e">attention_forward_head_major_gqa_flash_impl</a>(q, k, v, output,</div>
-<div class="line"><span class="lineno"> 2884</span>                                                num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno"> 2885</span>                                                num_tokens, head_dim,</div>
-<div class="line"><span class="lineno"> 2886</span>                                                aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 2887</span>                                                kv_stride_tokens,</div>
-<div class="line"><span class="lineno"> 2888</span>                                                <span class="comment">/*causal=*/</span>1);</div>
-<div class="line"><span class="lineno"> 2889</span>}</div>
-<div class="ttc" id="aattention__kernels_8c_html_aa1217d7695562693be4645458b8b704e"><div class="ttname"><a href="attention__kernels_8c.html#aa1217d7695562693be4645458b8b704e">attention_forward_head_major_gqa_flash_impl</a></div><div class="ttdeci">static void attention_forward_head_major_gqa_flash_impl(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int causal)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02751">attention_kernels.c:2751</a></div></div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l02890">2890</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 2900</span>{</div>
+<div class="line"><span class="lineno"> 2901</span>    <a class="code hl_function" href="attention__kernels_8c.html#aa1217d7695562693be4645458b8b704e">attention_forward_head_major_gqa_flash_impl</a>(q, k, v, output,</div>
+<div class="line"><span class="lineno"> 2902</span>                                                num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno"> 2903</span>                                                num_tokens, head_dim,</div>
+<div class="line"><span class="lineno"> 2904</span>                                                aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 2905</span>                                                kv_stride_tokens,</div>
+<div class="line"><span class="lineno"> 2906</span>                                                <span class="comment">/*causal=*/</span>1);</div>
+<div class="line"><span class="lineno"> 2907</span>}</div>
+<div class="ttc" id="aattention__kernels_8c_html_aa1217d7695562693be4645458b8b704e"><div class="ttname"><a href="attention__kernels_8c.html#aa1217d7695562693be4645458b8b704e">attention_forward_head_major_gqa_flash_impl</a></div><div class="ttdeci">static void attention_forward_head_major_gqa_flash_impl(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens, int causal)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02769">attention_kernels.c:2769</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00861">ck_test_attention_causal()</a>.</p>
 
@@ -725,9 +725,9 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  879</span>        seq_len              <span class="comment">/* kv_stride_tokens = seq_len for contiguous KV */</span></div>
 <div class="line"><span class="lineno">  880</span>    );</div>
 <div class="line"><span class="lineno">  881</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02872">attention_kernels.c:2872</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_a09d8f520b4991ea1b8b75891b1baf59e"><div class="ttname"><a href="ck__parity__api_8c.html#a09d8f520b4991ea1b8b75891b1baf59e">attention_forward_causal_head_major_gqa_flash_strided</a></div><div class="ttdeci">void attention_forward_causal_head_major_gqa_flash_strided(const float *q, const float *k, const float *v, float *output, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int kv_stride_tokens)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l02890">attention_kernels.c:2890</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l02872">attention_forward_causal_head_major_gqa_flash_strided()</a>.</p>
+<p class="reference">References <a class="el" href="attention__kernels_8c_source.html#l02890">attention_forward_causal_head_major_gqa_flash_strided()</a>.</p>
 
 </div>
 </div>
@@ -2826,10 +2826,10 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  626</span>    free(cos_cache);</div>
 <div class="line"><span class="lineno">  627</span>    free(sin_cache);</div>
 <div class="line"><span class="lineno">  628</span>}</div>
-<div class="ttc" id="ack__parity__api_8c_html_aa713ca6f388550450fef31ab56918886"><div class="ttname"><a href="ck__parity__api_8c.html#aa713ca6f388550450fef31ab56918886">rope_precompute_cache</a></div><div class="ttdeci">void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base, int rotary_dim, const char *scaling_type, float scaling_factor)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00257">rope_kernels.c:257</a></div></div>
-<div class="ttc" id="ack__parity__api_8c_html_ab18869516e9a6ab5998038716ac8a179"><div class="ttname"><a href="ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a></div><div class="ttdeci">void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00793">rope_kernels.c:793</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_aa713ca6f388550450fef31ab56918886"><div class="ttname"><a href="ck__parity__api_8c.html#aa713ca6f388550450fef31ab56918886">rope_precompute_cache</a></div><div class="ttdeci">void rope_precompute_cache(float *cos_cache, float *sin_cache, int max_seq_len, int head_dim, float base, int rotary_dim, const char *scaling_type, float scaling_factor)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00266">rope_kernels.c:266</a></div></div>
+<div class="ttc" id="ack__parity__api_8c_html_ab18869516e9a6ab5998038716ac8a179"><div class="ttname"><a href="ck__parity__api_8c.html#ab18869516e9a6ab5998038716ac8a179">rope_forward_qk</a></div><div class="ttdeci">void rope_forward_qk(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00802">rope_kernels.c:802</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00793">rope_forward_qk()</a>, and <a class="el" href="rope__kernels_8c_source.html#l00257">rope_precompute_cache()</a>.</p>
+<p class="reference">References <a class="el" href="rope__kernels_8c_source.html#l00802">rope_forward_qk()</a>, and <a class="el" href="rope__kernels_8c_source.html#l00266">rope_precompute_cache()</a>.</p>
 
 </div>
 </div>
@@ -5947,12 +5947,12 @@ Functions</h2></td></tr>
 <p>Combined RoPE forward for both Q and K in one call. q: [num_heads, num_tokens, head_dim] k: [num_kv_heads, num_tokens, head_dim]</p>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full </p>
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l00793">793</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  803</span>{</div>
-<div class="line"><span class="lineno">  804</span>    <a class="code hl_function" href="rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c">rope_forward_qk_with_rotary_dim</a>(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,</div>
-<div class="line"><span class="lineno">  805</span>                                    num_tokens, head_dim, aligned_head_dim, pos_offset, head_dim);</div>
-<div class="line"><span class="lineno">  806</span>}</div>
-<div class="ttc" id="arope__kernels_8c_html_ad16d38cd049be55296b1fef5ca5fee8c"><div class="ttname"><a href="rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c">rope_forward_qk_with_rotary_dim</a></div><div class="ttdeci">void rope_forward_qk_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00808">rope_kernels.c:808</a></div></div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l00802">802</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  812</span>{</div>
+<div class="line"><span class="lineno">  813</span>    <a class="code hl_function" href="rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c">rope_forward_qk_with_rotary_dim</a>(q, k, cos_cache, sin_cache, num_heads, num_kv_heads,</div>
+<div class="line"><span class="lineno">  814</span>                                    num_tokens, head_dim, aligned_head_dim, pos_offset, head_dim);</div>
+<div class="line"><span class="lineno">  815</span>}</div>
+<div class="ttc" id="arope__kernels_8c_html_ad16d38cd049be55296b1fef5ca5fee8c"><div class="ttname"><a href="rope__kernels_8c.html#ad16d38cd049be55296b1fef5ca5fee8c">rope_forward_qk_with_rotary_dim</a></div><div class="ttdeci">void rope_forward_qk_with_rotary_dim(float *q, float *k, const float *cos_cache, const float *sin_cache, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int rotary_dim)</div><div class="ttdef"><b>Definition</b> <a href="rope__kernels_8c_source.html#l00817">rope_kernels.c:817</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00552">ck_test_rope()</a>.</p>
 
@@ -6052,43 +6052,43 @@ Functions</h2></td></tr>
 </dl>
 <p>After changes: make test </p>
 
-<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l00257">257</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  265</span>{</div>
-<div class="line"><span class="lineno">  266</span>    <span class="comment">// Use rotary_dim = head_dim if not specified</span></div>
-<div class="line"><span class="lineno">  267</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
-<div class="line"><span class="lineno">  268</span>        rotary_dim = head_dim;</div>
-<div class="line"><span class="lineno">  269</span>    }</div>
-<div class="line"><span class="lineno">  270</span> </div>
-<div class="line"><span class="lineno">  271</span>    <span class="comment">// Use no scaling if not specified</span></div>
-<div class="line"><span class="lineno">  272</span>    <span class="keywordtype">int</span> is_linear_scaling = 0;</div>
-<div class="line"><span class="lineno">  273</span>    <span class="keywordflow">if</span> (scaling_type != NULL &amp;&amp; strcmp(scaling_type, <span class="stringliteral">&quot;linear&quot;</span>) == 0 &amp;&amp; scaling_factor &gt; 0.0f &amp;&amp; scaling_factor != 1.0f) {</div>
-<div class="line"><span class="lineno">  274</span>        is_linear_scaling = 1;</div>
-<div class="line"><span class="lineno">  275</span>    }</div>
-<div class="line"><span class="lineno">  276</span> </div>
-<div class="line"><span class="lineno">  277</span>    <span class="keywordtype">int</span> rotary_half = rotary_dim / 2;</div>
-<div class="line"><span class="lineno">  278</span> </div>
-<div class="line"><span class="lineno">  279</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> base_ld = (<span class="keywordtype">long</span> double)base;</div>
-<div class="line"><span class="lineno">  280</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> rotary_dim_ld = (<span class="keywordtype">long</span> double)rotary_dim;</div>
-<div class="line"><span class="lineno">  281</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> log_base = logl(base_ld);</div>
-<div class="line"><span class="lineno">  282</span> </div>
-<div class="line"><span class="lineno">  283</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> pos = 0; pos &lt; max_seq_len; ++pos) {</div>
-<div class="line"><span class="lineno">  284</span>        <span class="comment">// Apply linear scaling to position if needed</span></div>
-<div class="line"><span class="lineno">  285</span>        <span class="keywordtype">float</span> effective_pos = (float)pos;</div>
-<div class="line"><span class="lineno">  286</span>        <span class="keywordflow">if</span> (is_linear_scaling) {</div>
-<div class="line"><span class="lineno">  287</span>            effective_pos = (float)pos / scaling_factor;</div>
-<div class="line"><span class="lineno">  288</span>        }</div>
-<div class="line"><span class="lineno">  289</span> </div>
-<div class="line"><span class="lineno">  290</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
-<div class="line"><span class="lineno">  291</span>            <span class="comment">// Frequency spacing should be based on rotary_dim (not full head_dim)</span></div>
-<div class="line"><span class="lineno">  292</span>            <span class="keywordtype">long</span> <span class="keywordtype">double</span> exponent = ((<span class="keywordtype">long</span> double)(2 * i)) / rotary_dim_ld;</div>
-<div class="line"><span class="lineno">  293</span>            <span class="keywordtype">long</span> <span class="keywordtype">double</span> freq = expl(-exponent * log_base);</div>
-<div class="line"><span class="lineno">  294</span>            <span class="keywordtype">float</span> freq_f = (float)freq;</div>
-<div class="line"><span class="lineno">  295</span>            <span class="keywordtype">float</span> angle_f = effective_pos * freq_f;</div>
-<div class="line"><span class="lineno">  296</span>            cos_cache[pos * rotary_half + i] = cosf(angle_f);</div>
-<div class="line"><span class="lineno">  297</span>            sin_cache[pos * rotary_half + i] = sinf(angle_f);</div>
-<div class="line"><span class="lineno">  298</span>        }</div>
-<div class="line"><span class="lineno">  299</span>    }</div>
-<div class="line"><span class="lineno">  300</span>}</div>
+<p class="definition">Definition at line <a class="el" href="rope__kernels_8c_source.html#l00266">266</a> of file <a class="el" href="rope__kernels_8c_source.html">rope_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  274</span>{</div>
+<div class="line"><span class="lineno">  275</span>    <span class="comment">// Use rotary_dim = head_dim if not specified</span></div>
+<div class="line"><span class="lineno">  276</span>    <span class="keywordflow">if</span> (rotary_dim &lt;= 0 || rotary_dim &gt; head_dim) {</div>
+<div class="line"><span class="lineno">  277</span>        rotary_dim = head_dim;</div>
+<div class="line"><span class="lineno">  278</span>    }</div>
+<div class="line"><span class="lineno">  279</span> </div>
+<div class="line"><span class="lineno">  280</span>    <span class="comment">// Use no scaling if not specified</span></div>
+<div class="line"><span class="lineno">  281</span>    <span class="keywordtype">int</span> is_linear_scaling = 0;</div>
+<div class="line"><span class="lineno">  282</span>    <span class="keywordflow">if</span> (scaling_type != NULL &amp;&amp; strcmp(scaling_type, <span class="stringliteral">&quot;linear&quot;</span>) == 0 &amp;&amp; scaling_factor &gt; 0.0f &amp;&amp; scaling_factor != 1.0f) {</div>
+<div class="line"><span class="lineno">  283</span>        is_linear_scaling = 1;</div>
+<div class="line"><span class="lineno">  284</span>    }</div>
+<div class="line"><span class="lineno">  285</span> </div>
+<div class="line"><span class="lineno">  286</span>    <span class="keywordtype">int</span> rotary_half = rotary_dim / 2;</div>
+<div class="line"><span class="lineno">  287</span> </div>
+<div class="line"><span class="lineno">  288</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> base_ld = (<span class="keywordtype">long</span> double)base;</div>
+<div class="line"><span class="lineno">  289</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> rotary_dim_ld = (<span class="keywordtype">long</span> double)rotary_dim;</div>
+<div class="line"><span class="lineno">  290</span>    <span class="keywordtype">long</span> <span class="keywordtype">double</span> log_base = logl(base_ld);</div>
+<div class="line"><span class="lineno">  291</span> </div>
+<div class="line"><span class="lineno">  292</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> pos = 0; pos &lt; max_seq_len; ++pos) {</div>
+<div class="line"><span class="lineno">  293</span>        <span class="comment">// Apply linear scaling to position if needed</span></div>
+<div class="line"><span class="lineno">  294</span>        <span class="keywordtype">float</span> effective_pos = (float)pos;</div>
+<div class="line"><span class="lineno">  295</span>        <span class="keywordflow">if</span> (is_linear_scaling) {</div>
+<div class="line"><span class="lineno">  296</span>            effective_pos = (float)pos / scaling_factor;</div>
+<div class="line"><span class="lineno">  297</span>        }</div>
+<div class="line"><span class="lineno">  298</span> </div>
+<div class="line"><span class="lineno">  299</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; rotary_half; ++i) {</div>
+<div class="line"><span class="lineno">  300</span>            <span class="comment">// Frequency spacing should be based on rotary_dim (not full head_dim)</span></div>
+<div class="line"><span class="lineno">  301</span>            <span class="keywordtype">long</span> <span class="keywordtype">double</span> exponent = ((<span class="keywordtype">long</span> double)(2 * i)) / rotary_dim_ld;</div>
+<div class="line"><span class="lineno">  302</span>            <span class="keywordtype">long</span> <span class="keywordtype">double</span> freq = expl(-exponent * log_base);</div>
+<div class="line"><span class="lineno">  303</span>            <span class="keywordtype">float</span> freq_f = (float)freq;</div>
+<div class="line"><span class="lineno">  304</span>            <span class="keywordtype">float</span> angle_f = effective_pos * freq_f;</div>
+<div class="line"><span class="lineno">  305</span>            cos_cache[pos * rotary_half + i] = cosf(angle_f);</div>
+<div class="line"><span class="lineno">  306</span>            sin_cache[pos * rotary_half + i] = sinf(angle_f);</div>
+<div class="line"><span class="lineno">  307</span>        }</div>
+<div class="line"><span class="lineno">  308</span>    }</div>
+<div class="line"><span class="lineno">  309</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00552">ck_test_rope()</a>.</p>
 

@@ -388,39 +388,39 @@ Functions</h2></td></tr>
 <p>Single query token attends to kv_tokens in KV cache. Uses true flash attention from <a class="el" href="attention__flash__true_8c.html" title="Flash-style attention (online softmax, causal, streaming)">attention_flash_true.c</a>.</p>
 <p>After changes: make test &amp;&amp; make llamacpp-parity-full </p>
 
-<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l03203">3203</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno"> 3213</span>{</div>
-<div class="line"><span class="lineno"> 3214</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
-<div class="line"><span class="lineno"> 3215</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 3216</span>    }</div>
-<div class="line"><span class="lineno"> 3217</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || kv_tokens &lt;= 0 || cache_capacity &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 3218</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 3219</span>    }</div>
-<div class="line"><span class="lineno"> 3220</span>    <span class="keywordflow">if</span> (kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
-<div class="line"><span class="lineno"> 3221</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno"> 3222</span>    }</div>
-<div class="line"><span class="lineno"> 3223</span> </div>
-<div class="line"><span class="lineno"> 3224</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
-<div class="line"><span class="lineno"> 3225</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 3226</span> </div>
-<div class="line"><span class="lineno"> 3227</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno"> 3228</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
-<div class="line"><span class="lineno"> 3229</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 3230</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride;</div>
-<div class="line"><span class="lineno"> 3231</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride;</div>
-<div class="line"><span class="lineno"> 3232</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
-<div class="line"><span class="lineno"> 3233</span> </div>
-<div class="line"><span class="lineno"> 3234</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a>(out_head,</div>
-<div class="line"><span class="lineno"> 3235</span>                               q_head,</div>
-<div class="line"><span class="lineno"> 3236</span>                               k_head,</div>
-<div class="line"><span class="lineno"> 3237</span>                               v_head,</div>
-<div class="line"><span class="lineno"> 3238</span>                               1,</div>
-<div class="line"><span class="lineno"> 3239</span>                               kv_tokens,</div>
-<div class="line"><span class="lineno"> 3240</span>                               1,</div>
-<div class="line"><span class="lineno"> 3241</span>                               aligned_head_dim,</div>
-<div class="line"><span class="lineno"> 3242</span>                               scale);</div>
-<div class="line"><span class="lineno"> 3243</span>    }</div>
-<div class="line"><span class="lineno"> 3244</span>}</div>
+<p class="definition">Definition at line <a class="el" href="attention__kernels_8c_source.html#l03232">3232</a> of file <a class="el" href="attention__kernels_8c_source.html">attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno"> 3242</span>{</div>
+<div class="line"><span class="lineno"> 3243</span>    <span class="keywordflow">if</span> (!q_token || !k_cache || !v_cache || !out_token) {</div>
+<div class="line"><span class="lineno"> 3244</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 3245</span>    }</div>
+<div class="line"><span class="lineno"> 3246</span>    <span class="keywordflow">if</span> (num_heads &lt;= 0 || num_kv_heads &lt;= 0 || kv_tokens &lt;= 0 || cache_capacity &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 3247</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 3248</span>    }</div>
+<div class="line"><span class="lineno"> 3249</span>    <span class="keywordflow">if</span> (kv_tokens &gt; cache_capacity || head_dim &lt;= 0 || aligned_head_dim &lt;= 0) {</div>
+<div class="line"><span class="lineno"> 3250</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno"> 3251</span>    }</div>
+<div class="line"><span class="lineno"> 3252</span> </div>
+<div class="line"><span class="lineno"> 3253</span>    <span class="keyword">const</span> <span class="keywordtype">float</span> scale = 1.0f / sqrtf((<span class="keywordtype">float</span>)head_dim);</div>
+<div class="line"><span class="lineno"> 3254</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> head_stride = (size_t)cache_capacity * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 3255</span> </div>
+<div class="line"><span class="lineno"> 3256</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno"> 3257</span>        <span class="keywordtype">int</span> kv_head = (int)((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> long)num_kv_heads / (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_heads);</div>
+<div class="line"><span class="lineno"> 3258</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *q_head = q_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 3259</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *k_head = k_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><span class="lineno"> 3260</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *v_head = v_cache + (size_t)kv_head * head_stride;</div>
+<div class="line"><span class="lineno"> 3261</span>        <span class="keywordtype">float</span> *out_head = out_token + (size_t)h * (<span class="keywordtype">size_t</span>)aligned_head_dim;</div>
+<div class="line"><span class="lineno"> 3262</span> </div>
+<div class="line"><span class="lineno"> 3263</span>        <a class="code hl_function" href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a>(out_head,</div>
+<div class="line"><span class="lineno"> 3264</span>                               q_head,</div>
+<div class="line"><span class="lineno"> 3265</span>                               k_head,</div>
+<div class="line"><span class="lineno"> 3266</span>                               v_head,</div>
+<div class="line"><span class="lineno"> 3267</span>                               1,</div>
+<div class="line"><span class="lineno"> 3268</span>                               kv_tokens,</div>
+<div class="line"><span class="lineno"> 3269</span>                               1,</div>
+<div class="line"><span class="lineno"> 3270</span>                               aligned_head_dim,</div>
+<div class="line"><span class="lineno"> 3271</span>                               scale);</div>
+<div class="line"><span class="lineno"> 3272</span>    }</div>
+<div class="line"><span class="lineno"> 3273</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a2d29666212a174c892343d3589bcd737"><div class="ttname"><a href="ckernel__engine_8h.html#a2d29666212a174c892343d3589bcd737">attention_flash_decode</a></div><div class="ttdeci">void attention_flash_decode(float *out, const float *q, const float *k, const float *v, int T_q, int T_k, int H, int D_h, float scale)</div><div class="ttdoc">Main flash attention function with SIMD dispatch.</div><div class="ttdef"><b>Definition</b> <a href="attention__flash__true_8c_source.html#l00696">attention_flash_true.c:696</a></div></div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00222">mega_fused_attention_decode_q5_0()</a>, and <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00367">mega_fused_attention_decode_q5_0_parallel_simd()</a>.</p>
@@ -915,11 +915,11 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  351</span>}</div>
 <div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_a63d5de133ef52f96c5e24906eeca3226"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#a63d5de133ef52f96c5e24906eeca3226">gemv_q5_0_from_fp32</a></div><div class="ttdeci">static void gemv_q5_0_from_fp32(float *out, const void *W_q5_0, const float *x_fp32, const float *bias, int M, int K, block_q8_0 *x_q8_scratch)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">mega_fused_attention_decode_q5_0.c:84</a></div></div>
 <div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_a810c4648e813796b57b54fae12112200"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#a810c4648e813796b57b54fae12112200">apply_rope_inline</a></div><div class="ttdeci">static void apply_rope_inline(float *q, float *k, const float *rope_cos, const float *rope_sin, int pos, int H, int KV, int AD)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__decode__q5__0_8c_source.html#l00135">mega_fused_attention_decode_q5_0.c:135</a></div></div>
-<div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_a84803f8c5509c325dd6b9feec50a0493"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l03203">attention_kernels.c:3203</a></div></div>
+<div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_a84803f8c5509c325dd6b9feec50a0493"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#a84803f8c5509c325dd6b9feec50a0493">attention_forward_decode_head_major_gqa_flash</a></div><div class="ttdeci">void attention_forward_decode_head_major_gqa_flash(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim)</div><div class="ttdef"><b>Definition</b> <a href="attention__kernels_8c_source.html#l03232">attention_kernels.c:3232</a></div></div>
 <div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_a91313ca01f1386bfba894915d5aee263"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#a91313ca01f1386bfba894915d5aee263">rmsnorm_forward</a></div><div class="ttdeci">void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd, int T, int D, int AD, float eps)</div><div class="ttdef"><b>Definition</b> <a href="rmsnorm__kernels_8c_source.html#l00126">rmsnorm_kernels.c:126</a></div></div>
 <div class="ttc" id="amega__fused__attention__decode__q5__0_8c_html_aa4f04f71f99a72c69150da91db6cbb1a"><div class="ttname"><a href="mega__fused__attention__decode__q5__0_8c.html#aa4f04f71f99a72c69150da91db6cbb1a">gemv_q8_0_from_fp32</a></div><div class="ttdeci">static void gemv_q8_0_from_fp32(float *out, const void *W_q8_0, const float *x_fp32, const float *bias, int M, int K, block_q8_0 *x_q8_scratch)</div><div class="ttdef"><b>Definition</b> <a href="mega__fused__attention__decode__q5__0_8c_source.html#l00108">mega_fused_attention_decode_q5_0.c:108</a></div></div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00135">apply_rope_inline()</a>, <a class="el" href="attention__kernels_8c_source.html#l03203">attention_forward_decode_head_major_gqa_flash()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00108">gemv_q8_0_from_fp32()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00067">quantize_row_q8_0()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00126">rmsnorm_forward()</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01543">vec_dot_q5_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00135">apply_rope_inline()</a>, <a class="el" href="attention__kernels_8c_source.html#l03232">attention_forward_decode_head_major_gqa_flash()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00108">gemv_q8_0_from_fp32()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00067">quantize_row_q8_0()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00126">rmsnorm_forward()</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01543">vec_dot_q5_0_q8_0()</a>.</p>
 
 </div>
 </div>
@@ -1227,7 +1227,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  503</span>    }</div>
 <div class="line"><span class="lineno">  504</span>}</div>
 </div><!-- fragment -->
-<p class="reference">References <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00135">apply_rope_inline()</a>, <a class="el" href="attention__kernels_8c_source.html#l03203">attention_forward_decode_head_major_gqa_flash()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00108">gemv_q8_0_from_fp32()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00067">quantize_row_q8_0()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00126">rmsnorm_forward()</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01543">vec_dot_q5_0_q8_0()</a>.</p>
+<p class="reference">References <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00135">apply_rope_inline()</a>, <a class="el" href="attention__kernels_8c_source.html#l03232">attention_forward_decode_head_major_gqa_flash()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00084">gemv_q5_0_from_fp32()</a>, <a class="el" href="mega__fused__attention__decode__q5__0_8c_source.html#l00108">gemv_q8_0_from_fp32()</a>, <a class="el" href="ckernel__quant_8h_source.html#l00068">QK5_0</a>, <a class="el" href="gemm__kernels__q8__0_8c_source.html#l00067">quantize_row_q8_0()</a>, <a class="el" href="rmsnorm__kernels_8c_source.html#l00126">rmsnorm_forward()</a>, and <a class="el" href="gemm__kernels__q5__0_8c_source.html#l01543">vec_dot_q5_0_q8_0()</a>.</p>
 
 </div>
 </div>
