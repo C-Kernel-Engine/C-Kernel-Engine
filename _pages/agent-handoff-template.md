@@ -7,8 +7,9 @@ It is intentionally short and copy-paste friendly.
 ## Read First
 
 1. `docs/site/_pages/spec-training-method.html`
-2. `version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md`
-3. `version/v7/reports/spec_family_autopilot_policy.json`
+2. `version/v7/reports/SPEC15A_MEMORY_MAP_NEXT_AGENT_BRIEF_2026-03-28.md` when `spec15a` is the active strict-line target
+3. `version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md`
+4. `version/v7/reports/spec_family_autopilot_policy.json`
 
 ## Current Source Of Truth
 
@@ -50,8 +51,9 @@ Read these first and treat them as the live source of truth:
 
 1. docs/site/_pages/spec-training-method.html
 2. docs/site/_pages/agent-handoff-template.md
-3. version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md
-4. version/v7/reports/spec_family_autopilot_policy.json
+3. version/v7/reports/SPEC15A_MEMORY_MAP_NEXT_AGENT_BRIEF_2026-03-28.md if spec15a is the active target
+4. version/v7/reports/SPEC[X]_EXECUTION_CONTRACT_YYYY-MM-DD.md
+5. version/v7/reports/spec_family_autopilot_policy.json
 
 Current intent:
 - keep the last good spec[x] rung[y] as the training-method baseline, not the tokenizer ceiling
