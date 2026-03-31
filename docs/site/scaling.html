@@ -1956,6 +1956,31 @@ rdma link show
     <p>What people mean when they say "LLMs are parallel" is that <em>within</em> a single layer, the matrix multiplication can be parallelized across rows and columns. But that's not the model being parallel &mdash; that's a single operation within a sequential pipeline being decomposable. Every CPU has been decomposing matmuls across SIMD lanes and cores for decades.</p>
 </div>
 
+<h3>Amdahl's Law: Why Parallel Hardware Still Hits a Ceiling</h3>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Strong-Scaling Limit</h3>
+    <p>Amdahl's Law is the simplest way to say what the sequential transformer argument implies in practice:</p>
+    <pre>speedup(N) = 1 / (S + (1 - S) / N)</pre>
+    <p>Where <code>S</code> is the fraction of work that stays effectively serial or synchronization-bound. Even with infinite parallel hardware, the maximum speedup is still:</p>
+    <pre>max_speedup = 1 / S</pre>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>Serial / sync fraction</th><th>Theoretical max speedup</th><th>What it means</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>10%</td><td>10&times;</td><td>A surprisingly hard wall for giant clusters</td></tr>
+                <tr><td>5%</td><td>20&times;</td><td>Still not "infinite scaling"</td></tr>
+                <tr><td>2%</td><td>50&times;</td><td>Requires extraordinary system design</td></tr>
+                <tr><td>1%</td><td>100&times;</td><td>Already very difficult in real distributed systems</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>For LLMs, that serial fraction is not just "the next token depends on the previous token." It also includes layer boundaries, synchronization, collective communication, optimizer steps, routing decisions, and all the places where the system must wait for the slowest participant.</p>
+    <p><strong>CKE takeaway:</strong> do not optimize only for peak FLOPS. Reduce the effective serial fraction, reduce synchronization pressure, and keep compute, memory, and network in the same performance neighborhood.</p>
+</div>
+
 <div class="grid grid-2">
     <div class="card" style="border-left: 4px solid #ff6b6b;">
         <h3 style="margin-top: 0;">What GPUs Were Designed For</h3>
@@ -2004,6 +2029,20 @@ token 3 &rarr; 80 layers &rarr; token 4
     <p>MoE routing is conditional: for each token, a gating function decides which experts activate. GPUs — designed for dense, predictable, lockstep computation — handle this through software workarounds: load balancing losses, capacity factors, expert dropout, and auxiliary training objectives just to keep GPU utilization from collapsing under sparse activation patterns.</p>
     <p>Consider fixed-function inference chips. They prefer dense computation above all else. The minute you introduce dynamic routing — conditional branching, variable expert selection — they require architectural hacks. GPUs face the same underlying tension, just with more memory headroom to absorb it.</p>
     <p>CPUs have handled conditional branching natively since the beginning: branch prediction, out-of-order execution, speculative paths. The hardware was built for exactly this. <strong>AVX-512 computes 16 FP32 multiply-accumulates per cycle per core</strong> — across 128 cores that's 2048 parallel operations — and the dynamic routing overhead that GPUs must paper over in software is just normal control flow on a CPU.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Why MoE All-to-All Makes Topology Matter</h3>
+    <p>Jensen Huang's point about MoE is not that "one expert equals one GPU" in a literal one-expert-per-device sense. Real deployments usually place <strong>multiple experts per GPU</strong>, or shard very large experts across several GPUs. But the core communication pattern is the same:</p>
+    <pre>tokens on many GPUs
+   &darr; route top-k experts
+dispatch token states to expert owners (all-to-all)
+   &darr;
+run expert MLPs
+   &darr;
+send expert outputs back / combine (all-to-all again)</pre>
+    <p>That happens at every MoE layer. If the interconnect is a one-hop switched fabric, the communication cost is painful but bounded. If the topology is multi-hop, ring-like, torus-like, or otherwise forces traffic through several devices before reaching the destination, the waiting and queueing add up quickly.</p>
+    <p><strong>This is where Amdahl's Law shows up in systems form:</strong> the expert GEMMs may parallelize beautifully, but the dispatch, synchronization, and combine phases become the part you cannot hide. The more often the model must do all-to-all, the more the communication fraction dominates the ceiling on real speedup.</p>
 </div>
 
 <h3>Training: Batch Size Is Not What You Think</h3>
@@ -3341,7 +3380,7 @@ That's it. For any model size.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-23</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-30</p>
             </div>
         </div>
     </footer>
