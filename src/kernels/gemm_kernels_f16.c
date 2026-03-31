@@ -448,6 +448,7 @@ static void gemm_f16_input_fp16_ref(float *Y,
                                     const float *X,
                                     int M, int N, int K)
 {
+#pragma omp parallel for schedule(static) if(N > 1)
     for (int n = 0; n < N; ++n) {
         const float *x_row = &X[(size_t)n * (size_t)K];
         uint16_t x_f16[K];
@@ -499,6 +500,7 @@ void gemm_nt_f16(const float *A,
         return;
     }
 
+#pragma omp parallel for schedule(static) if(M > 1)
     for (int i = 0; i < M; ++i) {
         float *c_row = C + (size_t)i * (size_t)N;
         for (int j = 0; j < N; ++j) {

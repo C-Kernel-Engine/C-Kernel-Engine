@@ -409,7 +409,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             }
             fake_logits = array("f", [0.1, 0.9, -0.4, 0.0])
 
-            with mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_runtime), \
+            with mock.patch.object(bridge_runner_v8, "_ensure_engine_lib") as ensure_engine, \
+                 mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_runtime), \
                  mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}), \
                  mock.patch.object(bridge_runner_v8.GGUFTokenizer, "from_gguf", return_value=FakeTokenizer()):
                 with contextlib.redirect_stdout(io.StringIO()):
@@ -431,6 +432,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                     )
 
             self.assertEqual(rc, 0)
+            ensure_engine.assert_called_once_with(openmp=False)
             self.assertTrue(dump_path.exists())
             self.assertEqual(dump_path.stat().st_size, 3 * 16 * 4)
 
@@ -439,8 +441,132 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(report["prefix_source"], "synthetic_zero")
             self.assertEqual(report["prefix_tokens"], 3)
             self.assertEqual(report["decoder_embed_dim"], 16)
+            self.assertEqual(report["decoder_context_len"], 32)
             self.assertEqual(report["prompt_tokens"], [11, 22])
             self.assertEqual(report["prefix_dump_path"], str(dump_path.resolve()))
+
+    def test_bridge_runner_auto_caps_decoder_context_to_prefix_budget(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_native_bridge_ctx_") as tmpdir:
+            tmp = Path(tmpdir)
+            workdir = tmp / "work"
+            fake_decoder_gguf = tmp / "decoder.gguf"
+
+            class FakeTokenizer:
+                def encode(self, text: str) -> list[int]:
+                    self.last_text = text
+                    return [10, 20, 30, 40, 50]
+
+                def decode(self, ids: list[int], skip_special: bool = False) -> str:
+                    return f"<tok:{ids[0]}>"
+
+            fake_runtime = {
+                "embed_dim": 16,
+                "vocab_size": 4,
+                "so_path": workdir / "decoder" / "libdecoder_v8.so",
+                "c_path": workdir / "decoder" / "decoder_v8.c",
+            }
+            fake_logits = array("f", [0.1, 0.9, -0.4, 0.0])
+
+            with mock.patch.object(bridge_runner_v8, "_ensure_engine_lib") as ensure_engine, \
+                 mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_runtime) as prepare_decoder, \
+                 mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}), \
+                 mock.patch.object(bridge_runner_v8.GGUFTokenizer, "from_gguf", return_value=FakeTokenizer()):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    rc = bridge_runner_v8.main(
+                        [
+                            "--decoder-gguf",
+                            str(fake_decoder_gguf),
+                            "--workdir",
+                            str(workdir),
+                            "--prompt",
+                            "Describe the image.",
+                            "--synthetic-prefix-tokens",
+                            "40",
+                            "--top-k",
+                            "2",
+                        ]
+                    )
+
+            self.assertEqual(rc, 0)
+            ensure_engine.assert_called_once_with(openmp=False)
+            prepare_decoder.assert_called_once_with(
+                fake_decoder_gguf.resolve(),
+                workdir.resolve() / "decoder",
+                context_override=61,
+            )
+
+            report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["decoder_context_len"], 61)
+            self.assertEqual(report["total_prefill_tokens"], 45)
+
+    def test_bridge_runner_encoder_path_delays_dim_check_until_decoder_ready(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_native_bridge_encoder_") as tmpdir:
+            tmp = Path(tmpdir)
+            workdir = tmp / "work"
+            fake_decoder_gguf = tmp / "decoder.gguf"
+            fake_encoder_gguf = tmp / "encoder.gguf"
+
+            class FakeTokenizer:
+                def encode(self, text: str) -> list[int]:
+                    return [101, 202]
+
+                def decode(self, ids: list[int], skip_special: bool = False) -> str:
+                    return f"<tok:{ids[0]}>"
+
+            fake_decoder_runtime = {
+                "embed_dim": 16,
+                "vocab_size": 4,
+                "so_path": workdir / "decoder" / "libdecoder_v8.so",
+                "c_path": workdir / "decoder" / "decoder_v8.c",
+            }
+            fake_encoder_runtime = {
+                "embed_dim": 16,
+                "so_path": workdir / "encoder" / "libencoder_v8.so",
+            }
+            fake_encoder_report = {
+                "embed_dim": 16,
+                "prefix_tokens": 3,
+                "embeddings": array("f", [0.0] * (3 * 16)),
+                "bridge_activation": "vision_bridge_output",
+                "bridge_reason": "projector_output",
+                "image_source": "synthetic",
+                "image_mode": "checker",
+                "image_path": None,
+                "source_image_size": [768, 768],
+                "preprocess": "synthetic_generator",
+                "image_size": 768,
+                "interleaved_image": [0.0, 0.0, 0.0],
+            }
+            fake_logits = array("f", [0.1, 0.9, -0.4, 0.0])
+
+            with mock.patch.object(bridge_runner_v8, "_ensure_engine_lib") as ensure_engine, \
+                 mock.patch.object(bridge_runner_v8, "_prepare_encoder_runtime", return_value=fake_encoder_runtime), \
+                 mock.patch.object(bridge_runner_v8, "_run_encoder", return_value=fake_encoder_report), \
+                 mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_decoder_runtime), \
+                 mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}), \
+                 mock.patch.object(bridge_runner_v8.GGUFTokenizer, "from_gguf", return_value=FakeTokenizer()):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    rc = bridge_runner_v8.main(
+                        [
+                            "--decoder-gguf",
+                            str(fake_decoder_gguf),
+                            "--encoder-gguf",
+                            str(fake_encoder_gguf),
+                            "--workdir",
+                            str(workdir),
+                            "--prompt",
+                            "Describe the image.",
+                            "--top-k",
+                            "2",
+                        ]
+                    )
+
+            self.assertEqual(rc, 0)
+            ensure_engine.assert_called_once_with(openmp=True)
+            report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["prefix_source"], "encoder")
+            self.assertEqual(report["prefix_tokens"], 3)
+            self.assertEqual(report["decoder_context_len"], 32)
 
 
 if __name__ == "__main__":

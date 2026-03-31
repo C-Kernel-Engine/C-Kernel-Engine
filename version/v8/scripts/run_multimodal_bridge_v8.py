@@ -55,7 +55,21 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=str(REPO_ROOT), check=True)
 
 
-def _run_converter(gguf_path: Path, output_dir: Path) -> tuple[dict[str, Any], Path, Path, Path]:
+def _ensure_engine_lib(openmp: bool = False) -> None:
+    cmd = ["make"]
+    if openmp:
+        # The default engine build keeps OpenMP disabled; force a refresh here so
+        # multimodal encoder runs do not silently link against the serial library.
+        cmd.extend(["-B", "CK_ENABLE_OPENMP=1"])
+    cmd.append("build/libckernel_engine.so")
+    _run(cmd)
+
+
+def _run_converter(
+    gguf_path: Path,
+    output_dir: Path,
+    context_override: int | None = None,
+) -> tuple[dict[str, Any], Path, Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     bump_path = output_dir / "weights.bump"
     manifest_path = output_dir / "weights_manifest.json"
@@ -74,6 +88,8 @@ def _run_converter(gguf_path: Path, output_dir: Path) -> tuple[dict[str, Any], P
             "--config-out",
             str(config_path),
         ]
+        if context_override is not None and int(context_override) > 0:
+            sys.argv.extend(["--context", str(int(context_override))])
         convert_gguf_to_bump_v8.main()
     finally:
         sys.argv = old_argv
@@ -268,8 +284,17 @@ def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any
     }
 
 
-def _prepare_decoder_runtime(gguf_path: Path, output_dir: Path, parity_dump: bool = False) -> dict[str, Any]:
-    manifest, manifest_path, bump_path, config_path = _run_converter(gguf_path, output_dir)
+def _prepare_decoder_runtime(
+    gguf_path: Path,
+    output_dir: Path,
+    parity_dump: bool = False,
+    context_override: int | None = None,
+) -> dict[str, Any]:
+    manifest, manifest_path, bump_path, config_path = _run_converter(
+        gguf_path,
+        output_dir,
+        context_override=context_override,
+    )
     prefill_ir1 = output_dir / "ir1_prefill.json"
     prefill_layout = output_dir / "layout_prefill.json"
     prefill_lowered = output_dir / "lowered_prefill.json"
@@ -515,6 +540,19 @@ def _topk(values: array, k: int) -> list[tuple[int, float]]:
     return heapq.nlargest(k, enumerate(values), key=lambda item: float(item[1]))
 
 
+def _derive_decoder_context_len(
+    prompt_token_count: int,
+    prefix_tokens: int,
+    requested: int | None = None,
+    slack_tokens: int = 16,
+    minimum_context: int = 32,
+) -> int:
+    needed = max(1, int(prompt_token_count) + max(0, int(prefix_tokens)))
+    if requested is not None and int(requested) > 0:
+        return max(int(requested), needed)
+    return max(minimum_context, needed + max(1, int(slack_tokens)))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Explicit v8 multimodal bridge runner")
     ap.add_argument("--decoder-gguf", type=Path, required=True, help="Decoder GGUF to lower/codegen")
@@ -524,6 +562,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--image-mode", choices=["checker", "gradient", "gray"], default="checker", help="Synthetic image generator to use when --image-path is not provided")
     ap.add_argument("--image-path", type=Path, default=None, help="Optional real image path for encoder input; overrides --image-mode")
     ap.add_argument("--synthetic-prefix-tokens", type=int, default=0, help="Use zero prefix embeddings when a real encoder bridge is unavailable")
+    ap.add_argument("--decoder-context-len", type=int, default=None, help="Override decoder context length; default is prompt+prefix budget with small headroom")
     ap.add_argument("--dump-prefix-f32", type=Path, default=None, help="Optional output path for resolved float32 prefix embeddings")
     ap.add_argument("--top-k", type=int, default=8, help="How many top logits to report")
     args = ap.parse_args(argv)
@@ -533,7 +572,8 @@ def main(argv: list[str] | None = None) -> int:
     encoder_dir = workdir / "encoder"
     decoder_dir = workdir / "decoder"
 
-    decoder_runtime = _prepare_decoder_runtime(args.decoder_gguf.resolve(), decoder_dir)
+    _ensure_engine_lib(openmp=args.encoder_gguf is not None)
+
     tokenizer = GGUFTokenizer.from_gguf(str(args.decoder_gguf.resolve()))
     token_ids = tokenizer.encode(args.prompt)
 
@@ -550,7 +590,24 @@ def main(argv: list[str] | None = None) -> int:
             args.image_mode,
             image_path=args.image_path.resolve() if args.image_path is not None else None,
         )
-        if encoder_report["embed_dim"] == decoder_runtime["embed_dim"]:
+
+    decoder_prefix_budget = max(
+        int(encoder_report["prefix_tokens"]) if encoder_report is not None else 0,
+        max(0, int(args.synthetic_prefix_tokens)),
+    )
+    decoder_context_len = _derive_decoder_context_len(
+        prompt_token_count=len(token_ids),
+        prefix_tokens=decoder_prefix_budget,
+        requested=args.decoder_context_len,
+    )
+    decoder_runtime = _prepare_decoder_runtime(
+        args.decoder_gguf.resolve(),
+        decoder_dir,
+        context_override=decoder_context_len,
+    )
+
+    if encoder_report is not None:
+        if int(encoder_report["embed_dim"]) == int(decoder_runtime["embed_dim"]):
             prefix_source = "encoder"
             prefix_tokens = int(encoder_report["prefix_tokens"])
             prefix_embeddings = encoder_report["embeddings"]
@@ -595,6 +652,7 @@ def main(argv: list[str] | None = None) -> int:
         "prompt_token_count": len(token_ids),
         "prompt_tokens": token_ids,
         "decoder_embed_dim": int(decoder_runtime["embed_dim"]),
+        "decoder_context_len": int(decoder_context_len),
         "prefix_tokens": prefix_tokens,
         "prefix_dump_path": dumped_prefix_path,
         "total_prefill_tokens": prefix_tokens + len(token_ids),

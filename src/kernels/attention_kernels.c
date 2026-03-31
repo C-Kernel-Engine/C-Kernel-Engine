@@ -1845,6 +1845,57 @@ static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_regular(const float
     }
 }
 
+static CK_NOINLINE CK_OPTNONE void attention_query_full_ggml_regular_direct_v(const float *q_vec,
+                                                                              const float *k_head,
+                                                                              const float *v_head,
+                                                                              int kv_tokens,
+                                                                              int head_dim,
+                                                                              int aligned_head_dim,
+                                                                              float scale,
+                                                                              float *score_row,
+                                                                              float *out_vec)
+{
+    if (kv_tokens <= 0) {
+        for (int d = 0; d < aligned_head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        return;
+    }
+
+    for (int j = 0; j < kv_tokens; ++j) {
+        const float *k_vec = k_head + (size_t) j * (size_t) aligned_head_dim;
+        score_row[j] = ck_ggml_vec_dot_f32_contig(q_vec, k_vec, head_dim);
+    }
+
+    float *logit_row = (float *) alloca((size_t) kv_tokens * sizeof(float));
+    memcpy(logit_row, score_row, (size_t) kv_tokens * sizeof(float));
+    ck_vec_scale_f32_inplace(logit_row, kv_tokens, scale);
+    const float max_score = ck_vec_max_f32_contig(logit_row, kv_tokens);
+    const double sum = ck_ggml_vec_soft_max_row(kv_tokens, score_row, logit_row, max_score);
+    if (sum > 0.0) {
+        const float inv_sum = (float) (1.0 / sum);
+        ck_vec_scale_f32_inplace(score_row, kv_tokens, inv_sum);
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+        for (int j = 0; j < kv_tokens; ++j) {
+            const float w = score_row[j];
+            const float *v_vec = v_head + (size_t) j * (size_t) aligned_head_dim;
+            for (int d = 0; d < head_dim; ++d) {
+                out_vec[d] += w * v_vec[d];
+            }
+        }
+    } else {
+        for (int d = 0; d < head_dim; ++d) {
+            out_vec[d] = 0.0f;
+        }
+    }
+
+    for (int d = head_dim; d < aligned_head_dim; ++d) {
+        out_vec[d] = 0.0f;
+    }
+}
+
 #if CK_ENABLE_LLAMA_CPP_PARITY
 static CK_NOINLINE CK_OPTNONE void attention_query_full_dyn_ggml_regular(const float *q_vec,
                                                                          const float *k_head,
@@ -2999,9 +3050,9 @@ void attention_forward_full_head_major_gqa_exact_strided(const float *q,
         const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
         const float *k_head = k + (size_t) kv_head * kv_head_stride;
         const float *v_head = v + (size_t) kv_head * kv_head_stride;
-        float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
 
 #if CK_ENABLE_LLAMA_CPP_PARITY
+        float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
         if (ck_strict_parity_enabled() &&
             ck_attention_head_full_ggml_graph_oracle_regular(
                 q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
@@ -3064,21 +3115,19 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
         return;
     }
 
-    const float scale = ck_strict_parity_enabled()
+    const int strict = ck_strict_parity_enabled();
+    const float scale = strict
         ? ck_attention_strict_scale_f32(head_dim)
         : 1.0f / sqrtf((float) head_dim);
     const int T = num_tokens;
     const size_t kv_head_stride = (size_t) kv_stride_tokens * (size_t) aligned_head_dim;
-    const int debug_layer_id = ck_strict_parity_enabled() ? ck_attention_vec_dump_next_layer_id() : -1;
-    float *score_row = (float *) alloca((size_t) T * sizeof(float));
-    float *prob_row = (float *) alloca((size_t) T * sizeof(float));
-    float *v_cols = (float *) alloca((size_t) head_dim * (size_t) T * sizeof(float));
+    const int debug_layer_id = strict ? ck_attention_vec_dump_next_layer_id() : -1;
 #if CK_ENABLE_LLAMA_CPP_PARITY
     ck_ggml_vec_dot_f32_fn dot_fn = NULL;
     ck_ggml_vec_soft_max_f32_fn softmax_fn = NULL;
     ck_ggml_compute_forward_mul_mat_fn mul_mat_fn = NULL;
     ck_ggml_compute_forward_soft_max_fn softmax_compute_fn = NULL;
-    if (ck_strict_parity_enabled()) {
+    if (strict) {
         if (ck_attention_full_ggml_graph_oracle_multihead(q,
                                                           k,
                                                           v,
@@ -3098,90 +3147,76 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
         softmax_compute_fn = ck_resolve_ggml_compute_forward_soft_max();
     }
 #endif
-
-    for (int h = 0; h < num_heads; ++h) {
-        const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
-        const float *k_head = k + (size_t) kv_head * kv_head_stride;
-        const float *v_head = v + (size_t) kv_head * kv_head_stride;
-        float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
-
+    if (strict) {
+        float *score_row = (float *) alloca((size_t) T * sizeof(float));
+        float *v_cols = (float *) alloca((size_t) head_dim * (size_t) T * sizeof(float));
 #if CK_ENABLE_LLAMA_CPP_PARITY
-        if (ck_strict_parity_enabled() &&
-            ck_attention_head_full_ggml_graph_oracle_regular(
-                q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
-                k_head,
-                v_head,
-                out_head,
-                T,
-                head_dim,
-                aligned_head_dim,
-                scale)) {
-            continue;
-        }
+        float *prob_row = (float *) alloca((size_t) T * sizeof(float));
 #endif
 
-        for (int d = 0; d < head_dim; ++d) {
-            float *dst_col = v_cols + (size_t) d * (size_t) T;
-            for (int j = 0; j < T; ++j) {
-                dst_col[j] = v_head[(size_t) j * (size_t) aligned_head_dim + (size_t) d];
-            }
-        }
+        for (int h = 0; h < num_heads; ++h) {
+            const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
+            const float *k_head = k + (size_t) kv_head * kv_head_stride;
+            const float *v_head = v + (size_t) kv_head * kv_head_stride;
 
 #if CK_ENABLE_LLAMA_CPP_PARITY
-        if (dot_fn && softmax_fn && ck_attention_ggml_out_graph_enabled()) {
-            if (attention_head_full_dyn_ggml_regular_graph_out(
+            float *out_head = output + (size_t) h * (size_t) T * (size_t) aligned_head_dim;
+            if (ck_attention_head_full_ggml_graph_oracle_regular(
                     q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
                     k_head,
-                    v_cols,
+                    v_head,
+                    out_head,
                     T,
                     head_dim,
                     aligned_head_dim,
-                    scale,
-                    score_row,
-                    prob_row,
-                    out_head,
-                    dot_fn,
-                    softmax_fn,
-                    debug_layer_id,
-                    h)) {
-                if (T > 0) {
-                    ck_attention_trace("dyn_ggml_regular_graph_out", debug_layer_id, h);
-                    ck_attention_trace_float("scale", debug_layer_id, h, scale);
-                }
+                    scale)) {
                 continue;
             }
-        }
 #endif
 
-        for (int i = 0; i < T; ++i) {
-            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
-            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            for (int d = 0; d < head_dim; ++d) {
+                float *dst_col = v_cols + (size_t) d * (size_t) T;
+                for (int j = 0; j < T; ++j) {
+                    dst_col[j] = v_head[(size_t) j * (size_t) aligned_head_dim + (size_t) d];
+                }
+            }
+
 #if CK_ENABLE_LLAMA_CPP_PARITY
-            if (dot_fn && softmax_fn) {
-                if (i == 0) {
-                    ck_attention_trace("dyn_ggml_regular", debug_layer_id, h);
-                    ck_attention_trace_float("scale", debug_layer_id, h, scale);
+            if (dot_fn && softmax_fn && ck_attention_ggml_out_graph_enabled()) {
+                if (attention_head_full_dyn_ggml_regular_graph_out(
+                        q + (size_t) h * (size_t) T * (size_t) aligned_head_dim,
+                        k_head,
+                        v_cols,
+                        T,
+                        head_dim,
+                        aligned_head_dim,
+                        scale,
+                        score_row,
+                        prob_row,
+                        out_head,
+                        dot_fn,
+                        softmax_fn,
+                        debug_layer_id,
+                        h)) {
+                    if (T > 0) {
+                        ck_attention_trace("dyn_ggml_regular_graph_out", debug_layer_id, h);
+                        ck_attention_trace_float("scale", debug_layer_id, h, scale);
+                    }
+                    continue;
                 }
-                attention_query_full_dyn_ggml_regular(q_vec,
-                                                      k_head,
-                                                      v_cols,
-                                                      T,
-                                                      head_dim,
-                                                      aligned_head_dim,
-                                                      scale,
-                                                      score_row,
-                                                      prob_row,
-                                                      out_vec,
-                                                      dot_fn,
-                                                      softmax_fn,
-                                                      debug_layer_id,
-                                                      h,
-                                                      i);
-            } else if (dot_fn && mul_mat_fn && softmax_compute_fn) {
-                if (i == 0) {
-                    ck_attention_trace("ggml_compute_regular", debug_layer_id, h);
-                }
-                attention_query_full_ggml_compute_regular(q_vec,
+            }
+#endif
+
+            for (int i = 0; i < T; ++i) {
+                const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+                float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+#if CK_ENABLE_LLAMA_CPP_PARITY
+                if (dot_fn && softmax_fn) {
+                    if (i == 0) {
+                        ck_attention_trace("dyn_ggml_regular", debug_layer_id, h);
+                        ck_attention_trace_float("scale", debug_layer_id, h, scale);
+                    }
+                    attention_query_full_dyn_ggml_regular(q_vec,
                                                           k_head,
                                                           v_cols,
                                                           T,
@@ -3192,14 +3227,73 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
                                                           prob_row,
                                                           out_vec,
                                                           dot_fn,
-                                                          mul_mat_fn,
-                                                          softmax_compute_fn);
-            } else
+                                                          softmax_fn,
+                                                          debug_layer_id,
+                                                          h,
+                                                          i);
+                } else if (dot_fn && mul_mat_fn && softmax_compute_fn) {
+                    if (i == 0) {
+                        ck_attention_trace("ggml_compute_regular", debug_layer_id, h);
+                    }
+                    attention_query_full_ggml_compute_regular(q_vec,
+                                                              k_head,
+                                                              v_cols,
+                                                              T,
+                                                              head_dim,
+                                                              aligned_head_dim,
+                                                              scale,
+                                                              score_row,
+                                                              prob_row,
+                                                              out_vec,
+                                                              dot_fn,
+                                                              mul_mat_fn,
+                                                              softmax_compute_fn);
+                } else
 #endif
-            {
-                if (i == 0) {
-                    ck_attention_trace("ggml_regular", debug_layer_id, h);
+                {
+                    if (i == 0) {
+                        ck_attention_trace("ggml_regular", debug_layer_id, h);
+                    }
+                    attention_query_full_ggml_regular(q_vec,
+                                                      k_head,
+                                                      v_cols,
+                                                      T,
+                                                      head_dim,
+                                                      aligned_head_dim,
+                                                      scale,
+                                                      score_row,
+                                                      out_vec,
+                                                      debug_layer_id,
+                                                      h,
+                                                      i);
                 }
+            }
+        }
+        return;
+    }
+
+#pragma omp parallel for schedule(static) if(num_heads > 1)
+    for (int h = 0; h < num_heads; ++h) {
+        float *score_row_heap = (float *) malloc((size_t) T * sizeof(float));
+        float *v_cols = (float *) malloc((size_t) head_dim * (size_t) T * sizeof(float));
+        float *score_row = score_row_heap ? score_row_heap : (float *) alloca((size_t) T * sizeof(float));
+        const int kv_head = (int) ((long long) h * (long long) num_kv_heads / (long long) num_heads);
+        const float *k_head = k + (size_t) kv_head * kv_head_stride;
+        const float *v_head = v + (size_t) kv_head * kv_head_stride;
+
+        if (v_cols) {
+            for (int d = 0; d < head_dim; ++d) {
+                float *dst_col = v_cols + (size_t) d * (size_t) T;
+                for (int j = 0; j < T; ++j) {
+                    dst_col[j] = v_head[(size_t) j * (size_t) aligned_head_dim + (size_t) d];
+                }
+            }
+        }
+
+        for (int i = 0; i < T; ++i) {
+            const float *q_vec = q + qkv_index(h, i, 0, T, aligned_head_dim);
+            float *out_vec = output + qkv_index(h, i, 0, T, aligned_head_dim);
+            if (score_row && v_cols) {
                 attention_query_full_ggml_regular(q_vec,
                                                   k_head,
                                                   v_cols,
@@ -3209,11 +3303,23 @@ void attention_forward_full_head_major_gqa_ggml_strided(const float *q,
                                                   scale,
                                                   score_row,
                                                   out_vec,
-                                                  debug_layer_id,
+                                                  -1,
                                                   h,
                                                   i);
+            } else if (score_row) {
+                attention_query_full_ggml_regular_direct_v(q_vec,
+                                                           k_head,
+                                                           v_head,
+                                                           T,
+                                                           head_dim,
+                                                           aligned_head_dim,
+                                                           scale,
+                                                           score_row,
+                                                           out_vec);
             }
         }
+        free(v_cols);
+        free(score_row_heap);
     }
 }
 

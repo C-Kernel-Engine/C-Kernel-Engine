@@ -442,6 +442,19 @@ void gemm_nt_q8_0_q8_0_contract(const float *A,
         return;
     }
 
+    if (!strict) {
+#pragma omp parallel for schedule(static) if(M > 1)
+        for (int m = 0; m < M; ++m) {
+            gemv_q8_0_q8_0_contract(&C[m * N], B, &A_use[m * K], N, K);
+            if (bias) {
+                for (int n = 0; n < N; ++n) {
+                    C[m * N + n] += bias[n];
+                }
+            }
+        }
+        return;
+    }
+
     for (int m = 0; m < M; ++m) {
         gemv_q8_0_q8_0_contract(&C[m * N], B, &A_use[m * K], N, K);
         if (bias) {
@@ -451,7 +464,7 @@ void gemm_nt_q8_0_q8_0_contract(const float *A,
         }
     }
 
-    if (strict && strict_cached_layer >= 0 && ck_q80_contract_dump_enabled()) {
+    if (strict_cached_layer >= 0 && ck_q80_contract_dump_enabled()) {
         ck_q80_contract_dump_tensor("strict_out_proj_output",
                                     strict_cached_layer,
                                     C,
