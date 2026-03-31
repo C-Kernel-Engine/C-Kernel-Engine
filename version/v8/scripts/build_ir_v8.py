@@ -3619,15 +3619,16 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Model-specific overrides can still force FP32 by setting
     # config["prefer_q8_activation"]=false.
     prefer_q8_activation = bool(config.get("prefer_q8_activation", True))
-    # A temporary Llama/Mistral FP32-MLP override used to force MLP matmuls off
-    # the Q8_K activation path. That turned out to be the wrong default for
-    # llama.cpp parity on Q4_K/Q6_K models: the MLP linear ops should follow the
-    # same Q8_K activation contract as ggml's mul_mat path. Keep the override as
-    # an explicit config opt-in only.
+    # Some families still need FP32-activation MLP matmuls for parity.
+    # Keep this as an explicit manifest/template opt-in rather than a default.
     prefer_fp32_mlp_matmuls = (
         prefer_q8_activation
-        and model_family in {"llama", "mistral", "mistral3"}
-        and bool(config.get("prefer_fp32_mlp_matmuls", False))
+        and bool(
+            config.get(
+                "prefer_fp32_mlp_matmuls",
+                template_flags.get("prefer_fp32_mlp_matmuls", False),
+            )
+        )
     )
     registry = load_kernel_registry()
 

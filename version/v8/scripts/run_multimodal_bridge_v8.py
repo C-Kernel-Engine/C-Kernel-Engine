@@ -88,6 +88,7 @@ def _compile_generated_model(c_path: Path, so_path: Path) -> Path:
         "-O3",
         "-fopenmp",
         "-Iinclude",
+        "-Iversion/v7/include",
         "-Iversion/v7/src",
         str(c_path),
         "version/v7/src/ckernel_model_load_v7.c",
@@ -262,7 +263,7 @@ def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any
     }
 
 
-def _prepare_decoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any]:
+def _prepare_decoder_runtime(gguf_path: Path, output_dir: Path, parity_dump: bool = False) -> dict[str, Any]:
     manifest, manifest_path, bump_path, config_path = _run_converter(gguf_path, output_dir)
     prefill_ir1 = output_dir / "ir1_prefill.json"
     prefill_layout = output_dir / "layout_prefill.json"
@@ -273,8 +274,9 @@ def _prepare_decoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any
     decode_lowered = output_dir / "lowered_decode.json"
     decode_call = output_dir / "call_decode.json"
     manifest_map = output_dir / "weights_manifest.map"
-    c_path = output_dir / "decoder_v8.c"
-    so_path = output_dir / "libdecoder_v8.so"
+    suffix = "_parity_dump" if parity_dump else ""
+    c_path = output_dir / f"decoder_v8{suffix}.c"
+    so_path = output_dir / f"libdecoder_v8{suffix}.so"
 
     rc = build_ir_v8.main(
         [
@@ -329,6 +331,8 @@ def _prepare_decoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any
             "--output",
             str(c_path),
         ]
+        if parity_dump:
+            sys.argv.append("--parity-dump")
         codegen_rc = codegen_v8.main()
     finally:
         sys.argv = old_argv
