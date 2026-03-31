@@ -38,6 +38,10 @@ def _load_module(name: str, path: Path):
 
 build_ir_v8 = _load_module("build_ir_v8_native_bridge_host_tests", V8_BUILD_PATH)
 bridge_runner_v8 = _load_module("run_multimodal_bridge_v8_host_tests", V8_BRIDGE_RUNNER_PATH)
+vision_bridge_runtime_v8 = _load_module(
+    "vision_bridge_runtime_v8_host_tests",
+    ROOT / "version" / "v8" / "scripts" / "vision_bridge_runtime_v8.py",
+)
 
 
 def _entry(name: str, dtype: str, shape: list[int], offset: int) -> dict:
@@ -215,6 +219,28 @@ def _build_tiny_decoder_runtime(workdir: Path) -> tuple[Path, Path, Path]:
 
 
 class V8NativeBridgeHostTests(unittest.TestCase):
+    def test_vision_bridge_contract_prefers_projector_width_output(self) -> None:
+        layout = {
+            "config": {
+                "embed_dim": 1152,
+                "vision_merged_tokens": 576,
+                "projector_out_dim": 4096,
+                "projector_total_out_dim": 16384,
+                "projection_dim": 4096,
+            }
+        }
+        activation_buffers = {
+            "embedded_input": {"name": "embedded_input", "size_bytes": 2304 * 1152 * 4},
+            "vision_output": {"name": "vision_output", "size_bytes": 576 * 16384 * 4},
+        }
+        bridge = vision_bridge_runtime_v8.resolve_vision_bridge_contract(layout, activation_buffers)
+        self.assertEqual(bridge["named_activation"], "vision_bridge_output")
+        self.assertEqual(bridge["fallback_buffer_name"], "embedded_input")
+        self.assertEqual(bridge["embed_dim"], 4096)
+        self.assertEqual(bridge["prefix_tokens"], 576)
+        self.assertEqual(bridge["used_nbytes"], 576 * 4096 * 4)
+        self.assertEqual(bridge["reason"], "projector_output")
+
     @classmethod
     def setUpClass(cls) -> None:
         result = subprocess.run(

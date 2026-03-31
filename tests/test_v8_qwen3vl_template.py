@@ -378,6 +378,8 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertIn("position_embeddings_add_tiled_2d", text)
             self.assertIn("spatial_merge_contiguous_tiled", text)
             self.assertIn("add_stream_reorder_2d", text)
+            self.assertIn("vision_bridge_output", text)
+            self.assertIn("ck_strict_mtmd_clip_encode_planar_f32", text)
             self.assertIn("gelu_ggml_inplace", text)
             self.assertIn("layernorm_naive_serial_matched_precision", text)
             self.assertIn("feature_concat", text)

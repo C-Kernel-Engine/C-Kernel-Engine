@@ -27,6 +27,11 @@ if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from gguf_tokenizer import GGUFTokenizer  # type: ignore  # noqa: E402
+from vision_bridge_runtime_v8 import (  # type: ignore  # noqa: E402
+    declare_named_activation_api,
+    resolve_vision_bridge_contract,
+    try_named_activation_view,
+)
 
 
 def _load_module(name: str, path: Path):
@@ -367,6 +372,7 @@ def _load_encoder_lib(model_so: Path) -> ctypes.CDLL:
     lib.ck_model_get_base_ptr.restype = ctypes.c_uint64
     lib.ck_model_free.argtypes = []
     lib.ck_model_free.restype = None
+    declare_named_activation_api(lib)
     return lib
 
 
@@ -387,6 +393,7 @@ def _load_decoder_lib(model_so: Path) -> ctypes.CDLL:
     lib.ck_model_get_vocab_size.restype = ctypes.c_int
     lib.ck_model_free.argtypes = []
     lib.ck_model_free.restype = None
+    declare_named_activation_api(lib)
     return lib
 
 
@@ -401,8 +408,8 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
     try:
         layout = _load_layout(runtime["layout_path"])
         offsets = _load_activation_offsets(runtime["layout_path"])
+        bridge = resolve_vision_bridge_contract(layout, offsets)
         image_buf = offsets["image_input"]
-        output_buf = offsets["vision_output"]
         base_ptr = int(lib.ck_model_get_base_ptr())
         if base_ptr == 0:
             raise RuntimeError("encoder base ptr is null")
@@ -424,28 +431,43 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
                 "preprocess": "synthetic_generator",
             }
         image_len = _buffer_nbytes(image_buf) // ctypes.sizeof(ctypes.c_float)
-        output_len = _buffer_nbytes(output_buf) // ctypes.sizeof(ctypes.c_float)
         if len(planar) != image_len:
             raise RuntimeError(f"encoder planar image length mismatch: {len(planar)} != {image_len}")
 
         image_arr = (ctypes.c_float * image_len).from_address(
             base_ptr + _activation_runtime_offset(layout, image_buf)
         )
-        output_arr = (ctypes.c_float * output_len).from_address(
-            base_ptr + _activation_runtime_offset(layout, output_buf)
-        )
         image_arr[:] = planar
         rc = lib.ck_model_decode(0, None)
         if rc != 0:
             raise RuntimeError(f"encoder decode failed with rc={rc}")
 
-        embed_dim = int(runtime["embed_dim"])
-        if embed_dim <= 0 or output_len % embed_dim != 0:
-            raise RuntimeError(f"invalid encoder output shape: output_len={output_len} embed_dim={embed_dim}")
+        embed_dim = int(bridge["embed_dim"])
+        if embed_dim <= 0:
+            raise RuntimeError("encoder bridge embed_dim is not available")
+
+        output_ptr = 0
+        output_nbytes = 0
+        bridge_name = str(bridge.get("named_activation") or "")
+        if bridge_name:
+            named_view = try_named_activation_view(lib, bridge_name)
+            if named_view is not None:
+                output_ptr, output_nbytes = named_view
+        if output_ptr == 0 or output_nbytes <= 0:
+            output_buf = offsets[str(bridge["fallback_buffer_name"])]
+            output_ptr = base_ptr + _activation_runtime_offset(layout, output_buf)
+            output_nbytes = int(bridge["used_nbytes"])
+
+        output_len = output_nbytes // ctypes.sizeof(ctypes.c_float)
+        if output_ptr == 0 or output_len <= 0 or output_len % embed_dim != 0:
+            raise RuntimeError(f"invalid encoder bridge output: output_len={output_len} embed_dim={embed_dim}")
+        output_arr = (ctypes.c_float * output_len).from_address(output_ptr)
         return {
             "embed_dim": embed_dim,
             "prefix_tokens": output_len // embed_dim,
             "embeddings": array("f", output_arr),
+            "bridge_activation": bridge_name or str(bridge["fallback_buffer_name"]),
+            "bridge_reason": str(bridge["reason"]),
             "image_source": str(image_report["image_source"]),
             "image_mode": image_report.get("image_mode"),
             "image_path": image_report.get("image_path"),
@@ -589,6 +611,8 @@ def main(argv: list[str] | None = None) -> int:
         "encoder_report": {
             "embed_dim": int(encoder_report["embed_dim"]),
             "prefix_tokens": int(encoder_report["prefix_tokens"]),
+            "bridge_activation": str(encoder_report["bridge_activation"]),
+            "bridge_reason": str(encoder_report["bridge_reason"]),
             "image_source": str(encoder_report["image_source"]),
             "image_mode": None if encoder_report["image_mode"] is None else str(encoder_report["image_mode"]),
             "image_path": encoder_report["image_path"],

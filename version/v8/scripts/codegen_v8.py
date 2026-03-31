@@ -28,6 +28,7 @@ if str(V7_SCRIPTS) not in sys.path:
 
 import codegen_v7  # type: ignore  # noqa: E402
 import codegen_prefill_v7  # type: ignore  # noqa: E402
+from vision_bridge_runtime_v8 import resolve_vision_bridge_contract  # type: ignore  # noqa: E402
 
 
 def _patch_codegen_config(obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -65,7 +66,9 @@ def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) 
     act_buffers = (layout_obj.get("memory", {}) or {}).get("activations", {}).get("buffers", []) or []
     by_name = {str(buf.get("name", "")): buf for buf in act_buffers}
     image_buf = by_name.get("image_input")
-    output_buf = by_name.get("vision_output")
+    bridge = resolve_vision_bridge_contract(layout_obj, by_name)
+    target_name = str(bridge.get("fallback_buffer_name", "vision_output"))
+    output_buf = by_name.get(target_name)
     if not image_buf or not output_buf:
         return code
 
@@ -76,7 +79,7 @@ def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) 
         return code
 
     image_elems = int(image_buf.get("size_bytes", image_buf.get("size", 0)) or 0) // 4
-    output_elems = int(output_buf.get("size_bytes", output_buf.get("size", 0)) or 0) // 4
+    output_elems = int(bridge.get("used_nbytes", 0) or 0) // 4
     pixel_count = image_h * image_w
     if pixel_count <= 0 or image_elems <= 0 or output_elems <= 0:
         return code
@@ -87,6 +90,7 @@ def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) 
     if channels <= 0:
         return code
 
+    target_macro = f"A_{target_name.upper()}"
     block = f"""    {{
         const char *strict_mtmd_oracle_env = getenv("CK_STRICT_MTMD_CLIP_ORACLE");
         int strict_mtmd_oracle = strict_mtmd_oracle_env ? (atoi(strict_mtmd_oracle_env) != 0) : 0;
@@ -96,7 +100,7 @@ def _inject_strict_vision_encoder_oracle(code: str, layout_obj: Dict[str, Any]) 
                     {channels},
                     {image_h},
                     {image_w},
-                    (float*)(MEM + A_VISION_OUTPUT),
+                    (float*)(MEM + {target_macro}),
                     {output_elems})) {{
                 model->pos++;
                 return;
@@ -119,6 +123,8 @@ def _inject_activation_lookup_api(code: str, layout_obj: Dict[str, Any]) -> str:
 
     weights = (layout_obj.get("memory", {}) or {}).get("weights", {}) or {}
     activation_base = int(weights.get("base_offset", 0) or 0) + int(weights.get("size", 0) or 0)
+    by_name = {str(buf.get("name", "")): buf for buf in act_buffers}
+    bridge = resolve_vision_bridge_contract(layout_obj, by_name)
 
     cases = []
     for buf in act_buffers:
@@ -134,6 +140,20 @@ def _inject_activation_lookup_api(code: str, layout_obj: Dict[str, Any]) -> str:
             "        if (size_out) *size_out = (size_t){size};\n"
             "        return 1;\n"
             "    }}".format(name=c_name, offset=runtime_offset, size=size_bytes)
+        )
+    bridge_name = str(bridge.get("named_activation") or "")
+    fallback_name = str(bridge.get("fallback_buffer_name") or "")
+    fallback_buf = by_name.get(fallback_name)
+    bridge_size = int(bridge.get("used_nbytes", 0) or 0)
+    if bridge_name and fallback_buf and bridge_size > 0 and bridge_name not in by_name:
+        runtime_offset = activation_base + int(fallback_buf.get("offset", 0) or 0)
+        c_name = json.dumps(bridge_name)
+        cases.append(
+            "    if (strcmp(name, {name}) == 0) {{\n"
+            "        if (offset_out) *offset_out = (size_t){offset};\n"
+            "        if (size_out) *size_out = (size_t){size};\n"
+            "        return 1;\n"
+            "    }}".format(name=c_name, offset=runtime_offset, size=bridge_size)
         )
     if not cases:
         return code

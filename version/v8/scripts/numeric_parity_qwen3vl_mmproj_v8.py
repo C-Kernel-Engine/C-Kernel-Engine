@@ -26,6 +26,11 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import parity_qwen3vl_mmproj_v8 as parity_harness  # type: ignore  # noqa: E402
 import build_ir_v8  # type: ignore  # noqa: E402
+from vision_bridge_runtime_v8 import (  # type: ignore  # noqa: E402
+    declare_named_activation_api,
+    resolve_vision_bridge_contract,
+    try_named_activation_view,
+)
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
@@ -189,6 +194,7 @@ def _load_generated_lib(model_so: Path) -> ctypes.CDLL:
     lib.ck_model_get_base_ptr.restype = ctypes.c_uint64
     lib.ck_model_free.argtypes = []
     lib.ck_model_free.restype = None
+    declare_named_activation_api(lib)
     return lib
 
 
@@ -297,22 +303,18 @@ def _run_generated_encoder(
     try:
         layout = _load_layout(layout_path)
         offsets = _load_activation_offsets(layout_path)
+        bridge = resolve_vision_bridge_contract(layout, offsets)
         image_buf = offsets["image_input"]
-        output_buf = offsets["vision_output"]
         base_ptr = int(lib.ck_model_get_base_ptr())
         if base_ptr == 0:
             raise RuntimeError("ck_model_get_base_ptr returned null")
 
         image_len = _buffer_nbytes(image_buf) // ctypes.sizeof(ctypes.c_float)
-        output_len = _buffer_nbytes(output_buf) // ctypes.sizeof(ctypes.c_float)
         if len(planar_image) != image_len:
             raise RuntimeError(f"planar image length mismatch: {len(planar_image)} != {image_len}")
 
         image_arr = (ctypes.c_float * image_len).from_address(
             base_ptr + _activation_runtime_offset(layout, image_buf)
-        )
-        output_arr = (ctypes.c_float * output_len).from_address(
-            base_ptr + _activation_runtime_offset(layout, output_buf)
         )
         image_arr[:] = planar_image
 
@@ -320,6 +322,22 @@ def _run_generated_encoder(
         if rc != 0:
             raise RuntimeError(f"ck_model_decode failed with rc={rc}")
 
+        output_ptr = 0
+        output_nbytes = 0
+        bridge_name = str(bridge.get("named_activation") or "")
+        if bridge_name:
+            named_view = try_named_activation_view(lib, bridge_name)
+            if named_view is not None:
+                output_ptr, output_nbytes = named_view
+        if output_ptr == 0 or output_nbytes <= 0:
+            output_buf = offsets[str(bridge["fallback_buffer_name"])]
+            output_ptr = base_ptr + _activation_runtime_offset(layout, output_buf)
+            output_nbytes = int(bridge["used_nbytes"])
+
+        output_len = output_nbytes // ctypes.sizeof(ctypes.c_float)
+        if output_ptr == 0 or output_len <= 0:
+            raise RuntimeError("failed to resolve CK vision bridge output")
+        output_arr = (ctypes.c_float * output_len).from_address(output_ptr)
         return array("f", output_arr)
     finally:
         lib.ck_model_free()
@@ -476,7 +494,7 @@ def main(argv: list[str] | None = None) -> int:
     lowering = report.get("lowering", {}) if isinstance(report, dict) else {}
     notes = [
         "llama.cpp reference uses clip_encode_float_image from libmtmd via a local C shim.",
-        "CK output is read from the generated vision_output activation buffer using the runtime absolute offset from layout.json.",
+        "CK output is read from the resolved vision bridge activation, which prefers projector-width embeddings over stitched deepstack output.",
     ]
     if not lowering.get("has_vision_mrope", False):
         notes.append("Vision multi-section RoPE is still not lowered in the current v8 path, so parity is expected to fail.")
