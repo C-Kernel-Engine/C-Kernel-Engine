@@ -1,0 +1,304 @@
+<!-- TITLE: Spec17 Curriculum Blueprint -->
+<!-- NAV: quickstart -->
+
+<style>
+.spec17-callout {
+    margin: 1.2rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    background: rgba(255, 180, 0, 0.08);
+    border: 1px solid rgba(255, 180, 0, 0.18);
+}
+
+.spec17-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.spec17-card {
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.spec17-card h3 {
+    margin-top: 0;
+}
+</style>
+
+<h1>Spec17 Curriculum Blueprint</h1>
+
+<p>
+    <code>spec17</code> is planned as the bounded intent bridge after the frozen <code>spec16</code> shared-bundle winner.
+    It is not another narrow raw repair rung. The goal is to move from explicit layout/style prompts to bounded
+    <code>[topic] + [goal] + [audience]</code> planning while keeping the output contract the same:
+    one clean shared <code>[bundle]</code>, deterministic lowerers, deterministic compiler, and external <code>content.json</code>.
+</p>
+
+<div class="spec17-callout">
+    <strong>Why this exists:</strong> the run history from <code>spec02</code> through <code>spec16</code> shows a stable pattern.
+    Better contracts and better full curricula create the real progress. Post-hoc raw repair rungs, especially warning-language
+    fixes around wrappers and stop markers, regress more often than they help once a strong winner already exists.
+</div>
+
+<h2>Hard Boundary</h2>
+
+<div class="spec17-grid">
+    <div class="spec17-card">
+        <h3>Prompt Contract</h3>
+        <p>Primary prompt:</p>
+        <pre><code>[task:svg] [topic:&lt;topic_id&gt;] [goal:&lt;goal_id&gt;] [audience:&lt;audience_id&gt;] [OUT]</code></pre>
+        <p>Controlled hints may add <code>[emphasis]</code>, <code>[constraint]</code>, or <code>[content_pack]</code>.</p>
+        <p>Do not give the model explicit <code>layout</code>, <code>form</code>, <code>theme</code>, <code>tone</code>, <code>density</code>, <code>background</code>, or topology counts.</p>
+    </div>
+    <div class="spec17-card">
+        <h3>Output Contract</h3>
+        <p>Emit exactly one shared <code>[bundle]</code> only.</p>
+        <p>Do not emit raw SVG, free-written prose, topic ids, asset ids, or family-specific lowerer syntax.</p>
+        <p>Visible facts, copy, and numbers remain in external <code>content.json</code>.</p>
+    </div>
+    <div class="spec17-card">
+        <h3>Repair Boundary</h3>
+        <p>Allowed deterministic repair is narrow:</p>
+        <ul>
+            <li>truncate at the first valid <code>[/bundle]</code></li>
+            <li>strip copied prompt/control tags outside the bundle</li>
+            <li>dedupe singleton tags when <code>family</code> and <code>form</code> already match</li>
+            <li>fill missing prompt-controlled fields only when <code>family</code> and <code>form</code> already match</li>
+        </ul>
+        <p>Repair must never invent a new family, form, or style bundle.</p>
+    </div>
+</div>
+
+<h2>Founding Families</h2>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Family</th>
+            <th>Forms</th>
+            <th>Topology fields</th>
+            <th>Intent profiles</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>memory_map</code></td>
+            <td><code>typed_regions</code>, <code>arena_sections</code>, <code>layer_stack</code></td>
+            <td><code>segments</code>, <code>brackets</code>, <code>cards</code></td>
+            <td><code>memory_layout_map</code>, <code>allocator_regions</code>, <code>arena_guard_flow</code></td>
+        </tr>
+        <tr>
+            <td><code>timeline</code></td>
+            <td><code>milestone_chain</code>, <code>stage_sequence</code></td>
+            <td><code>stages</code>, <code>arrows</code>, <code>footer</code></td>
+            <td><code>ir_evolution_timeline</code>, <code>why_pipeline_timeline</code>, <code>operator_changeover_timeline</code></td>
+        </tr>
+        <tr>
+            <td><code>system_diagram</code></td>
+            <td><code>linear_pipeline</code>, <code>build_path</code>, <code>selection_path</code></td>
+            <td><code>stages</code>, <code>links</code>, <code>terminal</code>, <code>footer</code></td>
+            <td><code>pipeline_overview_flow</code>, <code>build_pipeline_flow</code>, <code>registry_selection_flow</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Stage Mix</h2>
+
+<p>
+    The curriculum is designed to teach the predictable failure frontiers from the beginning rather than patching them later.
+    All rows must stay compiler-valid and bundle-canonical. No warning-language repair rows are allowed.
+</p>
+
+<h3>Stage A</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Surface</th>
+            <th>Weight</th>
+            <th>Teaching purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>explicit_bundle_anchor</code></td>
+            <td><code>35%</code></td>
+            <td>Preserve the frozen <code>spec16</code> bundle grammar and anchor non-regression.</td>
+        </tr>
+        <tr>
+            <td><code>clean_stop_anchor</code></td>
+            <td><code>10%</code></td>
+            <td>Teach one clean bundle and stop without introducing wrapper-warning prose.</td>
+        </tr>
+        <tr>
+            <td><code>intent_family_bridge</code></td>
+            <td><code>20%</code></td>
+            <td>Teach <code>topic + goal + audience</code> to family/form routing.</td>
+        </tr>
+        <tr>
+            <td><code>form_disambiguation_contrast</code></td>
+            <td><code>10%</code></td>
+            <td>Separate sibling forms before the line defaults to one favorite form.</td>
+        </tr>
+        <tr>
+            <td><code>style_bundle_inference</code></td>
+            <td><code>10%</code></td>
+            <td>Teach theme/tone/density/background inference from audience and emphasis.</td>
+        </tr>
+        <tr>
+            <td><code>topology_budget_bridge</code></td>
+            <td><code>10%</code></td>
+            <td>Teach topology and density changes from compact/balanced/dense constraints.</td>
+        </tr>
+        <tr>
+            <td><code>family_confusion_contrast</code></td>
+            <td><code>5%</code></td>
+            <td>Keep the three-family boundary visible from the first stage.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Stage B</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Surface</th>
+            <th>Weight</th>
+            <th>Teaching purpose</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>explicit_bundle_anchor</code></td>
+            <td><code>20%</code></td>
+            <td>Keep the shared bundle grammar frozen while the prompt contract weakens.</td>
+        </tr>
+        <tr>
+            <td><code>clean_stop_anchor</code></td>
+            <td><code>5%</code></td>
+            <td>Preserve decode hygiene with positive clean-stop coverage.</td>
+        </tr>
+        <tr>
+            <td><code>intent_family_bridge</code></td>
+            <td><code>20%</code></td>
+            <td>Make bounded intent prompts a first-class path, not a rare ablation.</td>
+        </tr>
+        <tr>
+            <td><code>topic_goal_recombination</code></td>
+            <td><code>15%</code></td>
+            <td>Test whether the model recombines seen topics and seen goals instead of memorizing pairs.</td>
+        </tr>
+        <tr>
+            <td><code>form_disambiguation_contrast</code></td>
+            <td><code>10%</code></td>
+            <td>Continue pressure on sibling-form choice under weaker prompts.</td>
+        </tr>
+        <tr>
+            <td><code>style_bundle_inference</code></td>
+            <td><code>10%</code></td>
+            <td>Keep style inference from collapsing to the dominant bundle.</td>
+        </tr>
+        <tr>
+            <td><code>topology_budget_bridge</code></td>
+            <td><code>10%</code></td>
+            <td>Keep count and density planning inside the bounded contract.</td>
+        </tr>
+        <tr>
+            <td><code>paraphrase_bridge</code></td>
+            <td><code>5%</code></td>
+            <td>Teach wording robustness without changing the underlying task.</td>
+        </tr>
+        <tr>
+            <td><code>family_confusion_contrast</code></td>
+            <td><code>5%</code></td>
+            <td>Block hidden family imbalance before promotion.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Predicted Failure Frontiers</h2>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Failure frontier</th>
+            <th>Why it is predictable</th>
+            <th>How the curriculum teaches it up front</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>default family attractor</td>
+            <td>Shared-family lines often collapse to the most familiar family when the prompt weakens.</td>
+            <td><code>intent_family_bridge</code>, <code>topic_goal_recombination</code>, <code>family_confusion_contrast</code></td>
+        </tr>
+        <tr>
+            <td>default form attractor</td>
+            <td>Sibling forms inside one family are easy to blur together under CE pressure.</td>
+            <td><code>intent_family_bridge</code>, <code>form_disambiguation_contrast</code></td>
+        </tr>
+        <tr>
+            <td>default style attractor</td>
+            <td>Theme/tone/background often drift to the training-dominant bundle.</td>
+            <td><code>style_bundle_inference</code></td>
+        </tr>
+        <tr>
+            <td>topology/count drift</td>
+            <td>Counts often default to familiar values when the prompt only gives high-level intent.</td>
+            <td><code>topology_budget_bridge</code></td>
+        </tr>
+        <tr>
+            <td>topic leakage into output</td>
+            <td>Once topic and goal enter the prompt, the model may try to serialize them into the bundle.</td>
+            <td><code>explicit_bundle_anchor</code>, <code>clean_stop_anchor</code></td>
+        </tr>
+        <tr>
+            <td>paraphrase brittleness</td>
+            <td>Minor wording shifts can change the chosen bundle if the prompt surface is under-trained.</td>
+            <td><code>paraphrase_bridge</code></td>
+        </tr>
+        <tr>
+            <td>hidden family imbalance</td>
+            <td>One family can improve on visible probes while another silently collapses on hidden probes.</td>
+            <td><code>family_confusion_contrast</code>, balanced hidden splits</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Holdouts And Promotion</h2>
+
+<ul>
+    <li>Visible probes must stay balanced across all three families and cover family routing, form choice, style inference, and topology budgeting.</li>
+    <li>Hidden probes must stay balanced across all three families and include paraphrase and topic-goal recombination surfaces.</li>
+    <li>Raw exact and repaired exact must always be reported separately.</li>
+    <li>No family may regress on hidden probes while another improves.</li>
+    <li>If the remaining errors are mostly deterministic near-misses, stay on decode/repair instead of reopening raw repair churn.</li>
+</ul>
+
+<h2>Before Training Starts</h2>
+
+<ul>
+    <li>Audit the blueprint for form coverage, failure-frontier coverage, and stage-mix integrity.</li>
+    <li>Keep the shared <code>scene_bundle.v1</code> contract frozen from <code>spec16</code>.</li>
+    <li>Keep compiler parity, tokenizer coverage, and token-budget checks as hard gates.</li>
+    <li>Only materialize <code>spec17</code> after the blueprint and audit pass. Do not start from another speculative repair rung.</li>
+</ul>
+
+<p>
+    Source of truth in the repo:
+    <code>version/v7/reports/spec17_curriculum_blueprint.json</code>,
+    <code>version/v7/scripts/audit_curriculum_blueprint_v7.py</code>,
+    and the generated audit report under <code>version/v7/reports/</code>.
+</p>
+
+<h2>Related Pages</h2>
+
+<ul>
+    <li><a href="spec-training-method.html">spec-training-method.html</a></li>
+    <li><a href="spec-training-results.html">spec-training-results.html</a></li>
+</ul>
