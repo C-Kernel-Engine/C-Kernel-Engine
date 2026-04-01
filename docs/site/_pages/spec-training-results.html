@@ -1,0 +1,248 @@
+<!-- TITLE: Spec Training Results -->
+<!-- NAV: quickstart -->
+
+<style>
+.results-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.results-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 16% 18%, rgba(7,173,248,0.18), transparent 30%),
+        radial-gradient(circle at 82% 14%, rgba(255,180,0,0.16), transparent 28%),
+        linear-gradient(145deg, rgba(71,180,117,0.08), rgba(255,255,255,0));
+    pointer-events: none;
+}
+
+.results-hero-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.results-kicker {
+    color: var(--orange);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.65rem;
+}
+
+.results-subtitle,
+.results-note,
+.muted {
+    color: var(--text-secondary);
+}
+
+.results-grid,
+.split-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0 2rem 0;
+}
+
+.results-card,
+.split-card {
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+    background: linear-gradient(155deg, rgba(255,255,255,0.02), rgba(7,173,248,0.05));
+    box-shadow: var(--shadow-sm);
+}
+
+.metric-label {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.metric-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    margin: 0.15rem 0 0.35rem 0;
+    color: var(--text-primary);
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 2rem 0;
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.results-table th,
+.results-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--grey);
+    text-align: left;
+    vertical-align: top;
+}
+
+.results-table th {
+    color: var(--orange);
+    background: var(--dark-card);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.results-table tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+.results-table tbody tr:hover {
+    background: rgba(7,173,248,0.06);
+}
+
+.status {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,180,0,0.25);
+    background: rgba(255,180,0,0.10);
+    color: var(--text-primary);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.policy-callout {
+    margin: 1rem 0 1.8rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255,180,0,0.25);
+    background: linear-gradient(145deg, rgba(255,180,0,0.10), rgba(7,173,248,0.08));
+}
+
+.refresh-block {
+    margin: 1rem 0 0 0;
+}
+
+@media (max-width: 900px) {
+    .results-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+</style>
+
+<div class="card results-hero">
+    <div class="results-hero-inner">
+        <div class="results-kicker">Run History</div>
+        <h1>Spec Training Results</h1>
+        <p class="results-subtitle">
+            Manifest-driven visibility for the training lines. This page is generated from local run ledgers and probe reports,
+            while <a href="spec-training-method.html">spec-training-method.html</a> stays focused on the stable method and promotion rules.
+        </p>
+    </div>
+</div>
+
+<div class="policy-callout">
+    <strong>Page split:</strong> stable method lives on <a href="spec-training-method.html">Spec Training Method</a>,
+    generated run evidence lives here, and bulky raw artifacts are intended to move under <code>training-archive/</code>
+    as a future submodule mount instead of growing the main docs tree.
+</div>
+
+<div class="results-grid">
+    <div class="results-card">
+        <div class="metric-label">Specs With Probe Data</div>
+        <div class="metric-value">15</div>
+        <p class="results-note">Generated from 2 source roots and refreshed at 2026-04-01 14:56 UTC.</p>
+    </div>
+    <div class="results-card">
+        <div class="metric-label">Run Directories</div>
+        <div class="metric-value">95</div>
+        <p class="results-note">Stage records: 180. Probe reports: 110.</p>
+    </div>
+    <div class="results-card">
+        <div class="metric-label">Current Champion</div>
+        <div class="metric-value">spec12</div>
+        <p class="results-note">r17 at 100.0% visible exact and 100.0% hidden exact.</p>
+    </div>
+</div>
+
+<h2>History Split</h2>
+
+<div class="split-grid">
+    <div class="split-card">
+        <h3>Method Page</h3>
+        <p>Keep stable policy here: spec/rung definitions, reset-line rules, promotion gates, and decode-repair versus retrain decisions.</p>
+        <p><a href="spec-training-method.html">Open spec-training-method.html</a></p>
+    </div>
+    <div class="split-card">
+        <h3>Generated History</h3>
+        <p>This page is generated from <code>version/v7/reports/spec_training_manifest.json</code>, not hand-maintained prose.</p>
+        <p class="muted">It should be the first stop for “which rung is best?” and “what regressed?”</p>
+    </div>
+    <div class="split-card">
+        <h3>Archive Mount</h3>
+        <p>Raw ledgers, probe reports, tested-prompt reports, and large run folders can move under <code>training-archive/</code> as a submodule without breaking the docs surface.</p>
+        <p class="muted">The docs should depend on the compact manifest, not on browsing the archive directly.</p>
+    </div>
+</div>
+
+<h2>Best Rungs By Spec</h2>
+
+<table class="results-table">
+    <thead>
+        <tr>
+            <th>Spec</th>
+            <th>Best Rung</th>
+            <th>Visible Exact</th>
+            <th>Hidden Exact</th>
+            <th>Renderable</th>
+            <th>Run Dirs</th>
+            <th>Status / Lesson</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>spec04</strong><br><span class="muted">Structured Atoms</span></td><td>spec04_structured_scenes_ctx512_d64_h128_v224</td><td>0.0%</td><td>—</td><td>100.0%</td><td>2</td><td><span class="status">regressed</span><br><span class="muted">failed – no correct outputs</span></td></tr><tr><td><strong>spec05</strong><br><span class="muted">Structured Scenes</span></td><td>r2</td><td>80.8%</td><td>—</td><td>92.3%</td><td>1</td><td><span class="status">iterating</span><br><span class="muted">strong – minor gaps remain</span></td></tr><tr><td><strong>spec06</strong><br><span class="muted">Structured Infographics</span></td><td>r6</td><td>91.7%</td><td>—</td><td>100.0%</td><td>7</td><td><span class="status">iterating</span><br><span class="muted">strong – minor gaps remain</span></td></tr><tr><td><strong>spec07</strong><br><span class="muted">Scene DSL v1</span></td><td>r2</td><td>38.9%</td><td>—</td><td>75.0%</td><td>2</td><td><span class="status">regressed</span><br><span class="muted">weak – fundamental issues likely</span></td></tr><tr><td><strong>spec08</strong><br><span class="muted">Rich Scene DSL</span></td><td>r2</td><td>80.6%</td><td>—</td><td>91.7%</td><td>2</td><td><span class="status">iterating</span><br><span class="muted">strong – minor gaps remain</span></td></tr><tr><td><strong>spec10</strong><br><span class="muted">Asset Scene DSL</span></td><td>r4</td><td>94.3%</td><td>—</td><td>100.0%</td><td>5</td><td><span class="status">iterating</span><br><span class="muted">strong – minor gaps remain</span></td></tr><tr><td><strong>spec11</strong><br><span class="muted">Keyed Scene DSL</span></td><td>r2</td><td>100.0%</td><td>—</td><td>100.0%</td><td>3</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec12</strong><br><span class="muted">Scene DSL (gold)</span></td><td>r17</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td>20</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec13a</strong><br><span class="muted">Intent-Prompt Bridge</span></td><td>r2</td><td>75.0%</td><td>41.7%</td><td>100.0%</td><td>6</td><td><span class="status">iterating</span><br><span class="muted">partial – further iteration needed</span></td></tr><tr><td><strong>spec13b</strong><br><span class="muted">Decision-Tree Scene IR</span></td><td>r4</td><td>50.0%</td><td>66.7%</td><td>100.0%</td><td>8</td><td><span class="status">iterating</span><br><span class="muted">partial – further iteration needed</span></td></tr><tr><td><strong>spec14a</strong><br><span class="muted">Comparison Board Family</span></td><td>r10</td><td>100.0%</td><td>90.0%</td><td>100.0%</td><td>11</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec14b</strong><br><span class="muted">Timeline Family</span></td><td>r3</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td>3</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec15a</strong><br><span class="muted">Memory Map Family</span></td><td>r9</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td>11</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec15b</strong><br><span class="muted">System Diagram Family</span></td><td>r2</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td>2</td><td><span class="status">gold</span><br><span class="muted">converged – perfect exact match</span></td></tr><tr><td><strong>spec16</strong><br><span class="muted">Generalized Visual Bundle</span></td><td>r9</td><td>77.8%</td><td>100.0%</td><td>86.1%</td><td>12</td><td><span class="status">iterating</span><br><span class="muted">partial – further iteration needed</span></td></tr>
+    </tbody>
+</table>
+
+<h2>Recent Run Ledger</h2>
+
+<table class="results-table">
+    <thead>
+        <tr>
+            <th>Run</th>
+            <th>Latest Stage</th>
+            <th>Finished</th>
+            <th>Visible Exact</th>
+            <th>Hidden Exact</th>
+            <th>Renderable</th>
+            <th>Artifact Dir</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>spec16</strong><br><span class="muted">r12</span></td><td>midtrain</td><td>2026-03-31 09:21 UTC</td><td>—</td><td>—</td><td>—</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r12</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r11</span></td><td>midtrain</td><td>2026-03-31 04:20 UTC</td><td>75.0%</td><td>100.0%</td><td>94.4%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r11</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r10</span></td><td>midtrain</td><td>2026-03-31 02:46 UTC</td><td>72.2%</td><td>66.7%</td><td>75.0%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r10</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r9</span></td><td>midtrain</td><td>2026-03-30 19:27 UTC</td><td>—</td><td>—</td><td>—</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r9</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r8</span></td><td>midtrain</td><td>2026-03-30 17:45 UTC</td><td>63.9%</td><td>58.3%</td><td>88.9%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r8</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r7</span></td><td>midtrain</td><td>2026-03-30 13:57 UTC</td><td>30.6%</td><td>41.7%</td><td>66.7%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r7</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r6</span></td><td>midtrain</td><td>2026-03-30 12:30 UTC</td><td>66.7%</td><td>100.0%</td><td>86.1%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r6</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r5</span></td><td>midtrain</td><td>2026-03-30 11:03 UTC</td><td>0.0%</td><td>0.0%</td><td>50.0%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r5</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r4</span></td><td>pretrain</td><td>2026-03-30 10:24 UTC</td><td>—</td><td>—</td><td>—</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r4</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r3</span></td><td>midtrain</td><td>2026-03-30 10:09 UTC</td><td>11.1%</td><td>0.0%</td><td>66.7%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r3</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r2</span></td><td>midtrain</td><td>2026-03-30 09:28 UTC</td><td>30.6%</td><td>50.0%</td><td>86.1%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r2</code></td></tr><tr><td><strong>spec16</strong><br><span class="muted">r1</span></td><td>midtrain</td><td>2026-03-30 04:06 UTC</td><td>47.2%</td><td>58.3%</td><td>100.0%</td><td><code>spec16_scene_bundle_l3_d192_h384_ctx768_r1</code></td></tr><tr><td><strong>spec15b</strong><br><span class="muted">r2</span></td><td>midtrain</td><td>2026-03-30 01:26 UTC</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td><code>spec15b_scene_dsl_l3_d192_h384_ctx768_r2</code></td></tr><tr><td><strong>spec15b</strong><br><span class="muted">r1</span></td><td>midtrain</td><td>2026-03-30 00:33 UTC</td><td>72.2%</td><td>75.0%</td><td>77.8%</td><td><code>spec15b_scene_dsl_l3_d192_h384_ctx768_r1</code></td></tr><tr><td><strong>spec14b</strong><br><span class="muted">r3</span></td><td>midtrain</td><td>2026-03-29 21:41 UTC</td><td>100.0%</td><td>100.0%</td><td>100.0%</td><td><code>spec14b_scene_dsl_l3_d192_h384_ctx768_r3</code></td></tr><tr><td><strong>spec14b</strong><br><span class="muted">r2</span></td><td>midtrain</td><td>2026-03-29 21:07 UTC</td><td>2.8%</td><td>40.0%</td><td>100.0%</td><td><code>spec14b_scene_dsl_l3_d192_h384_ctx768_r2</code></td></tr>
+    </tbody>
+</table>
+
+<h2>Archive Policy</h2>
+
+<div class="card">
+    <p><strong>Submodule-ready split:</strong> keep the compact manifest and generated docs page in the main repo, then mount a future raw artifact archive at <code>training-archive/</code>.</p>
+    <ul>
+        <li>Stable docs stay in <code>docs/site/_pages/</code>.</li>
+        <li>Run summaries stay in <code>version/v7/reports/spec_training_manifest.json</code>.</li>
+        <li>Heavy artifacts move to <code>training-archive/</code> once you are ready to create the separate repo.</li>
+    </ul>
+    <p class="muted">Current source roots:</p>
+    <ul>
+        <li><code>/home/antshiv/.cache/ck-engine-v7/models/train</code> <span class="muted">(cache)</span></li><li><code>/home/antshiv/Workspace/C-Kernel-Engine/version/v7/runs</code> <span class="muted">(repo)</span></li>
+    </ul>
+    <div class="refresh-block">
+        <p><strong>Refresh command:</strong></p>
+        <pre><code>bash docs/site/build.sh</code></pre>
+    </div>
+</div>
