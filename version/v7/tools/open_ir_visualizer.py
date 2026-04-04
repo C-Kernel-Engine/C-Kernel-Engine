@@ -1562,6 +1562,26 @@ def collect_training_checkpoint_history(run_root: Path | None) -> dict | None:
     return history
 
 
+def collect_weight_health(search_roots: list[Path]) -> dict | None:
+    """Load weight_health_latest.json from the run directory."""
+    names = ["weight_health_latest.json", "weight_health.json"]
+    for root in search_roots:
+        if not root.exists() or not root.is_dir():
+            continue
+        for name in names:
+            candidate = root / name
+            if candidate.exists() and candidate.is_file():
+                try:
+                    with open(candidate, "r") as f:
+                        payload = json.load(f)
+                    if isinstance(payload, dict) and payload.get("schema", "").startswith("ck.weight_health"):
+                        payload.setdefault("_source", str(candidate))
+                        return payload
+                except Exception as e:
+                    print(f"  ! weight_health {candidate.name}: {e}")
+    return None
+
+
 def _has_renderable_profile_payload(payload) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -3107,6 +3127,9 @@ def load_model_data(
         "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
         "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
         "training_plan": model_candidates("training_plan.json") + [V7_REPORT_PATH / "training_plan.json", V7_REPORT_PATH_LEGACY / "training_plan.json"],
+        "run_scope": model_candidates("run_scope.json"),
+        "agent_brief": model_candidates("agent.md") + model_candidates("AGENT.md"),
+        "training_brief": model_candidates("training.md") + model_candidates("TRAINING.md"),
         "run_ledger": model_candidates("run_ledger.jsonl"),
         "corpus_sampling_log": model_candidates("corpus_sampling_log_latest.json") + model_candidates("corpus_sampling_log.json") + [V7_REPORT_PATH / "corpus_sampling_log_latest.json", V7_REPORT_PATH_LEGACY / "corpus_sampling_log_latest.json"],
         "dataset_qc": model_candidates("dataset_qc.json"),
@@ -3230,6 +3253,11 @@ def load_model_data(
                         if isinstance(_rec, dict) and _rec.get("run_id"):
                             _by_run[str(_rec["run_id"])] = _rec
                     payload = {"entries": sorted(_by_run.values(), key=lambda r: int(r.get("run_order") or 0))}
+                elif path.suffix.lower() in {".md", ".txt"}:
+                    payload = {
+                        "format": "markdown" if path.suffix.lower() == ".md" else "text",
+                        "text": path.read_text(encoding="utf-8"),
+                    }
                 else:
                     with open(path, "r") as f:
                         payload = json.load(f)
@@ -3300,6 +3328,13 @@ def load_model_data(
             data["files"]["training_canary_summary"] = canary_summary
             loaded.append("training_canary_summary(derived)")
             missing_optional = [k for k in missing_optional if k != "training_canary_summary"]
+
+    weight_health_payload = collect_weight_health(search_roots)
+    if weight_health_payload is not None:
+        data["files"]["weight_health"] = weight_health_payload
+        loaded.append("weight_health")
+    else:
+        missing_optional.append("weight_health")
 
     # If only runtime parity reports are present, derive dashboard-friendly
     # training_* aliases so the viewer renders without manual file renaming.
@@ -3446,6 +3481,14 @@ def load_model_data(
     # render a single structured view regardless of file-loading path.
     pipeline = files.get("training_pipeline")
     if isinstance(pipeline, dict):
+        training_plan_payload = files.get("training_plan")
+        if isinstance(training_plan_payload, dict):
+            pipeline["training_plan"] = training_plan_payload
+            if not isinstance(pipeline.get("run_scope"), dict) and isinstance(training_plan_payload.get("run_scope"), dict):
+                pipeline["run_scope"] = training_plan_payload.get("run_scope")
+        run_scope_payload = files.get("run_scope")
+        if isinstance(run_scope_payload, dict):
+            pipeline["run_scope"] = run_scope_payload
         data_lab = pipeline.get("data_lab")
         if not isinstance(data_lab, dict):
             data_lab = {}

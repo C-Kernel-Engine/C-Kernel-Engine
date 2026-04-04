@@ -27,6 +27,10 @@ const QUESTION_TABS = {
         label: 'What Is It Attending To?',
         title: 'Q×K attention structure, entropy and head redundancy.',
     },
+    'train-weight-health': {
+        label: 'Is Every Parameter Learning?',
+        title: 'Checkpoint delta health, gradient reachability, and stale-parameter flags.',
+    },
     'train-compare': {
         label: 'How Does This Compare?',
         title: 'Overlay baseline vs current run and inspect deltas.',

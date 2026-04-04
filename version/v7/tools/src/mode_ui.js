@@ -11,6 +11,7 @@ const TRAINING_TABS = [
     'train-parity',
     'train-grad-flow',
     'train-weights',
+    'train-weight-health',
     'train-attention',
     'train-compare',
     'train-memory-canary',
@@ -28,6 +29,7 @@ const TRAINING_SIGNAL_KEYS = [
     'memory_diagnostic',
     'memory_verification',
     'backprop_stitch_runtime',
+    'weight_health',
 ];
 
 function detectTrainingModeAvailable() {
@@ -174,6 +176,7 @@ function appendTrainingTabs() {
         { id: 'train-parity', label: 'Parity Tracker' },
         { id: 'train-grad-flow', label: 'Gradient Flow' },
         { id: 'train-weights', label: 'Weights & Activations' },
+        { id: 'train-weight-health', label: 'Weight Health' },
         { id: 'train-attention', label: 'Attention' },
         { id: 'train-compare', label: 'Run Compare' },
         { id: 'train-memory-canary', label: 'Memory & Canary' },
@@ -235,6 +238,11 @@ function ensureTrainingPanels() {
         'Weight movement and activation/gradient distribution snapshots.'
     );
     ensurePanel(
+        'train-weight-health',
+        'Weight Health',
+        'Checkpoint delta health, gradient reachability, and stale-parameter diagnostics.'
+    );
+    ensurePanel(
         'train-attention',
         'Attention Inspector',
         'Q×K patterns, entropy timeline, and head redundancy.'
@@ -257,6 +265,7 @@ function ensureTrainingPanels() {
     ensurePanelRoot('train-parity', 'trainParityRoot');
     ensurePanelRoot('train-grad-flow', 'trainGradFlowRoot');
     ensurePanelRoot('train-weights', 'trainWeightsRoot');
+    ensurePanelRoot('train-weight-health', 'trainWeightHealthRoot');
     ensurePanelRoot('train-attention', 'trainAttentionRoot');
     ensurePanelRoot('train-compare', 'trainCompareRoot');
     ensurePanelRoot('train-memory-canary', 'trainMemoryCanaryRoot');

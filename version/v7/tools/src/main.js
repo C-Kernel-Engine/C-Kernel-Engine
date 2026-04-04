@@ -4,6 +4,7 @@ import { renderTrainingDashboard } from './training_dashboard.js';
 import { renderTrainingExtensionTab } from './training_tabs.js';
 import { renderGradientFlow } from './gradient_flow.js';
 import { renderWeightActivation } from './weight_activation.js';
+import { renderWeightHealth } from './weight_health.js';
 import { renderAttentionInspector } from './attention_inspector.js';
 import { renderRunCompare } from './run_compare.js';
 import { renderTrainingMemoryDiag } from './training_memory_diag.js';
@@ -25,6 +26,10 @@ function renderTrainingTab(tabId) {
     }
     if (tabId === 'train-weights') {
         renderWeightActivation(files);
+        return;
+    }
+    if (tabId === 'train-weight-health') {
+        renderWeightHealth(files);
         return;
     }
     if (tabId === 'train-attention') {

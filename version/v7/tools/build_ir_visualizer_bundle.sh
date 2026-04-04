@@ -20,6 +20,7 @@ FILES=(
   "training_tabs.js"
   "gradient_flow.js"
   "weight_activation.js"
+  "weight_health.js"
   "attention_inspector.js"
   "run_compare.js"
   "training_memory_diag.js"

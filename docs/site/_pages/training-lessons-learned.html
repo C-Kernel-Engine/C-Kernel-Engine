@@ -1,0 +1,677 @@
+<!-- TITLE: Training Lessons Learned -->
+<!-- NAV: research -->
+
+<style>
+.lessons-hero {
+    text-align: center;
+    padding: 2.5rem 1.5rem 1.5rem;
+    background: linear-gradient(145deg, rgba(13,27,42,0.7), rgba(15,15,26,0.5));
+    border-radius: 14px;
+    border: 1px solid rgba(255,180,0,0.15);
+    margin-bottom: 2.5rem;
+}
+.lessons-hero h1 { margin: 0 0 0.5rem; }
+.lessons-hero .subtitle { color: rgba(255,255,255,0.55); font-size: 1.05rem; }
+
+.arc-table { width: 100%; border-collapse: collapse; margin: 1.2rem 0 1.8rem; font-size: 0.97rem; }
+.arc-table th { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 2px solid rgba(255,180,0,0.25); color: #ffb400; font-weight: 600; }
+.arc-table td { padding: 0.55rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+.arc-table tr:hover td { background: rgba(255,180,0,0.04); }
+
+.root-cause-card {
+    background: rgba(13,27,42,0.5);
+    border: 1px solid rgba(255,180,0,0.12);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin: 1rem 0;
+}
+.root-cause-card h4 { color: #ffb400; margin: 0 0 0.5rem; }
+
+.research-card {
+    background: rgba(15,15,26,0.6);
+    border: 1px solid rgba(100,180,255,0.15);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin: 1rem 0;
+}
+.research-card h4 { color: #64b5f6; margin: 0 0 0.5rem; }
+.research-card .paper-ref { font-size: 0.88rem; color: rgba(255,255,255,0.45); margin-top: 0.6rem; }
+
+.forward-card {
+    background: rgba(0,80,40,0.2);
+    border: 1px solid rgba(76,175,80,0.2);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin: 1rem 0;
+}
+.forward-card h4 { color: #81c784; margin: 0 0 0.5rem; }
+
+.verdict-box {
+    background: rgba(255,180,0,0.08);
+    border-left: 4px solid #ffb400;
+    padding: 1rem 1.4rem;
+    border-radius: 0 10px 10px 0;
+    margin: 1.5rem 0;
+    font-size: 1.02rem;
+}
+.verdict-box strong { color: #ffb400; }
+
+.code-block {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.88rem;
+    overflow-x: auto;
+    margin: 0.8rem 0;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.timeline-badge {
+    display: inline-block;
+    background: rgba(255,180,0,0.15);
+    color: #ffb400;
+    padding: 0.15rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+}
+.timeline-badge.red { background: rgba(244,67,54,0.15); color: #ef5350; }
+.timeline-badge.green { background: rgba(76,175,80,0.15); color: #81c784; }
+.timeline-badge.blue { background: rgba(100,180,255,0.15); color: #64b5f6; }
+
+.superpower-box {
+    background: linear-gradient(145deg, rgba(255,180,0,0.08), rgba(0,80,40,0.12));
+    border: 1px solid rgba(255,180,0,0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    text-align: center;
+}
+.superpower-box h3 { color: #ffb400; margin: 0 0 0.8rem; }
+</style>
+
+<div class="lessons-hero">
+    <h1>Training Lessons Learned</h1>
+    <p class="subtitle">Full arc analysis from spec02 through spec19 &mdash; why we struggled, what the research says, and how to think about training going forward.</p>
+    <p class="subtitle" style="font-size:0.88rem; margin-top:0.8rem;">Written 2026-04-02, revised with post-review corrections &bull; Covers ~30 days of spec progression and 50+ rungs</p>
+</div>
+
+<nav class="toc">
+    <strong>Contents</strong>
+    <ul>
+        <li><a href="#arc">The Arc: Spec by Spec</a></li>
+        <li><a href="#pattern">The Pattern: Why Rungs Keep Failing</a></li>
+        <li><a href="#root-causes">The 7 Root Causes</a></li>
+        <li><a href="#bundle-emission">The Deepest Failure: Bundle-Emission Threshold</a></li>
+        <li><a href="#research">What the Research Says</a></li>
+        <li><a href="#forward">How to Think About Training From Now On</a></li>
+        <li><a href="#rung-loop">Rungs As Coverage Sensors</a></li>
+        <li><a href="#working-thesis">The Working Thesis for Next Training</a></li>
+        <li><a href="#mental-model">The Mental Model: Tokenization &rarr; Output</a></li>
+        <li><a href="#superpower">The Superpower We&rsquo;re Underusing</a></li>
+        <li><a href="#related">Related Pages</a></li>
+    </ul>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="arc">The Arc: Spec by Spec</h2>
+
+<p>This is the full trajectory of the visual-DSL training line. Each spec changed the learning contract; each set of rungs explored that contract&rsquo;s ceiling.</p>
+
+<h3>Early Line (Spec02&ndash;03): Raw SVG + Tokenizer Discovery</h3>
+
+<p>The project started trying to teach a tiny model to emit raw SVG. Spec03&rsquo;s tokenizer audit revealed the foundational problem: <strong>0 out of 50 canonical control tags were captured as exact BPE tokens</strong>. The model was fighting to learn both the <em>spelling</em> of the DSL and the <em>semantics</em> simultaneously.</p>
+
+<div class="verdict-box">
+    <strong>Lesson:</strong> Promote canonical control tags to reserved/protected tokens. Treat interface atoms explicitly. The model should learn <em>scene decisions</em>, not subword spelling.
+</div>
+
+<h3>Spec09&ndash;10: The Scene DSL Revolution</h3>
+
+<p>The biggest design pivot. Backward-designed from real shipped SVG assets instead of synthetic grids. Defined 7 layout families, 20+ reusable components, and the foundational split:</p>
+
+<div class="code-block">model &rarr; scene DSL &rarr; compiler &rarr; SVG</div>
+
+<p>The model would learn visual <em>planning</em>, not SVG <em>rendering</em>. This mirrors what CodeT5 and phi-1 argue: structured formal output requires a different representation than free text.</p>
+
+<h3>Spec12: The Proving Ground (R1&ndash;R21)</h3>
+
+<p>This is where the real learning happened. Three families: <code>table_matrix</code>, <code>decision_tree</code>, <code>memory_map</code>.</p>
+
+<table class="arc-table">
+    <thead>
+        <tr><th>Run</th><th>Exact</th><th>Renderable</th><th>Key Lesson</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><span class="timeline-badge red">R1</span></td><td>0.0%</td><td>0.0%</td><td>Undertrained; nested grammar collapsed entirely</td></tr>
+        <tr><td><span class="timeline-badge">R2</span></td><td>27.3%</td><td>66.7%</td><td>Grammar became learnable with stronger curriculum</td></tr>
+        <tr><td><span class="timeline-badge">R3</span></td><td>42.4%</td><td>90.9%</td><td>First useful baseline; transition rows helped</td></tr>
+        <tr><td><span class="timeline-badge red">R4</span></td><td>30.3%</td><td>45.5%</td><td><strong>REGRESSION</strong> from over-repair fragmentation</td></tr>
+        <tr><td><span class="timeline-badge green">R5</span></td><td>72.7%</td><td>75.8%</td><td>Best balanced rung; returned to cleaner curriculum</td></tr>
+        <tr><td><span class="timeline-badge">R6</span></td><td>54.5%</td><td>78.8%</td><td>memory_map up, decision_tree regressed: family interference</td></tr>
+        <tr><td><span class="timeline-badge green">R17</span></td><td>100%</td><td>100%</td><td>Full visible + hidden probe pass; contract closed</td></tr>
+    </tbody>
+</table>
+
+<div class="verdict-box">
+    <strong>Critical lesson:</strong> The same 3L/192d model went from 0% to 100% on the explicit-contract task. For this narrow bounded contract, curriculum shape &mdash; balance, ordering, repair ratio &mdash; was the dominant lever, not capacity. R4 proved that too much repair pressure <em>destroys</em> previously learned structure. However, this does <strong>not</strong> prove capacity is irrelevant for the harder bounded-intent routing problem that spec17/18 attempted. Explicit-contract tasks and compositional-intent tasks are genuinely different problems.
+</div>
+
+<h3>Spec13: The Generalization Wall</h3>
+
+<ul>
+    <li><strong>spec13a:</strong> Tried intent prompts (topic+goal+audience &rarr; inferred layout). The model collapsed to a <strong>single attractor</strong> &mdash; one family for everything. This is the memorization-vs-generalization barrier.</li>
+    <li><strong>spec13b:</strong> Graph-family work. Discovered the model was learning <em>asset labels</em> inside the DSL, not transferable structure. Led to simplifying output contracts and the domain-agnostic principle.</li>
+</ul>
+
+<h3>Spec14a: The Default-Board Trap</h3>
+
+<p>R1 scored 19.2% exact but 92.3% renderable. The model learned <strong>one default board</strong> (<code>infra_dark/amber/rings/3-metrics/2-callouts</code>) and replayed it for every prompt. Root cause: <strong>block-ordered corpus</strong> with 48 identical rows in sequence. The model shortcut to memorizing the most frequent pattern.</p>
+
+<p>Dataset forensics showed: 21/21 non-exact rows predicted <code>[tone:amber]</code> when 12 required blue and 2 required green. The model learned the family shell but not the variant-control tokens.</p>
+
+<h3>Spec14b&ndash;15: Domain-Agnostic Single Families</h3>
+
+<p>The right insight: strip ALL topic/domain info from model-facing prompts. Individual families each got stable within their narrow contracts:</p>
+
+<ul>
+    <li><span class="timeline-badge green">spec15a R9</span> <code>memory_map</code> &mdash; decode-validated</li>
+    <li><span class="timeline-badge green">spec15b R2</span> <code>system_diagram</code> &mdash; decode-validated</li>
+    <li><span class="timeline-badge green">spec14b R3</span> <code>timeline</code> &mdash; decode-validated</li>
+</ul>
+
+<h3>Spec16: Multi-Family Unification &mdash; The Brittleness Wall</h3>
+
+<p>Combined three stable families into one model. <strong>R9 became the frozen winner at 81.25% exact.</strong> Then:</p>
+
+<table class="arc-table">
+    <thead>
+        <tr><th>Run</th><th>Exact</th><th>Renderable</th><th>What Happened</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><span class="timeline-badge green">R9</span></td><td>81.25%</td><td>95.8%</td><td>Frozen winner; best multi-family baseline</td></tr>
+        <tr><td><span class="timeline-badge">R11</span></td><td>81.25%</td><td>95.8%</td><td>Same rows as R9, slight reorder</td></tr>
+        <tr><td><span class="timeline-badge red">R12</span></td><td>0.0%</td><td>43.75%</td><td><strong>Total collapse.</strong> Same rows, 1/3 compute.</td></tr>
+    </tbody>
+</table>
+
+<div class="verdict-box">
+    <strong>Most important finding in the project:</strong> R12 used the <em>exact same row set</em> as R11 but with 1/3 the compute. Result: global output-contract collapse across all three families. Mixed-family tag soup, duplicated bundles, prompt-marker leakage. The repair-heavy curriculum is <strong>brittle</strong> &mdash; not robust to small perturbations in compute budget.
+</div>
+
+<h3>Spec17: The Intent Bridge &mdash; Where We Hit The Wall</h3>
+
+<p>Trying to learn: <code>topic + goal + audience &rarr; family + form + style + topology</code></p>
+
+<table class="arc-table">
+    <thead>
+        <tr><th>Run</th><th>Exact</th><th>Held-out Exact</th><th>What Happened</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>R1</td><td>7.1%</td><td>0%</td><td>Underpowered canary</td></tr>
+        <tr><td>R2</td><td>9.5%</td><td>0%</td><td>Blueprint/dataset mismatch; loss went <em>up</em></td></tr>
+        <tr><td>R4</td><td>9.5%</td><td>0%</td><td>Process bugs fixed; scaffold corrected; still zero generalization</td></tr>
+    </tbody>
+</table>
+
+<p>R4 is the cleanest read: scaffold corrected, full-pass canary, real contrast rows. Still <strong>zero held-out exact matches</strong>. The model emits syntactically valid bundles (71.4% renderable) but cannot route intent to the correct family/form/style combination.</p>
+
+<h3>Spec18: Routing-First Decomposition &mdash; Still Not Enough</h3>
+
+<p>Hypothesis: teach family+form routing first, delay style/topology. R1 result: <strong>4.76% exact, 0% held-out.</strong> Worse than spec17 R4. Curriculum decomposition alone was not sufficient at this model size and data mass.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="pattern">The Pattern: Why &ldquo;Progress in Rungs&rdquo; Keeps Failing</h2>
+
+<p>The recurring cycle across every spec:</p>
+
+<div class="code-block">New spec &rarr; early learning &rarr; narrow repair attempts &rarr;
+  fix one thing, break another &rarr; hit ceiling &rarr;
+    new spec &rarr; reset to near-zero &rarr; repeat</div>
+
+<p>This is not random bad luck. It is a structural problem with the rung-repair approach to training.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="root-causes">The 7 Root Causes</h2>
+
+<div class="root-cause-card">
+    <h4>1. The Narrow Repair Trap</h4>
+    <p>Adding repair rows to fix specific failures (missing <code>[/scene]</code>, wrong family) introduces noise that degrades previously-solved slices. Under cross-entropy, repair rows are just more positive targets &mdash; the model doesn&rsquo;t know they were &ldquo;corrections.&rdquo;</p>
+    <p><strong>Evidence:</strong> Spec12 R4 &mdash; more repair pressure &rarr; renderability collapsed from 90.9% to 45.5%. Spec16 R12 &mdash; repair-heavy curriculum collapsed entirely under reduced compute.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>2. Cross-Family Interference</h4>
+    <p>Strengthening one family weakens others. Each family competes for the same model capacity under standard cross-entropy training.</p>
+    <p><strong>Evidence:</strong> Spec12 R6 &mdash; memory_map went from 5/11 to 10/11, but decision_tree crashed from 11/11 to 3/11.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>3. The Generalization Wall</h4>
+    <p>Within every spec, memorizing seen prompts is easy (often 100% train exact). But held-out generalization stays near zero when the task requires compositional reasoning. The model learns <em>specific input&rarr;output mappings</em>, not the <em>underlying visual planning language</em>.</p>
+    <p><strong>Evidence:</strong> Spec17 R4 and Spec18 R1 &mdash; both 0% held-out exact despite clean process and scaffolds. Spec14a R1 &mdash; one default board replayed for all prompts.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>4. Measurement Bugs Masquerade as Training Failures</h4>
+    <p>Throughout the history: probe pipeline bugs, blueprint/catalog misalignment, seed integrity issues, decode budget problems, <code>rendered_svg_ok: null</code> despite correct output. Multiple rungs were wasted diagnosing infrastructure problems misidentified as training failures.</p>
+    <p><strong>Evidence:</strong> Spec14a R1 &mdash; probe adapter not registered. Spec17 R2 &mdash; audit validated the <em>blueprint</em>, not the <em>generated catalog</em>, so missing surfaces went undetected.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>5. Too Many Axes Change Between Specs</h4>
+    <p>Despite the methodology explicitly forbidding this, each new spec typically changes tokenizer + DSL grammar + prompt surface + curriculum + evaluation criteria simultaneously. This makes it impossible to attribute improvement or regression to any single cause.</p>
+    <p><strong>Evidence:</strong> Spec14a R2 had to be reclassified as a &ldquo;reset line&rdquo; because it changed tokenizer, prompt surface, curriculum, and dataset ordering all at once.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>6. Canary Budget Miscalibration</h4>
+    <p>Underpowered canaries can catch catastrophic collapse but cannot validate learning, especially for bridge/routing tasks that need multiple passes through the curriculum.</p>
+    <p><strong>Evidence:</strong> Spec17 R2 &mdash; ran 1/3 of one epoch per stage. Spec16 R12 &mdash; ran 1/3 of R11&rsquo;s compute. Both produced misleading results.</p>
+</div>
+
+<div class="root-cause-card">
+    <h4>7. The Semantic Gap Between Explicit and Intent Prompts</h4>
+    <p>Explicit control prompts work well (spec12 R17: 100%, spec16 R9: 81.25%). Intent prompts (topic+goal+audience &rarr; visual plan) are a fundamentally harder task requiring compositional generalization the tiny model hasn&rsquo;t achieved. This may be a genuine capacity/data-quality threshold, not just a curriculum-shape problem.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="bundle-emission">The Deepest Failure: Bundle-Emission Threshold</h2>
+
+<div class="verdict-box">
+    <strong>Post-review correction:</strong> The original analysis framed spec17/18 failures as &ldquo;wrong family choice&rdquo; &mdash; the model routing to the wrong family. That understates the problem. On held-out spec17, spec18, and spec19 rows, the model is often <strong>not emitting a parseable bundle family/form at all</strong>. The failure is upstream of misrouting.
+</div>
+
+<p>This is a critical distinction:</p>
+
+<table class="arc-table">
+    <thead>
+        <tr><th>Failure Level</th><th>What It Looks Like</th><th>What It Means</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Bundle-emission failure</strong></td>
+            <td>Output is prompt garbage, partial fragments, missing <code>[bundle]</code>, or no parseable family/form</td>
+            <td>The model has not generalized the bundle-emission contract itself to unseen prompt surfaces. The generalization threshold for structured output under novel prompts has not been crossed.</td>
+        </tr>
+        <tr>
+            <td>Family misrouting</td>
+            <td>Output is a valid bundle but with the wrong family or form for the intent</td>
+            <td>The model has generalized bundle emission but not the intent&rarr;family mapping. This would be a routing problem.</td>
+        </tr>
+        <tr>
+            <td>Style/topology drift</td>
+            <td>Output has the right family/form but wrong theme, tone, or counts</td>
+            <td>Routing works, fine-grained control does not. This is the easiest to fix.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>The spec17/18/19 evidence shows most held-out failures are at the <em>first</em> level, not the second or third. The model can emit valid bundles for seen training prompts (some train exact &gt; 0) but cannot transfer the bundle-emission pattern to novel prompt surfaces at all. This is a <strong>generalization threshold</strong> problem, and it means:</p>
+
+<ul>
+    <li>Curriculum decomposition alone (spec18&rsquo;s routing-first approach) is not enough if the model cannot even emit the container structure on novel inputs</li>
+    <li>The fix requires either a much larger and more diverse training corpus (so more prompt surfaces are &ldquo;seen&rdquo;) or more model capacity (so the structural pattern generalizes from fewer examples) or both</li>
+    <li>This is why the compiler-as-data-factory approach is so important: it can generate the volume and diversity of clean rows needed to push the emission threshold below the holdout surface</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="research">What the Research Says</h2>
+
+<p>Each paper maps directly to a problem observed in the spec history.</p>
+
+<div class="research-card">
+    <h4>Chinchilla: You&rsquo;re Probably Token-Starved</h4>
+    <p>Optimal token count scales linearly with parameter count at roughly 20 tokens per parameter. The narrow spec datasets may be undertrained in total tokens. More importantly, Chinchilla says compute should be split evenly between model size and data tokens. CKE retrains from scratch on each new spec rather than accumulating clean tokens.</p>
+    <p><strong>Applied to CKE:</strong> Compute packed token budgets and effective epochs per spec. Stop copying old totals into new DSLs. Accumulate rather than reset.</p>
+    <p class="paper-ref"><a href="https://proceedings.neurips.cc/paper_files/paper/2022/hash/c1e2faff6f588870935f114ebe04a3e5-Abstract-Conference.html">Hoffmann et al., 2022 &mdash; Training Compute-Optimal Large Language Models</a></p>
+</div>
+
+<div class="research-card">
+    <h4>Grokking: Train Long &mdash; But Only After Clean Data</h4>
+    <p>On small algorithmic datasets, models first memorize, then <strong>much later</strong> (sometimes 100x the memorization compute) suddenly generalize. Weight decay is the key lever &mdash; it penalizes memorized solutions and forces the model toward the simpler generalizing solution.</p>
+    <p><strong>Applied to CKE:</strong> The pattern of running a few rungs and then changing the spec when generalization doesn&rsquo;t emerge may be exactly wrong. The model might need to train much longer on a stable contract with strong weight decay. However, &ldquo;train longer&rdquo; is a hypothesis to test <em>after</em> the corpus is large and clean via compiler-generated data, not a prescription to run longer on the current small hand-mapped datasets. Grokking on a noisy 90-row corpus would just be grokking noise.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2201.02177">Power et al., 2022 &mdash; Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets</a></p>
+</div>
+
+<div class="research-card">
+    <h4>phi-1: Data Quality Is Your Biggest Lever</h4>
+    <p>A 1.3B model trained on 7GB of &ldquo;textbook-style&rdquo; code data beat models trained on 50x more tokens. The key: <strong>dense, structured, pedagogically ordered</strong> data. CKE&rsquo;s SVG domain is perfect for this &mdash; you can programmatically generate structurally valid, maximally diverse training data.</p>
+    <p><strong>Applied to CKE:</strong> Use the compiler <em>backward</em> to generate thousands of valid scene bundles programmatically with controlled variation. Every row compiler-verified. No hand-mapping. Repair/hygiene rows can still exist for closure and stop-boundary teaching, but they should be a small capped fraction, not the curriculum backbone.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2306.11644">Gunasekar et al., 2023 &mdash; Textbooks Are All You Need</a></p>
+</div>
+
+<div class="research-card">
+    <h4>Codex/HumanEval: pass@k as Diagnostic, Greedy as Gate</h4>
+    <p>pass@k: generate k samples and check if <em>any</em> are correct. CKE&rsquo;s greedy exact-match at temperature=0 is the harshest possible evaluation. For structured output with a deterministic compiler, generating 5-10 candidates and picking the one that compiles correctly is a powerful <strong>inference tactic and diagnostic tool</strong>.</p>
+    <p><strong>Applied to CKE:</strong> The compiler is a structural filter. Use pass@k as a side analysis to understand model capability and as a practical inference strategy. However, <strong>promotion gates should stay on greedy held-out exactness</strong>. If a model only succeeds via sampling luck, it is hiding training weakness, not solving the problem. pass@k tells you &ldquo;how close is the model to working?&rdquo; &mdash; greedy exact tells you &ldquo;does the model actually know this?&rdquo;</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2107.03374">Chen et al., 2021 &mdash; Evaluating Large Language Models Trained on Code</a></p>
+</div>
+
+<div class="research-card">
+    <h4>CodeT5: Identifier-Aware Pre-Training</h4>
+    <p>Code identifiers need specific pre-training signals beyond next-token prediction. CKE&rsquo;s DSL tokens (<code>[layout:poster_stack]</code>, <code>[theme:infra_dark]</code>, <code>[tone:amber]</code>) are exactly like code identifiers &mdash; they have constrained semantics.</p>
+    <p><strong>Applied to CKE:</strong> Consider pre-training objectives that specifically teach relationships between DSL tokens: masked scene-attribute prediction, contrastive objectives between valid/invalid attribute combinations, or denoising objectives that corrupt one scene field and train the model to restore it.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2109.00859">Wang et al., 2021 &mdash; CodeT5: Identifier-aware Unified Pre-trained Encoder-Decoder Models</a></p>
+</div>
+
+<div class="research-card">
+    <h4>AlphaCode: Generate-Then-Filter</h4>
+    <p>Generate many candidates, filter by structural validity. Combined with CKE&rsquo;s deterministic compiler, this is directly applicable: generate 10-50 candidate bundles, compile each one, score by structural validity + visual similarity, keep the best.</p>
+    <p><strong>Applied to CKE:</strong> Turns the model from &ldquo;must be exact&rdquo; to &ldquo;must be roughly right,&rdquo; which is a much easier task. The compiler does the precision work.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2203.07814">Li et al., 2022 &mdash; Competition-Level Code Generation with AlphaCode</a></p>
+</div>
+
+<div class="research-card">
+    <h4>NVIDIA Nemotron: Systematic Data Curation</h4>
+    <p>Nemotron&rsquo;s approach: quality-score every row with a lightweight model (filter out low quality), generate synthetic variations systematically, deduplicate aggressively, and maintain explicit measured mixing ratios between data categories.</p>
+    <p><strong>Applied to CKE:</strong> Treat the scene bundle corpus like Nemotron treats code data. Generate synthetic variations systematically. Quality-score every row before training. Maintain explicit mixing ratios with named buckets. Spec18 started doing this with named dataset buckets &mdash; keep going.</p>
+    <p class="paper-ref"><a href="https://huggingface.co/collections/nvidia/nemotron-v3-pre-training">NVIDIA Nemotron-v3 Pre-training Collection</a> &bull; <a href="https://arxiv.org/abs/2508.14444">Nemotron Nano 2 Tech Report</a></p>
+</div>
+
+<div class="research-card">
+    <h4>Where To Store The Evidence</h4>
+    <p>Training conclusions are only useful if they remain attached to the exact run that produced them. That means audits, probe reports, failure autopsies, compiler smoke previews, dataset manifests, and run briefs should live in the cache-root run artifact folder under <code>~/.cache/ck-engine-v7/models/train/&lt;run&gt;/</code>, not only in repo-side scratch notes.</p>
+    <p><strong>Applied to CKE:</strong> Treat each run directory as the canonical retrieval unit for LFS export, IR Hub browsing, and later operator review. The repository should keep scripts, templates, and documentation; the run directory should keep the generated evidence.</p>
+</div>
+
+<div class="research-card">
+    <h4>Deduplication: Outsized Impact on Generalization</h4>
+    <p>Deduplication of training data has outsized impact on generalization because it removes the memorization shortcut. When the same (or near-same) row appears many times, the model learns to replay it rather than learning the underlying structure.</p>
+    <p><strong>Applied to CKE:</strong> Spec14a&rsquo;s block-ordered corpus with 48 identical rows in sequence is the worst case for this. Interleave, deduplicate, and diversify.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2107.06499">Lee et al., 2022 &mdash; Deduplication of Training Data Makes Language Models Better</a></p>
+</div>
+
+<div class="research-card">
+    <h4>Memorization Without Overfitting</h4>
+    <p>Some memorization is actually necessary for tail distribution generalization. The model <em>needs</em> to memorize rare patterns to generalize from them. The problem is when memorization becomes the <em>only</em> strategy because the data doesn&rsquo;t create enough generalization pressure.</p>
+    <p><strong>Applied to CKE:</strong> Spec14a&rsquo;s default-board collapse is the textbook case: the model memorized the head of the distribution and ignored the tail. Weight decay + longer training + diverse data creates the pressure to move past memorization.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2012.09413">Feldman &amp; Zhang, 2020 &mdash; What Neural Networks Memorize and Why</a></p>
+</div>
+
+<div class="research-card">
+    <h4>ELECTRA: Efficient Structural Pre-Training</h4>
+    <p>Replaced token detection is a more efficient pre-training signal than masked language modeling, and it is closer to a <em>structural correctness signal</em> than cross-entropy loss. For a formal DSL, a &ldquo;detect the corrupted scene field&rdquo; objective could create stronger structural priors.</p>
+    <p><strong>Applied to CKE:</strong> Instead of pure next-token prediction, consider a discriminative objective: present the model with a scene bundle where one field is wrong (wrong family, wrong form, wrong tone) and train it to identify the corrupted field.</p>
+    <p class="paper-ref"><a href="https://arxiv.org/abs/2003.10555">Clark et al., 2020 &mdash; ELECTRA: Pre-training Text Encoders as Discriminators</a></p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="forward">How to Think About Training From Now On</h2>
+
+<h3>The Fundamental Shift: From Artisanal to Systematic</h3>
+
+<p>The project has been treating training like craftsmanship &mdash; hand-map assets, hand-tune repair rows, hand-balance family pressure, hand-read autopsies. This doesn&rsquo;t scale and creates the rung-repair trap. The shift should be toward systematic, compiler-driven data generation.</p>
+
+<div class="forward-card">
+    <h4>1. Compiler-As-Oracle: Generate Training Data Programmatically</h4>
+    <p>You have a deterministic compiler. This is your biggest asset. Use it <em>backward</em>:</p>
+<div class="code-block">For each (family, form) in family_registry:
+  For each (theme, tone, density) in style_combinations:
+    For each topology_config in valid_topologies(family, form):
+      bundle = generate_scene_bundle(family, form, theme, tone, density, topology)
+      svg = compile(bundle, content_template)
+      if svg validates:
+        add_to_corpus(prompt_template(family, form, ...), bundle)</div>
+    <p>This gives you <em>thousands</em> of structurally perfect training rows with controlled variation along every axis. No hand-mapping. Closure/stop hygiene rows are still legitimate as a tightly capped fraction (5-10%), but the corpus backbone should be compiler-verified clean rows, not repair-heavy curricula.</p>
+</div>
+
+<div class="forward-card">
+    <h4>2. Fix the Contract, Then Train Long (Grokking Approach)</h4>
+    <p>Stop changing the contract after every few rungs. Instead:</p>
+    <ul>
+        <li>Fix the scene bundle grammar <strong>once</strong></li>
+        <li>Fix the tokenizer <strong>once</strong></li>
+        <li>Fix the prompt surface <strong>once</strong></li>
+        <li>Generate a <strong>much larger</strong>, clean, programmatic corpus via compiler-generated lattice</li>
+        <li>Then and only then: train for much longer with weight decay on that frozen recipe</li>
+        <li>Watch for the grokking transition: memorization &rarr; sudden generalization</li>
+    </ul>
+    <p>The current pattern of 4-12 rungs per spec with curriculum tweaks between each is <em>preventing</em> grokking by constantly resetting the learning surface. But &ldquo;train longer&rdquo; is only a good experiment after steps 1-4 above are done. Training longer on a small noisy corpus is not the answer.</p>
+</div>
+
+<div class="forward-card">
+    <h4>3. Separate Routing from Scene Planning</h4>
+    <p>Spec17 and spec18 proved that <code>intent &rarr; family+form+style+topology</code> is genuinely harder than <code>explicit controls &rarr; scene bundle</code>. The right decomposition:</p>
+    <ul>
+        <li><strong>Router</strong> (separate model or deterministic rules): <code>topic + goal + audience &rarr; family + form + style_defaults</code></li>
+        <li><strong>Scene model</strong>: <code>explicit family + form + style &rarr; scene bundle</code></li>
+    </ul>
+    <p>The scene model is already proven to work under explicit control (spec16 R9). The routing can be a separate, potentially simpler model or even rule-based. This is how AlphaCode works &mdash; decompose the hard problem into an easier planning step and a constrained generation step.</p>
+</div>
+
+<div class="forward-card">
+    <h4>4. Use pass@k + Compiler Filtering as Diagnostic and Inference Tactic</h4>
+    <p>Do not require greedy exact match as the <em>only</em> way to understand model capability. Use pass@k as a side analysis:</p>
+<div class="code-block">candidates = [model.generate(prompt, temperature=0.3) for _ in range(10)]
+valid = [c for c in candidates if compiler.validates(c)]
+best = rank_by_structural_score(valid)</div>
+    <p>This leverages the compiler as a free structural verifier at inference time. However, <strong>promotion should still be based on greedy held-out exactness</strong>. pass@k is diagnostic (&ldquo;how close is the model?&rdquo;) and practical (&ldquo;can we get usable output?&rdquo;), but it does not mean training is solved.</p>
+</div>
+
+<div class="forward-card">
+    <h4>5. Textbook-Style Data (phi-1 Approach)</h4>
+    <p>For the routing problem specifically, generate &ldquo;textbook&rdquo; training data with explicit pedagogical structure:</p>
+<div class="code-block"># Lesson 1: Memory maps have regions and spans
+[intent: show memory layout]   &rarr; family: memory_map
+[intent: compare memory sizes]  &rarr; family: memory_map
+
+# Lesson 2: Timelines have sequential stages
+[intent: show project phases]   &rarr; family: timeline
+[intent: compare before/after]  &rarr; family: timeline
+
+# Lesson 3: Distinguish similar intents
+[intent: show component connections]  &rarr; family: system_diagram (NOT memory_map)
+[intent: show data flow between layers] &rarr; family: system_diagram (NOT timeline)</div>
+    <p>Each lesson teaches one distinction with explicit contrast. This is what spec18 contrast scaffolds attempted, but mixed into noisy curricula. Separate them into a clean pedagogical progression.</p>
+</div>
+
+<div class="forward-card">
+    <h4>6. Deterministic Pre-Checks Before Every Training Dollar</h4>
+    <p>Make these <strong>automated gates</strong>, not manual reviews:</p>
+<div class="code-block">BEFORE TRAINING:
+  &check; Blueprint matches generated catalog       (spec17 R2 bug)
+  &check; Token budget covers &ge;1 full epoch/stage  (spec17 R2 budget bug)
+  &check; No row appears &gt;3x in sequence            (spec14a ordering bug)
+  &check; Seed checkpoint probes non-zero on anchors (seed integrity gate)
+  &check; Compiler round-trips all gold scenes       (compiler-first rule)
+  &check; Mixing ratios match bucket manifest        (spec18 bucket discipline)
+  &check; Tokenizer covers all gold tokens, no &lt;unk&gt; (tokenizer gate)
+
+AFTER TRAINING:
+  &check; Held-out exact &gt; 0                         (hard gate)
+  &check; No family regression &gt; 10% from baseline   (non-regression gate)
+  &check; Raw AND repaired metrics reported separately (honest accounting)</div>
+</div>
+
+<div class="forward-card">
+    <h4>7. Accumulate Rather Than Reset</h4>
+    <p>Instead of starting each spec from scratch, consider curriculum continuation:</p>
+    <ul>
+        <li><strong>Phase 1:</strong> Train on explicit-control bundles until 100% exact (proven to work)</li>
+        <li><strong>Phase 2:</strong> Gradually introduce intent prompts while keeping 50%+ explicit anchors</li>
+        <li><strong>Phase 3:</strong> Gradually reduce explicit anchors as intent routing improves</li>
+    </ul>
+    <p>This mirrors how distillation works &mdash; start from a strong known capability and gradually shift the distribution, rather than jumping to the hard task cold.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="rung-loop">Rungs As Coverage Sensors</h2>
+
+<p>Once a branch becomes stable enough, a rung should teach us <strong>which region of the task is under-covered</strong>, not which exact prompts to memorize. This is the operational difference between healthy curriculum iteration and the old narrow-fix treadmill.</p>
+
+<div class="forward-card">
+    <h4>The Healthy Rung Loop</h4>
+<div class="code-block">1. Train a stable rung on a frozen contract.
+2. Autopsy misses by class: family, form, style, syntax, topology.
+3. Translate those misses into generalized curriculum gaps.
+4. Add broader neighbor coverage plus replay of the winning corpus.
+5. Re-run and check whether the miss class shrinks without broad regression.</div>
+    <p>The key rule: do <strong>not</strong> answer a miss by teaching the exact held-out prompt. Answer it by teaching the surrounding region of the task so the next rung gets a fuller flavor of the data distribution.</p>
+</div>
+
+<div class="forward-card">
+    <h4>How To Read Progress Correctly</h4>
+    <p>If a new rung improves several regions while regressions stay limited and structured, that is a <strong>learnability signal</strong>. It means the branch is no longer mostly collapsing; it is exposing deterministic curriculum gaps that can be engineered.</p>
+    <ul>
+        <li><strong>Bad signal:</strong> broad collapse, reset-to-zero behavior, or diffuse regressions across all splits.</li>
+        <li><strong>Good signal:</strong> one error class disappears, another shrinks, and the remaining misses cluster into a few interpretable classes.</li>
+        <li><strong>Interpretation:</strong> the curriculum mix is still incomplete, not the whole branch concept.</li>
+    </ul>
+</div>
+
+<div class="verdict-box">
+    <strong>Applied to spec19:</strong> the line is now stable enough that rung-to-rung miss-shift is meaningful. The work is no longer guessing or resetting; it is coverage engineering. That means <code>spec19</code> stays in <em>rung mode</em>, not new-spec mode, until the remaining miss classes stop shrinking.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="working-thesis">The Working Thesis for Next Training</h2>
+
+<div class="verdict-box">
+    <strong>Post-review consensus (2026-04-02):</strong> The analysis above is directionally right. The compiler-as-data-factory point is the strongest part. The &ldquo;fix once, train long&rdquo; point is also right, but only after the dataset becomes much larger and cleaner. The routing/planning split is a serious practical option, not just a fallback.
+</div>
+
+<p>If we continue to the next training run, this is the working thesis:</p>
+
+<table class="arc-table">
+    <thead>
+        <tr><th>Step</th><th>Action</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><span class="timeline-badge">1</span></td>
+            <td><strong>Freeze the current bundle contract and tokenizer.</strong></td>
+            <td>No more simultaneous contract changes. One stable learning surface.</td>
+        </tr>
+        <tr>
+            <td><span class="timeline-badge">2</span></td>
+            <td><strong>Generate a much larger compiler-verified lattice of clean rows.</strong></td>
+            <td>Use the compiler backward to systematically cover the family&times;form&times;style&times;topology combinatorial space. This is the phi-1 insight applied to CKE: dense, structured, pedagogically ordered data beats hand-mapped artisanal rows.</td>
+        </tr>
+        <tr>
+            <td><span class="timeline-badge">3</span></td>
+            <td><strong>Run one long same-size experiment on that frozen recipe.</strong></td>
+            <td>Test whether the generalization threshold can be crossed at current capacity with enough clean data and training time. This is the Grokking experiment: stable contract, large clean corpus, weight decay, extended training.</td>
+        </tr>
+        <tr>
+            <td><span class="timeline-badge">4</span></td>
+            <td><strong>In parallel or immediately after, run a same-data capacity canary.</strong></td>
+            <td>Cleanly separate the capacity question from the data question. If step 3 still shows zero held-out generalization on a large clean corpus, capacity may actually be the bottleneck for the intent-routing task specifically. This is the experiment that would prove it.</td>
+        </tr>
+        <tr>
+            <td><span class="timeline-badge">5</span></td>
+            <td><strong>Keep pass@k as side analysis, not the main success criterion.</strong></td>
+            <td>Promotion should still be based on greedy held-out exactness. pass@k is diagnostic and practical but does not prove training quality.</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>This sequence is ordered by information value. Steps 1-2 are prerequisites. Step 3 tests the main hypothesis (data quality + training duration). Step 4 tests the alternative hypothesis (capacity). Step 5 keeps measurement honest throughout.</p>
+
+<div class="root-cause-card">
+    <h4>What This Thesis Does Not Claim</h4>
+    <ul>
+        <li>&ldquo;Capacity is irrelevant&rdquo; &mdash; it may be the bottleneck for intent routing. Step 4 tests this.</li>
+        <li>&ldquo;Training longer always works&rdquo; &mdash; it only makes sense after the corpus is large and clean. Step 2 is a prerequisite for step 3.</li>
+        <li>&ldquo;Repair rows are bad&rdquo; &mdash; closure/stop hygiene rows are still legitimate when tightly capped. The problem is repair-<em>heavy</em> curricula.</li>
+        <li>&ldquo;The model just picks the wrong family&rdquo; &mdash; on held-out rows, the failure is often upstream: the model is not emitting a parseable bundle at all. This is a generalization threshold problem, not just a routing problem.</li>
+    </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="mental-model">The Mental Model: Tokenization &rarr; Output</h2>
+
+<p>When you look at a new training task, trace this chain mentally before spending any compute:</p>
+
+<div class="code-block">1. TOKENIZER: Can every target token be represented atomically?
+   If not &rarr; fix tokenizer first (spec03 lesson)
+
+2. CONTEXT BUDGET: Does the longest gold output fit in &lt;80% of context?
+   If not &rarr; compress DSL or raise context (spec12 token budget lesson)
+
+3. COMPILER ROUND-TRIP: Can the compiler reproduce every gold asset from the DSL?
+   If not &rarr; fix compiler first (the compiler-first principle)
+
+4. DATA QUALITY: Is every training row compiler-verified and structurally valid?
+   If not &rarr; generate programmatically, don&rsquo;t hand-map (phi-1 lesson)
+
+5. DATA DIVERSITY: Does the corpus cover all axis combinations evenly?
+   If not &rarr; generate systematically across the combinatorial space
+
+6. MEASUREMENT: Are probes testing the right thing? Is infrastructure correct?
+   If not &rarr; fix probes first (spec17 R2 catalog bug lesson)
+
+7. TRAINING BUDGET: Is there enough compute for &ge;5 full epochs with weight decay?
+   If not &rarr; train longer before changing anything (Grokking lesson)
+
+8. ONLY THEN: If all above are clean and the model still plateaus
+   &rarr; consider capacity increase</div>
+
+<p>This ordering is not arbitrary. It reflects the actual failure history of the project: most wasted rungs were caused by problems at levels 1-6, not level 8.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="superpower">The Superpower We&rsquo;re Underusing</h2>
+
+<div class="superpower-box">
+    <h3>The Deterministic Compiler Is the Single Biggest Advantage This Project Has</h3>
+    <p>Most ML projects would kill for a structural oracle. Stop treating it as a downstream consumer and start treating it as:</p>
+    <p>
+        <span class="timeline-badge green">Data Factory</span> Generate unlimited clean training rows<br>
+        <span class="timeline-badge blue">Diagnostic Gate</span> pass@k filtering at inference; greedy exactness for promotion<br>
+        <span class="timeline-badge">Measurement Oracle</span> Automated pre/post-training verification
+    </p>
+</div>
+
+<div class="verdict-box">
+    <strong>TL;DR &mdash; Why we&rsquo;re struggling:</strong> We keep changing the training contract too often, using hand-crafted repair-heavy curricula that create brittleness, stopping before grokking can occur, and trying to make one tiny model do both routing and scene planning. On held-out rows, the model often cannot even emit a parseable bundle &mdash; a generalization threshold problem upstream of family misrouting. Each narrow rung repair fixes one thing and breaks another, creating a treadmill.
+</div>
+
+<div class="verdict-box">
+    <strong>How to break out:</strong> Generate training data programmatically from the compiler (phi-1 approach). Fix the contract once and train much longer on the larger clean corpus (Grokking approach). Separate routing from scene planning (AlphaCode approach). Use pass@k + compiler filtering as diagnostic and inference tactic, but keep greedy held-out exactness as the promotion gate (Codex approach). Automate all measurement gates so infrastructure bugs never waste another rung. Test capacity as a clean separate experiment, not as a guess.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="related">Related Pages</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
+
+    <a href="spec19-textbook-routing-mixture.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(76,175,80,0.2); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#81c784;">Spec19 Textbook Routing Mixture</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">The current active spec applying the lessons from this page: compiler-generated lattice, frozen contract, routing-first curriculum.</span>
+    </a>
+
+    <a href="spec-training-method.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">Spec Training Method</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">The methodology for separating asset libraries, DSLs, compilers, token boundaries, and per-run report decisions.</span>
+    </a>
+
+    <a href="training-curriculum.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">Training Curriculum</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">The CK-native version ladder from v7 foundation work through scale, modalities, and deployment.</span>
+    </a>
+
+    <a href="training-intuition.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">Deep Training Intuition</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">Visibility stack, checkpoint strategy, 12-experiment curriculum, gradient triage, and diagnostic phases.</span>
+    </a>
+
+    <a href="v7-training-progression-playbook.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">v7 Training Progression Playbook</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">Operator playbook for SVG, routing, and code experiment tracks with the repeatable pipeline.</span>
+    </a>
+
+    <a href="spec-training-results.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">Spec Training Results</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">Manifest-driven run history with best rungs, recent results, and the stable/raw artifact split.</span>
+    </a>
+
+    <a href="research.html" style="display:block; padding:1rem; background:rgba(13,27,42,0.5); border:1px solid rgba(255,180,0,0.12); border-radius:10px; text-decoration:none; color:inherit;">
+        <strong style="color:#ffb400;">Research Tracker</strong><br>
+        <span style="font-size:0.9rem; color:rgba(255,255,255,0.55);">The broader research page feeding later version tracks: multimodal, sparse architectures, and more.</span>
+    </a>
+
+</div>

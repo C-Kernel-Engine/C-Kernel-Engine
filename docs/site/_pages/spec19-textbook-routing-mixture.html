@@ -1,0 +1,417 @@
+<!-- TITLE: Spec19 Textbook Routing Mixture -->
+<!-- NAV: quickstart -->
+
+<style>
+.spec19-callout {
+    margin: 1.2rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    background: linear-gradient(145deg, rgba(255,180,0,0.10), rgba(7,173,248,0.07));
+    border: 1px solid rgba(255,180,0,0.22);
+}
+
+.spec19-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1.4rem 0;
+}
+
+.spec19-card {
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.spec19-card h3 {
+    margin-top: 0;
+}
+</style>
+
+<h1>Spec19 Textbook Routing Mixture</h1>
+
+<p>
+    <code>spec19</code> is the recommended next branch after the bounded-intent experiments on top of the frozen
+    <code>spec16</code> scene-bundle winner. The point is not to keep churning near-identical routing rungs.
+    The point is to change the data philosophy in a controlled way: explicit named mixture buckets, denser
+    textbook-style routing coverage, cleaner minimal pairs, and capacity as a separate fallback lever instead of
+    a hidden curriculum tweak.
+</p>
+
+<div class="spec19-callout">
+    <strong>Current branch decision:</strong> <code>spec17</code> was a useful diagnostic bridge and <code>spec18</code>
+    proved the routing-first launcher path end to end, but <code>spec18 r1</code> still ended with zero held-out exactness.
+    That blocks <code>spec18 r2</code> on the same recipe. The next public recommendation is a new branch:
+    <code>spec19</code>.
+</div>
+
+<h2>Why Spec19 Exists</h2>
+
+<div class="spec19-grid">
+    <div class="spec19-card">
+        <h3>Spec17 Fixed The Question</h3>
+        <p>
+            <code>spec17</code> established the real problem: bounded intent is a planning task, not just a syntax task.
+            It also forced better audits and cleaner contrast coverage.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>Spec18 Fixed The Launch Shape</h3>
+        <p>
+            <code>spec18</code> kept the same compiler, renderer, tokenizer, and shared <code>[bundle]</code> contract while
+            testing a routing-first curriculum. The run path was correct and reproducible.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>Held-Out Routing Still Failed</h3>
+        <p>
+            <code>spec18 r1</code> ended with overall exactness around <code>4.8%</code>, but visible and hidden held-out exactness
+            stayed at <code>0%</code>. That means the remaining problem is not a missing guardrail. It is still a data and capacity question.
+        </p>
+    </div>
+</div>
+
+<h2>What To Copy From The Papers And The NVIDIA Dataset Lesson</h2>
+
+<div class="spec19-grid">
+    <div class="spec19-card">
+        <h3>Named Mixtures, Not One Blob</h3>
+        <p>
+            The useful lesson from NVIDIA's large public pretraining collections is organizational: split the corpus into named
+            components with explicit provenance and mixture control. For CK-native training, that means versioned bucket ids,
+            row counts, token counts, and stage weights.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>phi-1: Increase Structural Density</h3>
+        <p>
+            Prefer clean, compiler-validated, textbook-style teaching rows over more noisy coverage. The next branch should spend
+            more mass on direct routing supervision and minimal pairs than on broad scaffold language.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>Grokking: Stop Same-Shape Churn</h3>
+        <p>
+            If loss moves and held-out exactness stays flat, that is a block on repeating the same training style. Another
+            <code>spec18</code> rung with the same recipe would likely add cost without adding clarity.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>HumanEval / Codex: Measure Correctness</h3>
+        <p>
+            Renderable-but-wrong rows are semantic failures, not wins. Promotion should still depend on held-out exactness.
+            Sidecar best-of-<code>k</code> analysis can help diagnose whether the model knows more than greedy decode shows.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>CodeT5: Score Fields, Not Just Strings</h3>
+        <p>
+            Bundle tags behave like code identifiers with constrained semantics. That means evaluation should separate syntax from
+            family, form, style, and topology errors instead of collapsing everything into one exact-match bucket.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>AlphaCode: Generate Then Filter</h3>
+        <p>
+            The compiler is a structural oracle. Best-of-<code>k</code> decode plus compiler filtering is a valid sidecar metric
+            and practical inference path when syntax is close but greedy decode is brittle.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>Nemotron: Curate The Mixture Explicitly</h3>
+        <p>
+            The dataset lesson is operational, not mystical: keep named buckets, provenance, dedupe discipline, and measured
+            mix ratios. The run artifact directory should record those manifests so the branch can be replayed or shipped.
+        </p>
+    </div>
+</div>
+
+<h2>Hard Boundary</h2>
+
+<div class="spec19-grid">
+    <div class="spec19-card">
+        <h3>Keep Fixed</h3>
+        <ul>
+            <li>Seed from frozen <code>spec16 r9</code>.</li>
+            <li>Freeze the tokenizer unless a tokenizer branch is the explicit axis.</li>
+            <li>Keep the same shared <code>[bundle] ... [/bundle]</code> output contract.</li>
+            <li>Keep the same deterministic renderer and compiler boundary.</li>
+        </ul>
+    </div>
+    <div class="spec19-card">
+        <h3>Change One Main Thing</h3>
+        <ul>
+            <li>Change the dataset philosophy, not the whole stack at once.</li>
+            <li>Move to named mixture buckets.</li>
+            <li>Increase direct routebook density and minimal-pair coverage.</li>
+            <li>Separate any later capacity step into its own branch decision.</li>
+        </ul>
+    </div>
+    <div class="spec19-card">
+        <h3>Do Not Regress Into</h3>
+        <ul>
+            <li>warning-language repair rows</li>
+            <li>raw SVG targets</li>
+            <li>prompt-contamination teaching</li>
+            <li>blurry runs that change curriculum and capacity together</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Named Mixture Buckets</h2>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Bucket</th>
+            <th>Purpose</th>
+            <th>Typical contents</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>Anchor Replay</code></td>
+            <td>Preserve closure and exact bundle syntax.</td>
+            <td>Explicit bundle anchors, clean-stop anchors, permuted explicit anchors.</td>
+        </tr>
+        <tr>
+            <td><code>Routebook Direct</code></td>
+            <td>Teach <code>topic + goal + audience -&gt; family + form</code>.</td>
+            <td>Short direct prompts with deterministic lexical templates and canonical targets.</td>
+        </tr>
+        <tr>
+            <td><code>Form Minimal Pairs</code></td>
+            <td>Separate sibling forms inside one family.</td>
+            <td>Near-neighbor prompts with one controlled form-changing difference.</td>
+        </tr>
+        <tr>
+            <td><code>Family Minimal Pairs</code></td>
+            <td>Separate similar intents across different families.</td>
+            <td>Cross-family contrasts with explicit distractor structure when needed.</td>
+        </tr>
+        <tr>
+            <td><code>Routebook Paraphrase</code></td>
+            <td>Strengthen prompt-surface robustness after the direct route is learned.</td>
+            <td>Reordered tags, plain-language paraphrases, and small lexical alternations.</td>
+        </tr>
+        <tr>
+            <td><code>Style/Topology Bridge</code></td>
+            <td>Widen to style and count inference only after routing rows exist in mass.</td>
+            <td>Bounded <code>emphasis</code>, <code>constraint</code>, and <code>content_pack</code> hints.</td>
+        </tr>
+        <tr>
+            <td><code>Repair Hygiene</code></td>
+            <td>Keep narrow closure cleanup separate from semantic teaching.</td>
+            <td>Stop-boundary and singleton cleanup only, no broad warning prose.</td>
+        </tr>
+        <tr>
+            <td><code>Holdout / Hidden</code></td>
+            <td>Evaluation only.</td>
+            <td>Visible routing holdouts, hidden paraphrase, hidden recombination.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Stage Mix</h2>
+
+<h3>Stage A: Route Lock</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Surface family</th>
+            <th>Weight</th>
+            <th>Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>anchors</td>
+            <td><code>20%</code></td>
+            <td>Keep the solved shared bundle contract alive.</td>
+        </tr>
+        <tr>
+            <td><code>routebook_direct</code></td>
+            <td><code>25%</code></td>
+            <td>Make direct routing the center of mass.</td>
+        </tr>
+        <tr>
+            <td><code>form_minimal_pairs</code></td>
+            <td><code>20%</code></td>
+            <td>Force sibling-form discrimination.</td>
+        </tr>
+        <tr>
+            <td><code>family_minimal_pairs</code></td>
+            <td><code>15%</code></td>
+            <td>Force cross-family discrimination.</td>
+        </tr>
+        <tr>
+            <td><code>routebook_paraphrase</code></td>
+            <td><code>10%</code></td>
+            <td>Improve robustness without widening semantics too early.</td>
+        </tr>
+        <tr>
+            <td><code>style_topology_bridge</code> + hygiene</td>
+            <td><code>10%</code></td>
+            <td>Keep widening pressure present, but subordinate to routing.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Stage B: Controlled Widening</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Surface family</th>
+            <th>Weight</th>
+            <th>Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>anchors</td>
+            <td><code>20%</code></td>
+            <td>Preserve non-regression on the solved contract.</td>
+        </tr>
+        <tr>
+            <td>direct + minimal-pair routing</td>
+            <td><code>45%</code></td>
+            <td>Routing stays dominant even while the target space widens.</td>
+        </tr>
+        <tr>
+            <td><code>routebook_paraphrase</code></td>
+            <td><code>10%</code></td>
+            <td>Keep surface robustness under the same semantic contract.</td>
+        </tr>
+        <tr>
+            <td><code>style_topology_bridge</code></td>
+            <td><code>20%</code></td>
+            <td>Add style and topology only after stronger routing coverage exists.</td>
+        </tr>
+        <tr>
+            <td>recombination + hygiene</td>
+            <td><code>5%</code></td>
+            <td>Probe whether routing survives slightly broader combinations.</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Recommended Run Sequence</h2>
+
+<div class="spec19-grid">
+    <div class="spec19-card">
+        <h3>Spec19 R1 Canary</h3>
+        <p>
+            Keep the current architecture first. The question is whether the routebook mixture changes held-out exactness
+            without introducing new stack risk.
+        </p>
+        <ul>
+            <li>same frozen tokenizer</li>
+            <li>same <code>spec16 r9</code> seed</li>
+            <li>same shared bundle contract</li>
+            <li>full-pass canary only</li>
+        </ul>
+    </div>
+    <div class="spec19-card">
+        <h3>Gate For Promotion</h3>
+        <p>
+            Require nonzero exactness on both visible held-out splits and at least one hidden split. Renderability alone
+            is not enough.
+        </p>
+    </div>
+    <div class="spec19-card">
+        <h3>If It Is Still Zero</h3>
+        <p>
+            Treat that as a clean signal that the current model size may be the limit. Run a separate capacity canary on
+            the same <code>spec19</code> dataset recipe instead of silently changing data and model size together.
+        </p>
+    </div>
+</div>
+
+<h2>How To Read The Spec19 Rungs</h2>
+
+<p>
+    By 2026-04-02, <code>spec19</code> is no longer a reset line. It is a learnable rung line. The main question is no longer
+    “does this branch work at all?” but “which curriculum regions are still under-covered?”
+</p>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Rung</th>
+            <th>What changed</th>
+            <th>What it taught</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>r2</code></td>
+            <td>Expanded corpus, stronger compiler smoke gating, longer real training budget.</td>
+            <td>First real bounded-intent success. Held-out exactness crossed above zero on every split, proving the branch is learnable.</td>
+        </tr>
+        <tr>
+            <td><code>r3b</code></td>
+            <td>Coherent replay union of prior train corpora with clean eval collision filtering.</td>
+            <td>Replay-heavy cumulative data improved aggregate exactness, but visible <code>test</code> regressed. That showed replay helps, but the coverage was still unbalanced.</td>
+        </tr>
+        <tr>
+            <td><code>r3c</code></td>
+            <td><code>r3b</code> replay base plus broader neighbor coverage around persistent miss classes.</td>
+            <td>Visible <code>test</code> recovered to <code>10/10</code> and the <code>family</code> miss class disappeared entirely. Aggregate exactness did not rise because the remaining pressure moved into <code>style</code> and <code>syntax</code>.</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="spec19-callout">
+    <strong>Interpretation:</strong> this is now a curriculum-coverage problem, not another branch-reset problem. A rung should teach
+    which regions are under-supported, not which exact prompts to memorize. The next additions should widen coverage around the
+    surviving miss classes while keeping strong replay from the winning corpus.
+</div>
+
+<h3>Current Error-Class Shift</h3>
+
+<table class="axis-table">
+    <thead>
+        <tr>
+            <th>Rung</th>
+            <th>Failure mix</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>r3b</code></td>
+            <td><code>family 1, form 3, style 2, syntax 2</code></td>
+        </tr>
+        <tr>
+            <td><code>r3c</code></td>
+            <td><code>family 0, form 2, style 3, syntax 3</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<p>
+    That is a deterministic signal. The branch is progressing in meaningful areas and regressing in a few structured areas. The
+    right response is broader balanced curriculum support around those unstable regions, not narrow prompt patches and not a new spec.
+</p>
+
+<h2>Related Pages</h2>
+
+<div class="spec19-grid">
+    <div class="spec19-card">
+        <h3>Spec Training Method</h3>
+        <p>The broader method for one-axis runs, deterministic repair boundaries, and branch decisions.</p>
+        <p><a href="spec-training-method.html">Open spec-training-method.html</a></p>
+    </div>
+    <div class="spec19-card">
+        <h3>Training Curriculum</h3>
+        <p>The long-range CK-native roadmap that places <code>spec19</code> inside the wider version ladder.</p>
+        <p><a href="training-curriculum.html">Open training-curriculum.html</a></p>
+    </div>
+    <div class="spec19-card">
+        <h3>Spec17 Curriculum Blueprint</h3>
+        <p>The bounded-intent predecessor that made the problem visible and established the family structure.</p>
+        <p><a href="spec17-curriculum-blueprint.html">Open spec17-curriculum-blueprint.html</a></p>
+    </div>
+</div>
