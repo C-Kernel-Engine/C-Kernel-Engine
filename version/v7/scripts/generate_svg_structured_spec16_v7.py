@@ -584,7 +584,7 @@ def _bridge_prompt_variants(case: BundleCase, prompt_text: str, bundle: SceneBun
         ),
         (
             "bridge_bundle_only",
-            f"Return only one [bundle]...[/bundle] generalized visual scene bundle. Preserve the requested family, form, style, and topology exactly. {prompt_text}",
+            f"Return only one generalized visual scene bundle from [bundle] to [/bundle]. Preserve the requested family, form, style, and topology exactly. {prompt_text}",
         ),
         (
             "bridge_style_lock",
@@ -604,7 +604,7 @@ def _bridge_prompt_variants(case: BundleCase, prompt_text: str, bundle: SceneBun
         ),
         (
             "repair_clean_stop",
-            f"Return exactly one clean [bundle]...[/bundle] and stop. Do not emit prompt text, a second bundle, or any continuation after [/bundle]. {prompt_text}",
+            f"Return exactly one clean bundle block from [bundle] to [/bundle] and stop. Do not emit prompt text, a second bundle, or any continuation after [/bundle]. {prompt_text}",
         ),
         (
             "repair_control_stop",
@@ -646,7 +646,7 @@ def _train_hidden_prompt_variants(case: BundleCase, prompt_text: str, bundle: Sc
         ),
         (
             "train_hidden_clean_stop",
-            f"Return exactly one clean [bundle]...[/bundle] generalized visual scene bundle and stop. Do not emit a second bundle, prompt text, or any continuation after [/bundle]. {prompt_text}",
+            f"Return exactly one clean generalized visual scene bundle from [bundle] to [/bundle] and stop. Do not emit a second bundle, prompt text, or any continuation after [/bundle]. {prompt_text}",
         ),
     ]
 

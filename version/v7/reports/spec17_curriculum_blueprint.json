@@ -11,7 +11,8 @@
       "spec16_scene_bundle_l3_d192_h384_ctx768_r11",
       "spec16_scene_bundle_l3_d192_h384_ctx768_r12"
     ],
-    "autopsy_report": "version/v7/reports/SPEC16_R12_AUTOPSY_2026-03-31.md"
+    "autopsy_report": "version/v7/reports/SPEC16_R12_AUTOPSY_2026-03-31.md",
+    "spec17_r1_canary_autopsy": "version/v7/reports/SPEC17_R1_CANARY_AUTOPSY_2026-04-01.md"
   },
   "objective": "Teach a bounded intent prompt to select a shared spec16 scene bundle without reintroducing free-form prose, raw SVG, or repair-language curriculum churn.",
   "why_this_exists": [
@@ -361,6 +362,38 @@
       "notes": "Positive clean-stop examples only; no warning-language rows about wrappers or control tokens."
     },
     {
+      "id": "explicit_permuted_anchor",
+      "surface_type": "anchor",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["bundle_closure", "prompt_output_separation"],
+      "frontiers": ["anchor_retention_failure", "stop_leakage"],
+      "notes": "Carry the full explicit bundle prompt forward, but vary tag order so bundle closure does not depend on one fixed prompt layout."
+    },
+    {
+      "id": "layout_topic_bridge",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["family_routing", "bundle_closure"],
+      "frontiers": ["bridge_abruptness", "default_family_attractor"],
+      "notes": "Internal scaffold surface only: keep layout explicit while introducing topic, goal, and audience."
+    },
+    {
+      "id": "layout_form_bridge",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["form_selection", "family_routing"],
+      "frontiers": ["bridge_abruptness", "default_form_attractor"],
+      "notes": "Internal scaffold surface only: keep layout and form explicit while style and topology still need to be inferred."
+    },
+    {
+      "id": "layout_hint_bridge",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["style_inference", "topology_budgeting"],
+      "frontiers": ["bridge_abruptness", "default_style_attractor", "topology_count_drift"],
+      "notes": "Internal scaffold surface only: keep family and form explicit, but infer the remaining style and count bundle from bounded hints."
+    },
+    {
       "id": "intent_family_bridge",
       "surface_type": "intent",
       "families": ["memory_map", "timeline", "system_diagram"],
@@ -419,16 +452,28 @@
   ],
   "predicted_failure_frontiers": [
     {
+      "id": "anchor_retention_failure",
+      "severity": "high",
+      "description": "Even explicit anchor prompts stop producing the frozen bundle contract reliably once the branch curriculum weakens prompt control.",
+      "covered_by_surfaces": ["explicit_bundle_anchor", "explicit_permuted_anchor", "clean_stop_anchor"]
+    },
+    {
+      "id": "bridge_abruptness",
+      "severity": "high",
+      "description": "The jump from explicit control to pure bounded intent is too steep, so the model loses family or form before the bridge is learned.",
+      "covered_by_surfaces": ["layout_topic_bridge", "layout_form_bridge", "layout_hint_bridge"]
+    },
+    {
       "id": "default_family_attractor",
       "severity": "high",
       "description": "The model routes most prompts to one familiar family regardless of intent.",
-      "covered_by_surfaces": ["intent_family_bridge", "topic_goal_recombination", "family_confusion_contrast"]
+      "covered_by_surfaces": ["layout_topic_bridge", "intent_family_bridge", "topic_goal_recombination", "family_confusion_contrast"]
     },
     {
       "id": "default_form_attractor",
       "severity": "high",
       "description": "The model chooses the dominant sibling form inside a family instead of the correct one.",
-      "covered_by_surfaces": ["intent_family_bridge", "form_disambiguation_contrast"]
+      "covered_by_surfaces": ["layout_form_bridge", "intent_family_bridge", "form_disambiguation_contrast"]
     },
     {
       "id": "default_style_attractor",
@@ -496,31 +541,39 @@
       "id": "stage_a",
       "purpose": "Preserve spec16 bundle closure while teaching the first bounded intent bridge.",
       "surface_mix": [
-        {"surface": "explicit_bundle_anchor", "weight": 35},
-        {"surface": "clean_stop_anchor", "weight": 10},
-        {"surface": "intent_family_bridge", "weight": 20},
-        {"surface": "form_disambiguation_contrast", "weight": 10},
-        {"surface": "style_bundle_inference", "weight": 10},
-        {"surface": "topology_budget_bridge", "weight": 10},
-        {"surface": "family_confusion_contrast", "weight": 5}
+        {"surface": "explicit_bundle_anchor", "weight": 24},
+        {"surface": "explicit_permuted_anchor", "weight": 10},
+        {"surface": "clean_stop_anchor", "weight": 8},
+        {"surface": "layout_topic_bridge", "weight": 16},
+        {"surface": "layout_form_bridge", "weight": 14},
+        {"surface": "layout_hint_bridge", "weight": 10},
+        {"surface": "intent_family_bridge", "weight": 8},
+        {"surface": "form_disambiguation_contrast", "weight": 4},
+        {"surface": "style_bundle_inference", "weight": 3},
+        {"surface": "topology_budget_bridge", "weight": 2},
+        {"surface": "family_confusion_contrast", "weight": 1}
       ],
-      "notes": "No raw repair-prose rows. Every surface must remain compiler-valid and bundle-canonical."
+      "notes": "No raw repair-prose rows. Every surface must remain compiler-valid and bundle-canonical. Stage A now includes explicit scaffold bridges so the prompt-control drop is gradual instead of abrupt."
     },
     {
       "id": "stage_b",
       "purpose": "Shift the burden from explicit control to intent planning without losing closure or family balance.",
       "surface_mix": [
-        {"surface": "explicit_bundle_anchor", "weight": 20},
-        {"surface": "clean_stop_anchor", "weight": 5},
-        {"surface": "intent_family_bridge", "weight": 20},
-        {"surface": "topic_goal_recombination", "weight": 15},
-        {"surface": "form_disambiguation_contrast", "weight": 10},
-        {"surface": "style_bundle_inference", "weight": 10},
-        {"surface": "topology_budget_bridge", "weight": 10},
-        {"surface": "paraphrase_bridge", "weight": 5},
-        {"surface": "family_confusion_contrast", "weight": 5}
+        {"surface": "explicit_bundle_anchor", "weight": 16},
+        {"surface": "explicit_permuted_anchor", "weight": 8},
+        {"surface": "clean_stop_anchor", "weight": 6},
+        {"surface": "layout_topic_bridge", "weight": 12},
+        {"surface": "layout_form_bridge", "weight": 10},
+        {"surface": "layout_hint_bridge", "weight": 10},
+        {"surface": "intent_family_bridge", "weight": 12},
+        {"surface": "topic_goal_recombination", "weight": 8},
+        {"surface": "form_disambiguation_contrast", "weight": 6},
+        {"surface": "style_bundle_inference", "weight": 5},
+        {"surface": "topology_budget_bridge", "weight": 3},
+        {"surface": "paraphrase_bridge", "weight": 2},
+        {"surface": "family_confusion_contrast", "weight": 2}
       ],
-      "notes": "Keep explicit anchors, but make intent prompts and recombination the main planning pressure."
+      "notes": "Keep explicit anchors and scaffold bridges alive, but make intent prompts and recombination the main planning pressure once anchor retention is stable."
     }
   ],
   "holdouts": {

@@ -1,0 +1,82 @@
+{
+  "header": {
+    "headline": "v6.6 Failure Decision Tree",
+    "subtitle": "Start from the first failing gate. Do not debug everything at once."
+  },
+  "entry": {
+    "label": "ENTRYPOINT"
+  },
+  "nodes": {
+    "start": {
+      "title": "make v6.6-gate failed?",
+      "body": "Choose the first failing gate family before inspecting broader symptoms."
+    },
+    "l0_l1": {
+      "title": "L0 / L1 fail?",
+      "body": "Kernel map or tooling contracts failed.",
+      "detail": [
+        "make v6.6-kernel-map-gate",
+        "make v6.6-validate-contracts"
+      ]
+    },
+    "l2": {
+      "title": "L2 fail?",
+      "body": "Matrix smoke failed for a model row or build artifact.",
+      "detail": [
+        "make v6.6-validate-matrix-smoke",
+        "Inspect model_matrix_report_latest.json"
+      ]
+    },
+    "l3_l4": {
+      "title": "L3 / L4 fail?",
+      "body": "Parity matrix or long-decode gate failed.",
+      "detail": [
+        "make v6.6-validate-parity-matrix",
+        "make v6.6-validate-longdecode"
+      ]
+    }
+  },
+  "edges": {
+    "start_l0_l1": "contracts",
+    "start_l2": "matrix smoke",
+    "start_l3_l4": "parity / decode",
+    "l2_finish": "green leaf"
+  },
+  "outcomes": {
+    "contract_drift": {
+      "title": "Contract Drift Branch",
+      "body": "Compare changed script signatures, flags, and kernel maps first.",
+      "detail": [
+        "git diff version/v6.6/scripts",
+        "git diff version/v6.6/kernel_maps"
+      ]
+    },
+    "model_row": {
+      "title": "Model Row Failure Branch",
+      "body": "Use the failing row note, then rerun the single model command.",
+      "detail": [
+        "validate_model_matrix_v6_6.py --with-smoke",
+        "Check cache mismatch, smoke load, and build path"
+      ]
+    },
+    "parity_branch": {
+      "title": "Parity / Long-Decode Branch",
+      "body": "Check runtime availability, then rerun the parity validators.",
+      "detail": [
+        "make llamacpp-parity-build",
+        "Re-run parity matrix and long decode validators"
+      ]
+    }
+  },
+  "finish": {
+    "title": "Finish Branch",
+    "body": "After the failing leaf is green, rerun the full gate once.",
+    "detail": [
+      "make v6.6-gate"
+    ]
+  },
+  "footer": {
+    "note": "Operational rule: isolate one failing gate, one failing row, and one failing contract at a time."
+  }
+}
+

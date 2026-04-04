@@ -47,6 +47,129 @@
         }
       ]
     },
+    "position_embeddings_add": {
+      "params": [
+        {
+          "name": "x",
+          "source": "output:x",
+          "cast": "float*"
+        },
+        {
+          "name": "position_embd",
+          "source": "weight:pos_emb",
+          "cast": "const float*"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "num_positions",
+          "source": "dim:vision_num_patches"
+        }
+      ]
+    },
+    "rowwise_bias_add": {
+      "params": [
+        {
+          "name": "x",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "bias",
+          "source": "weight:bias",
+          "cast": "const float*"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
+        },
+        {
+          "name": "dim",
+          "source": "dim:dim"
+        }
+      ]
+    },
+    "add_stream_inplace": {
+      "params": [
+        {
+          "name": "a",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "b",
+          "source": "activation:b",
+          "cast": "const float*"
+        },
+        {
+          "name": "n",
+          "source": "dim:stream_elems"
+        }
+      ]
+    },
+    "spatial_merge_2x2": {
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "grid_h",
+          "source": "dim:vision_grid_h"
+        },
+        {
+          "name": "grid_w",
+          "source": "dim:vision_grid_w"
+        },
+        {
+          "name": "embed_dim",
+          "source": "dim:embed_dim"
+        }
+      ]
+    },
+    "gelu_fast_inplace": {
+      "params": [
+        {
+          "name": "data",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "n",
+          "source": "dim:gelu_elems"
+        }
+      ]
+    },
+    "bias_add": {
+      "params": [
+        {
+          "name": "a",
+          "source": "output:y",
+          "cast": "float*"
+        },
+        {
+          "name": "b",
+          "source": "weight:bias",
+          "cast": "const float*"
+        },
+        {
+          "name": "n",
+          "source": "dim:_output_dim"
+        }
+      ]
+    },
     "embedding_forward": {
       "params": [
         {

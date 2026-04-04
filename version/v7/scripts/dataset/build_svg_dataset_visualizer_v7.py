@@ -269,6 +269,7 @@ def _build_pipeline_map(workspace: Path, raw_inventory: dict, normalized: dict,
             run_dir = candidate
     run_str = str(run_dir) if run_dir else str(workspace.parent)
     ws_str = str(workspace)
+    has_run_brief = bool(run_dir and any((run_dir / name).exists() for name in ("run_scope.json", "agent.md", "training.md")))
 
     is_synth = normalized.get("schema", "").startswith("ck.structured_atoms_synthesized")
 
@@ -315,6 +316,16 @@ def _build_pipeline_map(workspace: Path, raw_inventory: dict, normalized: dict,
                        if training_data and training_data.get("available")
                        else "No training curve recorded — re-run training with loss logging enabled"),
             "command": f"python3 version/v7/scripts/train_e2e_v7.py --run-dir {run_str}",
+        },
+        {
+            "tab": "Overview",
+            "artifact": "run_scope.json + agent.md + training.md",
+            "script": "init_run_scope_v7.py",
+            "status": "present" if has_run_brief else "missing",
+            "detail": ("Run-local brief files are present"
+                       if has_run_brief
+                       else "Missing run-local brief files for future agents/operators"),
+            "command": f"python3 version/v7/scripts/init_run_scope_v7.py --run {run_str}",
         },
         {
             "tab": "Embeddings",
@@ -1087,6 +1098,34 @@ def _load_attention_data(run_dir: Path) -> dict[str, Any] | None:
         return None
 
 
+def _load_run_scope_bundle(run_dir: Path | None) -> dict[str, Any]:
+    bundle: dict[str, Any] = {"available": False, "scope": {}, "agent_md": "", "training_md": ""}
+    if not run_dir or not run_dir.exists():
+        return bundle
+
+    scope = _load_json_if_exists(run_dir / "run_scope.json")
+    if not isinstance(scope, dict):
+        training_plan = _load_json_if_exists(run_dir / "training_plan.json")
+        if isinstance(training_plan, dict) and isinstance(training_plan.get("run_scope"), dict):
+            scope = training_plan.get("run_scope")
+    if isinstance(scope, dict) and scope:
+        bundle["scope"] = scope
+        bundle["available"] = True
+
+    for key, name in (("agent_md", "agent.md"), ("training_md", "training.md")):
+        path = run_dir / name
+        if not path.exists():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            continue
+        if text:
+            bundle[key] = text
+            bundle["available"] = True
+    return bundle
+
+
 def build_html(workspace: Path, raw_inventory: dict[str, Any],
                normalized: dict[str, Any], classified: dict[str, Any]) -> str:
     gallery_items = _build_gallery_items(classified, workspace)
@@ -1108,6 +1147,7 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
     emb_data = _load_embeddings_data(run_dir) if run_dir else None
     attn_data = _load_attention_data(run_dir) if run_dir else None
     training_data = _load_training_data(run_dir) if run_dir else None
+    run_scope_bundle = _load_run_scope_bundle(run_dir) if run_dir else {"available": False, "scope": {}, "agent_md": "", "training_md": ""}
 
     pipeline_map = _build_pipeline_map(workspace, raw_inventory, normalized,
                                        classified, training_data, emb_data, attn_data)
@@ -1126,6 +1166,7 @@ def build_html(workspace: Path, raw_inventory: dict[str, Any],
         + f"const CK_ATTENTION = {_json_for_embed(attn_data)};\n"
         + f"const CK_PREFLIGHT = {_json_for_embed(preflight_info)};\n"
         + f"const CK_TRAINING = {_json_for_embed(training_data)};\n"
+        + f"const CK_RUN_SCOPE = {_json_for_embed(run_scope_bundle)};\n"
         + f"const CK_PIPELINE_MAP = {_json_for_embed(pipeline_map)};\n"
         + "</script>\n"
         + _HTML_SUFFIX
@@ -2162,6 +2203,8 @@ const norm  = typeof CK_NORMALIZED !== 'undefined' ? CK_NORMALIZED : {};
 const cls   = typeof CK_CLASSIFIED !== 'undefined' ? CK_CLASSIFIED : {};
 const ws    = typeof CK_WORKSPACE !== 'undefined' ? CK_WORKSPACE : '';
 const preflight = typeof CK_PREFLIGHT !== 'undefined' ? CK_PREFLIGHT : { available: false, checklist: [] };
+const runScopeBundle = typeof CK_RUN_SCOPE !== 'undefined' ? CK_RUN_SCOPE : { available: false, scope: {}, agent_md: '', training_md: '' };
+const runScope = (runScopeBundle && typeof runScopeBundle.scope === 'object') ? runScopeBundle.scope : {};
 
 const rawEntries    = Array.isArray(raw.entries) ? raw.entries : [];
 const normFailures  = Array.isArray(norm.failures) ? norm.failures : [];
@@ -2239,6 +2282,8 @@ function renderHeader() {
     chips.push(`Workspace: <code>${esc(pathName(ws))}</code>`);
     chips.push(`Raw: <code>${esc(pathName(raw.raw_assets_root||''))}</code>`);
     chips.push(`Normalized: <code>${esc(pathName(norm.normalized_root||''))}</code>`);
+    if (runScope.spec) chips.push(`Spec: <code>${esc(String(runScope.spec))}</code>`);
+    if (runScope.rung) chips.push(`Rung: <code>${esc(String(runScope.rung))}</code>`);
     el.innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join('');
 }
 
@@ -2262,6 +2307,10 @@ function renderOverview() {
     html += statCardHtml(fmt(pretrain), 'Pretrain', 'structural grammar sources');
     html += '</div>';
 
+    if (runScopeBundle.available) {
+        html += sectionHtml('🧭', 'Run Brief', runScope.rung || runScope.spec || 'loaded', 'badge-green', 'runBriefBody');
+    }
+
     // Health checks
     const checks = [];
     checks.push({ ok: imported > 0, label: 'Raw assets imported', detail: `${imported} files` });
@@ -2281,6 +2330,31 @@ function renderOverview() {
     html += sectionHtml('📐', 'Size Distribution', '', 'badge-blue', 'sizeBody');
 
     el.innerHTML = html;
+
+    if (runScopeBundle.available) {
+        const body = document.getElementById('runBriefBody');
+        if (body) {
+            const runTitle = runScope.title || runScope.run_name || 'Run brief';
+            let briefHtml = `<div class="source-block"><strong>${esc(String(runTitle))}</strong>`;
+            if (runScope.objective) briefHtml += `<div style="margin-top:0.45rem;">${esc(String(runScope.objective))}</div>`;
+            if (runScope.prompt_contract) briefHtml += `<div style="margin-top:0.55rem;color:var(--orange);"><strong>Prompt contract:</strong> ${esc(String(runScope.prompt_contract))}</div>`;
+            if (runScope.output_contract) briefHtml += `<div style="margin-top:0.3rem;color:var(--green);"><strong>Output contract:</strong> ${esc(String(runScope.output_contract))}</div>`;
+            const mkList = (title, values) => Array.isArray(values) && values.length
+                ? `<div style="margin-top:0.65rem;"><div class="subhead">${esc(title)}</div>${values.map(v => `<span class="token-pill">${esc(String(v))}</span>`).join('')}</div>`
+                : '';
+            briefHtml += mkList('In Scope', runScope.in_scope);
+            briefHtml += mkList('Out Of Scope', runScope.out_of_scope);
+            briefHtml += mkList('Success Gates', runScope.success_gates);
+            if (runScopeBundle.agent_md) {
+                briefHtml += `<div class="subhead" style="margin-top:0.8rem">agent.md</div><div class="source-block" style="white-space:pre-wrap;">${esc(runScopeBundle.agent_md)}</div>`;
+            }
+            if (runScopeBundle.training_md) {
+                briefHtml += `<div class="subhead" style="margin-top:0.8rem">training.md</div><div class="source-block" style="white-space:pre-wrap;">${esc(runScopeBundle.training_md)}</div>`;
+            }
+            briefHtml += '</div>';
+            body.innerHTML = briefHtml;
+        }
+    }
 
     // Fill health
     document.getElementById('healthBody').innerHTML = checks.map(c => {

@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "IR Dataflow Stitching",
+    "subtitle": "Each graph op points to the previous result, and memory planning binds those edges into runtime pointers."
+  },
+  "nodes": {
+    "norm": {
+      "title": "attn_norm",
+      "body": "Normalize the incoming state and publish x_norm.",
+      "detail": [
+        "op_id 10",
+        "x_norm"
+      ]
+    },
+    "proj": {
+      "title": "qkv_proj",
+      "body": "Project from x_norm into QKV tensors using upstream op ids.",
+      "detail": [
+        "op_id 11",
+        "inputs: 10"
+      ]
+    },
+    "rope": {
+      "title": "rope_qk",
+      "body": "Apply positional mixing while preserving explicit source references.",
+      "detail": [
+        "op_id 12",
+        "inputs: 11"
+      ]
+    },
+    "planner": {
+      "title": "Memory Planner",
+      "body": "Assign buffers to every edge before lowering replaces ids with pointers.",
+      "detail": [
+        "edge buffers",
+        "offsets"
+      ]
+    }
+  },
+  "edges": {
+    "norm_proj": "x_norm",
+    "proj_rope": "q/k",
+    "rope_planner": "edge refs",
+    "planner_lowered": "pointers"
+  },
+  "lowered": {
+    "title": "Lowered IR",
+    "body": "The stitched graph becomes concrete call arguments for codegen."
+  },
+  "footer": {
+    "note": "Stitching is the handoff from symbolic op ids to deterministic runtime memory."
+  }
+}

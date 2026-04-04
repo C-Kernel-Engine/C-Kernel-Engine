@@ -911,7 +911,6 @@ static void write_tokenizer_json(const char *path, const Trainer *tr) {
 
     fprintf(f, "{\n");
     fprintf(f, "  \"version\": \"1.0\",\n");
-    fprintf(f, "  \"ck_mode\": \"%s\",\n", tr->opt.ascii_only ? "ascii_bpe" : "bytelevel_bpe");
     fprintf(f, "  \"truncation\": null,\n");
     fprintf(f, "  \"padding\": null,\n");
     fprintf(f, "  \"added_tokens\": [\n");

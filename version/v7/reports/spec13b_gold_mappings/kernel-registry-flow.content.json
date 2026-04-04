@@ -1,0 +1,42 @@
+{
+  "header": {
+    "headline": "Kernel Registry Flow",
+    "subtitle": "Track how an abstract IR op resolves into a concrete runtime kernel."
+  },
+  "nodes": {
+    "ir": {
+      "title": "IR Operation",
+      "body": "Start from the canonical operator intent."
+    },
+    "registry": {
+      "title": "Registry Lookup",
+      "body": "Match the op to a supported kernel family.",
+      "detail": [
+        "attention",
+        "rmsnorm",
+        "matmul"
+      ]
+    },
+    "selector": {
+      "title": "Kernel Selector",
+      "body": "Choose the implementation for shape and policy."
+    },
+    "runtime": {
+      "title": "Generated Runtime",
+      "body": "Compile the selected kernel plan into the runtime artifact."
+    }
+  },
+  "edges": {
+    "ir_registry": "resolve",
+    "registry_selector": "candidates",
+    "selector_runtime": "chosen kernel",
+    "runtime_artifact": "compiled"
+  },
+  "artifact": {
+    "title": "Linked Runtime",
+    "body": "The final runtime uses only registered, validated kernels."
+  },
+  "footer": {
+    "note": "The registry boundary is one of the clearest deterministic compiler interfaces in the repo."
+  }
+}

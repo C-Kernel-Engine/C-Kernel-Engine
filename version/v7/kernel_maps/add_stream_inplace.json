@@ -1,0 +1,39 @@
+{
+  "id": "add_stream_inplace",
+  "op": "add_stream",
+  "variant": "fp32_flat_inplace",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "a",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "Primary stream (updated in-place)"
+    },
+    {
+      "name": "b",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "Secondary stream to add"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "Updated primary stream"
+    }
+  ],
+  "dims": ["stream_elems"],
+  "impl": {
+    "function": "add_stream_inplace",
+    "c_declaration": "void add_stream_inplace(float *a, const float *b, size_t n);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "notes": "In-place stream combine for dual patch projections before header bias/position application."
+}

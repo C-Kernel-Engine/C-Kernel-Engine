@@ -1,0 +1,37 @@
+{
+  "header": {
+    "headline": "IR Pipeline Flow",
+    "subtitle": "A compact graph of how the training compiler turns scene and model contracts into a runnable runtime."
+  },
+  "nodes": {
+    "source": {
+      "title": "Scene + Weights",
+      "body": "Start from the staged tokenizer, contract, and initialized weights."
+    },
+    "ir1": {
+      "title": "IR1 Build",
+      "body": "Build forward structure and fuse the stable graph skeleton."
+    },
+    "lower": {
+      "title": "Lower + Layout",
+      "body": "Assign memory, lower call IR, and prepare execution-ready plans."
+    },
+    "compile": {
+      "title": "Compile Runtime",
+      "body": "Generate C and compile the graph runtime into a shared library."
+    }
+  },
+  "edges": {
+    "source_ir1": "contract",
+    "ir1_lower": "ops + tensors",
+    "lower_compile": "call IR",
+    "compile_runtime": "libmodel.so"
+  },
+  "runtime": {
+    "title": "Runnable Runtime",
+    "body": "The compiled artifact is ready for deterministic CK inference and probe evaluation."
+  },
+  "footer": {
+    "note": "This holdout checks whether graph-family learning transfers to another compiler-oriented flow, not just the trained graph topics."
+  }
+}

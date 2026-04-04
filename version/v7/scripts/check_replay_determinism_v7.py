@@ -14,6 +14,7 @@ This catches:
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,18 @@ from tempfile import TemporaryDirectory
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TRAIN_PARITY = SCRIPT_DIR / "train_parity_epochs_v7.py"
+
+
+def _default_train_root() -> Path:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        base = Path(env).expanduser()
+        if base.name == "train":
+            return base
+        if base.name == "models":
+            return base / "train"
+        return base / "models" / "train"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
 
 
 def _run_once(args, json_out: Path) -> dict:
@@ -76,7 +89,9 @@ def main() -> int:
     parser.add_argument("--json-out", type=Path, default=None)
     args = parser.parse_args()
 
-    with TemporaryDirectory(prefix="v7_replay_") as td:
+    train_root = _default_train_root()
+    train_root.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="v7_replay_", dir=str(train_root)) as td:
         tdir = Path(td)
         r1 = _run_once(args, tdir / "run1.json")
         r2 = _run_once(args, tdir / "run2.json")

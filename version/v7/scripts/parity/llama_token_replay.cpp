@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -18,6 +19,7 @@ struct Args {
     std::string model_path;
     std::vector<int32_t> tokens;
     std::string prompt;
+    std::string prefix_f32_path;
     std::string logits_out_path;
     std::string dump_dir;
     std::vector<std::string> dump_names;
@@ -108,6 +110,12 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             args.prompt = v;
             continue;
         }
+        if (a == "--prefix-f32") {
+            const char * v = need_value("--prefix-f32");
+            if (!v) return false;
+            args.prefix_f32_path = v;
+            continue;
+        }
         if (a == "--ctx") {
             const char * v = need_value("--ctx");
             if (!v) return false;
@@ -158,7 +166,7 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
             std::cout
                 << "Usage: llama_token_replay --model <path.gguf> "
                 << "(--tokens <id,id,...> | --prompt <text>) "
-                << "--logits-out <path.bin> [--ctx N] [--top-k K] [--threads N] "
+                << "--logits-out <path.bin> [--prefix-f32 <path.f32>] [--ctx N] [--top-k K] [--threads N] "
                 << "[--decode-mode batched|sequential] [--dump-dir dir --dump-names a,b,c]\n";
             std::exit(0);
         }
@@ -176,6 +184,53 @@ static bool parse_args(int argc, char ** argv, Args & args, std::string & err) {
     }
     if (args.logits_out_path.empty()) {
         err = "missing --logits-out";
+        return false;
+    }
+    return true;
+}
+
+static bool load_prefix_embeddings(
+    const std::string & path,
+    int32_t n_embd,
+    std::vector<float> & out_embd,
+    int32_t & out_tokens,
+    std::string & err
+) {
+    out_embd.clear();
+    out_tokens = 0;
+    if (path.empty()) {
+        return true;
+    }
+    if (n_embd <= 0) {
+        err = "invalid n_embd for prefix embeddings";
+        return false;
+    }
+
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f) {
+        err = "failed opening prefix-f32 file";
+        return false;
+    }
+    const std::streamsize nbytes = f.tellg();
+    if (nbytes <= 0 || (nbytes % static_cast<std::streamsize>(sizeof(float))) != 0) {
+        err = "prefix-f32 file size must be a positive multiple of 4 bytes";
+        return false;
+    }
+    const size_t n_floats = static_cast<size_t>(nbytes / static_cast<std::streamsize>(sizeof(float)));
+    if (n_floats % static_cast<size_t>(n_embd) != 0) {
+        err = "prefix-f32 row count does not match model embedding size";
+        return false;
+    }
+    out_embd.resize(n_floats);
+    f.seekg(0, std::ios::beg);
+    f.read(reinterpret_cast<char *>(out_embd.data()), nbytes);
+    if (!f.good()) {
+        err = "failed reading prefix-f32 file";
+        return false;
+    }
+    out_tokens = static_cast<int32_t>(n_floats / static_cast<size_t>(n_embd));
+    if (out_tokens <= 0) {
+        err = "prefix-f32 file contains zero tokens";
         return false;
     }
     return true;
@@ -378,14 +433,21 @@ static int32_t decode_tokens(
     llama_context * ctx,
     const std::vector<llama_token> & tokens,
     const std::string & decode_mode,
+    int32_t pos0,
     DumpState * dump_state
 ) {
     if (decode_mode == "sequential") {
         for (size_t i = 0; i < tokens.size(); ++i) {
             begin_dump_batch(dump_state, static_cast<int32_t>(i));
-            llama_token tok = tokens[i];
-            llama_batch batch = llama_batch_get_one(&tok, 1);
+            llama_batch batch = llama_batch_init(1, 0, 1);
+            batch.n_tokens = 1;
+            batch.token[0] = tokens[i];
+            batch.pos[0] = pos0 + static_cast<int32_t>(i);
+            batch.n_seq_id[0] = 1;
+            batch.seq_id[0][0] = 0;
+            batch.logits[0] = 1;
             const int32_t rc = llama_decode(ctx, batch);
+            llama_batch_free(batch);
             if (rc != 0) {
                 return rc;
             }
@@ -394,11 +456,47 @@ static int32_t decode_tokens(
     }
 
     begin_dump_batch(dump_state, static_cast<int32_t>(tokens.size()) - 1);
-    llama_batch batch = llama_batch_get_one(
-        const_cast<llama_token *>(tokens.data()),
-        static_cast<int32_t>(tokens.size())
-    );
-    return llama_decode(ctx, batch);
+    llama_batch batch = llama_batch_init(static_cast<int32_t>(tokens.size()), 0, 1);
+    batch.n_tokens = static_cast<int32_t>(tokens.size());
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        batch.token[i] = tokens[i];
+        batch.pos[i] = pos0 + static_cast<int32_t>(i);
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;
+        batch.logits[i] = (i + 1 == tokens.size()) ? 1 : 0;
+    }
+    const int32_t rc = llama_decode(ctx, batch);
+    llama_batch_free(batch);
+    return rc;
+}
+
+static int32_t decode_prefix_embeddings(
+    llama_context * ctx,
+    const std::vector<float> & prefix_embd,
+    int32_t prefix_tokens,
+    int32_t n_embd,
+    DumpState * dump_state
+) {
+    if (prefix_tokens <= 0) {
+        return 0;
+    }
+    begin_dump_batch(dump_state, -1);
+    llama_batch batch = llama_batch_init(prefix_tokens, n_embd, 1);
+    batch.n_tokens = prefix_tokens;
+    for (int32_t i = 0; i < prefix_tokens; ++i) {
+        std::memcpy(
+            batch.embd + static_cast<size_t>(i) * static_cast<size_t>(n_embd),
+            prefix_embd.data() + static_cast<size_t>(i) * static_cast<size_t>(n_embd),
+            static_cast<size_t>(n_embd) * sizeof(float)
+        );
+        batch.pos[i] = i;
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;
+        batch.logits[i] = 0;
+    }
+    const int32_t rc = llama_decode(ctx, batch);
+    llama_batch_free(batch);
+    return rc;
 }
 
 int main(int argc, char ** argv) {
@@ -440,9 +538,20 @@ int main(int argc, char ** argv) {
         }
     }
 
+    const int32_t n_embd_inp = llama_model_n_embd_inp(model);
+    std::vector<float> prefix_embd;
+    int32_t prefix_tokens = 0;
+    if (!load_prefix_embeddings(args.prefix_f32_path, n_embd_inp, prefix_embd, prefix_tokens, err)) {
+        print_json_error(err);
+        llama_model_free(model);
+        llama_backend_free();
+        return 12;
+    }
+
     llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx = static_cast<uint32_t>(std::max(args.ctx_len, static_cast<int>(args.tokens.size()) + 8));
-    cparams.n_batch = static_cast<uint32_t>(std::max<int>(32, static_cast<int>(args.tokens.size())));
+    const int total_tokens = prefix_tokens + static_cast<int>(args.tokens.size());
+    cparams.n_ctx = static_cast<uint32_t>(std::max(args.ctx_len, total_tokens + 8));
+    cparams.n_batch = static_cast<uint32_t>(std::max<int>(32, total_tokens));
     cparams.n_ubatch = cparams.n_batch;
     int hw_threads = static_cast<int>(std::thread::hardware_concurrency());
     int n_threads = args.threads > 0 ? args.threads : std::max(1, hw_threads);
@@ -476,7 +585,31 @@ int main(int argc, char ** argv) {
     }
 
     std::vector<llama_token> tokens(args.tokens.begin(), args.tokens.end());
-    int32_t rc = decode_tokens(ctx, tokens, args.decode_mode, dump_state.dump_dir.empty() ? nullptr : &dump_state);
+    if (prefix_tokens > 0) {
+        int32_t rc = decode_prefix_embeddings(
+            ctx,
+            prefix_embd,
+            prefix_tokens,
+            n_embd_inp,
+            dump_state.dump_dir.empty() ? nullptr : &dump_state
+        );
+        if (rc != 0) {
+            std::ostringstream oss;
+            oss << "llama_decode failed rc=" << rc << " while replaying prefix embeddings";
+            print_json_error(oss.str());
+            llama_free(ctx);
+            llama_model_free(model);
+            llama_backend_free();
+            return 13;
+        }
+    }
+    int32_t rc = decode_tokens(
+        ctx,
+        tokens,
+        args.decode_mode,
+        prefix_tokens,
+        dump_state.dump_dir.empty() ? nullptr : &dump_state
+    );
     if (rc != 0) {
         std::ostringstream oss;
         oss << "llama_decode failed rc=" << rc << " mode=" << args.decode_mode;
@@ -547,6 +680,7 @@ int main(int argc, char ** argv) {
     std::cout << "\"ok\":true,";
     std::cout << "\"n_vocab\":" << n_vocab << ",";
     std::cout << "\"token_count\":" << tokens.size() << ",";
+    std::cout << "\"prefix_token_count\":" << prefix_tokens << ",";
     std::cout << "\"tokens\":[";
     for (size_t i = 0; i < args.tokens.size(); ++i) {
         if (i) std::cout << ",";

@@ -1,0 +1,37 @@
+{
+  "header": {
+    "headline": "IR Artifact Lineage",
+    "subtitle": "Show how each stage introduces a more executable representation."
+  },
+  "nodes": {
+    "template": {
+      "title": "Template",
+      "body": "Begin from a reusable high-level model template."
+    },
+    "ir1": {
+      "title": "IR1 Forward",
+      "body": "Expand the template into explicit forward operators."
+    },
+    "ir2": {
+      "title": "IR2 Backward",
+      "body": "Attach gradients, saves, and training-only structure."
+    },
+    "layout": {
+      "title": "Layout + Plan",
+      "body": "Assign buffers, memory layout, and execution order."
+    }
+  },
+  "edges": {
+    "template_ir1": "expand",
+    "ir1_ir2": "differentiate",
+    "ir2_layout": "allocate",
+    "layout_runtime": "emit"
+  },
+  "runtime": {
+    "title": "Generated Runtime",
+    "body": "The final artifact contains compiled execution logic plus staged metadata."
+  },
+  "footer": {
+    "note": "This is a graph-family replacement for many lineage and lowering diagrams in docs/site/assets."
+  }
+}

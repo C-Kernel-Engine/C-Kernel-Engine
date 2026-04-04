@@ -1,0 +1,93 @@
+{
+  "schema": "ck.spec_broader_1_family_pack.v1",
+  "generated_on": "2026-04-04",
+  "branch": "spec_broader_1",
+  "family": "table_matrix",
+  "priority": "P0",
+  "lineage": "new_family_promoted_from_spec12_vocab_draft",
+  "why_now": "Dense row/column explainers remain absent from the current bundle contract and block a broad slice of the asset library.",
+  "readiness": {
+    "renderer_status": "precursor_renderer_family",
+    "renderer_layout": "table_analysis",
+    "gold_seed_authoring_status": "can_start_with_precursor",
+    "compiler_scope": "promote_precursor_to_first_class_family",
+    "notes": "Spec09 has table_analysis as a precursor, but the broader branch needs a cleaner first-class table_matrix family."
+  },
+  "replay_reference_assets": [
+    {
+      "asset": "quantization-formats.svg",
+      "path": "docs/site/assets/quantization-formats.svg"
+    }
+  ],
+  "dsl_additions": [
+    "table_block",
+    "table_header",
+    "table_column",
+    "table_cell",
+    "column_group",
+    "row_state",
+    "legend_block"
+  ],
+  "compiler_additions": [
+    "true table grid layout",
+    "column group headers",
+    "row state highlighting",
+    "table legend anchoring",
+    "cell text wrapping"
+  ],
+  "selected_assets": [
+    {
+      "asset": "bf16_format.svg",
+      "path": "docs/site/assets/bf16_format.svg",
+      "proposed_form": "format_matrix",
+      "priority": "P0",
+      "needs": [
+        "dsl_extension",
+        "compiler_extension",
+        "gold_mapping"
+      ],
+      "notes": "Compact matrix explaining numeric format structure."
+    },
+    {
+      "asset": "quantization_grouping.svg",
+      "path": "docs/site/assets/quantization_grouping.svg",
+      "proposed_form": "grouped_quant_table",
+      "priority": "P0",
+      "needs": [
+        "dsl_extension",
+        "compiler_extension",
+        "gold_mapping"
+      ],
+      "notes": "Grouped quantization layout that pressures column-group semantics."
+    },
+    {
+      "asset": "quantization_overview.svg",
+      "path": "docs/site/assets/quantization_overview.svg",
+      "proposed_form": "quantization_matrix",
+      "priority": "P0",
+      "needs": [
+        "dsl_extension",
+        "compiler_extension",
+        "gold_mapping"
+      ],
+      "notes": "Rich table/matrix explainer mixing headers, gradients, and directional annotation."
+    },
+    {
+      "asset": "ir-v66-edge-case-matrix.svg",
+      "path": "docs/site/assets/ir-v66-edge-case-matrix.svg",
+      "proposed_form": "edge_case_matrix",
+      "priority": "P1",
+      "needs": [
+        "dsl_extension",
+        "compiler_extension",
+        "gold_mapping"
+      ],
+      "notes": "Operational matrix for gate/edge-case coverage rather than a generic comparison board."
+    }
+  ],
+  "immediate_next_steps": [
+    "Use the precursor renderer layout `table_analysis` to author exploratory gold seeds.",
+    "Promote `table_matrix` to a first-class family only after the exploratory seeds reveal the missing compiler behavior.",
+    "Write a family-smoke report that clearly separates precursor success from required new-family work."
+  ]
+}

@@ -70,7 +70,7 @@ def run_fd_check(
     batches = _build_batches(total_tokens=total_tokens, seq_len=seq_len, vocab=vocab, seed=seed + 7)
     if not batches:
         raise RuntimeError("No batches generated for FD check")
-    x, y = batches[0]
+    x, y, _valid_tokens = batches[0]
 
     # Analytical gradients.
     loss = _loss_on_batch(model, x, y, lib)

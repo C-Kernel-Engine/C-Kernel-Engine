@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "Templates to IR",
+    "subtitle": "Templates describe architecture; the IR builder resolves concrete ops, dataflow, and kernels."
+  },
+  "nodes": {
+    "template": {
+      "title": "Template JSON",
+      "body": "Start from architecture fields, flags, and model-family structure.",
+      "detail": [
+        "header/body/footer",
+        "flags"
+      ]
+    },
+    "builder": {
+      "title": "IR1 Builder",
+      "body": "Map template ops into graph nodes and kernel families.",
+      "detail": [
+        "ops",
+        "families"
+      ]
+    },
+    "dataflow": {
+      "title": "Dataflow Graph",
+      "body": "Attach op ids and edge relationships so later stages stay explicit.",
+      "detail": [
+        "op ids",
+        "edges"
+      ]
+    },
+    "registry": {
+      "title": "Registry Match",
+      "body": "Resolve valid kernels from quant summaries and template flags.",
+      "detail": [
+        "quant-aware",
+        "validated"
+      ]
+    }
+  },
+  "edges": {
+    "template_builder": "template",
+    "builder_dataflow": "graph",
+    "dataflow_registry": "kernel match",
+    "registry_ir1": "ir1"
+  },
+  "ir1": {
+    "title": "IR1 Output",
+    "body": "The emitted IR is ready for lowering without model-specific if/else code."
+  },
+  "footer": {
+    "note": "This bridge matters because templates stay declarative while the compiler resolves execution details."
+  }
+}

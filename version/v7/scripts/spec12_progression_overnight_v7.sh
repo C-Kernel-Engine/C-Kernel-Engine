@@ -8,10 +8,19 @@ LOG_DIR="${LOG_DIR:-$MODEL_CACHE_ROOT/reports/spec12_progression}"
 mkdir -p "$RUN_ROOT" "$LOG_DIR"
 MASTER_LOG="${MASTER_LOG:-$LOG_DIR/spec12_progression_overnight.log}"
 START_RUNG="${START_RUNG:-r3}"
+TRAIN_DRIVER="${TRAIN_DRIVER:-ck_cli}"
+CK_CLI_LOG_EVERY="${CK_CLI_LOG_EVERY:-200}"
+export TRAIN_DRIVER
+export CK_CLI_LOG_EVERY
 
 SUCCESS_EXACT_RATE="${SUCCESS_EXACT_RATE:-0.50}"
 SUCCESS_RENDERABLE_RATE="${SUCCESS_RENDERABLE_RATE:-0.85}"
 SUCCESS_MATERIALIZED_RATE="${SUCCESS_MATERIALIZED_RATE:-0.55}"
+
+# Progression workflow policy:
+#   1. Each rung runs the Python parity regimen first (PyTorch oracle + CK checks).
+#   2. If parity passes, full stage training should stay on ck_cli by default.
+#   3. Override TRAIN_DRIVER=ck_run only when debugging parity/runtime issues.
 
 log_run_timing() {
   local run_dir="$1"
@@ -114,6 +123,7 @@ run_variant() {
   local log_path="$LOG_DIR/spec12_${suffix}.log"
   local session_name="ck-v7-spec12-${suffix}"
   echo "[spec12-progress] starting ${suffix} -> $run_dir" | tee -a "$MASTER_LOG"
+  echo "[spec12-progress] workflow ${suffix}: oracle=pytorch parity=python-regimen train_driver=${TRAIN_DRIVER} ck_cli_log_every=${CK_CLI_LOG_EVERY}" | tee -a "$MASTER_LOG"
   if tmux has-session -t "$session_name" 2>/dev/null; then
     tmux kill-session -t "$session_name"
   fi
@@ -242,12 +252,26 @@ observe_and_gate() {
 
 should_run_rung() {
   local suffix="$1"
+  local start_idx suffix_idx
   case "$START_RUNG" in
-    r3) return 0 ;;
-    r4) [[ "$suffix" != "r3" ]] ;;
-    r5) [[ "$suffix" == "r5" ]] ;;
-    *) return 0 ;;
+    r3) start_idx=3 ;;
+    r4) start_idx=4 ;;
+    r5) start_idx=5 ;;
+    r6) start_idx=6 ;;
+    r7) start_idx=7 ;;
+    r8) start_idx=8 ;;
+    *) start_idx=3 ;;
   esac
+  case "$suffix" in
+    r3) suffix_idx=3 ;;
+    r4) suffix_idx=4 ;;
+    r5) suffix_idx=5 ;;
+    r6) suffix_idx=6 ;;
+    r7) suffix_idx=7 ;;
+    r8) suffix_idx=8 ;;
+    *) suffix_idx=99 ;;
+  esac
+  [[ "$suffix_idx" -ge "$start_idx" ]]
 }
 
 if should_run_rung r3; then
@@ -273,7 +297,7 @@ if should_run_rung r4; then
 fi
 
 if should_run_rung r5; then
-  run_and_gate r5 \
+  if run_and_gate r5 \
     TRAIN_REPEATS=8 \
     PRETRAIN_EPOCHS=3 \
     MIDTRAIN_EPOCHS=5 \
@@ -283,5 +307,56 @@ if should_run_rung r5; then
     MIDTRAIN_HEADER_REPEAT=10 \
     MIDTRAIN_BLOCK_REPEAT=6 \
     MIDTRAIN_TRANSITION_REPEAT=10 \
-    MIDTRAIN_TABLE_REPEAT=5
+    MIDTRAIN_TABLE_REPEAT=5; then
+    exit 0
+  fi
+fi
+
+if should_run_rung r6; then
+  if observe_and_gate r6; then
+    exit 0
+  fi
+fi
+
+if should_run_rung r7; then
+  if run_and_gate r7 \
+    TRAIN_REPEATS=8 \
+    PRETRAIN_EPOCHS=3 \
+    MIDTRAIN_EPOCHS=5 \
+    MIDTRAIN_EDIT_REPEAT=5 \
+    MIDTRAIN_DIRECT_REPEAT=8 \
+    MIDTRAIN_CLOSE_REPEAT=12 \
+    MIDTRAIN_HEADER_REPEAT=10 \
+    MIDTRAIN_BLOCK_REPEAT=6 \
+    MIDTRAIN_TRANSITION_REPEAT=10 \
+    MIDTRAIN_TABLE_REPEAT=5 \
+    MIDTRAIN_MEMORY_REPEAT=2 \
+    MIDTRAIN_DECISION_REPEAT=4 \
+    MIDTRAIN_END_REPEAT=6 \
+    MIDTRAIN_START_REPEAT=6 \
+    MIDTRAIN_RESTART_REPEAT=6; then
+    exit 0
+  fi
+fi
+
+if should_run_rung r8; then
+  # Recovery rung: start from last good r6 weights and run a smaller corrective
+  # midtrain-only canary instead of another full fresh line from scratch.
+  run_and_gate r8 \
+    SEED_FROM_RUN=r6 \
+    SKIP_PRETRAIN=1 \
+    TRAIN_REPEATS=8 \
+    MIDTRAIN_EPOCHS=1 \
+    MIDTRAIN_EDIT_REPEAT=4 \
+    MIDTRAIN_DIRECT_REPEAT=6 \
+    MIDTRAIN_CLOSE_REPEAT=6 \
+    MIDTRAIN_HEADER_REPEAT=8 \
+    MIDTRAIN_BLOCK_REPEAT=4 \
+    MIDTRAIN_TRANSITION_REPEAT=4 \
+    MIDTRAIN_TABLE_REPEAT=4 \
+    MIDTRAIN_MEMORY_REPEAT=1 \
+    MIDTRAIN_DECISION_REPEAT=2 \
+    MIDTRAIN_END_REPEAT=2 \
+    MIDTRAIN_START_REPEAT=2 \
+    MIDTRAIN_RESTART_REPEAT=0
 fi

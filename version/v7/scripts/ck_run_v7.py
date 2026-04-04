@@ -7748,6 +7748,38 @@ def step_run_train_init(args: argparse.Namespace) -> None:
         log(f"  Dataset snapshot: {out_dir / 'dataset'}", C_GREEN)
         log(f"  Dataset viewer: {out_dir / 'dataset_viewer.html'}", C_GREEN)
 
+    run_scope_script = SCRIPTS_DIR / "init_run_scope_v7.py"
+    if run_scope_script.exists():
+        run_scope_cmd = [
+            python_exec,
+            str(run_scope_script),
+            "--run", str(out_dir),
+            "--title", str(out_dir.name),
+        ]
+        agent_summary = str(getattr(args, "agent_summary", "") or "").strip()
+        if agent_summary:
+            run_scope_cmd.extend(["--notes", agent_summary])
+        read_first_items = [str(item).strip() for item in (getattr(args, "read_first", None) or []) if str(item).strip()]
+        agent_guide_items = [str(item).strip() for item in (getattr(args, "agent_guide", None) or []) if str(item).strip()]
+        seen_read_first = set()
+        for item in read_first_items:
+            if item in seen_read_first:
+                continue
+            seen_read_first.add(item)
+            run_scope_cmd.extend(["--read-first", item])
+        for item in agent_guide_items:
+            run_scope_cmd.extend(["--context-file", item])
+            if item not in seen_read_first:
+                seen_read_first.add(item)
+                run_scope_cmd.extend(["--read-first", item])
+        run_cmd(run_scope_cmd, cwd=PROJECT_ROOT)
+        meta["paths"]["run_scope"] = str(out_dir / "run_scope.json")
+        meta["paths"]["agent_brief"] = str(out_dir / "agent.md")
+        meta["paths"]["training_brief"] = str(out_dir / "training.md")
+        (out_dir / "operator_train_run.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    else:
+        log(f"  Warning: run-scope script not found: {run_scope_script}", C_ORANGE)
+
     log(f"  Run directory: {out_dir}", C_GREEN)
 
 
@@ -10783,6 +10815,12 @@ Examples:
                              help='How to stage the dataset workspace into the run dir when --dataset-workspace is set')
     init_parser.add_argument('--dataset-stage-force', action='store_true',
                              help='Replace existing run_dir/dataset snapshot and dataset_viewer.html during init')
+    init_parser.add_argument('--agent-summary', default=None,
+                             help='Short run-local summary for future agents/operators (stored in training.md and run_scope notes)')
+    init_parser.add_argument('--agent-guide', action='append', default=[],
+                             help='Markdown/text file to copy into run_dir/context and reference from agent.md; may be repeated')
+    init_parser.add_argument('--read-first', action='append', default=[],
+                             help='Repo-relative or absolute path future agents should read first; may be repeated')
 
     # Train command (alias for train-e2e parity harness)
     train_parser = subparsers.add_parser('train-e2e', aliases=['train'],

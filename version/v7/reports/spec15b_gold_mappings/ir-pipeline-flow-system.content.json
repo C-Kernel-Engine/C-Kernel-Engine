@@ -1,0 +1,68 @@
+{
+  "header": {
+    "kicker": "System Diagram",
+    "headline": "IR Pipeline Flow",
+    "subtitle": "A compact flow of how staged scene and model contracts become a runnable runtime."
+  },
+  "stages": {
+    "stage_1": {
+      "badge": "INPUT",
+      "title": "Scene + Weights",
+      "body": "Start from staged tokenizer artifacts, contracts, and initialized weights.",
+      "detail": [
+        "tokens",
+        "weights"
+      ]
+    },
+    "stage_2": {
+      "badge": "BUILD",
+      "title": "IR1 Build",
+      "body": "Fuse the stable graph skeleton and forward structure.",
+      "detail": [
+        "IR1",
+        "fuse"
+      ]
+    },
+    "stage_3": {
+      "badge": "LOWER",
+      "title": "Lower + Layout",
+      "body": "Assign memory, lower call IR, and prepare execution-ready plans.",
+      "detail": [
+        "call IR",
+        "layout"
+      ]
+    },
+    "stage_4": {
+      "badge": "COMPILE",
+      "title": "Compile Runtime",
+      "body": "Generate C and compile the graph runtime into a shared library.",
+      "detail": [
+        "C code",
+        "libmodel"
+      ]
+    }
+  },
+  "links": {
+    "stage_1_stage_2": {
+      "label": "contract"
+    },
+    "stage_2_stage_3": {
+      "label": "ops + tensors"
+    },
+    "stage_3_stage_4": {
+      "label": "call IR"
+    },
+    "stage_4_terminal": {
+      "label": "runtime"
+    }
+  },
+  "terminal": {
+    "badge": "READY",
+    "title": "Runnable Runtime",
+    "body": "The compiled artifact is ready for deterministic CK inference and probe evaluation."
+  },
+  "footer": {
+    "title": "Transfer Check",
+    "body": "This case checks whether the family learns one bounded compiler-oriented board rather than one topic-specific flow."
+  }
+}

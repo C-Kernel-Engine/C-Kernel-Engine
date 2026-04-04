@@ -38,6 +38,9 @@ That means a production infographic stack should look like:
 
 The model should primarily learn structure, composition, and style choice.
 It should not memorize final prose, numbers, or one-off asset-specific sentences as part of the structure language.
+For strict visual-language lines, the model-facing input should also stay
+domain-agnostic: feed family/control wording only, and route topic facts
+through upstream systems plus external `content.json`.
 
 ## What The Recent Runs Proved
 
@@ -636,6 +639,8 @@ Goal:
 
 - bridge from explicit scene-control prompts to intent-driven scene planning
 - keep content generation separate from scene planning
+- for future strict visual-language lines, keep domain-bearing request text out
+  of the model-facing prompt surface
 
 Recommended first step:
 
@@ -652,7 +657,8 @@ See:
 Deliverables:
 
 - `spec13a`: intent-prompt bridge with bounded ontology
-- `spec13b`: controlled paraphrases over the same topic/family set
+- `spec13b`: generalized scene IR / renderer with deterministic layout
+- `spec13c`: assistant / tool shell around the scene planner
 - optional separate content-generation line later
 - production-style scene + content rendering tests
 

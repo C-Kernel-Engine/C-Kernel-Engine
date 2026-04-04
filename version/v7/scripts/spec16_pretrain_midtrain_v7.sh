@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-RUN="${1:-$ROOT/version/v7/runs/spec16_scene_bundle_l3_d192_h384_ctx768_r12}"
+MODEL_CACHE_ROOT="${MODEL_CACHE_ROOT:-$HOME/.cache/ck-engine-v7/models}"
+RUN="${1:-$MODEL_CACHE_ROOT/train/spec16_scene_bundle_l3_d192_h384_ctx768_r12}"
 DATASET_PREFIX="${DATASET_PREFIX:-spec16_scene_bundle}"
 WORKSPACE="$RUN/dataset"
 
@@ -156,7 +157,7 @@ ALLOW_FULL_RUNG="${ALLOW_FULL_RUNG:-0}"
 ALLOW_DECISION_OVERRIDE="${ALLOW_DECISION_OVERRIDE:-0}"
 PILOT_TOKEN_NUMERATOR="${PILOT_TOKEN_NUMERATOR:-1}"
 PILOT_TOKEN_DENOMINATOR="${PILOT_TOKEN_DENOMINATOR:-3}"
-FROZEN_BASELINE_RUN="${FROZEN_BASELINE_RUN:-$ROOT/version/v7/runs/spec16_scene_bundle_l3_d192_h384_ctx768_r9}"
+FROZEN_BASELINE_RUN="${FROZEN_BASELINE_RUN:-$MODEL_CACHE_ROOT/train/spec16_scene_bundle_l3_d192_h384_ctx768_r9}"
 DECISION_ARTIFACT="${DECISION_ARTIFACT:-$ROOT/version/v7/reports/spec16_training_decision.json}"
 RUN_SCOPE_SPEC="${RUN_SCOPE_SPEC:-spec16}"
 RUN_SCOPE_RUNG="${RUN_SCOPE_RUNG:-r12}"
@@ -405,6 +406,22 @@ for _item in "${RUN_SCOPE_LESSONS[@]}"; do
 done
 
 run_timed init_run_scope "${RUN_SCOPE_ARGS[@]}"
+
+LAUNCHER_GUARD_ARGS=(
+  python3
+  version/v7/scripts/training_launcher_guard_v7.py
+  --run "$RUN"
+  --preflight "$PREFLIGHT_JSON"
+  --decision-artifact "$DECISION_ARTIFACT"
+  --require-run-scope
+  --require-run-policy
+  --require-token-budget
+  --require-canary-metadata
+)
+if [ "$ALLOW_DECISION_OVERRIDE" = "1" ]; then
+  LAUNCHER_GUARD_ARGS+=(--allow-decision-override)
+fi
+run_timed launcher_guard "${LAUNCHER_GUARD_ARGS[@]}"
 
 run_timed init_model \
   .venv/bin/python version/v7/scripts/init_tiny_train_model_v7.py \

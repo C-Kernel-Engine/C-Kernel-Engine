@@ -1,0 +1,124 @@
+{
+  "header": {
+    "kicker": "Format board",
+    "headline": "Quantization formats compared",
+    "subtitle": "A generic board can compare byte layouts, header fields, and bug-risk patterns without baking format names into the DSL."
+  },
+  "legend": {
+    "title": "Reusable comparison parts",
+    "items": [
+      "Format lane",
+      "Metric strip",
+      "Operator callout"
+    ],
+    "note": "The scene program stays generic while the payload carries specific format examples."
+  },
+  "columns": {
+    "left": {
+      "kicker": "Simple",
+      "title": "Symmetric 4-bit",
+      "subtitle": "The smallest header keeps the layout easy to read and the byte story compact.",
+      "chips": [
+        "1 scale",
+        "16 data bytes",
+        "4.5 bits/w"
+      ],
+      "bullets": [
+        "Use when the board needs a clean baseline lane",
+        "Dequant math can stay simple and visual",
+        "The byte budget is easy to summarize in one metric card"
+      ],
+      "stat": "Baseline lane",
+      "accent": "blue",
+      "note": "This lane is the reference point for the rest of the board."
+    },
+    "center": {
+      "kicker": "Asymmetric",
+      "title": "4-bit with min",
+      "subtitle": "An extra header field buys a wider representational story but increases the bookkeeping burden.",
+      "chips": [
+        "scale + min",
+        "20 bytes",
+        "5.0 bits/w"
+      ],
+      "bullets": [
+        "Header growth should be explicit in the board",
+        "Extra fields create new bug zones",
+        "The visual lane should make the tradeoff obvious"
+      ],
+      "stat": "More bookkeeping",
+      "accent": "green",
+      "note": "This lane explains why one extra field changes the entire block story."
+    },
+    "right": {
+      "kicker": "Packed",
+      "title": "Advanced packed blocks",
+      "subtitle": "Sub-scales, high bits, and richer packing need more explanatory chips and stronger caution cards.",
+      "chips": [
+        "sub-scales",
+        "high bits",
+        "bug-prone"
+      ],
+      "bullets": [
+        "Packed layouts need clearer visual grouping",
+        "The board should surface bug zones explicitly",
+        "Arithmetic notes belong in payload, not the scene grammar"
+      ],
+      "stat": "Most complex",
+      "accent": "purple",
+      "note": "This lane proves the family can carry a denser comparison without becoming a table clone."
+    }
+  },
+  "metrics": {
+    "metric_1": {
+      "label": "Bits per weight",
+      "value": "4.5 / 5.0 / packed",
+      "detail": "Every lane gets a compact byte-budget summary",
+      "state": "highlight"
+    },
+    "metric_2": {
+      "label": "Header fields",
+      "value": "1 / 2 / many",
+      "detail": "Header growth drives the comparison story",
+      "state": "blue"
+    },
+    "metric_3": {
+      "label": "Bug risk",
+      "value": "rises with packing",
+      "detail": "Packed fields need explicit caution cards",
+      "state": "amber"
+    },
+    "metric_4": {
+      "label": "Dequant rule",
+      "value": "keep it external",
+      "detail": "Arithmetic copy belongs in payload notes",
+      "state": "green"
+    }
+  },
+  "callouts": {
+    "callout_1": {
+      "badge": "Operator rule",
+      "title": "Teach arithmetic through payload",
+      "body": "The family can frame byte math, but the actual equations and edge cases should stay in content fields.",
+      "lines": [
+        "Numbers in content.json",
+        "Board structure in scene DSL"
+      ],
+      "state": "blue"
+    },
+    "callout_2": {
+      "badge": "Compiler rule",
+      "title": "Let the renderer own visual hierarchy",
+      "body": "The model should choose lanes, metrics, and callouts. The compiler should turn that into a strong board without case-specific hacks.",
+      "lines": [
+        "Reusable lanes",
+        "Reusable metric cards",
+        "Reusable callouts"
+      ],
+      "state": "green"
+    }
+  },
+  "footer": {
+    "note": "This gold pack uses one generic comparison-board grammar across multiple comparison topics so the tokenizer can learn reusable visual vocabulary instead of asset names."
+  }
+}

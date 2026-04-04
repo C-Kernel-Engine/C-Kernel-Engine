@@ -1,0 +1,37 @@
+{
+  "id": "spatial_merge_2x2",
+  "op": "spatial_merge",
+  "variant": "token_major_2x2_fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": ["H*W", "E"],
+      "desc": "Token-major grid activations [grid_h * grid_w, embed_dim]"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "output",
+      "dtype": "fp32",
+      "shape": ["(H/2)*(W/2)", "4*E"],
+      "desc": "Merged token-major activations"
+    }
+  ],
+  "dims": ["grid_h", "grid_w", "embed_dim"],
+  "impl": {
+    "function": "spatial_merge_2x2",
+    "c_declaration": "void spatial_merge_2x2(const float *input, float *output, int grid_h, int grid_w, int embed_dim);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_vision.py"]
+  },
+  "notes": "Merge neighboring 2x2 spatial tokens into a wider token. Matches the first v8 Qwen3-VL merger path."
+}

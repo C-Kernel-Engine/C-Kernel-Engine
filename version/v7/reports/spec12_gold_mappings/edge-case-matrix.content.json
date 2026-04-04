@@ -1,0 +1,91 @@
+{
+  "header": {
+    "kicker": "Operational Matrix",
+    "headline": "v6.6 Edge-Case Matrix",
+    "subtitle": "Cases that should stay explicit to keep future operator behavior predictable."
+  },
+  "legend": {
+    "title": "Legend",
+    "note": "Rows pair each explicit case with the minimum surviving check and the owning surface.",
+    "warning": "Highlight rows are the ones most likely to create false release confidence if they drift silently.",
+    "items": [
+      "Runtime / parity",
+      "Network / cache",
+      "Kernel boundary",
+      "Schema drift",
+      "Reliability"
+    ]
+  },
+  "groups": [
+    {
+      "title": "Gate and Runtime Cases",
+      "caption": "Cases that directly change gate truth values or runtime correctness.",
+      "header": [
+        "Case",
+        "Why It Matters",
+        "Minimum Check",
+        "Owner"
+      ],
+      "rows": [
+        [
+          "No llama parity runtime",
+          "SKIP rows can still fail strict require-all gates",
+          "make v6.6-validate-parity-matrix-required",
+          "Parity tooling"
+        ],
+        [
+          "Offline warm-cache run",
+          "Build and smoke confidence should survive network outages",
+          "make v6.6-validate-matrix-smoke",
+          "Build matrix"
+        ],
+        [
+          "Sliding window boundaries",
+          "Window drift can silently break decode parity",
+          "make test-attention-sliding",
+          "Kernel tests"
+        ]
+      ]
+    },
+    {
+      "title": "Layout and Stability Cases",
+      "caption": "Schema, wrapper, and long-run failures that create brittle operator behavior.",
+      "header": [
+        "Case",
+        "Why It Matters",
+        "Minimum Check",
+        "Owner"
+      ],
+      "rows": [
+        [
+          "Flat vs legacy layout schema",
+          "Schema drift breaks smoke and analysis parsers",
+          "python version/v6.6/scripts/validate_tooling_contracts.py",
+          "IR tooling"
+        ],
+        [
+          "Model override path hygiene",
+          "Default-cache assumptions create false confidence in local runs",
+          "make v6.6-test-quick MODEL=/path/to/ck_build",
+          "Test harness"
+        ],
+        [
+          "Long decode reliability",
+          "Short smoke can pass while sustained decode diverges",
+          "make v6.6-validate-longdecode",
+          "Runtime validation"
+        ],
+        [
+          "Concurrent gate runs",
+          "Shared cache writes can create nondeterministic failures",
+          "run v6.6-gate in isolated output dirs",
+          "CI ops"
+        ]
+      ]
+    }
+  ],
+  "footer": {
+    "title": "Maintenance Rule",
+    "body": "Update the matrix whenever gate commands, require-all behavior, or report schemas change."
+  }
+}

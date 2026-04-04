@@ -1,0 +1,105 @@
+{
+  "header": {
+    "headline": "Model Memory Layout",
+    "subtitle": "Every tensor has a fixed, known offset"
+  },
+  "offsets": [
+    "0x000000",
+    "0x200000",
+    "0x2C0000",
+    "0x380000",
+    "0x1A00000",
+    "0x1CC0000",
+    "0x5CC0000"
+  ],
+  "segments": {
+    "embeddings": {
+      "title": "Embeddings",
+      "size": "32 MB",
+      "caption": "vocab_size x hidden_dim",
+      "tone": "header"
+    },
+    "layer_0": {
+      "title": "Layer 0",
+      "size": "known fixed region",
+      "caption": "Q, K, V, O and MLP live at fixed offsets",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "layer_1": {
+      "title": "Layer 1",
+      "size": "same structural shape",
+      "caption": "Sequential offsets continue without runtime discovery",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "mid_layers": {
+      "title": "Layers 2-22",
+      "caption": "Same structure, sequential offsets"
+    },
+    "layer_23": {
+      "title": "Layer 23",
+      "size": "final transformer block",
+      "caption": "Layout remains regular through the final layer",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "lm_head": {
+      "title": "LM Head",
+      "size": "64 MB",
+      "caption": "hidden_dim x vocab_size",
+      "tone": "header"
+    },
+    "runtime": {
+      "title": "Activations and KV Cache",
+      "caption": "Runtime buffers at known offsets",
+      "parts": [
+        "KV Cache",
+        "Activations",
+        "Gradients"
+      ]
+    }
+  },
+  "cards": {
+    "benefits": {
+      "title": "Key Benefits",
+      "items": [
+        "Same offsets every run",
+        "Compile-time known",
+        "Direct RDMA access",
+        "Zero-copy observation"
+      ]
+    },
+    "layout_json": {
+      "title": "layout.json",
+      "lines": [
+        "\"layer_0\": {",
+        "\"attn_q\": 0x2C0000,",
+        "\"attn_k\": 0x2E0000,",
+        "\"mlp\": 0x320000"
+      ]
+    },
+    "direct_access": {
+      "title": "Direct Access",
+      "lines": [
+        "// Read layer 0 Q weights",
+        "rdma_read(0x2C0000)"
+      ]
+    }
+  }
+}

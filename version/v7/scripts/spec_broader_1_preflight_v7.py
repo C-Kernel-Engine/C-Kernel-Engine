@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""Preflight gates for broader scene-DSL bootstrap training."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from build_spec_broader_1_probe_contract_v7 import build_contract as build_probe_contract
+from pack_training_tokens_v7 import (
+    _TrueBPEHandle,
+    _encode_row_with_fallback,
+    _pack_rows,
+    _read_rows,
+    _resolve_special_ids,
+)
+from render_svg_structured_scene_spec09_v7 import _parse_scene_document, render_structured_scene_spec09_svg
+
+
+ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_TOKENIZER_LIB = ROOT / "build" / "libckernel_tokenizer.so"
+
+
+def _load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _parse_prompt_tags(prompt: str) -> dict[str, str]:
+    tags: dict[str, str] = {}
+    for token in str(prompt or "").split():
+        if not (token.startswith("[") and token.endswith("]")):
+            continue
+        body = token[1:-1]
+        if ":" not in body:
+            continue
+        key, value = body.split(":", 1)
+        tags[key] = value
+    return tags
+
+
+def _stage_dataset_path(run_dir: Path, prefix: str, stage: str) -> Path:
+    return run_dir / "dataset" / stage / "train" / f"{prefix}_{stage}_train.txt"
+
+
+def _catalog_path(run_dir: Path, prefix: str) -> Path:
+    candidates = [
+        run_dir / "dataset" / "tokenizer" / f"{prefix}_render_catalog.json",
+        run_dir / "dataset" / "manifests" / "generated" / "structured_atoms" / f"{prefix}_render_catalog.json",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    raise SystemExit(f"render catalog not found for prefix '{prefix}' under {run_dir / 'dataset'}")
+
+
+def _safe_int(value: int | str | None) -> int | None:
+    if value in (None, "", 0, "0"):
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _budget_stage(
+    *,
+    name: str,
+    dataset_path: Path,
+    tokenizer_json: Path,
+    tokenizer_bin: Path,
+    tokenizer_lib: Path,
+    seq_len: int,
+    target_epochs: float,
+    current_total_tokens: int | None,
+) -> dict[str, Any]:
+    rows = _read_rows(dataset_path)
+    if not rows:
+        raise SystemExit(f"no rows found in dataset: {dataset_path}")
+
+    bos_id, eos_id, pad_id = _resolve_special_ids(
+        tokenizer_json=tokenizer_json,
+        bos_override=None,
+        eos_override=None,
+        pad_override=None,
+    )
+
+    dropped_rows: list[dict[str, Any]] = []
+    payloads: list[list[int]] = []
+    row_lengths: list[int] = []
+    with _TrueBPEHandle(tokenizer_lib, tokenizer_bin, tokenizer_json) as handle:
+        for idx, row in enumerate(rows, start=1):
+            ids = _encode_row_with_fallback(handle, row)
+            full = [int(bos_id), *[int(v) for v in ids], int(eos_id)]
+            row_lengths.append(int(len(full)))
+            if len(full) > int(seq_len):
+                if len(dropped_rows) < 16:
+                    dropped_rows.append({"row_index": int(idx), "token_count": int(len(full)), "preview": row[:160]})
+                continue
+            payloads.append(full)
+
+    if not payloads:
+        raise SystemExit(f"all rows exceeded seq_len={seq_len}: {dataset_path}")
+
+    _, stats = _pack_rows(payloads, int(seq_len), int(pad_id))
+    one_epoch_tokens = int(stats.get("recommended_total_tokens", 0) or 0)
+    recommended_total_tokens = max(int(seq_len), int(round(one_epoch_tokens * float(target_epochs))))
+    current_budget = _safe_int(current_total_tokens)
+    effective_epochs_at_current = float(current_budget) / float(max(1, one_epoch_tokens)) if current_budget is not None else None
+    budget_pass = current_budget is None or current_budget >= recommended_total_tokens
+    return {
+        "stage": name,
+        "dataset": str(dataset_path),
+        "rows_total": int(len(rows)),
+        "rows_kept": int(len(payloads)),
+        "rows_dropped_oversize": int(len(dropped_rows)),
+        "dropped_examples": dropped_rows,
+        "row_tokens_min": int(min(row_lengths) if row_lengths else 0),
+        "row_tokens_max": int(max(row_lengths) if row_lengths else 0),
+        "pack_stats": stats,
+        "target_effective_epochs": float(target_epochs),
+        "one_epoch_total_tokens": int(one_epoch_tokens),
+        "recommended_total_tokens": int(recommended_total_tokens),
+        "current_total_tokens": int(current_budget) if current_budget is not None else None,
+        "effective_epochs_at_current_budget": effective_epochs_at_current,
+        "budget_gate_pass": bool(budget_pass),
+    }
+
+
+def _validate_scene_output(output_tokens: str, expected_svg: str | None, prompt: str, content_json: dict[str, Any] | None) -> dict[str, Any]:
+    tokens = [tok.strip() for tok in str(output_tokens or "").split() if tok.strip()]
+    starts_clean = bool(tokens) and tokens[0] == "[scene]"
+    ends_clean = bool(tokens) and tokens[-1] == "[/scene]"
+    try:
+        scene_doc = _parse_scene_document(output_tokens)
+        parse_ok = True
+        parse_error = None
+    except Exception as exc:
+        scene_doc = None
+        parse_ok = False
+        parse_error = str(exc)
+
+    try:
+        rendered_svg = render_structured_scene_spec09_svg(output_tokens, content=content_json)
+        renderable = bool(rendered_svg.strip())
+        render_error = None
+    except Exception as exc:
+        rendered_svg = ""
+        renderable = False
+        render_error = str(exc)
+
+    expected_svg_norm = str(expected_svg or "").strip()
+    rendered_svg_norm = rendered_svg.strip()
+    svg_exact = bool(expected_svg_norm) and expected_svg_norm == rendered_svg_norm
+    prompt_tags = _parse_prompt_tags(prompt)
+    return {
+        "prompt": prompt,
+        "layout": prompt_tags.get("layout"),
+        "topic": prompt_tags.get("topic"),
+        "starts_clean": bool(starts_clean),
+        "ends_clean": bool(ends_clean),
+        "parse_ok": bool(parse_ok),
+        "parse_error": parse_error,
+        "renderable": bool(renderable),
+        "render_error": render_error,
+        "svg_exact": bool(svg_exact),
+        "scene_doc": scene_doc,
+    }
+
+
+def _catalog_validation(run_dir: Path, prefix: str) -> dict[str, Any]:
+    catalog_rows = _load_json(_catalog_path(run_dir, prefix))
+    if not isinstance(catalog_rows, list):
+        raise SystemExit("broader render catalog must be a JSON list")
+
+    failures: list[dict[str, Any]] = []
+    per_layout: dict[str, dict[str, int]] = {}
+    ok = 0
+    for row in catalog_rows:
+        if not isinstance(row, dict):
+            continue
+        prompt = str(row.get("prompt") or "")
+        output_tokens = str(row.get("output_tokens") or "")
+        expected_svg = str(row.get("svg_xml") or "")
+        content_json = row.get("content_json") if isinstance(row.get("content_json"), dict) else None
+        result = _validate_scene_output(output_tokens, expected_svg, prompt, content_json)
+        layout = str(row.get("layout") or result.get("layout") or "unknown")
+        stats = per_layout.setdefault(layout, {"count": 0, "starts_clean": 0, "ends_clean": 0, "parse_ok": 0, "renderable": 0, "svg_exact": 0})
+        stats["count"] += 1
+        for key in ("starts_clean", "ends_clean", "parse_ok", "renderable", "svg_exact"):
+            if bool(result.get(key)):
+                stats[key] += 1
+        passed = all(bool(result.get(key)) for key in ("starts_clean", "ends_clean", "parse_ok", "renderable", "svg_exact"))
+        if passed:
+            ok += 1
+        elif len(failures) < 24:
+            failures.append(
+                {
+                    "prompt": prompt,
+                    "layout": layout,
+                    "topic": result.get("topic"),
+                    "starts_clean": result.get("starts_clean"),
+                    "ends_clean": result.get("ends_clean"),
+                    "parse_ok": result.get("parse_ok"),
+                    "parse_error": result.get("parse_error"),
+                    "renderable": result.get("renderable"),
+                    "render_error": result.get("render_error"),
+                    "svg_exact": result.get("svg_exact"),
+                }
+            )
+    total = sum(int(stats.get("count", 0)) for stats in per_layout.values())
+    return {
+        "count": int(total),
+        "pass_count": int(ok),
+        "pass_rate": float(ok) / float(max(1, total)),
+        "layout_summary": per_layout,
+        "failures": failures,
+        "pass": int(ok) == int(total),
+    }
+
+
+def _canary_validation(run_dir: Path, prefix: str, per_split: int) -> dict[str, Any]:
+    contract = build_probe_contract(run_dir, prefix, max(1, int(per_split)))
+    cases: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    ok = 0
+    total = 0
+    for split in contract.get("splits") or []:
+        split_name = str((split or {}).get("name") or "probe")
+        for case in (split or {}).get("cases") or []:
+            if not isinstance(case, dict):
+                continue
+            total += 1
+            prompt = str(case.get("prompt") or "")
+            expected_output = str(case.get("expected_output") or "")
+            expected_svg = str(case.get("expected_rendered_output") or "")
+            content_json = case.get("content_json") if isinstance(case.get("content_json"), dict) else None
+            result = _validate_scene_output(expected_output, expected_svg, prompt, content_json)
+            layout = str(result.get("layout") or "unknown")
+            record = {
+                "split": split_name,
+                "label": case.get("label"),
+                "prompt": prompt,
+                "layout": layout,
+                "starts_clean": result.get("starts_clean"),
+                "ends_clean": result.get("ends_clean"),
+                "parse_ok": result.get("parse_ok"),
+                "renderable": result.get("renderable"),
+                "svg_exact": result.get("svg_exact"),
+            }
+            cases.append(record)
+            passed = all(bool(result.get(key)) for key in ("starts_clean", "ends_clean", "parse_ok", "renderable", "svg_exact"))
+            if passed:
+                ok += 1
+            elif len(failures) < 24:
+                failed = dict(record)
+                failed["parse_error"] = result.get("parse_error")
+                failed["render_error"] = result.get("render_error")
+                failures.append(failed)
+    return {
+        "count": int(total),
+        "pass_count": int(ok),
+        "pass_rate": float(ok) / float(max(1, total)),
+        "cases": cases,
+        "failures": failures,
+        "pass": int(ok) == int(total),
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Preflight gates for broader scene-DSL bootstrap training")
+    ap.add_argument("--run", required=True, type=Path)
+    ap.add_argument("--prefix", default="spec_broader_1_scene_dsl")
+    ap.add_argument("--tokenizer-json", required=True, type=Path)
+    ap.add_argument("--tokenizer-bin", required=True, type=Path)
+    ap.add_argument("--seq-len", type=int, default=512)
+    ap.add_argument("--pretrain-epochs", type=float, default=1.0)
+    ap.add_argument("--midtrain-epochs", type=float, default=1.0)
+    ap.add_argument("--current-pretrain-total-tokens", default=None)
+    ap.add_argument("--current-midtrain-total-tokens", default=None)
+    ap.add_argument("--canary-per-split", type=int, default=4)
+    ap.add_argument("--json-out", required=True, type=Path)
+    ap.add_argument("--strict", action="store_true")
+    args = ap.parse_args()
+
+    run_dir = args.run.expanduser().resolve()
+    prefix = str(args.prefix)
+    tokenizer_json = args.tokenizer_json.expanduser().resolve()
+    tokenizer_bin = args.tokenizer_bin.expanduser().resolve()
+    pretrain = _budget_stage(
+        name="pretrain",
+        dataset_path=_stage_dataset_path(run_dir, prefix, "pretrain"),
+        tokenizer_json=tokenizer_json,
+        tokenizer_bin=tokenizer_bin,
+        tokenizer_lib=DEFAULT_TOKENIZER_LIB,
+        seq_len=int(args.seq_len),
+        target_epochs=float(args.pretrain_epochs),
+        current_total_tokens=_safe_int(args.current_pretrain_total_tokens),
+    )
+    midtrain = _budget_stage(
+        name="midtrain",
+        dataset_path=_stage_dataset_path(run_dir, prefix, "midtrain"),
+        tokenizer_json=tokenizer_json,
+        tokenizer_bin=tokenizer_bin,
+        tokenizer_lib=DEFAULT_TOKENIZER_LIB,
+        seq_len=int(args.seq_len),
+        target_epochs=float(args.midtrain_epochs),
+        current_total_tokens=_safe_int(args.current_midtrain_total_tokens),
+    )
+    catalog = _catalog_validation(run_dir, prefix)
+    canary = _canary_validation(run_dir, prefix, int(args.canary_per_split))
+    payload = {
+        "schema": "ck.spec_broader_1_preflight.v1",
+        "run": str(run_dir),
+        "prefix": prefix,
+        "seq_len": int(args.seq_len),
+        "stages": {"pretrain": pretrain, "midtrain": midtrain},
+        "catalog": catalog,
+        "canary": canary,
+        "pass": bool(pretrain["budget_gate_pass"] and midtrain["budget_gate_pass"] and catalog["pass"] and canary["pass"]),
+    }
+    args.json_out.expanduser().resolve().write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    if args.strict and not payload["pass"]:
+        raise SystemExit(2)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

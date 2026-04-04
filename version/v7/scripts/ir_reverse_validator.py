@@ -162,6 +162,8 @@ class IRReverseValidator:
                 continue
             source = arg.get("source", "")
             name = arg.get("name", "")
+            buffer_ref = str(arg.get("buffer_ref", "") or "").strip()
+            weight_ref = str(arg.get("weight_ref", "") or "").strip()
 
             # Parse source type
             if ":" in source:
@@ -171,15 +173,16 @@ class IRReverseValidator:
                 source_ref = ""
 
             if source_type == "weight":
-                result["weights"].append(source_ref or name)
+                result["weights"].append(weight_ref or source_ref or name)
             elif source_type == "bias":
-                result["biases"].append(source_ref or name)
+                result["biases"].append(weight_ref or source_ref or name)
             elif source_type == "activation":
-                result["inputs"].append(source_ref or name)
+                result["inputs"].append(buffer_ref or source_ref or name)
             elif source_type == "output":
-                result["outputs"].append(source_ref or name)
+                result["outputs"].append(buffer_ref or source_ref or name)
             elif source_type == "scratch":
-                pass  # Scratch buffers tracked separately
+                if buffer_ref:
+                    result["inputs"].append(buffer_ref)
             elif source_type in ("const", "dim", "null", "runtime", "kv_cache"):
                 pass  # Not buffer references
 
@@ -369,6 +372,12 @@ class IRReverseValidator:
             if isinstance(region, dict):
                 for key in region.keys():
                     defined_buffers.add(key)
+                for entry in region.get("buffers", []):
+                    if isinstance(entry, dict) and entry.get("name"):
+                        defined_buffers.add(str(entry["name"]))
+                for entry in region.get("entries", []):
+                    if isinstance(entry, dict) and entry.get("name"):
+                        defined_buffers.add(str(entry["name"]))
 
         missing = referenced_buffers - defined_buffers
 

@@ -1,0 +1,13 @@
+[scene]
+[layout:table_matrix]
+[theme:infra_dark]
+[tone:blue]
+[density:compact]
+[topic:quantization_formats]
+[header_band:header]
+[legend_block:legend]
+[table_block:groups.0]
+[table_block:groups.1]
+[note_band:footer]
+[/scene]
+

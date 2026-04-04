@@ -3,11 +3,12 @@
     "description": "Kernel registry generated from v7 kernel maps",
     "version": "v7",
     "generated_by": "gen_kernel_registry_from_maps.py",
-    "source_dir": "version/v7/kernel_maps",
+    "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v7/kernel_maps",
     "counts": {
-      "total": 103,
+      "total": 108,
       "by_op": {
         "add_backward": 1,
+        "add_stream": 1,
         "attention": 6,
         "attention_projection": 1,
         "attention_sliding": 2,
@@ -22,12 +23,14 @@
         "fused_qkv_block": 1,
         "gated_deltanet": 1,
         "geglu": 2,
+        "gelu": 1,
         "gemm": 12,
         "gemm_backward": 1,
         "gemv": 13,
         "kv_cache_store": 1,
         "logits_store_indexed": 1,
         "optimizer": 4,
+        "position_embeddings": 1,
         "qk_norm": 1,
         "qk_norm_backward": 1,
         "qkv_projection": 1,
@@ -48,7 +51,9 @@
         "rope": 3,
         "rope_backward": 2,
         "rope_init": 2,
+        "rowwise_bias_add": 1,
         "softmax": 1,
+        "spatial_merge": 1,
         "split_q_gate": 1,
         "split_q_gate_backward": 1,
         "ssm_conv1d": 1,
@@ -217,6 +222,57 @@
       "notes": "FP32 AdamW parameter update kernel.",
       "name": "adamw_update_f32",
       "_source_file": "adamw_update_f32.json"
+    },
+    {
+      "id": "add_stream_inplace",
+      "op": "add_stream",
+      "variant": "fp32_flat_inplace",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "a",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Primary stream (updated in-place)"
+        },
+        {
+          "name": "b",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Secondary stream to add"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Updated primary stream"
+        }
+      ],
+      "dims": [
+        "stream_elems"
+      ],
+      "impl": {
+        "function": "add_stream_inplace",
+        "c_declaration": "void add_stream_inplace(float *a, const float *b, size_t n);",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ]
+      },
+      "notes": "In-place stream combine for dual patch projections before header bias/position application.",
+      "name": "add_stream_inplace",
+      "_source_file": "add_stream_inplace.json"
     },
     {
       "id": "attention_backward_causal_head_major_gqa",
@@ -3317,6 +3373,55 @@
       "notes": "GeGLU activation: out = GELU(a) * b where input is split along last dimension. Used in LLaMA, Mistral, and other modern LLMs.",
       "name": "geglu_forward_fp32",
       "_source_file": "geglu_forward_fp32.json"
+    },
+    {
+      "id": "gelu_fast_inplace",
+      "op": "gelu",
+      "variant": "fast_inplace_fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "Input/output buffer (in-place)"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "N"
+          ],
+          "desc": "GELU output (same buffer as input)"
+        }
+      ],
+      "dims": [
+        "N"
+      ],
+      "impl": {
+        "function": "gelu_fast_inplace",
+        "c_declaration": "void gelu_fast_inplace(float *data, size_t n);",
+        "sources": [
+          "src/kernels/gelu_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_gelu.py"
+        ]
+      },
+      "notes": "Fast in-place GELU used by the first v8 Qwen3-VL projector footer.",
+      "name": "gelu_fast_inplace",
+      "_source_file": "gelu_fast_inplace.json"
     },
     {
       "id": "gemm_backward_f32",
@@ -7778,6 +7883,69 @@
       "_source_file": "memcpy.json"
     },
     {
+      "id": "position_embeddings_add",
+      "op": "position_embeddings",
+      "variant": "absolute_learned_inplace_fp32",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Token-major activation stream [tokens, embed_dim]"
+        }
+      ],
+      "weights": [
+        {
+          "name": "pos_emb",
+          "dtype": "fp32",
+          "shape": [
+            "P",
+            "E"
+          ],
+          "desc": "Learned position embeddings [num_positions, embed_dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "In-place updated activation stream"
+        }
+      ],
+      "dims": [
+        "T",
+        "E",
+        "P"
+      ],
+      "impl": {
+        "function": "position_embeddings_add",
+        "c_declaration": "void position_embeddings_add(float *x, const float *position_embd, int num_tokens, int embed_dim, int num_positions);",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_vision.py"
+        ]
+      },
+      "notes": "Add learned absolute position embeddings in-place. Fixed-size first path for v8 vision bring-up.",
+      "name": "position_embeddings_add",
+      "_source_file": "position_embeddings_add.json"
+    },
+    {
       "id": "qk_norm_backward_f32",
       "op": "qk_norm_backward",
       "variant": "fp32_reference",
@@ -11618,6 +11786,67 @@
       "_source_file": "rope_precompute_cache_split.json"
     },
     {
+      "id": "rowwise_bias_add",
+      "op": "rowwise_bias_add",
+      "variant": "fp32_token_major",
+      "quant": {
+        "weight": "fp32",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Token-major activation stream [rows, dim] (in-place)"
+        }
+      ],
+      "weights": [
+        {
+          "name": "bias",
+          "dtype": "fp32",
+          "shape": [
+            "E"
+          ],
+          "desc": "Bias vector [dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "E"
+          ],
+          "desc": "Bias-added activation stream"
+        }
+      ],
+      "dims": [
+        "rows",
+        "dim"
+      ],
+      "impl": {
+        "function": "rowwise_bias_add",
+        "c_declaration": "void rowwise_bias_add(float *x, const float *bias, int rows, int dim);",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_vision.py"
+        ]
+      },
+      "notes": "Apply a single bias vector across each row of a token-major activation matrix.",
+      "name": "rowwise_bias_add",
+      "_source_file": "rowwise_bias_add.json"
+    },
+    {
       "id": "softmax_cross_entropy_loss",
       "op": "softmax",
       "variant": "fp32_loss_grad",
@@ -11722,6 +11951,59 @@
       "notes": "Softmax cross-entropy forward + dlogits kernel for v7 training (index-target mean reduction aligned to PyTorch ignore_index semantics).",
       "name": "softmax_cross_entropy_loss",
       "_source_file": "softmax_cross_entropy_loss.json"
+    },
+    {
+      "id": "spatial_merge_2x2",
+      "op": "spatial_merge",
+      "variant": "token_major_2x2_fp32",
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "H*W",
+            "E"
+          ],
+          "desc": "Token-major grid activations [grid_h * grid_w, embed_dim]"
+        }
+      ],
+      "weights": [],
+      "outputs": [
+        {
+          "name": "output",
+          "dtype": "fp32",
+          "shape": [
+            "(H/2)*(W/2)",
+            "4*E"
+          ],
+          "desc": "Merged token-major activations"
+        }
+      ],
+      "dims": [
+        "grid_h",
+        "grid_w",
+        "embed_dim"
+      ],
+      "impl": {
+        "function": "spatial_merge_2x2",
+        "c_declaration": "void spatial_merge_2x2(const float *input, float *output, int grid_h, int grid_w, int embed_dim);",
+        "sources": [
+          "src/kernels/vision_kernels.c"
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_vision.py"
+        ]
+      },
+      "notes": "Merge neighboring 2x2 spatial tokens into a wider token. Matches the first v8 Qwen3-VL merger path.",
+      "name": "spatial_merge_2x2",
+      "_source_file": "spatial_merge_2x2.json"
     },
     {
       "id": "split_q_gate_backward_f32",

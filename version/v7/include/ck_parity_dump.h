@@ -145,6 +145,61 @@ static inline void ck_dump_tensor_2d(
 }
 
 /**
+ * Dump a 3D head-major tensor after reordering it to token-major logical order.
+ *
+ * Source layout:
+ *   data[head][token][dim]
+ *
+ * Dumped logical flatten order:
+ *   data[token][head][dim]
+ *
+ * This is used for parity on attention Q/K/V buffers, where CK stores
+ * head-major scratch but llama.cpp checkpoint views flatten logically by token.
+ */
+static inline void ck_dump_tensor_head_major_token_major(
+    const float *data,
+    int layer_id,
+    const char *op_name,
+    int num_heads,
+    int num_tokens,
+    int head_dim
+) {
+    if (!g_ck_dump_file || !data || num_heads <= 0 || num_tokens <= 0 || head_dim <= 0) return;
+
+    const size_t elem_count = (size_t) num_heads * (size_t) num_tokens * (size_t) head_dim;
+    float *tmp = (float *) malloc(elem_count * sizeof(float));
+    if (!tmp) return;
+
+    size_t dst = 0;
+    for (int token = 0; token < num_tokens; ++token) {
+        for (int head = 0; head < num_heads; ++head) {
+            const float *src = data +
+                (size_t) head * (size_t) num_tokens * (size_t) head_dim +
+                (size_t) token * (size_t) head_dim;
+            memcpy(&tmp[dst], src, (size_t) head_dim * sizeof(float));
+            dst += (size_t) head_dim;
+        }
+    }
+
+    CKDumpFileHeader header = {0};
+    memcpy(header.magic, CKDUMP_MAGIC, 8);
+    header.version = CKDUMP_VERSION;
+    header.layer_id = layer_id;
+    strncpy(header.op_name, op_name, 31);
+    header.op_name[31] = '\0';
+    header.dtype = 0;  /* fp32 */
+    header.rank = 1;
+    header.shape[0] = (int64_t) elem_count;
+    header.elem_count = (uint32_t) elem_count;
+    header.token_id = g_ck_dump_token;
+
+    fwrite(&header, sizeof(CKDumpFileHeader), 1, g_ck_dump_file);
+    fwrite(tmp, elem_count * sizeof(float), 1, g_ck_dump_file);
+    fflush(g_ck_dump_file);
+    free(tmp);
+}
+
+/**
  * Close dump file. Call after inference completes.
  */
 static inline void ck_dump_close(void) {
@@ -165,6 +220,7 @@ static inline void ck_dump_close(void) {
 #define ck_dump_set_token(token)
 #define ck_dump_tensor(data, layer, name, count)
 #define ck_dump_tensor_2d(data, layer, name, d0, d1)
+#define ck_dump_tensor_head_major_token_major(data, layer, name, h, t, d)
 #define ck_dump_close()
 
 #endif  /* CK_PARITY_DUMP */

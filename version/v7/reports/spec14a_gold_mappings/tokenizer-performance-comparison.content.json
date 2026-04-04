@@ -1,0 +1,127 @@
+{
+  "header": {
+    "kicker": "Benchmark board",
+    "headline": "Tokenizer throughput comparison",
+    "subtitle": "A comparison board can keep workload bands, winners, and caveats stable while payload numbers change."
+  },
+  "legend": {
+    "title": "Board grammar",
+    "items": [
+      "Workload bands",
+      "Winner badges",
+      "Summary cards"
+    ],
+    "note": "Copy and measurements stay in content.json. The scene DSL only plans the board."
+  },
+  "columns": {
+    "left": {
+      "kicker": "Inputs",
+      "title": "Workload bands",
+      "subtitle": "The board compares short, medium, long, and very long inputs on one shared benchmark harness.",
+      "chips": [
+        "11 chars",
+        "200 chars",
+        "3K chars",
+        "15K chars"
+      ],
+      "bullets": [
+        "Keep every pair aligned to a shared axis",
+        "Show the workload label before the winner badge",
+        "Let the footer own benchmark conditions"
+      ],
+      "stat": "4 bands",
+      "accent": "amber",
+      "note": "The left lane sets the framing for the entire comparison."
+    },
+    "center": {
+      "kicker": "Winner",
+      "title": "C-Kernel trie",
+      "subtitle": "The fast path keeps trie traversal and hot-loop memory movement lean.",
+      "chips": [
+        "3.7K",
+        "29K",
+        "97K",
+        "97K"
+      ],
+      "bullets": [
+        "Green carries the dominant series",
+        "Average card anchors the story",
+        "Winner badges stay close to each group"
+      ],
+      "stat": "36x faster",
+      "accent": "green",
+      "note": "The winning lane should still read as part of one fair board."
+    },
+    "right": {
+      "kicker": "Baseline",
+      "title": "PyTorch / tiktoken",
+      "subtitle": "The slower reference remains visible so the board reads as a fair comparison instead of a poster.",
+      "chips": [
+        "1.9K",
+        "8.1K",
+        "5.9K",
+        "2.3K"
+      ],
+      "bullets": [
+        "Blue marks the baseline series",
+        "Each group shares the same workload label",
+        "The footer captures benchmark scope"
+      ],
+      "stat": "2,567 avg",
+      "accent": "blue",
+      "note": "A comparison board should never hide the losing reference."
+    }
+  },
+  "metrics": {
+    "metric_1": {
+      "label": "Average throughput",
+      "value": "93,235 chars/ms",
+      "detail": "C-Kernel trie",
+      "state": "success"
+    },
+    "metric_2": {
+      "label": "Baseline average",
+      "value": "2,567 chars/ms",
+      "detail": "PyTorch / tiktoken",
+      "state": "blue"
+    },
+    "metric_3": {
+      "label": "Peak speedup",
+      "value": "36x",
+      "detail": "Across the benchmark set",
+      "state": "highlight"
+    },
+    "metric_4": {
+      "label": "Key optimization",
+      "value": "Trie path",
+      "detail": "No memcpy in the hot loop",
+      "state": "amber"
+    }
+  },
+  "callouts": {
+    "callout_1": {
+      "badge": "Design rule",
+      "title": "Keep the board honest",
+      "body": "The slower system should remain visible even when the result is decisively one sided.",
+      "lines": [
+        "Shared axes",
+        "Visible baseline",
+        "One benchmark harness"
+      ],
+      "state": "blue"
+    },
+    "callout_2": {
+      "badge": "Boundary",
+      "title": "Keep benchmark facts external",
+      "body": "The model chooses columns, metrics, and callouts. The payload owns numbers and benchmark notes.",
+      "lines": [
+        "Numbers in content.json",
+        "Layout in scene DSL"
+      ],
+      "state": "green"
+    }
+  },
+  "footer": {
+    "note": "Benchmark facts stay in payload. The successor DSL should only encode board structure, style, and reusable comparison components."
+  }
+}

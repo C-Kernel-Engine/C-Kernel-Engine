@@ -8,7 +8,7 @@ TARGET_PROBE="${TARGET_PROBE:-$MODEL_CACHE_ROOT/train/spec11_keyed_scene_dsl_l3_
 
 detect_active_rung() {
   local suffix
-  for suffix in r5 r4 r3; do
+  for suffix in r10 r9 r8 r7 r6 r5 r4 r3; do
     local candidate="$MODEL_CACHE_ROOT/train/spec12_scene_dsl_l3_d192_h384_ctx768_${suffix}"
     local ledger="$candidate/run_ledger.jsonl"
     if [[ ! -f "$ledger" ]]; then
@@ -21,7 +21,7 @@ detect_active_rung() {
       return 0
     fi
   done
-  for suffix in r5 r4 r3; do
+  for suffix in r10 r9 r8 r7 r6 r5 r4 r3; do
     if [[ -d "$MODEL_CACHE_ROOT/train/spec12_scene_dsl_l3_d192_h384_ctx768_${suffix}" ]]; then
       printf '%s\n' "$suffix"
       return 0
@@ -32,6 +32,11 @@ detect_active_rung() {
 
 prev_rung() {
   case "$1" in
+    r10) printf 'r9\n' ;;
+    r9) printf 'r8\n' ;;
+    r8) printf 'r7\n' ;;
+    r7) printf 'r6\n' ;;
+    r6) printf 'r5\n' ;;
     r5) printf 'r4\n' ;;
     r4) printf 'r3\n' ;;
     *) printf 'r2\n' ;;

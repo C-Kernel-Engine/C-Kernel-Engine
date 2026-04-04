@@ -1,0 +1,127 @@
+{
+  "header": {
+    "kicker": "Interop board",
+    "headline": "RoPE layouts compared",
+    "subtitle": "The board shows that both paths share the same angle schedule but rotate across different channel planes."
+  },
+  "legend": {
+    "title": "Shared frame",
+    "items": [
+      "Pairwise path",
+      "Split-half path",
+      "Engineering rule"
+    ],
+    "note": "This family explains compatibility choices, not free-form prose."
+  },
+  "columns": {
+    "left": {
+      "kicker": "Llama family",
+      "title": "Pairwise rotation",
+      "subtitle": "Even and odd channels form the 2D rotation plane for each local pair.",
+      "chips": [
+        "(0,1)",
+        "(2,3)",
+        "(4,5)"
+      ],
+      "bullets": [
+        "Checkpoint family defines the expected channel pairing",
+        "llama.cpp compatibility depends on matching this layout",
+        "Wrong layout diverges immediately after RoPE"
+      ],
+      "stat": "Consecutive pairs",
+      "accent": "amber",
+      "note": "Use this when the training stack already defines pairwise planes."
+    },
+    "center": {
+      "kicker": "NeoX family",
+      "title": "Split-half rotation",
+      "subtitle": "The first half of the vector rotates against the second half instead of even-odd pairs.",
+      "chips": [
+        "(0,half)",
+        "(1,half+1)",
+        "(2,half+2)"
+      ],
+      "bullets": [
+        "The angle schedule can stay identical while planes differ",
+        "Checkpoint semantics still change because the channel contract changes",
+        "Interoperability breaks if a runtime assumes the wrong plane"
+      ],
+      "stat": "Half-vector pairs",
+      "accent": "blue",
+      "note": "Use this only when the checkpoint family was trained on split-half RoPE."
+    },
+    "right": {
+      "kicker": "Engineering rule",
+      "title": "Treat layout as semantics",
+      "subtitle": "RoPE layout is a compatibility rule inherited from training, templates, and reference runtimes.",
+      "chips": [
+        "Same angles",
+        "Different planes",
+        "Parity boundary"
+      ],
+      "bullets": [
+        "Do not treat layout choice as a tuning knob",
+        "Choose the path that matches the checkpoint family",
+        "Check hidden-state parity before blaming later kernels"
+      ],
+      "stat": "Not a knob",
+      "accent": "green",
+      "note": "The board should make the compatibility rule obvious at a glance."
+    }
+  },
+  "metrics": {
+    "metric_1": {
+      "label": "Rotation plane",
+      "value": "pair vs half",
+      "detail": "The plane definition is the core comparison",
+      "state": "highlight"
+    },
+    "metric_2": {
+      "label": "First divergence",
+      "value": "right after RoPE",
+      "detail": "A mismatch shows up before later attention math",
+      "state": "amber"
+    },
+    "metric_3": {
+      "label": "Engineering rule",
+      "value": "match training",
+      "detail": "Checkpoint family decides the layout",
+      "state": "green"
+    }
+  },
+  "callouts": {
+    "callout_1": {
+      "badge": "Choose pairwise",
+      "title": "Use pairwise when the checkpoint family demands it",
+      "body": "Llama-derived stacks and llama.cpp-compatible checkpoints expect consecutive pairs.",
+      "lines": [
+        "Training stack defines the contract",
+        "Templates and runtimes must agree"
+      ],
+      "state": "amber"
+    },
+    "callout_2": {
+      "badge": "Choose split-half",
+      "title": "Use split-half when the model was trained that way",
+      "body": "NeoX-style implementations rotate the first half against the second half and checkpoints inherit that semantic choice.",
+      "lines": [
+        "Half-vector pairing",
+        "Runtime must preserve the same layout"
+      ],
+      "state": "blue"
+    },
+    "callout_3": {
+      "badge": "Do not drift",
+      "title": "Stop at parity, not at intuition",
+      "body": "If the hidden state drifts after RoPE, fix the layout contract before changing anything downstream.",
+      "lines": [
+        "Paritiy before kernels",
+        "Semantics before tuning"
+      ],
+      "state": "green"
+    }
+  },
+  "footer": {
+    "note": "The successor board family should make compatibility rules legible while keeping all topic-specific wording in payload files."
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "header": {
+    "kicker": "Systems board",
+    "headline": "The compute-to-bandwidth chasm",
+    "subtitle": "The board compares a bridgeable CPU terrain to a much harsher GPU-at-scale terrain without changing the family grammar."
+  },
+  "legend": {
+    "title": "Comparison lanes",
+    "items": [
+      "CPU terrain",
+      "GPU terrain",
+      "Bridge rule"
+    ],
+    "note": "The family compares system regimes while the payload carries the actual engineering claim."
+  },
+  "columns": {
+    "left": {
+      "kicker": "CPU at scale",
+      "title": "Gentle terrain",
+      "subtitle": "Peak compute, local memory, and network bandwidth stay close enough that software can bridge the gap.",
+      "chips": [
+        "Peak compute",
+        "Local memory",
+        "Network floor"
+      ],
+      "bullets": [
+        "Software can overlap compute and communication",
+        "Tiling and prefetching stay meaningful",
+        "The compute-network gap remains small"
+      ],
+      "stat": "Bridgeable",
+      "accent": "green",
+      "note": "The board should show that the left lane is a solvable engineering regime."
+    },
+    "center": {
+      "kicker": "GPU at scale",
+      "title": "Everest to trench",
+      "subtitle": "Peak compute rises far above the same network floor, leaving a gap software cannot fully erase.",
+      "chips": [
+        "Peak FLOPS",
+        "Intra-node shelf",
+        "Cross-node floor"
+      ],
+      "bullets": [
+        "The network floor does not rise with compute",
+        "Intra-node links help but do not remove the chasm",
+        "The starved-compute story is the central contrast"
+      ],
+      "stat": "Extreme gap",
+      "accent": "amber",
+      "note": "The center lane must still read as the same board, not as a different infographic family."
+    },
+    "right": {
+      "kicker": "Engineering rule",
+      "title": "Bridge what can be bridged",
+      "subtitle": "C-Kernel-Engine targets the regime where software can synchronize compute and data movement instead of assuming the network disappears.",
+      "chips": [
+        "Overlap",
+        "Prefetch",
+        "Scheduling"
+      ],
+      "bullets": [
+        "Do not plan around missing bandwidth",
+        "Tune where software still has leverage",
+        "Use the board to compare regimes, not to hide constraints"
+      ],
+      "stat": "Sync the gap",
+      "accent": "blue",
+      "note": "The right lane turns the comparison into an action rule."
+    }
+  },
+  "metrics": {
+    "metric_1": {
+      "label": "Gap size",
+      "value": "small vs extreme",
+      "detail": "CPU and GPU-at-scale sit in different regimes",
+      "state": "highlight"
+    },
+    "metric_2": {
+      "label": "Shared floor",
+      "value": "network",
+      "detail": "Cross-node movement remains the slowest layer",
+      "state": "blue"
+    },
+    "metric_3": {
+      "label": "Target",
+      "value": "compute-data sync",
+      "detail": "Bridge where software still matters",
+      "state": "green"
+    }
+  },
+  "callouts": {
+    "callout_1": {
+      "badge": "Why CPU first",
+      "title": "Software can close a gentle gap",
+      "body": "When compute and data movement live in the same neighborhood, engineering work can materially change the result.",
+      "lines": [
+        "Tiling still matters",
+        "Overlap still matters",
+        "Scheduling still matters"
+      ],
+      "state": "green"
+    },
+    "callout_2": {
+      "badge": "Why not fantasy",
+      "title": "Do not assume the network disappears",
+      "body": "A useful comparison board makes the slowest layer visible so system design stays honest.",
+      "lines": [
+        "Keep the slow floor visible",
+        "Show the engineering boundary"
+      ],
+      "state": "amber"
+    }
+  },
+  "footer": {
+    "note": "The comparison board should stay generic enough to compare performance regimes, system stacks, or model choices without embedding topic-specific ids in the DSL."
+  }
+}

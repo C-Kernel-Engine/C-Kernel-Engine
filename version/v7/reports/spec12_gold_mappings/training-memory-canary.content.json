@@ -1,0 +1,106 @@
+{
+  "header": {
+    "headline": "v7 Training Memory Layout and Canary Diagnostics",
+    "subtitle": "Contiguous arena, section boundaries, tensor slots, and phase checks"
+  },
+  "offsets": [
+    "0x000000",
+    "0x180000",
+    "0x2C0000",
+    "0x3A0000",
+    "0x520000",
+    "0x640000",
+    "0x720000"
+  ],
+  "segments": {
+    "weights": {
+      "title": "weights",
+      "size": "persistent params",
+      "caption": "Persistent model params; readonly during forward",
+      "parts": [
+        "params",
+        "bump",
+        "manifest"
+      ]
+    },
+    "activations": {
+      "title": "activations",
+      "size": "forward scratch",
+      "caption": "act.* and saved.* tensors produced during forward",
+      "parts": [
+        "act.*",
+        "saved.*",
+        "ctx"
+      ]
+    },
+    "grad_act": {
+      "title": "grad_act",
+      "size": "backward scratch",
+      "caption": "grad.act.* tensors produced during backward",
+      "parts": [
+        "grad.act",
+        "reduce",
+        "tmp"
+      ]
+    },
+    "grad_weights": {
+      "title": "grad_weights",
+      "size": "dW + tmp.dW",
+      "caption": "Gradient buffers accumulated before optimizer step",
+      "parts": [
+        "dW",
+        "tmp.dW",
+        "accum"
+      ]
+    },
+    "optimizer": {
+      "title": "optimizer",
+      "size": "adamw state",
+      "caption": "m and v buffers updated inside step()",
+      "parts": [
+        "m",
+        "v",
+        "step"
+      ]
+    },
+    "temp_aux": {
+      "title": "temp + aux",
+      "size": "scratch",
+      "caption": "Loss buffers, canary regions, and audit metadata",
+      "parts": [
+        "loss",
+        "canary",
+        "audit"
+      ]
+    }
+  },
+  "cards": {
+    "canaries": {
+      "title": "Canary Guards",
+      "items": [
+        "Per-slot metadata tracks name, offset, section, and writable phase",
+        "Guard pattern plants 16-float tails near declared tensor bounds",
+        "Tail canaries catch overruns near allocator boundaries",
+        "Use slot maps to connect the first corrupt guard to the owning op"
+      ]
+    },
+    "phases": {
+      "title": "Diagnostic Phases",
+      "lines": [
+        "1) plant canaries + snapshot weights",
+        "2) run forward, verify guards and weights",
+        "3) run backward, verify guards again",
+        "4) run optimizer + optional oracle compare"
+      ]
+    },
+    "checks": {
+      "title": "Operational Checks",
+      "lines": [
+        "layout_train_audit.json: overlap + bounds + alignment",
+        "memory_diagnostic_latest.json: phase + first_corrupt_idx",
+        "generated_train_runtime_summary_v7.json: slots + emitted ops",
+        "cks-v7-run train --backend ck --train-strict"
+      ]
+    }
+  }
+}

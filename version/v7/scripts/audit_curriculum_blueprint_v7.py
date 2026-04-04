@@ -46,7 +46,29 @@ def _finding(level: str, message: str) -> dict[str, str]:
     return {"level": level, "message": message}
 
 
-def audit_blueprint_doc(doc: dict[str, Any], *, blueprint_path: str = "") -> dict[str, Any]:
+def _generator_surface_counts(render_catalog_doc: Any) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    if not isinstance(render_catalog_doc, list):
+        return counts
+    for row in render_catalog_doc:
+        if not isinstance(row, dict):
+            continue
+        if not bool(row.get("training_prompt")):
+            continue
+        surface = str(row.get("prompt_surface") or "").strip()
+        if not surface:
+            continue
+        counts[surface] += 1
+    return counts
+
+
+def audit_blueprint_doc(
+    doc: dict[str, Any],
+    *,
+    blueprint_path: str = "",
+    render_catalog_doc: Any = None,
+    render_catalog_path: str = "",
+) -> dict[str, Any]:
     findings: list[dict[str, str]] = []
 
     if str(doc.get("schema") or "") != BLUEPRINT_SCHEMA:
@@ -230,6 +252,29 @@ def audit_blueprint_doc(doc: dict[str, Any], *, blueprint_path: str = "") -> dic
                 if surface_id not in seen_surfaces:
                     findings.append(_finding("fail", f"non_regression surface {surface_id} must appear in stage {stage_id}"))
 
+    actual_surface_counts = _generator_surface_counts(render_catalog_doc)
+    actual_surface_ids = set(actual_surface_counts)
+    expected_surface_ids = set(surface_map)
+    generator_missing_surfaces = sorted(expected_surface_ids - actual_surface_ids)
+    generator_extra_surfaces = sorted(actual_surface_ids - expected_surface_ids)
+    if render_catalog_doc is not None:
+        if generator_missing_surfaces:
+            findings.append(
+                _finding(
+                    "fail",
+                    "render catalog is missing declared training surfaces: "
+                    + ", ".join(generator_missing_surfaces),
+                )
+            )
+        if generator_extra_surfaces:
+            findings.append(
+                _finding(
+                    "warn",
+                    "render catalog contains undeclared training surfaces: "
+                    + ", ".join(generator_extra_surfaces),
+                )
+            )
+
     verdict = "pass"
     if any(row["level"] == "fail" for row in findings):
         verdict = "fail"
@@ -252,12 +297,17 @@ def audit_blueprint_doc(doc: dict[str, Any], *, blueprint_path: str = "") -> dic
         "stage_surface_counts": {key: len(value) for key, value in sorted(stage_surface_ids.items())},
         "competency_stage_coverage": {key: sorted(value) for key, value in sorted(competency_stage_coverage.items())},
         "frontier_stage_coverage": {key: sorted(value) for key, value in sorted(frontier_stage_coverage.items())},
+        "generator_surface_count": len(actual_surface_counts),
+        "generator_surface_counts": dict(sorted(actual_surface_counts.items())),
+        "generator_missing_surfaces": generator_missing_surfaces,
+        "generator_extra_surfaces": generator_extra_surfaces,
     }
 
     return {
         "schema": SCHEMA,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "blueprint_path": blueprint_path,
+        "render_catalog_path": render_catalog_path,
         "spec": doc.get("spec"),
         "title": doc.get("title"),
         "verdict": verdict,
@@ -266,8 +316,14 @@ def audit_blueprint_doc(doc: dict[str, Any], *, blueprint_path: str = "") -> dic
     }
 
 
-def audit_blueprint(path: Path) -> dict[str, Any]:
-    return audit_blueprint_doc(_load_json(path), blueprint_path=str(path))
+def audit_blueprint(path: Path, *, render_catalog_path: Path | None = None) -> dict[str, Any]:
+    render_catalog_doc = _load_json(render_catalog_path) if render_catalog_path else None
+    return audit_blueprint_doc(
+        _load_json(path),
+        blueprint_path=str(path),
+        render_catalog_doc=render_catalog_doc,
+        render_catalog_path="" if render_catalog_path is None else str(render_catalog_path),
+    )
 
 
 def _build_markdown(payload: dict[str, Any]) -> str:
@@ -285,6 +341,7 @@ def _build_markdown(payload: dict[str, Any]) -> str:
         f"- title: `{payload.get('title')}`",
         f"- verdict: `{payload.get('verdict')}`",
         f"- blueprint: `{payload.get('blueprint_path')}`",
+        f"- render catalog: `{payload.get('render_catalog_path') or 'not provided'}`",
         f"- generated at: `{payload.get('generated_at')}`",
         "",
         "## Summary",
@@ -297,6 +354,12 @@ def _build_markdown(payload: dict[str, Any]) -> str:
         f"- surfaces: `{summary.get('surface_count')}`",
         f"- competencies: `{summary.get('competency_count')}`",
         f"- failure frontiers: `{summary.get('failure_frontier_count')}`",
+        "",
+        "## Generator Coverage",
+        "",
+        f"- actual training surfaces: `{summary.get('generator_surface_count')}`",
+        f"- missing declared surfaces: `{', '.join(summary.get('generator_missing_surfaces') or []) or 'none'}`",
+        f"- undeclared extra surfaces: `{', '.join(summary.get('generator_extra_surfaces') or []) or 'none'}`",
         "",
         "## Family Coverage",
         "",
@@ -322,12 +385,15 @@ def _build_markdown(payload: dict[str, Any]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Audit a curriculum blueprint JSON file.")
     ap.add_argument("--blueprint", required=True, help="Path to the curriculum blueprint JSON.")
+    ap.add_argument("--render-catalog", default=None, help="Optional generated render catalog to validate against the blueprint.")
     ap.add_argument("--out-json", default=None, help="Optional output JSON path.")
     ap.add_argument("--out-md", default=None, help="Optional output markdown path.")
+    ap.add_argument("--strict", action="store_true", help="Exit nonzero when the audit verdict is fail.")
     args = ap.parse_args()
 
     blueprint_path = Path(args.blueprint).expanduser().resolve()
-    payload = audit_blueprint(blueprint_path)
+    render_catalog_path = Path(args.render_catalog).expanduser().resolve() if args.render_catalog else None
+    payload = audit_blueprint(blueprint_path, render_catalog_path=render_catalog_path)
 
     out_json = (
         Path(args.out_json).expanduser().resolve()
@@ -347,6 +413,8 @@ def main() -> int:
     print(f"[OK] verdict={payload['verdict']} families={payload['summary']['family_count']} surfaces={payload['summary']['surface_count']}")
     print(f"[OK] wrote: {out_json}")
     print(f"[OK] wrote: {out_md}")
+    if args.strict and str(payload.get("verdict") or "") == "fail":
+        return 2
     return 0
 
 

@@ -1,0 +1,94 @@
+{
+  "header": {
+    "headline": "Bump Allocator Memory Layout",
+    "subtitle": "Typed regions stay ordered inside one quantized arena"
+  },
+  "offsets": [
+    "0x0000",
+    "0x1000",
+    "0x9A0000",
+    "0x4000000",
+    "0x6000000",
+    "0x7000000"
+  ],
+  "segments": {
+    "headers": {
+      "title": "Tensor Headers",
+      "size": "metadata only",
+      "caption": "Small descriptors track type, shape, strides, and data pointer targets",
+      "parts": [
+        "tensor[0]",
+        "tensor[1]",
+        "tensor[2]"
+      ]
+    },
+    "q4k_weights": {
+      "title": "Quantized Weights (Q4_K)",
+      "size": "~9.4 MB / layer set",
+      "caption": "Read-only packed blocks keep scales and codes contiguous inside one region",
+      "parts": [
+        "d",
+        "scales",
+        "qs"
+      ]
+    },
+    "bf16_cache": {
+      "title": "Dequantized Cache (BF16)",
+      "size": "optional hot weights",
+      "caption": "Hot layers can be expanded into a faster cache without changing the arena order",
+      "parts": [
+        "bf16",
+        "hot",
+        "cache"
+      ]
+    },
+    "activations": {
+      "title": "Activations (FP32)",
+      "size": "always full precision",
+      "caption": "Batch x sequence x embed buffers stay FP32 to preserve quality and avoid recalibration",
+      "parts": [
+        "buf_a",
+        "buf_b",
+        "fp32"
+      ]
+    },
+    "scratch": {
+      "title": "Scratch Space",
+      "size": "temporary buffers",
+      "caption": "Attention scores, intermediate MLP values, and softmax scratch reuse one region",
+      "parts": [
+        "attn",
+        "mlp",
+        "softmax"
+      ]
+    }
+  },
+  "cards": {
+    "tensor_structure": {
+      "title": "Tensor Structure",
+      "lines": [
+        "ggml_type type;",
+        "uint32_t ne[4];",
+        "size_t nb[4];",
+        "void* data;"
+      ]
+    },
+    "key_principles": {
+      "title": "Key Principles",
+      "items": [
+        "Never mix types in the same region",
+        "Weights stay read-only after load",
+        "Activations stay FP32 for stable quality",
+        "Scratch space reuses a single watermark"
+      ]
+    },
+    "memory_savings": {
+      "title": "Memory Savings",
+      "lines": [
+        "FP32 weights: 28 GB",
+        "Q4_K weights: ~4 GB",
+        "Activations: ~500 MB / batch"
+      ]
+    }
+  }
+}

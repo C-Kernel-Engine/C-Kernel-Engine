@@ -33,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CK_RUN = ROOT / "version" / "v7" / "scripts" / "ck_run_v7.py"
 TORCH_REF = ROOT / "version" / "v7" / "scripts" / "train_qwen3_torch_from_run_v7.py"
 OPEN_VIS = ROOT / "version" / "v7" / "tools" / "open_ir_visualizer.py"
+OPEN_IR_HUB = ROOT / "version" / "v7" / "tools" / "open_ir_hub.py"
 PROMOTE_CKPT = ROOT / "version" / "v7" / "scripts" / "promote_latest_checkpoint_v7.py"
 PACK_TOKENS = ROOT / "version" / "v7" / "scripts" / "pack_training_tokens_v7.py"
 BPE_BIN = ROOT / "build" / "ck-bpe-train"
@@ -62,6 +63,52 @@ def _cache_train_root_hint() -> str:
     if env:
         return str(Path(env).expanduser() / "train")
     return "~/.cache/ck-engine-v7/models/train"
+
+
+def _path_is_within(child: Path, parent: Path) -> bool:
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def _enforce_cache_train_run_dir(
+    run_dir: Path,
+    *,
+    allow_non_cache_run_dir: bool = False,
+    caller: str = "train_data_pipeline_v7.py",
+) -> Path:
+    resolved = run_dir.expanduser().resolve()
+    train_root = _cache_train_root()
+    repo_runs_root = (ROOT / "version" / "v7" / "runs").resolve()
+
+    if allow_non_cache_run_dir:
+        if not _path_is_within(resolved, train_root):
+            print(
+                f"[WARN] {caller}: using non-canonical run-dir because --allow-non-cache-run-dir was set.\n"
+                f"       run_dir={resolved}\n"
+                "       This is for intentional ephemeral smoke work only; the run will not be discovered automatically by IR Hub."
+            )
+        return resolved
+
+    if _path_is_within(resolved, repo_runs_root):
+        raise SystemExit(
+            "ERROR: training run dirs under the repo-local version/v7/runs tree are disallowed.\n"
+            f"  run_dir:    {resolved}\n"
+            f"  train_root: {train_root}\n"
+            "Use the canonical cache-backed train root so IR Hub, reports, checkpoints, and dataset artifacts stay in one operator-visible tree."
+        )
+
+    if not _path_is_within(resolved, train_root):
+        raise SystemExit(
+            "ERROR: training run dirs must live under the canonical cache train root.\n"
+            f"  run_dir:    {resolved}\n"
+            f"  train_root: {train_root}\n"
+            "Pass --allow-non-cache-run-dir only for intentional ephemeral smoke work."
+        )
+
+    return resolved
 
 
 def _is_bpe_tokenizer_mode(tokenizer: str) -> bool:
@@ -96,6 +143,30 @@ def _run_capture(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
             msg += f"\n  stderr: {stderr_msg[-2000:]}"
         raise RuntimeError(msg)
     return result
+
+
+def _refresh_ir_hub_for_run_dir(run_dir: Path) -> Path | None:
+    run_dir = run_dir.expanduser().resolve()
+    train_root = _cache_train_root()
+    if not _path_is_within(run_dir, train_root):
+        return None
+    models_root = _cache_models_root()
+    hub_html = models_root / "ir_hub.html"
+    hub_index = models_root / "runs_hub_index.json"
+    _run(
+        [
+            _python_exec(),
+            str(OPEN_IR_HUB),
+            "--models-root",
+            str(models_root),
+            "--output",
+            str(hub_html),
+            "--index-out",
+            str(hub_index),
+        ],
+        cwd=ROOT,
+    )
+    return hub_html
 
 
 def _promote_checkpoint(
@@ -3772,9 +3843,19 @@ def _build_or_update_training_plan_payload(
         "stages": stages_sorted,
         "source_pipeline": "training_pipeline_latest.json",
     }
+    if isinstance(existing_plan, dict):
+        for key, value in existing_plan.items():
+            if key not in plan:
+                plan[key] = value
     # Preserve operator-written roadmap across pipeline re-runs.
     if isinstance(existing_plan, dict) and isinstance(existing_plan.get("roadmap"), dict):
         plan["roadmap"] = existing_plan["roadmap"]
+    run_scope_path = run_dir / "run_scope.json"
+    run_scope_payload = _load_json(run_scope_path) if run_scope_path.exists() else None
+    if isinstance(run_scope_payload, dict):
+        plan["run_scope"] = run_scope_payload
+    elif isinstance(existing_plan, dict) and isinstance(existing_plan.get("run_scope"), dict):
+        plan["run_scope"] = existing_plan["run_scope"]
     return plan
 
 
@@ -4245,6 +4326,11 @@ def main() -> int:
                     help="Generate v7 IR visualizer HTML after training (default: enabled)")
     ap.add_argument("--no-open-visualizer", dest="open_visualizer", action="store_false",
                     help="Skip v7 IR visualizer HTML generation")
+    ap.set_defaults(refresh_ir_hub=True)
+    ap.add_argument("--refresh-ir-hub", dest="refresh_ir_hub", action="store_true",
+                    help="Refresh the canonical IR Hub after pipeline completion (default: enabled)")
+    ap.add_argument("--no-refresh-ir-hub", dest="refresh_ir_hub", action="store_false",
+                    help="Skip IR Hub refresh after pipeline completion")
     ap.add_argument("--json-out", default=None, help="Optional pipeline report JSON")
     ap.add_argument("--bpe-vocab-size", type=int, default=1024)
     ap.add_argument("--bpe-min-freq", type=int, default=2)
@@ -4462,19 +4548,11 @@ def main() -> int:
     if args.require_ascii_data is None:
         args.require_ascii_data = args.tokenizer == "ascii_bpe"
 
-    run_dir = Path(args.run).expanduser().resolve()
-    cache_train_root = _cache_train_root()
-    try:
-        in_cache_train_root = run_dir.is_relative_to(cache_train_root)
-    except AttributeError:
-        in_cache_train_root = str(run_dir).startswith(str(cache_train_root))
-    if not in_cache_train_root:
-        print(
-            f"[WARN] --run is outside {_cache_train_root_hint()}.\n"
-            f"       run_dir={run_dir}\n"
-            "       Keep IR, dataset, checkpoints, and training JSON under one cache run-dir\n"
-            "       so open_ir_hub.py can discover and share the full operator view cleanly."
-        )
+    run_dir = _enforce_cache_train_run_dir(
+        Path(args.run),
+        allow_non_cache_run_dir=bool(getattr(args, "allow_non_cache_run_dir", False)),
+        caller="train_data_pipeline_v7.py",
+    )
     manifest = run_dir / "weights_manifest.json"
     weights_bump = run_dir / "weights.bump"
     needs_init = (not run_dir.exists()) or (not manifest.exists()) or (not weights_bump.exists())
@@ -4870,6 +4948,12 @@ def main() -> int:
         _atomic_write_text(training_plan_path, json.dumps(training_plan, indent=2))
         prepare_pipeline["training_plan_path"] = str(training_plan_path)
         _atomic_write_text(run_dir / "training_pipeline_latest.json", json.dumps(prepare_pipeline, indent=2))
+        hub_path: Path | None = None
+        if bool(getattr(args, "refresh_ir_hub", True)):
+            try:
+                hub_path = _refresh_ir_hub_for_run_dir(run_dir)
+            except Exception as exc:
+                print(f"WARNING: could not refresh IR Hub: {exc}", file=sys.stderr)
         print("v7 train pipeline prepared")
         print(f"  run_dir:   {run_dir}")
         print(f"  dataset:   {dataset_path}")
@@ -4883,6 +4967,8 @@ def main() -> int:
             f" line_rate={tokenizer_roundtrip.get('line_eval', {}).get('exact_match_rate', 0.0):.4f}"
         )
         print(f"  data_lab:  {data_lab_artifacts.get('dataset_profile_json')}")
+        if hub_path is not None:
+            print(f"  ir_hub:    {hub_path}")
         return 0
 
     # ── Run Ledger: write start record + pipeline_report stub ──────────────
@@ -5215,6 +5301,15 @@ def main() -> int:
             cwd=ROOT,
         )
         print("  visualizer: generated via open_ir_visualizer.py --generate --run ... --html-only")
+
+    hub_path: Path | None = None
+    if bool(getattr(args, "refresh_ir_hub", True)):
+        try:
+            hub_path = _refresh_ir_hub_for_run_dir(run_dir)
+        except Exception as exc:
+            print(f"WARNING: could not refresh IR Hub: {exc}", file=sys.stderr)
+    if hub_path is not None:
+        print(f"  ir_hub:    {hub_path}")
 
     return 0
 

@@ -6,80 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from training_policy_v7 import build_training_decision_payload, load_json, probe_metrics_from_doc, render_training_decision_md
+
 
 FAMILIES = ("memory_map", "timeline", "system_diagram")
+HIDDEN_SPLITS = ("hidden_train", "hidden_test")
 RUN_RE = re.compile(r"_r(\d+)$")
 
 
-def _load_json(path: Path) -> dict[str, Any] | list[Any] | None:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def _family_from_prompt(prompt: str) -> str:
-    text = str(prompt or "")
-    for family in FAMILIES:
-        if f"[layout:{family}]" in text:
-            return family
-    return "unknown"
-
-
-def _rate(num: int, den: int) -> float:
-    if den <= 0:
-        return 0.0
-    return float(num) / float(den)
-
-
 def _probe_metrics_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
-    results = [row for row in (doc.get("results") or []) if isinstance(row, dict)]
-    family_exact: Counter[str] = Counter()
-    family_total: Counter[str] = Counter()
-    hidden_exact: Counter[str] = Counter()
-    hidden_total: Counter[str] = Counter()
-    exact_total = 0
-    renderable_total = 0
-    repairable_tail = 0
-    malformed = 0
-    for row in results:
-        family = _family_from_prompt(str(row.get("prompt") or ""))
-        family_total[family] += 1
-        if bool(row.get("exact_match")):
-            exact_total += 1
-            family_exact[family] += 1
-        if bool(row.get("renderable")):
-            renderable_total += 1
-        if row.get("split") in {"hidden_train", "hidden_test"}:
-            hidden_total[str(row["split"])] += 1
-            if bool(row.get("exact_match")):
-                hidden_exact[str(row["split"])] += 1
-        if not bool(row.get("exact_match")):
-            if bool(row.get("renderable")):
-                repairable_tail += 1
-            else:
-                malformed += 1
-    return {
-        "n_results": len(results),
-        "overall_exact": _rate(exact_total, len(results)),
-        "renderable": _rate(renderable_total, len(results)),
-        "family_exact_counts": {family: int(family_exact.get(family, 0)) for family in FAMILIES},
-        "family_totals": {family: int(family_total.get(family, 0)) for family in FAMILIES},
-        "family_exact_rates": {
-            family: _rate(family_exact.get(family, 0), family_total.get(family, 0))
-            for family in FAMILIES
-        },
-        "hidden_exact_rates": {
-            split: _rate(hidden_exact.get(split, 0), hidden_total.get(split, 0))
-            for split in ("hidden_train", "hidden_test")
-        },
-        "repairable_nonexact_rows": repairable_tail,
-        "malformed_nonexact_rows": malformed,
-    }
+    return probe_metrics_from_doc(doc, families=FAMILIES, hidden_splits=HIDDEN_SPLITS)
 
 
 def _rung_number(path: Path) -> int:
@@ -101,33 +40,18 @@ def _candidate_run_paths(root: Path, frozen_run: Path) -> list[Path]:
 
 
 def _paper_guidance() -> list[dict[str, str]]:
-    return [
-        {
-            "paper": "Chinchilla (Hoffmann et al., 2022)",
-            "gate": "Do not trust a pilot budget unless selected tokens and actual processed tokens match.",
-            "suggestion": "Block new raw training until token-budget accounting is verified end to end.",
+    payload = build_training_decision_payload(
+        spec="spec16",
+        frozen_run=Path("/tmp/spec16"),
+        frozen_metrics={
+            "overall_exact": 0.0,
+            "hidden_exact_rates": {"hidden_train": 0.0, "hidden_test": 0.0},
+            "repairable_nonexact_rows": 0,
+            "malformed_nonexact_rows": 0,
         },
-        {
-            "paper": "phi-1 (Gunasekar et al., 2023)",
-            "gate": "Prefer clean, compiler-validated coverage over more repair prose.",
-            "suggestion": "Only add new training rows when they add validated unique coverage, not just new warning language.",
-        },
-        {
-            "paper": "Deduplication of Training Data Makes Language Models Better (Lee et al., 2022)",
-            "gate": "Do not remove shortcut repetition unless it is replaced with new useful coverage.",
-            "suggestion": "Any dedup or curriculum shrink must show replacement coverage before training is allowed.",
-        },
-        {
-            "paper": "HumanEval / Codex (Chen et al., 2021)",
-            "gate": "When outputs are mostly renderable or mechanically repairable, prefer decode/repair over more CE training.",
-            "suggestion": "Use executable or compilable correctness as the route selector, not train loss.",
-        },
-        {
-            "paper": "Grokking (Power et al., 2022)",
-            "gate": "If loss improves while exactness regresses, stop repeating the same objective and data style.",
-            "suggestion": "Treat that pattern as a block on more same-family repair rungs.",
-        },
-    ]
+        descendants=[],
+    )
+    return list(payload["paper_guidance"])
 
 
 def _training_reenable_conditions() -> list[str]:
@@ -156,98 +80,32 @@ def _build_decision_payload(
     frozen_metrics: dict[str, Any],
     descendants: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    blocked_descendants = [
-        row for row in descendants
-        if (not bool(row.get("beats_frozen"))) or (row.get("pilot_gate_clears") is False)
-    ]
-    strong_frozen = (
-        frozen_metrics["overall_exact"] >= 0.80
-        and frozen_metrics["hidden_exact_rates"]["hidden_train"] >= 1.0
-        and frozen_metrics["hidden_exact_rates"]["hidden_test"] >= 1.0
+    payload = build_training_decision_payload(
+        spec="spec16",
+        frozen_run=frozen_run,
+        frozen_metrics=frozen_metrics,
+        descendants=descendants,
+        hidden_splits=HIDDEN_SPLITS,
+        strong_overall_exact_threshold=0.80,
+        strong_hidden_exact_threshold=1.0,
+        blocked_descendant_threshold=2,
+        default_allowed_action="pilot_train",
+        blocked_default_action="decode_repair",
+        suggested_next_training_branch="capacity_branch",
+        training_reenable_conditions=_training_reenable_conditions(),
+        banned_training_patterns=_banned_training_patterns(),
+        paper_guidance=_paper_guidance(),
     )
-    repairable_bias = frozen_metrics["repairable_nonexact_rows"] >= frozen_metrics["malformed_nonexact_rows"]
-
-    training_allowed = not (strong_frozen and len(blocked_descendants) >= 2)
-    default_action = "pilot_train" if training_allowed else "decode_repair"
-    suggested_next_training_branch = "capacity_branch" if not training_allowed else "pilot_train"
-    reasons: list[str] = []
-    if strong_frozen:
-        reasons.append("frozen raw baseline already demonstrates the spec16 bundle capability")
-    if len(blocked_descendants) >= 2:
-        reasons.append("multiple post-baseline rungs failed to beat or even preserve the frozen winner")
-    if repairable_bias:
-        reasons.append("the remaining error mass is closer to decode/repair work than fresh capability acquisition")
-    if descendants and descendants[-1].get("pilot_gate_clears") is False:
-        reasons.append("the latest pilot failed the frozen-baseline gate and should not promote into another raw rung")
-
-    unblock_requirements = [
-        "complete an autopsy of the latest blocked rung before changing training data again",
-        "verify pilot budget integrity so selected tokens match actual processed tokens",
-        "prove the next training idea is a new branch, not another narrow raw-repair rung",
-    ]
-    if not training_allowed:
-        unblock_requirements.append(
-            "if more raw margin is still needed after decode/repair, branch to a capacity test on the frozen r9 recipe"
-        )
-
-    return {
-        "schema": "ck.spec16_training_decision.v1",
-        "spec": "spec16",
-        "frozen_raw_winner": str(frozen_run),
-        "frozen_metrics": frozen_metrics,
-        "descendant_runs": descendants,
-        "paper_guidance": _paper_guidance(),
-        "training_allowed": training_allowed,
-        "default_action": default_action,
-        "allowed_actions": ["decode_repair", "measurement_autopsy"] + (["pilot_train"] if training_allowed else []),
-        "suggested_next_training_branch": suggested_next_training_branch,
-        "block_raw_repair_rungs": not training_allowed,
-        "reasons": reasons,
-        "unblock_requirements": unblock_requirements,
-        "training_reenable_conditions": _training_reenable_conditions(),
-        "banned_training_patterns": _banned_training_patterns(),
-    }
+    payload["schema"] = "ck.spec16_training_decision.v1"
+    return payload
 
 
 def _render_md(payload: dict[str, Any]) -> str:
-    verdict = "ALLOW TRAINING" if payload["training_allowed"] else "BLOCK RAW TRAINING"
-    lines = [
+    return render_training_decision_md(payload).replace(
+        "# Training Decision",
         "# Spec16 Training Decision",
-        "",
-        f"- Verdict: **{verdict}**",
-        f"- Frozen raw winner: `{payload['frozen_raw_winner']}`",
-        f"- Default action: `{payload['default_action']}`",
-        f"- Suggested next training branch: `{payload['suggested_next_training_branch']}`",
-        "",
-        "## Reasons",
-        "",
-        *[f"- {item}" for item in payload["reasons"]],
-        "",
-        "## Unblock Requirements",
-        "",
-        *[f"- {item}" for item in payload["unblock_requirements"]],
-        "",
-        "## Training Re-Enable Conditions",
-        "",
-        *[f"- {item}" for item in payload["training_reenable_conditions"]],
-        "",
-        "## Banned Training Patterns",
-        "",
-        *[f"- {item}" for item in payload["banned_training_patterns"]],
-        "",
-        "## Paper Guidance",
-        "",
-    ]
-    for item in payload["paper_guidance"]:
-        lines.append(f"- {item['paper']}: {item['gate']} Suggestion: {item['suggestion']}")
-    if payload["descendant_runs"]:
-        lines.extend(["", "## Descendant Runs", ""])
-        for row in payload["descendant_runs"]:
-            lines.append(
-                f"- `{row['run_name']}`: exact `{row['overall_exact']:.4f}`, renderable `{row['renderable']:.4f}`, "
-                f"beats frozen `{row['beats_frozen']}`, pilot gate `{row['pilot_gate_clears']}`"
-            )
-    return "\n".join(lines) + "\n"
+        1,
+    )
 
 
 def main() -> int:
@@ -261,7 +119,7 @@ def main() -> int:
 
     frozen_run = Path(args.frozen_run).expanduser().resolve()
     frozen_probe = frozen_run / "spec16_probe_report.json"
-    frozen_doc = _load_json(frozen_probe)
+    frozen_doc = load_json(frozen_probe)
     if not isinstance(frozen_doc, dict):
         raise SystemExit(f"failed to load frozen probe report: {frozen_probe}")
     frozen_metrics = _probe_metrics_from_doc(frozen_doc)
@@ -270,11 +128,11 @@ def main() -> int:
     descendants: list[dict[str, Any]] = []
     for run_dir in descendant_paths:
         probe_path = run_dir / "spec16_probe_report.json"
-        probe_doc = _load_json(probe_path)
+        probe_doc = load_json(probe_path)
         if not isinstance(probe_doc, dict):
             continue
         metrics = _probe_metrics_from_doc(probe_doc)
-        gate_doc = _load_json(run_dir / "spec16_pilot_gate.json")
+        gate_doc = load_json(run_dir / "spec16_pilot_gate.json")
         pilot_gate_clears = gate_doc.get("clears_gate") if isinstance(gate_doc, dict) else None
         descendants.append(
             {

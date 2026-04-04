@@ -1,0 +1,570 @@
+{
+  "schema": "ck.curriculum_blueprint.v1",
+  "spec": "spec19",
+  "date": "2026-04-01",
+  "title": "Spec19 Textbook Routing Mixture",
+  "derived_from": {
+    "frozen_raw_winner": "spec16_scene_bundle_l3_d192_h384_ctx768_r9",
+    "repaired_baseline": "spec16_scene_bundle_l3_d192_h384_ctx768_r9 + deterministic repair",
+    "diagnostic_branch": "spec17_scene_bundle_l3_d192_h384_ctx768_r4",
+    "autopsy_report": "version/v7/reports/SPEC16_R12_AUTOPSY_2026-03-31.md",
+    "spec17_r4_autopsy": "version/v7/reports/SPEC17_R4_CONTRAST_SCAFFOLD_AUTOPSY_2026-04-01.md",
+    "training_plan": "docs/site/_pages/spec19-textbook-routing-mixture.html"
+  },
+  "objective": "Teach bounded-intent family and form routing with a textbook routebook and minimal-pair mixture before widening to style and topology inference, while preserving the frozen spec16 shared bundle contract.",
+  "why_this_exists": [
+    "Spec16 proved the shared bundle can be learned cleanly when the prompt contract stays explicit and deterministic.",
+    "Spec17 fixed its scaffold process bugs but still ended with zero exactness on visible and hidden held-out splits, which means the remaining failure is a capability mismatch rather than a launch bug.",
+    "Spec19 changes the dataset philosophy: preserve closure, make direct routebook rows and minimal pairs the center of mass, and only then widen to style and topology inference."
+  ],
+  "contracts": {
+    "prompt_contract": {
+      "primary_prompt": "[task:svg] [topic:<topic_id>] [goal:<goal_id>] [audience:<audience_id>] [OUT]",
+      "controlled_hints": [
+        "[emphasis:<hint>]",
+        "[constraint:<compact|balanced|dense>]",
+        "[content_pack:<brief|default|dense>]"
+      ],
+      "internal_scaffold_only": [
+        "[layout:<family>]",
+        "[form:<form>]"
+      ],
+      "disallowed_prompt_fields": [
+        "theme",
+        "tone",
+        "density",
+        "background",
+        "topology counters",
+        "raw SVG",
+        "repair prose"
+      ]
+    },
+    "output_contract": {
+      "primary_surface": "Emit exactly one shared [bundle] scene_bundle.v1 only.",
+      "external_payload": "Visible copy, facts, numbers, and labels remain in content.json.",
+      "disallowed_outputs": [
+        "raw SVG",
+        "topic ids or prompt metadata inside the bundle",
+        "asset-specific ids",
+        "free-written prose",
+        "family-specific lowerer syntax"
+      ]
+    },
+    "decode_boundary": {
+      "allowed_repairs": [
+        "truncate at the first valid [/bundle]",
+        "strip copied prompt or control tags outside the bundle",
+        "dedupe singleton tags when family and form already match",
+        "fill missing prompt-controlled fields only when family and form already match"
+      ],
+      "disallowed_repairs": [
+        "change family",
+        "change form",
+        "guess a new style bundle",
+        "re-emit a fresh bundle from the prompt without model evidence"
+      ]
+    }
+  },
+  "families": [
+    {
+      "name": "memory_map",
+      "forms": ["typed_regions", "arena_sections", "layer_stack"],
+      "count_fields": ["segments", "brackets", "cards"],
+      "intent_profiles": ["memory_layout_map", "allocator_regions", "arena_guard_flow"]
+    },
+    {
+      "name": "timeline",
+      "forms": ["milestone_chain", "stage_sequence"],
+      "count_fields": ["stages", "arrows", "footer"],
+      "intent_profiles": ["ir_evolution_timeline", "why_pipeline_timeline", "operator_changeover_timeline"]
+    },
+    {
+      "name": "system_diagram",
+      "forms": ["linear_pipeline", "build_path", "selection_path"],
+      "count_fields": ["stages", "links", "terminal", "footer"],
+      "intent_profiles": ["pipeline_overview_flow", "build_pipeline_flow", "registry_selection_flow"]
+    }
+  ],
+  "intent_profiles": [
+    {
+      "id": "memory_layout_map",
+      "family": "memory_map",
+      "form": "layer_stack",
+      "topic": "memory_layout_map",
+      "goal": "explain_structure",
+      "audience": "engineer",
+      "emphasis": "topology",
+      "canonical_style": {
+        "theme": "signal_glow",
+        "tone": "green",
+        "density": "balanced",
+        "background": "mesh"
+      },
+      "canonical_topology": {
+        "segments": 5,
+        "brackets": 2,
+        "cards": 3
+      }
+    },
+    {
+      "id": "allocator_regions",
+      "family": "memory_map",
+      "form": "typed_regions",
+      "topic": "allocator_regions",
+      "goal": "compare_options",
+      "audience": "technical",
+      "emphasis": "comparison",
+      "canonical_style": {
+        "theme": "infra_dark",
+        "tone": "blue",
+        "density": "balanced",
+        "background": "none"
+      },
+      "canonical_topology": {
+        "segments": 4,
+        "brackets": 2,
+        "cards": 2
+      }
+    },
+    {
+      "id": "arena_guard_flow",
+      "family": "memory_map",
+      "form": "arena_sections",
+      "topic": "arena_guard_flow",
+      "goal": "route_debug",
+      "audience": "operator",
+      "emphasis": "selection",
+      "canonical_style": {
+        "theme": "paper_editorial",
+        "tone": "amber",
+        "density": "airy",
+        "background": "grid"
+      },
+      "canonical_topology": {
+        "segments": 4,
+        "brackets": 1,
+        "cards": 3
+      }
+    },
+    {
+      "id": "ir_evolution_timeline",
+      "family": "timeline",
+      "form": "milestone_chain",
+      "topic": "ir_evolution_timeline",
+      "goal": "show_sequence",
+      "audience": "technical",
+      "emphasis": "sequence",
+      "canonical_style": {
+        "theme": "signal_glow",
+        "tone": "amber",
+        "density": "balanced",
+        "background": "mesh"
+      },
+      "canonical_topology": {
+        "stages": 5,
+        "arrows": 4,
+        "footer": 1
+      }
+    },
+    {
+      "id": "why_pipeline_timeline",
+      "family": "timeline",
+      "form": "stage_sequence",
+      "topic": "why_pipeline_timeline",
+      "goal": "explain_process",
+      "audience": "operator",
+      "emphasis": "flow",
+      "canonical_style": {
+        "theme": "infra_dark",
+        "tone": "green",
+        "density": "compact",
+        "background": "rings"
+      },
+      "canonical_topology": {
+        "stages": 4,
+        "arrows": 3,
+        "footer": 1
+      }
+    },
+    {
+      "id": "operator_changeover_timeline",
+      "family": "timeline",
+      "form": "stage_sequence",
+      "topic": "operator_changeover_timeline",
+      "goal": "show_sequence",
+      "audience": "operator",
+      "emphasis": "sequence",
+      "canonical_style": {
+        "theme": "paper_editorial",
+        "tone": "blue",
+        "density": "airy",
+        "background": "grid"
+      },
+      "canonical_topology": {
+        "stages": 4,
+        "arrows": 3,
+        "footer": 0
+      }
+    },
+    {
+      "id": "pipeline_overview_flow",
+      "family": "system_diagram",
+      "form": "linear_pipeline",
+      "topic": "pipeline_overview_flow",
+      "goal": "show_flow",
+      "audience": "technical",
+      "emphasis": "flow",
+      "canonical_style": {
+        "theme": "signal_glow",
+        "tone": "blue",
+        "density": "balanced",
+        "background": "mesh"
+      },
+      "canonical_topology": {
+        "stages": 4,
+        "links": 3,
+        "terminal": 1,
+        "footer": 1
+      }
+    },
+    {
+      "id": "build_pipeline_flow",
+      "family": "system_diagram",
+      "form": "build_path",
+      "topic": "build_pipeline_flow",
+      "goal": "explain_pipeline",
+      "audience": "engineer",
+      "emphasis": "flow",
+      "canonical_style": {
+        "theme": "signal_glow",
+        "tone": "blue",
+        "density": "balanced",
+        "background": "mesh"
+      },
+      "canonical_topology": {
+        "stages": 4,
+        "links": 4,
+        "terminal": 1,
+        "footer": 1
+      }
+    },
+    {
+      "id": "registry_selection_flow",
+      "family": "system_diagram",
+      "form": "selection_path",
+      "topic": "registry_selection_flow",
+      "goal": "route_decision",
+      "audience": "operator",
+      "emphasis": "selection",
+      "canonical_style": {
+        "theme": "paper_editorial",
+        "tone": "amber",
+        "density": "airy",
+        "background": "grid"
+      },
+      "canonical_topology": {
+        "stages": 4,
+        "links": 3,
+        "terminal": 1,
+        "footer": 0
+      }
+    }
+  ],
+  "intent_taxonomy": {
+    "topics": [
+      "memory_layout_map",
+      "allocator_regions",
+      "arena_guard_flow",
+      "ir_evolution_timeline",
+      "why_pipeline_timeline",
+      "operator_changeover_timeline",
+      "pipeline_overview_flow",
+      "build_pipeline_flow",
+      "registry_selection_flow"
+    ],
+    "goals": [
+      "explain_structure",
+      "compare_options",
+      "route_debug",
+      "show_sequence",
+      "explain_process",
+      "show_flow",
+      "explain_pipeline",
+      "route_decision"
+    ],
+    "audiences": ["engineer", "operator", "technical"],
+    "emphasis_hints": ["topology", "comparison", "flow", "sequence", "selection"],
+    "constraints": ["compact", "balanced", "dense"],
+    "content_packs": ["brief", "default", "dense"]
+  },
+  "competencies": [
+    {
+      "id": "bundle_closure",
+      "description": "Emit exactly one clean [bundle] and stop at [/bundle].",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "prompt_output_separation",
+      "description": "Keep topic, goal, audience, and control markers out of the output bundle.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "family_routing",
+      "description": "Choose the correct family from bounded intent without explicit family tags.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "form_selection",
+      "description": "Choose the correct sibling form inside the selected family.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "routing_scaffold_retention",
+      "description": "Retain family and form when the curriculum drops from explicit scaffold prompts to routing prompts.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "style_topology_inference",
+      "description": "Infer the canonical style bundle and topology counts only after routing pressure is established.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    },
+    {
+      "id": "paraphrase_robustness",
+      "description": "Preserve bundle choice under wording shifts and field-order changes.",
+      "must_appear_in_stages": ["stage_b"]
+    },
+    {
+      "id": "family_balance",
+      "description": "Avoid improving one family by collapsing another, especially on hidden probes.",
+      "must_appear_in_stages": ["stage_a", "stage_b"]
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "explicit_bundle_anchor",
+      "surface_type": "anchor",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["bundle_closure", "prompt_output_separation"],
+      "frontiers": ["anchor_retention_failure", "topic_leakage_into_output", "stop_leakage"],
+      "notes": "Frozen spec16 explicit bundle prompts carried forward unchanged."
+    },
+    {
+      "id": "explicit_permuted_anchor",
+      "surface_type": "anchor",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["bundle_closure", "prompt_output_separation"],
+      "frontiers": ["anchor_retention_failure", "paraphrase_brittleness"],
+      "notes": "Carry the full explicit bundle prompt forward, but vary tag order so closure does not depend on one prompt layout."
+    },
+    {
+      "id": "clean_stop_anchor",
+      "surface_type": "hygiene",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["bundle_closure", "prompt_output_separation"],
+      "frontiers": ["prompt_copy_leakage", "stop_leakage"],
+      "notes": "Positive clean-stop rows only; no warning-language repair prose."
+    },
+    {
+      "id": "routebook_direct",
+      "surface_type": "intent",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["family_routing", "form_selection", "routing_scaffold_retention"],
+      "frontiers": ["default_family_attractor", "default_form_attractor"],
+      "notes": "Primary short routebook prompts with topic, goal, and audience only."
+    },
+    {
+      "id": "routebook_direct_hint",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["family_routing", "form_selection", "routing_scaffold_retention", "style_topology_inference"],
+      "frontiers": ["routing_bridge_abruptness", "style_topology_noise"],
+      "notes": "Routebook prompts with bounded emphasis, constraint, and content_pack hints."
+    },
+    {
+      "id": "recombination_bridge",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["family_routing", "form_selection", "paraphrase_robustness"],
+      "frontiers": ["routing_bridge_abruptness", "hidden_recombination_failure"],
+      "notes": "Controlled field recombinations keep the same semantic target under changed field order and hint mix."
+    },
+    {
+      "id": "form_minimal_pair",
+      "surface_type": "contrast",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["form_selection", "family_balance"],
+      "frontiers": ["default_form_attractor", "contrast_ignorance"],
+      "notes": "Near-neighbor prompts with one controlled sibling-form difference."
+    },
+    {
+      "id": "family_minimal_pair",
+      "surface_type": "contrast",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["family_routing", "family_balance"],
+      "frontiers": ["default_family_attractor", "contrast_ignorance", "hidden_family_imbalance"],
+      "notes": "Cross-family minimal pairs with explicit distractor structure when needed."
+    },
+    {
+      "id": "style_topology_bridge",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["style_topology_inference"],
+      "frontiers": ["style_topology_noise"],
+      "notes": "Bounded hints for emphasis, constraint, and content_pack teach style and topology only after routing rows exist."
+    },
+    {
+      "id": "routebook_paraphrase",
+      "surface_type": "bridge",
+      "families": ["memory_map", "timeline", "system_diagram"],
+      "competencies": ["paraphrase_robustness"],
+      "frontiers": ["paraphrase_brittleness", "hidden_recombination_failure"],
+      "notes": "Prompt wording shifts and small lexical alternations preserve the same target bundle."
+    }
+  ],
+  "predicted_failure_frontiers": [
+    {
+      "id": "anchor_retention_failure",
+      "severity": "high",
+      "description": "Even explicit anchor prompts stop producing the frozen bundle contract reliably once the branch curriculum weakens prompt control.",
+      "covered_by_surfaces": ["explicit_bundle_anchor", "explicit_permuted_anchor", "clean_stop_anchor"]
+    },
+    {
+      "id": "routing_bridge_abruptness",
+      "severity": "high",
+      "description": "The jump from scaffolded family and form prompts to pure bounded intent is too steep, so the model loses routing before the bridge is learned.",
+      "covered_by_surfaces": ["routebook_direct", "routebook_direct_hint", "recombination_bridge"]
+    },
+    {
+      "id": "default_family_attractor",
+      "severity": "high",
+      "description": "The model routes most prompts to one familiar family regardless of intent.",
+      "covered_by_surfaces": ["routebook_direct", "routebook_direct_hint", "family_minimal_pair"]
+    },
+    {
+      "id": "default_form_attractor",
+      "severity": "high",
+      "description": "The model chooses the dominant sibling form inside a family instead of the correct one.",
+      "covered_by_surfaces": ["routebook_direct", "routebook_direct_hint", "form_minimal_pair"]
+    },
+    {
+      "id": "contrast_ignorance",
+      "severity": "medium",
+      "description": "Contrast metadata is ignored, so sibling-form and cross-family distractors do not change the selected bundle.",
+      "covered_by_surfaces": ["form_minimal_pair", "family_minimal_pair"]
+    },
+    {
+      "id": "style_topology_noise",
+      "severity": "high",
+      "description": "Adding style and topology hints destabilizes already-learned routing or collapses style to a default attractor.",
+      "covered_by_surfaces": ["routebook_direct_hint", "style_topology_bridge"]
+    },
+    {
+      "id": "topic_leakage_into_output",
+      "severity": "high",
+      "description": "Topic ids, goals, or prompt fields appear inside the emitted bundle.",
+      "covered_by_surfaces": ["explicit_bundle_anchor", "clean_stop_anchor"]
+    },
+    {
+      "id": "prompt_copy_leakage",
+      "severity": "high",
+      "description": "The model copies [task:svg], [OUT], or similar control markers into the decode path.",
+      "covered_by_surfaces": ["clean_stop_anchor"]
+    },
+    {
+      "id": "stop_leakage",
+      "severity": "high",
+      "description": "The model keeps generating after the first valid [/bundle].",
+      "covered_by_surfaces": ["explicit_bundle_anchor", "clean_stop_anchor"]
+    },
+    {
+      "id": "paraphrase_brittleness",
+      "severity": "medium",
+      "description": "Small wording shifts change the chosen bundle even though the intent is the same.",
+      "covered_by_surfaces": ["explicit_permuted_anchor", "routebook_paraphrase"]
+    },
+    {
+      "id": "hidden_family_imbalance",
+      "severity": "high",
+      "description": "Visible improvements hide a collapse in one family on hidden probes.",
+      "covered_by_surfaces": ["family_minimal_pair", "routebook_direct"]
+    },
+    {
+      "id": "hidden_recombination_failure",
+      "severity": "medium",
+      "description": "Reordered or paraphrased prompts fail even when the visible routing prompts look stable.",
+      "covered_by_surfaces": ["routebook_paraphrase", "recombination_bridge"]
+    }
+  ],
+  "curriculum_stages": [
+    {
+      "id": "stage_a",
+      "purpose": "Preserve spec16 closure while making direct routebook rows and minimal pairs the center of mass.",
+      "surface_mix": [
+        {"surface": "explicit_bundle_anchor", "weight": 10},
+        {"surface": "explicit_permuted_anchor", "weight": 5},
+        {"surface": "clean_stop_anchor", "weight": 5},
+        {"surface": "routebook_direct", "weight": 15},
+        {"surface": "routebook_direct_hint", "weight": 10},
+        {"surface": "form_minimal_pair", "weight": 20},
+        {"surface": "family_minimal_pair", "weight": 15},
+        {"surface": "routebook_paraphrase", "weight": 10},
+        {"surface": "style_topology_bridge", "weight": 5},
+        {"surface": "recombination_bridge", "weight": 5}
+      ],
+      "notes": "Stage A is routebook-first on purpose: anchors stay alive, but direct routing and minimal pairs dominate the mixture."
+    },
+    {
+      "id": "stage_b",
+      "purpose": "Preserve learned routing while widening style and topology inference without giving up direct routebook pressure.",
+      "surface_mix": [
+        {"surface": "explicit_bundle_anchor", "weight": 10},
+        {"surface": "explicit_permuted_anchor", "weight": 5},
+        {"surface": "clean_stop_anchor", "weight": 5},
+        {"surface": "routebook_direct", "weight": 15},
+        {"surface": "routebook_direct_hint", "weight": 5},
+        {"surface": "form_minimal_pair", "weight": 15},
+        {"surface": "family_minimal_pair", "weight": 10},
+        {"surface": "routebook_paraphrase", "weight": 10},
+        {"surface": "style_topology_bridge", "weight": 20},
+        {"surface": "recombination_bridge", "weight": 5}
+      ],
+      "notes": "Stage B still keeps routing pressure dominant, but now style and topology widening is large enough to test generalization beyond family and form selection."
+    }
+  ],
+  "holdouts": {
+    "visible": {
+      "per_family": 12,
+      "required_surfaces": [
+        "routebook_direct",
+        "form_minimal_pair",
+        "family_minimal_pair",
+        "style_topology_bridge"
+      ],
+      "balance_rule": "Each family must appear equally across visible holdout prompt surfaces."
+    },
+    "hidden": {
+      "per_family": 6,
+      "required_surfaces": [
+        "routebook_direct",
+        "family_minimal_pair",
+        "routebook_paraphrase"
+      ],
+      "balance_rule": "Each family must appear equally across hidden paraphrase and hidden recombination probes."
+    },
+    "non_regression": ["explicit_bundle_anchor"]
+  },
+  "promotion_gates": [
+    "Compiler and canonicalizer parity must pass before any model training starts.",
+    "The curriculum audit must pass against the materialized render catalog, not only the blueprint JSON.",
+    "Raw exactness must be reported separately from repaired exactness.",
+    "Held-out exactness must become nonzero on visible and hidden splits before the branch is promotable.",
+    "If remaining errors are mostly deterministic near-misses, continue decode or repair instead of reopening raw repair-language rungs."
+  ],
+  "banned_patterns": [
+    "Do not add warning-language rows about [OUT], wrappers, singleton tags, or stop markers as the main repair strategy.",
+    "Do not mix raw SVG, free-written prose, or family-specific lowerer syntax into the spec19 output contract.",
+    "Do not remove anchor coverage in order to make the curriculum look more intent-heavy.",
+    "Do not treat better loss alone as evidence that routing improved.",
+    "Do not change tokenizer, family contract, and model size all at once in the first spec19 rung."
+  ]
+}

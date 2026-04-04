@@ -1,0 +1,54 @@
+{
+  "header": {
+    "headline": "IR Lowering Pipeline",
+    "subtitle": "A deterministic compiler path from graph ops to lowered runtime artifacts."
+  },
+  "nodes": {
+    "ir1": {
+      "title": "IR1",
+      "body": "Capture graph ops, dataflow edges, and kernel family intent.",
+      "detail": [
+        "ops + ids",
+        "dataflow",
+        "kernel family"
+      ]
+    },
+    "ir2": {
+      "title": "IR2",
+      "body": "Add scheduling decisions and kernel-variant selection.",
+      "detail": [
+        "schedule",
+        "variants"
+      ]
+    },
+    "lower": {
+      "title": "IR Lower",
+      "body": "Resolve pointers, call args, and runtime-facing dimensions.",
+      "detail": [
+        "inputs",
+        "runtime args"
+      ]
+    },
+    "layout": {
+      "title": "Memory Layout",
+      "body": "Bind buffers and offsets so lowered calls are concrete.",
+      "detail": [
+        "layout.json",
+        "offsets"
+      ]
+    }
+  },
+  "edges": {
+    "ir1_ir2": "schedule",
+    "ir2_lower": "lower",
+    "lower_layout": "buffers",
+    "layout_artifacts": "artifacts"
+  },
+  "artifacts": {
+    "title": "Lowered Artifacts",
+    "body": "Write layout, lowered IR, and init-call metadata for runtime generation."
+  },
+  "footer": {
+    "note": "Lowering stays deterministic because structure, memory planning, and runtime args are explicit."
+  }
+}

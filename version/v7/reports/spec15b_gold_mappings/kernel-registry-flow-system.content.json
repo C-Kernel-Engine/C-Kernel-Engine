@@ -1,0 +1,68 @@
+{
+  "header": {
+    "kicker": "System Diagram",
+    "headline": "Kernel Registry Flow",
+    "subtitle": "Track how an abstract operator resolves into a concrete runtime artifact."
+  },
+  "stages": {
+    "stage_1": {
+      "badge": "INPUT",
+      "title": "IR Operation",
+      "body": "Start from the canonical operator intent.",
+      "detail": [
+        "op",
+        "shape"
+      ]
+    },
+    "stage_2": {
+      "badge": "MATCH",
+      "title": "Registry Lookup",
+      "body": "Match the op to a supported kernel family.",
+      "detail": [
+        "attention",
+        "matmul"
+      ]
+    },
+    "stage_3": {
+      "badge": "SELECT",
+      "title": "Kernel Selector",
+      "body": "Choose the implementation for shape and policy.",
+      "detail": [
+        "policy",
+        "shape"
+      ]
+    },
+    "stage_4": {
+      "badge": "BUILD",
+      "title": "Generated Runtime",
+      "body": "Compile the selected kernel plan into the runtime artifact.",
+      "detail": [
+        "emit",
+        "compile"
+      ]
+    }
+  },
+  "links": {
+    "stage_1_stage_2": {
+      "label": "resolve"
+    },
+    "stage_2_stage_3": {
+      "label": "candidates"
+    },
+    "stage_3_stage_4": {
+      "label": "chosen kernel"
+    },
+    "stage_4_terminal": {
+      "label": "linked"
+    }
+  },
+  "terminal": {
+    "badge": "OUTPUT",
+    "title": "Linked Runtime",
+    "body": "The final runtime uses only registered, validated kernels."
+  },
+  "footer": {
+    "title": "Compiler Boundary",
+    "body": "The registry boundary is a clean deterministic interface for the first strict system_diagram family."
+  }
+}

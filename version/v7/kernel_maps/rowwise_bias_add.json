@@ -1,0 +1,44 @@
+{
+  "id": "rowwise_bias_add",
+  "op": "rowwise_bias_add",
+  "variant": "fp32_token_major",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Token-major activation stream [rows, dim] (in-place)"
+    }
+  ],
+  "weights": [
+    {
+      "name": "bias",
+      "dtype": "fp32",
+      "shape": ["E"],
+      "desc": "Bias vector [dim]"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Bias-added activation stream"
+    }
+  ],
+  "dims": ["rows", "dim"],
+  "impl": {
+    "function": "rowwise_bias_add",
+    "c_declaration": "void rowwise_bias_add(float *x, const float *bias, int rows, int dim);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_vision.py"]
+  },
+  "notes": "Apply a single bias vector across each row of a token-major activation matrix."
+}

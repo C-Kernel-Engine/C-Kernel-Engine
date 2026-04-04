@@ -3321,7 +3321,7 @@ static int cmd_profile_subcommand(int argc, char **argv) {
 
     char base_train[16384];
     snprintf(base_train, sizeof(base_train),
-             "'%s' train --run '%s' --train-token-file '%s' --train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g %s %s",
+             "'%s' train --run '%s' --allow-non-cache-run-dir --train-token-file '%s' --train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g %s %s",
              self,
              opt.run_dir,
              opt.token_file,
@@ -3477,7 +3477,7 @@ static int cmd_profile_subcommand(int argc, char **argv) {
         snprintf(
             cmd,
             sizeof(cmd),
-            "%s'%s' '%s' train-e2e --run '%s' --backend ck --train-verify-memory --train-strict "
+            "%s'%s' '%s' train-e2e --run '%s' --allow-non-cache-run-dir --backend ck --train-verify-memory --train-strict "
             "--train-epochs %d --train-seq-len %d --train-total-tokens %d --train-grad-accum %d --train-lr %.9g --prompt 'Hello!'",
             th_prefix,
             python_exe,

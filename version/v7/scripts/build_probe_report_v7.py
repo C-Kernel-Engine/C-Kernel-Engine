@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import html
 import json
+import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -20,6 +22,7 @@ from probe_report_adapters_v7 import (
     normalize_svg,
     normalize_whitespace,
 )
+from pack_training_tokens_v7 import _TrueBPEHandle
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -27,6 +30,7 @@ CK_CHAT_SCRIPT = ROOT / "scripts" / "ck_chat.py"
 PROBE_CONTRACT_DIR = ROOT / "version" / "v7" / "data" / "probe_contracts"
 CONTRACT_SCHEMA = "ck.probe_report_contract.v1"
 REPORT_SCHEMA = "ck.probe_report.v1"
+DEFAULT_TOKENIZER_LIB = ROOT / "build" / "libckernel_tokenizer.so"
 
 
 def _html(text: Any) -> str:
@@ -47,6 +51,110 @@ def _resolve_path(raw: str | Path, base_dir: Path) -> Path:
 def _python_bin() -> str:
     venv = ROOT / ".venv" / "bin" / "python"
     return str(venv) if venv.exists() else sys.executable
+
+
+class _TokenBudgetAnalyzer:
+    def __init__(self, *, handle: _TrueBPEHandle, context_len: int | None, decode_max_tokens: int | None):
+        self.handle = handle
+        self.context_len = int(context_len) if context_len else None
+        self.decode_max_tokens = int(decode_max_tokens) if decode_max_tokens else None
+
+    @classmethod
+    def for_run(cls, run_dir: Path, decode_cfg: dict[str, Any]):
+        tokenizer_json_candidates = [
+            run_dir / "tokenizer.json",
+            run_dir / "dataset" / "tokenizer" / "tokenizer.json",
+        ]
+        tokenizer_bin_candidates = [
+            run_dir / "tokenizer_bin",
+            run_dir / "dataset" / "tokenizer" / "tokenizer_bin",
+        ]
+        tokenizer_json = next((p for p in tokenizer_json_candidates if p.exists()), None)
+        tokenizer_bin = next((p for p in tokenizer_bin_candidates if p.exists()), None)
+        if tokenizer_json is None or tokenizer_bin is None or not DEFAULT_TOKENIZER_LIB.exists():
+            return None
+
+        context_len = None
+        for candidate in (run_dir / "config.json", run_dir / "weights_manifest.json", run_dir / "train_init_config.json"):
+            if not candidate.exists():
+                continue
+            try:
+                doc = _load_json(candidate)
+            except Exception:
+                continue
+            if isinstance(doc, dict):
+                if isinstance(doc.get("architecture"), dict):
+                    raw = doc["architecture"].get("context_len")
+                    if raw:
+                        context_len = int(raw)
+                        break
+                if isinstance(doc.get("config"), dict):
+                    raw = doc["config"].get("context_len")
+                    if raw:
+                        context_len = int(raw)
+                        break
+
+        handle = _TrueBPEHandle(DEFAULT_TOKENIZER_LIB, tokenizer_bin, tokenizer_json)
+        analyzer = cls(
+            handle=handle,
+            context_len=context_len,
+            decode_max_tokens=int(decode_cfg.get("max_tokens") or 0) or None,
+        )
+        atexit.register(analyzer.close)
+        return analyzer
+
+    def close(self) -> None:
+        if getattr(self, "handle", None) is not None:
+            self.handle.close()
+            self.handle = None
+
+    def count_tokens(self, text: str) -> int:
+        if not text or self.handle is None:
+            return 0
+        return len(self.handle.encode(text))
+
+    def classify(
+        self,
+        *,
+        prompt: str,
+        parsed_output: str,
+        expected_output: str | None,
+        stop_markers: list[str],
+        render_error: str | None,
+    ) -> dict[str, Any]:
+        prompt_tokens = self.count_tokens(prompt)
+        parsed_tokens = self.count_tokens(parsed_output)
+        expected_tokens = self.count_tokens(expected_output or "")
+        decode_threshold = max(1, int(self.decode_max_tokens or 0) - 1) if self.decode_max_tokens else None
+        context_threshold = max(1, int(self.context_len or 0) - 1) if self.context_len else None
+        hit_decode_ceiling = bool(decode_threshold and parsed_tokens >= decode_threshold)
+        hit_context_ceiling = bool(context_threshold and (prompt_tokens + parsed_tokens) >= context_threshold)
+        missing_stop_marker = bool(stop_markers) and not any(marker in parsed_output for marker in stop_markers)
+        prefix_matches_expected = bool(expected_output) and bool(parsed_output) and str(expected_output).startswith(parsed_output)
+        truncated_at_budget = (
+            missing_stop_marker
+            and prefix_matches_expected
+            and ("must end with" in str(render_error or "") or not str(render_error or "").strip())
+            and (hit_decode_ceiling or hit_context_ceiling)
+        )
+        reason_parts: list[str] = []
+        if hit_decode_ceiling:
+            reason_parts.append("decode_max_tokens")
+        if hit_context_ceiling:
+            reason_parts.append("context_len")
+        return {
+            "prompt_tokens": prompt_tokens,
+            "parsed_output_tokens": parsed_tokens,
+            "expected_output_tokens": expected_tokens,
+            "decode_max_tokens": self.decode_max_tokens,
+            "context_len": self.context_len,
+            "hit_decode_ceiling": hit_decode_ceiling,
+            "hit_context_ceiling": hit_context_ceiling,
+            "missing_stop_marker": missing_stop_marker,
+            "prefix_matches_expected": prefix_matches_expected,
+            "truncated_at_budget": truncated_at_budget,
+            "truncation_reason": "+".join(reason_parts) if truncated_at_budget and reason_parts else None,
+        }
 
 
 def _candidate_dataset_manifests(dataset_path: Path) -> list[Path]:
@@ -277,6 +385,7 @@ def _load_catalog(contract: dict[str, Any], contract_path: Path) -> dict[str, di
                 str(row.get(rendered_mime_key) or "").strip() or None if rendered_mime_key else rendered_mime
             ),
             "catalog_split": str(row.get(split_key) or "").strip() or None,
+            "content_json": row.get("content_json") if isinstance(row.get("content_json"), dict) else None,
         }
     return out
 
@@ -327,6 +436,7 @@ def _load_cases(
                             str(row.get("expected_rendered_mime") or "").strip()
                             or ("image/svg+xml" if row.get("expected_svg") else None)
                         ),
+                        "content_json": row.get("content_json") if isinstance(row.get("content_json"), dict) else None,
                     }
                 )
             continue
@@ -357,6 +467,7 @@ def _load_cases(
                     "expected_output": expected.get("expected_output"),
                     "expected_rendered_output": expected.get("expected_rendered_output"),
                     "expected_rendered_mime": expected.get("expected_rendered_mime"),
+                    "content_json": expected.get("content_json") if isinstance(expected.get("content_json"), dict) else None,
                 }
             )
     if not cases:
@@ -364,10 +475,18 @@ def _load_cases(
     return cases
 
 
-def _run_prompt(model_dir: Path, prompt: str, decode_cfg: dict[str, Any]) -> str:
+def _run_prompt(model_dir: Path, prompt: str, decode_cfg: dict[str, Any], adapter_cfg: dict[str, Any]) -> str:
     max_tokens = int(decode_cfg.get("max_tokens") or 64)
     temperature = float(decode_cfg.get("temperature") or 0.0)
-    stop_on_text = str(decode_cfg.get("stop_on_text") or "").strip()
+    repeat_penalty = float(decode_cfg.get("repeat_penalty") or 1.0)
+    raw_stop = decode_cfg.get("stop_on_text")
+    stop_markers: list[str] = []
+    if isinstance(raw_stop, list):
+        stop_markers = [str(marker).strip() for marker in raw_stop if str(marker).strip()]
+    else:
+        stop_text = str(raw_stop or "").strip()
+        if stop_text:
+            stop_markers = [stop_text]
     cmd = [
         _python_bin(),
         str(CK_CHAT_SCRIPT),
@@ -376,18 +495,24 @@ def _run_prompt(model_dir: Path, prompt: str, decode_cfg: dict[str, Any]) -> str
         "--python-tokenizer",
         "--chat-template",
         "none",
+        "--allow-raw-prompt",
         "--prompt",
         prompt,
         "--max-tokens",
         str(max_tokens),
         "--temperature",
         str(temperature),
+        "--repeat-penalty",
+        str(repeat_penalty),
         "--no-stats",
     ]
-    if stop_on_text:
-        cmd.extend(["--stop-on-text", stop_on_text])
-    else:
-        cmd.append("--stop-at-eos")
+    # Control-token visibility must come from the staged tokenizer/template
+    # sidecars for the run; the chat runtime stays agnostic to individual specs.
+    # The output adapter owns stop-marker truncation so the visible response
+    # still includes terminators like [/scene] for parser/render checks.
+    if stop_markers:
+        for marker in stop_markers:
+            cmd.extend(["--stop-on-text", marker])
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
     if result.returncode != 0:
         raise SystemExit(
@@ -438,6 +563,10 @@ def _normalize_value(text: Any, mime: str | None = None) -> str:
     return normalize_whitespace(raw)
 
 
+def _normalize_scene_dsl(text: Any) -> str:
+    return re.sub(r"\s+", "", str(text or "").strip())
+
+
 def _build_preview_markup(payload: str | None, mime: str | None, fallback: str) -> str:
     content = str(payload or "").strip()
     mime_name = str(mime or "").strip().lower()
@@ -453,30 +582,69 @@ def _evaluate_case(
     raw_output: str,
     response_text: str,
     adapter_cfg: dict[str, Any],
+    *,
+    budget_analyzer: _TokenBudgetAnalyzer | None,
 ) -> dict[str, Any]:
     adapter_name = str(adapter_cfg.get("name") or "plain_text").strip()
-    actual = apply_output_adapter(adapter_name, response_text, adapter_cfg)
+    case_adapter_cfg = dict(adapter_cfg)
+    content_json = case.get("content_json")
+    if isinstance(content_json, dict):
+        case_adapter_cfg["content_json"] = content_json
+    case_adapter_cfg["prompt"] = str(case.get("prompt") or "")
+    actual = apply_output_adapter(adapter_name, response_text, case_adapter_cfg)
     expected_output = str(case.get("expected_output") or "").strip() or None
     expected_rendered_output = str(case.get("expected_rendered_output") or "").strip() or None
     expected_rendered_mime = str(case.get("expected_rendered_mime") or "").strip() or None
     expected_eval = None
     if expected_output:
-        expected_eval = apply_output_adapter(adapter_name, expected_output, adapter_cfg)
+        expected_adapter_cfg = dict(case_adapter_cfg)
+        expected_adapter_cfg.pop("repairer", None)
+        expected_adapter_cfg.pop("prompt", None)
+        expected_eval = apply_output_adapter(adapter_name, expected_output, expected_adapter_cfg)
     if not expected_rendered_output and isinstance(expected_eval, dict):
         expected_rendered_output = str(expected_eval.get("materialized_output") or "").strip() or None
     if not expected_rendered_mime and isinstance(expected_eval, dict):
         expected_rendered_mime = str(expected_eval.get("materialized_mime") or "").strip() or None
 
     parsed_output = str(actual.get("parsed_output") or "").strip()
+    parsed_output_raw = str(actual.get("parsed_output_raw") or "").strip() or parsed_output
     materialized_output = str(actual.get("materialized_output") or "").strip() or None
     materialized_mime = str(actual.get("materialized_mime") or "").strip() or None
-    exact_match = bool(expected_output) and _normalize_value(parsed_output) == _normalize_value(expected_output)
+    renderer_name = str(case_adapter_cfg.get("renderer") or "").strip().lower()
+    if adapter_name == "text_renderer" and renderer_name.startswith("structured_svg_scene_spec"):
+        exact_match = bool(expected_output) and _normalize_scene_dsl(parsed_output) == _normalize_scene_dsl(expected_output)
+    else:
+        exact_match = bool(expected_output) and _normalize_value(parsed_output) == _normalize_value(expected_output)
     materialized_exact_match = bool(materialized_output and expected_rendered_output) and (
         _normalize_value(materialized_output, materialized_mime or expected_rendered_mime)
         == _normalize_value(expected_rendered_output, expected_rendered_mime or materialized_mime)
     )
     renderable = bool(actual.get("renderable")) and bool(materialized_output)
     valid_svg = (materialized_mime == "image/svg+xml") and is_valid_svg(materialized_output)
+    stop_markers = [str(marker).strip() for marker in (adapter_cfg.get("stop_markers") or []) if str(marker).strip()]
+    budget_diag = (
+        budget_analyzer.classify(
+            prompt=str(case.get("prompt") or ""),
+            parsed_output=parsed_output,
+            expected_output=expected_output,
+            stop_markers=stop_markers,
+            render_error=actual.get("render_error"),
+        )
+        if budget_analyzer is not None
+        else {
+            "prompt_tokens": None,
+            "parsed_output_tokens": None,
+            "expected_output_tokens": None,
+            "decode_max_tokens": int(adapter_cfg.get("max_tokens") or 0) or None,
+            "context_len": None,
+            "hit_decode_ceiling": False,
+            "hit_context_ceiling": False,
+            "missing_stop_marker": False,
+            "prefix_matches_expected": False,
+            "truncated_at_budget": False,
+            "truncation_reason": None,
+        }
+    )
 
     return {
         "id": case.get("id"),
@@ -488,15 +656,32 @@ def _evaluate_case(
         "expected_rendered_output": expected_rendered_output,
         "expected_rendered_mime": expected_rendered_mime,
         "expected_svg": expected_rendered_output if expected_rendered_mime == "image/svg+xml" else None,
+        "content_json": content_json if isinstance(content_json, dict) else None,
         "raw_output": raw_output.strip(),
         "response_text": response_text.strip(),
         "parsed_output": parsed_output,
+        "parsed_output_raw": parsed_output_raw,
         "materialized_output": materialized_output,
         "materialized_mime": materialized_mime,
         "rendered_svg": materialized_output if materialized_mime == "image/svg+xml" else None,
         "render_error": actual.get("render_error"),
         "prefix_text": actual.get("prefix_text"),
         "tail_text": actual.get("tail_text"),
+        "repair_applied": bool(actual.get("repair_applied")),
+        "repairer": actual.get("repairer"),
+        "repair_note": actual.get("repair_note"),
+        "repair_diag": actual.get("repair_diag") if isinstance(actual.get("repair_diag"), dict) else None,
+        "prompt_tokens": budget_diag.get("prompt_tokens"),
+        "parsed_output_tokens": budget_diag.get("parsed_output_tokens"),
+        "expected_output_tokens": budget_diag.get("expected_output_tokens"),
+        "decode_max_tokens": budget_diag.get("decode_max_tokens"),
+        "context_len": budget_diag.get("context_len"),
+        "hit_decode_ceiling": bool(budget_diag.get("hit_decode_ceiling")),
+        "hit_context_ceiling": bool(budget_diag.get("hit_context_ceiling")),
+        "missing_stop_marker": bool(budget_diag.get("missing_stop_marker")),
+        "prefix_matches_expected": bool(budget_diag.get("prefix_matches_expected")),
+        "truncated_at_budget": bool(budget_diag.get("truncated_at_budget")),
+        "truncation_reason": budget_diag.get("truncation_reason"),
         "exact_match": exact_match,
         "materialized_exact_match": materialized_exact_match,
         "svg_exact_match": materialized_exact_match if materialized_mime == "image/svg+xml" else False,
@@ -508,6 +693,7 @@ def _evaluate_case(
             "svg_exact_match": 1.0 if materialized_mime == "image/svg+xml" and materialized_exact_match else 0.0,
             "valid_svg": 1.0 if valid_svg else 0.0,
             "renderable": 1.0 if renderable else 0.0,
+            "truncated_at_budget": 1.0 if budget_diag.get("truncated_at_budget") else 0.0,
         },
     }
 
@@ -521,15 +707,18 @@ def _build_summary(results: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
     total_renderable = 0
     total_materialized_exact = 0
     total_svg_exact = 0
+    total_budget_truncated = 0
     for split_name, rows in by_split.items():
         exact = sum(1 for row in rows if row.get("exact_match"))
         renderable = sum(1 for row in rows if row.get("renderable"))
         materialized_exact = sum(1 for row in rows if row.get("materialized_exact_match"))
         svg_exact = sum(1 for row in rows if row.get("svg_exact_match"))
+        budget_truncated = sum(1 for row in rows if row.get("truncated_at_budget"))
         total_exact += exact
         total_renderable += renderable
         total_materialized_exact += materialized_exact
         total_svg_exact += svg_exact
+        total_budget_truncated += budget_truncated
         split_summary.append(
             {
                 "split": split_name,
@@ -538,6 +727,7 @@ def _build_summary(results: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
                 "renderable_rate": renderable / len(rows) if rows else 0.0,
                 "materialized_exact_rate": materialized_exact / len(rows) if rows else 0.0,
                 "svg_exact_rate": svg_exact / len(rows) if rows else 0.0,
+                "budget_truncation_rate": budget_truncated / len(rows) if rows else 0.0,
             }
         )
     split_summary.sort(key=lambda row: str(row.get("split") or ""))
@@ -547,6 +737,7 @@ def _build_summary(results: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
         "renderable_rate": total_renderable / len(results) if results else 0.0,
         "materialized_exact_rate": total_materialized_exact / len(results) if results else 0.0,
         "svg_exact_rate": total_svg_exact / len(results) if results else 0.0,
+        "budget_truncation_rate": total_budget_truncated / len(results) if results else 0.0,
     }
     return split_summary, totals
 
@@ -588,6 +779,8 @@ def _case_card(row: dict[str, Any]) -> str:
         f'<span class="chip {_metric_class(1.0 if row.get("materialized_exact_match") else 0.0)}">{"Final exact" if row.get("materialized_exact_match") else "Final drift"}</span>',
         f'<span class="chip split">{_html(row.get("split"))}</span>',
     ]
+    if row.get("truncated_at_budget"):
+        chips.append('<span class="chip mid">Budget truncation</span>')
     if row.get("tail_text"):
         chips.append('<span class="chip mid">Tail drift</span>')
     if row.get("prefix_text"):
@@ -631,6 +824,38 @@ def _case_card(row: dict[str, Any]) -> str:
           <pre>{_html(row.get("expected_rendered_output") or "—")}</pre>
         </div>
       </div>
+      <div class="text-grid materialized-grid">
+        <div>
+          <div class="text-title">Budget Diagnostics</div>
+          <pre>{_html(json.dumps({
+              "prompt_tokens": row.get("prompt_tokens"),
+              "parsed_output_tokens": row.get("parsed_output_tokens"),
+              "expected_output_tokens": row.get("expected_output_tokens"),
+              "decode_max_tokens": row.get("decode_max_tokens"),
+              "context_len": row.get("context_len"),
+              "hit_decode_ceiling": row.get("hit_decode_ceiling"),
+              "hit_context_ceiling": row.get("hit_context_ceiling"),
+              "missing_stop_marker": row.get("missing_stop_marker"),
+              "prefix_matches_expected": row.get("prefix_matches_expected"),
+              "truncated_at_budget": row.get("truncated_at_budget"),
+              "truncation_reason": row.get("truncation_reason"),
+          }, indent=2))}</pre>
+        </div>
+        <div>
+          <div class="text-title">Render Diagnostic</div>
+          <pre>{_html(row.get("render_error") or "—")}</pre>
+        </div>
+      </div>
+      <div class="text-grid materialized-grid">
+        <div>
+          <div class="text-title">Bound content.json</div>
+          <pre>{_html(json.dumps(row.get("content_json"), indent=2) if isinstance(row.get("content_json"), dict) else "—")}</pre>
+        </div>
+        <div>
+          <div class="text-title">Compiler Read</div>
+          <pre>{_html("The compiler receives the parsed scene DSL plus the bound content.json payload for this case.")}</pre>
+        </div>
+      </div>
     </article>
     """
 
@@ -642,7 +867,7 @@ def _build_html(report: dict[str, Any]) -> str:
           <div class="k">{_html(row.get("split"))}</div>
           <div class="v">{_pct(row.get("exact_rate"))}</div>
           <div class="n">
-            raw exact · {_pct(row.get("materialized_exact_rate"))} final exact · {_pct(row.get("renderable_rate"))} previewable · {_html(row.get("count"))} cases
+            raw exact · {_pct(row.get("materialized_exact_rate"))} final exact · {_pct(row.get("renderable_rate"))} previewable · {_pct(row.get("budget_truncation_rate"))} budget-truncated · {_html(row.get("count"))} cases
           </div>
         </article>
         """
@@ -746,6 +971,7 @@ def _build_html(report: dict[str, Any]) -> str:
         <article class="summary-card"><div class="k">Exact</div><div class="v">{_pct(totals.get("exact_rate"))}</div><div class="n">{_html(totals.get("count"))} total cases</div></article>
         <article class="summary-card"><div class="k">Previewable</div><div class="v">{_pct(totals.get("renderable_rate"))}</div><div class="n">adapter-backed final artifact preview</div></article>
         <article class="summary-card"><div class="k">Final Exact</div><div class="v">{_pct(totals.get("materialized_exact_rate"))}</div><div class="n">materialized output vs expected final artifact</div></article>
+        <article class="summary-card"><div class="k">Budget Truncated</div><div class="v">{_pct(totals.get("budget_truncation_rate"))}</div><div class="n">cases that hit decode/context ceiling before stop marker</div></article>
         {split_cards}
       </div>
     </section>
@@ -781,12 +1007,13 @@ def main() -> int:
     output_adapter_cfg = _resolve_output_adapter(contract)
     output_adapter = str(output_adapter_cfg.get("name") or "plain_text").strip()
     decode_cfg = contract.get("decode") if isinstance(contract.get("decode"), dict) else {}
+    budget_analyzer = _TokenBudgetAnalyzer.for_run(run_dir, decode_cfg)
 
     results: list[dict[str, Any]] = []
     for case in cases:
-        raw_output = _run_prompt(model_dir, str(case["prompt"]), decode_cfg)
+        raw_output = _run_prompt(model_dir, str(case["prompt"]), decode_cfg, output_adapter_cfg)
         response_text = extract_response_text(raw_output, str(case["prompt"]))
-        results.append(_evaluate_case(case, raw_output, response_text, output_adapter_cfg))
+        results.append(_evaluate_case(case, raw_output, response_text, output_adapter_cfg, budget_analyzer=budget_analyzer))
 
     split_summary, totals = _build_summary(results)
     report = {

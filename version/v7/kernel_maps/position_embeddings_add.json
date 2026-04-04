@@ -1,0 +1,44 @@
+{
+  "id": "position_embeddings_add",
+  "op": "position_embeddings",
+  "variant": "absolute_learned_inplace_fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "Token-major activation stream [tokens, embed_dim]"
+    }
+  ],
+  "weights": [
+    {
+      "name": "pos_emb",
+      "dtype": "fp32",
+      "shape": ["P", "E"],
+      "desc": "Learned position embeddings [num_positions, embed_dim]"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["T", "E"],
+      "desc": "In-place updated activation stream"
+    }
+  ],
+  "dims": ["T", "E", "P"],
+  "impl": {
+    "function": "position_embeddings_add",
+    "c_declaration": "void position_embeddings_add(float *x, const float *position_embd, int num_tokens, int embed_dim, int num_positions);",
+    "sources": ["src/kernels/vision_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_vision.py"]
+  },
+  "notes": "Add learned absolute position embeddings in-place. Fixed-size first path for v8 vision bring-up."
+}

@@ -738,6 +738,8 @@ def _gguf_read_value(r: GGUFReader, vtype: int):
             return list(struct.unpack(f"<{n}f", raw))
         if elem_type == GGUF_TYPE_FLOAT64:
             return list(struct.unpack(f"<{n}d", raw))
+        if elem_type == GGUF_TYPE_BOOL:
+            return [bool(v) for v in raw]
         raise GGUFError(f"Unsupported GGUF array elem type {elem_type}")
     raise GGUFError(f"Unsupported GGUF value type {vtype}")
 

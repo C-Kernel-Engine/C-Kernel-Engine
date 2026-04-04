@@ -1,0 +1,42 @@
+{
+  "header": {
+    "headline": "Prompt to SVG Pipeline",
+    "subtitle": "A minimal compiler-backed path from user intent to a saved infographic."
+  },
+  "nodes": {
+    "intent": {
+      "title": "Prompt Intent",
+      "body": "Capture task, topic, and audience."
+    },
+    "router": {
+      "title": "Family Router",
+      "body": "Choose the right structural family.",
+      "detail": [
+        "graph",
+        "table",
+        "timeline"
+      ]
+    },
+    "planner": {
+      "title": "Layout Planner",
+      "body": "Assemble scene structure and refs."
+    },
+    "compiler": {
+      "title": "Compiler",
+      "body": "Lower scene IR into deterministic SVG."
+    }
+  },
+  "edges": {
+    "intent_router": "intent",
+    "router_planner": "family",
+    "planner_compiler": "scene IR",
+    "compiler_svg": "rendered"
+  },
+  "svg": {
+    "title": "Final SVG",
+    "body": "Write preview and file artifact."
+  },
+  "footer": {
+    "note": "First spec13b flow-graph baseline: keep the path deterministic end to end."
+  }
+}

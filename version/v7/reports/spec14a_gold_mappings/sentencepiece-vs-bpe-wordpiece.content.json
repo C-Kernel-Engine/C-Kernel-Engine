@@ -1,0 +1,124 @@
+{
+  "header": {
+    "kicker": "Algorithm board",
+    "headline": "Tokenizer algorithms compared",
+    "subtitle": "The board holds constant the comparison grammar while the payload swaps in different algorithm summaries."
+  },
+  "legend": {
+    "title": "Reusable sections",
+    "items": [
+      "Algorithm lane",
+      "Shared metric strip",
+      "Operator callouts"
+    ],
+    "note": "The same family can compare tokenization rules, performance paths, or checkpoint contracts."
+  },
+  "columns": {
+    "left": {
+      "kicker": "Algorithm A",
+      "title": "BPE",
+      "subtitle": "Frequent pair merges build subword units incrementally from a byte-safe base.",
+      "chips": [
+        "Pair merges",
+        "Byte safe",
+        "Popular LLMs"
+      ],
+      "bullets": [
+        "Merge priority drives segmentation",
+        "Works well for large decoder-only stacks",
+        "Simple merge history is easy to visualize"
+      ],
+      "stat": "Greedy merge",
+      "accent": "blue",
+      "note": "BPE is strong when merge history is the main story."
+    },
+    "center": {
+      "kicker": "Algorithm B",
+      "title": "WordPiece",
+      "subtitle": "Greedy longest-match works over a fixed vocabulary and marks continuation pieces explicitly.",
+      "chips": [
+        "Longest match",
+        "## prefix",
+        "BERT style"
+      ],
+      "bullets": [
+        "Whitespace split comes first",
+        "Continuation markers change visual labeling",
+        "Unknown handling becomes a key tradeoff"
+      ],
+      "stat": "Greedy match",
+      "accent": "purple",
+      "note": "WordPiece is good when continuation markers need to be explained."
+    },
+    "right": {
+      "kicker": "Algorithm C",
+      "title": "SentencePiece",
+      "subtitle": "A unigram language model and Viterbi decode search for the best token path under learned scores.",
+      "chips": [
+        "Space marker",
+        "Unigram LM",
+        "Global optimum"
+      ],
+      "bullets": [
+        "The objective is probabilistic instead of merge ordered",
+        "Reversibility stays visible at the board level",
+        "Scored candidates fit well in chips and callouts"
+      ],
+      "stat": "Viterbi DP",
+      "accent": "green",
+      "note": "SentencePiece needs more explanation cards but benefits from clear structure."
+    }
+  },
+  "metrics": {
+    "metric_1": {
+      "label": "Space handling",
+      "value": "marker vs split",
+      "detail": "Each algorithm marks boundaries differently",
+      "state": "blue"
+    },
+    "metric_2": {
+      "label": "Search rule",
+      "value": "3 search modes",
+      "detail": "The decision surface changes by algorithm",
+      "state": "highlight"
+    },
+    "metric_3": {
+      "label": "Reversibility",
+      "value": "best in SPM",
+      "detail": "BPE and SPM keep stronger reconstruction paths",
+      "state": "green"
+    },
+    "metric_4": {
+      "label": "Unknown policy",
+      "value": "UNK risk in WP",
+      "detail": "Fallback behavior is part of the comparison",
+      "state": "amber"
+    }
+  },
+  "callouts": {
+    "callout_1": {
+      "badge": "Model fit",
+      "title": "Different stacks inherit different token rules",
+      "body": "The family choice is usually inherited from training code, checkpoints, and interoperability requirements.",
+      "lines": [
+        "Decoder-only LLMs often use BPE",
+        "BERT family uses WordPiece",
+        "LLaMA and T5 rely on SentencePiece"
+      ],
+      "state": "purple"
+    },
+    "callout_2": {
+      "badge": "Boundary",
+      "title": "Keep algorithm facts in payload",
+      "body": "The board family should not hard-code BPE or SentencePiece semantics in the output DSL.",
+      "lines": [
+        "Generic board layout",
+        "Specific facts in content.json"
+      ],
+      "state": "green"
+    }
+  },
+  "footer": {
+    "note": "A generic comparison board can compare algorithms, systems, or layouts without putting topic names into the model-side grammar."
+  }
+}

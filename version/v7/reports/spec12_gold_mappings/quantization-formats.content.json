@@ -1,0 +1,86 @@
+{
+  "header": {
+    "kicker": "Format Reference",
+    "headline": "C-Kernel-Engine Quantization Formats",
+    "subtitle": "Byte-level structure with explicit size calculations and dequantization math"
+  },
+  "legend": {
+    "title": "Legend",
+    "note": "Each box represents one byte in the block layout.",
+    "warning": "Warning highlights mark common bug surfaces in packed formats.",
+    "items": [
+      "Scale (d)",
+      "Min (m or dmin)",
+      "Quant Data",
+      "High Bits",
+      "Sub-scales"
+    ]
+  },
+  "groups": [
+    {
+      "title": "Simple Formats (32 weights per block)",
+      "caption": "Single-scale and low-overhead formats used as the baseline family.",
+      "header": [
+        "Format",
+        "Header Bytes",
+        "Payload Bytes",
+        "Bits / Weight"
+      ],
+      "rows": [
+        [
+          "Q4_0",
+          "2 bytes (scale)",
+          "16 bytes quants",
+          "4.5 bits / weight"
+        ],
+        [
+          "Q4_1",
+          "4 bytes (scale + min)",
+          "16 bytes quants",
+          "5.0 bits / weight"
+        ],
+        [
+          "Q5_0",
+          "2 bytes scale + 4 bytes high bits",
+          "16 bytes low bits",
+          "5.5 bits / weight"
+        ]
+      ]
+    },
+    {
+      "title": "Grouped / Advanced Formats",
+      "caption": "Higher-compression layouts add grouping metadata, sub-scales, and more bug surfaces.",
+      "header": [
+        "Format",
+        "Grouping",
+        "Extra Metadata",
+        "Implementation Risk"
+      ],
+      "rows": [
+        [
+          "Q5_1",
+          "32 weights / block",
+          "min + scale + high bits",
+          "moderate"
+        ],
+        [
+          "Q8_0",
+          "32 weights / block",
+          "single scale, larger payload",
+          "low"
+        ],
+        [
+          "Q4_K / Q5_K",
+          "superblock / sub-block",
+          "sub-scales + grouped headers",
+          "high"
+        ]
+      ]
+    }
+  ],
+  "footer": {
+    "title": "Compiler Target",
+    "body": "Spec12 should express grouped tables, legends, and row-state emphasis without falling back to raw SVG rectangles per cell."
+  }
+}
+

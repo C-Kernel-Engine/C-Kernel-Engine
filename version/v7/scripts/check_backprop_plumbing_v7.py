@@ -567,7 +567,11 @@ def audit_backprop_plumbing(
     # layer flow coverage
     manifest_cfg = manifest.get("config")
     manifest_cfg = manifest_cfg if isinstance(manifest_cfg, dict) else {}
-    num_layers = _cfg_int(manifest_cfg, ["num_layers"]) or _cfg_int(ir2.get("config", {}) if isinstance(ir2.get("config"), dict) else {}, ["num_layers"]) or int(ir2.get("num_layers", 0) or 0)
+    num_layers = (
+        int(ir2.get("num_layers", 0) or 0)
+        or _cfg_int(ir2.get("config", {}) if isinstance(ir2.get("config"), dict) else {}, ["num_layers"])
+        or _cfg_int(manifest_cfg, ["num_layers"])
+    )
     if num_layers <= 0:
         # fallback: infer from tensors/op layer ids
         inferred = -1
