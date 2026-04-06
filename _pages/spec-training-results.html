@@ -1,0 +1,248 @@
+<!-- TITLE: Spec Training Results -->
+<!-- NAV: quickstart -->
+
+<style>
+.results-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.results-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 16% 18%, rgba(7,173,248,0.18), transparent 30%),
+        radial-gradient(circle at 82% 14%, rgba(255,180,0,0.16), transparent 28%),
+        linear-gradient(145deg, rgba(71,180,117,0.08), rgba(255,255,255,0));
+    pointer-events: none;
+}
+
+.results-hero-inner {
+    position: relative;
+    z-index: 1;
+}
+
+.results-kicker {
+    color: var(--orange);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.65rem;
+}
+
+.results-subtitle,
+.results-note,
+.muted {
+    color: var(--text-secondary);
+}
+
+.results-grid,
+.split-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0 2rem 0;
+}
+
+.results-card,
+.split-card {
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+    background: linear-gradient(155deg, rgba(255,255,255,0.02), rgba(7,173,248,0.05));
+    box-shadow: var(--shadow-sm);
+}
+
+.metric-label {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.metric-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    margin: 0.15rem 0 0.35rem 0;
+    color: var(--text-primary);
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 2rem 0;
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.results-table th,
+.results-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--grey);
+    text-align: left;
+    vertical-align: top;
+}
+
+.results-table th {
+    color: var(--orange);
+    background: var(--dark-card);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.results-table tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+.results-table tbody tr:hover {
+    background: rgba(7,173,248,0.06);
+}
+
+.status {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,180,0,0.25);
+    background: rgba(255,180,0,0.10);
+    color: var(--text-primary);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.policy-callout {
+    margin: 1rem 0 1.8rem 0;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255,180,0,0.25);
+    background: linear-gradient(145deg, rgba(255,180,0,0.10), rgba(7,173,248,0.08));
+}
+
+.refresh-block {
+    margin: 1rem 0 0 0;
+}
+
+@media (max-width: 900px) {
+    .results-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+</style>
+
+<div class="card results-hero">
+    <div class="results-hero-inner">
+        <div class="results-kicker">Run History</div>
+        <h1>Spec Training Results</h1>
+        <p class="results-subtitle">
+            Manifest-driven visibility for the training lines. This page is generated from local run ledgers and probe reports,
+            while <a href="spec-training-method.html">spec-training-method.html</a> stays focused on the stable method and promotion rules.
+        </p>
+    </div>
+</div>
+
+<div class="policy-callout">
+    <strong>Page split:</strong> stable method lives on <a href="spec-training-method.html">Spec Training Method</a>,
+    generated run evidence lives here, and bulky raw artifacts are intended to move under <code>training-archive/</code>
+    as a future submodule mount instead of growing the main docs tree.
+</div>
+
+<div class="results-grid">
+    <div class="results-card">
+        <div class="metric-label">Specs With Probe Data</div>
+        <div class="metric-value">0</div>
+        <p class="results-note">Generated from 0 source roots and refreshed at 2026-04-06 06:28 UTC.</p>
+    </div>
+    <div class="results-card">
+        <div class="metric-label">Run Directories</div>
+        <div class="metric-value">0</div>
+        <p class="results-note">Stage records: 0. Probe reports: 0.</p>
+    </div>
+    <div class="results-card">
+        <div class="metric-label">Current Champion</div>
+        <div class="metric-value">—</div>
+        <p class="results-note">— at — visible exact and — hidden exact.</p>
+    </div>
+</div>
+
+<h2>History Split</h2>
+
+<div class="split-grid">
+    <div class="split-card">
+        <h3>Method Page</h3>
+        <p>Keep stable policy here: spec/rung definitions, reset-line rules, promotion gates, and decode-repair versus retrain decisions.</p>
+        <p><a href="spec-training-method.html">Open spec-training-method.html</a></p>
+    </div>
+    <div class="split-card">
+        <h3>Generated History</h3>
+        <p>This page is generated from <code>version/v7/reports/spec_training_manifest.json</code>, not hand-maintained prose.</p>
+        <p class="muted">It should be the first stop for “which rung is best?” and “what regressed?”</p>
+    </div>
+    <div class="split-card">
+        <h3>Archive Mount</h3>
+        <p>Raw ledgers, probe reports, tested-prompt reports, and large run folders can move under <code>training-archive/</code> as a submodule without breaking the docs surface.</p>
+        <p class="muted">The docs should depend on the compact manifest, not on browsing the archive directly.</p>
+    </div>
+</div>
+
+<h2>Best Rungs By Spec</h2>
+
+<table class="results-table">
+    <thead>
+        <tr>
+            <th>Spec</th>
+            <th>Best Rung</th>
+            <th>Visible Exact</th>
+            <th>Hidden Exact</th>
+            <th>Renderable</th>
+            <th>Run Dirs</th>
+            <th>Status / Lesson</th>
+        </tr>
+    </thead>
+    <tbody>
+        
+    </tbody>
+</table>
+
+<h2>Recent Run Ledger</h2>
+
+<table class="results-table">
+    <thead>
+        <tr>
+            <th>Run</th>
+            <th>Latest Stage</th>
+            <th>Finished</th>
+            <th>Visible Exact</th>
+            <th>Hidden Exact</th>
+            <th>Renderable</th>
+            <th>Artifact Dir</th>
+        </tr>
+    </thead>
+    <tbody>
+        
+    </tbody>
+</table>
+
+<h2>Archive Policy</h2>
+
+<div class="card">
+    <p><strong>Submodule-ready split:</strong> keep the compact manifest and generated docs page in the main repo, then mount a future raw artifact archive at <code>training-archive/</code>.</p>
+    <ul>
+        <li>Stable docs stay in <code>docs/site/_pages/</code>.</li>
+        <li>Run summaries stay in <code>version/v7/reports/spec_training_manifest.json</code>.</li>
+        <li>Heavy artifacts move to <code>training-archive/</code> once you are ready to create the separate repo.</li>
+    </ul>
+    <p class="muted">Current source roots:</p>
+    <ul>
+        
+    </ul>
+    <div class="refresh-block">
+        <p><strong>Refresh command:</strong></p>
+        <pre><code>bash docs/site/build.sh</code></pre>
+    </div>
+</div>

@@ -1116,22 +1116,35 @@ Variables</h2></td></tr>
 <div class="line"><span class="lineno">  442</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  443</span>    }</div>
 <div class="line"><span class="lineno">  444</span> </div>
-<div class="line"><span class="lineno">  445</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><span class="lineno">  446</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
-<div class="line"><span class="lineno">  447</span>        <span class="keywordflow">if</span> (bias) {</div>
-<div class="line"><span class="lineno">  448</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><span class="lineno">  449</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
-<div class="line"><span class="lineno">  450</span>            }</div>
-<div class="line"><span class="lineno">  451</span>        }</div>
-<div class="line"><span class="lineno">  452</span>    }</div>
-<div class="line"><span class="lineno">  453</span> </div>
-<div class="line"><span class="lineno">  454</span>    <span class="keywordflow">if</span> (strict &amp;&amp; strict_cached_layer &gt;= 0 &amp;&amp; <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b">ck_q80_contract_dump_enabled</a>()) {</div>
-<div class="line"><span class="lineno">  455</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1">ck_q80_contract_dump_tensor</a>(<span class="stringliteral">&quot;strict_out_proj_output&quot;</span>,</div>
-<div class="line"><span class="lineno">  456</span>                                    strict_cached_layer,</div>
-<div class="line"><span class="lineno">  457</span>                                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><span class="lineno">  458</span>                                    (<span class="keywordtype">size_t</span>) M * (<span class="keywordtype">size_t</span>) N);</div>
-<div class="line"><span class="lineno">  459</span>    }</div>
-<div class="line"><span class="lineno">  460</span>}</div>
+<div class="line"><span class="lineno">  445</span>    <span class="keywordflow">if</span> (!strict) {</div>
+<div class="line"><span class="lineno">  446</span><span class="preprocessor">#pragma omp parallel for schedule(static) if(M &gt; 1)</span></div>
+<div class="line"><span class="lineno">  447</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno">  448</span>            <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
+<div class="line"><span class="lineno">  449</span>            <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><span class="lineno">  450</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno">  451</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
+<div class="line"><span class="lineno">  452</span>                }</div>
+<div class="line"><span class="lineno">  453</span>            }</div>
+<div class="line"><span class="lineno">  454</span>        }</div>
+<div class="line"><span class="lineno">  455</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  456</span>    }</div>
+<div class="line"><span class="lineno">  457</span> </div>
+<div class="line"><span class="lineno">  458</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><span class="lineno">  459</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
+<div class="line"><span class="lineno">  460</span>        <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><span class="lineno">  461</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><span class="lineno">  462</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
+<div class="line"><span class="lineno">  463</span>            }</div>
+<div class="line"><span class="lineno">  464</span>        }</div>
+<div class="line"><span class="lineno">  465</span>    }</div>
+<div class="line"><span class="lineno">  466</span> </div>
+<div class="line"><span class="lineno">  467</span>    <span class="keywordflow">if</span> (strict_cached_layer &gt;= 0 &amp;&amp; <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b">ck_q80_contract_dump_enabled</a>()) {</div>
+<div class="line"><span class="lineno">  468</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1">ck_q80_contract_dump_tensor</a>(<span class="stringliteral">&quot;strict_out_proj_output&quot;</span>,</div>
+<div class="line"><span class="lineno">  469</span>                                    strict_cached_layer,</div>
+<div class="line"><span class="lineno">  470</span>                                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><span class="lineno">  471</span>                                    (<span class="keywordtype">size_t</span>) M * (<span class="keywordtype">size_t</span>) N);</div>
+<div class="line"><span class="lineno">  472</span>    }</div>
+<div class="line"><span class="lineno">  473</span>}</div>
 <div class="ttc" id="ackernel__engine_8h_html_a75c7765e632ce028248d865a2b7b82a5"><div class="ttname"><a href="ckernel__engine_8h.html#a75c7765e632ce028248d865a2b7b82a5">ck_strict_consume_next_gemm_a</a></div><div class="ttdeci">const float * ck_strict_consume_next_gemm_a(size_t elems)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00070">ckernel_strict.c:70</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html_aef8c9a331116ff9c2d77b03152aa8004"><div class="ttname"><a href="ckernel__engine_8h.html#aef8c9a331116ff9c2d77b03152aa8004">ck_strict_parity_enabled</a></div><div class="ttdeci">int ck_strict_parity_enabled(void)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__strict_8c_source.html#l00043">ckernel_strict.c:43</a></div></div>
 <div class="ttc" id="agemm__kernels__q8__0__q8__0__contract_8c_html_a3b0e8de31ffad5dfddb74a0dd7c2a5b0"><div class="ttname"><a href="gemm__kernels__q8__0__q8__0__contract_8c.html#a3b0e8de31ffad5dfddb74a0dd7c2a5b0">gemm_nt_q8_0_q8_0_ggml_strict</a></div><div class="ttdeci">static int gemm_nt_q8_0_q8_0_ggml_strict(const float *A, const void *B, const float *bias, float *C, int M, int N, int K)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q8__0__q8__0__contract_8c_source.html#l00209">gemm_kernels_q8_0_q8_0_contract.c:209</a></div></div>

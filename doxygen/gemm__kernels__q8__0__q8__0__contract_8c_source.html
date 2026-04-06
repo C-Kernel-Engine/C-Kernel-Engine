@@ -614,22 +614,35 @@ $(document).ready(function(){initNavTree('gemm__kernels__q8__0__q8__0__contract_
 <div class="line"><a id="l00442" name="l00442"></a><span class="lineno">  442</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><a id="l00443" name="l00443"></a><span class="lineno">  443</span>    }</div>
 <div class="line"><a id="l00444" name="l00444"></a><span class="lineno">  444</span> </div>
-<div class="line"><a id="l00445" name="l00445"></a><span class="lineno">  445</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
-<div class="line"><a id="l00446" name="l00446"></a><span class="lineno">  446</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
-<div class="line"><a id="l00447" name="l00447"></a><span class="lineno">  447</span>        <span class="keywordflow">if</span> (bias) {</div>
-<div class="line"><a id="l00448" name="l00448"></a><span class="lineno">  448</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
-<div class="line"><a id="l00449" name="l00449"></a><span class="lineno">  449</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
-<div class="line"><a id="l00450" name="l00450"></a><span class="lineno">  450</span>            }</div>
-<div class="line"><a id="l00451" name="l00451"></a><span class="lineno">  451</span>        }</div>
-<div class="line"><a id="l00452" name="l00452"></a><span class="lineno">  452</span>    }</div>
-<div class="line"><a id="l00453" name="l00453"></a><span class="lineno">  453</span> </div>
-<div class="line"><a id="l00454" name="l00454"></a><span class="lineno">  454</span>    <span class="keywordflow">if</span> (strict &amp;&amp; strict_cached_layer &gt;= 0 &amp;&amp; <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b">ck_q80_contract_dump_enabled</a>()) {</div>
-<div class="line"><a id="l00455" name="l00455"></a><span class="lineno">  455</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1">ck_q80_contract_dump_tensor</a>(<span class="stringliteral">&quot;strict_out_proj_output&quot;</span>,</div>
-<div class="line"><a id="l00456" name="l00456"></a><span class="lineno">  456</span>                                    strict_cached_layer,</div>
-<div class="line"><a id="l00457" name="l00457"></a><span class="lineno">  457</span>                                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
-<div class="line"><a id="l00458" name="l00458"></a><span class="lineno">  458</span>                                    (<span class="keywordtype">size_t</span>) M * (<span class="keywordtype">size_t</span>) N);</div>
-<div class="line"><a id="l00459" name="l00459"></a><span class="lineno">  459</span>    }</div>
-<div class="line"><a id="l00460" name="l00460"></a><span class="lineno">  460</span>}</div>
+<div class="line"><a id="l00445" name="l00445"></a><span class="lineno">  445</span>    <span class="keywordflow">if</span> (!strict) {</div>
+<div class="line"><a id="l00446" name="l00446"></a><span class="lineno">  446</span><span class="preprocessor">#pragma omp parallel for schedule(static) if(M &gt; 1)</span></div>
+<div class="line"><a id="l00447" name="l00447"></a><span class="lineno">  447</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><a id="l00448" name="l00448"></a><span class="lineno">  448</span>            <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
+<div class="line"><a id="l00449" name="l00449"></a><span class="lineno">  449</span>            <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><a id="l00450" name="l00450"></a><span class="lineno">  450</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><a id="l00451" name="l00451"></a><span class="lineno">  451</span>                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
+<div class="line"><a id="l00452" name="l00452"></a><span class="lineno">  452</span>                }</div>
+<div class="line"><a id="l00453" name="l00453"></a><span class="lineno">  453</span>            }</div>
+<div class="line"><a id="l00454" name="l00454"></a><span class="lineno">  454</span>        }</div>
+<div class="line"><a id="l00455" name="l00455"></a><span class="lineno">  455</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><a id="l00456" name="l00456"></a><span class="lineno">  456</span>    }</div>
+<div class="line"><a id="l00457" name="l00457"></a><span class="lineno">  457</span> </div>
+<div class="line"><a id="l00458" name="l00458"></a><span class="lineno">  458</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> m = 0; m &lt; M; ++m) {</div>
+<div class="line"><a id="l00459" name="l00459"></a><span class="lineno">  459</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a4f11509e1e7b5d11992dd9328cff17f1">gemv_q8_0_q8_0_contract</a>(&amp;<a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N], B, &amp;A_use[m * K], N, K);</div>
+<div class="line"><a id="l00460" name="l00460"></a><span class="lineno">  460</span>        <span class="keywordflow">if</span> (bias) {</div>
+<div class="line"><a id="l00461" name="l00461"></a><span class="lineno">  461</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> n = 0; n &lt; N; ++n) {</div>
+<div class="line"><a id="l00462" name="l00462"></a><span class="lineno">  462</span>                <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>[m * N + n] += bias[n];</div>
+<div class="line"><a id="l00463" name="l00463"></a><span class="lineno">  463</span>            }</div>
+<div class="line"><a id="l00464" name="l00464"></a><span class="lineno">  464</span>        }</div>
+<div class="line"><a id="l00465" name="l00465"></a><span class="lineno">  465</span>    }</div>
+<div class="line"><a id="l00466" name="l00466"></a><span class="lineno">  466</span> </div>
+<div class="line"><a id="l00467" name="l00467"></a><span class="lineno">  467</span>    <span class="keywordflow">if</span> (strict_cached_layer &gt;= 0 &amp;&amp; <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#aed3c4bd54098ddb7d345cc239ef7938b">ck_q80_contract_dump_enabled</a>()) {</div>
+<div class="line"><a id="l00468" name="l00468"></a><span class="lineno">  468</span>        <a class="code hl_function" href="gemm__kernels__q8__0__q8__0__contract_8c.html#a7354ac34859bb413e86904d59905caf1">ck_q80_contract_dump_tensor</a>(<span class="stringliteral">&quot;strict_out_proj_output&quot;</span>,</div>
+<div class="line"><a id="l00469" name="l00469"></a><span class="lineno">  469</span>                                    strict_cached_layer,</div>
+<div class="line"><a id="l00470" name="l00470"></a><span class="lineno">  470</span>                                    <a class="code hl_define" href="show__config_8c.html#a3d5cffd490a70d568b820514b5a0f937">C</a>,</div>
+<div class="line"><a id="l00471" name="l00471"></a><span class="lineno">  471</span>                                    (<span class="keywordtype">size_t</span>) M * (<span class="keywordtype">size_t</span>) N);</div>
+<div class="line"><a id="l00472" name="l00472"></a><span class="lineno">  472</span>    }</div>
+<div class="line"><a id="l00473" name="l00473"></a><span class="lineno">  473</span>}</div>
 </div>
 <div class="ttc" id="ackernel__codegen_8c_html_a04d7db4e2bcb4065154316ec01cb0225"><div class="ttname"><a href="ckernel__codegen_8c.html#a04d7db4e2bcb4065154316ec01cb0225">op_name</a></div><div class="ttdeci">static const char * op_name(CKOpType op)</div><div class="ttdef"><b>Definition</b> <a href="ckernel__codegen_8c_source.html#l00035">ckernel_codegen.c:35</a></div></div>
 <div class="ttc" id="ackernel__engine_8h_html"><div class="ttname"><a href="ckernel__engine_8h.html">ckernel_engine.h</a></div></div>

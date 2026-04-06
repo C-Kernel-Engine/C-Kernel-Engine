@@ -1375,6 +1375,20 @@
     token budget, and the model size all move at once, the run becomes uninterpretable.
 </div>
 
+<div class="method-alert">
+    <strong>Page split:</strong> keep this page for the stable method only. Use
+    <a href="spec-training-results.html">spec-training-results.html</a> for the generated rung history, best-run ladder,
+    and recent regressions, and keep bulky raw artifacts under the run archive rather than turning this page into a log dump.
+</div>
+
+<div class="method-alert">
+    <strong>Local lesson from <code>spec02</code> through <code>spec16</code>:</strong> broad spec-level progress has been real,
+    but once a line already has a strong raw winner, post-hoc raw repair rungs have regressed more often than they helped.
+    The default policy is now: predict likely failure frontiers before training, encode them as clean positive coverage in the
+    initial curriculum, freeze strong raw winners, and route syntax-only residue to deterministic decode/repair instead of
+    reopening the same brittle CE surface.
+</div>
+
 <h2>Why This Method Exists</h2>
 
 <p>
@@ -1980,6 +1994,35 @@ Better boundary
     That sentence is narrow enough to govern the materializer, the probe, and the post-run decision.
 </p>
 
+<div class="method-alert">
+    <strong>Operator rule from the live spec lines:</strong> once a raw rung becomes the champion on a frozen contract,
+    freeze it. The next training change should default to decode-first work or a small pilot, not an unconstrained full rung.
+    A full rung should be blocked until a pilot proves the target family improves without hidden-holdout or family regression.
+</div>
+
+<div class="decision-grid">
+    <div class="decision-card">
+        <h3>Freeze the raw winner</h3>
+        <p>Keep the current raw champion as the comparison anchor. New runs compete against that run, not against train loss or operator intuition.</p>
+        <p><strong>Rule:</strong> promotion gates should reference one frozen probe report and one frozen best rung.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Pilot before full rung</h3>
+        <p>If a repair idea touches shared-family behavior, run a small pilot first. Scale the token budget down and treat the result as a gate, not an automatic successor rung.</p>
+        <p><strong>Rule:</strong> a full rung stays blocked until the pilot improves the target family with no family or hidden-split regression.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Decode first after strong raw runs</h3>
+        <p>Once the raw line is mostly correct, push stop-boundary, prompt-spill, and deterministic cleanup into decode, validation, and repair before spending another broad training cycle.</p>
+        <p><strong>Rule:</strong> if the miss set is mostly repairable, train less and validate more.</p>
+    </div>
+    <div class="decision-card">
+        <h3>Ban literal prompt junk repair rows</h3>
+        <p>Do not teach the model the exact wrapper junk you want it to avoid. That turns the warning language itself into the target distribution.</p>
+        <p><strong>Rule:</strong> use control-agnostic clean-stop prompts rather than rows that spell out <code>[OUT]</code>, duplicated prompt blocks, or schema-noise tokens.</p>
+    </div>
+</div>
+
 <h2>Context Budget Is A Gate</h2>
 
 <p>
@@ -2410,14 +2453,16 @@ Next run:</pre>
         <img src="assets/iteration-philosophy.svg" alt="Iteration philosophy — fail fast, learn, repeat" loading="lazy">
         <div class="svg-gallery-label">
             <span class="gallery-tag gallery-tag-dsl">Practice</span>
-            Fail fast, learn, repair narrowly, repeat
+            Fail fast, learn, freeze winners, redesign upfront
         </div>
     </div>
 </div>
 
 <p>
     These conclusions did not come from theory alone. They came from repeated runs that failed, partially worked,
-    regressed, recovered, and exposed the actual pressure points in the system.
+    regressed, recovered, and exposed the actual pressure points in the system. Across the full run history, the stable
+    wins came from better contracts and better full curricula. Narrow raw repair churn became less reliable once a line
+    was already mostly learned.
 </p>
 
 <div class="decision-grid">
@@ -2430,15 +2475,19 @@ Next run:</pre>
         <p>Once a run becomes strong on the current contract, freeze it. Do not erase the baseline with broad speculative follow-ups.</p>
     </div>
     <div class="decision-card">
-        <h3>3. Repair narrowly</h3>
-        <p>When only a few misses remain, the next run should be a surgical repair run with strong anchor replay, not a broad new rewrite.</p>
+        <h3>3. Front-load predictable failures</h3>
+        <p>Family drift, sibling-form confusion, style attractors, topology/count defaults, and stop leakage are usually visible in the contract before the first run. Teach those boundaries as clean positive coverage from day one instead of relying on post-hoc warning-language rows.</p>
     </div>
     <div class="decision-card">
-        <h3>4. Separate asset, DSL, compiler, and content work</h3>
+        <h3>4. Use decode/repair before raw churn</h3>
+        <p>When the remaining miss set is mostly syntax hygiene or mechanically repairable near-misses, deterministic decode/repair is the default path. Reopen raw training only for a true new branch such as a redesigned curriculum or a capacity test.</p>
+    </div>
+    <div class="decision-card">
+        <h3>5. Separate asset, DSL, compiler, and content work</h3>
         <p>Runs became interpretable only after we started isolating which layer changed: richer scene vocabulary, richer compiler, broader asset family, or better structure-content separation.</p>
     </div>
     <div class="decision-card">
-        <h3>5. Token granularity is its own spec axis</h3>
+        <h3>6. Token granularity is its own spec axis</h3>
         <p>Whole-component tokens were useful as training wheels, but they should not remain the long-term boundary. Once keyed structure works, shrinking token granularity deserves a dedicated run.</p>
     </div>
 </div>
@@ -2706,8 +2755,8 @@ Next run:</pre>
 
 <div class="decision-grid">
     <div class="decision-card">
-        <h3>Use a repair run when the contract is almost closed</h3>
-        <p>If the current representation is strong and only a few cases remain, do a narrow repair run. Keep the baseline frozen and target the exact failure slice.</p>
+        <h3>Use deterministic decode/repair first when the contract is almost closed</h3>
+        <p>If the current representation is strong and the remaining misses are syntax-only or mechanically repairable, keep the raw winner frozen and improve the decode/repair layer first. Do not default to another raw repair rung on the same brittle surface.</p>
     </div>
     <div class="decision-card">
         <h3>Use a compiler step when visuals are still weak</h3>
@@ -2726,8 +2775,8 @@ Next run:</pre>
         <p>If the scene language is still carrying visible prose or one-off values, branch to keyed structure plus separate <code>content.json</code>. The model should emit refs like <code>@section_card.0.title</code>, not literal asset prose inside the component token.</p>
     </div>
     <div class="decision-card">
-        <h3>Use richer negative examples when self-correction is weak</h3>
-        <p>Closing-tag repairs are not enough. Add wrong-layout, wrong-order, wrong-theme, and missing-component correction pairs when outputs are parseable but semantically wrong.</p>
+        <h3>Use clean contrast coverage when planning is still wrong</h3>
+        <p>If a failure is truly still in training, add compiler-valid contrast sets and boundary cases, not warning-language rows about <code>[OUT]</code>, wrappers, or singleton tags. The curriculum should teach the right choice, not narrate what not to do.</p>
     </div>
 </div>
 
@@ -2736,6 +2785,7 @@ Next run:</pre>
 <ul>
     <li>Promote a run only if it improves the primary target metric without regressing the already-solved slices.</li>
     <li>Reject a run if it changes too many axes to interpret, even if the final number looks better.</li>
+    <li>When a frozen raw winner exists, default to decode/repair and block more same-surface raw repair rungs until the next training idea is a true new branch.</li>
     <li>Branch a new spec only when the current spec ceiling is real and well measured.</li>
     <li>Make compiler fidelity a hard gate: use a gold pack, not just a couple of hand-picked examples.</li>
     <li>Scale model size only after the DSL and compiler contracts are stable.</li>
@@ -3363,6 +3413,11 @@ Next run:</pre>
             <td>All training rows parse, no duplicates, holdout prompts are disjoint from train</td>
             <td>Dataset QC step in training pipeline</td>
         </tr>
+        <tr>
+            <td>Failure-frontier forecast</td>
+            <td>The curriculum blueprint names the predictable failure classes and shows which surfaces teach each one before the first run starts</td>
+            <td><code>spec17_curriculum_blueprint.json</code> + <code>audit_curriculum_blueprint_v7.py</code></td>
+        </tr>
     </tbody>
 </table>
 
@@ -3424,6 +3479,14 @@ Next run:</pre>
 
 <p>This keeps the task bounded. The model is not being asked to learn open-domain language or free-written infographic copy. It is being asked to choose a good scene plan under weaker prompt control.</p>
 
+<div class="method-alert">
+    <strong>Current branch recommendation:</strong> <code>spec17</code> established the bounded-intent bridge shape and
+    <code>spec18</code> tested a routing-first curriculum on the same frozen stack, but held-out exactness still stayed at
+    zero. The next public recommendation is therefore <code>spec19</code>: a textbook-routing branch with named mixture
+    buckets, denser minimal-pair routing coverage, and capacity held back as a separate fallback lever.
+    See <a href="spec19-textbook-routing-mixture.html">spec19-textbook-routing-mixture.html</a>.
+</div>
+
 <h3>Progress Goal After The Last Good Baseline</h3>
 
 <p>
@@ -3454,6 +3517,16 @@ Next run:</pre>
         <h3>Training Curriculum</h3>
         <p>The long-range CK-native learning ladder from <code>v7</code> through later versions.</p>
         <p><a href="training-curriculum.html">Open training-curriculum.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Spec17 Curriculum</h3>
+        <p>The bounded intent-bridge blueprint, failure-frontier map, and stage mix planned after the frozen <code>spec16</code> winner.</p>
+        <p><a href="spec17-curriculum-blueprint.html">Open spec17-curriculum-blueprint.html</a></p>
+    </div>
+    <div class="report-card">
+        <h3>Spec19 Routing Mixture</h3>
+        <p>The current recommended next branch: named mixture buckets, textbook-style routing rows, and a clean capacity fallback if held-out exactness stays flat.</p>
+        <p><a href="spec19-textbook-routing-mixture.html">Open spec19-textbook-routing-mixture.html</a></p>
     </div>
     <div class="report-card">
         <h3>Version History</h3>
@@ -3694,7 +3767,7 @@ Next run:</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-03-30</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-06</p>
             </div>
         </div>
     </footer>
