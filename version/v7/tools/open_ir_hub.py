@@ -25,6 +25,7 @@ Usage:
 │   • Command builders: dataset viewer, export embeddings, export attention    │
 │   • _find_embeddings_path / _find_attention_path — artifact finders          │
 │   • _find_weight_health_path / _build_weight_health_cmd — probe helpers      │
+│   • _find_probe_report_html_path — discovers *probe_report.html viewers      │
 │   • _build_dataset_viewer_cmd — always returns a command (never None)        │
 │   • build_index() — aggregates all runs into hub payload JSON                │
 │                                                                              │
@@ -42,6 +43,8 @@ Usage:
 │     - 🔍 Open IR Visualizer                                                  │
 │     - 📊 Open Dataset Viewer                                                 │
 │     - 🩺 Weight Health Probe                                                 │
+│   • 🔬 DSL Probe viewer — links to *probe_report.html for DSL output review  │
+│   • Probe metrics in card stats (exact rate, probe count)                    │
 │   • Deep-links: embViewerLink() / attnViewerLink() → repo-root viewer       │
 │   • cmdBlock(cmd, label, desc) — copyable command blocks with descriptions   │
 │   • Search/filter by run name                                                │
@@ -191,6 +194,31 @@ def _build_model_make_cmd(target: str, run_dir: Path) -> str:
     return f"make {target} V7_MODEL={run_q}"
 
 
+def _has_train_runtime(run_dir: Path) -> bool:
+    has_lib = (run_dir / "libtrain.so").exists() or (run_dir / ".ck_build" / "libtrain.so").exists()
+    has_summary = (run_dir / "generated_train_runtime_summary_v7.json").exists()
+    has_weights = (run_dir / "weights.bump").exists()
+    has_manifest = (run_dir / "weights_manifest.json").exists()
+    return bool(has_lib and has_weights and has_manifest and has_summary)
+
+
+def _build_compile_train_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return (
+        f"python3 version/v7/scripts/ck_run_v7.py init --run {run_q} "
+        "--generate-ir --generate-runtime"
+    )
+
+
+def _build_compile_tokenizer_cmd() -> str:
+    return "make tokenizer"
+
+
+def _build_profile_dashboard_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"make v7-profile-dashboard-run RUN={run_q} V7_FORCE_COMPILE=1"
+
+
 def _build_init_run_scope_cmd(run_dir: Path) -> str:
     run_q = shlex.quote(str(run_dir))
     return f"python3 version/v7/scripts/init_run_scope_v7.py --run {run_q}"
@@ -242,12 +270,101 @@ def _build_weight_health_cmd(run_dir: Path) -> str:
     return f"python3 version/v7/scripts/weight_health_probe_v7.py --run {run_q}"
 
 
+def _find_tokenizer_quality_gate_path(run_dir: Path) -> Path | None:
+    candidate = run_dir / "tokenizer_quality_gate.json"
+    if candidate.exists():
+        return candidate
+    return None
+
+
+def _extract_tokenizer_quality_gate(run_dir: Path) -> dict[str, Any]:
+    path = _find_tokenizer_quality_gate_path(run_dir)
+    if path is None:
+        return {}
+    obj = _safe_read_json(path)
+    if not isinstance(obj, dict):
+        return {}
+    return {
+        "verdict": obj.get("verdict", "UNKNOWN"),
+        "vocab_size": obj.get("vocab_size"),
+        "content_mega_count": obj.get("content_mega_count", 0),
+        "content_mega_fraction": obj.get("content_mega_fraction", 0),
+        "issue_count": len(obj.get("issues", [])),
+        "length_percentiles": obj.get("length_percentiles", {}),
+    }
+
+
+def _build_tokenizer_quality_gate_cmd(run_dir: Path) -> str:
+    run_q = shlex.quote(str(run_dir))
+    return f"python3 version/v7/scripts/tokenizer_quality_gate_v7.py --run {run_q}"
+
+
 def _find_dsl_planner_path(run_dir: Path) -> Path | None:
     """Find a pre-generated DSL planner report, if present."""
     direct = run_dir / "dsl_planner_report.html"
     if direct.is_file():
         return direct
     return None
+
+
+def _find_probe_report_html_path(run_dir: Path) -> Path | None:
+    """Find the best probe report HTML viewer for this run."""
+    candidates = sorted(run_dir.glob("*probe_report.html"))
+    if candidates:
+        return candidates[-1]
+    return None
+
+
+def _find_probe_contract_path(run_dir: Path) -> Path | None:
+    """Find a probe contract suitable for build_probe_report_v7.py."""
+    # Prefer a root-level contract (written by earlier pipeline steps).
+    root_contracts = sorted(run_dir.glob("*probe_contract.json"))
+    if root_contracts:
+        return root_contracts[-1]
+    # Fall back to dataset/contracts/ (materialized during dataset prep).
+    ds_contracts = sorted(run_dir.glob("dataset/contracts/*probe_report_contract.json"))
+    if ds_contracts:
+        return ds_contracts[-1]
+    return None
+
+
+def _infer_line_slug(run_dir: Path) -> str:
+    """Detect the LINE_SLUG for a run from its existing artifacts."""
+    for pattern in ("*_preflight.json",):
+        for path in sorted(run_dir.glob(pattern)):
+            stem = path.stem                          # e.g. gen1_full_preflight
+            suffix = "_preflight"
+            if stem.endswith(suffix):
+                return stem[: -len(suffix)]
+    # Fall back: first segment of the run directory name before _scene_
+    name = run_dir.name
+    idx = name.find("_scene_")
+    if idx > 0:
+        return name[:idx]
+    return "probe"
+
+
+def _build_probe_report_cmd(run_dir: Path) -> str | None:
+    """Build a command to generate DSL probe report for a run missing one."""
+    # Already has a probe report → no need.
+    if sorted(run_dir.glob("*probe_report.json")):
+        return None
+    contract = _find_probe_contract_path(run_dir)
+    if contract is None:
+        return None
+    # Must have weights to actually run inference.
+    if not (run_dir / "weights_manifest.json").exists() and not (run_dir / "weights.bump").exists():
+        return None
+    slug = _infer_line_slug(run_dir)
+    run_q = shlex.quote(str(run_dir))
+    contract_q = shlex.quote(str(contract))
+    html_out = shlex.quote(str(run_dir / f"{slug}_probe_report.html"))
+    json_out = shlex.quote(str(run_dir / f"{slug}_probe_report.json"))
+    return (
+        f"python3 version/v7/scripts/build_probe_report_v7.py "
+        f"--run {run_q} --contract {contract_q} "
+        f"--output {html_out} --json-out {json_out}"
+    )
 
 
 def _has_probe_autopsy(run_dir: Path) -> bool:
@@ -769,6 +886,8 @@ class RunRecord:
     gallery_path: Path | None
     dsl_planner_path: Path | None
     dsl_planner_cmd: str | None
+    probe_report_html_path: Path | None
+    probe_report_cmd: str | None
     dataset_snapshot_path: Path | None
     artifact_index_path: Path | None
     dataset_workspace: str | None
@@ -804,6 +923,12 @@ class RunRecord:
     export_attention_cmd: str
     prepare_all_cmd: str
     weight_health_cmd: str
+    tokenizer_quality_gate: dict[str, Any]
+    tokenizer_quality_gate_cmd: str
+    has_train_runtime: bool
+    compile_train_cmd: str
+    compile_tokenizer_cmd: str
+    profile_dashboard_cmd: str
     artifact_sections: list[dict[str, Any]]
     coverage_summary: dict[str, Any]
     next_actions: list[dict[str, str]]
@@ -832,6 +957,9 @@ class RunRecord:
             "dsl_planner_path": str(self.dsl_planner_path) if self.dsl_planner_path else None,
             "dsl_planner_uri": self.dsl_planner_path.resolve().as_uri() if self.dsl_planner_path else None,
             "dsl_planner_cmd": self.dsl_planner_cmd,
+            "probe_report_html_path": str(self.probe_report_html_path) if self.probe_report_html_path else None,
+            "probe_report_html_uri": self.probe_report_html_path.resolve().as_uri() if self.probe_report_html_path else None,
+            "probe_report_cmd": self.probe_report_cmd,
             "dataset_snapshot_path": str(self.dataset_snapshot_path) if self.dataset_snapshot_path else None,
             "dataset_snapshot_uri": self.dataset_snapshot_path.resolve().as_uri() if self.dataset_snapshot_path else None,
             "artifact_index_path": str(self.artifact_index_path) if self.artifact_index_path else None,
@@ -871,6 +999,12 @@ class RunRecord:
             "export_attention_cmd": self.export_attention_cmd,
             "prepare_all_cmd": self.prepare_all_cmd,
             "weight_health_cmd": self.weight_health_cmd,
+            "tokenizer_quality_gate": self.tokenizer_quality_gate,
+            "tokenizer_quality_gate_cmd": self.tokenizer_quality_gate_cmd,
+            "has_train_runtime": self.has_train_runtime,
+            "compile_train_cmd": self.compile_train_cmd,
+            "compile_tokenizer_cmd": self.compile_tokenizer_cmd,
+            "profile_dashboard_cmd": self.profile_dashboard_cmd,
             "artifact_sections": self.artifact_sections,
             "coverage_summary": self.coverage_summary,
             "next_actions": self.next_actions,
@@ -1000,6 +1134,8 @@ def _build_run_coverage(
             next_actions.append({"label": "Refresh core training artifacts", "cmd": _build_run_make_cmd("v7-capture-artifacts-run", run_dir)})
         if any(section["present"] < section["total"] for section in sections if section["key"] == "runtime_perf"):
             next_actions.append({"label": "Capture training runtime telemetry", "cmd": _build_run_make_cmd("v7-profile-dashboard-run", run_dir)})
+        if not _has_train_runtime(run_dir):
+            next_actions.append({"label": "Compile train runtime (enables Training tab)", "cmd": _build_compile_train_cmd(run_dir)})
         if not _has_run_artifact(run_dir, "run_scope.json", "agent.md", "training.md", "AGENT.md", "TRAINING.md"):
             next_actions.append({"label": "Initialize run brief", "cmd": _build_init_run_scope_cmd(run_dir)})
     else:
@@ -1111,8 +1247,11 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
     weight_health = _find_weight_health_path(run_dir)
     gallery = _find_gallery_path(run_dir)
     dsl_planner = _find_dsl_planner_path(run_dir)
+    probe_report_html = _find_probe_report_html_path(run_dir)
+    probe_report_cmd = _build_probe_report_cmd(run_dir)
     has_autopsy = _has_probe_autopsy(run_dir)
-    dsl_planner_cmd = _build_dsl_planner_cmd(run_dir) if has_autopsy else None
+    has_probe_report_json = bool(sorted(run_dir.glob("*probe_report.json")))
+    dsl_planner_cmd = _build_dsl_planner_cmd(run_dir) if (has_autopsy or has_probe_report_json) else None
     dataset_snapshot_path = _find_dataset_snapshot_path(run_dir)
     artifact_index_path = _find_run_artifact(run_dir, "artifact_index.md", "artifact_index.json")
     dataset_snapshot = _safe_read_json(dataset_snapshot_path) if dataset_snapshot_path else None
@@ -1172,6 +1311,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         next_actions.append({"label": "Rebuild dataset viewer", "cmd": dataset_rebuild_viewer_cmd})
     if dsl_planner_cmd and not dsl_planner:
         next_actions.append({"label": "Generate DSL planner report", "cmd": dsl_planner_cmd})
+    if probe_report_cmd:
+        next_actions.append({"label": "Generate DSL probe report", "cmd": probe_report_cmd})
 
     return RunRecord(
         run_dir=run_dir,
@@ -1187,6 +1328,8 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         gallery_path=gallery,
         dsl_planner_path=dsl_planner,
         dsl_planner_cmd=dsl_planner_cmd,
+        probe_report_html_path=probe_report_html,
+        probe_report_cmd=probe_report_cmd,
         dataset_snapshot_path=dataset_snapshot_path,
         artifact_index_path=artifact_index_path,
         dataset_workspace=dataset_workspace,
@@ -1222,6 +1365,12 @@ def collect_run_record(run_dir: Path, models_root: Path) -> RunRecord:
         export_attention_cmd=_build_export_attention_cmd(run_dir),
         prepare_all_cmd=_build_prepare_all_cmd(run_dir),
         weight_health_cmd=_build_weight_health_cmd(run_dir),
+        tokenizer_quality_gate=_extract_tokenizer_quality_gate(run_dir),
+        tokenizer_quality_gate_cmd=_build_tokenizer_quality_gate_cmd(run_dir),
+        has_train_runtime=_has_train_runtime(run_dir),
+        compile_train_cmd=_build_compile_train_cmd(run_dir),
+        compile_tokenizer_cmd=_build_compile_tokenizer_cmd(),
+        profile_dashboard_cmd=_build_profile_dashboard_cmd(run_dir),
         artifact_sections=artifact_sections,
         coverage_summary=coverage_summary,
         next_actions=next_actions,
@@ -1240,6 +1389,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
     embeddings_count = sum(1 for r in payload_runs if r.get("embeddings_path"))
     attention_count = sum(1 for r in payload_runs if r.get("attention_path"))
     weight_health_count = sum(1 for r in payload_runs if r.get("weight_health_path"))
+    probe_report_html_count = sum(1 for r in payload_runs if r.get("probe_report_html_path"))
     pass_count = sum(1 for r in payload_runs if (r.get("parity_regimen") or {}).get("status") in ("PASS", "PASS_REUSED"))
 
     global_viewer = REPO_ROOT / "dataset_viewer.html"
@@ -1258,6 +1408,7 @@ def build_index(models_root: Path) -> dict[str, Any]:
             "runs_with_embeddings": embeddings_count,
             "runs_with_attention": attention_count,
             "runs_with_weight_health": weight_health_count,
+            "runs_with_probe_report_html": probe_report_html_count,
             "runs_parity_pass": pass_count,
         },
         "runs": payload_runs,
@@ -2004,6 +2155,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       gap: 14px;
       align-items: flex-start;
       flex-wrap: wrap;
+      min-width: 0;
     }
 
     .spotlight-title {
@@ -2131,7 +2283,14 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .run-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .run-card .run-actions .btn {
+      padding: 0 10px;
+      min-height: 34px;
+      font-size: 0.74rem;
     }
 
     .btn {
@@ -2456,6 +2615,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .run-card {
       position: relative;
       overflow: hidden;
+      min-width: 0;
       border-radius: 24px;
       background:
         linear-gradient(180deg, rgba(17, 22, 29, 0.97), rgba(11, 15, 20, 0.99));
@@ -2481,6 +2641,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       padding: 22px 20px;
       display: grid;
       gap: 16px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     body.compact-mode .run-card-body {
@@ -2504,6 +2666,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     .badge.pass { color: #8fd1ab; background: rgba(87, 216, 156, 0.08); border-color: rgba(87, 216, 156, 0.12); }
     .badge.fail { color: #d798a3; background: rgba(255, 111, 127, 0.08); border-color: rgba(255, 111, 127, 0.12); }
+    .badge.warn { color: #e0b860; background: rgba(255, 176, 32, 0.10); border-color: rgba(255, 176, 32, 0.18); }
     .badge.skip { color: #d6c191; background: rgba(255, 208, 113, 0.08); border-color: rgba(255, 208, 113, 0.12); }
     .badge.missing { color: #b8afd1; background: rgba(120, 120, 120, 0.08); border-color: rgba(120, 120, 120, 0.12); }
     .badge.report { color: #8ebed0; background: rgba(7, 173, 248, 0.08); border-color: rgba(7, 173, 248, 0.12); }
@@ -2514,6 +2677,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
       display: grid;
       gap: 10px;
       padding-top: 2px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .health-note {
@@ -2527,6 +2692,13 @@ def render_html(index_payload: dict[str, Any]) -> str:
       flex-wrap: wrap;
       gap: 6px;
       margin-top: 2px;
+      min-width: 0;
+    }
+
+    .section-summary .badge {
+      font-size: 0.6rem;
+      padding: 0 7px;
+      min-height: 22px;
     }
 
     .action-stack {
@@ -2584,6 +2756,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
+      min-width: 0;
     }
 
     body.compact-mode .run-stats {
@@ -2649,6 +2822,8 @@ def render_html(index_payload: dict[str, Any]) -> str:
     .run-card .detail-toggle {
       border-top-color: rgba(255,255,255,0.035);
       padding-top: 12px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .run-card .detail-toggle summary {
@@ -3040,11 +3215,11 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     function cmdBlock(cmd, label, desc) {
       if (!cmd) return '';
-      return `<div style="margin-top:8px;">
+      return `<div style="margin-top:8px;min-width:0;">
         <div style="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">${label}</div>
         ${desc ? `<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${desc}</div>` : ''}
-        <div class="spotlight-command" style="display:flex;align-items:center;gap:8px;">
-          <code style="flex:1;overflow:auto">${escapeHtml(cmd)}</code>
+        <div class="spotlight-command" style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <code style="flex:1;min-width:0;overflow-x:auto;word-break:break-all">${escapeHtml(cmd)}</code>
           <button class="btn" style="flex-shrink:0" data-copy="${encodeURIComponent(cmd)}">Copy</button>
         </div>
       </div>`;
@@ -3052,7 +3227,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
 
     function renderCommandsPanel(run) {
       return `
-        <div style="margin-top:14px;border:1px solid rgba(255,180,0,0.14);border-radius:12px;padding:14px 16px;background:rgba(20,20,20,0.6);">
+        <div style="margin-top:14px;border:1px solid rgba(255,180,0,0.14);border-radius:12px;padding:14px 16px;background:rgba(20,20,20,0.6);min-width:0;overflow:hidden;">
           <div style="font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">⚡ Operator Commands</div>
           ${cmdBlock(run.generate_report_cmd, '📊 Generate IR Report', 'Runs the full IR visualizer pipeline and writes ir_report.html into the run directory.')}
           ${cmdBlock(run.datasetRebuildViewerCmd, '📦 Build Dataset Viewer', 'Reads workspace manifests (raw inventory, normalized, classified) and generates a standalone dataset_viewer.html for this run.')}
@@ -3061,6 +3236,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
           ${cmdBlock(run.export_attention_cmd, '🔭 Export Attention', 'Runs a full forward pass on probe sequences and saves per-layer/per-head attention matrices to attention.json.')}
           ${cmdBlock(run.prepare_all_cmd, '🚀 Prepare All Viewer Artifacts', 'One-click: generates embeddings.json + attention.json + dataset_viewer.html. Use --force to regenerate existing.')}
           ${cmdBlock(run.weight_health_cmd, '🩺 Weight Health Probe', 'Compares init vs latest checkpoint: per-tensor delta, gradient reachability, stale-parameter flags. Writes weight_health_latest.json — view in IR Visualizer Weight Health tab.')}
+          ${cmdBlock(run.tokenizer_quality_gate_cmd, '🔤 Tokenizer Quality Gate', 'Analyzes vocab for over-merged content tokens, length distribution, and generalization fitness. Flags tokens that bake topic-specific text into single entries. Run BEFORE training.')}
+          ${cmdBlock(run.compile_train_cmd, '🔧 Compile Train Runtime', 'Generates forward IR → backward IR → memory layout → codegen → libtrain.so + generated_train_runtime_summary_v7.json. Required to enable the Training tab in the IR Visualizer.')}
+          ${cmdBlock(run.compile_tokenizer_cmd, '⚙️ Build C Tokenizer', 'Compiles build/libckernel_tokenizer.so from src/tokenizer/. Required before running profile-dashboard or ck-cli-v7 inference.')}
+          ${cmdBlock(run.profile_dashboard_cmd, '📈 Profile Dashboard', 'Full profiling pipeline: capture artifacts → prepare runtime → decode → perf-stat → flamegraph. Use V7_FORCE_COMPILE=1 to force a model recompile.')}
         </div>
       `;
     }
@@ -3168,6 +3347,14 @@ def render_html(index_payload: dict[str, Any]) -> str:
         coverageSummary: (run.coverage_summary && typeof run.coverage_summary === 'object') ? run.coverage_summary : {},
         nextActions: Array.isArray(run.next_actions) ? run.next_actions : [],
         reportReady: Boolean(run.report_path),
+        probeReportHtmlReady: Boolean(run.probe_report_html_path),
+        probeReportCmd: run.probe_report_cmd || '',
+        tokenizerGate: (run.tokenizer_quality_gate && typeof run.tokenizer_quality_gate === 'object') ? run.tokenizer_quality_gate : {},
+        tokenizerGateCmd: run.tokenizer_quality_gate_cmd || '',
+        hasTrainRuntime: Boolean(run.has_train_runtime),
+        compileTrainCmd: run.compile_train_cmd || '',
+        compileTokenizerCmd: run.compile_tokenizer_cmd || '',
+        profileDashboardCmd: run.profile_dashboard_cmd || '',
         datasetViewerReady: Boolean(run.dataset_viewer_path),
         galleryReady: Boolean(run.gallery_path),
         datasetSnapshotReady: Boolean(run.dataset_snapshot_path),
@@ -3548,6 +3735,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
               ${run.artifact_index_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.artifact_index_uri)}">Artifacts</a>` : ''}
               ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
               ${run.dsl_planner_uri ? `<a class="btn dsl-planner" target="_blank" rel="noopener" href="${escapeHtml(run.dsl_planner_uri)}">DSL Planner</a>` : ''}
+              ${run.probe_report_html_uri ? `<a class="btn dsl-planner" target="_blank" rel="noopener" href="${escapeHtml(run.probe_report_html_uri)}">🔬 DSL Probe</a>` : (run.probe_report_cmd ? `<button class="btn dsl-planner-gen" data-copy="${encodeURIComponent(run.probe_report_cmd)}">⚡ Gen DSL Probe</button>` : '')}
               ${embViewerLink(run, '🧬 Embeddings')}
               ${attnViewerLink(run, '🔭 Attention')}
               <a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.run_uri)}">Run dir</a>
@@ -3999,6 +4187,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
       const embeddingsCount = summary.runs_with_embeddings || runs.filter((run) => run.embeddings_uri).length;
       const attentionCount = summary.runs_with_attention || runs.filter((run) => run.attention_uri).length;
       const weightHealthCount = summary.runs_with_weight_health || runs.filter((run) => run.weight_health_path).length;
+      const probeReportCount = runs.filter((run) => run.probeReportHtmlReady).length;
       const parityPass = summary.runs_parity_pass || runs.filter((run) => run.parityStatus === 'PASS' || run.parityStatus === 'PASS_REUSED').length;
       const trainCount = summary.runs_train || runs.filter((run) => run.kind === 'train').length;
       const inferCount = runs.filter((run) => run.kind === 'inference').length;
@@ -4028,6 +4217,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
         { label: '🧬 Embeddings', value: fmtInt(embeddingsCount), note: 'Runs with exported embeddings.json.' },
         { label: '🔭 Attention', value: fmtInt(attentionCount), note: 'Runs with exported attention.json.' },
         { label: '🩺 Weight Health', value: fmtInt(weightHealthCount), note: 'Runs with weight_health_latest.json probe results.' },
+        { label: '🔬 DSL Probes', value: fmtInt(probeReportCount), note: 'Runs with probe_report.html DSL output viewers.' },
         { label: 'Parity Pass', value: fmtInt(parityPass), note: 'PASS plus PASS_REUSED regimen states.' },
         { label: 'Best Loss / Checkpoints', value: `${fmtLoss(bestLoss)} / ${fmtInt(totalCheckpoints)}`, note: 'Lowest loss and total checkpoint volume.' },
       ];
@@ -4162,6 +4352,7 @@ def render_html(index_payload: dict[str, Any]) -> str:
                 ${run.artifact_index_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.artifact_index_uri)}">Artifacts</a>` : ''}
                 ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset viewer</a>` : ''}
                 ${run.dsl_planner_uri ? `<a class="btn dsl-planner" target="_blank" rel="noopener" href="${escapeHtml(run.dsl_planner_uri)}">DSL Planner</a>` : (run.dsl_planner_cmd ? `<button class="btn dsl-planner-gen" data-copy="${encodeURIComponent(run.dsl_planner_cmd)}">⚡ Gen DSL Planner</button>` : '')}
+                ${run.probe_report_html_uri ? `<a class="btn dsl-planner" target="_blank" rel="noopener" href="${escapeHtml(run.probe_report_html_uri)}">🔬 DSL Probe Viewer</a>` : (run.probe_report_cmd ? `<button class="btn dsl-planner-gen" data-copy="${encodeURIComponent(run.probe_report_cmd)}">⚡ Gen DSL Probe</button>` : '')}
                 ${embViewerLink(run, '🧬 Embeddings')}
                 ${attnViewerLink(run, '🔭 Attention')}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">SVG Gallery</a>` : ''}
@@ -4296,6 +4487,10 @@ def render_html(index_payload: dict[str, Any]) -> str:
         <div class="panel-head"><h3>Operator Actions</h3></div>
         <div class="rail-body">
           <div class="kv-stack">
+            <div class="kv-row" style="border-bottom:1px solid rgba(255,180,0,0.15);padding-bottom:8px;margin-bottom:4px"><span class="k" style="color:var(--gold)">⚙️ Build Prerequisites</span><span class="v mono" style="font-size:0.72rem">Run once after checkout or toolchain update</span></div>
+            <div class="kv-row"><span class="k">C Tokenizer Runtime</span><span class="v mono">make tokenizer</span></div>
+            <div class="kv-row"><span class="k">Full v7 Build</span><span class="v mono">make v7</span></div>
+            <div class="kv-row" style="border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:8px;margin-bottom:4px"><span class="k">BPE Trainer (optional)</span><span class="v mono">make ck-bpe-train</span></div>
             <div class="kv-row"><span class="k">Hub</span><span class="v mono">python3 version/v7/tools/open_ir_hub.py --open</span></div>
             <div class="kv-row"><span class="k">Refresh Report</span><span class="v mono">make v7-capture-artifacts-run RUN=/path/to/run</span></div>
             <div class="kv-row"><span class="k">Profile Dashboard</span><span class="v mono">make v7-profile-dashboard-run RUN=/path/to/run</span></div>
@@ -4406,7 +4601,16 @@ def render_html(index_payload: dict[str, Any]) -> str:
                   ${scope.rung ? `<span class="badge">${escapeHtml(String(scope.rung))}</span>` : ''}
                   ${showParityBadge(run) ? `<span class="badge ${tone}">${escapeHtml(run.parityStatus)}</span>` : ''}
                   ${run.reportReady ? '<span class="badge report">report</span>' : ''}
+                  ${run.probeReportHtmlReady ? '<span class="badge pass">probe</span>' : (run.probeReportCmd ? '<span class="badge warn">probe pending</span>' : '')}
                   ${run.datasetViewerReady ? '<span class="badge report">dataset</span>' : ''}
+                  ${(() => {
+                    const tg = run.tokenizerGate || {};
+                    if (tg.verdict === 'FAIL') return '<span class="badge fail" title="Tokenizer has degenerate content-embedded tokens">tok ❌</span>';
+                    if (tg.verdict === 'WARN') return '<span class="badge warn" title="Tokenizer has quality warnings">tok ⚠️</span>';
+                    if (tg.verdict === 'PASS') return '<span class="badge pass" title="Tokenizer quality gate passed">tok ✓</span>';
+                    return '';
+                  })()}
+                  ${run.kind === 'train' ? (run.hasTrainRuntime ? '<span class="badge pass" title="Training tab available: libtrain.so + summary present">train ✓</span>' : '<span class="badge warn" title="Training tab disabled: run compile_train_cmd to generate libtrain.so">train ⚠️</span>') : ''}
                 </div>
               </div>
 
@@ -4420,12 +4624,17 @@ def render_html(index_payload: dict[str, Any]) -> str:
               <div class="run-stats">
                 <div class="run-stat"><div class="k">Updated</div><div class="v">${escapeHtml(run.updatedLabel)}</div></div>
                 <div class="run-stat"><div class="k">Final Loss</div><div class="v">${escapeHtml(fmtLoss(run.final_loss))}</div></div>
+                ${run.probeSummary && run.probeSummary.probe_count ? `
+                  <div class="run-stat"><div class="k">Probe Exact</div><div class="v">${escapeHtml(fmtPct(run.probeSummary.metrics ? run.probeSummary.metrics.exact_rate : null))}</div></div>
+                  <div class="run-stat"><div class="k">Probe Count</div><div class="v">${escapeHtml(fmtInt(run.probeSummary.probe_count))}</div></div>
+                ` : ''}
               </div>
 
               <div class="run-actions">
                 ${run.report_uri ? `<a class="btn primary" target="_blank" rel="noopener" href="${escapeHtml(run.report_uri)}">Report</a>` : ''}
                 ${run.artifact_index_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.artifact_index_uri)}">Artifacts</a>` : ''}
                 ${run.dataset_viewer_uri ? `<a class="btn dataset" target="_blank" rel="noopener" href="${escapeHtml(run.dataset_viewer_uri)}">Dataset</a>` : ''}
+                ${run.probe_report_html_uri ? `<a class="btn dsl-planner" target="_blank" rel="noopener" href="${escapeHtml(run.probe_report_html_uri)}">🔬 DSL Probe</a>` : (run.probe_report_cmd ? `<button class="btn dsl-planner-gen" data-copy="${encodeURIComponent(run.probe_report_cmd)}">⚡ Gen Probe</button>` : '')}
                 ${embViewerLink(run, '🧬 Emb')}
                 ${attnViewerLink(run, '🔭 Attn')}
                 ${run.gallery_uri ? `<a class="btn" target="_blank" rel="noopener" href="${escapeHtml(run.gallery_uri)}">Gallery</a>` : ''}
