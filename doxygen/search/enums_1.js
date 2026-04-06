@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['ggml_5fstatus_0',['ggml_status',['../ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235ad',1,'ggml_runtime_compat.h']]],
-  ['ggml_5ftype_1',['ggml_type',['../ggml__runtime__compat_8h.html#a7f5db4faa296c99fcdd51cb4154df0ff',1,'ggml_runtime_compat.h']]]
+  ['recommendationcategory_4578',['RecommendationCategory',['../system__topology_8h.html#abc3893de9bbd40dc5a7191b3dedcf446',1,'system_topology.h']]],
+  ['recommendationpriority_4579',['RecommendationPriority',['../system__topology_8h.html#aabe7a1b1ca3c4e61061d2fbc43762a69',1,'system_topology.h']]]
 ];
