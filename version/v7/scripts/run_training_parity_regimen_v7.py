@@ -24,6 +24,11 @@ Extended Plane R+ (opt-in longer/broader generated-runtime coverage):
   - H1: generated-runtime shape matrix (multiple seq/accum profiles)
   - I1: longer-horizon replay + grad-accum snapshot parity
 
+Regimen profiles:
+  - default: current A/B/C + D/E/F signoff surface
+  - strict: controlled signoff lane; keeps decisive A/D/E/F gates, skips B/C sweeps
+  - extended: default + G/H/I
+
 Important interpretation:
   - A1 is intentionally a kernel-level isolation gate, not a full generated-runtime
     production signoff by itself.
@@ -34,6 +39,8 @@ Important interpretation:
     parity checks.
   - E1 is intentionally narrower: it is a determinism sentinel for the parity
     harness, not a generated-runtime signoff by itself.
+  - stage-profile=strict is the controlled signoff lane when operators want
+    bounded runtime/memory without the broader B/C sweep fanout.
   - G1/H1/I1 are disabled by default for legacy callers and can be enabled with
     --extended-checks when operators want broader horizon/shape signoff.
   - A1/A2 default to short-horizon optimizer settings so this gate captures
@@ -284,6 +291,7 @@ def _config_signature(
         "d2_epochs": int(args.d2_epochs),
         "d2_grad_accum": int(args.d2_grad_accum),
         "d2_steps_per_epoch": int(args.d2_steps_per_epoch),
+        "stage_profile": str(getattr(args, "stage_profile", "default") or "default"),
         "extended_checks": bool(getattr(args, "extended_checks", False)),
         "memory_check": bool(getattr(args, "memory_check", True)),
         "memory_min_available_gb": float(getattr(args, "memory_min_available_gb", 6.0)),
@@ -820,6 +828,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--no-skip-if-unchanged", dest="skip_if_unchanged", action="store_false", help="Always rerun regimen.")
     ap.set_defaults(stop_on_fail=True)
     ap.add_argument("--no-stop-on-fail", dest="stop_on_fail", action="store_false", help="Continue remaining stages even after a failure.")
+    ap.add_argument("--stage-profile", choices=["default", "strict", "extended"], default="default",
+                    help="Regimen surface: default=A/B/C+D/E/F, strict=controlled core signoff, extended=default+G/H/I.")
     ap.set_defaults(runtime_checks=True)
     ap.add_argument("--no-runtime-checks", dest="runtime_checks", action="store_false", help="Skip runtime replay/stitch checks.")
     ap.set_defaults(extended_checks=False)
@@ -921,6 +931,18 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    args.stage_profile = str(getattr(args, "stage_profile", "default") or "default").strip().lower()
+    if args.stage_profile not in {"default", "strict", "extended"}:
+        print("ERROR: --stage-profile must be one of default|strict|extended", file=sys.stderr)
+        return 2
+    if bool(args.extended_checks) and args.stage_profile == "strict":
+        print("ERROR: --extended-checks cannot be combined with --stage-profile strict", file=sys.stderr)
+        return 2
+    if args.stage_profile == "extended":
+        args.extended_checks = True
+    if bool(args.extended_checks) and args.stage_profile == "default":
+        args.stage_profile = "extended"
+
     if int(args.a1_max_steps) < 1:
         print("ERROR: --a1-max-steps must be >= 1", file=sys.stderr)
         return 2
@@ -1079,6 +1101,9 @@ def main() -> int:
     stability_cases = _parse_grid(args.stability_grid)
     stages: List[StageResult] = []
     stop_due_to_failure = False
+    controlled_strict = bool(args.stage_profile == "strict")
+    run_grad_accum_sweeps = not controlled_strict
+    run_stability_sweeps = not controlled_strict
     effective_memory_min_available_gb = float(args.memory_min_available_gb)
     if bool(args.extended_checks):
         effective_memory_min_available_gb = max(
@@ -1100,6 +1125,7 @@ def main() -> int:
             "failed_stage_ids": failed,
             "total_stages": len(stages),
             "passed_stages": sum(1 for s in stages if s.status == "PASS"),
+            "stage_profile": str(args.stage_profile),
             "runtime_checks_enabled": bool(args.runtime_checks),
             "extended_checks_enabled": bool(args.extended_checks),
         }
@@ -1136,9 +1162,12 @@ def main() -> int:
                 "sweep_epochs": int(args.sweep_epochs),
                 "sweep_steps_per_epoch": int(args.sweep_steps_per_epoch),
                 "stability_grid": [(e, g, s) for (e, g, s) in stability_cases],
+                "stage_profile": str(args.stage_profile),
                 "stop_on_fail": bool(args.stop_on_fail),
                 "runtime_checks": bool(args.runtime_checks),
                 "extended_checks": bool(args.extended_checks),
+                "grad_accum_sweeps_enabled": bool(run_grad_accum_sweeps),
+                "stability_sweeps_enabled": bool(run_stability_sweeps),
                 "memory_check": bool(args.memory_check),
                 "memory_min_available_gb": float(args.memory_min_available_gb),
                 "extended_memory_min_available_gb": float(args.extended_memory_min_available_gb),
@@ -1688,7 +1717,7 @@ def main() -> int:
     )
 
     # Stage B: grad-accum sweeps.
-    if not stop_due_to_failure:
+    if (not stop_due_to_failure) and bool(run_grad_accum_sweeps):
         for g in grad_accum_values:
             stage_id = f"B{g}"
             stage_json = base_out_dir / f"regimen_grad_accum_g{g}.json"
@@ -1782,7 +1811,7 @@ def main() -> int:
                 break
 
     # Stage C: stability matrix sweeps.
-    if not stop_due_to_failure:
+    if (not stop_due_to_failure) and bool(run_stability_sweeps):
         for idx, (epochs, g, steps_case) in enumerate(stability_cases, start=1):
             stage_id = f"C{idx}"
             stage_json = base_out_dir / f"regimen_stability_e{epochs}_g{g}_s{steps_case}.json"

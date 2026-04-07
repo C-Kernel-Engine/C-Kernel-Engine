@@ -28,6 +28,12 @@ Family-scoped text parity now means:
 - `E`: determinism sentinel for the parity harness, not a generated-runtime signoff by itself
 - `G/H/I` when `--extended-checks` is enabled: longer-horizon and broader generated-runtime parity coverage
 
+Regimen profiles:
+
+- `--stage-profile default`: current broad `A/B/C + D/E/F` surface
+- `--stage-profile strict`: controlled signoff lane; keeps `M0`, `A`, and `D/E/F`, skips the heavier `B/C` sweep fanout
+- `--stage-profile extended`: default surface plus `G/H/I`
+
 Operator-facing family matrix:
 
 - `run_backprop_family_matrix_v7.py --mode fast`

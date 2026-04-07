@@ -165,6 +165,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--md-out", type=Path, default=None)
     ap.add_argument("--cache-dir", type=Path, default=None, help="Optional CK_CACHE_DIR for child runs.")
+    ap.add_argument("--stage-profile", choices=["default", "strict", "extended"], default="default",
+                    help="Forward the selected regimen profile to each family run.")
     ap.add_argument("--extended-checks", action="store_true", help="Enable regimen G/H/I stages for each family.")
     ap.set_defaults(memory_check=True)
     ap.add_argument("--no-memory-check", dest="memory_check", action="store_false",
@@ -182,6 +184,13 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    args.stage_profile = str(getattr(args, "stage_profile", "default") or "default").strip().lower()
+    if bool(args.extended_checks) and args.stage_profile == "strict":
+        raise SystemExit("--extended-checks cannot be combined with --stage-profile strict")
+    if args.stage_profile == "extended":
+        args.extended_checks = True
+    if bool(args.extended_checks) and args.stage_profile == "default":
+        args.stage_profile = "extended"
     families = _parse_families(args.families, mode=args.mode)
     python_exec = _pick_python(args.python_exec)
     if not REGIMEN.exists():
@@ -217,6 +226,8 @@ def main() -> int:
             str(family_md),
             "--logs-dir",
             str(family_logs),
+            "--stage-profile",
+            str(args.stage_profile),
             "--memory-min-available-gb",
             str(float(args.memory_min_available_gb)),
             "--extended-memory-min-available-gb",
@@ -249,6 +260,7 @@ def main() -> int:
         "families": list(families),
         "report_root": str(report_root),
         "cache_dir": str(args.cache_dir.resolve()) if args.cache_dir is not None else None,
+        "stage_profile": str(args.stage_profile),
         "extended_checks": bool(args.extended_checks),
         "summary": {
             "passed": len(failed) == 0 and len(results) == len(families),

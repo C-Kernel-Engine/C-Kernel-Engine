@@ -7260,6 +7260,9 @@ def _maybe_run_training_parity_regimen(args: argparse.Namespace, *, run_dir: Opt
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
     memory_cfg = _train_memory_headroom_config(args)
+    regimen_profile = str(getattr(args, "parity_regimen_profile", "default") or "default").strip().lower()
+    if regimen_profile not in {"default", "strict", "extended"}:
+        regimen_profile = "default"
     cmd = [
         python_exec,
         str(regimen_script),
@@ -7269,6 +7272,8 @@ def _maybe_run_training_parity_regimen(args: argparse.Namespace, *, run_dir: Opt
         str(regimen_json),
         "--md-out",
         str(regimen_md),
+        "--stage-profile",
+        str(regimen_profile),
         "--memory-min-available-gb",
         str(float(memory_cfg["min_available_gb"])),
         "--extended-memory-min-available-gb",
@@ -10582,6 +10587,8 @@ Examples:
                         help='Do not load tiny parity init from run_dir/weights.bump')
         sp.add_argument('--parity-regimen', choices=['off', 'suggest', 'run', 'require'], default='suggest',
                         help='Post-train operator gate: suggest/run/require staged CK-vs-PyTorch parity regimen')
+        sp.add_argument('--parity-regimen-profile', choices=['default', 'strict', 'extended'], default='default',
+                        help='Regimen surface to use when invoking run_training_parity_regimen_v7.py')
 
         sp.add_argument('--train-epochs', type=int, default=3)
         sp.add_argument('--train-seq-len', type=int, default=16)
@@ -10717,6 +10724,8 @@ Examples:
                            help='Do not load tiny parity init from run_dir/weights.bump')
     run_parser.add_argument('--parity-regimen', choices=['off', 'suggest', 'run', 'require'], default='suggest',
                            help='With --train-e2e: suggest/run/require staged CK-vs-PyTorch parity regimen')
+    run_parser.add_argument('--parity-regimen-profile', choices=['default', 'strict', 'extended'], default='default',
+                           help='With --train-e2e: regimen surface to use when invoking run_training_parity_regimen_v7.py')
     run_parser.add_argument('--train-epochs', type=int, default=3,
                            help='Epochs for --train-e2e (default: 3)')
     run_parser.add_argument('--train-seq-len', type=int, default=16,
