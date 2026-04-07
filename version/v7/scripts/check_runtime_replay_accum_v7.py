@@ -48,6 +48,62 @@ def _bool(v: object) -> bool:
     return bool(v)
 
 
+def _evaluate(report: dict, *, replay_tol: float, state_tol: float) -> dict:
+    oracle = report.get("oracle", {}) if isinstance(report, dict) else {}
+    replay_failures = oracle.get("replay_failures", []) if isinstance(oracle, dict) else []
+    parity_steps = report.get("parity_steps", []) if isinstance(report, dict) else []
+
+    checked_steps = [row for row in parity_steps if isinstance(row, dict) and _bool(row.get("checked"))]
+    checked_with_replay = [row for row in checked_steps if row.get("replay_diff") is not None]
+    checked_with_accum = [
+        row
+        for row in checked_with_replay
+        if row.get("replay_accum_snapshot_max_abs_diff") is not None
+    ]
+
+    max_replay_diff = max((float(row.get("replay_diff", 0.0) or 0.0) for row in checked_with_replay), default=0.0)
+    max_accum_diff = max((float(row.get("replay_accum_snapshot_max_abs_diff", 0.0) or 0.0) for row in checked_with_accum), default=0.0)
+
+    passed = True
+    if not _bool(oracle.get("replay_on_check", False)):
+        passed = False
+    if not _bool(oracle.get("accum_snapshot_api_available", False)):
+        passed = False
+    if not _bool(oracle.get("replay_accum_snapshot_api_available", False)):
+        passed = False
+    if len(replay_failures) > 0:
+        passed = False
+    if len(checked_with_replay) == 0:
+        passed = False
+    if len(checked_with_accum) == 0:
+        passed = False
+    if max_replay_diff > float(replay_tol):
+        passed = False
+    if max_accum_diff > float(state_tol):
+        passed = False
+
+    return {
+        "passed": bool(passed),
+        "checks": {
+            "pass_parity": bool(report.get("pass_parity", False)),
+            "pass_parity_gate_applied": {
+                "passed": True,
+                "required": False,
+                "raw_pass_parity": bool(report.get("pass_parity", False)),
+            },
+            "replay_on_check": bool(oracle.get("replay_on_check", False)),
+            "accum_snapshot_api_available": bool(oracle.get("accum_snapshot_api_available", False)),
+            "replay_accum_snapshot_api_available": bool(oracle.get("replay_accum_snapshot_api_available", False)),
+            "replay_failures_count": int(len(replay_failures)),
+            "checked_steps": int(len(checked_steps)),
+            "checked_steps_with_replay": int(len(checked_with_replay)),
+            "checked_steps_with_accum_snapshot": int(len(checked_with_accum)),
+            "max_replay_loss_abs_diff": float(max_replay_diff),
+            "max_replay_accum_snapshot_abs_diff": float(max_accum_diff),
+        },
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Runtime replay parity check for grad_accum>1 (including accum snapshots).")
     ap.add_argument("--epochs", type=int, default=1)
@@ -60,6 +116,10 @@ def main() -> int:
     ap.add_argument("--d-model", type=int, default=64)
     ap.add_argument("--hidden", type=int, default=128)
     ap.add_argument("--layers", type=int, default=1)
+    ap.add_argument("--template", type=str, default="qwen3",
+                    help="Training graph template for the temp runtime run (default: qwen3)")
+    ap.add_argument("--template-file", type=Path, default=None,
+                    help="Optional custom template JSON path paired with --template")
     ap.add_argument("--prompt", type=str, default="Hello!")
     ap.add_argument("--parity-every", type=int, default=1)
     ap.add_argument("--replay-tol", type=float, default=1e-7)
@@ -97,7 +157,11 @@ def main() -> int:
             str(args.hidden),
             "--context-len",
             str(args.seq_len),
+            "--template",
+            str(args.template),
         ]
+        if args.template_file is not None:
+            init_cmd.extend(["--template-file", str(args.template_file)])
         init_rc, init_out = _run(init_cmd)
         if init_rc != 0:
             print(init_out, file=sys.stderr)
@@ -160,55 +224,12 @@ def main() -> int:
 
         report = json.loads(out_json.read_text(encoding="utf-8"))
 
-    oracle = report.get("oracle", {}) if isinstance(report, dict) else {}
-    replay_failures = oracle.get("replay_failures", []) if isinstance(oracle, dict) else []
-    parity_steps = report.get("parity_steps", []) if isinstance(report, dict) else []
-
-    checked_steps = [row for row in parity_steps if isinstance(row, dict) and _bool(row.get("checked"))]
-    checked_with_replay = [row for row in checked_steps if row.get("replay_diff") is not None]
-    checked_with_accum = [
-        row
-        for row in checked_with_replay
-        if row.get("replay_accum_snapshot_max_abs_diff") is not None
-    ]
-
-    max_replay_diff = max((float(row.get("replay_diff", 0.0) or 0.0) for row in checked_with_replay), default=0.0)
-    max_accum_diff = max((float(row.get("replay_accum_snapshot_max_abs_diff", 0.0) or 0.0) for row in checked_with_accum), default=0.0)
-
-    passed = True
-    if not _bool(report.get("pass_parity", False)):
-        passed = False
-    if not _bool(oracle.get("replay_on_check", False)):
-        passed = False
-    if not _bool(oracle.get("accum_snapshot_api_available", False)):
-        passed = False
-    if not _bool(oracle.get("replay_accum_snapshot_api_available", False)):
-        passed = False
-    if len(replay_failures) > 0:
-        passed = False
-    if len(checked_with_replay) == 0:
-        passed = False
-    if len(checked_with_accum) == 0:
-        passed = False
-    if max_replay_diff > float(args.replay_tol):
-        passed = False
-    if max_accum_diff > float(args.state_tol):
-        passed = False
+    eval_out = _evaluate(report, replay_tol=float(args.replay_tol), state_tol=float(args.state_tol))
+    passed = bool(eval_out["passed"])
 
     payload = {
         "passed": bool(passed),
-        "checks": {
-            "pass_parity": bool(report.get("pass_parity", False)),
-            "replay_on_check": bool(oracle.get("replay_on_check", False)),
-            "accum_snapshot_api_available": bool(oracle.get("accum_snapshot_api_available", False)),
-            "replay_accum_snapshot_api_available": bool(oracle.get("replay_accum_snapshot_api_available", False)),
-            "replay_failures_count": int(len(replay_failures)),
-            "checked_steps": int(len(checked_steps)),
-            "checked_steps_with_replay": int(len(checked_with_replay)),
-            "checked_steps_with_accum_snapshot": int(len(checked_with_accum)),
-            "max_replay_loss_abs_diff": float(max_replay_diff),
-            "max_replay_accum_snapshot_abs_diff": float(max_accum_diff),
-        },
+        "checks": eval_out["checks"],
         "thresholds": {
             "replay_tol": float(args.replay_tol),
             "state_tol": float(args.state_tol),
@@ -224,6 +245,8 @@ def main() -> int:
             "d_model": int(args.d_model),
             "hidden": int(args.hidden),
             "layers": int(args.layers),
+            "template": str(args.template),
+            "template_file": str(args.template_file) if args.template_file is not None else None,
             "prompt": str(args.prompt),
             "parity_every": int(args.parity_every),
         },
@@ -233,6 +256,14 @@ def main() -> int:
     print("=" * 88)
     print("v7 RUNTIME REPLAY ACCUM CHECK")
     print("=" * 88)
+    print(
+        "- pass_parity_gate_applied: %s (required=%s raw=%s)"
+        % (
+            payload["checks"]["pass_parity_gate_applied"].get("passed"),
+            payload["checks"]["pass_parity_gate_applied"].get("required"),
+            payload["checks"]["pass_parity_gate_applied"].get("raw_pass_parity"),
+        )
+    )
     print(f"- replay_failures_count: {payload['checks']['replay_failures_count']}")
     print(f"- checked_steps_with_replay: {payload['checks']['checked_steps_with_replay']}")
     print(f"- checked_steps_with_accum_snapshot: {payload['checks']['checked_steps_with_accum_snapshot']}")

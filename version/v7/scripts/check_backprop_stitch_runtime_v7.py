@@ -106,9 +106,13 @@ def _run_smoke(args: argparse.Namespace, run_dir: Path, report_out: Path) -> Dic
         str(args.init_kv_heads),
         "--context-len",
         str(args.seq_len),
+        "--template",
+        str(args.template),
         "--init",
         str(args.init_method),
     ]
+    if args.template_file is not None:
+        init_cmd.extend(["--template-file", str(args.template_file)])
     init_rc, init_out = _run(init_cmd)
     if init_rc != 0:
         raise RuntimeError(f"ck_run_v7.py init failed\n{init_out}")
@@ -316,8 +320,15 @@ def _evaluate(
         },
     }
 
+    pass_parity_gate = bool(checks["pass_parity"]) if require_all_checked_clean else True
+    checks["pass_parity_gate_applied"] = {
+        "passed": bool(pass_parity_gate),
+        "required": bool(require_all_checked_clean),
+        "raw_pass_parity": bool(checks["pass_parity"]),
+    }
+
     passed = (
-        bool(checks["pass_parity"])
+        bool(pass_parity_gate)
         and bool(checks["manifest_dim_wiring"]["passed"])
         and bool(checks["conflicting_request_detected"]["passed"])
         and bool(checks["first_checked_parity_step"]["passed"])
@@ -354,6 +365,10 @@ def main() -> int:
     ap.add_argument("--init-hidden", type=int, default=64)
     ap.add_argument("--init-heads", type=int, default=4)
     ap.add_argument("--init-kv-heads", type=int, default=2)
+    ap.add_argument("--template", type=str, default="qwen3",
+                    help="Training graph template for the temp runtime run (default: qwen3)")
+    ap.add_argument("--template-file", type=Path, default=None,
+                    help="Optional custom template JSON path paired with --template")
 
     ap.add_argument("--train-vocabulary-request", type=int, default=256)
     ap.add_argument("--train-d-model-request", type=int, default=64)
@@ -413,6 +428,8 @@ def main() -> int:
             "prompt": str(args.prompt),
             "parity_every": int(args.parity_every),
             "init": {
+                "template": str(args.template),
+                "template_file": str(args.template_file) if args.template_file is not None else None,
                 "layers": int(args.init_layers),
                 "vocab": int(args.init_vocab),
                 "d_model": int(args.init_d_model),
@@ -443,6 +460,14 @@ def main() -> int:
     print("=" * 96)
     print(f"- passed: {payload['passed']}")
     print(f"- pass_parity: {payload['checks']['pass_parity']}")
+    print(
+        "- pass_parity_gate_applied: %s (required=%s raw=%s)"
+        % (
+            payload["checks"]["pass_parity_gate_applied"].get("passed"),
+            payload["checks"]["pass_parity_gate_applied"].get("required"),
+            payload["checks"]["pass_parity_gate_applied"].get("raw_pass_parity"),
+        )
+    )
     wiring = payload["checks"]["manifest_dim_wiring"]
     print(f"- manifest_dim_wiring: {wiring['passed']} source={wiring.get('source')}")
     first = payload["checks"]["first_checked_parity_step"]

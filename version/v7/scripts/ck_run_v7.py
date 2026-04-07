@@ -52,6 +52,11 @@ KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
 V7_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v7.txt"
 LLAMA_HELPER_SRC = SCRIPTS_DIR / "parity" / "llama_token_replay.cpp"
 LLAMA_HELPER_BIN = Path("/tmp/ckv7_llama_token_replay")
+CHECK_MEMORY_HEADROOM = SCRIPTS_DIR / "check_memory_headroom_v7.py"
+
+DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_GB = 6.0
+DEFAULT_TRAIN_EXTENDED_MEMORY_MIN_AVAILABLE_GB = 8.0
+DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_RATIO = 0.20
 
 def _get_cache_dir() -> Path:
     """Pick the canonical writable cache dir for all generated v7 artifacts."""
@@ -431,6 +436,49 @@ def _print_v7_next_steps(command: Optional[str], exc: Optional[BaseException] = 
     print("  make v7-doctor", file=sys.stderr)
     if command == "run":
         print("  version/v7/scripts/cks-v7-run run <model-or-run-dir> [...]", file=sys.stderr)
+
+
+def _train_memory_headroom_config(args: argparse.Namespace) -> dict[str, float | bool]:
+    enabled = bool(getattr(args, "train_memory_check", True))
+    min_available_raw = getattr(args, "train_memory_min_available_gb", DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_GB)
+    extended_min_available_raw = getattr(
+        args,
+        "train_extended_memory_min_available_gb",
+        DEFAULT_TRAIN_EXTENDED_MEMORY_MIN_AVAILABLE_GB,
+    )
+    min_available_ratio_raw = getattr(
+        args,
+        "train_memory_min_available_ratio",
+        DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_RATIO,
+    )
+    min_available_gb = float(
+        DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_GB if min_available_raw is None else min_available_raw
+    )
+    extended_min_available_gb = float(
+        DEFAULT_TRAIN_EXTENDED_MEMORY_MIN_AVAILABLE_GB
+        if extended_min_available_raw is None
+        else extended_min_available_raw
+    )
+    min_available_ratio = float(
+        DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_RATIO
+        if min_available_ratio_raw is None
+        else min_available_ratio_raw
+    )
+    if min_available_gb < 0.0:
+        log_error("--train-memory-min-available-gb must be >= 0")
+        sys.exit(2)
+    if extended_min_available_gb < 0.0:
+        log_error("--train-extended-memory-min-available-gb must be >= 0")
+        sys.exit(2)
+    if not 0.0 <= min_available_ratio <= 1.0:
+        log_error("--train-memory-min-available-ratio must be in [0, 1]")
+        sys.exit(2)
+    return {
+        "enabled": enabled,
+        "min_available_gb": min_available_gb,
+        "extended_min_available_gb": extended_min_available_gb,
+        "min_available_ratio": min_available_ratio,
+    }
 
 
 def run_cmd(cmd: list, cwd: Path = None, capture: bool = False) -> subprocess.CompletedProcess:
@@ -7029,6 +7077,40 @@ def _run_train_strict_preflight(python_exec: str) -> None:
     run_cmd(cmd, cwd=PROJECT_ROOT)
 
 
+def _run_train_memory_preflight(
+    *,
+    python_exec: str,
+    run_dir: Optional[Path],
+    min_available_gb: float,
+    min_available_ratio: float,
+) -> Path:
+    """Gate training entry on live host memory headroom before heavy parity/runtime work."""
+    if not CHECK_MEMORY_HEADROOM.exists():
+        log_error(f"Strict preflight requested but script not found: {CHECK_MEMORY_HEADROOM}")
+        sys.exit(1)
+
+    out = (run_dir / "memory_headroom_train_latest.json") if run_dir is not None else (DEFAULT_REPORT_DIR / "memory_headroom_train_latest.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        python_exec,
+        str(CHECK_MEMORY_HEADROOM),
+        "--label",
+        "train_e2e",
+        "--min-available-gb",
+        str(float(min_available_gb)),
+        "--min-available-ratio",
+        str(float(min_available_ratio)),
+        "--json-out",
+        str(out),
+    ]
+    log("  train-strict preflight: check_memory_headroom_v7.py", C_DIM)
+    rc = run_cmd_allow_fail(cmd, cwd=PROJECT_ROOT).returncode
+    if rc != 0:
+        log_error(f"train-strict memory preflight failed: {out}")
+        sys.exit(1)
+    return out
+
+
 def _run_ck_profile_via_cli(
     *,
     args: argparse.Namespace,
@@ -7177,6 +7259,7 @@ def _maybe_run_training_parity_regimen(args: argparse.Namespace, *, run_dir: Opt
     regimen_md = run_dir / "training_parity_regimen_latest.md"
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
+    memory_cfg = _train_memory_headroom_config(args)
     cmd = [
         python_exec,
         str(regimen_script),
@@ -7186,7 +7269,15 @@ def _maybe_run_training_parity_regimen(args: argparse.Namespace, *, run_dir: Opt
         str(regimen_json),
         "--md-out",
         str(regimen_md),
+        "--memory-min-available-gb",
+        str(float(memory_cfg["min_available_gb"])),
+        "--extended-memory-min-available-gb",
+        str(float(memory_cfg["extended_min_available_gb"])),
+        "--memory-min-available-ratio",
+        str(float(memory_cfg["min_available_ratio"])),
     ]
+    if not bool(memory_cfg["enabled"]):
+        cmd.append("--no-memory-check")
 
     if mode == "suggest":
         if regimen_json.exists():
@@ -7261,9 +7352,17 @@ def step_run_train_e2e(args: argparse.Namespace) -> Path:
 
     parity_python = PROJECT_ROOT / ".venv" / "bin" / "python"
     python_exec = str(parity_python) if parity_python.exists() else sys.executable
+    train_memory_cfg = _train_memory_headroom_config(args)
 
     if bool(getattr(args, "train_strict", False)):
         _run_train_strict_preflight(python_exec)
+        if bool(train_memory_cfg["enabled"]):
+            _run_train_memory_preflight(
+                python_exec=python_exec,
+                run_dir=run_dir,
+                min_available_gb=float(train_memory_cfg["min_available_gb"]),
+                min_available_ratio=float(train_memory_cfg["min_available_ratio"]),
+            )
 
     train_dims = _resolve_train_dims_for_run(args, run_dir)
     train_vocab = int(train_dims["effective"]["vocab"])
@@ -10418,6 +10517,15 @@ Examples:
                         help='Enable strict training preflight checks before running training commands')
         sp.add_argument('--train-disable-diag-snapshot', action='store_true',
                         help='Disable strict memory-diagnostic weight snapshot malloc path in generated runtime')
+        sp.set_defaults(train_memory_check=True)
+        sp.add_argument('--no-train-memory-check', dest='train_memory_check', action='store_false',
+                        help='Skip live host memory headroom preflight for strict training/parity launches')
+        sp.add_argument('--train-memory-min-available-gb', type=float, default=DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_GB,
+                        help='Minimum live MemAvailable GiB floor before strict training launches')
+        sp.add_argument('--train-extended-memory-min-available-gb', type=float, default=DEFAULT_TRAIN_EXTENDED_MEMORY_MIN_AVAILABLE_GB,
+                        help='Minimum live MemAvailable GiB floor forwarded to extended parity regimen runs')
+        sp.add_argument('--train-memory-min-available-ratio', type=float, default=DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_RATIO,
+                        help='Minimum live MemAvailable / MemTotal ratio used in training memory preflight')
         sp.add_argument('--parity-on', action='store_true',
                         help='Enable scheduled oracle parity checks (metadata/config for training pipeline)')
         sp.add_argument('--kernel-strict-math', action='store_true',
@@ -10568,6 +10676,15 @@ Examples:
                            help='Enable strict training preflight checks before --train-e2e')
     run_parser.add_argument('--train-disable-diag-snapshot', action='store_true',
                            help='Disable strict memory-diagnostic weight snapshot malloc path in generated runtime')
+    run_parser.set_defaults(train_memory_check=True)
+    run_parser.add_argument('--no-train-memory-check', dest='train_memory_check', action='store_false',
+                           help='Skip live host memory headroom preflight for strict --train-e2e and parity launches')
+    run_parser.add_argument('--train-memory-min-available-gb', type=float, default=DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_GB,
+                           help='Minimum live MemAvailable GiB floor before strict --train-e2e launches')
+    run_parser.add_argument('--train-extended-memory-min-available-gb', type=float, default=DEFAULT_TRAIN_EXTENDED_MEMORY_MIN_AVAILABLE_GB,
+                           help='Minimum live MemAvailable GiB floor forwarded to extended parity regimen runs')
+    run_parser.add_argument('--train-memory-min-available-ratio', type=float, default=DEFAULT_TRAIN_MEMORY_MIN_AVAILABLE_RATIO,
+                           help='Minimum live MemAvailable / MemTotal ratio used in training memory preflight')
     run_parser.add_argument('--parity-on', action='store_true',
                            help='Enable scheduled oracle parity checks metadata for --train-e2e')
     run_parser.add_argument('--kernel-strict-math', action='store_true',

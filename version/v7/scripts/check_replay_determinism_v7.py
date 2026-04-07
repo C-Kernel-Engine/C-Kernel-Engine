@@ -66,6 +66,15 @@ def _run_once(args, json_out: Path) -> dict:
         "--json-out",
         str(json_out),
     ]
+    if args.weights_bump is not None and args.weights_manifest is not None:
+        cmd.extend(
+            [
+                "--weights-bump",
+                str(args.weights_bump),
+                "--weights-manifest",
+                str(args.weights_manifest),
+            ]
+        )
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     if proc.returncode != 0:
         raise RuntimeError("train_parity run failed:\n%s" % proc.stdout)
@@ -85,9 +94,23 @@ def main() -> int:
     parser.add_argument("--optimizer", type=str, default="adamw", choices=["adamw", "sgd"])
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--weights-bump", type=Path, default=None,
+                        help="Optional weights.bump used to family-scope the parity harness.")
+    parser.add_argument("--weights-manifest", type=Path, default=None,
+                        help="Optional weights_manifest.json paired with --weights-bump.")
     parser.add_argument("--tol", type=float, default=1e-12)
     parser.add_argument("--json-out", type=Path, default=None)
     args = parser.parse_args()
+
+    if (args.weights_bump is None) != (args.weights_manifest is None):
+        print("ERROR: --weights-bump and --weights-manifest must be provided together", file=sys.stderr)
+        return 2
+    if args.weights_bump is not None and not args.weights_bump.exists():
+        print(f"ERROR: weights.bump not found: {args.weights_bump}", file=sys.stderr)
+        return 2
+    if args.weights_manifest is not None and not args.weights_manifest.exists():
+        print(f"ERROR: weights_manifest.json not found: {args.weights_manifest}", file=sys.stderr)
+        return 2
 
     train_root = _default_train_root()
     train_root.mkdir(parents=True, exist_ok=True)
@@ -131,6 +154,8 @@ def main() -> int:
             "optimizer": args.optimizer,
             "lr": args.lr,
             "seed": args.seed,
+            "weights_bump": str(args.weights_bump) if args.weights_bump is not None else None,
+            "weights_manifest": str(args.weights_manifest) if args.weights_manifest is not None else None,
         },
     }
 

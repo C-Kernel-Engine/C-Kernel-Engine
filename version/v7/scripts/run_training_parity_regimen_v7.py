@@ -14,10 +14,15 @@ Plane K (kernel-isolation harness):
   - C*: stability sweeps
 
 Plane R (generated runtime correctness):
-  - D1: runtime stitch smoke (generated runtime via ck_run_v7.py --backend ck)
-  - D2: runtime stitch multi-step parity (grad_accum > 1 coverage)
-  - E1: replay determinism check
-  - F1: replay + grad-accum snapshot check
+  - D1: runtime stitch smoke (generated runtime via ck_run_v7.py --backend ck + Torch oracle)
+  - D2: runtime stitch multi-step parity (grad_accum > 1 coverage + Torch oracle)
+  - E1: parity-harness determinism check (not generated-runtime parity)
+  - F1: runtime replay + grad-accum snapshot check (+ Torch oracle)
+
+Extended Plane R+ (opt-in longer/broader generated-runtime coverage):
+  - G1: longer-horizon generated-runtime stitch parity
+  - H1: generated-runtime shape matrix (multiple seq/accum profiles)
+  - I1: longer-horizon replay + grad-accum snapshot parity
 
 Important interpretation:
   - A1 is intentionally a kernel-level isolation gate, not a full generated-runtime
@@ -25,8 +30,12 @@ Important interpretation:
   - A1 failures usually indicate math/path drift in isolated C-kernel parity
     execution (often approximation/order effects), and should be investigated
     before trusting downstream runtime behavior.
-  - D1/D2/E1/F1 are the generated-runtime stitch/replay checks that validate the
-    integrated runtime path.
+  - D1/D2/F1 validate the integrated generated-runtime path with sampled Torch
+    parity checks.
+  - E1 is intentionally narrower: it is a determinism sentinel for the parity
+    harness, not a generated-runtime signoff by itself.
+  - G1/H1/I1 are disabled by default for legacy callers and can be enabled with
+    --extended-checks when operators want broader horizon/shape signoff.
   - A1/A2 default to short-horizon optimizer settings so this gate captures
     kernel-path parity drift, not AdamW first-step sign sensitivity on tiny
     gradient deltas.
@@ -54,6 +63,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -64,6 +74,18 @@ TRAIN_PARITY = SCRIPT_DIR / "train_parity_epochs_v7.py"
 CHECK_REPLAY = SCRIPT_DIR / "check_replay_determinism_v7.py"
 CHECK_STITCH = SCRIPT_DIR / "check_backprop_stitch_runtime_v7.py"
 CHECK_REPLAY_ACCUM = SCRIPT_DIR / "check_runtime_replay_accum_v7.py"
+CHECK_MEMORY_HEADROOM = SCRIPT_DIR / "check_memory_headroom_v7.py"
+CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
+
+FAMILY_TEMPLATE_ALIASES: Dict[str, str] = {
+    "qwen2": "qwen2",
+    "qwen3": "qwen3",
+    "qwen35": "qwen35",
+    "gemma": "gemma3",
+    "gemma3": "gemma3",
+    "nanbeige": "nanbeige",
+    "llama": "llama",
+}
 
 
 def _default_report_dir() -> Path:
@@ -84,6 +106,18 @@ def _default_report_dir() -> Path:
 
 
 DEFAULT_REPORT_DIR = _default_report_dir()
+
+
+def _default_train_root() -> Path:
+    env = os.environ.get("CK_CACHE_DIR")
+    if env:
+        base = Path(env).expanduser()
+        if base.name == "train":
+            return base
+        if base.name == "models":
+            return base / "train"
+        return base / "models" / "train"
+    return Path.home() / ".cache" / "ck-engine-v7" / "models" / "train"
 
 # Strict sentinel tolerance for A4 (AdamW toy-model regression gate).
 # This is intentionally NOT derived from --param-tol so it stays fixed regardless of
@@ -163,6 +197,106 @@ def _python_has_torch(python_exec: str) -> bool:
     cmd = [python_exec, "-c", "import torch; print(torch.__version__)"]
     rc = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).returncode
     return rc == 0
+
+
+def _resolve_template_name(
+    family: Optional[str],
+    template: Optional[str],
+) -> Optional[str]:
+    explicit = str(template or "").strip().lower()
+    if explicit:
+        return FAMILY_TEMPLATE_ALIASES.get(explicit, explicit)
+    fam = str(family or "").strip().lower()
+    if fam:
+        return FAMILY_TEMPLATE_ALIASES.get(fam, fam)
+    return None
+
+
+def _template_path(template_name: Optional[str]) -> Optional[Path]:
+    text = str(template_name or "").strip()
+    if not text:
+        return None
+    path = ROOT / "version" / "v7" / "templates" / f"{text}.json"
+    return path if path.exists() else None
+
+
+def _template_doc(template_name: Optional[str]) -> Dict[str, Any]:
+    path = _template_path(template_name)
+    if path is None:
+        return {}
+    try:
+        doc = _json_load(path)
+    except Exception:
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _template_attention_variant(template_name: Optional[str]) -> str:
+    doc = _template_doc(template_name)
+    contract = doc.get("contract") if isinstance(doc.get("contract"), dict) else {}
+    attention = contract.get("attention_contract") if isinstance(contract.get("attention_contract"), dict) else {}
+    block = contract.get("block_contract") if isinstance(contract.get("block_contract"), dict) else {}
+    return str(attention.get("attn_variant") or block.get("body_type") or "").strip().lower()
+
+
+def _template_from_manifest(weights_manifest: Optional[Path]) -> Optional[str]:
+    if weights_manifest is None or not weights_manifest.exists():
+        return None
+    try:
+        doc = _json_load(weights_manifest)
+    except Exception:
+        return None
+    template_doc = doc.get("template") if isinstance(doc.get("template"), dict) else {}
+    template_name = str(template_doc.get("name", "") or "").strip().lower()
+    if template_name:
+        return FAMILY_TEMPLATE_ALIASES.get(template_name, template_name)
+    cfg = doc.get("config") if isinstance(doc.get("config"), dict) else {}
+    model_name = str(cfg.get("model", "") or "").strip().lower()
+    if model_name:
+        return FAMILY_TEMPLATE_ALIASES.get(model_name, model_name)
+    return None
+
+
+def _config_signature(
+    args: argparse.Namespace,
+    *,
+    resolved_template: Optional[str],
+    use_run_weights: bool,
+    runtime_gate_profile: Optional[Dict[str, Any]] = None,
+    extended_runtime_gate_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    return {
+        "family": str(getattr(args, "family", None) or ""),
+        "template": str(resolved_template or ""),
+        "seed": int(args.seed),
+        "seq_len": int(args.seq_len),
+        "vocab": int(args.vocab),
+        "d_model": int(args.d_model),
+        "hidden": int(args.hidden),
+        "num_layers": int(args.num_layers),
+        "init_heads": int(args.init_heads),
+        "init_kv_heads": int(args.init_kv_heads),
+        "lr": float(args.lr),
+        "loss_tol": float(args.loss_tol),
+        "param_tol": float(args.param_tol),
+        "forward_epochs": int(args.forward_epochs),
+        "d1_grad_accum": int(args.d1_grad_accum),
+        "d2_epochs": int(args.d2_epochs),
+        "d2_grad_accum": int(args.d2_grad_accum),
+        "d2_steps_per_epoch": int(args.d2_steps_per_epoch),
+        "extended_checks": bool(getattr(args, "extended_checks", False)),
+        "memory_check": bool(getattr(args, "memory_check", True)),
+        "memory_min_available_gb": float(getattr(args, "memory_min_available_gb", 6.0)),
+        "extended_memory_min_available_gb": float(getattr(args, "extended_memory_min_available_gb", 8.0)),
+        "memory_min_available_ratio": float(getattr(args, "memory_min_available_ratio", 0.20)),
+        "grad_accum_sweep": list(_parse_accum_list(args.grad_accum_sweep)),
+        "stability_grid": list(_parse_grid(args.stability_grid)),
+        "runtime_checks": bool(args.runtime_checks),
+        "backend_xray": bool(args.backend_xray),
+        "use_run_weights": bool(use_run_weights),
+        "runtime_gate_profile": dict(runtime_gate_profile or {}),
+        "extended_runtime_gate_profile": dict(extended_runtime_gate_profile or {}),
+    }
 
 
 def _build_fingerprint(run_dir: Optional[Path]) -> Dict[str, Any]:
@@ -284,6 +418,134 @@ def _parse_accum_list(spec: str) -> List[int]:
     if not vals:
         raise ValueError("Grad-accum sweep is empty")
     return vals
+
+
+def _runtime_gate_profile(args: argparse.Namespace, *, resolved_template: Optional[str]) -> Dict[str, Any]:
+    base_seq_len = int(args.seq_len)
+    profile: Dict[str, Any] = {
+        "template": str(resolved_template or ""),
+        "attention_variant": _template_attention_variant(resolved_template),
+        "d1_seq_len": int(base_seq_len),
+        "d1_total_tokens": int(max(base_seq_len + 1, base_seq_len * max(1, int(args.d1_grad_accum)))),
+        "d2_seq_len": int(base_seq_len),
+        "d2_total_tokens": int(
+            max(
+                base_seq_len + 1,
+                base_seq_len * max(1, int(args.d2_grad_accum)) * max(1, int(args.d2_steps_per_epoch)),
+            )
+        ),
+        "e1_seq_len": int(base_seq_len),
+        "e1_total_tokens": int(max(1024, base_seq_len * 64)),
+        "f1_seq_len": int(base_seq_len),
+        "f1_total_tokens": int(max(72, base_seq_len * 9)),
+        "notes": [],
+    }
+    if profile["attention_variant"] == "hybrid_recurrent_attention":
+        profile["d1_seq_len"] = 1
+        profile["d1_total_tokens"] = int(max(2, max(1, int(args.d1_grad_accum))))
+        profile["d2_seq_len"] = 1
+        profile["d2_total_tokens"] = int(max(2, max(1, int(args.d2_grad_accum)) * max(1, int(args.d2_steps_per_epoch))))
+        profile["f1_seq_len"] = 1
+        profile["f1_total_tokens"] = 16
+        profile["notes"].append(
+            "Hybrid recurrent families use single-token generated-runtime parity in v7 "
+            "until sequence-mode recurrent state-history parity is implemented."
+        )
+    return profile
+
+
+def _extended_runtime_gate_profile(
+    args: argparse.Namespace,
+    *,
+    runtime_gate_profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    attention_variant = str(runtime_gate_profile.get("attention_variant") or "").strip().lower()
+    dense_seq = int(runtime_gate_profile.get("d2_seq_len", args.seq_len) or args.seq_len)
+    replay_seq = int(runtime_gate_profile.get("f1_seq_len", args.seq_len) or args.seq_len)
+    long_grad_accum = max(4, int(args.d2_grad_accum))
+    long_steps_per_epoch = max(8, int(args.d2_steps_per_epoch) * 3)
+    replay_grad_accum = max(8, int(args.d2_grad_accum))
+    replay_steps_per_epoch = max(8, int(args.d2_steps_per_epoch) * 2)
+    profile: Dict[str, Any] = {
+        "g1": {
+            "epochs": max(2, int(args.d2_epochs)),
+            "seq_len": int(dense_seq),
+            "grad_accum": int(long_grad_accum),
+            "steps_per_epoch": int(long_steps_per_epoch),
+            "total_tokens": int(max(int(dense_seq) + 1, int(dense_seq) * int(long_grad_accum) * int(long_steps_per_epoch) + 1)),
+        },
+        "h1_cases": [],
+        "i1": {
+            "epochs": 2,
+            "seq_len": int(replay_seq),
+            "grad_accum": int(replay_grad_accum),
+            "steps_per_epoch": int(replay_steps_per_epoch),
+            "parity_every": 2,
+            "total_tokens": int(max(int(replay_seq) + 1, int(replay_seq) * int(replay_grad_accum) * int(replay_steps_per_epoch) + 1)),
+        },
+        "notes": [],
+    }
+    if attention_variant == "hybrid_recurrent_attention":
+        profile["h1_cases"] = [
+            {
+                "id": "single_token_g1",
+                "seq_len": 1,
+                "grad_accum": 1,
+                "steps_per_epoch": 6,
+                "epochs": 1,
+                "total_tokens": 8,
+            },
+            {
+                "id": "single_token_g4",
+                "seq_len": 1,
+                "grad_accum": 4,
+                "steps_per_epoch": 6,
+                "epochs": 1,
+                "total_tokens": 25,
+            },
+            {
+                "id": "single_token_g8",
+                "seq_len": 1,
+                "grad_accum": 8,
+                "steps_per_epoch": 8,
+                "epochs": 1,
+                "total_tokens": 65,
+            },
+        ]
+        profile["notes"].append(
+            "Hybrid recurrent families keep generated-runtime shape coverage on single-token sequence mode in v7; "
+            "H1 varies accumulation windows and optimizer-step budget instead of sequence length."
+        )
+    else:
+        short_seq = max(4, dense_seq // 2) if dense_seq > 4 else dense_seq
+        wide_seq = max(dense_seq, min(dense_seq * 2, 64))
+        profile["h1_cases"] = [
+            {
+                "id": f"seq{short_seq}_g1",
+                "seq_len": int(short_seq),
+                "grad_accum": 1,
+                "steps_per_epoch": 6,
+                "epochs": 1,
+                "total_tokens": int(max(int(short_seq) + 1, int(short_seq) * 6 + 1)),
+            },
+            {
+                "id": f"seq{dense_seq}_g2",
+                "seq_len": int(dense_seq),
+                "grad_accum": 2,
+                "steps_per_epoch": 6,
+                "epochs": 1,
+                "total_tokens": int(max(int(dense_seq) + 1, int(dense_seq) * 2 * 6 + 1)),
+            },
+            {
+                "id": f"seq{wide_seq}_g4",
+                "seq_len": int(wide_seq),
+                "grad_accum": 4,
+                "steps_per_epoch": 4,
+                "epochs": 1,
+                "total_tokens": int(max(int(wide_seq) + 1, int(wide_seq) * 4 * 4 + 1)),
+            },
+        ]
+    return profile
 
 
 def _loss_param_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -471,6 +733,11 @@ def _render_markdown(payload: Dict[str, Any]) -> str:
         metrics = s.get("metrics") if isinstance(s.get("metrics"), dict) else {}
         metric_parts: List[str] = []
         for k in (
+            "available_gb",
+            "effective_min_available_gb",
+            "available_ratio",
+            "min_available_ratio",
+            "swap_used_gb",
             "optimizer_steps",
             "max_loss_abs_diff",
             "final_param_max_abs_diff",
@@ -506,6 +773,7 @@ def _maybe_skip_unchanged(
     *,
     force: bool,
     skip_if_unchanged: bool,
+    config_signature: Dict[str, Any],
 ) -> Tuple[bool, Optional[Dict[str, Any]]]:
     if force or (not skip_if_unchanged):
         return False, None
@@ -517,14 +785,17 @@ def _maybe_skip_unchanged(
         return False, None
     prev_fp = prev.get("fingerprint") if isinstance(prev.get("fingerprint"), dict) else {}
     prev_sum = prev.get("summary") if isinstance(prev.get("summary"), dict) else {}
+    prev_sig = prev.get("config_signature") if isinstance(prev.get("config_signature"), dict) else {}
     prev_passed = bool(prev_sum.get("passed", False))
     same_fp = str(prev_fp.get("digest", "")) == str(fingerprint.get("digest", ""))
-    if prev_passed and same_fp:
+    same_sig = prev_sig == config_signature
+    if prev_passed and same_fp and same_sig:
         out = {
             "generated_at": _utc_now_iso(),
             "skipped": True,
             "skip_reason": "unchanged_runtime_codegen_fingerprint",
             "fingerprint": fingerprint,
+            "config_signature": config_signature,
             "summary": {
                 "passed": True,
                 "skipped": True,
@@ -551,15 +822,41 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--no-stop-on-fail", dest="stop_on_fail", action="store_false", help="Continue remaining stages even after a failure.")
     ap.set_defaults(runtime_checks=True)
     ap.add_argument("--no-runtime-checks", dest="runtime_checks", action="store_false", help="Skip runtime replay/stitch checks.")
+    ap.set_defaults(extended_checks=False)
+    ap.add_argument("--extended-checks", action="store_true", help="Enable longer-horizon/broader generated-runtime G/H/I checks.")
+    ap.set_defaults(memory_check=True)
+    ap.add_argument("--no-memory-check", dest="memory_check", action="store_false",
+                    help="Skip live host memory headroom preflight before heavy parity stages.")
+    ap.add_argument("--memory-min-available-gb", type=float, default=6.0,
+                    help="Minimum live MemAvailable GiB floor for standard parity stages.")
+    ap.add_argument("--extended-memory-min-available-gb", type=float, default=8.0,
+                    help="Minimum live MemAvailable GiB floor when --extended-checks is enabled.")
+    ap.add_argument("--memory-min-available-ratio", type=float, default=0.20,
+                    help="Minimum live MemAvailable / MemTotal ratio used in the effective memory floor.")
     ap.set_defaults(backend_xray=True)
     ap.add_argument("--no-backend-xray", dest="backend_xray", action="store_false", help="Skip backend-isolation xray report generation.")
 
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument(
+        "--family",
+        type=str,
+        default=None,
+        choices=sorted(FAMILY_TEMPLATE_ALIASES.keys()),
+        help="Family alias for family-scoped parity runs (qwen2/qwen3/qwen35/gemma/nanbeige/llama).",
+    )
+    ap.add_argument(
+        "--template",
+        type=str,
+        default=None,
+        help="Explicit training template override. Built-ins include qwen2, qwen3, qwen35, gemma3, llama.",
+    )
     ap.add_argument("--seq-len", type=int, default=16)
     ap.add_argument("--vocab", type=int, default=256)
     ap.add_argument("--d-model", type=int, default=64)
     ap.add_argument("--hidden", type=int, default=128)
     ap.add_argument("--num-layers", type=int, default=1)
+    ap.add_argument("--init-heads", type=int, default=8, help="Head count for family-scoped temp init runs.")
+    ap.add_argument("--init-kv-heads", type=int, default=4, help="KV head count for family-scoped temp init runs.")
     ap.add_argument("--lr", type=float, default=1e-3)
     # A1/A2 fix:
     # AdamW can amplify tiny CK-vs-Torch gradient deltas into large first-step
@@ -630,6 +927,18 @@ def main() -> int:
     if int(args.a2_max_steps) < 1:
         print("ERROR: --a2-max-steps must be >= 1", file=sys.stderr)
         return 2
+    if int(args.init_heads) < 1:
+        print("ERROR: --init-heads must be >= 1", file=sys.stderr)
+        return 2
+    if int(args.init_kv_heads) < 1:
+        print("ERROR: --init-kv-heads must be >= 1", file=sys.stderr)
+        return 2
+    if int(args.init_heads) % int(args.init_kv_heads) != 0:
+        print("ERROR: --init-heads must be divisible by --init-kv-heads", file=sys.stderr)
+        return 2
+    if int(args.d_model) % int(args.init_heads) != 0:
+        print("ERROR: --d-model must be divisible by --init-heads", file=sys.stderr)
+        return 2
     if int(args.d1_grad_accum) < 1:
         print("ERROR: --d1-grad-accum must be >= 1", file=sys.stderr)
         return 2
@@ -642,6 +951,15 @@ def main() -> int:
     if int(args.d2_steps_per_epoch) < 1:
         print("ERROR: --d2-steps-per-epoch must be >= 1", file=sys.stderr)
         return 2
+    if float(args.memory_min_available_gb) < 0.0:
+        print("ERROR: --memory-min-available-gb must be >= 0", file=sys.stderr)
+        return 2
+    if float(args.extended_memory_min_available_gb) < 0.0:
+        print("ERROR: --extended-memory-min-available-gb must be >= 0", file=sys.stderr)
+        return 2
+    if not 0.0 <= float(args.memory_min_available_ratio) <= 1.0:
+        print("ERROR: --memory-min-available-ratio must be in [0, 1]", file=sys.stderr)
+        return 2
     if args.a1_lr is not None and float(args.a1_lr) <= 0.0:
         print("ERROR: --a1-lr must be > 0 when set", file=sys.stderr)
         return 2
@@ -650,12 +968,17 @@ def main() -> int:
     run_dir = args.run_dir.resolve() if args.run_dir is not None else None
     run_bump = (run_dir / "weights.bump") if run_dir is not None else None
     run_manifest = (run_dir / "weights_manifest.json") if run_dir is not None else None
+    resolved_template = _resolve_template_name(args.family, args.template)
+    if resolved_template is None:
+        resolved_template = _template_from_manifest(run_manifest)
     use_run_weights = bool(
         run_bump is not None
         and run_manifest is not None
         and run_bump.exists()
         and run_manifest.exists()
     )
+    runtime_gate_profile = _runtime_gate_profile(args, resolved_template=resolved_template)
+    extended_runtime_gate_profile = _extended_runtime_gate_profile(args, runtime_gate_profile=runtime_gate_profile)
 
     def _append_run_weights(cmd: List[str]) -> None:
         if not use_run_weights:
@@ -678,17 +1001,69 @@ def main() -> int:
         print("Hint: run via .venv/bin/python or install torch in the chosen environment.", file=sys.stderr)
         return 2
 
-    for req in (TRAIN_PARITY, CHECK_REPLAY, CHECK_STITCH, CHECK_REPLAY_ACCUM):
+    for req in (TRAIN_PARITY, CHECK_REPLAY, CHECK_STITCH, CHECK_REPLAY_ACCUM, CHECK_MEMORY_HEADROOM, CK_RUN):
         if not req.exists():
             print(f"ERROR: missing script: {req}", file=sys.stderr)
             return 2
 
+    temp_seed_dir: Optional[TemporaryDirectory[str]] = None
+    if run_dir is None and resolved_template is not None:
+        train_root = _default_train_root()
+        train_root.mkdir(parents=True, exist_ok=True)
+        temp_seed_dir = TemporaryDirectory(prefix="v7_regimen_seed_", dir=str(train_root))
+        run_dir = Path(temp_seed_dir.name) / "run"
+        run_bump = run_dir / "weights.bump"
+        run_manifest = run_dir / "weights_manifest.json"
+        seed_cmd = [
+            python_exec,
+            str(CK_RUN),
+            "init",
+            "--run",
+            str(run_dir),
+            "--allow-non-cache-run-dir",
+            "--train-seed",
+            str(args.seed),
+            "--layers",
+            str(args.num_layers),
+            "--vocab-size",
+            str(args.vocab),
+            "--embed-dim",
+            str(args.d_model),
+            "--hidden-dim",
+            str(args.hidden),
+            "--num-heads",
+            str(args.init_heads),
+            "--num-kv-heads",
+            str(args.init_kv_heads),
+            "--context-len",
+            str(args.seq_len),
+            "--template",
+            str(resolved_template),
+        ]
+        logs_dir_seed = args.logs_dir.resolve() if args.logs_dir is not None else (base_out_dir / "training_parity_regimen_logs")
+        rc_seed, _, seed_log = _run_stage_command("S0", "Family Seed Init", seed_cmd, None, logs_dir_seed)
+        if rc_seed != 0 or not run_bump.exists() or not run_manifest.exists():
+            print(f"ERROR: failed to initialize family seed run for template={resolved_template}", file=sys.stderr)
+            print(f"See log: {seed_log}", file=sys.stderr)
+            if temp_seed_dir is not None:
+                temp_seed_dir.cleanup()
+            return 1
+        use_run_weights = True
+
+    config_sig = _config_signature(
+        args,
+        resolved_template=resolved_template,
+        use_run_weights=use_run_weights,
+        runtime_gate_profile=runtime_gate_profile,
+        extended_runtime_gate_profile=extended_runtime_gate_profile,
+    )
     fp = _build_fingerprint(run_dir)
     should_skip, skip_payload = _maybe_skip_unchanged(
         json_out,
         fp,
         force=bool(args.force),
         skip_if_unchanged=bool(args.skip_if_unchanged),
+        config_signature=config_sig,
     )
     if should_skip and skip_payload is not None:
         _json_dump(json_out, skip_payload)
@@ -696,18 +1071,156 @@ def main() -> int:
         print(f"[skip] unchanged fingerprint; reused pass state from {json_out}")
         print(f"[skip] report={json_out}")
         print(f"[skip] table={md_out}")
+        if temp_seed_dir is not None:
+            temp_seed_dir.cleanup()
         return 0
 
     grad_accum_values = _parse_accum_list(args.grad_accum_sweep)
     stability_cases = _parse_grid(args.stability_grid)
     stages: List[StageResult] = []
     stop_due_to_failure = False
+    effective_memory_min_available_gb = float(args.memory_min_available_gb)
+    if bool(args.extended_checks):
+        effective_memory_min_available_gb = max(
+            effective_memory_min_available_gb,
+            float(args.extended_memory_min_available_gb),
+        )
 
     def _add_stage(stage: StageResult) -> None:
         nonlocal stop_due_to_failure
         stages.append(stage)
         if stage.status != "PASS" and args.stop_on_fail:
             stop_due_to_failure = True
+
+    def _write_report_and_return() -> int:
+        stage_dicts = [s.to_dict() for s in stages]
+        failed = [s.id for s in stages if s.status != "PASS"]
+        summary = {
+            "passed": len(failed) == 0 and len(stages) > 0,
+            "failed_stage_ids": failed,
+            "total_stages": len(stages),
+            "passed_stages": sum(1 for s in stages if s.status == "PASS"),
+            "runtime_checks_enabled": bool(args.runtime_checks),
+            "extended_checks_enabled": bool(args.extended_checks),
+        }
+
+        payload = {
+            "generated_at": _utc_now_iso(),
+            "skipped": False,
+            "fingerprint": fp,
+            "config_signature": config_sig,
+            "config": {
+                "run_dir": str(run_dir) if run_dir is not None else None,
+                "python_exec": str(python_exec),
+                "family": str(args.family or ""),
+                "template": str(resolved_template or ""),
+                "seed": int(args.seed),
+                "seq_len": int(args.seq_len),
+                "vocab": int(args.vocab),
+                "d_model": int(args.d_model),
+                "hidden": int(args.hidden),
+                "num_layers": int(args.num_layers),
+                "init_heads": int(args.init_heads),
+                "init_kv_heads": int(args.init_kv_heads),
+                "lr": float(args.lr),
+                "loss_tol": float(args.loss_tol),
+                "param_tol": float(args.param_tol),
+                "ck_loss_backend": str(args.ck_loss_backend),
+                "forward_epochs": int(args.forward_epochs),
+                "d1_grad_accum": int(args.d1_grad_accum),
+                "d2_epochs": int(args.d2_epochs),
+                "d2_grad_accum": int(args.d2_grad_accum),
+                "d2_steps_per_epoch": int(args.d2_steps_per_epoch),
+                "runtime_stitch_lr": float(min(float(args.lr), 5e-4)),
+                "grad_accum_sweep": grad_accum_values,
+                "sweep_epochs": int(args.sweep_epochs),
+                "sweep_steps_per_epoch": int(args.sweep_steps_per_epoch),
+                "stability_grid": [(e, g, s) for (e, g, s) in stability_cases],
+                "stop_on_fail": bool(args.stop_on_fail),
+                "runtime_checks": bool(args.runtime_checks),
+                "extended_checks": bool(args.extended_checks),
+                "memory_check": bool(args.memory_check),
+                "memory_min_available_gb": float(args.memory_min_available_gb),
+                "extended_memory_min_available_gb": float(args.extended_memory_min_available_gb),
+                "memory_min_available_ratio": float(args.memory_min_available_ratio),
+                "effective_memory_min_available_gb": float(effective_memory_min_available_gb),
+                "backend_xray": bool(args.backend_xray),
+                "use_run_weights": bool(use_run_weights),
+                "runtime_gate_profile": runtime_gate_profile,
+                "extended_runtime_gate_profile": extended_runtime_gate_profile,
+            },
+            "summary": summary,
+            "stages": stage_dicts,
+        }
+
+        _json_dump(json_out, payload)
+        md_out.parent.mkdir(parents=True, exist_ok=True)
+        md_out.write_text(_render_markdown(payload), encoding="utf-8")
+
+        print(f"[done] report={json_out}")
+        print(f"[done] table={md_out}")
+        if temp_seed_dir is not None:
+            temp_seed_dir.cleanup()
+        if summary["passed"]:
+            print("[result] TRAINING_PARITY_REGIMEN=PASS")
+            return 0
+        print("[result] TRAINING_PARITY_REGIMEN=FAIL")
+        return 1
+
+    if bool(args.memory_check):
+        memory_json = base_out_dir / "memory_headroom_parity_latest.json"
+        memory_cmd = [
+            python_exec,
+            str(CHECK_MEMORY_HEADROOM),
+            "--label",
+            "training_parity_regimen",
+            "--min-available-gb",
+            str(effective_memory_min_available_gb),
+            "--min-available-ratio",
+            str(float(args.memory_min_available_ratio)),
+            "--json-out",
+            str(memory_json),
+        ]
+        rc_mem, dt_mem, log_mem = _run_stage_command("M0", "Memory Headroom Preflight", memory_cmd, memory_json, logs_dir)
+        memory_metrics: Dict[str, Any] = {}
+        memory_notes: List[str] = []
+        memory_status = "FAIL"
+        if rc_mem != 0:
+            memory_notes.append("Live system memory headroom is below the configured parity floor.")
+        if memory_json.exists():
+            payload_mem = _json_load(memory_json)
+            memory_blob = payload_mem.get("memory") if isinstance(payload_mem.get("memory"), dict) else {}
+            thresholds_blob = payload_mem.get("thresholds") if isinstance(payload_mem.get("thresholds"), dict) else {}
+            memory_metrics = {
+                "available_gb": float(memory_blob.get("mem_available_gb", 0.0) or 0.0),
+                "effective_min_available_gb": float(thresholds_blob.get("effective_min_available_gb", 0.0) or 0.0),
+                "available_ratio": float(memory_blob.get("available_ratio", 0.0) or 0.0),
+                "min_available_ratio": float(thresholds_blob.get("min_available_ratio", 0.0) or 0.0),
+                "swap_used_gb": float(memory_blob.get("swap_used_gb", 0.0) or 0.0),
+            }
+            memory_status = "PASS" if bool(payload_mem.get("passed", False)) else "FAIL"
+            for reason in payload_mem.get("reasons", []) if isinstance(payload_mem.get("reasons"), list) else []:
+                memory_notes.append(str(reason))
+            for warning in payload_mem.get("warnings", []) if isinstance(payload_mem.get("warnings"), list) else []:
+                memory_notes.append(f"warning: {warning}")
+        else:
+            memory_notes.append("Command failed before JSON output.")
+        _add_stage(
+            StageResult(
+                id="M0",
+                name="Memory Headroom Preflight",
+                status=memory_status,
+                duration_s=dt_mem,
+                command=memory_cmd,
+                artifact_json=_rel(memory_json),
+                artifact_log=_rel(Path(log_mem)),
+                metrics=memory_metrics,
+                notes=memory_notes,
+                rc=rc_mem,
+            )
+        )
+        if memory_status != "PASS":
+            return _write_report_and_return()
 
     # Stage A: kernel-isolation canary on parity harness.
     # This stage is expected to catch C-kernel numeric drift early (before
@@ -1374,14 +1887,10 @@ def main() -> int:
     # These exercise ck_run_v7.py --backend ck and validate integrated runtime
     # correctness independent of harness-only kernel isolation signals.
     if (not stop_due_to_failure) and bool(args.runtime_checks):
-        d1_total_tokens = max(int(args.seq_len), int(args.seq_len) * max(1, int(args.d1_grad_accum)))
-        d2_total_tokens = max(
-            int(args.seq_len) + 1,
-            int(args.seq_len) * max(1, int(args.d2_grad_accum)) * max(1, int(args.d2_steps_per_epoch)),
-        )
         # Runtime stitch script uses AdamW with a safety guard around 1e-3.
         # Keep runtime gate in the safe region by default.
         runtime_ck_lr = min(float(args.lr), 5e-4)
+        runtime_notes = list(runtime_gate_profile.get("notes") or [])
         runtime_specs = [
             (
                 "D1",
@@ -1392,15 +1901,17 @@ def main() -> int:
                     "--epochs",
                     "1",
                     "--seq-len",
-                    str(args.seq_len),
+                    str(runtime_gate_profile["d1_seq_len"]),
                     "--total-tokens",
-                    str(d1_total_tokens),
+                    str(runtime_gate_profile["d1_total_tokens"]),
                     "--grad-accum",
                     str(args.d1_grad_accum),
                     "--lr",
                     str(runtime_ck_lr),
                     "--seed",
                     str(args.seed),
+                    "--template",
+                    str(resolved_template or "qwen3"),
                     "--no-require-all-checked-clean",
                     "--json-out",
                     str(base_out_dir / "backprop_stitch_runtime_latest.json"),
@@ -1416,15 +1927,17 @@ def main() -> int:
                     "--epochs",
                     str(args.d2_epochs),
                     "--seq-len",
-                    str(args.seq_len),
+                    str(runtime_gate_profile["d2_seq_len"]),
                     "--total-tokens",
-                    str(d2_total_tokens),
+                    str(runtime_gate_profile["d2_total_tokens"]),
                     "--grad-accum",
                     str(args.d2_grad_accum),
                     "--lr",
                     str(runtime_ck_lr),
                     "--seed",
                     str(args.seed),
+                    "--template",
+                    str(resolved_template or "qwen3"),
                     "--json-out",
                     str(base_out_dir / "backprop_stitch_runtime_multistep_latest.json"),
                 ],
@@ -1432,16 +1945,16 @@ def main() -> int:
             ),
             (
                 "E1",
-                "Replay Determinism Check",
+                "Parity Harness Determinism Check",
                 [
                     python_exec,
                     str(CHECK_REPLAY),
                     "--epochs",
                     "3",
                     "--seq-len",
-                    str(args.seq_len),
+                    str(runtime_gate_profile["e1_seq_len"]),
                     "--total-tokens",
-                    str(max(1024, int(args.seq_len) * 64)),
+                    str(runtime_gate_profile["e1_total_tokens"]),
                     "--vocab",
                     str(args.vocab),
                     "--d-model",
@@ -1470,9 +1983,9 @@ def main() -> int:
                     "--epochs",
                     "1",
                     "--seq-len",
-                    str(args.seq_len),
+                    str(runtime_gate_profile["f1_seq_len"]),
                     "--total-tokens",
-                    str(max(72, int(args.seq_len) * 9)),
+                    str(runtime_gate_profile["f1_total_tokens"]),
                     "--grad-accum",
                     "8",
                     "--vocab",
@@ -1487,12 +2000,16 @@ def main() -> int:
                     str(args.lr),
                     "--seed",
                     str(args.seed),
+                    "--template",
+                    str(resolved_template or "qwen3"),
                     "--json-out",
                     str(base_out_dir / "replay_accum_latest.json"),
                 ],
                 base_out_dir / "replay_accum_latest.json",
             ),
         ]
+        if use_run_weights and run_bump is not None and run_manifest is not None:
+            runtime_specs[2][2].extend(["--weights-bump", str(run_bump), "--weights-manifest", str(run_manifest)])
         for sid, sname, cmd, sj in runtime_specs:
             rc_r, dt_r, log_r = _run_stage_command(sid, sname, cmd, sj, logs_dir)
             metrics_r: Dict[str, Any] = {}
@@ -1510,6 +2027,7 @@ def main() -> int:
                     notes_r.append("Runtime check reported failure.")
             else:
                 notes_r.append("Command failed before JSON output.")
+            notes_r.extend(runtime_notes)
             _add_stage(
                 StageResult(
                     id=sid,
@@ -1527,63 +2045,228 @@ def main() -> int:
             if stop_due_to_failure:
                 break
 
-    stage_dicts = [s.to_dict() for s in stages]
-    failed = [s.id for s in stages if s.status != "PASS"]
-    summary = {
-        "passed": len(failed) == 0 and len(stages) > 0,
-        "failed_stage_ids": failed,
-        "total_stages": len(stages),
-        "passed_stages": sum(1 for s in stages if s.status == "PASS"),
-        "runtime_checks_enabled": bool(args.runtime_checks),
-    }
+        if (not stop_due_to_failure) and bool(args.extended_checks):
+            extended_notes = list(runtime_notes) + list(extended_runtime_gate_profile.get("notes") or [])
 
-    payload = {
-        "generated_at": _utc_now_iso(),
-        "skipped": False,
-        "fingerprint": fp,
-        "config": {
-            "run_dir": str(run_dir) if run_dir is not None else None,
-            "python_exec": str(python_exec),
-            "seed": int(args.seed),
-            "seq_len": int(args.seq_len),
-            "vocab": int(args.vocab),
-            "d_model": int(args.d_model),
-            "hidden": int(args.hidden),
-            "num_layers": int(args.num_layers),
-            "lr": float(args.lr),
-            "loss_tol": float(args.loss_tol),
-            "param_tol": float(args.param_tol),
-            "ck_loss_backend": str(args.ck_loss_backend),
-            "forward_epochs": int(args.forward_epochs),
-            "d1_grad_accum": int(args.d1_grad_accum),
-            "d2_epochs": int(args.d2_epochs),
-            "d2_grad_accum": int(args.d2_grad_accum),
-            "d2_steps_per_epoch": int(args.d2_steps_per_epoch),
-            "runtime_stitch_lr": float(min(float(args.lr), 5e-4)),
-            "grad_accum_sweep": grad_accum_values,
-            "sweep_epochs": int(args.sweep_epochs),
-            "sweep_steps_per_epoch": int(args.sweep_steps_per_epoch),
-            "stability_grid": [(e, g, s) for (e, g, s) in stability_cases],
-            "stop_on_fail": bool(args.stop_on_fail),
-            "runtime_checks": bool(args.runtime_checks),
-            "backend_xray": bool(args.backend_xray),
-            "use_run_weights": bool(use_run_weights),
-        },
-        "summary": summary,
-        "stages": stage_dicts,
-    }
+            g1_profile = extended_runtime_gate_profile.get("g1") if isinstance(extended_runtime_gate_profile.get("g1"), dict) else {}
+            g1_json = base_out_dir / "runtime_long_horizon_stitch_latest.json"
+            g1_cmd = [
+                python_exec,
+                str(CHECK_STITCH),
+                "--epochs",
+                str(int(g1_profile.get("epochs", 2) or 2)),
+                "--seq-len",
+                str(int(g1_profile.get("seq_len", runtime_gate_profile.get("d2_seq_len", args.seq_len)) or args.seq_len)),
+                "--total-tokens",
+                str(int(g1_profile.get("total_tokens", runtime_gate_profile.get("d2_total_tokens", args.seq_len + 1)) or (args.seq_len + 1))),
+                "--grad-accum",
+                str(int(g1_profile.get("grad_accum", max(4, args.d2_grad_accum)) or max(4, args.d2_grad_accum))),
+                "--lr",
+                str(runtime_ck_lr),
+                "--seed",
+                str(args.seed),
+                "--template",
+                str(resolved_template or "qwen3"),
+                "--parity-every",
+                "1",
+                "--json-out",
+                str(g1_json),
+            ]
+            rc_g1, dt_g1, log_g1 = _run_stage_command("G1", "Long-Horizon Runtime Stitch Check", g1_cmd, g1_json, logs_dir)
+            g1_metrics: Dict[str, Any] = {}
+            g1_notes: List[str] = []
+            g1_status = "FAIL"
+            if rc_g1 != 0:
+                g1_notes.append("Command exited non-zero; inspect log for longer-horizon runtime failure.")
+            elif g1_json.exists():
+                p = _json_load(g1_json)
+                g1_metrics = dict(p.get("checks") if isinstance(p.get("checks"), dict) else {})
+                g1_status = "PASS" if bool(p.get("passed", False)) else "FAIL"
+                if g1_status != "PASS":
+                    g1_notes.append("Long-horizon runtime stitch parity reported failure.")
+            else:
+                g1_notes.append("Command failed before JSON output.")
+            g1_notes.extend(extended_notes)
+            _add_stage(
+                StageResult(
+                    id="G1",
+                    name="Long-Horizon Runtime Stitch Check",
+                    status=g1_status,
+                    duration_s=dt_g1,
+                    command=g1_cmd,
+                    artifact_json=_rel(g1_json),
+                    artifact_log=_rel(Path(log_g1)),
+                    metrics=g1_metrics,
+                    notes=g1_notes,
+                    rc=rc_g1,
+                )
+            )
 
-    _json_dump(json_out, payload)
-    md_out.parent.mkdir(parents=True, exist_ok=True)
-    md_out.write_text(_render_markdown(payload), encoding="utf-8")
+        if (not stop_due_to_failure) and bool(args.extended_checks):
+            h1_cases = extended_runtime_gate_profile.get("h1_cases")
+            h1_cases = h1_cases if isinstance(h1_cases, list) else []
+            h1_summary_json = base_out_dir / "runtime_shape_matrix_latest.json"
+            h1_log = logs_dir / "H1.log"
+            h1_results: List[Dict[str, Any]] = []
+            h1_log_lines: List[str] = []
+            t_h1_0 = time.perf_counter()
+            for idx, case in enumerate(h1_cases, start=1):
+                if not isinstance(case, dict):
+                    continue
+                case_id = str(case.get("id") or f"case_{idx}")
+                case_json = base_out_dir / f"runtime_shape_matrix_{case_id}.json"
+                case_cmd = [
+                    python_exec,
+                    str(CHECK_STITCH),
+                    "--epochs",
+                    str(int(case.get("epochs", 1) or 1)),
+                    "--seq-len",
+                    str(int(case.get("seq_len", runtime_gate_profile.get("d1_seq_len", args.seq_len)) or args.seq_len)),
+                    "--total-tokens",
+                    str(int(case.get("total_tokens", args.seq_len + 1) or (args.seq_len + 1))),
+                    "--grad-accum",
+                    str(int(case.get("grad_accum", 1) or 1)),
+                    "--lr",
+                    str(runtime_ck_lr),
+                    "--seed",
+                    str(args.seed),
+                    "--template",
+                    str(resolved_template or "qwen3"),
+                    "--parity-every",
+                    "1",
+                    "--json-out",
+                    str(case_json),
+                ]
+                rc_case, dt_case, log_case = _run_stage_command(
+                    f"H1_{idx}",
+                    f"Runtime Shape Matrix [{case_id}]",
+                    case_cmd,
+                    case_json,
+                    logs_dir,
+                )
+                case_row: Dict[str, Any] = {
+                    "id": case_id,
+                    "rc": int(rc_case),
+                    "duration_s": float(dt_case),
+                    "artifact_json": _rel(case_json),
+                    "artifact_log": _rel(Path(log_case)),
+                    "config": {
+                        "epochs": int(case.get("epochs", 1) or 1),
+                        "seq_len": int(case.get("seq_len", args.seq_len) or args.seq_len),
+                        "total_tokens": int(case.get("total_tokens", args.seq_len + 1) or (args.seq_len + 1)),
+                        "grad_accum": int(case.get("grad_accum", 1) or 1),
+                    },
+                    "passed": False,
+                    "checks": {},
+                }
+                if rc_case == 0 and case_json.exists():
+                    p = _json_load(case_json)
+                    case_row["passed"] = bool(p.get("passed", False))
+                    case_row["checks"] = dict(p.get("checks") if isinstance(p.get("checks"), dict) else {})
+                h1_results.append(case_row)
+                h1_log_lines.append(
+                    f"[{case_id}] rc={rc_case} dt={dt_case:.2f}s passed={case_row['passed']} "
+                    f"seq_len={case_row['config']['seq_len']} grad_accum={case_row['config']['grad_accum']}"
+                )
 
-    print(f"[done] report={json_out}")
-    print(f"[done] table={md_out}")
-    if summary["passed"]:
-        print("[result] TRAINING_PARITY_REGIMEN=PASS")
-        return 0
-    print("[result] TRAINING_PARITY_REGIMEN=FAIL")
-    return 1
+            h1_failed = [str(row.get("id")) for row in h1_results if not bool(row.get("passed"))]
+            h1_payload = {
+                "generated_at": _utc_now_iso(),
+                "passed": len(h1_results) > 0 and len(h1_failed) == 0,
+                "summary": {
+                    "case_count": int(len(h1_results)),
+                    "passed_cases": int(sum(1 for row in h1_results if bool(row.get("passed")))),
+                    "failed_case_ids": h1_failed,
+                },
+                "notes": extended_notes,
+                "cases": h1_results,
+            }
+            _json_dump(h1_summary_json, h1_payload)
+            h1_log.write_text("\n".join(h1_log_lines) + ("\n" if h1_log_lines else ""), encoding="utf-8")
+            dt_h1 = time.perf_counter() - t_h1_0
+            _add_stage(
+                StageResult(
+                    id="H1",
+                    name="Runtime Shape Matrix Check",
+                    status="PASS" if bool(h1_payload.get("passed", False)) else "FAIL",
+                    duration_s=float(dt_h1),
+                    command=[python_exec, str(CHECK_STITCH), "--shape-matrix", str(resolved_template or "qwen3")],
+                    artifact_json=_rel(h1_summary_json),
+                    artifact_log=_rel(h1_log),
+                    metrics={
+                        "case_count": int(h1_payload["summary"]["case_count"]),
+                        "passed_cases": int(h1_payload["summary"]["passed_cases"]),
+                        "failed_case_ids": list(h1_payload["summary"]["failed_case_ids"]),
+                    },
+                    notes=extended_notes,
+                    rc=0 if bool(h1_payload.get("passed", False)) else 1,
+                )
+            )
+
+        if (not stop_due_to_failure) and bool(args.extended_checks):
+            i1_profile = extended_runtime_gate_profile.get("i1") if isinstance(extended_runtime_gate_profile.get("i1"), dict) else {}
+            i1_json = base_out_dir / "runtime_replay_long_horizon_latest.json"
+            i1_cmd = [
+                python_exec,
+                str(CHECK_REPLAY_ACCUM),
+                "--epochs",
+                str(int(i1_profile.get("epochs", 2) or 2)),
+                "--seq-len",
+                str(int(i1_profile.get("seq_len", runtime_gate_profile.get("f1_seq_len", args.seq_len)) or args.seq_len)),
+                "--total-tokens",
+                str(int(i1_profile.get("total_tokens", runtime_gate_profile.get("f1_total_tokens", args.seq_len + 1)) or (args.seq_len + 1))),
+                "--grad-accum",
+                str(int(i1_profile.get("grad_accum", 8) or 8)),
+                "--lr",
+                str(runtime_ck_lr),
+                "--seed",
+                str(args.seed),
+                "--vocab",
+                str(args.vocab),
+                "--d-model",
+                str(args.d_model),
+                "--hidden",
+                str(args.hidden),
+                "--layers",
+                str(args.num_layers),
+                "--template",
+                str(resolved_template or "qwen3"),
+                "--parity-every",
+                str(int(i1_profile.get("parity_every", 2) or 2)),
+                "--json-out",
+                str(i1_json),
+            ]
+            rc_i1, dt_i1, log_i1 = _run_stage_command("I1", "Long-Horizon Replay/Accum Check", i1_cmd, i1_json, logs_dir)
+            i1_metrics: Dict[str, Any] = {}
+            i1_notes: List[str] = []
+            i1_status = "FAIL"
+            if rc_i1 != 0:
+                i1_notes.append("Command exited non-zero; inspect log for replay/accum failure.")
+            elif i1_json.exists():
+                p = _json_load(i1_json)
+                i1_metrics = dict(p.get("checks") if isinstance(p.get("checks"), dict) else {})
+                i1_status = "PASS" if bool(p.get("passed", False)) else "FAIL"
+                if i1_status != "PASS":
+                    i1_notes.append("Long-horizon replay/accum parity reported failure.")
+            else:
+                i1_notes.append("Command failed before JSON output.")
+            i1_notes.extend(extended_notes)
+            _add_stage(
+                StageResult(
+                    id="I1",
+                    name="Long-Horizon Replay/Accum Check",
+                    status=i1_status,
+                    duration_s=dt_i1,
+                    command=i1_cmd,
+                    artifact_json=_rel(i1_json),
+                    artifact_log=_rel(Path(log_i1)),
+                    metrics=i1_metrics,
+                    notes=i1_notes,
+                    rc=rc_i1,
+                )
+            )
+
+    return _write_report_and_return()
 
 
 if __name__ == "__main__":

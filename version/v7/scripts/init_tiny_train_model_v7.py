@@ -89,6 +89,40 @@ def _init_weight(
     return (rng.standard_normal(shape).astype(np.float32) * np.float32(0.02)).astype(np.float32)
 
 
+def _qwen35_layer_kinds(n_layers: int) -> List[str]:
+    kinds: List[str] = []
+    for layer in range(max(0, int(n_layers))):
+        kinds.append("full_attention" if ((layer + 1) % 4 == 0) else "recurrent")
+    return kinds
+
+
+def _qwen35_dims(embed_dim: int, hidden_dim: int, num_heads: int, head_dim: int) -> Dict[str, int]:
+    ssm_state_size = max(1, head_dim)
+    ssm_group_count = max(1, hidden_dim // max(1, ssm_state_size))
+    q_dim = ssm_state_size * ssm_group_count
+    gate_dim = max(1, num_heads)
+    ssm_inner_size = max(gate_dim, hidden_dim)
+    recurrent_head_dim = max(1, ssm_inner_size // gate_dim)
+    ssm_inner_size = recurrent_head_dim * gate_dim
+    return {
+        "attn_out_dim": embed_dim,
+        "q_gate_proj_dim": 2 * embed_dim,
+        "attn_gate_dim": embed_dim,
+        "ssm_state_size": ssm_state_size,
+        "ssm_group_count": ssm_group_count,
+        "ssm_time_step_rank": gate_dim,
+        "ssm_inner_size": ssm_inner_size,
+        "ssm_conv_kernel": 4,
+        "ssm_conv_history": 3,
+        "q_dim": q_dim,
+        "k_dim": q_dim,
+        "v_dim": ssm_inner_size,
+        "gate_dim": gate_dim,
+        "recurrent_head_dim": recurrent_head_dim,
+        "ssm_conv_channels": q_dim + q_dim + ssm_inner_size,
+    }
+
+
 def build_tiny_model(
     out_dir: Path,
     seed: int,
@@ -134,29 +168,62 @@ def build_tiny_model(
     _append_tensor(blob, entries, "tiny.fc1.bias", np.zeros((2 * hidden_dim,), dtype=np.float32))
     _append_tensor(blob, entries, "tiny.fc2.weight", _init_weight(rng, (vocab_size, hidden_dim), init))
     _append_tensor(blob, entries, "tiny.fc2.bias", np.zeros((vocab_size,), dtype=np.float32))
+    qwen35_dims = _qwen35_dims(embed_dim, hidden_dim, num_heads, head_dim) if str(template_name) == "qwen35" else {}
+    layer_kinds = _qwen35_layer_kinds(n_layers) if str(template_name) == "qwen35" else []
 
     for l in range(n_layers):
         prefix = f"layer.{l}"
-        _append_tensor(blob, entries, f"{prefix}.ln1_gamma", np.ones((embed_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.ln2_gamma", np.ones((embed_dim,), dtype=np.float32))
+        if str(template_name) == "qwen35":
+            kind = layer_kinds[l]
+            _append_tensor(blob, entries, f"{prefix}.attn_norm", np.ones((embed_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.post_attention_norm", np.ones((embed_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.ffn_gate", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.ffn_down", _init_weight(rng, (embed_dim, hidden_dim), init))
+            if kind == "recurrent":
+                q_dim = int(qwen35_dims["q_dim"])
+                k_dim = int(qwen35_dims["k_dim"])
+                v_dim = int(qwen35_dims["v_dim"])
+                gate_dim = int(qwen35_dims["gate_dim"])
+                conv_channels = int(qwen35_dims["ssm_conv_channels"])
+                conv_kernel = int(qwen35_dims["ssm_conv_kernel"])
+                recurrent_head_dim = int(qwen35_dims["recurrent_head_dim"])
+                _append_tensor(blob, entries, f"{prefix}.attn_qkv", _init_weight(rng, (q_dim + k_dim + v_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.attn_gate", _init_weight(rng, (v_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.ssm_alpha", _init_weight(rng, (gate_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.ssm_beta", _init_weight(rng, (gate_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.ssm_conv1d", _init_weight(rng, (conv_channels, conv_kernel), init))
+                _append_tensor(blob, entries, f"{prefix}.ssm_dt_bias", np.zeros((gate_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.ssm_a", np.ones((gate_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.ssm_norm", np.ones((recurrent_head_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.ssm_out", _init_weight(rng, (embed_dim, v_dim), init))
+            else:
+                _append_tensor(blob, entries, f"{prefix}.attn_q_gate", _init_weight(rng, (int(qwen35_dims["q_gate_proj_dim"]), embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.attn_k", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.attn_v", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
+                _append_tensor(blob, entries, f"{prefix}.attn_output", _init_weight(rng, (embed_dim, int(qwen35_dims["attn_out_dim"])), init))
+                _append_tensor(blob, entries, f"{prefix}.attn_q_norm", np.ones((head_dim,), dtype=np.float32))
+                _append_tensor(blob, entries, f"{prefix}.attn_k_norm", np.ones((head_dim,), dtype=np.float32))
+        else:
+            _append_tensor(blob, entries, f"{prefix}.ln1_gamma", np.ones((embed_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.ln2_gamma", np.ones((embed_dim,), dtype=np.float32))
 
-        _append_tensor(blob, entries, f"{prefix}.wq", _init_weight(rng, (embed_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.wo", _init_weight(rng, (embed_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.bo", np.zeros((embed_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.wq", _init_weight(rng, (embed_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.wk", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.wv", _init_weight(rng, (num_kv_heads * head_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.wo", _init_weight(rng, (embed_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.bq", np.zeros((embed_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.bk", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.bv", np.zeros((num_kv_heads * head_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.bo", np.zeros((embed_dim,), dtype=np.float32))
 
-        _append_tensor(blob, entries, f"{prefix}.q_norm", np.ones((head_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.k_norm", np.ones((head_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.q_norm", np.ones((head_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.k_norm", np.ones((head_dim,), dtype=np.float32))
 
-        # SwiGLU path: w1 emits 2*hidden, w2 projects hidden -> embed
-        _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (embed_dim, hidden_dim), init))
-        _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
-        _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
+            # SwiGLU path: w1 emits 2*hidden, w2 projects hidden -> embed
+            _append_tensor(blob, entries, f"{prefix}.w1", _init_weight(rng, (2 * hidden_dim, embed_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.w2", _init_weight(rng, (embed_dim, hidden_dim), init))
+            _append_tensor(blob, entries, f"{prefix}.b1", np.zeros((2 * hidden_dim,), dtype=np.float32))
+            _append_tensor(blob, entries, f"{prefix}.b2", np.zeros((embed_dim,), dtype=np.float32))
 
     cfg = {
         "model": str(template_name or "qwen3"),
@@ -200,6 +267,31 @@ def build_tiny_model(
             },
         },
     }
+    if str(template_name) == "qwen35":
+        cfg.update(
+            {
+                "attn_out_dim": int(qwen35_dims["attn_out_dim"]),
+                "q_gate_proj_dim": int(qwen35_dims["q_gate_proj_dim"]),
+                "attn_gate_dim": int(qwen35_dims["attn_gate_dim"]),
+                "ssm_state_size": int(qwen35_dims["ssm_state_size"]),
+                "ssm_group_count": int(qwen35_dims["ssm_group_count"]),
+                "ssm_time_step_rank": int(qwen35_dims["ssm_time_step_rank"]),
+                "ssm_inner_size": int(qwen35_dims["ssm_inner_size"]),
+                "ssm_conv_kernel": int(qwen35_dims["ssm_conv_kernel"]),
+                "ssm_conv_history": int(qwen35_dims["ssm_conv_history"]),
+                "q_dim": int(qwen35_dims["q_dim"]),
+                "k_dim": int(qwen35_dims["k_dim"]),
+                "v_dim": int(qwen35_dims["v_dim"]),
+                "gate_dim": int(qwen35_dims["gate_dim"]),
+                "recurrent_num_heads": int(qwen35_dims["gate_dim"]),
+                "recurrent_head_dim": int(qwen35_dims["recurrent_head_dim"]),
+                "ssm_conv_channels": int(qwen35_dims["ssm_conv_channels"]),
+                "num_seqs": 1,
+                "layer_kinds": list(layer_kinds),
+                "hybrid_block_pattern": list(layer_kinds),
+                "full_attention_interval": 4,
+            }
+        )
 
     manifest = {
         "version": 1,
@@ -218,7 +310,7 @@ def build_tiny_model(
         "template": str(template_name or "qwen3"),
         "kernel_policy": kernel_policy,
         "architecture": {
-            "family": "qwen3-like",
+            "family": "qwen35-hybrid" if str(template_name) == "qwen35" else "qwen3-like",
             "num_layers": n_layers,
             "vocab_size": vocab_size,
             "embed_dim": embed_dim,
@@ -256,6 +348,23 @@ def build_tiny_model(
             },
         },
     }
+    if str(template_name) == "qwen35":
+        run_cfg["architecture"].update(
+            {
+                "attn_out_dim": int(qwen35_dims["attn_out_dim"]),
+                "q_gate_proj_dim": int(qwen35_dims["q_gate_proj_dim"]),
+                "attn_gate_dim": int(qwen35_dims["attn_gate_dim"]),
+                "ssm_state_size": int(qwen35_dims["ssm_state_size"]),
+                "ssm_group_count": int(qwen35_dims["ssm_group_count"]),
+                "ssm_time_step_rank": int(qwen35_dims["ssm_time_step_rank"]),
+                "ssm_inner_size": int(qwen35_dims["ssm_inner_size"]),
+                "ssm_conv_kernel": int(qwen35_dims["ssm_conv_kernel"]),
+                "recurrent_num_heads": int(qwen35_dims["gate_dim"]),
+                "recurrent_head_dim": int(qwen35_dims["recurrent_head_dim"]),
+                "layer_kinds": list(layer_kinds),
+                "full_attention_interval": 4,
+            }
+        )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "weights.bump").write_bytes(bytes(blob))
