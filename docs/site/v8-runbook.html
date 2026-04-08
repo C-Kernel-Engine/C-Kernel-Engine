@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IR v2 Format  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>v8 Qwen3-VL Runbook | C-Kernel-Engine</title>
+    <meta name="description" content="Operator runbook for the validated C-Kernel-Engine v8 multimodal inference lane using the Qwen3-VL decoder plus matching mmproj.">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/ir-v2.html">
-    <meta property="og:title" content="IR v2 Format  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/v8-runbook.html">
+    <meta property="og:title" content="v8 Qwen3-VL Runbook | C-Kernel-Engine">
+    <meta property="og:description" content="Operator runbook for the validated C-Kernel-Engine v8 multimodal inference lane using the Qwen3-VL decoder plus matching mmproj.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/ir-v2.html">
+    <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/v8-runbook.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
     <style>
         :root {
@@ -940,494 +940,250 @@
     </header>
     <main>
 
-<h1>IR v2 Format Specification</h1>
+<style>
+.v8-runbook-hero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    margin: 0.8rem 0 1.2rem;
+}
+.v8-runbook-card {
+    background: linear-gradient(145deg, rgba(7,173,248,0.1), rgba(255,180,0,0.08));
+    border: 1px solid var(--grey);
+    border-left: 4px solid #07adf8;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+}
+.v8-runbook-card h2,
+.v8-runbook-card h3 {
+    margin-top: 0;
+}
+.v8-runbook-card h2::before,
+.v8-runbook-card h3::before {
+    display: none;
+}
+.v8-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.8rem;
+}
+.v8-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: rgba(7,173,248,0.1);
+    border: 1px solid rgba(7,173,248,0.3);
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    color: var(--text-secondary);
+}
+.v8-cmd pre {
+    margin-top: 0.45rem;
+}
+.v8-path-table code {
+    font-size: 0.8rem;
+}
+.v8-note {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+@media (max-width: 900px) {
+    .v8-runbook-hero {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 
-<p>IR v2 is a self-documenting JSON format that captures model architecture, buffer definitions, and computation graphs in a portable, machine-readable format.</p>
+<h1>v8 Qwen3-VL Runbook</h1>
 
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Key Features</h3>
+<p>
+    This is the operator runbook for the currently validated <code>v8</code> multimodal path:
+    <strong>Qwen3-VL-8B-Instruct</strong> on the decoder side plus the matching
+    <code>mmproj-Qwen3VL-8B-Instruct</code> encoder projection file.
+</p>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <div>
+        <strong>Validated Scope</strong><br>
+        For the tested Qwen3-VL pair, <code>v8</code> now runs encoder -&gt; bridge -&gt; decoder end to end and produces coherent image captions instead of stop-marker or prompt-shell garbage.
+    </div>
+</div>
+
+<div class="v8-runbook-hero">
+    <div class="v8-runbook-card">
+        <h2>What This Runbook Covers</h2>
+        <p>
+            One model family at a time. This page is intentionally about the Qwen3-VL bring-up that is working today.
+            It does not claim that unrelated multimodal families are ready in <code>v8</code>.
+        </p>
+        <div class="v8-chip-row">
+            <span class="v8-chip">version/v8/scripts/cks-v8-run</span>
+            <span class="v8-chip">ck_run_v8.py</span>
+            <span class="v8-chip">Qwen3-VL</span>
+            <span class="v8-chip">inference only</span>
+        </div>
+    </div>
+    <div class="v8-runbook-card">
+        <h2>Validated Pair</h2>
+        <p><strong>Decoder GGUF:</strong><br><code>hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf</code></p>
+        <p><strong>mmproj GGUF example path:</strong><br><code>./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf</code></p>
+        <p class="v8-note">Use a matching decoder/mmproj pair. If those drift apart, the bridge result is not meaningful.</p>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Boundary</strong><br>
+        <code>v8</code> is the inference bring-up lane. Training workflows remain in <code>v7</code>.
+    </div>
+</div>
+
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">How The Vision Side Works</h3>
+    <p style="margin-bottom: 0.35rem;">
+        If you want the architecture view instead of the operator commands, read
+        <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>.
+        That page explains how the encoder graph is derived from GGUF + template + lowering and how the bridge hands the prefix into the decoder.
+    </p>
+    <p style="margin-bottom: 0;">
+        For parity-specific investigation, see <a href="vision-encoder-parity.html">Vision Encoder Parity</a>.
+    </p>
+</div>
+
+<h2>Prerequisites</h2>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Supported Host</h3>
     <ul>
-        <li><strong>Portable</strong> - Same IR works for different batch sizes</li>
-        <li><strong>Self-documenting</strong> - Contains notes explaining the format</li>
-        <li><strong>Extensible</strong> - Supports encoder, decoder, and encoder-decoder architectures</li>
+        <li>Linux host with a working C toolchain and Python 3.</li>
+        <li>Repo-local <code>.venv</code> with <code>requirements-v8.txt</code>, or let <code>cks-v8-run</code> bootstrap it interactively.</li>
+        <li>A local Qwen3-VL mmproj file available at a known path.</li>
     </ul>
-</div>
-
-<h2>Pipeline Overview</h2>
-
-<div class="img-container" style="background: #fafafa; padding: 1rem; border-radius: 8px;">
-    <svg width="1200" height="500" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
-            </marker>
-            <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#388e3c"/>
-            </marker>
-        </defs>
-
-        <!-- Background -->
-        <rect width="1200" height="500" fill="#fafafa"/>
-
-        <!-- Title -->
-        <text x="600" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">
-            IR v2 Pipeline: From HuggingFace to C Runtime
-        </text>
-
-        <!-- Step 1: Input Files -->
-        <rect x="50" y="70" width="200" height="120" fill="#e3f2fd" stroke="#1976d2" rx="8" stroke-width="2"/>
-        <text x="150" y="100" text-anchor="middle" font-size="13" font-weight="bold" fill="#1976d2">config.json</text>
-        <text x="150" y="118" text-anchor="middle" font-size="10" fill="#666">(HuggingFace)</text>
-        <text x="60" y="140" font-size="9" font-family="monospace" fill="#333">hidden_size: 896</text>
-        <text x="60" y="155" font-size="9" font-family="monospace" fill="#333">vocab_size: 151936</text>
-        <text x="60" y="170" font-size="9" font-family="monospace" fill="#333">num_layers: 24</text>
-
-        <rect x="280" y="70" width="200" height="120" fill="#fff3e0" stroke="#f57c00" rx="8" stroke-width="2"/>
-        <text x="380" y="100" text-anchor="middle" font-size="13" font-weight="bold" fill="#e65100">global_buffers.json</text>
-        <text x="380" y="118" text-anchor="middle" font-size="10" fill="#666">(kernel_maps/)</text>
-        <text x="290" y="140" font-size="9" font-family="monospace" fill="#333">token_emb: [vocab, embed]</text>
-        <text x="290" y="155" font-size="9" font-family="monospace" fill="#333">logits: [tokens, vocab]</text>
-
-        <rect x="510" y="70" width="200" height="120" fill="#fff3e0" stroke="#f57c00" rx="8" stroke-width="2"/>
-        <text x="610" y="100" text-anchor="middle" font-size="13" font-weight="bold" fill="#e65100">decoder_layer_plan.json</text>
-        <text x="610" y="118" text-anchor="middle" font-size="10" fill="#666">(kernel_maps/)</text>
-        <text x="520" y="140" font-size="9" font-family="monospace" fill="#333">rmsnorm → qkv_project</text>
-        <text x="520" y="155" font-size="9" font-family="monospace" fill="#333">→ rope → attention</text>
-        <text x="520" y="170" font-size="9" font-family="monospace" fill="#333">→ mlp → residual</text>
-
-        <!-- Arrows down -->
-        <line x1="150" y1="190" x2="150" y2="230" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
-        <line x1="380" y1="190" x2="380" y2="230" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
-        <line x1="610" y1="190" x2="610" y2="230" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
-
-        <!-- Step 2: Compiler -->
-        <rect x="100" y="240" width="560" height="80" fill="#f3e5f5" stroke="#7b1fa2" rx="8" stroke-width="2"/>
-        <text x="380" y="275" text-anchor="middle" font-size="16" font-weight="bold" fill="#7b1fa2">scripts/build_ir_v2.py</text>
-        <text x="380" y="300" text-anchor="middle" font-size="11" fill="#666">Parse config → Build dimensions → Load buffers → Plan nodes</text>
-
-        <!-- Arrow down -->
-        <line x1="380" y1="320" x2="380" y2="360" stroke="#388e3c" stroke-width="3" marker-end="url(#arrow-green)"/>
-
-        <!-- Step 3: IR Output -->
-        <rect x="100" y="370" width="300" height="110" fill="#e8f5e9" stroke="#388e3c" rx="8" stroke-width="2"/>
-        <text x="250" y="400" text-anchor="middle" font-size="14" font-weight="bold" fill="#2e7d32">ir_v2.json</text>
-        <text x="110" y="425" font-size="10" font-family="monospace" fill="#333">dimensions: [{id:10, name:"vocab"}]</text>
-        <text x="110" y="445" font-size="10" font-family="monospace" fill="#333">buffers: [{name:"token_emb",...}]</text>
-        <text x="110" y="465" font-size="10" font-family="monospace" fill="#333">nodes: [{kernel:"rmsnorm",...}]</text>
-
-        <!-- Arrow right -->
-        <line x1="400" y1="425" x2="450" y2="425" stroke="#388e3c" stroke-width="3" marker-end="url(#arrow-green)"/>
-
-        <!-- Step 4: Code Gen -->
-        <rect x="460" y="370" width="300" height="110" fill="#e8f5e9" stroke="#388e3c" rx="8" stroke-width="2"/>
-        <text x="610" y="400" text-anchor="middle" font-size="14" font-weight="bold" fill="#2e7d32">generated_v2.c</text>
-        <text x="470" y="425" font-size="10" font-family="monospace" fill="#333">CKV2BufferLayout buffers[] = {</text>
-        <text x="480" y="445" font-size="10" font-family="monospace" fill="#333">{0, 272269312, 0}, // token_emb</text>
-        <text x="480" y="465" font-size="10" font-family="monospace" fill="#333">...</text>
-
-        <!-- Legend -->
-        <rect x="780" y="70" width="180" height="130" fill="white" stroke="#ddd" rx="5"/>
-        <text x="795" y="95" font-size="12" font-weight="bold" fill="#333">Legend</text>
-        <rect x="795" y="105" width="16" height="12" fill="#e3f2fd" stroke="#1976d2"/>
-        <text x="820" y="115" font-size="10" fill="#333">External input</text>
-        <rect x="795" y="125" width="16" height="12" fill="#fff3e0" stroke="#f57c00"/>
-        <text x="820" y="135" font-size="10" fill="#333">Config (you write)</text>
-        <rect x="795" y="145" width="16" height="12" fill="#f3e5f5" stroke="#7b1fa2"/>
-        <text x="820" y="155" font-size="10" fill="#333">Python compiler</text>
-        <rect x="795" y="165" width="16" height="12" fill="#e8f5e9" stroke="#388e3c"/>
-        <text x="820" y="175" font-size="10" fill="#333">Generated output</text>
-    </svg>
-</div>
-
-<h2>Dimension Mapping</h2>
-
-<p>The IR uses symbolic dimension IDs that map to actual values from the model config:</p>
-
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Source in config.json</th>
-            <th>Example (Qwen2-0.5B)</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr><td>0</td><td><code>tokens</code></td><td>batch_size x seq_len (runtime)</td><td>131072</td></tr>
-        <tr><td>1</td><td><code>embed</code></td><td>hidden_size</td><td>896</td></tr>
-        <tr><td>2</td><td><code>aligned_embed</code></td><td>hidden_size (64-byte aligned)</td><td>896</td></tr>
-        <tr><td>3</td><td><code>head_dim</code></td><td>hidden_size / num_attention_heads</td><td>64</td></tr>
-        <tr><td>5</td><td><code>num_heads</code></td><td>num_attention_heads</td><td>14</td></tr>
-        <tr><td>6</td><td><code>num_kv_heads</code></td><td>num_key_value_heads</td><td>2</td></tr>
-        <tr><td>8</td><td><code>intermediate</code></td><td>intermediate_size</td><td>4864</td></tr>
-        <tr><td>10</td><td><code>vocab</code></td><td>vocab_size</td><td>151936</td></tr>
-    </tbody>
-</table>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">How Dimensions Resolve</h3>
-    <pre>shape[{dim:10}] → dimensions[10] → {name:"vocab", value:151936} → 151936 elements
-
-Example: token_emb shape = [vocab, aligned_embed] = [151936, 896]</pre>
-</div>
-
-<h2>Input Files</h2>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3 style="margin-top: 0;">config.json <small>(from HuggingFace)</small></h3>
-        <p>Downloaded automatically. Provides model dimensions.</p>
-        <pre>{
-  "hidden_size": 896,
-  "vocab_size": 151936,
-  "num_attention_heads": 14,
-  "num_key_value_heads": 2,
-  "intermediate_size": 4864,
-  "num_hidden_layers": 24
-}</pre>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">global_buffers.json <small>(kernel_maps/)</small></h3>
-        <p>Defines global buffers using symbolic dimension names.</p>
-        <pre>{"buffers": [
-  {"name": "token_emb",
-   "scope": "global",
-   "role": "weight",
-   "shape": [{"dim":"vocab"},
-             {"dim":"aligned_embed"}]}
-]}</pre>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">decoder_layer_plan.json <small>(kernel_maps/)</small></h3>
-        <p>Defines operations in each transformer layer.</p>
-        <pre>{"steps": [
-  {"kernel": "rmsnorm",
-   "bind": {"input": "input",
-            "gamma": "ln1_gamma"}},
-  {"kernel": "qkv_project", ...},
-  {"kernel": "attention", ...}
-]}</pre>
-    </div>
-    <div class="card card-green">
-        <h3 style="margin-top: 0;">ir_v2.json <small>(Output)</small></h3>
-        <p>Self-documenting IR with all dimensions resolved.</p>
-        <pre>{
-  "version": 2,
-  "notes": ["...format guide..."],
-  "dimensions": [...],
-  "buffers": [...],
-  "nodes": [...]
-}</pre>
+    <div class="v8-cmd">
+        <pre>python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-v8.txt</pre>
     </div>
 </div>
 
-<h2>Usage</h2>
+<h2>Optional Text Smoke</h2>
+
+<div class="card">
+    <p>Before touching vision, you can verify that the <code>v8</code> runner surface is alive with a plain text model:</p>
+    <div class="v8-cmd">
+        <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --thinking-mode suppressed</pre>
+    </div>
+    <p class="v8-note">This is not the Qwen3-VL validation path. It is only a quick runner smoke test.</p>
+</div>
+
+<h2>Canonical Qwen3-VL Vision Run</h2>
 
 <div class="card card-accent">
-    <h3 style="margin-top: 0;">Generate IR v2</h3>
-    <pre># Fetch config from HuggingFace
-make fetch-v2 IR_V2_HF=Qwen/Qwen2-0.5B
-
-# Generate IR v2
-make ir-v2 IR_V2_HF=Qwen/Qwen2-0.5B
-
-# Generate C runtime
-./build/ck_ir_v2_demo --ir build/ir_v2.json --emit build/generated_v2.c</pre>
+    <h3 style="margin-top: 0;">Real Image Bring-Up</h3>
+    <p>Replace the <code>--mmproj</code> value below if your local mmproj file lives somewhere else.</p>
+    <div class="v8-cmd">
+        <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj ./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+  --image-path version/v8/test_assets/v8_vision_doc_card_72.png \
+  --prompt "Explain this image." \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --thinking-mode suppressed</pre>
+    </div>
+    <p style="margin-bottom: 0;">
+        The first run converts the GGUF, lowers/codegens the runtimes, compiles them, runs the encoder bridge, then generates from the decoder.
+    </p>
+    <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
+        For a cleaner caption sanity check, add <code>--max-tokens 48</code> so the current bridge generation loop does not ramble into a long repetition tail.
+    </p>
 </div>
 
 <div class="card">
-    <h3 style="margin-top: 0;">For GGUF Quantized Models</h3>
-    <pre># Use the GGUF-specific repo
-make ir-v2 IR_V2_HF=Qwen/Qwen2-0.5B-Instruct-GGUF \
-           IR_V2_WEIGHTS=qwen2-0_5b-instruct-q4_k_m.gguf</pre>
-</div>
-
-<h2>IR Lowering</h2>
-
-<p>The high-level IR is <strong>portable</strong> but not executable. The <strong>lowering pass</strong> converts it to a mode-specific form with a concrete memory plan.</p>
-
-<div class="img-container" style="background: #fafafa; padding: 1rem; border-radius: 8px;">
-    <svg width="900" height="200" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
-            </marker>
-        </defs>
-        <rect width="900" height="200" fill="#fafafa"/>
-
-        <!-- High-level IR -->
-        <rect x="50" y="70" width="150" height="60" fill="#e8f5e9" stroke="#388e3c" rx="6" stroke-width="2"/>
-        <text x="125" y="95" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">ir_v2.json</text>
-        <text x="125" y="115" text-anchor="middle" font-size="10" fill="#666">Portable IR</text>
-
-        <!-- Arrow -->
-        <line x1="200" y1="100" x2="270" y2="100" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
-        <text x="235" y="90" text-anchor="middle" font-size="10" fill="#666">--lower</text>
-
-        <!-- Lowering box -->
-        <rect x="280" y="50" width="140" height="100" fill="#f3e5f5" stroke="#7b1fa2" rx="6" stroke-width="2"/>
-        <text x="350" y="80" text-anchor="middle" font-size="11" font-weight="bold" fill="#7b1fa2">Lowering Pass</text>
-        <text x="350" y="100" text-anchor="middle" font-size="9" fill="#666">Filter nodes</text>
-        <text x="350" y="115" text-anchor="middle" font-size="9" fill="#666">Compute memory</text>
-        <text x="350" y="130" text-anchor="middle" font-size="9" fill="#666">Mode-specific</text>
-
-        <!-- Arrows to modes -->
-        <line x1="420" y1="70" x2="490" y2="40" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
-        <line x1="420" y1="100" x2="490" y2="100" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
-        <line x1="420" y1="130" x2="490" y2="160" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
-
-        <!-- Mode outputs -->
-        <rect x="500" y="20" width="140" height="40" fill="#e3f2fd" stroke="#1976d2" rx="5"/>
-        <text x="570" y="45" text-anchor="middle" font-size="11" font-weight="bold" fill="#1976d2">prefill.json</text>
-
-        <rect x="500" y="80" width="140" height="40" fill="#fff3e0" stroke="#f57c00" rx="5"/>
-        <text x="570" y="105" text-anchor="middle" font-size="11" font-weight="bold" fill="#e65100">decode.json</text>
-
-        <rect x="500" y="140" width="140" height="40" fill="#ffebee" stroke="#c62828" rx="5"/>
-        <text x="570" y="165" text-anchor="middle" font-size="11" font-weight="bold" fill="#c62828">backward.json</text>
-
-        <!-- Memory plan note -->
-        <rect x="680" y="60" width="180" height="80" fill="white" stroke="#ddd" rx="5"/>
-        <text x="770" y="85" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">Each includes:</text>
-        <text x="690" y="105" font-size="9" fill="#666">• lowering metadata</text>
-        <text x="690" y="120" font-size="9" fill="#666">• memory_plan (offsets)</text>
-        <text x="690" y="135" font-size="9" fill="#666">• filtered nodes</text>
-    </svg>
-</div>
-
-<div class="grid grid-3">
-    <div class="card">
-        <h3 style="margin-top: 0;">Prefill Mode</h3>
-        <p>Process full sequence (prompt). All tokens in parallel.</p>
-        <pre>./build/ck_ir_v2_demo config.json \
-  --lower prefill</pre>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Decode Mode</h3>
-        <p>Generate one token at a time. Uses KV cache.</p>
-        <pre>./build/ck_ir_v2_demo config.json \
-  --lower decode \
-  --lower-out build/decode.json</pre>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Backward Mode</h3>
-        <p>Training. Auto-builds backward graph.</p>
-        <pre>./build/ck_ir_v2_demo config.json \
-  --lower backward</pre>
+    <h3 style="margin-top: 0;">Synthetic Prefix Probe</h3>
+    <p>For a seam-only smoke test without a real image file, keep the decoder pair but switch to a synthetic prefix:</p>
+    <div class="v8-cmd">
+        <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj ./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+  --image-mode checker \
+  --prompt "Describe the image." \
+  --context-len 1024 \
+  --force-convert --force-compile</pre>
     </div>
 </div>
+
+<h2>What Success Looks Like</h2>
 
 <div class="card card-green">
-    <h3 style="margin-top: 0;">What Lowering Adds</h3>
-    <pre>{
-  "lowering": {
-    "mode": "prefill",
-    "nodes_filtered": 12,
-    "nodes_kept": 252
-  },
-  "memory_plan": {
-    "total_bytes": 976914176,
-    "buffers": [
-      {"name": "token_emb", "offset": 0, "size": 272269312},
-      {"name": "embedded_input", "offset": 272269312, "size": 469762048},
-      {"name": "layer_0.ln1_gamma", "offset": 742031360, "size": 1792},
-      {"name": "layer_0.ln1_output", "offset": 742033152, "size": ...}
-    ]
-  },
-  "nodes": [ ... filtered & tagged ... ]
-}</pre>
-    <p><small>Note: All offsets are from a single base pointer. Weights and activations interleaved in execution order.</small></p>
+    <ul>
+        <li>The bridge logs reach <code>[v8-bridge] done report=...</code>.</li>
+        <li>A bridge report exists under the model cache and contains <code>"status": "ok"</code>.</li>
+        <li>The generated caption is coherent natural language, not raw stop tokens, <code>/no_think</code>, or an empty assistant turn.</li>
+    </ul>
+    <p style="margin-bottom: 0;">A healthy prompt shell uses the GGUF chat template in <code>auto</code> mode and preserves the vision markers around <code>&lt;image_embeds&gt;</code>.</p>
 </div>
 
-<h2>Memory Layout Philosophy</h2>
+<h2>Artifacts To Inspect</h2>
 
-<p>C-Kernel-Engine uses a <strong>single contiguous memory allocation</strong> for the entire model. This design is critical for CPU performance.</p>
+<div class="card">
+    <table class="table v8-path-table">
+        <thead>
+            <tr><th>Artifact</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>~/.cache/ck-engine-v8/models/.../multimodal_bridge/bridge_report.json</code></td>
+                <td>Final bridge status, prompt accounting, prefix grid, and generated text.</td>
+            </tr>
+            <tr>
+                <td><code>~/.cache/ck-engine-v8/models/.../multimodal_bridge/encoder/</code></td>
+                <td>Encoder-side lowered IR, compiled runtime, and bridge artifacts.</td>
+            </tr>
+            <tr>
+                <td><code>~/.cache/ck-engine-v8/models/.../multimodal_bridge/decoder/</code></td>
+                <td>Decoder lowered IR, generated C, compiled shared library, and decode bridge artifacts.</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="v8-cmd">
+        <pre>./build/ck-cli-v8 --list</pre>
+    </div>
+</div>
 
-<div class="card card-accent">
-    <h3 style="margin-top: 0;">Why One Allocation?</h3>
+<h2>Troubleshooting</h2>
+
+<div class="card">
     <ul>
-        <li><strong>CPU doesn't care</strong> if data is a weight or activation - it just needs sequential memory access</li>
-        <li><strong>Single base pointer + offsets</strong> = simpler memory management, no pointer chasing</li>
-        <li><strong>Hugepage alignment</strong> (1GB/2MB) enables NUMA-aware placement</li>
-        <li><strong>Layer-level prefetching</strong> - while layer N computes, layer N+1's data streams from different memory channel</li>
+        <li>If you omit <code>--image-path</code>, the bridge uses a synthetic image path. That is useful for seam probes, not for validating real-image captioning.</li>
+        <li>If the bridge report is missing, check disk space first. The first compile path writes large intermediate artifacts.</li>
+        <li>If output starts echoing raw chat markers or thinking-control strings, keep <code>--chat-template auto</code> and do not force a manual template override on this model.</li>
+        <li>If captions are incoherent again, verify that the decoder GGUF and mmproj GGUF are the matching Qwen3-VL pair.</li>
     </ul>
 </div>
 
-<div class="img-container" style="background: #fafafa; padding: 1rem; border-radius: 8px;">
-    <svg width="800" height="420" xmlns="http://www.w3.org/2000/svg">
-        <rect width="800" height="420" fill="#fafafa"/>
-        <text x="400" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Memory Layout: Single Contiguous Block (Execution Order)</text>
+<h2>Support Statement</h2>
 
-        <!-- Memory block -->
-        <rect x="100" y="50" width="600" height="350" fill="white" stroke="#333" stroke-width="2" rx="4"/>
-
-        <!-- Token embeddings -->
-        <rect x="100" y="50" width="600" height="40" fill="#e3f2fd" stroke="#1976d2"/>
-        <text x="400" y="75" text-anchor="middle" font-size="12" font-weight="bold" fill="#1976d2">Token Embeddings (weight)</text>
-
-        <!-- Embedded input (activation right after weight) -->
-        <rect x="100" y="90" width="600" height="30" fill="#fff3e0" stroke="#f57c00"/>
-        <text x="400" y="110" text-anchor="middle" font-size="11" fill="#e65100">Embedded Input (activation)</text>
-
-        <!-- Layer 0 -->
-        <rect x="100" y="120" width="600" height="100" fill="#f3e5f5" stroke="#7b1fa2" stroke-dasharray="none"/>
-        <text x="120" y="140" font-size="12" font-weight="bold" fill="#7b1fa2">Layer 0</text>
-
-        <!-- Layer 0 contents -->
-        <rect x="120" y="150" width="140" height="20" fill="#e3f2fd"/>
-        <text x="190" y="164" text-anchor="middle" font-size="9" fill="#1976d2">ln1_gamma (W)</text>
-        <rect x="270" y="150" width="140" height="20" fill="#fff3e0"/>
-        <text x="340" y="164" text-anchor="middle" font-size="9" fill="#e65100">ln1_output (A)</text>
-        <rect x="420" y="150" width="140" height="20" fill="#e3f2fd"/>
-        <text x="490" y="164" text-anchor="middle" font-size="9" fill="#1976d2">wq, wk, wv (W)</text>
-
-        <rect x="120" y="175" width="140" height="20" fill="#fff3e0"/>
-        <text x="190" y="189" text-anchor="middle" font-size="9" fill="#e65100">q, k, v (A)</text>
-        <rect x="270" y="175" width="140" height="20" fill="#fff3e0"/>
-        <text x="340" y="189" text-anchor="middle" font-size="9" fill="#e65100">attn_scores (A)</text>
-        <rect x="420" y="175" width="140" height="20" fill="#e3f2fd"/>
-        <text x="490" y="189" text-anchor="middle" font-size="9" fill="#1976d2">proj_weight (W)</text>
-
-        <rect x="120" y="200" width="270" height="15" fill="#fff3e0"/>
-        <text x="255" y="211" text-anchor="middle" font-size="8" fill="#e65100">... MLP weights & activations interleaved ...</text>
-
-        <!-- Layer 1..N -->
-        <rect x="100" y="220" width="600" height="50" fill="#ede7f6" stroke="#7b1fa2" stroke-dasharray="4"/>
-        <text x="400" y="250" text-anchor="middle" font-size="12" fill="#7b1fa2">Layer 1 ... Layer N (same pattern)</text>
-
-        <!-- Final LN -->
-        <rect x="100" y="270" width="600" height="30" fill="#e8f5e9" stroke="#388e3c"/>
-        <text x="400" y="290" text-anchor="middle" font-size="11" fill="#2e7d32">Final LayerNorm (weight + activation)</text>
-
-        <!-- Logits -->
-        <rect x="100" y="300" width="600" height="30" fill="#fff3e0" stroke="#f57c00"/>
-        <text x="400" y="320" text-anchor="middle" font-size="11" fill="#e65100">Logits (activation)</text>
-
-        <!-- Gradients (training) -->
-        <rect x="100" y="330" width="600" height="70" fill="#ffebee" stroke="#c62828" stroke-dasharray="4"/>
-        <text x="400" y="360" text-anchor="middle" font-size="12" fill="#c62828">Gradient Storage (if training)</text>
-        <text x="400" y="380" text-anchor="middle" font-size="10" fill="#666">Same layout: d_weights and d_activations interleaved</text>
-
-        <!-- Arrow and annotation -->
-        <line x1="720" y1="70" x2="720" y2="380" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
-        <text x="740" y="225" font-size="10" fill="#333" transform="rotate(90 740 225)">Execution Order</text>
-
-        <!-- Legend -->
-        <rect x="110" y="405" width="60" height="12" fill="#e3f2fd" stroke="#1976d2"/>
-        <text x="180" y="415" font-size="10" fill="#333">Weight</text>
-        <rect x="230" y="405" width="60" height="12" fill="#fff3e0" stroke="#f57c00"/>
-        <text x="300" y="415" font-size="10" fill="#333">Activation</text>
-        <rect x="360" y="405" width="60" height="12" fill="#ffebee" stroke="#c62828"/>
-        <text x="430" y="415" font-size="10" fill="#333">Gradient</text>
-    </svg>
-</div>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3 style="margin-top: 0;">NUMA / Sub-NUMA Optimization</h3>
-        <p>With 1GB hugepages, each page can be placed on a different DRAM bank:</p>
-        <pre>Page 0 (0-1GB)   → DRAM Bank 0 (Layer 0-5)
-Page 1 (1-2GB)   → DRAM Bank 1 (Layer 6-11)
-Page 2 (2-3GB)   → DRAM Bank 2 (Layer 12-17)
-...</pre>
-        <p>While Layer 0 computes, Layer 6's data prefetches from a different memory channel - <strong>no bandwidth contention</strong>.</p>
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
     </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Offset-Based Access</h3>
-        <p>All tensors accessed via offsets from single base pointer:</p>
-        <pre>typedef struct {
-    size_t ln1_gamma;      // weight
-    size_t ln1_output;     // activation
-    size_t wq, wk, wv;     // weights
-    size_t q, k, v;        // activations
-    ...
-} LayerOffsets;
-
-// Access: base + layer->ln1_gamma</pre>
+    <div>
+        <strong>What We Are Claiming</strong><br>
+        The tested Qwen3-VL artifact pair works in <code>v8</code> for end-to-end multimodal inference bring-up. That does not automatically extend to unrelated model families or future multimodal templates that need kernels the engine does not have yet.
     </div>
 </div>
-
-<div class="card card-green">
-    <h3 style="margin-top: 0;">Why NOT Separate Arenas?</h3>
-    <p>Separating weights/activations/gradients into different allocations would mean:</p>
-    <ul>
-        <li>3+ base pointers to track (or 6+ with sections)</li>
-        <li>Multiple malloc/canary regions to manage</li>
-        <li>Cache misses when jumping between arenas</li>
-        <li>Harder to optimize for NUMA placement</li>
-    </ul>
-    <p><strong>One allocation = one base pointer + offsets = maximum simplicity and performance.</strong></p>
-</div>
-
-<h2>Key Concepts</h2>
-
-<div class="grid grid-3">
-    <div class="card">
-        <h3 style="margin-top: 0;">Shape Resolution</h3>
-        <p>Each shape dimension is <code>{dim, mult, div}</code>:</p>
-        <pre>size = dimensions[dim].value
-       * mult / div</pre>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Buffer Roles</h3>
-        <ul style="margin: 0; padding-left: 1.2rem;">
-            <li><code>weight</code> - Model params</li>
-            <li><code>activation</code> - Runtime tensors</li>
-            <li><code>grad</code> - Gradients</li>
-        </ul>
-    </div>
-    <div class="card">
-        <h3 style="margin-top: 0;">Buffer Scope</h3>
-        <ul style="margin: 0; padding-left: 1.2rem;">
-            <li><code>global</code> - Shared across layers</li>
-            <li><code>layer</code> - Per-layer tensors</li>
-        </ul>
-    </div>
-</div>
-
-<h2>IR v2 JSON Structure</h2>
-
-<pre>{
-  "version": 2,
-  "notes": [
-    "=== IR V2 FORMAT GUIDE ===",
-    "DIMENSIONS: maps numeric IDs to named values from config.json",
-    "  - dim:10 → dimensions[10] → 'vocab' → 151936",
-    "BUFFERS: each has shape, role, dtype, scope",
-    "NODES: kernel invocations with bindings to buffers"
-  ],
-  "config": {
-    "num_layers": 24,
-    "hidden_size": 896,
-    "vocab_size": 151936,
-    ...
-  },
-  "dimensions": [
-    {"id": 0, "name": "tokens", "value": 131072},
-    {"id": 1, "name": "embed", "value": 896},
-    {"id": 10, "name": "vocab", "value": 151936}
-  ],
-  "buffers": [
-    {
-      "name": "token_emb",
-      "scope": "global",
-      "role": "weight",
-      "dtype": "bf16",
-      "shape": [{"dim": 10}, {"dim": 2}]
-    }
-  ],
-  "nodes": [
-    {
-      "layer": 0,
-      "op": "rmsnorm",
-      "kernel": "rmsnorm_forward",
-      "bindings": [
-        {"arg": "input", "buffer": "input"},
-        {"arg": "gamma", "buffer": "ln1_gamma"}
-      ]
-    }
-  ]
-}</pre>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->

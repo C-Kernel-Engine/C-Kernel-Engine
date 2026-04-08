@@ -105,6 +105,18 @@
     </div>
 </div>
 
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">How The Vision Side Works</h3>
+    <p style="margin-bottom: 0.35rem;">
+        If you want the architecture view instead of the operator commands, read
+        <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>.
+        That page explains how the encoder graph is derived from GGUF + template + lowering and how the bridge hands the prefix into the decoder.
+    </p>
+    <p style="margin-bottom: 0;">
+        For parity-specific investigation, see <a href="vision-encoder-parity.html">Vision Encoder Parity</a>.
+    </p>
+</div>
+
 <h2>Prerequisites</h2>
 
 <div class="card">
@@ -122,18 +134,49 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
 </div>
 
-<h2>Optional Text Smoke</h2>
+<h2>Canonical Text Bring-Up</h2>
 
 <div class="card">
-    <p>Before touching vision, you can verify that the <code>v8</code> runner surface is alive with a plain text model:</p>
+    <p>The public <code>v8</code> inference surface should accept the same promoted family command shapes as <code>v7</code>, just routed through <code>v8</code> code:</p>
     <div class="v8-cmd">
-        <pre>version/v8/scripts/cks-v8-run run \
+        <pre>Gemma 3 270M
+
+version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=none \
+  --generate-visualizer
+
+Qwen2 0.5B Instruct
+
+version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --generate-visualizer
+
+Qwen3 0.6B
+
+version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
   --context-len 1024 \
   --force-convert --force-compile \
-  --thinking-mode suppressed</pre>
+  --generate-visualizer
+
+Qwen3.5 0.8B
+
+python3 version/v8/scripts/ck_run_v8.py run \
+  hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --force-convert --force-compile \
+  --context-len 1034
+
+NaanBeige 4.1 3B
+
+version/v8/scripts/cks-v8-run run \
+  hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --chat-template auto \
+  --generate-visualizer</pre>
     </div>
-    <p class="v8-note">This is not the Qwen3-VL validation path. It is only a quick runner smoke test.</p>
+    <p class="v8-note">These are text-family bring-up commands. The validated Qwen3-VL vision path is the multimodal command below.</p>
 </div>
 
 <h2>Canonical Qwen3-VL Vision Run</h2>
@@ -153,6 +196,9 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
     <p style="margin-bottom: 0;">
         The first run converts the GGUF, lowers/codegens the runtimes, compiles them, runs the encoder bridge, then generates from the decoder.
+    </p>
+    <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
+        For a cleaner caption sanity check, add <code>--max-tokens 48</code> so the current bridge generation loop does not ramble into a long repetition tail.
     </p>
 </div>
 

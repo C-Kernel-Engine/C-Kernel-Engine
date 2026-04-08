@@ -1,0 +1,411 @@
+<!-- TITLE: v8 Vision Encoder -->
+<!-- NAV: architecture-links -->
+
+<style>
+.v8-vision-hero {
+    display: grid;
+    grid-template-columns: 1.15fr 0.95fr;
+    gap: 1rem;
+    margin: 0.85rem 0 1.35rem;
+}
+.v8-vision-panel {
+    background:
+        radial-gradient(circle at top right, rgba(7,173,248,0.12), transparent 45%),
+        linear-gradient(145deg, rgba(255,180,0,0.09), rgba(7,173,248,0.05));
+    border: 1px solid var(--grey);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+}
+.v8-vision-panel h2,
+.v8-vision-panel h3 {
+    margin-top: 0;
+}
+.v8-vision-panel h2::before,
+.v8-vision-panel h3::before {
+    display: none;
+}
+.v8-vision-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+}
+.v8-vision-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.73rem;
+    border-radius: 999px;
+    padding: 0.18rem 0.58rem;
+    background: rgba(7,173,248,0.12);
+    border: 1px solid rgba(7,173,248,0.25);
+    color: var(--text-secondary);
+}
+.v8-vision-flow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.7rem;
+    margin: 1rem 0 1.35rem;
+}
+.v8-vision-step {
+    position: relative;
+    background: var(--dark-card);
+    border: 1px solid var(--grey);
+    border-top: 3px solid var(--orange);
+    border-radius: 10px;
+    padding: 0.9rem 0.95rem;
+    min-height: 170px;
+}
+.v8-vision-step-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--orange);
+    margin-bottom: 0.45rem;
+}
+.v8-vision-step h3 {
+    margin: 0 0 0.45rem;
+    font-size: 1rem;
+}
+.v8-vision-step p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+.v8-vision-step code {
+    font-size: 0.76rem;
+}
+.v8-vision-contracts {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.9rem;
+    margin: 0.9rem 0 1.3rem;
+}
+.v8-vision-contract {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--grey);
+    border-radius: 10px;
+    padding: 1rem;
+}
+.v8-vision-contract h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+.v8-vision-contract ul {
+    margin-bottom: 0;
+}
+.v8-vision-compare {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.95rem;
+    margin: 0.9rem 0 1.3rem;
+}
+.v8-vision-compare .card {
+    height: 100%;
+}
+.v8-vision-compare h3 {
+    margin-top: 0;
+}
+.v8-vision-artifacts code {
+    font-size: 0.79rem;
+}
+.v8-vision-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 0.95rem;
+}
+.v8-vision-link {
+    display: inline-block;
+    text-decoration: none;
+    border-radius: 7px;
+    padding: 0.5rem 0.8rem;
+    font-weight: 600;
+}
+.v8-vision-link.primary {
+    background: var(--orange);
+    color: var(--dark);
+}
+.v8-vision-link.secondary {
+    background: rgba(7,173,248,0.12);
+    border: 1px solid rgba(7,173,248,0.3);
+    color: var(--text-primary);
+}
+@media (max-width: 1100px) {
+    .v8-vision-flow {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 900px) {
+    .v8-vision-hero,
+    .v8-vision-contracts,
+    .v8-vision-compare {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 640px) {
+    .v8-vision-flow {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<h1>v8 Vision Encoder Architecture</h1>
+
+<p>
+    This page explains how the validated <code>v8</code> vision lane works under the hood:
+    how a real image becomes a deterministic encoder prefix, how that prefix crosses the bridge,
+    and where the current system is already template-driven versus where the bridge host still carries explicit policy.
+</p>
+
+<div class="alert alert-success">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <div>
+        <strong>Current Scope</strong><br>
+        The working path today is the validated <code>v8</code> Qwen3-VL encoder + decoder pair. This page is about that architecture and why it matters, not a claim that all multimodal families are already solved.
+    </div>
+</div>
+
+<div class="v8-vision-hero">
+    <div class="v8-vision-panel">
+        <h2>Why This Matters</h2>
+        <p>
+            This is the first point where the same <code>C-Kernel-Engine</code> inference stack is visibly spanning both sides of a multimodal transformer:
+            a vision encoder graph on one end and a decoder graph on the other.
+        </p>
+        <p>
+            That is a real architecture milestone. The system is no longer only “text inference with extra kernels.”
+            It now proves that templates, lowering, memory planning, codegen, and runtime stitching can carry an image-derived prefix into a decoder without a separate one-off runtime.
+        </p>
+        <div class="v8-vision-chip-row">
+            <span class="v8-vision-chip">template-driven graph</span>
+            <span class="v8-vision-chip">GGUF-derived config</span>
+            <span class="v8-vision-chip">deterministic memory</span>
+            <span class="v8-vision-chip">encoder → bridge → decoder</span>
+        </div>
+    </div>
+    <div class="v8-vision-panel">
+        <h2>Validated Components</h2>
+        <ul>
+            <li><strong>Template:</strong> <code>version/v8/templates/qwen3_vl_vision.json</code></li>
+            <li><strong>Converter:</strong> <code>version/v8/scripts/convert_gguf_to_bump_v8.py</code></li>
+            <li><strong>Lowering:</strong> <code>version/v8/scripts/build_ir_v8.py</code></li>
+            <li><strong>Host bridge:</strong> <code>version/v8/scripts/run_multimodal_bridge_v8.py</code></li>
+            <li><strong>Operator surface:</strong> <code>version/v8/scripts/ck_run_v8.py</code></li>
+        </ul>
+        <div class="v8-vision-links">
+            <a class="v8-vision-link primary" href="v8-runbook.html">Open v8 Runbook</a>
+            <a class="v8-vision-link secondary" href="vision-encoder-parity.html">See Encoder Parity Notes</a>
+        </div>
+    </div>
+</div>
+
+<h2>End-to-End Flow</h2>
+
+<div class="v8-vision-flow">
+    <div class="v8-vision-step">
+        <div class="v8-vision-step-label">Step 1</div>
+        <h3>GGUF Intake</h3>
+        <p>
+            The converter reads tensor names, dtypes, shapes, tokenizer metadata, and Qwen3-VL vision metadata from the GGUF files.
+            This is where artifact-specific truth enters the system.
+        </p>
+    </div>
+    <div class="v8-vision-step">
+        <div class="v8-vision-step-label">Step 2</div>
+        <h3>Template Resolution</h3>
+        <p>
+            The encoder graph shape comes from <code>qwen3_vl_vision.json</code>:
+            patch frontend, position path, attention body, deepstack branch, and projector footer.
+        </p>
+    </div>
+    <div class="v8-vision-step">
+        <div class="v8-vision-step-label">Step 3</div>
+        <h3>IR + Layout</h3>
+        <p>
+            <code>build_ir_v8.py</code> lowers that template into concrete kernel calls, activation buffers,
+            and offsets. The result is deterministic IR plus a deterministic memory plan.
+        </p>
+    </div>
+    <div class="v8-vision-step">
+        <div class="v8-vision-step-label">Step 4</div>
+        <h3>Bridge Prefix</h3>
+        <p>
+            The encoder runtime writes a named activation carrying projector output rows.
+            Those rows become the multimodal prefix consumed by the decoder prefill/decode bridge.
+        </p>
+    </div>
+    <div class="v8-vision-step">
+        <div class="v8-vision-step-label">Step 5</div>
+        <h3>Decoder Continuation</h3>
+        <p>
+            The decoder runs on the decode-layout runtime and treats the encoder rows as a staged prefix.
+            Text tokens resume after the vision grid using the bridge contract’s row/grid semantics.
+        </p>
+    </div>
+</div>
+
+<h2>Source of Truth Stack</h2>
+
+<div class="v8-vision-contracts">
+    <div class="v8-vision-contract">
+        <h3>1. GGUF</h3>
+        <p>The artifact-specific source of truth.</p>
+        <ul>
+            <li>Tensor names and shapes</li>
+            <li>Weight dtypes and quantization types</li>
+            <li>Vision metadata like patch size, image size, projector dims, deepstack hints</li>
+            <li>Tokenizer and chat template metadata</li>
+        </ul>
+    </div>
+    <div class="v8-vision-contract">
+        <h3>2. Template</h3>
+        <p>The structural source of truth.</p>
+        <ul>
+            <li>Header/body/footer graph order</li>
+            <li>Vision-specific operator sequence</li>
+            <li>Kernel ids and contract sections</li>
+            <li>What the encoder is, not the exact artifact numbers</li>
+        </ul>
+    </div>
+    <div class="v8-vision-contract">
+        <h3>3. Lowered Manifest + Layout</h3>
+        <p>The execution source of truth.</p>
+        <ul>
+            <li>Concrete call graph</li>
+            <li>Resolved buffers and offsets</li>
+            <li>Quant/kernel decisions</li>
+            <li>Bridge-visible activation locations</li>
+        </ul>
+    </div>
+    <div class="v8-vision-contract">
+        <h3>4. Bridge Host</h3>
+        <p>The orchestration source of truth.</p>
+        <ul>
+            <li>Loads image input</li>
+            <li>Runs encoder and decoder runtimes</li>
+            <li>Maps encoder output into decoder prefix rows</li>
+            <li>Owns the remaining family-specific bridge glue</li>
+        </ul>
+    </div>
+</div>
+
+<h2>What Is Already Derived</h2>
+
+<div class="v8-vision-compare">
+    <div class="card card-green">
+        <h3>Mostly Derived Today</h3>
+        <ul>
+            <li>Vision graph structure from <code>qwen3_vl_vision.json</code></li>
+            <li>Patch/grid/projector dimensions from GGUF metadata</li>
+            <li>Quant summary and weight mapping from the actual artifact</li>
+            <li>Kernel call order from lowering, not handwritten encoder code</li>
+            <li>Memory buffer sizes and offsets from the layout planner</li>
+            <li>Named activation resolution for the projector output bridge</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3>Still Explicit In The Host</h3>
+        <ul>
+            <li>Qwen3-VL smart-resize/image preprocessing logic</li>
+            <li>Synthetic image generators for seam-only probes</li>
+            <li>Some bridge row/grid fallback rules</li>
+            <li>Chat-template fallback parsing in the bridge runner</li>
+            <li>The current choice of which bridge decoder API to call</li>
+        </ul>
+    </div>
+</div>
+
+<div class="alert alert-warning">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+    </div>
+    <div>
+        <strong>Honest State</strong><br>
+        The encoder runtime itself is already mostly template/manifest/lowering driven. The remaining hardcoded family knowledge is concentrated in the bridge shell, not in the generated encoder graph.
+    </div>
+</div>
+
+<h2>The Actual Encoder Shape</h2>
+
+<div class="card">
+    <p>
+        The current Qwen3-VL encoder template is not a toy wrapper. It encodes a real transformer-style path:
+    </p>
+    <ol>
+        <li><strong>Patch frontend:</strong> patchify, dual patch projection, stream merge, patch bias, tiled 2D position addition</li>
+        <li><strong>Position contract:</strong> 2D position ids plus multi-section RoPE for vision attention</li>
+        <li><strong>Transformer body:</strong> layernorm, packed QKV projection, split Q/K/V, full attention, out projection, residual, MLP</li>
+        <li><strong>Deepstack branch:</strong> selected layer taps are spatially merged and projected through branch MLP blocks</li>
+        <li><strong>Projector footer:</strong> the resulting rows become the bridge-visible vision embedding prefix for the decoder</li>
+    </ol>
+    <p style="margin-bottom: 0;">
+        That matters because the engine is not “calling an external encoder.” It is lowering and running the encoder as part of the same system.
+    </p>
+</div>
+
+<h2>Important Artifacts</h2>
+
+<div class="card v8-vision-artifacts">
+    <table class="table">
+        <thead>
+            <tr><th>Artifact</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>encoder/weights_manifest.json</code></td>
+                <td>Resolved config, embedded template, quant summary, and weight inventory</td>
+            </tr>
+            <tr>
+                <td><code>encoder/ir1.json</code></td>
+                <td>Pre-lowering operator expansion from the template</td>
+            </tr>
+            <tr>
+                <td><code>encoder/layout.json</code></td>
+                <td>Activation buffers and memory offsets used by the generated runtime</td>
+            </tr>
+            <tr>
+                <td><code>encoder/call.json</code></td>
+                <td>Call-ready IR consumed by code generation</td>
+            </tr>
+            <tr>
+                <td><code>encoder/encoder_v8.c</code></td>
+                <td>Generated C runtime for the vision encoder graph</td>
+            </tr>
+            <tr>
+                <td><code>multimodal_bridge/bridge_report.json</code></td>
+                <td>Final bridge contract: prefix rows, grid, prompt segmentation, generated text</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2>What “Template-Driven Bridge” Means</h2>
+
+<div class="card">
+    <p>
+        The next cleanup step is not to add more handwritten Qwen logic. It is to promote bridge policy into explicit contracts:
+    </p>
+    <ul>
+        <li><strong>Image preprocess contract:</strong> resize policy, alignment rule, normalization stats, channel layout</li>
+        <li><strong>Multimodal bridge contract:</strong> which activation is the prefix, how many rows it has, what grid metadata it carries, and which decoder entrypoint should consume it</li>
+        <li><strong>Chat contract:</strong> prompt shell, stop markers, and image marker placement</li>
+    </ul>
+    <p style="margin-bottom: 0;">
+        Once that happens, the bridge shell stops asking “is this Qwen3-VL?” and starts asking “what does the resolved contract say?”
+    </p>
+</div>
+
+<h2>Why This Is A Real Milestone</h2>
+
+<div class="alert alert-info">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </div>
+    <div>
+        <strong>Serious Software Signal</strong><br>
+        The important thing is not only that Qwen3-VL now captions an image. It is that the same deterministic stack now spans GGUF intake, template lowering, generated vision execution, bridge stitching, and decoder continuation. That is the shape of a real transformer runtime, not an application wrapper.
+    </div>
+</div>
+
