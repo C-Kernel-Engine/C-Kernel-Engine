@@ -361,11 +361,11 @@ MAKE_TARGETS = {
         "target": "v7-kernel-map-contracts",
         "timeout_sec": 600,
     },
-    "v7_backprop_family_parity_fast": {
-        "name": "v7 Backprop Family Parity (fast)",
+    "v7_training_family_regression_full": {
+        "name": "v7 Training Family Regression (full)",
         "category": "training",
-        "target": "v7-regression-backprop-fast",
-        "timeout_sec": 7200,
+        "target": "regression-training-full",
+        "timeout_sec": 10800,
     },
     "v7_backprop_long_epoch_nightly": {
         "name": "v7 Backprop Long-Epoch Drift",
@@ -428,7 +428,7 @@ QUICK_TESTS = [
 MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v6.6-validate-matrix-nightly": ROOT / "version" / "v6.6" / "tools" / "model_matrix_report_latest.json",
     "v7-kernel-map-contracts": ROOT / "version" / "v7" / ".cache" / "reports" / "kernel_map_validation_latest.json",
-    "v7-regression-backprop-fast": ROOT / "version" / "v7" / ".cache" / "reports" / "backprop_family_matrix" / "fast" / "v7_backprop_family_matrix_latest.json",
+    "regression-training-full": ROOT / "version" / "v7" / ".cache" / "reports" / "backprop_family_matrix" / "full" / "v7_backprop_family_matrix_latest.json",
     "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
     "v7-visualizer-health": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_health_latest.json",
     "v7-visualizer-generated-e2e": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_generated_e2e_latest.json",
@@ -485,7 +485,7 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
             parts.append("warning_sample=" + " | ".join(str(item) for item in warnings[:2]))
         return f"{prefix}; {'; '.join(parts)}"
 
-    if target == "v7-regression-backprop-fast":
+    if target == "regression-training-full":
         summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
         rows = payload.get("results") if isinstance(payload.get("results"), list) else []
         failing = [row for row in rows if isinstance(row, dict) and not bool(row.get("passed", False))]

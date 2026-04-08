@@ -409,17 +409,17 @@ jobs:
                   return "FAIL"
               return "PASS" if failed_stage_ids else "-"
 
-          backprop_report = Path("version/v7/.cache/reports/backprop_family_matrix/fast/v7_backprop_family_matrix_latest.json")
-          backprop_result = results_by_name.get("v7 Backprop Family Parity (fast)")
+          backprop_report = Path("version/v7/.cache/reports/backprop_family_matrix/full/v7_backprop_family_matrix_latest.json")
+          backprop_result = results_by_name.get("v7 Training Family Regression (full)")
           backprop_payload = {
               "status": "not_run",
-              "mode": "fast",
+              "mode": "full",
               "stage_profile": "default",
               "families_total": 0,
               "families_passed": 0,
               "families_failed": 0,
               "family_rows": [],
-              "note": "v7-regression-backprop-fast did not publish a nightly summary.",
+              "note": "regression-training-full did not publish a nightly summary.",
           }
           if backprop_report.exists():
               doc = json.loads(backprop_report.read_text(encoding="utf-8"))
@@ -469,7 +469,7 @@ jobs:
                   "families_failed": 0,
                   "family_rows": [],
                   "note": (
-                      "v7-regression-backprop-fast ran but did not publish "
+                      "regression-training-full ran but did not publish "
                       "v7_backprop_family_matrix_latest.json. "
                       + str(backprop_result.get("error_msg", "") or "")
                   ).strip(),

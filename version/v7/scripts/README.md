@@ -49,12 +49,19 @@ or `--no-memory-check` only for intentional local diagnostics.
 
 Operator-facing make entrypoints:
 
+- `make regression-training-fast`
+- `make regression-training-full`
+- `make training-fast`
+- `make training-full`
+
+Those generic training targets are the stable user-facing interface. Today they route to the
+`v7` text-backprop lane. If a later version becomes the primary training lane, the
+Makefile should update that routing internally without changing the user command.
+
+Compatibility aliases still exist:
+
 - `make regression-backprop-fast`
 - `make regression-backprop-full`
-
-Those generic targets are the stable user-facing interface. Today they route to the
-`v7` text-backprop lane. If a later version becomes the primary backprop lane, the
-Makefile should update that routing internally without changing the user command.
 
 Current family transfer target order:
 

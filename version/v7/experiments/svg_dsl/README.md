@@ -75,6 +75,8 @@ into the top-level active `version/v7/scripts/` surface forever.
 Generated outputs belong under:
 
 - `version/v7/artifacts/svg_dsl/`
+- current SVG/spec report archive:
+  `version/v7/artifacts/svg_dsl/spec_archive_2026-04-08/`
 
 That includes:
 
@@ -115,6 +117,8 @@ For the current dirty worktree:
 - keep atomic DSL + tokenizer + active text/training files as source
 - keep gen1/program code as source, but classify it as experiment source
 - keep generated archives in `version/v7/artifacts/svg_dsl/`
+- keep older `version/v7/reports/...` paths as compatibility symlinks when an
+  archive move would otherwise break existing manifest snapshots
 - do not move experiment source into artifacts
 - when we do the real move, leave compatibility wrappers in
   `version/v7/scripts/` so imports/tests/docs do not break all at once

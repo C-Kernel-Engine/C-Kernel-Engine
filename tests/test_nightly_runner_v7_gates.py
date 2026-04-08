@@ -29,16 +29,16 @@ nightly = _load_module("nightly_runner_v7_gate_test", SCRIPT)
 
 
 class NightlyRunnerV7GateTests(unittest.TestCase):
-    def test_v7_make_targets_include_kernel_map_and_backprop_matrix(self) -> None:
+    def test_v7_make_targets_include_kernel_map_and_training_matrix(self) -> None:
         self.assertIn("v7_kernel_map_contracts", nightly.MAKE_TARGETS)
         self.assertEqual(
             nightly.MAKE_TARGETS["v7_kernel_map_contracts"]["target"],
             "v7-kernel-map-contracts",
         )
-        self.assertIn("v7_backprop_family_parity_fast", nightly.MAKE_TARGETS)
+        self.assertIn("v7_training_family_regression_full", nightly.MAKE_TARGETS)
         self.assertEqual(
-            nightly.MAKE_TARGETS["v7_backprop_family_parity_fast"]["target"],
-            "v7-regression-backprop-fast",
+            nightly.MAKE_TARGETS["v7_training_family_regression_full"]["target"],
+            "regression-training-full",
         )
 
     def test_kernel_map_failure_artifact_summary_uses_validator_counts(self) -> None:
@@ -95,15 +95,15 @@ class NightlyRunnerV7GateTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            original = nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v7-regression-backprop-fast"]
-            nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v7-regression-backprop-fast"] = report
+            original = nightly.MAKE_TARGET_FAILURE_ARTIFACTS["regression-training-full"]
+            nightly.MAKE_TARGET_FAILURE_ARTIFACTS["regression-training-full"] = report
             try:
                 summary = nightly._summarize_make_failure_artifact(
-                    "v7-regression-backprop-fast",
+                    "regression-training-full",
                     start_ts=0.0,
                 )
             finally:
-                nightly.MAKE_TARGET_FAILURE_ARTIFACTS["v7-regression-backprop-fast"] = original
+                nightly.MAKE_TARGET_FAILURE_ARTIFACTS["regression-training-full"] = original
             self.assertIn("families:3/4", summary)
             self.assertIn("qwen3:B2,C2", summary)
 

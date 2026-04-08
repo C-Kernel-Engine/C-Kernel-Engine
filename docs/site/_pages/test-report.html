@@ -338,9 +338,9 @@
     </div>
 
     <div class="regression-section">
-      <h2>v7 Backprop Family Parity</h2>
+      <h2>v7 Training Family Regression</h2>
       <p class="regression-meta" id="backprop-regression-meta">
-        `make regression-backprop-fast` status is not available in this report yet.
+        `make regression-training-full` status is not available in this report yet.
       </p>
 
       <div class="summary-cards" style="margin: 0 0 1rem 0;">
@@ -377,7 +377,7 @@
           </tr>
         </thead>
         <tbody id="backprop-regression-tbody">
-          <tr><td colspan="9" class="updated-time">No backprop family summary published in this report.</td></tr>
+          <tr><td colspan="9" class="updated-time">No training family summary published in this report.</td></tr>
         </tbody>
       </table>
     </div>
@@ -539,8 +539,8 @@
       (<code>make v7-kernel-map-contracts</code>)</li>
     <li><strong>v7 Backprop Kernel Parity</strong>: Optimizer + QK-norm backward ISA matrix + RMSNorm/SwiGLU backward + GEMM backward sweep
       (<code>make v7-kernel-parity-train</code>)</li>
-    <li><strong>v7 Backprop Family Parity</strong>: family-level <code>A/B/C/D/E/F</code> training regimen across the fast decoder matrix
-      (<code>make regression-backprop-fast</code>)</li>
+    <li><strong>v7 Training Family Regression</strong>: family-level <code>A/B/C/D/E/F</code> training regimen across the full decoder family matrix
+      (<code>make regression-training-full</code> nightly, <code>make regression-training-fast</code> for local fast coverage)</li>
     <li><strong>v7 IR Visualizer E2E</strong>: Runbook-path regression with explicit run-dir wiring, decode profile checks, and tiny train-runtime ASan artifact validation
       (<code>make visualizer</code>, <code>make visualizer-full</code>)</li>
     <li><strong>v7 Visualizer Health Gate</strong>: Contract-driven static analysis (160 checks) + JS unit tests (100 test vectors) for IR visualizer, dataset viewer, and IR hub
@@ -561,7 +561,7 @@
     <div>
       <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
-      <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, published backprop family parity, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
+      <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, published training family regression, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
     </div>
   </div>
 
@@ -1019,12 +1019,12 @@ function renderBackpropRegression(data) {
   const tbody = document.getElementById('backprop-regression-tbody');
 
   if (!data) {
-    metaEl.textContent = 'make regression-backprop-fast status is not available in this report yet.';
+    metaEl.textContent = 'make regression-training-full status is not available in this report yet.';
     statusEl.textContent = '-';
     passedEl.textContent = '0';
     failedEl.textContent = '0';
     totalEl.textContent = '0';
-    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No backprop family summary published in this report.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No training family summary published in this report.</td></tr>';
     return;
   }
 
@@ -1041,7 +1041,7 @@ function renderBackpropRegression(data) {
   totalEl.textContent = String(familiesTotal);
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No family rows were published for backprop parity.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No family rows were published for training regression.</td></tr>';
     return;
   }
 

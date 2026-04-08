@@ -1003,6 +1003,14 @@ test-relu: $(LIB_RELU)
 test-vision: $(LIB_VISION)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
 
+# Policy:
+# - Keep public/operator-facing test entrypoints version-neutral (`make test`,
+#   `make nightly`, `make regression-fast`, future `make vision-test`,
+#   `make vision-parity`).
+# - Versioned targets below are internal bring-up shims only. Do not grow the
+#   public surface with bespoke `test-vX-*` / `nightly-vX-*` names.
+# - New lanes are promoted behind the stable parent targets only after they pass
+#   the current regression lane plus the newer capability-specific coverage.
 test-v8-vision: $(LIB_VISION)
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) unittest/test_vision.py
 	LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH $(PYTHON) $(PYTHONFLAGS) tests/test_v8_siglip_template.py
@@ -3339,6 +3347,7 @@ report-md:
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
+.PHONY: v7-regression-training-fast v7-regression-training-full regression-training-fast regression-training-full training-fast training-full
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
@@ -3749,10 +3758,16 @@ v7-help:
 	@echo "  make v7-backprop-long-epoch"
 	@echo "  make v7-backprop-long-epoch-nightly"
 	@echo "  make v7-backprop-production-ready"
+	@echo "  make regression-training-fast"
+	@echo "  make regression-training-full"
+	@echo "  make training-fast"
+	@echo "  make training-full"
 	@echo "  make regression-backprop-fast"
 	@echo "  make regression-backprop-full"
 	@echo "  make v7-regression-backprop-fast"
 	@echo "  make v7-regression-backprop-full"
+	@echo "  make v7-regression-training-fast"
+	@echo "  make v7-regression-training-full"
 	@echo "  make v7-gate-train"
 	@echo "  make v7-gate"
 	@echo "  make v7"
@@ -3777,8 +3792,9 @@ v7-help:
 	@echo "  - production train safety defaults: max-grad-norm=$(V7_TRAIN_PROD_MAX_GRAD_NORM), enforce=$(V7_TRAIN_ENFORCE_PROD_SAFETY)"
 	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
 	@echo "  - runtime parity bitwise diagnostics: set V7_TRAIN_RUNTIME_PARITY_BITWISE=1 (forces --bitwise-parity)"
-	@echo "  - backprop family matrix: regression-backprop-fast is the stable entrypoint and currently routes to $(BACKPROP_FAST_TARGET)"
-	@echo "  - versioned backprop targets remain as compatibility shims; update BACKPROP_LATEST_VERSION when a newer lane becomes primary"
+	@echo "  - training family regression: regression-training-fast is the stable entrypoint and currently routes to $(BACKPROP_FAST_TARGET)"
+	@echo "  - compatibility aliases regression-backprop-fast and training-fast route to the same fast training family matrix"
+	@echo "  - versioned v7-regression-training-* and older backprop-named targets remain compatibility shims"
 	@echo "  - current v7 fast matrix covers qwen2/qwen3/gemma/nanbeige; full adds qwen35"
 	@echo "  - family override for smoke/triage: V7_BACKPROP_MATRIX_FAMILIES=qwen3 or qwen2,qwen3"
 	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
@@ -4281,6 +4297,18 @@ v7-regression-backprop-full:
 regression-backprop-fast: $(BACKPROP_FAST_TARGET)
 
 regression-backprop-full: $(BACKPROP_FULL_TARGET)
+
+v7-regression-training-fast: v7-regression-backprop-fast
+
+v7-regression-training-full: v7-regression-backprop-full
+
+regression-training-fast: $(BACKPROP_FAST_TARGET)
+
+regression-training-full: $(BACKPROP_FULL_TARGET)
+
+training-fast: $(BACKPROP_FAST_TARGET)
+
+training-full: $(BACKPROP_FULL_TARGET)
 
 v7-backprop-plumbing:
 	@set -e; \
