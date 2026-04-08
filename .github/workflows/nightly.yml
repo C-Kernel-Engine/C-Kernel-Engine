@@ -241,7 +241,7 @@ jobs:
             python3 -c "import json; d=json.load(open('docs/site/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
           fi
 
-      - name: Attach v7 Fast Regression Summary
+      - name: Attach v7 Nightly Summaries
         env:
           REGRESSION_SHOULD_RUN: ${{ steps.regression_scope.outputs.should_run }}
           REGRESSION_REASON: ${{ steps.regression_scope.outputs.reason }}
@@ -250,6 +250,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          from datetime import datetime, timezone
           from pathlib import Path
 
           latest_path = Path("docs/site/site/nightly-results/latest.json")
@@ -257,11 +258,30 @@ jobs:
             raise SystemExit("missing nightly latest.json")
 
           data = json.loads(latest_path.read_text(encoding="utf-8"))
+          results = data.get("results") if isinstance(data.get("results"), list) else []
+          results_by_name = {
+              str(row.get("name")): row
+              for row in results
+              if isinstance(row, dict) and row.get("name")
+          }
           reports_root = Path("build/v7-regression-reports")
           summary_files = sorted(reports_root.glob("*/summary.json"))
           repo_latest_path = Path("docs/site/nightly-results/latest.json")
           requested = str(os.environ.get("REGRESSION_SHOULD_RUN", "")).lower() == "true"
           outcome = str(os.environ.get("REGRESSION_OUTCOME", "skipped")).lower()
+
+          def _utc_mtime(path: Path) -> str:
+              return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat().replace("+00:00", "Z")
+
+          def _load_previous_payload(key: str):
+              if not repo_latest_path.exists():
+                  return None
+              try:
+                  repo_latest = json.loads(repo_latest_path.read_text(encoding="utf-8"))
+              except Exception:
+                  return None
+              prev = repo_latest.get(key)
+              return dict(prev) if isinstance(prev, dict) else None
 
           regression_payload = {
               "status": "not_run",
@@ -320,24 +340,155 @@ jobs:
                       f"(outcome={outcome}). See build/v7_regression_fast.log."
                   ),
               }
-          elif repo_latest_path.exists():
-              try:
-                  repo_latest = json.loads(repo_latest_path.read_text(encoding="utf-8"))
-                  prev = repo_latest.get("regression_fast")
-                  if isinstance(prev, dict) and (prev.get("family_rows") or prev.get("families_total")):
-                      regression_payload = dict(prev)
-                      reason = os.environ.get("REGRESSION_REASON", "not requested")
-                      regression_payload["note"] = (
-                          f"{prev.get('note', 'Preserved previous regression-fast snapshot.')} "
-                          f"Preserved because this workflow skipped regression-fast ({reason})."
-                      ).strip()
-              except Exception:
-                  pass
+          else:
+              prev = _load_previous_payload("regression_fast")
+              if prev and (prev.get("family_rows") or prev.get("families_total")):
+                  regression_payload = dict(prev)
+                  reason = os.environ.get("REGRESSION_REASON", "not requested")
+                  regression_payload["note"] = (
+                      f"{prev.get('note', 'Preserved previous regression-fast snapshot.')} "
+                      f"Preserved because this workflow skipped regression-fast ({reason})."
+                  ).strip()
+
+          kernel_map_report = Path("version/v7/.cache/reports/kernel_map_validation_latest.json")
+          kernel_map_result = results_by_name.get("v7 Kernel Map Contracts")
+          kernel_map_payload = {
+              "status": "not_run",
+              "kernel_maps": 0,
+              "passed": 0,
+              "failed": 0,
+              "warnings": 0,
+              "sample_warnings": [],
+              "note": "v7-kernel-map-contracts did not publish a nightly summary.",
+          }
+          if kernel_map_report.exists():
+              doc = json.loads(kernel_map_report.read_text(encoding="utf-8"))
+              summary = doc.get("summary") if isinstance(doc.get("summary"), dict) else {}
+              warnings = doc.get("warnings") if isinstance(doc.get("warnings"), list) else []
+              kernel_map_payload = {
+                  "status": str(summary.get("status", "not_run")).lower(),
+                  "generated_at": _utc_mtime(kernel_map_report),
+                  "summary_path": str(kernel_map_report),
+                  "kernel_maps": int(summary.get("kernel_maps", 0) or 0),
+                  "passed": int(summary.get("passed", 0) or 0),
+                  "failed": int(summary.get("failed", 0) or 0),
+                  "warnings": int(summary.get("warnings", 0) or 0),
+                  "strict": bool(summary.get("strict", False)),
+                  "sample_warnings": [str(item) for item in warnings[:5]],
+                  "note": f"Source: {kernel_map_report}",
+              }
+          elif isinstance(kernel_map_result, dict):
+              result_status = str(kernel_map_result.get("status", "not_run")).lower()
+              kernel_map_payload = {
+                  "status": "fail" if result_status in ("fail", "timeout") else result_status,
+                  "kernel_maps": 0,
+                  "passed": 0,
+                  "failed": 0,
+                  "warnings": 0,
+                  "sample_warnings": [],
+                  "note": (
+                      "v7-kernel-map-contracts ran but did not publish "
+                      "kernel_map_validation_latest.json. "
+                      + str(kernel_map_result.get("error_msg", "") or "")
+                  ).strip(),
+              }
+          else:
+              prev = _load_previous_payload("kernel_map_contracts")
+              if prev and (prev.get("kernel_maps") or prev.get("summary_path")):
+                  kernel_map_payload = dict(prev)
+                  kernel_map_payload["note"] = (
+                      f"{prev.get('note', 'Preserved previous kernel-map snapshot.')} "
+                      "Preserved because this workflow did not publish a fresh kernel-map summary."
+                  ).strip()
+
+          def _stage_group_status(row_passed, failed_stage_ids, prefix):
+              if row_passed:
+                  return "PASS"
+              prefix_failures = [stage for stage in failed_stage_ids if str(stage).startswith(prefix)]
+              if prefix_failures:
+                  return "FAIL"
+              return "PASS" if failed_stage_ids else "-"
+
+          backprop_report = Path("version/v7/.cache/reports/backprop_family_matrix/fast/v7_backprop_family_matrix_latest.json")
+          backprop_result = results_by_name.get("v7 Backprop Family Parity (fast)")
+          backprop_payload = {
+              "status": "not_run",
+              "mode": "fast",
+              "stage_profile": "default",
+              "families_total": 0,
+              "families_passed": 0,
+              "families_failed": 0,
+              "family_rows": [],
+              "note": "v7-regression-backprop-fast did not publish a nightly summary.",
+          }
+          if backprop_report.exists():
+              doc = json.loads(backprop_report.read_text(encoding="utf-8"))
+              row_payloads = []
+              for row in doc.get("results") or []:
+                  if not isinstance(row, dict):
+                      continue
+                  row_summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
+                  failed_stage_ids = [str(stage) for stage in row_summary.get("failed_stage_ids") or []]
+                  row_passed = bool(row.get("passed", False))
+                  row_payloads.append({
+                      "family": row.get("family"),
+                      "status": "PASS" if row_passed else "FAIL",
+                      "a_status": _stage_group_status(row_passed, failed_stage_ids, "A"),
+                      "b_status": _stage_group_status(row_passed, failed_stage_ids, "B"),
+                      "c_status": _stage_group_status(row_passed, failed_stage_ids, "C"),
+                      "d_status": _stage_group_status(row_passed, failed_stage_ids, "D"),
+                      "e_status": _stage_group_status(row_passed, failed_stage_ids, "E"),
+                      "f_status": _stage_group_status(row_passed, failed_stage_ids, "F"),
+                      "failed_stage_ids": failed_stage_ids,
+                      "report_json": row.get("report_json"),
+                  })
+              summary = doc.get("summary") if isinstance(doc.get("summary"), dict) else {}
+              families_passed = int(summary.get("passed_families", 0) or 0)
+              families_total = int(summary.get("total_families", len(row_payloads)) or len(row_payloads))
+              backprop_payload = {
+                  "status": "pass" if bool(summary.get("passed", False)) else "fail",
+                  "mode": str(doc.get("mode", "fast") or "fast"),
+                  "stage_profile": str(doc.get("stage_profile", "default") or "default"),
+                  "generated_at": str(doc.get("generated_at") or _utc_mtime(backprop_report)),
+                  "summary_path": str(backprop_report),
+                  "families_total": families_total,
+                  "families_passed": families_passed,
+                  "families_failed": max(0, families_total - families_passed),
+                  "family_rows": row_payloads,
+                  "failed_families": list(summary.get("failed_families") or []),
+                  "note": f"Source: {backprop_report}",
+              }
+          elif isinstance(backprop_result, dict):
+              result_status = str(backprop_result.get("status", "not_run")).lower()
+              backprop_payload = {
+                  "status": "fail" if result_status in ("fail", "timeout") else result_status,
+                  "mode": "fast",
+                  "stage_profile": "default",
+                  "families_total": 0,
+                  "families_passed": 0,
+                  "families_failed": 0,
+                  "family_rows": [],
+                  "note": (
+                      "v7-regression-backprop-fast ran but did not publish "
+                      "v7_backprop_family_matrix_latest.json. "
+                      + str(backprop_result.get("error_msg", "") or "")
+                  ).strip(),
+              }
+          else:
+              prev = _load_previous_payload("backprop_regression")
+              if prev and (prev.get("family_rows") or prev.get("families_total")):
+                  backprop_payload = dict(prev)
+                  backprop_payload["note"] = (
+                      f"{prev.get('note', 'Preserved previous backprop family snapshot.')} "
+                      "Preserved because this workflow did not publish a fresh backprop family summary."
+                  ).strip()
 
           data["regression_fast"] = regression_payload
+          data["kernel_map_contracts"] = kernel_map_payload
+          data["backprop_regression"] = backprop_payload
           latest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
           Path("build/nightly_report.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-          print("Attached regression_fast to nightly latest.json")
+          print("Attached v7 nightly summaries to nightly latest.json")
           PY
 
       - name: Run v6.6 E2E Tests
@@ -374,6 +525,8 @@ jobs:
             build/*.log
             build/*.json
             build/v7-regression-reports/**
+            version/v7/.cache/reports/kernel_map_validation_latest.json
+            version/v7/.cache/reports/backprop_family_matrix/**
           retention-days: 7
 
       - name: Prepare nightly results for deployment

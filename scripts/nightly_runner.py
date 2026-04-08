@@ -355,6 +355,18 @@ MAKE_TARGETS = {
         "target": "v6.6-validate-matrix-nightly",
         "timeout_sec": 2400,
     },
+    "v7_kernel_map_contracts": {
+        "name": "v7 Kernel Map Contracts",
+        "category": "parity",
+        "target": "v7-kernel-map-contracts",
+        "timeout_sec": 600,
+    },
+    "v7_backprop_family_parity_fast": {
+        "name": "v7 Backprop Family Parity (fast)",
+        "category": "training",
+        "target": "v7-regression-backprop-fast",
+        "timeout_sec": 7200,
+    },
     "v7_backprop_long_epoch_nightly": {
         "name": "v7 Backprop Long-Epoch Drift",
         "category": "training",
@@ -415,6 +427,8 @@ QUICK_TESTS = [
 
 MAKE_TARGET_FAILURE_ARTIFACTS = {
     "v6.6-validate-matrix-nightly": ROOT / "version" / "v6.6" / "tools" / "model_matrix_report_latest.json",
+    "v7-kernel-map-contracts": ROOT / "version" / "v7" / ".cache" / "reports" / "kernel_map_validation_latest.json",
+    "v7-regression-backprop-fast": ROOT / "version" / "v7" / ".cache" / "reports" / "backprop_family_matrix" / "fast" / "v7_backprop_family_matrix_latest.json",
     "v7-ir-visualizer-e2e-nightly": ROOT / "version" / "v7" / ".cache" / "reports" / "ir_visualizer_e2e_latest.json",
     "v7-visualizer-health": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_health_latest.json",
     "v7-visualizer-generated-e2e": ROOT / "version" / "v7" / ".cache" / "reports" / "visualizer_generated_e2e_latest.json",
@@ -460,6 +474,37 @@ def _summarize_make_failure_artifact(target: str, *, start_ts: float) -> str:
         if len(failing) > 3:
             details.append(f"+{len(failing) - 3} more")
         return f"{prefix}; failing_rows={' | '.join(details)}"
+
+    if target == "v7-kernel-map-contracts":
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        warnings = payload.get("warnings") if isinstance(payload.get("warnings"), list) else []
+        parts = [
+            f"summary=status:{summary.get('status')} passed:{summary.get('passed')}/{summary.get('kernel_maps')} failed:{summary.get('failed')} warnings:{summary.get('warnings')}"
+        ]
+        if warnings:
+            parts.append("warning_sample=" + " | ".join(str(item) for item in warnings[:2]))
+        return f"{prefix}; {'; '.join(parts)}"
+
+    if target == "v7-regression-backprop-fast":
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        rows = payload.get("results") if isinstance(payload.get("results"), list) else []
+        failing = [row for row in rows if isinstance(row, dict) and not bool(row.get("passed", False))]
+        parts = [
+            f"summary=passed:{summary.get('passed')} families:{summary.get('passed_families')}/{summary.get('total_families')}"
+        ]
+        if failing:
+            details = []
+            for row in failing[:4]:
+                failed_stage_ids = []
+                row_summary = row.get("summary")
+                if isinstance(row_summary, dict):
+                    failed_stage_ids = list(row_summary.get("failed_stage_ids") or [])
+                detail = ",".join(str(stage) for stage in failed_stage_ids[:4]) or f"rc={row.get('rc')}"
+                details.append(f"{row.get('family')}:{detail}")
+            if len(failing) > 4:
+                details.append(f"+{len(failing) - 4} more")
+            parts.append("family_fail=" + " | ".join(details))
+        return f"{prefix}; {'; '.join(parts)}"
 
     if target == "v7-ir-visualizer-e2e-nightly":
         checks = payload.get("checks")

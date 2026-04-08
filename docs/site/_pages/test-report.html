@@ -210,6 +210,11 @@
       font-size: 0.8rem;
       white-space: normal;
     }
+    .regression-warning-cell {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      white-space: normal;
+    }
   </style>
 
   <div id="loading-state" class="active">
@@ -291,6 +296,88 @@
         </thead>
         <tbody id="regression-fast-tbody">
           <tr><td colspan="8" class="updated-time">No regression-fast data published in this report.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="regression-section">
+      <h2>v7 Kernel Map Contracts</h2>
+      <p class="regression-meta" id="kernel-map-meta">
+        `make v7-kernel-map-contracts` status is not available in this report yet.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card">
+          <div class="value" id="kernel-map-status">-</div>
+          <div class="label">Overall</div>
+        </div>
+        <div class="summary-card passed">
+          <div class="value" id="kernel-map-passed">0</div>
+          <div class="label">Maps Passed</div>
+        </div>
+        <div class="summary-card failed">
+          <div class="value" id="kernel-map-failed">0</div>
+          <div class="label">Maps Failed</div>
+        </div>
+        <div class="summary-card">
+          <div class="value" id="kernel-map-warnings">0</div>
+          <div class="label">Warnings</div>
+        </div>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Validator Notes</th>
+          </tr>
+        </thead>
+        <tbody id="kernel-map-warning-tbody">
+          <tr><td class="updated-time">No kernel-map summary published in this report.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="regression-section">
+      <h2>v7 Backprop Family Parity</h2>
+      <p class="regression-meta" id="backprop-regression-meta">
+        `make regression-backprop-fast` status is not available in this report yet.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card">
+          <div class="value" id="backprop-regression-status">-</div>
+          <div class="label">Overall</div>
+        </div>
+        <div class="summary-card passed">
+          <div class="value" id="backprop-regression-passed">0</div>
+          <div class="label">Families Passed</div>
+        </div>
+        <div class="summary-card failed">
+          <div class="value" id="backprop-regression-failed">0</div>
+          <div class="label">Families Failed</div>
+        </div>
+        <div class="summary-card">
+          <div class="value" id="backprop-regression-total">0</div>
+          <div class="label">Families Total</div>
+        </div>
+      </div>
+
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Family</th>
+            <th>Status</th>
+            <th>A</th>
+            <th>B</th>
+            <th>C</th>
+            <th>D</th>
+            <th>E</th>
+            <th>F</th>
+            <th>Failed Stages</th>
+          </tr>
+        </thead>
+        <tbody id="backprop-regression-tbody">
+          <tr><td colspan="9" class="updated-time">No backprop family summary published in this report.</td></tr>
         </tbody>
       </table>
     </div>
@@ -448,8 +535,12 @@
       (<code>unittest/test_attention_sliding_contract.py</code>)</li>
     <li><strong>BF16 Tests</strong>: BFloat16 precision tests (when CPU supports it)</li>
     <li><strong>Quantization Tests</strong>: Q4_K, Q6_K quantized kernel tests</li>
+    <li><strong>v7 Kernel Map Contracts</strong>: sync + validator + contract tests for the active v7 map surface
+      (<code>make v7-kernel-map-contracts</code>)</li>
     <li><strong>v7 Backprop Kernel Parity</strong>: Optimizer + QK-norm backward ISA matrix + RMSNorm/SwiGLU backward + GEMM backward sweep
       (<code>make v7-kernel-parity-train</code>)</li>
+    <li><strong>v7 Backprop Family Parity</strong>: family-level <code>A/B/C/D/E/F</code> training regimen across the fast decoder matrix
+      (<code>make regression-backprop-fast</code>)</li>
     <li><strong>v7 IR Visualizer E2E</strong>: Runbook-path regression with explicit run-dir wiring, decode profile checks, and tiny train-runtime ASan artifact validation
       (<code>make visualizer</code>, <code>make visualizer-full</code>)</li>
     <li><strong>v7 Visualizer Health Gate</strong>: Contract-driven static analysis (160 checks) + JS unit tests (100 test vectors) for IR visualizer, dataset viewer, and IR hub
@@ -470,7 +561,7 @@
     <div>
       <strong>Run locally:</strong> <code>make test</code> (kernel-focused), <code>make visualizer</code> (fast path), <code>make visualizer-full</code> (includes tiny train-runtime ASan checks), <code>make nightly</code> (full matrix).
       <br>
-      <span style="color: var(--text-muted);">Nightly coverage now includes v7 backprop kernel parity, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
+      <span style="color: var(--text-muted);">Nightly coverage now includes v7 kernel-map contracts, v7 backprop kernel parity, published backprop family parity, visualizer runbook regression checks, and published <code>regression-fast</code> family summaries.</span>
     </div>
   </div>
 
@@ -734,6 +825,8 @@ function renderResults(data) {
   document.getElementById('sub-tests-passed').textContent = subPassed;
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRegressionFast(data.regression_fast || null);
+  renderKernelMapContracts(data.kernel_map_contracts || null);
+  renderBackpropRegression(data.backprop_regression || null);
 
   const statusEl = document.getElementById('overall-status');
   if (failed > 0) {
@@ -865,6 +958,111 @@ function renderRegressionFast(data) {
       <td>${row.contract_status || '-'}</td>
       <td>${row.first_token_status || '-'}</td>
       <td class="regression-family-note">${row.failure_detail || row.failure_reason || ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderKernelMapContracts(data) {
+  const metaEl = document.getElementById('kernel-map-meta');
+  const statusEl = document.getElementById('kernel-map-status');
+  const passedEl = document.getElementById('kernel-map-passed');
+  const failedEl = document.getElementById('kernel-map-failed');
+  const warningsEl = document.getElementById('kernel-map-warnings');
+  const tbody = document.getElementById('kernel-map-warning-tbody');
+
+  if (!data) {
+    metaEl.textContent = 'make v7-kernel-map-contracts status is not available in this report yet.';
+    statusEl.textContent = '-';
+    passedEl.textContent = '0';
+    failedEl.textContent = '0';
+    warningsEl.textContent = '0';
+    tbody.innerHTML = '<tr><td class="updated-time">No kernel-map summary published in this report.</td></tr>';
+    return;
+  }
+
+  const status = String(data.status || 'not_run').toLowerCase();
+  const kernelMaps = Number(data.kernel_maps || 0);
+  const passed = Number(data.passed || 0);
+  const failed = Number(data.failed || 0);
+  const warnings = Number(data.warnings || 0);
+  const samples = Array.isArray(data.sample_warnings) ? data.sample_warnings : [];
+
+  metaEl.textContent = data.note || `Generated: ${data.generated_at || '-'}`;
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'N/R';
+  passedEl.textContent = String(passed || (status === 'pass' ? kernelMaps : 0));
+  failedEl.textContent = String(failed);
+  warningsEl.textContent = String(warnings);
+
+  if (samples.length === 0) {
+    const note = warnings > 0
+      ? `${warnings} warning(s) recorded. See validator artifact for the full list.`
+      : 'No kernel-map warnings recorded in this run.';
+    tbody.innerHTML = `<tr><td class="regression-warning-cell">${note}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  samples.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="regression-warning-cell">${item}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderBackpropRegression(data) {
+  const metaEl = document.getElementById('backprop-regression-meta');
+  const statusEl = document.getElementById('backprop-regression-status');
+  const passedEl = document.getElementById('backprop-regression-passed');
+  const failedEl = document.getElementById('backprop-regression-failed');
+  const totalEl = document.getElementById('backprop-regression-total');
+  const tbody = document.getElementById('backprop-regression-tbody');
+
+  if (!data) {
+    metaEl.textContent = 'make regression-backprop-fast status is not available in this report yet.';
+    statusEl.textContent = '-';
+    passedEl.textContent = '0';
+    failedEl.textContent = '0';
+    totalEl.textContent = '0';
+    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No backprop family summary published in this report.</td></tr>';
+    return;
+  }
+
+  const rows = Array.isArray(data.family_rows) ? data.family_rows : [];
+  const status = String(data.status || 'not_run').toLowerCase();
+  const familiesPassed = Number(data.families_passed || 0);
+  const familiesFailed = Number(data.families_failed || 0);
+  const familiesTotal = Number(data.families_total || rows.length);
+
+  metaEl.textContent = data.note || `Mode: ${data.mode || 'fast'} · Profile: ${data.stage_profile || 'default'}`;
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : 'N/R';
+  passedEl.textContent = String(familiesPassed);
+  failedEl.textContent = String(familiesFailed);
+  totalEl.textContent = String(familiesTotal);
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="updated-time">No family rows were published for backprop parity.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    const rowStatus = String(row.status || 'SKIP').toUpperCase();
+    const badgeClass = rowStatus === 'PASS' ? 'pass' : rowStatus === 'FAIL' ? 'fail' : 'skip';
+    const failedStageText = Array.isArray(row.failed_stage_ids) && row.failed_stage_ids.length > 0
+      ? row.failed_stage_ids.join(', ')
+      : '-';
+    tr.innerHTML = `
+      <td><code>${row.family || '-'}</code></td>
+      <td><span class="regression-badge ${badgeClass}">${rowStatus}</span></td>
+      <td>${row.a_status || '-'}</td>
+      <td>${row.b_status || '-'}</td>
+      <td>${row.c_status || '-'}</td>
+      <td>${row.d_status || '-'}</td>
+      <td>${row.e_status || '-'}</td>
+      <td>${row.f_status || '-'}</td>
+      <td class="regression-family-note">${failedStageText}</td>
     `;
     tbody.appendChild(tr);
   });
