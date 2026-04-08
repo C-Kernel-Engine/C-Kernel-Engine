@@ -2,6 +2,7 @@ var ggml__runtime__compat_8h =
 [
     [ "ggml_init_params", "structggml__init__params.html", "structggml__init__params" ],
     [ "GGML_MROPE_SECTIONS", "ggml__runtime__compat_8h.html#a4137501de39b1fe78c0b3e1c19eb0f98", null ],
+    [ "GGML_ROPE_TYPE_IMROPE", "ggml__runtime__compat_8h.html#a1e1b82250cb90231ee164367d2171684", null ],
     [ "GGML_ROPE_TYPE_VISION", "ggml__runtime__compat_8h.html#aed82669845c3d2180182458027fc03b6", null ],
     [ "ggml_fp16_t", "ggml__runtime__compat_8h.html#a954dc34e2ac6f8da867e7c9b961cbdc7", null ],
     [ "ggml_status", "ggml__runtime__compat_8h.html#a25b8976b70962cc9b52c3508eda235ad", [
