@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -108,14 +109,39 @@ def load_runtime_contract(model_dir: Path) -> dict[str, Any]:
     return contract
 
 
-def _run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    *,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
         cwd=str(cwd or ROOT),
+        env=env,
         text=True,
         capture_output=True,
         check=False,
     )
+
+
+def _with_prepend_env_path(env: dict[str, str], key: str, path: Path) -> None:
+    value = str(path)
+    current = str(env.get(key, "") or "").strip()
+    if not current:
+        env[key] = value
+        return
+    parts = [p for p in current.split(":") if p]
+    if value in parts:
+        env[key] = ":".join(parts)
+        return
+    env[key] = ":".join([value] + parts)
+
+
+def _llama_runtime_env(lib_dir: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    _with_prepend_env_path(env, "LD_LIBRARY_PATH", lib_dir)
+    return env
 
 
 def ensure_llama_helper() -> Path:
@@ -176,6 +202,7 @@ def ensure_llama_helper() -> Path:
 
 def run_llama_logits(gguf_path: Path, tokens: list[int], ctx_len: int, top_k: int, threads: int) -> dict[str, Any]:
     helper = ensure_llama_helper()
+    helper_env = _llama_runtime_env(LLAMA_CPP / "build" / "bin")
     with tempfile.TemporaryDirectory(prefix="llama_token_replay_") as td:
         logits_path = Path(td) / "llama_logits.f32"
         cmd = [
@@ -193,7 +220,7 @@ def run_llama_logits(gguf_path: Path, tokens: list[int], ctx_len: int, top_k: in
         ]
         if threads > 0:
             cmd.extend(["--threads", str(int(threads))])
-        proc = _run(cmd, cwd=ROOT)
+        proc = _run(cmd, cwd=ROOT, env=helper_env)
         if proc.returncode != 0:
             raise RuntimeError(
                 "llama_token_replay failed\n"
