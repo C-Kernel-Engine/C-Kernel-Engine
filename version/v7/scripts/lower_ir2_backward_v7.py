@@ -26,6 +26,64 @@ KERNEL_REGISTRY_PATH = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
 KERNEL_BINDINGS_PATH = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
 DEFAULT_GRAD_RULES_PATH = SCRIPT_DIR / "grad_rules_v7.json"
 
+BACKWARD_BRIDGE_PLAN_SPECS: Dict[str, Dict[str, Any]] = {
+    "attn_backward_core": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "semantic_op_from_forward": True,
+        "pre_roles": (
+            {"role": "dy", "input_key": "in_0", "head_group": "num_heads"},
+            {"role": "q", "input_key": "in_1", "head_group": "num_heads"},
+            {"role": "k", "input_key": "in_2", "head_group": "num_kv_heads"},
+            {"role": "v", "input_key": "in_3", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (
+            {"role": "d_q", "output_key": "d_q", "head_group": "num_heads"},
+            {"role": "d_k", "output_key": "d_k", "head_group": "num_kv_heads"},
+            {"role": "d_v", "output_key": "d_v", "head_group": "num_kv_heads"},
+        ),
+    },
+    "rope_qk_backward_core": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "semantic_op": "rope_qk",
+        "pre_roles": (
+            {"role": "grad_q", "input_key": "in_0", "head_group": "num_heads"},
+            {"role": "grad_k", "input_key": "in_1", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (
+            {"role": "d_q", "output_key": "d_q", "head_group": "num_heads"},
+            {"role": "d_k", "output_key": "d_k", "head_group": "num_kv_heads"},
+        ),
+    },
+    "qk_norm_backward_core": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "semantic_op": "qk_norm",
+        "pre_roles": (
+            {"role": "grad_q", "input_key": "in_0", "head_group": "num_heads"},
+            {"role": "grad_k", "input_key": "in_1", "head_group": "num_kv_heads"},
+            {"role": "q", "input_key": "in_2", "head_group": "num_heads"},
+            {"role": "k", "input_key": "in_3", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (
+            {"role": "d_q", "output_key": "d_q", "head_group": "num_heads"},
+            {"role": "d_k", "output_key": "d_k", "head_group": "num_kv_heads"},
+        ),
+    },
+    "checkpoint_rematerialize_saved_tensor": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "semantic_op": "checkpoint_rematerialize_saved_tensor",
+        "pre_roles": (
+            {"role": "q", "input_key": "q", "head_group": "num_heads"},
+            {"role": "k", "input_key": "k", "head_group": "num_kv_heads"},
+            {"role": "v", "input_key": "v", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (),
+    },
+}
+
 
 def _load_json(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
@@ -120,6 +178,28 @@ def _default_activation_numel(config: Dict[str, Any]) -> int:
     return max(1, d_model, hidden, 2 * hidden, vocab, q_dim, kv_dim)
 
 
+def _aligned_head_dim(config: Dict[str, Any]) -> int:
+    head_dim = _cfg_int(config, ["head_dim"], 1)
+    return _cfg_int(config, ["aligned_head_dim"], max(1, head_dim))
+
+
+def _active_tokens(config: Dict[str, Any]) -> int:
+    return _cfg_int(config, ["train_tokens", "tokens", "seq_len"], 1)
+
+
+def _head_major_bridge_shape_numel(config: Dict[str, Any], head_group: str) -> Tuple[List[int], int]:
+    tokens = max(1, _active_tokens(config))
+    aligned_head_dim = max(1, _aligned_head_dim(config))
+    group = str(head_group or "num_heads").strip().lower()
+    if group in ("num_kv_heads", "kv", "k", "v"):
+        heads = _cfg_int(config, ["num_kv_heads"], _cfg_int(config, ["num_heads"], 1))
+    else:
+        heads = _cfg_int(config, ["num_heads"], 1)
+    heads = max(1, int(heads))
+    numel = max(1, tokens * heads * aligned_head_dim)
+    return [heads, tokens, aligned_head_dim], numel
+
+
 def _tensor_numel(tensors: Dict[str, Dict[str, Any]], tensor_id: Optional[str]) -> Optional[int]:
     if not isinstance(tensor_id, str) or not tensor_id:
         return None
@@ -192,6 +272,52 @@ def _ensure_tensor(
     }
 
 
+def _bridge_ref(
+    tensors: Dict[str, Dict[str, Any]],
+    config: Dict[str, Any],
+    *,
+    core_op_id: int,
+    role: str,
+    head_group: str,
+) -> Dict[str, Any]:
+    shape, numel = _head_major_bridge_shape_numel(config, head_group)
+    tid = "tmp.bridge.bwd.op%d.%s" % (int(core_op_id), _sanitize_tensor_id(role))
+    _ensure_tensor(
+        tensors,
+        tensor_id=tid,
+        dtype="fp32",
+        kind="tmp",
+        requires_grad=False,
+        persistent=False,
+        producer=None,
+        shape=shape,
+        numel=numel,
+    )
+    return {
+        "tensor": tid,
+        "kind": "tmp",
+        "shape": shape,
+        "numel": numel,
+        "head_group": head_group,
+    }
+
+
+def _normalize_checkpoint_policy(policy: Any) -> str:
+    raw = str(policy or "none").strip().lower()
+    aliases = {
+        "": "none",
+        "off": "none",
+        "save_all": "none",
+        "recompute_attention": "recompute_attn",
+        "recompute_attn_weights": "recompute_attn",
+    }
+    return aliases.get(raw, raw)
+
+
+def _checkpoint_recomputes_attention(policy: str) -> bool:
+    return _normalize_checkpoint_policy(policy) == "recompute_attn"
+
+
 def synthesize_ir2_backward(
     ir1: Dict[str, Any],
     registry: Dict[str, Any],
@@ -207,10 +333,14 @@ def synthesize_ir2_backward(
     kernels = _kernel_ids(registry)
     bindings = _binding_ids(bindings_doc)
     rules = grad_rules.get("rules", {}) or {}
+    checkpoint_policy = _normalize_checkpoint_policy(checkpoint_policy)
+    if checkpoint_policy not in {"none", "recompute_attn"}:
+        raise RuntimeError("Unsupported checkpoint policy: %s" % checkpoint_policy)
+
     config = _resolve_ir1_config(ir1)
     activation_default_numel = _default_activation_numel(config)
 
-    forward_ops = list(ir1.get("ops", []))
+    forward_ops = deepcopy(ir1.get("ops", []))
     tensors: Dict[str, Dict[str, Any]] = deepcopy(ir1.get("tensors", {}))
 
     backward_ops: List[Dict[str, Any]] = []
@@ -226,6 +356,9 @@ def synthesize_ir2_backward(
     grad_for_tensor: Dict[str, str] = {}
     # Tracks writers per gradient destination for invariant reporting/debugging.
     grad_writers: Dict[str, List[int]] = {}
+    bridge_enabled = str(ir1.get("bridge_lowering", "legacy") or "legacy").strip().lower() == "explicit"
+    checkpoint_rematerialize_ops = 0
+    checkpoint_demoted_saved_tensors: List[str] = []
 
     def emit_backward_op(op: Dict[str, Any]) -> Dict[str, Any]:
         nonlocal next_op_id
@@ -300,6 +433,311 @@ def synthesize_ir2_backward(
         }
         created = emit_backward_op(op)
         grad_writers.setdefault(dst_tensor, []).append(int(created["op_id"]))
+
+    def build_backward_bridge_plan(
+        *,
+        plan_key: str,
+        core_op_id: int,
+        semantic_op: str,
+        bwd_inputs: Dict[str, Dict[str, Any]],
+        bwd_outputs: Dict[str, Dict[str, Any]],
+        runtime_contract: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        spec = BACKWARD_BRIDGE_PLAN_SPECS.get(str(plan_key))
+        if not isinstance(spec, dict):
+            return None
+
+        plan: Dict[str, Any] = {
+            "version": 1,
+            "mode": "explicit",
+            "semantic_op": str(semantic_op),
+            "kernel_layout": str(spec.get("kernel_layout", "head_major") or "head_major"),
+            "tensor_layout": str(spec.get("tensor_layout", "token_major") or "token_major"),
+            "pre": [],
+            "post": [],
+        }
+        if isinstance(runtime_contract, dict) and runtime_contract:
+            plan["runtime_contract"] = dict(runtime_contract)
+
+        for row in spec.get("pre_roles", ()):
+            input_key = str(row.get("input_key", "") or "")
+            src = bwd_inputs.get(input_key)
+            if not isinstance(src, dict) or not isinstance(src.get("tensor"), str):
+                return None
+            role = str(row.get("role", input_key) or input_key)
+            head_group = str(row.get("head_group", "num_heads") or "num_heads")
+            scratch = _bridge_ref(tensors, config, core_op_id=core_op_id, role=role, head_group=head_group)
+            plan["pre"].append(
+                {
+                    "role": role,
+                    "head_group": head_group,
+                    "input_tensor": src["tensor"],
+                    "output_tensor": scratch["tensor"],
+                    "layout_in": "token_major",
+                    "layout_out": "head_major",
+                }
+            )
+
+        for row in spec.get("post_roles", ()):
+            output_key = str(row.get("output_key", "") or "")
+            dst = bwd_outputs.get(output_key)
+            if not isinstance(dst, dict) or not isinstance(dst.get("tensor"), str):
+                return None
+            role = str(row.get("role", output_key) or output_key)
+            head_group = str(row.get("head_group", "num_heads") or "num_heads")
+            scratch = _bridge_ref(tensors, config, core_op_id=core_op_id, role=role, head_group=head_group)
+            plan["post"].append(
+                {
+                    "role": role,
+                    "head_group": head_group,
+                    "input_tensor": scratch["tensor"],
+                    "output_tensor": dst["tensor"],
+                    "layout_in": "head_major",
+                    "layout_out": "token_major",
+                }
+            )
+        return plan
+
+    def attach_backward_bridge_plan(
+        core_op: Dict[str, Any],
+        *,
+        kernel_id: str,
+        fwd_op: Dict[str, Any],
+        bwd_inputs: Dict[str, Dict[str, Any]],
+        bwd_outputs: Dict[str, Dict[str, Any]],
+    ) -> None:
+        if not bridge_enabled:
+            return
+        core_op_id = int(core_op.get("op_id", -1))
+        if core_op_id < 0:
+            return
+        plan_key = str(core_op.get("op", "") or "")
+        semantic_op = str(fwd_op.get("op", "") or "attention")
+        spec = BACKWARD_BRIDGE_PLAN_SPECS.get(plan_key)
+        if not isinstance(spec, dict):
+            return
+        if not bool(spec.get("semantic_op_from_forward", False)):
+            semantic_op = str(spec.get("semantic_op", semantic_op) or semantic_op)
+        plan = build_backward_bridge_plan(
+            plan_key=plan_key,
+            core_op_id=core_op_id,
+            semantic_op=semantic_op,
+            bwd_inputs=bwd_inputs,
+            bwd_outputs=bwd_outputs,
+        )
+        if isinstance(plan, dict):
+            core_op["bridge_plan"] = plan
+
+    def _apply_forward_checkpoint_policy(op: Dict[str, Any]) -> None:
+        if not _checkpoint_recomputes_attention(checkpoint_policy):
+            return
+        if str(op.get("op", "") or "") not in ("attn", "attn_sliding"):
+            return
+        runtime_contract = op.get("runtime_contract") if isinstance(op.get("runtime_contract"), dict) else {}
+        base_kernel_id = str(
+            runtime_contract.get("base_kernel_id")
+            or runtime_contract.get("kernel_id")
+            or op.get("kernel_id")
+            or ""
+        )
+        if not base_kernel_id:
+            return
+        updated_contract = dict(runtime_contract)
+        updated_contract["version"] = int(updated_contract.get("version", 1) or 1)
+        updated_contract["semantic_op"] = str(updated_contract.get("semantic_op") or op.get("op") or "attn")
+        updated_contract["base_kernel_id"] = base_kernel_id
+        updated_contract["kernel_id"] = base_kernel_id
+        updated_contract["materialize_saved_attn_weights"] = False
+        updated_contract["checkpoint_policy"] = checkpoint_policy
+        updated_contract.pop("requires_zero_sliding_window", None)
+        op["runtime_kernel_id"] = base_kernel_id
+        op["runtime_contract"] = updated_contract
+        bridge_plan = op.get("bridge_plan")
+        if isinstance(bridge_plan, dict):
+            bridge_plan["runtime_contract"] = dict(updated_contract)
+        saved = op.get("save_for_backward")
+        if isinstance(saved, dict):
+            attn_saved = saved.get("attn_weights")
+            if isinstance(attn_saved, dict):
+                attn_saved["checkpoint_storage"] = "recompute"
+
+    def emit_checkpoint_rematerialize_saved_tensor(
+        *,
+        fwd_op: Dict[str, Any],
+        fwd_inputs: Dict[str, Dict[str, Any]],
+        saved_attn: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        nonlocal checkpoint_rematerialize_ops
+        saved_tid = saved_attn.get("tensor")
+        if not isinstance(saved_tid, str) or not saved_tid:
+            return None
+        q_ref = fwd_inputs.get("q")
+        k_ref = fwd_inputs.get("k")
+        v_ref = fwd_inputs.get("v")
+        if not all(isinstance(x, dict) and isinstance(x.get("tensor"), str) for x in (q_ref, k_ref, v_ref)):
+            return None
+
+        saved_meta = tensors.get(saved_tid) if isinstance(tensors.get(saved_tid), dict) else {}
+        saved_shape = saved_meta.get("shape") if isinstance(saved_meta.get("shape"), list) else saved_attn.get("shape")
+        saved_numel = _tensor_numel(tensors, saved_tid) or saved_attn.get("numel")
+        saved_numel = int(saved_numel) if isinstance(saved_numel, int) and saved_numel > 0 else None
+        tensors.setdefault(saved_tid, {})
+        tensors[saved_tid]["dtype"] = "fp32"
+        tensors[saved_tid]["kind"] = "aux"
+        tensors[saved_tid]["persistent"] = False
+        tensors[saved_tid]["requires_grad"] = False
+        tensors[saved_tid]["checkpoint_storage"] = "recompute"
+        tensors[saved_tid]["shape"] = list(saved_shape) if isinstance(saved_shape, list) else tensors[saved_tid].get("shape")
+        if saved_numel is not None:
+            tensors[saved_tid]["numel"] = int(saved_numel)
+        if saved_tid not in checkpoint_demoted_saved_tensors:
+            checkpoint_demoted_saved_tensors.append(saved_tid)
+
+        out_shape, out_numel = _head_major_bridge_shape_numel(config, "num_heads")
+        out_tensor = "aux.checkpoint.op%d.attn_out" % int(fwd_op.get("op_id", -1))
+        _ensure_tensor(
+            tensors,
+            tensor_id=out_tensor,
+            dtype="fp32",
+            kind="aux",
+            requires_grad=False,
+            persistent=False,
+            producer=None,
+            shape=out_shape,
+            numel=out_numel,
+        )
+
+        base_kernel_id = str(
+            ((fwd_op.get("runtime_contract") or {}).get("base_kernel_id"))
+            or ((fwd_op.get("runtime_contract") or {}).get("kernel_id"))
+            or fwd_op.get("kernel_id")
+            or "attention_forward_causal_head_major_gqa_flash_strided"
+        )
+        runtime_contract = {
+            "version": 1,
+            "semantic_op": str(fwd_op.get("op") or "attn"),
+            "kernel_id": "attention_forward_causal_head_major_gqa_exact",
+            "base_kernel_id": base_kernel_id,
+            "materialize_saved_attn_weights": True,
+            "checkpoint_policy": checkpoint_policy,
+        }
+        rematerialize_contract = {
+            "version": 1,
+            "mode": "forward_recompute",
+            "semantic_op": str(fwd_op.get("op") or "attn"),
+            "saved_key": "attn_weights",
+            "saved_tensor": saved_tid,
+            "runtime_contract": dict(runtime_contract),
+        }
+
+        remat = emit_backward_op(
+            {
+                "phase": "backward",
+                "op": "checkpoint_rematerialize_saved_tensor",
+                "kernel_id": base_kernel_id,
+                "forward_ref": int(fwd_op.get("op_id", -1)),
+                "layer": int(fwd_op.get("layer", -1)),
+                "section": fwd_op.get("section"),
+                "role": "checkpoint_rematerialize",
+                "runtime_contract": runtime_contract,
+                "rematerialize_contract": rematerialize_contract,
+                "save_for_backward": {
+                    "attn_weights": {
+                        "tensor": saved_tid,
+                        "kind": "aux",
+                        "shape": list(saved_shape) if isinstance(saved_shape, list) else None,
+                        "numel": saved_numel,
+                        "checkpoint_storage": "recompute",
+                    }
+                },
+                "dataflow": {
+                    "inputs": {
+                        "q": dict(q_ref or {}),
+                        "k": dict(k_ref or {}),
+                        "v": dict(v_ref or {}),
+                    },
+                    "outputs": {
+                        "out": {
+                            "tensor": out_tensor,
+                            "kind": "aux",
+                            "dtype": "fp32",
+                            "shape": out_shape,
+                            "numel": out_numel,
+                        }
+                    },
+                },
+                "attrs": {
+                    "checkpoint_policy": checkpoint_policy,
+                    "rematerialize_saved": "attn_weights",
+                },
+            }
+        )
+        tensors[saved_tid]["producer"] = {"op_id": int(remat.get("op_id", -1)), "output_name": "attn_weights"}
+        if bridge_enabled:
+            plan = build_backward_bridge_plan(
+                plan_key="checkpoint_rematerialize_saved_tensor",
+                core_op_id=int(remat.get("op_id", -1)),
+                semantic_op="checkpoint_rematerialize_saved_tensor",
+                bwd_inputs={
+                    "q": dict(q_ref or {}),
+                    "k": dict(k_ref or {}),
+                    "v": dict(v_ref or {}),
+                },
+                bwd_outputs={},
+                runtime_contract=runtime_contract,
+            )
+            if isinstance(plan, dict):
+                remat["bridge_plan"] = plan
+        checkpoint_rematerialize_ops += 1
+        return remat
+
+    def _shape_numel_from_write_source(
+        write_spec: Dict[str, Any],
+        *,
+        fwd_inputs: Dict[str, Dict[str, Any]],
+        fwd_outputs: Dict[str, Dict[str, Any]],
+        fwd_weights: Dict[str, Dict[str, Any]],
+        save_for_backward: Dict[str, Dict[str, Any]],
+    ) -> Tuple[Optional[List[int]], Optional[int]]:
+        source_specs = (
+            ("shape_from_saved", save_for_backward, "tensor"),
+            ("shape_from_input", fwd_inputs, "tensor"),
+            ("shape_from_output", fwd_outputs, "tensor"),
+            ("shape_from_weight", fwd_weights, "tensor"),
+        )
+        for field, pool, tensor_key in source_specs:
+            ref_name = str(write_spec.get(field, "") or "").strip()
+            if not ref_name:
+                continue
+            ref = pool.get(ref_name)
+            if not isinstance(ref, dict):
+                continue
+            tensor_id = ref.get(tensor_key)
+            if not isinstance(tensor_id, str) or not tensor_id:
+                continue
+            meta = tensors.get(tensor_id)
+            shape = None
+            if isinstance(meta, dict):
+                meta_shape = meta.get("shape")
+                if isinstance(meta_shape, list) and meta_shape:
+                    shape = list(meta_shape)
+            if shape is None:
+                ref_shape = ref.get("shape")
+                if isinstance(ref_shape, list) and ref_shape:
+                    shape = list(ref_shape)
+            numel = _tensor_numel(tensors, tensor_id)
+            if not isinstance(numel, int) or numel <= 0:
+                ref_numel = ref.get("numel")
+                if isinstance(ref_numel, int) and ref_numel > 0:
+                    numel = int(ref_numel)
+                else:
+                    numel = None
+            return shape, numel
+        return None, None
+
+    for op in forward_ops:
+        if isinstance(op, dict):
+            _apply_forward_checkpoint_policy(op)
 
     # Seed backward graph from explicit CE gradient on final logits.
     # This is the only non-reverse-traversal entrypoint for gradient flow.
@@ -439,6 +877,8 @@ def synthesize_ir2_backward(
         for spec in backward_specs:
             kernel_id = _resolve_backward_kernel_id(spec, config)
             role = str(spec.get("role", "core"))
+            rematerialize_saved_attn = False
+            rematerialize_saved_attn_ref: Optional[Dict[str, Any]] = None
 
             if kernel_id not in kernels:
                 issues.append("Missing kernel `%s` for backward op=%s" % (kernel_id, fwd.get("op")))
@@ -479,6 +919,13 @@ def synthesize_ir2_backward(
                         warnings.append("save_for_backward `%s` missing for op_id=%s" % (ref, fwd.get("op_id")))
                         blocked = True
                         continue
+                    if (
+                        _checkpoint_recomputes_attention(checkpoint_policy)
+                        and ref == "attn_weights"
+                        and str(fwd.get("op", "") or "") in ("attn", "attn_sliding")
+                    ):
+                        rematerialize_saved_attn = True
+                        rematerialize_saved_attn_ref = s
                     bwd_inputs[key] = {
                         "tensor": s.get("tensor"),
                         "kind": s.get("kind", "saved_activation"),
@@ -604,22 +1051,17 @@ def synthesize_ir2_backward(
                     aux_tensor = str(w.get("tensor") or ("aux.op%d.%s" % (int(fwd.get("op_id", -1)), out_name)))
                     aux_shape: Optional[List[int]] = [activation_default_numel]
                     aux_numel = activation_default_numel
-                    # Attention backward uses d_scores scratch with the same logical
-                    # footprint as saved attention weights [H, T, aligned_context_window].
-                    # Keep this sizing contract in IR2 so layout/codegen stay consistent.
-                    if out_name in ("d_scores", "dscores"):
-                        saved_attn = save_for_backward.get("attn_weights")
-                        if isinstance(saved_attn, dict):
-                            saved_tid = saved_attn.get("tensor")
-                            if isinstance(saved_tid, str) and saved_tid:
-                                saved_meta = tensors.get(saved_tid)
-                                if isinstance(saved_meta, dict):
-                                    saved_shape = saved_meta.get("shape")
-                                    if isinstance(saved_shape, list) and saved_shape:
-                                        aux_shape = saved_shape
-                                saved_numel = _tensor_numel(tensors, saved_tid)
-                                if isinstance(saved_numel, int) and saved_numel > 0:
-                                    aux_numel = saved_numel
+                    resolved_shape, resolved_numel = _shape_numel_from_write_source(
+                        w,
+                        fwd_inputs=fwd_inputs,
+                        fwd_outputs=fwd_outputs,
+                        fwd_weights=fwd_weights,
+                        save_for_backward=save_for_backward,
+                    )
+                    if isinstance(resolved_shape, list) and resolved_shape:
+                        aux_shape = resolved_shape
+                    if isinstance(resolved_numel, int) and resolved_numel > 0:
+                        aux_numel = resolved_numel
                     _ensure_tensor(
                         tensors,
                         tensor_id=aux_tensor,
@@ -633,6 +1075,19 @@ def synthesize_ir2_backward(
                     )
                     bwd_outputs[out_name] = {"tensor": aux_tensor, "kind": "aux"}
 
+            if rematerialize_saved_attn and isinstance(rematerialize_saved_attn_ref, dict):
+                remat = emit_checkpoint_rematerialize_saved_tensor(
+                    fwd_op=fwd,
+                    fwd_inputs=fwd_inputs,
+                    saved_attn=rematerialize_saved_attn_ref,
+                )
+                if not isinstance(remat, dict):
+                    issues.append(
+                        "checkpoint_policy `%s` could not rematerialize attn_weights for op_id=%s"
+                        % (checkpoint_policy, fwd.get("op_id"))
+                    )
+                    continue
+
             core = emit_backward_op(
                 {
                     "phase": "backward",
@@ -645,6 +1100,13 @@ def synthesize_ir2_backward(
                     "grad_rule": rule_name,
                     "dataflow": {"inputs": bwd_inputs, "outputs": bwd_outputs},
                 }
+            )
+            attach_backward_bridge_plan(
+                core,
+                kernel_id=kernel_id,
+                fwd_op=fwd,
+                bwd_inputs=bwd_inputs,
+                bwd_outputs=bwd_outputs,
             )
 
             # Emit explicit accumulation ops so fanout and weight updates remain visible
@@ -703,6 +1165,7 @@ def synthesize_ir2_backward(
     return {
         "format": "ir2-train-v7",
         "version": 1,
+        "bridge_lowering": str(ir1.get("bridge_lowering", "legacy") or "legacy"),
         "checkpoint_policy": checkpoint_policy,
         "config": config,
         "template_name": ir1.get("template_name"),
@@ -715,11 +1178,17 @@ def synthesize_ir2_backward(
             "backward_ops": len(backward_ops),
             "backward_kernel_ops": len(backward_kernel_ops),
             "accumulate_ops": len(accumulate_ops),
+            "checkpoint_rematerialize_ops": int(checkpoint_rematerialize_ops),
             "grad_activation_tensors": len(grad_act_tensors),
             "grad_weight_tensors": len(grad_weight_tensors),
             "issues": len(issues),
             "warnings": len(warnings),
             "unresolved": len(unresolved),
+        },
+        "checkpoint_summary": {
+            "policy": checkpoint_policy,
+            "checkpoint_rematerialize_ops": int(checkpoint_rematerialize_ops),
+            "demoted_saved_tensors": sorted(checkpoint_demoted_saved_tensors),
         },
         "gradient_summary": {
             "grad_weight_tensors": grad_weight_tensors,
@@ -737,7 +1206,7 @@ def main() -> int:
     ap.add_argument("--ir1", required=True, help="Input ir1 train-forward json")
     ap.add_argument("--output", required=True, help="Output ir2 json")
     ap.add_argument("--grad-rules", default=str(DEFAULT_GRAD_RULES_PATH), help="grad_rules_v7.json path")
-    ap.add_argument("--checkpoint-policy", default="none", help="Checkpoint policy tag (none/every_n_layers/...)")
+    ap.add_argument("--checkpoint-policy", default="none", help="Checkpoint policy tag (none/recompute_attn)")
     ap.add_argument("--strict", action="store_true", help="Fail on unresolved backward coverage")
     ap.add_argument("--allow-partial", action="store_true", help="Allow unresolved TODO grad rules")
     ap.add_argument("--summary-out", default=None, help="Optional compact summary json")

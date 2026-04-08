@@ -250,16 +250,23 @@ def build_layout(ir2: Dict[str, Any], manifest: Optional[Dict[str, Any]], align_
         )
 
     total_bytes = _align_up(offset, align_bytes)
+    checkpoint_policy = str(ir2.get("checkpoint_policy", "none") or "none")
+    checkpoint_summary = ir2.get("checkpoint_summary") if isinstance(ir2.get("checkpoint_summary"), dict) else {}
+    region_bytes = {str(r.get("name", "")): int(r.get("bytes", 0) or 0) for r in region_rows}
 
     return {
         "format": "layout-train-v7",
         "generated_at": _utc_now_iso(),
         "align_bytes": int(align_bytes),
+        "checkpoint_policy": checkpoint_policy,
         "config": ir2.get("config") if isinstance(ir2.get("config"), dict) else {},
         "summary": {
             "tensor_count": len(placed),
             "region_count": len(region_rows),
             "missing_numel": missing_numel,
+            "region_bytes": region_bytes,
+            "checkpoint_policy": checkpoint_policy,
+            "checkpoint_rematerialize_ops": int(checkpoint_summary.get("checkpoint_rematerialize_ops", 0) or 0),
         },
         "regions": region_rows,
         "tensors": placed,

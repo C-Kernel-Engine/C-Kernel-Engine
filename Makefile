@@ -3338,6 +3338,7 @@ report-md:
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
+.PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
@@ -3619,6 +3620,16 @@ V7_BACKPROP_STITCH_ACCUM ?= 4
 V7_BACKPROP_STITCH_TOTAL_TOKENS ?= 32
 V7_BACKPROP_PLUMBING_RUNTIME_REPORT ?=
 V7_BACKPROP_PLUMBING_RUNTIME_SUMMARY ?=
+V7_BACKPROP_MATRIX_REPORT_ROOT ?= $(V7_REPORT_DIR)/backprop_family_matrix
+V7_BACKPROP_MATRIX_JSON ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.json
+V7_BACKPROP_MATRIX_MD ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.md
+V7_BACKPROP_MATRIX_EXTENDED ?= 0
+V7_BACKPROP_MATRIX_CACHE_DIR ?= version/v7/.cache
+V7_BACKPROP_MATRIX_FORCE ?= 0
+V7_BACKPROP_MATRIX_FAMILIES ?=
+BACKPROP_LATEST_VERSION ?= v7
+BACKPROP_FAST_TARGET ?= $(BACKPROP_LATEST_VERSION)-regression-backprop-fast
+BACKPROP_FULL_TARGET ?= $(BACKPROP_LATEST_VERSION)-regression-backprop-full
 V7_VISUALIZER_E2E_MODEL ?= $(if $(wildcard $(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF),$(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF,$(if $(wildcard $(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen2-0.5B-Instruct-GGUF),$(HOME)/.cache/ck-engine-v7/models/Qwen--Qwen2-0.5B-Instruct-GGUF,$(V7_SMOKE_MODEL_QWEN2)))
 V7_VISUALIZER_E2E_CONTEXT ?= 1024
 V7_VISUALIZER_E2E_MAX_TOKENS ?= 1
@@ -3738,6 +3749,10 @@ v7-help:
 	@echo "  make v7-backprop-long-epoch"
 	@echo "  make v7-backprop-long-epoch-nightly"
 	@echo "  make v7-backprop-production-ready"
+	@echo "  make regression-backprop-fast"
+	@echo "  make regression-backprop-full"
+	@echo "  make v7-regression-backprop-fast"
+	@echo "  make v7-regression-backprop-full"
 	@echo "  make v7-gate-train"
 	@echo "  make v7-gate"
 	@echo "  make v7"
@@ -3762,6 +3777,10 @@ v7-help:
 	@echo "  - production train safety defaults: max-grad-norm=$(V7_TRAIN_PROD_MAX_GRAD_NORM), enforce=$(V7_TRAIN_ENFORCE_PROD_SAFETY)"
 	@echo "  - v7-backprop-long-epoch defaults to smoke mode (set V7_BACKPROP_LONG_EPOCH_MODE=full for full horizon)"
 	@echo "  - runtime parity bitwise diagnostics: set V7_TRAIN_RUNTIME_PARITY_BITWISE=1 (forces --bitwise-parity)"
+	@echo "  - backprop family matrix: regression-backprop-fast is the stable entrypoint and currently routes to $(BACKPROP_FAST_TARGET)"
+	@echo "  - versioned backprop targets remain as compatibility shims; update BACKPROP_LATEST_VERSION when a newer lane becomes primary"
+	@echo "  - current v7 fast matrix covers qwen2/qwen3/gemma/nanbeige; full adds qwen35"
+	@echo "  - family override for smoke/triage: V7_BACKPROP_MATRIX_FAMILIES=qwen3 or qwen2,qwen3"
 	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
 	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
 
@@ -4226,6 +4245,36 @@ v7-replay:
 
 v7-replay-accum:
 	@$(PYTHON) version/v7/scripts/check_runtime_replay_accum_v7.py --json-out $(V7_REPORT_DIR)/replay_accum_latest.json
+
+v7-regression-backprop-fast:
+	@extra_flags=""; \
+	if [ "$(V7_BACKPROP_MATRIX_FORCE)" = "1" ]; then extra_flags="$$extra_flags --force"; fi; \
+	if [ -n "$(V7_BACKPROP_MATRIX_CACHE_DIR)" ]; then extra_flags="$$extra_flags --cache-dir $(V7_BACKPROP_MATRIX_CACHE_DIR)"; fi; \
+	if [ -n "$(V7_BACKPROP_MATRIX_FAMILIES)" ]; then extra_flags="$$extra_flags --families $(V7_BACKPROP_MATRIX_FAMILIES)"; fi; \
+	if [ "$(V7_BACKPROP_MATRIX_EXTENDED)" = "1" ]; then extra_flags="$$extra_flags --extended-checks"; fi; \
+	$(PYTHON) version/v7/scripts/run_backprop_family_matrix_v7.py \
+		--mode fast \
+		--report-root "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/fast" \
+		--json-out "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/fast/v7_backprop_family_matrix_latest.json" \
+		--md-out "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/fast/v7_backprop_family_matrix_latest.md" \
+		$$extra_flags
+
+v7-regression-backprop-full:
+	@extra_flags=""; \
+	if [ "$(V7_BACKPROP_MATRIX_FORCE)" = "1" ]; then extra_flags="$$extra_flags --force"; fi; \
+	if [ -n "$(V7_BACKPROP_MATRIX_CACHE_DIR)" ]; then extra_flags="$$extra_flags --cache-dir $(V7_BACKPROP_MATRIX_CACHE_DIR)"; fi; \
+	if [ -n "$(V7_BACKPROP_MATRIX_FAMILIES)" ]; then extra_flags="$$extra_flags --families $(V7_BACKPROP_MATRIX_FAMILIES)"; fi; \
+	if [ "$(V7_BACKPROP_MATRIX_EXTENDED)" = "1" ]; then extra_flags="$$extra_flags --extended-checks"; fi; \
+	$(PYTHON) version/v7/scripts/run_backprop_family_matrix_v7.py \
+		--mode full \
+		--report-root "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/full" \
+		--json-out "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/full/v7_backprop_family_matrix_latest.json" \
+		--md-out "$(V7_BACKPROP_MATRIX_REPORT_ROOT)/full/v7_backprop_family_matrix_latest.md" \
+		$$extra_flags
+
+regression-backprop-fast: $(BACKPROP_FAST_TARGET)
+
+regression-backprop-full: $(BACKPROP_FULL_TARGET)
 
 v7-backprop-plumbing:
 	@set -e; \

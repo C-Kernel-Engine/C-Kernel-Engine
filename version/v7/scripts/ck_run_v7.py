@@ -4772,6 +4772,8 @@ def _ensure_train_runtime_artifacts(
     strict: bool,
     runtime_defines: Optional[dict] = None,
     train_tokens: int = 1,
+    bridge_lowering: str = "legacy",
+    checkpoint_policy: str = "none",
     extra_cflags: Optional[Sequence[str]] = None,
 ) -> tuple[Path, Path]:
     """Ensure run_dir has IR1/IR2/layout/audits and compiled libtrain.so."""
@@ -4801,6 +4803,12 @@ def _ensure_train_runtime_artifacts(
     exec_plan_script = SCRIPTS_DIR / "generate_train_exec_plan_v7.py"
 
     desired_tokens = max(1, int(train_tokens or 1))
+    desired_bridge_lowering = str(bridge_lowering or "legacy").strip().lower()
+    if desired_bridge_lowering not in {"legacy", "explicit"}:
+        raise RuntimeError(f"Unsupported train bridge lowering: {desired_bridge_lowering}")
+    desired_checkpoint_policy = str(checkpoint_policy or "none").strip().lower()
+    if desired_checkpoint_policy not in {"none", "recompute_attn"}:
+        raise RuntimeError(f"Unsupported train checkpoint policy: {desired_checkpoint_policy}")
 
     def _read_ir1_tokens(path: Path) -> Optional[int]:
         if not path.exists():
@@ -4829,14 +4837,36 @@ def _ensure_train_runtime_artifacts(
             return None
         return None
 
+    def _read_ir1_bridge_lowering(path: Path) -> Optional[str]:
+        if not path.exists():
+            return None
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            raw = str(doc.get("bridge_lowering", "") or "").strip().lower()
+            return raw or None
+        except Exception:
+            return None
+
+    def _read_ir2_checkpoint_policy(path: Path) -> Optional[str]:
+        if not path.exists():
+            return None
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            raw = str(doc.get("checkpoint_policy", "") or "").strip().lower()
+            return raw or None
+        except Exception:
+            return None
+
     # Each stage only regenerates when inputs are newer. This keeps CLI reruns fast
     # while still guaranteeing that libtrain is rebuilt after contract changes.
     existing_ir1_tokens = _read_ir1_tokens(ir1)
+    existing_ir1_bridge_lowering = _read_ir1_bridge_lowering(ir1)
     needs_ir1 = (
         (not ir1.exists())
         or (manifest.exists() and manifest.stat().st_mtime > ir1.stat().st_mtime)
         or (build_ir_script.exists() and build_ir_script.stat().st_mtime > ir1.stat().st_mtime)
         or (existing_ir1_tokens is not None and int(existing_ir1_tokens) != int(desired_tokens))
+        or (existing_ir1_bridge_lowering != desired_bridge_lowering)
     )
     if needs_ir1:
         cmd = [
@@ -4846,6 +4876,7 @@ def _ensure_train_runtime_artifacts(
             "--output", str(ir1),
             "--report-out", str(ir1_report),
             "--tokens", str(desired_tokens),
+            "--bridge-lowering", desired_bridge_lowering,
         ]
         if strict:
             cmd.append("--strict")
@@ -4856,6 +4887,7 @@ def _ensure_train_runtime_artifacts(
         or strict
         or (ir1.exists() and ir1.stat().st_mtime > ir2.stat().st_mtime)
         or (lower_ir_script.exists() and lower_ir_script.stat().st_mtime > ir2.stat().st_mtime)
+        or (_read_ir2_checkpoint_policy(ir2) != desired_checkpoint_policy)
     )
     if needs_ir2:
         cmd = [
@@ -4864,6 +4896,7 @@ def _ensure_train_runtime_artifacts(
             "--ir1", str(ir1),
             "--output", str(ir2),
             "--summary-out", str(ir2_summary),
+            "--checkpoint-policy", desired_checkpoint_policy,
         ]
         if strict:
             cmd.append("--strict")
@@ -5205,6 +5238,8 @@ def _run_ck_train_runtime_body(
         strict=bool(getattr(args, "train_strict", False)),
         runtime_defines=runtime_defines,
         train_tokens=seq_len,
+        bridge_lowering=str(getattr(args, "train_bridge_lowering", "legacy") or "legacy"),
+        checkpoint_policy=str(getattr(args, "train_checkpoint_policy", "none") or "none"),
         extra_cflags=bitwise_compile_flags,
     )
 
@@ -6361,6 +6396,7 @@ def _run_ck_train_runtime_body(
                             snap_np,
                             oracle_x_vals,
                             oracle_y_vals,
+                            valid_tokens=int(valid_tokens),
                         )
                         oracle_loss = float(oracle_loss_val)
 
@@ -7717,6 +7753,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
             "--manifest", str(manifest_path),
             "--output", str(ir1_out),
             "--report-out", str(ir1_report),
+            "--bridge-lowering", str(getattr(args, "train_bridge_lowering", "legacy") or "legacy"),
         ]
         if getattr(args, "strict", False):
             ir1_cmd.append("--strict")
@@ -7731,6 +7768,7 @@ def step_run_train_init(args: argparse.Namespace) -> None:
             "--ir1", str(ir1_out),
             "--output", str(ir2_out),
             "--summary-out", str(ir2_summary),
+            "--checkpoint-policy", str(getattr(args, "train_checkpoint_policy", "none") or "none"),
         ]
         if getattr(args, "strict", False):
             ir2_cmd.append("--strict")
@@ -10589,6 +10627,10 @@ Examples:
                         help='Post-train operator gate: suggest/run/require staged CK-vs-PyTorch parity regimen')
         sp.add_argument('--parity-regimen-profile', choices=['default', 'strict', 'extended'], default='default',
                         help='Regimen surface to use when invoking run_training_parity_regimen_v7.py')
+        sp.add_argument('--train-bridge-lowering', choices=['legacy', 'explicit'], default='legacy',
+                        help='How explicitly to model training layout bridges in IR/codegen (default: legacy)')
+        sp.add_argument('--train-checkpoint-policy', choices=['none', 'recompute_attn'], default='none',
+                        help='Training activation checkpoint policy for IR2/layout generation (default: none)')
 
         sp.add_argument('--train-epochs', type=int, default=3)
         sp.add_argument('--train-seq-len', type=int, default=16)
@@ -10726,6 +10768,10 @@ Examples:
                            help='With --train-e2e: suggest/run/require staged CK-vs-PyTorch parity regimen')
     run_parser.add_argument('--parity-regimen-profile', choices=['default', 'strict', 'extended'], default='default',
                            help='With --train-e2e: regimen surface to use when invoking run_training_parity_regimen_v7.py')
+    run_parser.add_argument('--train-bridge-lowering', choices=['legacy', 'explicit'], default='legacy',
+                           help='With --train-e2e: how explicitly to model training layout bridges in IR/codegen')
+    run_parser.add_argument('--train-checkpoint-policy', choices=['none', 'recompute_attn'], default='none',
+                           help='With --train-e2e: activation checkpoint policy for IR2/layout generation')
     run_parser.add_argument('--train-epochs', type=int, default=3,
                            help='Epochs for --train-e2e (default: 3)')
     run_parser.add_argument('--train-seq-len', type=int, default=16,
@@ -10935,6 +10981,10 @@ Examples:
                              help='With --generate-ir, also emit generated_train_runtime_v7.c')
     init_parser.add_argument('--strict', action='store_true',
                              help='Strict train IR build checks when --generate-ir is used')
+    init_parser.add_argument('--train-bridge-lowering', choices=['legacy', 'explicit'], default='legacy',
+                             help='How explicitly to model training layout bridges when --generate-ir is used')
+    init_parser.add_argument('--train-checkpoint-policy', choices=['none', 'recompute_attn'], default='none',
+                             help='Activation checkpoint policy for IR2/layout generation when --generate-ir is used')
     init_parser.add_argument('--dataset-workspace', default=None,
                              help='Optional split-aware dataset workspace to snapshot into the run dir (e.g. version/v7/data/spec04)')
     init_parser.add_argument('--dataset-stage-mode', choices=['copy', 'symlink'], default='copy',

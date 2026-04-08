@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 SCRIPT_DIR = Path(__file__).resolve().parent
 V7_ROOT = SCRIPT_DIR.parent
 DEFAULT_REGISTRY = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
+DEFAULT_BINDINGS = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
 
 
 FALLBACK_DECLS: Dict[str, str] = {
@@ -400,11 +401,131 @@ def _tensor_numel_map(tensors: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, int
     return out, missing
 
 
-def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
+def _cfg_int(cfg: Dict[str, Any], *keys: str, default: int = 0) -> int:
+    for key in keys:
+        raw = cfg.get(key)
+        try:
+            value = int(raw)
+        except Exception:
+            continue
+        if value > 0:
+            return int(value)
+    return int(default)
+
+
+def _cfg_float(cfg: Dict[str, Any], *keys: str, default: float = 0.0) -> float:
+    for key in keys:
+        raw = cfg.get(key)
+        try:
+            return float(raw)
+        except Exception:
+            continue
+    return float(default)
+
+
+def _derived_recurrent_num_heads(cfg: Dict[str, Any]) -> int:
+    return max(
+        1,
+        _cfg_int(
+            cfg,
+            "recurrent_num_heads",
+            "gate_dim",
+            "ssm_time_step_rank",
+            "num_heads",
+            default=1,
+        ),
+    )
+
+
+def _derived_recurrent_head_dim(cfg: Dict[str, Any]) -> int:
+    explicit = _cfg_int(cfg, "recurrent_head_dim", default=0)
+    if explicit > 0:
+        return int(explicit)
+    v_dim = _cfg_int(cfg, "v_dim", default=0)
+    rec_heads = _derived_recurrent_num_heads(cfg)
+    if v_dim > 0 and rec_heads > 0 and (v_dim % rec_heads) == 0:
+        return int(v_dim // rec_heads)
+    return max(1, _cfg_int(cfg, "ssm_state_size", "head_dim", default=1))
+
+
+def _scalar_expr_from_binding_source(arg_type: str, source: Optional[str], cfg: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(source, str) or not source:
+        return None
+    is_float = "float" in arg_type and "*" not in arg_type
+    is_size_t = "size_t" in arg_type
+    is_int = (("int" in arg_type) or is_size_t) and ("*" not in arg_type)
+
+    if source.startswith("const:"):
+        value = source.split(":", 1)[1].strip()
+        if is_float and not value.endswith("f") and "." in value:
+            return f"{value}f"
+        return value
+
+    if source.startswith("runtime:"):
+        key = source.split(":", 1)[1].strip().lower()
+        if key in ("seq_len", "num_tokens", "token_count", "rows", "tokens", "context_window"):
+            return "g_active_tokens"
+        return None
+
+    if not source.startswith("dim:"):
+        return None
+
+    key = source.split(":", 1)[1].strip().lower()
+
+    if key in ("seq_len", "num_tokens", "token_count", "rows", "tokens", "context_window"):
+        return "g_active_tokens"
+
+    if is_float:
+        if key == "rms_eps":
+            return "%.8ff" % _cfg_float(cfg, "rms_eps", default=1e-5)
+        if key == "rope_theta":
+            return "%.6ff" % _cfg_float(cfg, "rope_theta", default=10000.0)
+        return None
+
+    if not (is_int or is_size_t):
+        return None
+
+    dim_map: Dict[str, int] = {
+        "num_heads": _cfg_int(cfg, "num_heads", default=1),
+        "num_kv_heads": _cfg_int(cfg, "num_kv_heads", "num_heads", default=1),
+        "head_dim": _cfg_int(cfg, "head_dim", default=64),
+        "embed_dim": _cfg_int(cfg, "embed_dim", "hidden_size", default=128),
+        "aligned_embed_dim": _cfg_int(cfg, "embed_dim", "hidden_size", default=128),
+        "d_model": _cfg_int(cfg, "embed_dim", "hidden_size", default=128),
+        "hidden_dim": _cfg_int(cfg, "hidden_size", "embed_dim", default=128),
+        "intermediate_dim": _cfg_int(cfg, "hidden_size", "embed_dim", default=128),
+        "vocab_size": _cfg_int(cfg, "vocab_size", default=256),
+        "rotary_dim": _cfg_int(cfg, "rotary_dim", "head_dim", default=_cfg_int(cfg, "head_dim", default=64)),
+        "sliding_window": max(0, _cfg_int(cfg, "sliding_window", default=0)),
+        "q_dim": _cfg_int(cfg, "q_dim", default=max(1, _cfg_int(cfg, "num_heads", default=1) * _cfg_int(cfg, "head_dim", default=64))),
+        "k_dim": _cfg_int(cfg, "k_dim", "q_dim", default=max(1, _cfg_int(cfg, "num_heads", default=1) * _cfg_int(cfg, "head_dim", default=64))),
+        "v_dim": _cfg_int(cfg, "v_dim", "hidden_size", default=_cfg_int(cfg, "hidden_size", "embed_dim", default=128)),
+        "gate_dim": _cfg_int(cfg, "gate_dim", "ssm_time_step_rank", "num_heads", default=1),
+        "ssm_time_step_rank": _cfg_int(cfg, "ssm_time_step_rank", "gate_dim", "num_heads", default=1),
+        "recurrent_num_heads": _derived_recurrent_num_heads(cfg),
+        "recurrent_head_dim": _derived_recurrent_head_dim(cfg),
+        "ssm_state_size": _cfg_int(cfg, "ssm_state_size", default=max(1, _cfg_int(cfg, "head_dim", default=1))),
+        "ssm_conv_kernel": _cfg_int(cfg, "ssm_conv_kernel", default=4),
+        "ssm_conv_history": _cfg_int(cfg, "ssm_conv_history", default=max(0, _cfg_int(cfg, "ssm_conv_kernel", default=4) - 1)),
+        "ssm_conv_channels": _cfg_int(cfg, "ssm_conv_channels", default=max(1, _cfg_int(cfg, "q_dim", default=1) + _cfg_int(cfg, "k_dim", default=1) + _cfg_int(cfg, "v_dim", default=1))),
+        "num_seqs": max(1, _cfg_int(cfg, "num_seqs", default=1)),
+        "attn_out_dim": _cfg_int(cfg, "attn_out_dim", "embed_dim", default=_cfg_int(cfg, "embed_dim", "hidden_size", default=128)),
+    }
+    value = dim_map.get(key)
+    if value is None:
+        return None
+    return str(int(value))
+
+
+def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any], param_source: Optional[str] = None) -> str:
     name = str(arg_name).lower()
     is_float = "float" in arg_type and "*" not in arg_type
     is_size_t = "size_t" in arg_type
     is_int = (("int" in arg_type) or is_size_t) and ("*" not in arg_type)
+
+    mapped = _scalar_expr_from_binding_source(arg_type, param_source, cfg)
+    if mapped is not None:
+        return mapped
 
     if is_float:
         if "eps" in name:
@@ -447,6 +568,13 @@ def _arg_scalar_expr(arg_type: str, arg_name: str, cfg: Dict[str, Any]) -> str:
             return str(int(cfg.get("hidden_size", cfg.get("embed_dim", 128))))
         if "kv_stride_tokens" in name:
             return "g_active_tokens"
+        if "sliding_window" in name:
+            raw = cfg.get("sliding_window", 0)
+            try:
+                val = int(raw or 0)
+            except Exception:
+                val = 0
+            return str(max(0, val))
         if "rotary_dim" in name:
             hd = int(cfg.get("head_dim", 64))
             return str(int(cfg.get("rotary_dim", hd)))
@@ -651,6 +779,7 @@ def _choose_tensor_for_ptr(
     tensors: Dict[str, Dict[str, Any]],
     tvars_f32: Dict[str, str],
     tvars_i32: Dict[str, str],
+    param_source: Optional[str] = None,
     fallback_state: Optional[Dict[str, int]] = None,
 ) -> str:
     want_i32 = "int32_t" in arg_type or "int32" in arg_type
@@ -675,6 +804,45 @@ def _choose_tensor_for_ptr(
         if (not tid_dtype_is_i32(tid)) and tid in tvars_f32:
             return tvars_f32[tid]
         return None
+
+    def find_pool_var_by_source_token(pool: Dict[str, str], token: str) -> Optional[str]:
+        if not isinstance(token, str) or not token:
+            return None
+
+        direct = tid_to_var(pool.get(token))
+        if direct:
+            return direct
+
+        token_l = token.lower()
+        for key, tid in _sorted_pool_items(pool):
+            key_l = str(key).lower()
+            tid_l = str(tid).lower()
+            if key_l == token_l or tid_l.endswith("." + token_l) or tid_l.endswith("_" + token_l) or token_l in tid_l:
+                var = tid_to_var(tid)
+                if var:
+                    return var
+        return None
+
+    if isinstance(param_source, str) and param_source:
+        source = param_source.strip()
+        if source == "null":
+            return "NULL"
+        if ":" in source:
+            prefix, value = source.split(":", 1)
+            prefix = prefix.strip().lower()
+            value = value.strip()
+            if prefix == "activation":
+                var = find_pool_var_by_source_token(io_inputs, value)
+                if var:
+                    return var
+            elif prefix == "output":
+                var = find_pool_var_by_source_token(io_outputs, value)
+                if var:
+                    return var
+            elif prefix in ("weight", "weight_f"):
+                var = find_pool_var_by_source_token(io_weights, value)
+                if var:
+                    return var
 
     def find_semantic(pool: Dict[str, str], token: str) -> Optional[str]:
         for k, tid in _sorted_pool_items(pool):
@@ -924,8 +1092,45 @@ def _is_pairwise_rope_backward_qk_kernel(kernel_id: Any) -> bool:
     return str(kernel_id or "").strip() == "rope_backward_qk_pairwise_f32"
 
 
+def _bridge_plan_entry(bridge_plan: Dict[str, Any], phase: str, role: str) -> Optional[Dict[str, Any]]:
+    if not isinstance(bridge_plan, dict):
+        return None
+    rows = bridge_plan.get(phase)
+    if not isinstance(rows, list):
+        return None
+    want = str(role or "").strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("role", "")).strip().lower() == want:
+            return row
+    return None
+
+
+def _attention_runtime_contract(op: Dict[str, Any], default_kernel_id: str) -> Dict[str, Any]:
+    contract = op.get("runtime_contract")
+    if isinstance(contract, dict):
+        return contract
+    bridge_plan = op.get("bridge_plan")
+    if isinstance(bridge_plan, dict):
+        plan_contract = bridge_plan.get("runtime_contract")
+        if isinstance(plan_contract, dict):
+            return plan_contract
+    return {"kernel_id": str(default_kernel_id or "")}
+
+
+def _bridge_head_group_macro(head_group: Any) -> str:
+    group = str(head_group or "num_heads").strip().lower()
+    if group in ("num_kv_heads", "kv", "k", "v"):
+        return "CK_ROPE_NUM_KV_HEADS"
+    return "CK_ROPE_NUM_HEADS"
+
+
 def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional[Dict[str, Any]] = None, layout: Optional[Dict[str, Any]] = None, exec_plan: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     cfg = dict(ir2.get("config") or {})
+    bridge_lowering = str(ir2.get("bridge_lowering", "legacy") or "legacy").strip().lower()
+    bindings_doc = _load_json(DEFAULT_BINDINGS) if DEFAULT_BINDINGS.exists() else {}
+    kernel_bindings = dict(bindings_doc.get("bindings") or {})
     tensors = _collect_tensors(ir2)
     tensor_numel, missing_numel = _tensor_numel_map(tensors)
     if missing_numel:
@@ -959,6 +1164,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     # Collect declarations required by kernels in this IR.
     used_decl: Dict[str, Tuple[str, List[Tuple[str, str]], str]] = {}
     skipped_ops: List[str] = []
+    explicit_forward_bridge_plans = 0
+    explicit_backward_bridge_plans = 0
+    checkpoint_rematerialize_ops = 0
 
     def resolve_decl_for_kernel(kernel_id: str) -> Optional[Tuple[str, List[Tuple[str, str]], str]]:
         k = kernel_map.get(kernel_id) or {}
@@ -1912,6 +2120,1146 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 best = cand
         return best[1] if best is not None else None
 
+    def _bridge_var(tid: Any) -> str:
+        return tvars_f32.get(str(tid or ""), "g_dummy_f32")
+
+    def _bridge_numel(tid: Any) -> int:
+        return int(tensor_numel.get(str(tid or ""), 0) or 0)
+
+    def _emit_qk_norm_forward_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        comment: str,
+        q_bridge: Dict[str, Any],
+        k_bridge: Dict[str, Any],
+        q_gamma_var: str,
+        k_gamma_var: str,
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s (%s) */" % (op_id, op_name, kid, comment))
+        for bridge in (q_bridge, k_bridge):
+            in_var = str(bridge.get("in_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            out_var = str(bridge.get("out_var") or in_var)
+            in_numel = int(bridge.get("in_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            out_numel = int(bridge.get("out_numel", 0) or 0)
+            pre_group = _bridge_head_group_macro(bridge.get("pre_head_group"))
+            post_group = _bridge_head_group_macro(bridge.get("post_head_group"))
+            if in_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (in_var, int(in_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+            if out_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (out_var, int(out_numel), op_id))
+            ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (in_var, head_var, pre_group))
+        ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+            str(q_bridge.get("head_var") or "g_dummy_f32"),
+            str(k_bridge.get("head_var") or "g_dummy_f32"),
+            q_gamma_var,
+            k_gamma_var,
+        ))
+        for bridge in (q_bridge, k_bridge):
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            out_var = str(bridge.get("out_var") or "g_dummy_f32")
+            post_group = _bridge_head_group_macro(bridge.get("post_head_group"))
+            ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (head_var, out_var, post_group))
+        ap("    call_count++;")
+
+    def _emit_rope_forward_qk_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        comment: str,
+        rope_bridge_fn: str,
+        q_bridge: Dict[str, Any],
+        k_bridge: Dict[str, Any],
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s (%s) */" % (op_id, op_name, kid, comment))
+        for bridge in (q_bridge, k_bridge):
+            in_var = str(bridge.get("in_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            out_var = str(bridge.get("out_var") or in_var)
+            in_numel = int(bridge.get("in_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            out_numel = int(bridge.get("out_numel", 0) or 0)
+            pre_group = _bridge_head_group_macro(bridge.get("pre_head_group"))
+            post_group = _bridge_head_group_macro(bridge.get("post_head_group"))
+            if in_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (in_var, int(in_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+            if out_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (out_var, int(out_numel), op_id))
+            ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (in_var, head_var, pre_group))
+        ap("    %s(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+            rope_bridge_fn,
+            str(q_bridge.get("head_var") or "g_dummy_f32"),
+            str(k_bridge.get("head_var") or "g_dummy_f32"),
+        ))
+        for bridge in (q_bridge, k_bridge):
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            out_var = str(bridge.get("out_var") or "g_dummy_f32")
+            post_group = _bridge_head_group_macro(bridge.get("post_head_group"))
+            ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (head_var, out_var, post_group))
+        ap("    call_count++;")
+
+    def _emit_rope_backward_qk_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        comment: str,
+        dq_out_bridge: Dict[str, Any],
+        dk_out_bridge: Dict[str, Any],
+        dq_bridge: Dict[str, Any],
+        dk_bridge: Dict[str, Any],
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s (%s) */" % (op_id, op_name, kid, comment))
+        for bridge in (dq_out_bridge, dk_out_bridge, dq_bridge, dk_bridge):
+            token_var = str(bridge.get("token_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            token_numel = int(bridge.get("token_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            if token_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (token_var, int(token_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dq_out_bridge.get("token_var") or "g_dummy_f32"),
+            str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dq_out_bridge.get("pre_head_group")),
+        ))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dk_out_bridge.get("token_var") or "g_dummy_f32"),
+            str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dk_out_bridge.get("pre_head_group")),
+        ))
+        if _is_pairwise_rope_backward_qk_kernel(kid):
+            ap("    rope_backward_qk_pairwise_with_rotary_dim(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
+                str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
+                str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
+                str(dq_bridge.get("head_var") or "g_dummy_f32"),
+                str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            ))
+        else:
+            ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
+                str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
+                str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
+                str(dq_bridge.get("head_var") or "g_dummy_f32"),
+                str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            ))
+        ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dq_bridge.get("head_var") or "g_dummy_f32"),
+            str(dq_bridge.get("token_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dq_bridge.get("post_head_group")),
+        ))
+        ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            str(dk_bridge.get("token_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dk_bridge.get("post_head_group")),
+        ))
+        ap("#if CK_ABLATE_ROPE_BACKWARD_QK")
+        ap("    /* Ablation fallback: treat RoPE backward as identity for dq/dk. */")
+        dq_numel = int(dq_bridge.get("token_numel", 0) or 0)
+        dk_numel = int(dk_bridge.get("token_numel", 0) or 0)
+        dq_out_numel = int(dq_out_bridge.get("token_numel", 0) or 0)
+        dk_out_numel = int(dk_out_bridge.get("token_numel", 0) or 0)
+        dq_var = str(dq_bridge.get("token_var") or "g_dummy_f32")
+        dk_var = str(dk_bridge.get("token_var") or "g_dummy_f32")
+        dq_out_var = str(dq_out_bridge.get("token_var") or "g_dummy_f32")
+        dk_out_var = str(dk_out_bridge.get("token_var") or "g_dummy_f32")
+        if dq_numel > 0:
+            cp = min(int(dq_numel), int(dq_out_numel))
+            if cp > 0:
+                ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
+            if int(dq_numel) > cp:
+                ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+        if dk_numel > 0:
+            cp = min(int(dk_numel), int(dk_out_numel))
+            if cp > 0:
+                ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
+            if int(dk_numel) > cp:
+                ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
+        ap("#endif")
+        ap("    call_count++;")
+
+    def _emit_qk_norm_backward_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        comment: str,
+        dq_out_bridge: Dict[str, Any],
+        dk_out_bridge: Dict[str, Any],
+        q_in_bridge: Dict[str, Any],
+        k_in_bridge: Dict[str, Any],
+        dq_bridge: Dict[str, Any],
+        dk_bridge: Dict[str, Any],
+        q_gamma_var: str,
+        k_gamma_var: str,
+        dq_gamma_var: str,
+        dk_gamma_var: str,
+        dq_gamma_numel: int,
+        dk_gamma_numel: int,
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s (%s) */" % (op_id, op_name, kid, comment))
+        for bridge in (dq_out_bridge, dk_out_bridge, q_in_bridge, k_in_bridge, dq_bridge, dk_bridge):
+            token_var = str(bridge.get("token_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            token_numel = int(bridge.get("token_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            if token_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (token_var, int(token_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dq_out_bridge.get("token_var") or "g_dummy_f32"),
+            str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dq_out_bridge.get("pre_head_group")),
+        ))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dk_out_bridge.get("token_var") or "g_dummy_f32"),
+            str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dk_out_bridge.get("pre_head_group")),
+        ))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(q_in_bridge.get("token_var") or "g_dummy_f32"),
+            str(q_in_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(q_in_bridge.get("pre_head_group")),
+        ))
+        ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(k_in_bridge.get("token_var") or "g_dummy_f32"),
+            str(k_in_bridge.get("head_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(k_in_bridge.get("pre_head_group")),
+        ))
+        ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
+            str(dq_out_bridge.get("head_var") or "g_dummy_f32"),
+            str(dk_out_bridge.get("head_var") or "g_dummy_f32"),
+            str(q_in_bridge.get("head_var") or "g_dummy_f32"),
+            str(k_in_bridge.get("head_var") or "g_dummy_f32"),
+            q_gamma_var,
+            k_gamma_var,
+            str(dq_bridge.get("head_var") or "g_dummy_f32"),
+            str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            dq_gamma_var,
+            dk_gamma_var,
+        ))
+        ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dq_bridge.get("head_var") or "g_dummy_f32"),
+            str(dq_bridge.get("token_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dq_bridge.get("post_head_group")),
+        ))
+        ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+            str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            str(dk_bridge.get("token_var") or "g_dummy_f32"),
+            _bridge_head_group_macro(dk_bridge.get("post_head_group")),
+        ))
+        ap("#if CK_ABLATE_QK_NORM_BACKWARD")
+        ap("    /* Ablation fallback: treat qk_norm backward as identity for dq/dk and zero gamma grads. */")
+        dq_numel = int(dq_bridge.get("token_numel", 0) or 0)
+        dk_numel = int(dk_bridge.get("token_numel", 0) or 0)
+        dq_out_numel = int(dq_out_bridge.get("token_numel", 0) or 0)
+        dk_out_numel = int(dk_out_bridge.get("token_numel", 0) or 0)
+        dq_var = str(dq_bridge.get("token_var") or "g_dummy_f32")
+        dk_var = str(dk_bridge.get("token_var") or "g_dummy_f32")
+        dq_out_var = str(dq_out_bridge.get("token_var") or "g_dummy_f32")
+        dk_out_var = str(dk_out_bridge.get("token_var") or "g_dummy_f32")
+        if dq_numel > 0:
+            cp = min(int(dq_numel), int(dq_out_numel))
+            if cp > 0:
+                ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
+            if int(dq_numel) > cp:
+                ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+        if dk_numel > 0:
+            cp = min(int(dk_numel), int(dk_out_numel))
+            if cp > 0:
+                ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
+            if int(dk_numel) > cp:
+                ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
+        if int(dq_gamma_numel) > 0:
+            ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dq_gamma_var, int(dq_gamma_numel)))
+        if int(dk_gamma_numel) > 0:
+            ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_gamma_var, int(dk_gamma_numel)))
+        ap("#endif")
+        ap("    call_count++;")
+
+    def _emit_attention_forward_runtime_call(
+        *,
+        op_id: Any,
+        runtime_kid: str,
+        q_head_var: str,
+        k_head_var: str,
+        v_head_var: str,
+        out_head_var: str,
+        attn_saved_var: str,
+        has_attn_saved: bool,
+        requires_saved_attn: bool,
+        requires_zero_sliding_window: bool,
+        sliding_window_expr: str,
+        missing_saved_comment: str,
+    ) -> None:
+        if requires_saved_attn and not has_attn_saved:
+            ap("    /* %s */" % missing_saved_comment)
+            ap("    return -7001 - %s;" % op_id)
+        elif runtime_kid == "attention_forward_causal_head_major_gqa_exact":
+            if requires_zero_sliding_window:
+                ap("    if ((int)(%s) > 0) return -7000 - %s;" % (sliding_window_expr, op_id))
+            ap("    attention_forward_causal_head_major_gqa_exact(%s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
+                q_head_var,
+                k_head_var,
+                v_head_var,
+                attn_saved_var,
+                out_head_var,
+            ))
+        elif runtime_kid == "attention_forward_causal_head_major_gqa_flash_strided_sliding":
+            ap("    attention_forward_causal_head_major_gqa_flash_strided_sliding(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens, %s);" % (
+                q_head_var,
+                k_head_var,
+                v_head_var,
+                out_head_var,
+                sliding_window_expr,
+            ))
+        elif runtime_kid == "attention_forward_causal_head_major_gqa_flash_strided":
+            ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
+                q_head_var,
+                k_head_var,
+                v_head_var,
+                out_head_var,
+            ))
+        else:
+            ap("    /* unsupported attention runtime kernel `%s` */" % runtime_kid)
+            ap("    return -7002 - %s;" % op_id)
+
+    def _emit_attention_forward_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        runtime_kid: str,
+        comment: str,
+        q_bridge: Dict[str, Any],
+        k_bridge: Dict[str, Any],
+        v_bridge: Dict[str, Any],
+        out_bridge: Dict[str, Any],
+        attn_saved_var: str,
+        attn_saved_numel: int,
+        requires_saved_attn: bool,
+        requires_zero_sliding_window: bool,
+        sliding_window_expr: str,
+        missing_saved_comment: str = "attention runtime contract requires saved attn weights, but none were allocated",
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s runtime_kernel_id=%s (%s) */" % (op_id, op_name, kid, runtime_kid, comment))
+        for bridge in (q_bridge, k_bridge, v_bridge):
+            token_var = str(bridge.get("token_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            token_numel = int(bridge.get("token_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            if token_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (token_var, int(token_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+
+        out_head_var = str(out_bridge.get("head_var") or "g_dummy_f32")
+        out_token_var = str(out_bridge.get("token_var") or "g_dummy_f32")
+        out_head_numel = int(out_bridge.get("head_numel", 0) or 0)
+        out_token_numel = int(out_bridge.get("token_numel", 0) or 0)
+        direct_head_output = bool(out_bridge.get("direct_head_output"))
+        if out_head_numel > 0:
+            ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (out_head_var, int(out_head_numel), op_id))
+        if not direct_head_output and out_token_numel > 0:
+            ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (out_token_var, int(out_token_numel), op_id))
+        if requires_saved_attn and attn_saved_numel > 0:
+            ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (attn_saved_var, int(attn_saved_numel), op_id))
+
+        for bridge in (q_bridge, k_bridge, v_bridge):
+            token_var = str(bridge.get("token_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            pre_head_group_expr = str(bridge.get("pre_head_group_expr") or "CK_ROPE_NUM_HEADS")
+            ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+                token_var,
+                head_var,
+                pre_head_group_expr,
+            ))
+
+        has_attn_saved = bool(attn_saved_var and attn_saved_numel > 0)
+        _emit_attention_forward_runtime_call(
+            op_id=op_id,
+            runtime_kid=runtime_kid,
+            q_head_var=str(q_bridge.get("head_var") or "g_dummy_f32"),
+            k_head_var=str(k_bridge.get("head_var") or "g_dummy_f32"),
+            v_head_var=str(v_bridge.get("head_var") or "g_dummy_f32"),
+            out_head_var=out_head_var,
+            attn_saved_var=attn_saved_var,
+            has_attn_saved=has_attn_saved,
+            requires_saved_attn=requires_saved_attn,
+            requires_zero_sliding_window=requires_zero_sliding_window,
+            sliding_window_expr=sliding_window_expr,
+            missing_saved_comment=missing_saved_comment,
+        )
+
+        if not direct_head_output:
+            post_head_group_expr = str(out_bridge.get("post_head_group_expr") or "CK_ROPE_NUM_HEADS")
+            ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+                out_head_var,
+                out_token_var,
+                post_head_group_expr,
+            ))
+        ap("    call_count++;")
+
+    def _emit_attention_backward_bridge_core(
+        *,
+        op_id: Any,
+        op_name: Any,
+        kid: str,
+        fn: str,
+        comment: str,
+        dy_bridge: Dict[str, Any],
+        q_bridge: Dict[str, Any],
+        k_bridge: Dict[str, Any],
+        v_bridge: Dict[str, Any],
+        dq_bridge: Dict[str, Any],
+        dk_bridge: Dict[str, Any],
+        dv_bridge: Dict[str, Any],
+        attn_var: str,
+        ds_var: str,
+        ds_numel: int,
+    ) -> None:
+        ap("    /* op_id=%s op=%s kernel_id=%s (%s) */" % (op_id, op_name, kid, comment))
+        for bridge in (dy_bridge, q_bridge, k_bridge, v_bridge, dq_bridge, dk_bridge, dv_bridge):
+            token_var = str(bridge.get("token_var") or "g_dummy_f32")
+            head_var = str(bridge.get("head_var") or "g_dummy_f32")
+            token_numel = int(bridge.get("token_numel", 0) or 0)
+            head_numel = int(bridge.get("head_numel", 0) or 0)
+            if token_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (token_var, int(token_numel), op_id))
+            if head_numel > 0:
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (head_var, int(head_numel), op_id))
+        for bridge in (dy_bridge, q_bridge, k_bridge, v_bridge):
+            ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+                str(bridge.get("token_var") or "g_dummy_f32"),
+                str(bridge.get("head_var") or "g_dummy_f32"),
+                _bridge_head_group_macro(bridge.get("pre_head_group")),
+            ))
+        ap("    %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
+            fn,
+            str(dy_bridge.get("head_var") or "g_dummy_f32"),
+            str(q_bridge.get("head_var") or "g_dummy_f32"),
+            str(k_bridge.get("head_var") or "g_dummy_f32"),
+            str(v_bridge.get("head_var") or "g_dummy_f32"),
+            attn_var,
+            str(dq_bridge.get("head_var") or "g_dummy_f32"),
+            str(dk_bridge.get("head_var") or "g_dummy_f32"),
+            str(dv_bridge.get("head_var") or "g_dummy_f32"),
+            ds_var,
+        ))
+        for bridge in (dq_bridge, dk_bridge, dv_bridge):
+            ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, %s, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (
+                str(bridge.get("head_var") or "g_dummy_f32"),
+                str(bridge.get("token_var") or "g_dummy_f32"),
+                _bridge_head_group_macro(bridge.get("post_head_group")),
+            ))
+        ap("#if CK_ABLATE_ATTENTION_BACKWARD")
+        ap("    /* Ablation fallback: bypass attention backward outputs with passthrough/zeros. */")
+        dq_numel = int(dq_bridge.get("token_numel", 0) or 0)
+        dk_numel = int(dk_bridge.get("token_numel", 0) or 0)
+        dv_numel = int(dv_bridge.get("token_numel", 0) or 0)
+        dy_numel = int(dy_bridge.get("token_numel", 0) or 0)
+        dq_var = str(dq_bridge.get("token_var") or "g_dummy_f32")
+        dk_var = str(dk_bridge.get("token_var") or "g_dummy_f32")
+        dv_var = str(dv_bridge.get("token_var") or "g_dummy_f32")
+        dy_var = str(dy_bridge.get("token_var") or "g_dummy_f32")
+        if dq_numel > 0:
+            cp = min(int(dq_numel), int(dy_numel))
+            if cp > 0:
+                ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dy_var, int(cp)))
+            if int(dq_numel) > cp:
+                ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
+        if dk_numel > 0:
+            ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_var, int(dk_numel)))
+        if dv_numel > 0:
+            ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dv_var, int(dv_numel)))
+        if int(ds_numel) > 0:
+            ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (ds_var, int(ds_numel)))
+        ap("#endif")
+        ap("    call_count++;")
+
+    def _emit_explicit_forward_bridge(op: Dict[str, Any], kid: str, io_inputs: Dict[str, str], io_outputs: Dict[str, str], io_weights: Dict[str, str]) -> bool:
+        nonlocal explicit_forward_bridge_plans
+        bridge_plan = op.get("bridge_plan")
+        if not isinstance(bridge_plan, dict):
+            return False
+        if str(bridge_plan.get("mode", "")).strip().lower() != "explicit":
+            return False
+
+        op_id = op.get("op_id")
+        op_name = op.get("op")
+
+        if kid == "qk_norm_forward":
+            q_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+            k_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+            q_post = _bridge_plan_entry(bridge_plan, "post", "q")
+            k_post = _bridge_plan_entry(bridge_plan, "post", "k")
+            if not all(isinstance(x, dict) for x in (q_pre, k_pre, q_post, k_post)):
+                return False
+
+            q_in_tid = io_inputs.get("q")
+            k_in_tid = io_inputs.get("k")
+            q_out_tid = io_outputs.get("q") or q_in_tid
+            k_out_tid = io_outputs.get("k") or k_in_tid
+            q_in_var = _bridge_var(q_in_tid)
+            k_in_var = _bridge_var(k_in_tid)
+            q_out_var = _bridge_var(q_out_tid)
+            k_out_var = _bridge_var(k_out_tid)
+            q_head_var = _bridge_var(q_pre.get("output_tensor"))
+            k_head_var = _bridge_var(k_pre.get("output_tensor"))
+            q_gamma_var = tvars_f32.get(io_weights.get("q_gamma", ""), "g_dummy_f32")
+            k_gamma_var = tvars_f32.get(io_weights.get("k_gamma", ""), "g_dummy_f32")
+            q_in_numel = _bridge_numel(q_in_tid)
+            k_in_numel = _bridge_numel(k_in_tid)
+            q_head_numel = _bridge_numel(q_pre.get("output_tensor"))
+            k_head_numel = _bridge_numel(k_pre.get("output_tensor"))
+            q_out_numel = _bridge_numel(q_out_tid)
+            k_out_numel = _bridge_numel(k_out_tid)
+
+            _emit_qk_norm_forward_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                comment="explicit bridge plan via shared qk_norm bridge",
+                q_bridge={
+                    "in_var": q_in_var,
+                    "head_var": q_head_var,
+                    "out_var": q_out_var,
+                    "in_numel": q_in_numel,
+                    "head_numel": q_head_numel,
+                    "out_numel": q_out_numel,
+                    "pre_head_group": q_pre.get("head_group"),
+                    "post_head_group": q_post.get("head_group"),
+                },
+                k_bridge={
+                    "in_var": k_in_var,
+                    "head_var": k_head_var,
+                    "out_var": k_out_var,
+                    "in_numel": k_in_numel,
+                    "head_numel": k_head_numel,
+                    "out_numel": k_out_numel,
+                    "pre_head_group": k_pre.get("head_group"),
+                    "post_head_group": k_post.get("head_group"),
+                },
+                q_gamma_var=q_gamma_var,
+                k_gamma_var=k_gamma_var,
+            )
+            explicit_forward_bridge_plans += 1
+            return True
+
+        if _is_rope_forward_qk_kernel(kid):
+            q_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+            k_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+            q_post = _bridge_plan_entry(bridge_plan, "post", "q")
+            k_post = _bridge_plan_entry(bridge_plan, "post", "k")
+            if not all(isinstance(x, dict) for x in (q_pre, k_pre, q_post, k_post)):
+                return False
+
+            rope_bridge_fn = _rope_forward_qk_bridge_function(kid)
+            q_in_tid = io_inputs.get("q")
+            k_in_tid = io_inputs.get("k")
+            q_out_tid = io_outputs.get("q") or q_in_tid
+            k_out_tid = io_outputs.get("k") or k_in_tid
+            q_in_var = _bridge_var(q_in_tid)
+            k_in_var = _bridge_var(k_in_tid)
+            q_out_var = _bridge_var(q_out_tid)
+            k_out_var = _bridge_var(k_out_tid)
+            q_head_var = _bridge_var(q_pre.get("output_tensor"))
+            k_head_var = _bridge_var(k_pre.get("output_tensor"))
+            q_in_numel = _bridge_numel(q_in_tid)
+            k_in_numel = _bridge_numel(k_in_tid)
+            q_head_numel = _bridge_numel(q_pre.get("output_tensor"))
+            k_head_numel = _bridge_numel(k_pre.get("output_tensor"))
+            q_out_numel = _bridge_numel(q_out_tid)
+            k_out_numel = _bridge_numel(k_out_tid)
+
+            _emit_rope_forward_qk_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                comment="explicit bridge plan via shared rope_forward_qk bridge",
+                rope_bridge_fn=rope_bridge_fn,
+                q_bridge={
+                    "in_var": q_in_var,
+                    "head_var": q_head_var,
+                    "out_var": q_out_var,
+                    "in_numel": q_in_numel,
+                    "head_numel": q_head_numel,
+                    "out_numel": q_out_numel,
+                    "pre_head_group": q_pre.get("head_group"),
+                    "post_head_group": q_post.get("head_group"),
+                },
+                k_bridge={
+                    "in_var": k_in_var,
+                    "head_var": k_head_var,
+                    "out_var": k_out_var,
+                    "in_numel": k_in_numel,
+                    "head_numel": k_head_numel,
+                    "out_numel": k_out_numel,
+                    "pre_head_group": k_pre.get("head_group"),
+                    "post_head_group": k_post.get("head_group"),
+                },
+            )
+            explicit_forward_bridge_plans += 1
+            return True
+
+        if kid in (
+            "attention_forward_causal_head_major_gqa_flash_strided",
+            "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+        ):
+            q_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+            k_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+            v_pre = _bridge_plan_entry(bridge_plan, "pre", "v")
+            out_post = _bridge_plan_entry(bridge_plan, "post", "out")
+            if not all(isinstance(x, dict) for x in (q_pre, k_pre, v_pre, out_post)):
+                return False
+
+            q_tid = io_inputs.get("q")
+            k_tid = io_inputs.get("k")
+            v_tid = io_inputs.get("v")
+            y_tid = io_outputs.get("out") or io_outputs.get("output") or io_outputs.get("y")
+            sfb = op.get("save_for_backward")
+            attn_sfb = sfb.get("attn_weights") if isinstance(sfb, dict) else None
+            attn_saved_tid = attn_sfb.get("tensor") if isinstance(attn_sfb, dict) else None
+            q_var = _bridge_var(q_tid)
+            k_var = _bridge_var(k_tid)
+            v_var = _bridge_var(v_tid)
+            y_var = _bridge_var(y_tid)
+            q_head_var = _bridge_var(q_pre.get("output_tensor"))
+            k_head_var = _bridge_var(k_pre.get("output_tensor"))
+            v_head_var = _bridge_var(v_pre.get("output_tensor"))
+            y_head_var = _bridge_var(out_post.get("input_tensor"))
+            attn_saved_var = _bridge_var(attn_saved_tid)
+            q_numel = _bridge_numel(q_tid)
+            k_numel = _bridge_numel(k_tid)
+            v_numel = _bridge_numel(v_tid)
+            y_numel = _bridge_numel(y_tid)
+            q_head_numel = _bridge_numel(q_pre.get("output_tensor"))
+            k_head_numel = _bridge_numel(k_pre.get("output_tensor"))
+            v_head_numel = _bridge_numel(v_pre.get("output_tensor"))
+            y_head_numel = _bridge_numel(out_post.get("input_tensor"))
+            attn_saved_numel = _bridge_numel(attn_saved_tid)
+            runtime_contract = _attention_runtime_contract(op, kid)
+            runtime_kid = str(runtime_contract.get("kernel_id", "") or kid)
+            requires_saved_attn = bool(runtime_contract.get("materialize_saved_attn_weights"))
+            requires_zero_sliding_window = bool(runtime_contract.get("requires_zero_sliding_window"))
+            uses_sliding_window = bool(
+                runtime_kid == "attention_forward_causal_head_major_gqa_flash_strided_sliding"
+                or requires_zero_sliding_window
+            )
+            sliding_window_expr = _arg_scalar_expr("int", "sliding_window", cfg) if uses_sliding_window else "0"
+            _emit_attention_forward_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                runtime_kid=runtime_kid,
+                comment="explicit bridge plan via shared attention_forward bridge",
+                q_bridge={
+                    "token_var": q_var,
+                    "head_var": q_head_var,
+                    "token_numel": q_numel,
+                    "head_numel": q_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(q_pre.get("head_group")),
+                },
+                k_bridge={
+                    "token_var": k_var,
+                    "head_var": k_head_var,
+                    "token_numel": k_numel,
+                    "head_numel": k_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(k_pre.get("head_group")),
+                },
+                v_bridge={
+                    "token_var": v_var,
+                    "head_var": v_head_var,
+                    "token_numel": v_numel,
+                    "head_numel": v_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(v_pre.get("head_group")),
+                },
+                out_bridge={
+                    "head_var": y_head_var,
+                    "head_numel": y_head_numel,
+                    "token_var": y_var,
+                    "token_numel": y_numel,
+                    "post_head_group_expr": _bridge_head_group_macro(out_post.get("head_group")),
+                },
+                attn_saved_var=attn_saved_var,
+                attn_saved_numel=attn_saved_numel,
+                requires_saved_attn=requires_saved_attn,
+                requires_zero_sliding_window=requires_zero_sliding_window,
+                sliding_window_expr=sliding_window_expr,
+                missing_saved_comment="explicit attention runtime contract requires saved attn weights, but none were allocated",
+            )
+            explicit_forward_bridge_plans += 1
+            return True
+
+        return False
+
+    def _emit_explicit_backward_bridge(op: Dict[str, Any], kid: str, fn: str, io_inputs: Dict[str, str], io_outputs: Dict[str, str]) -> bool:
+        nonlocal explicit_backward_bridge_plans
+        bridge_plan = op.get("bridge_plan")
+        if not isinstance(bridge_plan, dict):
+            return False
+        if str(bridge_plan.get("mode", "")).strip().lower() != "explicit":
+            return False
+
+        op_id = op.get("op_id")
+        op_name = op.get("op")
+
+        if kid in ("attention_backward_causal_head_major_gqa", "attention_backward_causal_head_major"):
+            dy_pre = _bridge_plan_entry(bridge_plan, "pre", "dy")
+            q_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+            k_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+            v_pre = _bridge_plan_entry(bridge_plan, "pre", "v")
+            dq_post = _bridge_plan_entry(bridge_plan, "post", "d_q")
+            dk_post = _bridge_plan_entry(bridge_plan, "post", "d_k")
+            dv_post = _bridge_plan_entry(bridge_plan, "post", "d_v")
+            if not all(isinstance(x, dict) for x in (dy_pre, q_pre, k_pre, v_pre, dq_post, dk_post, dv_post)):
+                return False
+
+            dy_tid = io_inputs.get("in_0")
+            q_tid = io_inputs.get("in_1")
+            k_tid = io_inputs.get("in_2")
+            v_tid = io_inputs.get("in_3")
+            attn_tid = io_inputs.get("in_4")
+            dq_tid = io_outputs.get("d_q")
+            dk_tid = io_outputs.get("d_k")
+            dv_tid = io_outputs.get("d_v")
+            ds_tid = io_outputs.get("d_scores")
+
+            dy_var = _bridge_var(dy_tid)
+            q_var = _bridge_var(q_tid)
+            k_var = _bridge_var(k_tid)
+            v_var = _bridge_var(v_tid)
+            attn_var = _bridge_var(attn_tid)
+            dq_var = _bridge_var(dq_tid)
+            dk_var = _bridge_var(dk_tid)
+            dv_var = _bridge_var(dv_tid)
+            ds_var = _bridge_var(ds_tid)
+
+            dy_head_var = _bridge_var(dy_pre.get("output_tensor"))
+            q_head_var = _bridge_var(q_pre.get("output_tensor"))
+            k_head_var = _bridge_var(k_pre.get("output_tensor"))
+            v_head_var = _bridge_var(v_pre.get("output_tensor"))
+            dq_head_var = _bridge_var(dq_post.get("input_tensor"))
+            dk_head_var = _bridge_var(dk_post.get("input_tensor"))
+            dv_head_var = _bridge_var(dv_post.get("input_tensor"))
+
+            dy_numel = _bridge_numel(dy_tid)
+            q_numel = _bridge_numel(q_tid)
+            k_numel = _bridge_numel(k_tid)
+            v_numel = _bridge_numel(v_tid)
+            dq_numel = _bridge_numel(dq_tid)
+            dk_numel = _bridge_numel(dk_tid)
+            dv_numel = _bridge_numel(dv_tid)
+            dy_head_numel = _bridge_numel(dy_pre.get("output_tensor"))
+            q_head_numel = _bridge_numel(q_pre.get("output_tensor"))
+            k_head_numel = _bridge_numel(k_pre.get("output_tensor"))
+            v_head_numel = _bridge_numel(v_pre.get("output_tensor"))
+            dq_head_numel = _bridge_numel(dq_post.get("input_tensor"))
+            dk_head_numel = _bridge_numel(dk_post.get("input_tensor"))
+            dv_head_numel = _bridge_numel(dv_post.get("input_tensor"))
+            ds_numel = _bridge_numel(ds_tid)
+
+            _emit_attention_backward_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                fn=fn,
+                comment="explicit backward bridge plan via shared attention_backward bridge",
+                dy_bridge={
+                    "token_var": dy_var,
+                    "head_var": dy_head_var,
+                    "token_numel": dy_numel,
+                    "head_numel": dy_head_numel,
+                    "pre_head_group": dy_pre.get("head_group"),
+                },
+                q_bridge={
+                    "token_var": q_var,
+                    "head_var": q_head_var,
+                    "token_numel": q_numel,
+                    "head_numel": q_head_numel,
+                    "pre_head_group": q_pre.get("head_group"),
+                },
+                k_bridge={
+                    "token_var": k_var,
+                    "head_var": k_head_var,
+                    "token_numel": k_numel,
+                    "head_numel": k_head_numel,
+                    "pre_head_group": k_pre.get("head_group"),
+                },
+                v_bridge={
+                    "token_var": v_var,
+                    "head_var": v_head_var,
+                    "token_numel": v_numel,
+                    "head_numel": v_head_numel,
+                    "pre_head_group": v_pre.get("head_group"),
+                },
+                dq_bridge={
+                    "token_var": dq_var,
+                    "head_var": dq_head_var,
+                    "token_numel": dq_numel,
+                    "head_numel": dq_head_numel,
+                    "post_head_group": dq_post.get("head_group"),
+                },
+                dk_bridge={
+                    "token_var": dk_var,
+                    "head_var": dk_head_var,
+                    "token_numel": dk_numel,
+                    "head_numel": dk_head_numel,
+                    "post_head_group": dk_post.get("head_group"),
+                },
+                dv_bridge={
+                    "token_var": dv_var,
+                    "head_var": dv_head_var,
+                    "token_numel": dv_numel,
+                    "head_numel": dv_head_numel,
+                    "post_head_group": dv_post.get("head_group"),
+                },
+                attn_var=attn_var,
+                ds_var=ds_var,
+                ds_numel=ds_numel,
+            )
+            explicit_backward_bridge_plans += 1
+            return True
+
+        if _is_rope_backward_qk_kernel(kid):
+            dq_out_pre = _bridge_plan_entry(bridge_plan, "pre", "grad_q")
+            dk_out_pre = _bridge_plan_entry(bridge_plan, "pre", "grad_k")
+            dq_post = _bridge_plan_entry(bridge_plan, "post", "d_q")
+            dk_post = _bridge_plan_entry(bridge_plan, "post", "d_k")
+            if not all(isinstance(x, dict) for x in (dq_out_pre, dk_out_pre, dq_post, dk_post)):
+                return False
+
+            dq_out_tid = io_inputs.get("in_0")
+            dk_out_tid = io_inputs.get("in_1")
+            dq_tid = io_outputs.get("d_q")
+            dk_tid = io_outputs.get("d_k")
+
+            dq_out_var = _bridge_var(dq_out_tid)
+            dk_out_var = _bridge_var(dk_out_tid)
+            dq_var = _bridge_var(dq_tid)
+            dk_var = _bridge_var(dk_tid)
+            dq_out_head_var = _bridge_var(dq_out_pre.get("output_tensor"))
+            dk_out_head_var = _bridge_var(dk_out_pre.get("output_tensor"))
+            dq_head_var = _bridge_var(dq_post.get("input_tensor"))
+            dk_head_var = _bridge_var(dk_post.get("input_tensor"))
+
+            dq_out_numel = _bridge_numel(dq_out_tid)
+            dk_out_numel = _bridge_numel(dk_out_tid)
+            dq_numel = _bridge_numel(dq_tid)
+            dk_numel = _bridge_numel(dk_tid)
+            dq_out_head_numel = _bridge_numel(dq_out_pre.get("output_tensor"))
+            dk_out_head_numel = _bridge_numel(dk_out_pre.get("output_tensor"))
+            dq_head_numel = _bridge_numel(dq_post.get("input_tensor"))
+            dk_head_numel = _bridge_numel(dk_post.get("input_tensor"))
+
+            _emit_rope_backward_qk_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                comment="explicit backward bridge plan via shared rope_backward_qk bridge",
+                dq_out_bridge={
+                    "token_var": dq_out_var,
+                    "head_var": dq_out_head_var,
+                    "token_numel": dq_out_numel,
+                    "head_numel": dq_out_head_numel,
+                    "pre_head_group": dq_out_pre.get("head_group"),
+                },
+                dk_out_bridge={
+                    "token_var": dk_out_var,
+                    "head_var": dk_out_head_var,
+                    "token_numel": dk_out_numel,
+                    "head_numel": dk_out_head_numel,
+                    "pre_head_group": dk_out_pre.get("head_group"),
+                },
+                dq_bridge={
+                    "token_var": dq_var,
+                    "head_var": dq_head_var,
+                    "token_numel": dq_numel,
+                    "head_numel": dq_head_numel,
+                    "post_head_group": dq_post.get("head_group"),
+                },
+                dk_bridge={
+                    "token_var": dk_var,
+                    "head_var": dk_head_var,
+                    "token_numel": dk_numel,
+                    "head_numel": dk_head_numel,
+                    "post_head_group": dk_post.get("head_group"),
+                },
+            )
+            explicit_backward_bridge_plans += 1
+            return True
+
+        if kid == "qk_norm_backward_f32":
+            dq_out_pre = _bridge_plan_entry(bridge_plan, "pre", "grad_q")
+            dk_out_pre = _bridge_plan_entry(bridge_plan, "pre", "grad_k")
+            q_in_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+            k_in_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+            dq_post = _bridge_plan_entry(bridge_plan, "post", "d_q")
+            dk_post = _bridge_plan_entry(bridge_plan, "post", "d_k")
+            if not all(isinstance(x, dict) for x in (dq_out_pre, dk_out_pre, q_in_pre, k_in_pre, dq_post, dk_post)):
+                return False
+
+            dq_out_tid = io_inputs.get("in_0")
+            dk_out_tid = io_inputs.get("in_1")
+            q_in_tid = io_inputs.get("in_2")
+            k_in_tid = io_inputs.get("in_3")
+            q_gamma_tid = io_inputs.get("in_4")
+            k_gamma_tid = io_inputs.get("in_5")
+            dq_tid = io_outputs.get("d_q")
+            dk_tid = io_outputs.get("d_k")
+            dq_gamma_tid = io_outputs.get("d_q_gamma")
+            dk_gamma_tid = io_outputs.get("d_k_gamma")
+
+            dq_out_var = _bridge_var(dq_out_tid)
+            dk_out_var = _bridge_var(dk_out_tid)
+            q_in_var = _bridge_var(q_in_tid)
+            k_in_var = _bridge_var(k_in_tid)
+            q_gamma_var = _bridge_var(q_gamma_tid)
+            k_gamma_var = _bridge_var(k_gamma_tid)
+            dq_var = _bridge_var(dq_tid)
+            dk_var = _bridge_var(dk_tid)
+            dq_gamma_var = _bridge_var(dq_gamma_tid)
+            dk_gamma_var = _bridge_var(dk_gamma_tid)
+
+            dq_out_head_var = _bridge_var(dq_out_pre.get("output_tensor"))
+            dk_out_head_var = _bridge_var(dk_out_pre.get("output_tensor"))
+            q_in_head_var = _bridge_var(q_in_pre.get("output_tensor"))
+            k_in_head_var = _bridge_var(k_in_pre.get("output_tensor"))
+            dq_head_var = _bridge_var(dq_post.get("input_tensor"))
+            dk_head_var = _bridge_var(dk_post.get("input_tensor"))
+
+            dq_out_numel = _bridge_numel(dq_out_tid)
+            dk_out_numel = _bridge_numel(dk_out_tid)
+            q_in_numel = _bridge_numel(q_in_tid)
+            k_in_numel = _bridge_numel(k_in_tid)
+            dq_numel = _bridge_numel(dq_tid)
+            dk_numel = _bridge_numel(dk_tid)
+            dq_gamma_numel = _bridge_numel(dq_gamma_tid)
+            dk_gamma_numel = _bridge_numel(dk_gamma_tid)
+            dq_out_head_numel = _bridge_numel(dq_out_pre.get("output_tensor"))
+            dk_out_head_numel = _bridge_numel(dk_out_pre.get("output_tensor"))
+            q_in_head_numel = _bridge_numel(q_in_pre.get("output_tensor"))
+            k_in_head_numel = _bridge_numel(k_in_pre.get("output_tensor"))
+            dq_head_numel = _bridge_numel(dq_post.get("input_tensor"))
+            dk_head_numel = _bridge_numel(dk_post.get("input_tensor"))
+
+            _emit_qk_norm_backward_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=kid,
+                comment="explicit backward bridge plan via shared qk_norm_backward bridge",
+                dq_out_bridge={
+                    "token_var": dq_out_var,
+                    "head_var": dq_out_head_var,
+                    "token_numel": dq_out_numel,
+                    "head_numel": dq_out_head_numel,
+                    "pre_head_group": dq_out_pre.get("head_group"),
+                },
+                dk_out_bridge={
+                    "token_var": dk_out_var,
+                    "head_var": dk_out_head_var,
+                    "token_numel": dk_out_numel,
+                    "head_numel": dk_out_head_numel,
+                    "pre_head_group": dk_out_pre.get("head_group"),
+                },
+                q_in_bridge={
+                    "token_var": q_in_var,
+                    "head_var": q_in_head_var,
+                    "token_numel": q_in_numel,
+                    "head_numel": q_in_head_numel,
+                    "pre_head_group": q_in_pre.get("head_group"),
+                },
+                k_in_bridge={
+                    "token_var": k_in_var,
+                    "head_var": k_in_head_var,
+                    "token_numel": k_in_numel,
+                    "head_numel": k_in_head_numel,
+                    "pre_head_group": k_in_pre.get("head_group"),
+                },
+                dq_bridge={
+                    "token_var": dq_var,
+                    "head_var": dq_head_var,
+                    "token_numel": dq_numel,
+                    "head_numel": dq_head_numel,
+                    "post_head_group": dq_post.get("head_group"),
+                },
+                dk_bridge={
+                    "token_var": dk_var,
+                    "head_var": dk_head_var,
+                    "token_numel": dk_numel,
+                    "head_numel": dk_head_numel,
+                    "post_head_group": dk_post.get("head_group"),
+                },
+                q_gamma_var=q_gamma_var,
+                k_gamma_var=k_gamma_var,
+                dq_gamma_var=dq_gamma_var,
+                dk_gamma_var=dk_gamma_var,
+                dq_gamma_numel=dq_gamma_numel,
+                dk_gamma_numel=dk_gamma_numel,
+            )
+            explicit_backward_bridge_plans += 1
+            return True
+
+        return False
+
+    def _emit_checkpoint_rematerialize_saved_tensor(op: Dict[str, Any], io_inputs: Dict[str, str], io_outputs: Dict[str, str]) -> bool:
+        nonlocal checkpoint_rematerialize_ops
+        op_name = str(op.get("op", "")).strip().lower()
+        if op_name not in ("checkpoint_rematerialize_saved_tensor", "checkpoint_rematerialize_attn_weights"):
+            return False
+
+        remat_contract = op.get("rematerialize_contract") if isinstance(op.get("rematerialize_contract"), dict) else {}
+        saved_key = str(
+            remat_contract.get("saved_key")
+            or ((op.get("attrs") or {}).get("rematerialize_saved") if isinstance(op.get("attrs"), dict) else "")
+            or ""
+        ).strip()
+        semantic_op = str(remat_contract.get("semantic_op", "") or "").strip().lower()
+        if saved_key and saved_key != "attn_weights":
+            return False
+        if semantic_op and semantic_op not in ("attn", "attn_sliding"):
+            return False
+
+        runtime_contract = _attention_runtime_contract(op, str(op.get("kernel_id", "") or ""))
+        runtime_kid = str(runtime_contract.get("kernel_id", "") or "attention_forward_causal_head_major_gqa_exact")
+        if runtime_kid != "attention_forward_causal_head_major_gqa_exact":
+            return False
+
+        op_id = op.get("op_id")
+        q_tid = io_inputs.get("q")
+        k_tid = io_inputs.get("k")
+        v_tid = io_inputs.get("v")
+        out_tid = io_outputs.get("out")
+        sfb = op.get("save_for_backward")
+        attn_sfb = sfb.get("attn_weights") if isinstance(sfb, dict) else None
+        attn_saved_tid = attn_sfb.get("tensor") if isinstance(attn_sfb, dict) else None
+
+        q_var = _bridge_var(q_tid)
+        k_var = _bridge_var(k_tid)
+        v_var = _bridge_var(v_tid)
+        out_var = _bridge_var(out_tid)
+        attn_saved_var = _bridge_var(attn_saved_tid)
+
+        q_numel = _bridge_numel(q_tid)
+        k_numel = _bridge_numel(k_tid)
+        v_numel = _bridge_numel(v_tid)
+        out_numel = _bridge_numel(out_tid)
+        attn_saved_numel = _bridge_numel(attn_saved_tid)
+
+        bridge_plan = op.get("bridge_plan") if isinstance(op.get("bridge_plan"), dict) else {}
+        q_pre = _bridge_plan_entry(bridge_plan, "pre", "q")
+        k_pre = _bridge_plan_entry(bridge_plan, "pre", "k")
+        v_pre = _bridge_plan_entry(bridge_plan, "pre", "v")
+        if all(isinstance(x, dict) for x in (q_pre, k_pre, v_pre)):
+            q_head_var = _bridge_var(q_pre.get("output_tensor"))
+            k_head_var = _bridge_var(k_pre.get("output_tensor"))
+            v_head_var = _bridge_var(v_pre.get("output_tensor"))
+            q_head_numel = _bridge_numel(q_pre.get("output_tensor"))
+            k_head_numel = _bridge_numel(k_pre.get("output_tensor"))
+            v_head_numel = _bridge_numel(v_pre.get("output_tensor"))
+            _emit_attention_forward_bridge_core(
+                op_id=op_id,
+                op_name=op_name,
+                kid=runtime_kid,
+                runtime_kid=runtime_kid,
+                comment="explicit checkpoint rematerialization via shared attention_forward bridge",
+                q_bridge={
+                    "token_var": q_var,
+                    "head_var": q_head_var,
+                    "token_numel": q_numel,
+                    "head_numel": q_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(q_pre.get("head_group")),
+                },
+                k_bridge={
+                    "token_var": k_var,
+                    "head_var": k_head_var,
+                    "token_numel": k_numel,
+                    "head_numel": k_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(k_pre.get("head_group")),
+                },
+                v_bridge={
+                    "token_var": v_var,
+                    "head_var": v_head_var,
+                    "token_numel": v_numel,
+                    "head_numel": v_head_numel,
+                    "pre_head_group_expr": _bridge_head_group_macro(v_pre.get("head_group")),
+                },
+                out_bridge={
+                    "head_var": out_var,
+                    "head_numel": out_numel,
+                    "direct_head_output": True,
+                },
+                attn_saved_var=attn_saved_var,
+                attn_saved_numel=attn_saved_numel,
+                requires_saved_attn=True,
+                requires_zero_sliding_window=False,
+                sliding_window_expr="0",
+            )
+            checkpoint_rematerialize_ops += 1
+            return True
+
+        banned: set[str] = {q_var, k_var, v_var, out_var, attn_saved_var}
+        q_scratch = _pick_tmp_scratch_var(q_numel, banned)
+        if q_scratch is not None:
+            banned.add(q_scratch)
+        k_scratch = _pick_tmp_scratch_var(k_numel, banned)
+        if k_scratch is not None:
+            banned.add(k_scratch)
+        v_scratch = _pick_tmp_scratch_var(v_numel, banned)
+        if v_scratch is not None:
+            banned.add(v_scratch)
+        if not (q_scratch and k_scratch and v_scratch):
+            return False
+        _emit_attention_forward_bridge_core(
+            op_id=op_id,
+            op_name=op_name,
+            kid=runtime_kid,
+            runtime_kid=runtime_kid,
+            comment="checkpoint rematerialization via shared attention_forward bridge",
+            q_bridge={
+                "token_var": q_var,
+                "head_var": q_scratch,
+                "token_numel": q_numel,
+                "head_numel": q_numel,
+                "pre_head_group_expr": "CK_ROPE_NUM_HEADS",
+            },
+            k_bridge={
+                "token_var": k_var,
+                "head_var": k_scratch,
+                "token_numel": k_numel,
+                "head_numel": k_numel,
+                "pre_head_group_expr": "CK_ROPE_NUM_KV_HEADS",
+            },
+            v_bridge={
+                "token_var": v_var,
+                "head_var": v_scratch,
+                "token_numel": v_numel,
+                "head_numel": v_numel,
+                "pre_head_group_expr": "CK_ROPE_NUM_KV_HEADS",
+            },
+            out_bridge={
+                "head_var": out_var,
+                "head_numel": out_numel,
+                "direct_head_output": True,
+            },
+            attn_saved_var=attn_saved_var,
+            attn_saved_numel=attn_saved_numel,
+            requires_saved_attn=True,
+            requires_zero_sliding_window=False,
+            sliding_window_expr="0",
+        )
+        checkpoint_rematerialize_ops += 1
+        return True
+
     def emit_ops(fn_name: str, ops: List[Dict[str, Any]], phase: str, *, trace_canary: bool = False) -> None:
         if trace_canary:
             ap("int %s(int *failed_op_id, int *first_corrupt_idx) {" % fn_name)
@@ -1923,6 +3271,9 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         ap("    /* %s ops: %d */" % (phase, len(ops)))
         ap("    int call_count = 0;")
         for op in ops:
+            if str(op.get("phase", "")).strip().lower() == "bridge":
+                ap("    /* skip explicit bridge metadata op_id=%s (%s) */" % (op.get("op_id"), op.get("op")))
+                continue
             kid = op.get("kernel_id")
             op_id = op.get("op_id")
             op_name = op.get("op")
@@ -1931,6 +3282,11 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("    /* skip op_id=%s (%s): missing kernel_id */" % (op_id, op_name))
                 continue
 
+            io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
+            if phase == "backward":
+                if _emit_checkpoint_rematerialize_saved_tensor(op, io_inputs, io_outputs):
+                    continue
+
             resolved = used_decl.get(kid)
             if resolved is None:
                 skipped_ops.append("op_id=%s kernel_id=%s no callable declaration" % (op_id, kid))
@@ -1938,7 +3294,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 continue
 
             fn, args, _decl = resolved
-            io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
+            if phase == "forward" and bridge_lowering == "explicit":
+                if _emit_explicit_forward_bridge(op, str(kid), io_inputs, io_outputs, io_weights):
+                    continue
+            if phase == "backward" and bridge_lowering == "explicit":
+                if _emit_explicit_backward_bridge(op, str(kid), fn, io_inputs, io_outputs):
+                    continue
 
             # qk_norm_forward is in-place and head-major in kernel API, while IR
             # models token-major out-of-place tensors.
@@ -1961,25 +3322,39 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     banned.add(q_scratch)
                 k_scratch = _pick_tmp_scratch_var(k_numel, banned)
 
-                ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
                 if q_numel > 0 and q_out_var != q_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
                 if k_numel > 0 and k_out_var != k_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
                 if q_scratch and k_scratch:
-                    if q_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
-                    if k_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
-                    ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
-                        q_scratch, k_scratch, q_gamma_var, k_gamma_var
-                    ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                    _emit_qk_norm_forward_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        comment="token-major IR <-> head-major kernel bridge via shared qk_norm bridge",
+                        q_bridge={
+                            "in_var": q_out_var,
+                            "head_var": q_scratch,
+                            "out_var": q_out_var,
+                            "in_numel": q_numel,
+                            "head_numel": q_numel,
+                            "out_numel": q_numel,
+                            "pre_head_group": "num_heads",
+                            "post_head_group": "num_heads",
+                        },
+                        k_bridge={
+                            "in_var": k_out_var,
+                            "head_var": k_scratch,
+                            "out_var": k_out_var,
+                            "in_numel": k_numel,
+                            "head_numel": k_numel,
+                            "out_numel": k_numel,
+                            "pre_head_group": "num_kv_heads",
+                            "post_head_group": "num_kv_heads",
+                        },
+                        q_gamma_var=q_gamma_var,
+                        k_gamma_var=k_gamma_var,
+                    )
                 else:
                     ap("    /* missing tmp.* scratch for qk_norm bridge; fallback direct call */")
                     if q_numel > 0:
@@ -1989,6 +3364,47 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     ap("    qk_norm_forward(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
                         q_out_var, k_out_var, q_gamma_var, k_gamma_var
                     ))
+                    ap("    call_count++;")
+                continue
+
+            # recurrent_qk_l2_norm_forward is also in-place at the kernel level,
+            # but IR carries explicit output tensors so the pre-normalized q/k can
+            # be saved for backward and the normalized q/k can feed DeltaNet.
+            if kid == "recurrent_qk_l2_norm_forward":
+                q_in_tid = io_inputs.get("q")
+                k_in_tid = io_inputs.get("k")
+                q_out_tid = io_outputs.get("q") or q_in_tid
+                k_out_tid = io_outputs.get("k") or k_in_tid
+                q_in_var = tvars_f32.get(q_in_tid or "", "g_dummy_f32")
+                k_in_var = tvars_f32.get(k_in_tid or "", "g_dummy_f32")
+                q_out_var = tvars_f32.get(q_out_tid or "", q_in_var)
+                k_out_var = tvars_f32.get(k_out_tid or "", k_in_var)
+                q_numel = int(tensor_numel.get(q_out_tid or q_in_tid or "", 0) or 0)
+                k_numel = int(tensor_numel.get(k_out_tid or k_in_tid or "", 0) or 0)
+                q_dim = int(cfg.get("q_dim", 0) or 0)
+                k_dim = int(cfg.get("k_dim", q_dim) or q_dim)
+                recurrent_head_dim = _derived_recurrent_head_dim(cfg)
+                recurrent_eps = _cfg_float(cfg, "rms_eps", default=1e-5)
+
+                ap("    /* op_id=%s op=%s kernel_id=%s (copy-to-output, then normalize in place) */" % (op_id, op_name, kid))
+                if q_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_in_var, int(q_numel), op_id))
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
+                    if q_out_var != q_in_var:
+                        ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
+                if k_numel > 0:
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_in_var, int(k_numel), op_id))
+                    ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
+                    if k_out_var != k_in_var:
+                        ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
+                ap("    recurrent_qk_l2_norm_forward(%s, %s, g_active_tokens, %d, %d, %d, %.8ff);" % (
+                    q_out_var,
+                    k_out_var,
+                    int(q_dim),
+                    int(k_dim),
+                    int(recurrent_head_dim),
+                    float(recurrent_eps),
+                ))
                 ap("    call_count++;")
                 continue
 
@@ -2013,28 +3429,39 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     banned.add(q_scratch)
                 k_scratch = _pick_tmp_scratch_var(k_numel, banned)
 
-                ap("    /* op_id=%s op=%s kernel_id=%s (IR token-major <-> kernel head-major bridge) */" % (op_id, op_name, kid))
                 if q_numel > 0 and q_out_var != q_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (q_out_var, q_in_var, int(q_numel)))
                 if k_numel > 0 and k_out_var != k_in_var:
                     ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (k_out_var, k_in_var, int(k_numel)))
 
                 if q_scratch and k_scratch:
-                    if q_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_out_var, int(q_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
-                    if k_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_out_var, int(k_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_out_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_out_var, k_scratch))
-                    ap("    %s(%s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
-                        rope_bridge_fn,
-                        q_scratch,
-                        k_scratch,
-                    ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_scratch, q_out_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_scratch, k_out_var))
+                    _emit_rope_forward_qk_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        comment="IR token-major <-> kernel head-major bridge via shared rope_forward_qk bridge",
+                        rope_bridge_fn=rope_bridge_fn,
+                        q_bridge={
+                            "in_var": q_out_var,
+                            "head_var": q_scratch,
+                            "out_var": q_out_var,
+                            "in_numel": q_numel,
+                            "head_numel": q_numel,
+                            "out_numel": q_numel,
+                            "pre_head_group": "num_heads",
+                            "post_head_group": "num_heads",
+                        },
+                        k_bridge={
+                            "in_var": k_out_var,
+                            "head_var": k_scratch,
+                            "out_var": k_out_var,
+                            "in_numel": k_numel,
+                            "head_numel": k_numel,
+                            "out_numel": k_numel,
+                            "pre_head_group": "num_kv_heads",
+                            "post_head_group": "num_kv_heads",
+                        },
+                    )
                 else:
                     ap("    /* missing tmp.* scratch for RoPE bridge; fallback direct call */")
                     if q_numel > 0:
@@ -2051,7 +3478,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
             # attention_forward_* kernels in this runtime are head-major contracts.
             # IR tensors are token-major, so bridge layouts explicitly here.
-            if kid == "attention_forward_causal_head_major_gqa_flash_strided":
+            if kid in (
+                "attention_forward_causal_head_major_gqa_flash_strided",
+                "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+            ):
                 q_tid = io_inputs.get("q")
                 k_tid = io_inputs.get("k")
                 v_tid = io_inputs.get("v")
@@ -2069,7 +3499,15 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 v_numel = int(tensor_numel.get(v_tid or "", 0) or 0)
                 y_numel = int(tensor_numel.get(y_tid or "", 0) or 0)
                 attn_saved_numel = int(tensor_numel.get(attn_saved_tid or "", 0) or 0)
-                needs_attn_saved = bool(attn_saved_var and attn_saved_numel > 0)
+                runtime_contract = _attention_runtime_contract(op, kid)
+                runtime_kid = str(runtime_contract.get("kernel_id", "") or kid)
+                requires_saved_attn = bool(runtime_contract.get("materialize_saved_attn_weights"))
+                requires_zero_sliding_window = bool(runtime_contract.get("requires_zero_sliding_window"))
+                uses_sliding_window = bool(
+                    runtime_kid == "attention_forward_causal_head_major_gqa_flash_strided_sliding"
+                    or requires_zero_sliding_window
+                )
+                sliding_window_expr = _arg_scalar_expr("int", "sliding_window", cfg) if uses_sliding_window else "0"
 
                 banned: set[str] = {q_var, k_var, v_var, y_var}
                 q_scratch = _pick_tmp_scratch_var(q_numel, banned)
@@ -2084,35 +3522,46 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 y_scratch = _pick_tmp_scratch_var(y_numel, banned)
 
                 if q_scratch and k_scratch and v_scratch and y_scratch:
-                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR -> head-major kernel bridge) */" % (op_id, op_name, kid))
-                    if q_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_var, int(q_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
-                    if k_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_var, int(k_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    if v_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_var, int(v_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_scratch, int(v_numel), op_id))
-                    if y_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_var, int(y_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (y_scratch, int(y_numel), op_id))
-                    if needs_attn_saved:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (attn_saved_var, int(attn_saved_numel), op_id))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
-                    if needs_attn_saved:
-                        # Flash forward does not materialize softmax weights; backward expects saved attn weights.
-                        ap("    attention_forward_causal_head_major_gqa_exact(%s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
-                            q_scratch, k_scratch, v_scratch, attn_saved_var, y_scratch
-                        ))
-                    else:
-                        ap("    attention_forward_causal_head_major_gqa_flash_strided(%s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
-                            q_scratch, k_scratch, v_scratch, y_scratch
-                        ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (y_scratch, y_var))
-                    ap("    call_count++;")
+                    _emit_attention_forward_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        runtime_kid=runtime_kid,
+                        comment="token-major IR -> head-major kernel bridge via shared attention_forward bridge",
+                        q_bridge={
+                            "token_var": q_var,
+                            "head_var": q_scratch,
+                            "token_numel": q_numel,
+                            "head_numel": q_numel,
+                            "pre_head_group_expr": "CK_ROPE_NUM_HEADS",
+                        },
+                        k_bridge={
+                            "token_var": k_var,
+                            "head_var": k_scratch,
+                            "token_numel": k_numel,
+                            "head_numel": k_numel,
+                            "pre_head_group_expr": "CK_ROPE_NUM_KV_HEADS",
+                        },
+                        v_bridge={
+                            "token_var": v_var,
+                            "head_var": v_scratch,
+                            "token_numel": v_numel,
+                            "head_numel": v_numel,
+                            "pre_head_group_expr": "CK_ROPE_NUM_KV_HEADS",
+                        },
+                        out_bridge={
+                            "head_var": y_scratch,
+                            "head_numel": y_numel,
+                            "token_var": y_var,
+                            "token_numel": y_numel,
+                            "post_head_group_expr": "CK_ROPE_NUM_HEADS",
+                        },
+                        attn_saved_var=attn_saved_var,
+                        attn_saved_numel=attn_saved_numel,
+                        requires_saved_attn=requires_saved_attn,
+                        requires_zero_sliding_window=requires_zero_sliding_window,
+                        sliding_window_expr=sliding_window_expr,
+                    )
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -2171,57 +3620,65 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 dv_scratch = _pick_tmp_scratch_var(dv_numel, banned)
 
                 if dy_scratch and q_scratch and k_scratch and v_scratch and dq_scratch and dk_scratch and dv_scratch:
-                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
-                    if dy_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dy_var, int(dy_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dy_scratch, int(dy_numel), op_id))
-                    if q_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_var, int(q_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_scratch, int(q_numel), op_id))
-                    if k_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_var, int(k_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_scratch, int(k_numel), op_id))
-                    if v_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_var, int(v_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (v_scratch, int(v_numel), op_id))
-                    if dq_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
-                    if dk_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
-                    if dv_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_var, int(dv_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dv_scratch, int(dv_numel), op_id))
-
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dy_var, dy_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_var, q_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_var, k_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (v_var, v_scratch))
-
-                    ap("    %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, g_active_tokens);" % (
-                        fn, dy_scratch, q_scratch, k_scratch, v_scratch, attn_var, dq_scratch, dk_scratch, dv_scratch, ds_var
-                    ))
-
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dv_scratch, dv_var))
-                    ap("#if CK_ABLATE_ATTENTION_BACKWARD")
-                    ap("    /* Ablation fallback: bypass attention backward outputs with passthrough/zeros. */")
-                    if dq_numel > 0:
-                        cp = min(int(dq_numel), int(dy_numel))
-                        if cp > 0:
-                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dy_var, int(cp)))
-                        if int(dq_numel) > cp:
-                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
-                    if dk_numel > 0:
-                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_var, int(dk_numel)))
-                    if dv_numel > 0:
-                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dv_var, int(dv_numel)))
-                    if ds_numel > 0:
-                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (ds_var, int(ds_numel)))
-                    ap("#endif")
-                    ap("    call_count++;")
+                    _emit_attention_backward_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        fn=fn,
+                        comment="token-major IR <-> head-major kernel bridge via shared attention_backward bridge",
+                        dy_bridge={
+                            "token_var": dy_var,
+                            "head_var": dy_scratch,
+                            "token_numel": dy_numel,
+                            "head_numel": dy_numel,
+                            "pre_head_group": "num_heads",
+                        },
+                        q_bridge={
+                            "token_var": q_var,
+                            "head_var": q_scratch,
+                            "token_numel": q_numel,
+                            "head_numel": q_numel,
+                            "pre_head_group": "num_heads",
+                        },
+                        k_bridge={
+                            "token_var": k_var,
+                            "head_var": k_scratch,
+                            "token_numel": k_numel,
+                            "head_numel": k_numel,
+                            "pre_head_group": "num_kv_heads",
+                        },
+                        v_bridge={
+                            "token_var": v_var,
+                            "head_var": v_scratch,
+                            "token_numel": v_numel,
+                            "head_numel": v_numel,
+                            "pre_head_group": "num_kv_heads",
+                        },
+                        dq_bridge={
+                            "token_var": dq_var,
+                            "head_var": dq_scratch,
+                            "token_numel": dq_numel,
+                            "head_numel": dq_numel,
+                            "post_head_group": "num_heads",
+                        },
+                        dk_bridge={
+                            "token_var": dk_var,
+                            "head_var": dk_scratch,
+                            "token_numel": dk_numel,
+                            "head_numel": dk_numel,
+                            "post_head_group": "num_kv_heads",
+                        },
+                        dv_bridge={
+                            "token_var": dv_var,
+                            "head_var": dv_scratch,
+                            "token_numel": dv_numel,
+                            "head_numel": dv_numel,
+                            "post_head_group": "num_kv_heads",
+                        },
+                        attn_var=attn_var,
+                        ds_var=ds_var,
+                        ds_numel=ds_numel,
+                    )
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -2256,48 +3713,40 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 dk_scratch = _pick_tmp_scratch_var(dk_numel, banned)
 
                 if dq_out_scratch and dk_out_scratch and dq_scratch and dk_scratch:
-                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
-                    if dq_out_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_var, int(dq_out_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_scratch, int(dq_out_numel), op_id))
-                    if dk_out_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_var, int(dk_out_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_scratch, int(dk_out_numel), op_id))
-                    if dq_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
-                    if dk_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
-
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
-                    if _is_pairwise_rope_backward_qk_kernel(kid):
-                        ap("    rope_backward_qk_pairwise_with_rotary_dim(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0, CK_ROPE_ROTARY_DIM);" % (
-                            dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
-                        ))
-                    else:
-                        ap("    rope_backward_qk(%s, %s, %s, %s, g_rope_cos_cache, g_rope_sin_cache, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM, 0);" % (
-                            dq_out_scratch, dk_out_scratch, dq_scratch, dk_scratch
-                        ))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
-                    ap("#if CK_ABLATE_ROPE_BACKWARD_QK")
-                    ap("    /* Ablation fallback: treat RoPE backward as identity for dq/dk. */")
-                    if dq_numel > 0:
-                        cp = min(int(dq_numel), int(dq_out_numel))
-                        if cp > 0:
-                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
-                        if int(dq_numel) > cp:
-                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
-                    if dk_numel > 0:
-                        cp = min(int(dk_numel), int(dk_out_numel))
-                        if cp > 0:
-                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
-                        if int(dk_numel) > cp:
-                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
-                    ap("#endif")
-                    ap("    call_count++;")
+                    _emit_rope_backward_qk_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        comment="token-major IR <-> head-major kernel bridge via shared rope_backward_qk bridge",
+                        dq_out_bridge={
+                            "token_var": dq_out_var,
+                            "head_var": dq_out_scratch,
+                            "token_numel": dq_out_numel,
+                            "head_numel": dq_out_numel,
+                            "pre_head_group": "num_heads",
+                        },
+                        dk_out_bridge={
+                            "token_var": dk_out_var,
+                            "head_var": dk_out_scratch,
+                            "token_numel": dk_out_numel,
+                            "head_numel": dk_out_numel,
+                            "pre_head_group": "num_kv_heads",
+                        },
+                        dq_bridge={
+                            "token_var": dq_var,
+                            "head_var": dq_scratch,
+                            "token_numel": dq_numel,
+                            "head_numel": dq_numel,
+                            "post_head_group": "num_heads",
+                        },
+                        dk_bridge={
+                            "token_var": dk_var,
+                            "head_var": dk_scratch,
+                            "token_numel": dk_numel,
+                            "head_numel": dk_numel,
+                            "post_head_group": "num_kv_heads",
+                        },
+                    )
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for rope backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -2354,58 +3803,60 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 dk_scratch = _pick_tmp_scratch_var(dk_numel, banned)
 
                 if dq_out_scratch and dk_out_scratch and q_in_scratch and k_in_scratch and dq_scratch and dk_scratch:
-                    ap("    /* op_id=%s op=%s kernel_id=%s (token-major IR <-> head-major kernel bridge) */" % (op_id, op_name, kid))
-                    if dq_out_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_var, int(dq_out_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_out_scratch, int(dq_out_numel), op_id))
-                    if dk_out_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_var, int(dk_out_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_out_scratch, int(dk_out_numel), op_id))
-                    if q_in_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_in_var, int(q_in_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (q_in_scratch, int(q_in_numel), op_id))
-                    if k_in_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_in_var, int(k_in_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (k_in_scratch, int(k_in_numel), op_id))
-                    if dq_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_var, int(dq_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dq_scratch, int(dq_numel), op_id))
-                    if dk_numel > 0:
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_var, int(dk_numel), op_id))
-                        ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (dk_scratch, int(dk_numel), op_id))
-
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_out_var, dq_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_out_var, dk_out_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (q_in_var, q_in_scratch))
-                    ap("    ck_reorder_token_to_head_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (k_in_var, k_in_scratch))
-
-                    ap("    qk_norm_backward(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CK_ROPE_NUM_HEADS, CK_ROPE_NUM_KV_HEADS, g_active_tokens, CK_ROPE_HEAD_DIM, 1e-5f);" % (
-                        dq_out_scratch, dk_out_scratch, q_in_scratch, k_in_scratch, q_gamma_var, k_gamma_var,
-                        dq_scratch, dk_scratch, dq_gamma_var, dk_gamma_var
-                    ))
-
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dq_scratch, dq_var))
-                    ap("    ck_reorder_head_to_token_major(%s, %s, g_active_tokens, CK_ROPE_NUM_KV_HEADS, CK_ROPE_HEAD_DIM, CK_ROPE_ALIGNED_HEAD_DIM);" % (dk_scratch, dk_var))
-                    ap("#if CK_ABLATE_QK_NORM_BACKWARD")
-                    ap("    /* Ablation fallback: treat qk_norm backward as identity for dq/dk and zero gamma grads. */")
-                    if dq_numel > 0:
-                        cp = min(int(dq_numel), int(dq_out_numel))
-                        if cp > 0:
-                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dq_var, dq_out_var, int(cp)))
-                        if int(dq_numel) > cp:
-                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dq_var, int(cp), int(dq_numel - cp)))
-                    if dk_numel > 0:
-                        cp = min(int(dk_numel), int(dk_out_numel))
-                        if cp > 0:
-                            ap("    memcpy(%s, %s, (size_t)%d * sizeof(float));" % (dk_var, dk_out_var, int(cp)))
-                        if int(dk_numel) > cp:
-                            ap("    memset(%s + (size_t)%d, 0, (size_t)%d * sizeof(float));" % (dk_var, int(cp), int(dk_numel - cp)))
-                    if dq_gamma_numel > 0:
-                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dq_gamma_var, int(dq_gamma_numel)))
-                    if dk_gamma_numel > 0:
-                        ap("    memset(%s, 0, (size_t)%d * sizeof(float));" % (dk_gamma_var, int(dk_gamma_numel)))
-                    ap("#endif")
-                    ap("    call_count++;")
+                    _emit_qk_norm_backward_bridge_core(
+                        op_id=op_id,
+                        op_name=op_name,
+                        kid=kid,
+                        comment="token-major IR <-> head-major kernel bridge via shared qk_norm_backward bridge",
+                        dq_out_bridge={
+                            "token_var": dq_out_var,
+                            "head_var": dq_out_scratch,
+                            "token_numel": dq_out_numel,
+                            "head_numel": dq_out_numel,
+                            "pre_head_group": "num_heads",
+                        },
+                        dk_out_bridge={
+                            "token_var": dk_out_var,
+                            "head_var": dk_out_scratch,
+                            "token_numel": dk_out_numel,
+                            "head_numel": dk_out_numel,
+                            "pre_head_group": "num_kv_heads",
+                        },
+                        q_in_bridge={
+                            "token_var": q_in_var,
+                            "head_var": q_in_scratch,
+                            "token_numel": q_in_numel,
+                            "head_numel": q_in_numel,
+                            "pre_head_group": "num_heads",
+                        },
+                        k_in_bridge={
+                            "token_var": k_in_var,
+                            "head_var": k_in_scratch,
+                            "token_numel": k_in_numel,
+                            "head_numel": k_in_numel,
+                            "pre_head_group": "num_kv_heads",
+                        },
+                        dq_bridge={
+                            "token_var": dq_var,
+                            "head_var": dq_scratch,
+                            "token_numel": dq_numel,
+                            "head_numel": dq_numel,
+                            "post_head_group": "num_heads",
+                        },
+                        dk_bridge={
+                            "token_var": dk_var,
+                            "head_var": dk_scratch,
+                            "token_numel": dk_numel,
+                            "head_numel": dk_numel,
+                            "post_head_group": "num_kv_heads",
+                        },
+                        q_gamma_var=q_gamma_var,
+                        k_gamma_var=k_gamma_var,
+                        dq_gamma_var=dq_gamma_var,
+                        dk_gamma_var=dk_gamma_var,
+                        dq_gamma_numel=dq_gamma_numel,
+                        dk_gamma_numel=dk_gamma_numel,
+                    )
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for qk_norm backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -2422,10 +3873,20 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             gemm_fwd_mnk = None
             if kid == "gemm_blocked_serial":
                 gemm_fwd_mnk = _exec_plan_shape_mnk(op_plan) or _infer_gemm_forward_mnk(op, cfg)
-            swiglu_dim: Optional[int] = None
-            if kid in ("swiglu_forward", "swiglu_forward_exact", "swiglu_backward", "swiglu_backward_exact"):
-                # swiglu kernels expect `dim` as per-token hidden width (D), where
-                # input is [T, 2D], output/grad_output is [T, D], d_input is [T, 2D].
+            activation_dim: Optional[int] = None
+            if kid in (
+                "swiglu_forward",
+                "swiglu_forward_exact",
+                "swiglu_backward",
+                "swiglu_backward_exact",
+                "geglu_backward_exact",
+                "geglu_forward_fp32",
+                "geglu_forward_exact",
+                "geglu_forward_bf16",
+            ):
+                # SwiGLU/GeGLU kernels expect `dim` as per-token hidden width (D),
+                # where input is [T, 2D], output/grad_output is [T, D], and
+                # d_input is [T, 2D].
                 tok = int(cfg.get("train_tokens", cfg.get("tokens", 1)) or 1)
                 tok = max(1, tok)
 
@@ -2436,7 +3897,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
                 cands: List[int] = []
 
-                if kid in ("swiglu_forward", "swiglu_forward_exact"):
+                if kid in ("swiglu_forward", "swiglu_forward_exact", "geglu_forward_fp32", "geglu_forward_exact", "geglu_forward_bf16"):
                     # Forward: prefer output [T,D], fallback to input [T,2D].
                     for key in ("out", "y"):
                         n = _num(io_outputs.get(key))
@@ -2466,7 +3927,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
                 cands = [int(v) for v in cands if int(v) > 0]
                 if cands:
-                    swiglu_dim = int(min(cands))
+                    activation_dim = int(min(cands))
                 else:
                     # Legacy fallback for unusual IR wiring.
                     raw: List[int] = []
@@ -2475,11 +3936,21 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         if n > 0:
                             raw.append(n)
                     if raw:
-                        swiglu_dim = int(min(raw))
+                        activation_dim = int(min(raw))
 
             call_args: List[str] = []
             ptr_fallback_state: Dict[str, int] = {}
             bounds_checks: List[Tuple[str, int]] = []
+            binding_param_sources = {}
+            binding_row = kernel_bindings.get(kid)
+            if isinstance(binding_row, dict):
+                for param in (binding_row.get("params") or []):
+                    if not isinstance(param, dict):
+                        continue
+                    pname = param.get("name")
+                    psource = param.get("source")
+                    if isinstance(pname, str) and isinstance(psource, str):
+                        binding_param_sources[pname.lower()] = psource
             for atype, aname in args:
                 is_ptr = "*" in atype
                 if is_ptr:
@@ -2658,9 +4129,26 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                                 atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
                                 fallback_state=ptr_fallback_state,
                             )
-                    else:
+                    elif kid == "rmsnorm_forward":
+                        # Train IR materializes rstd_cache for backward parity, while
+                        # shared inference bindings intentionally keep it NULL.
+                        lname = str(aname).lower()
+                        bound_source = binding_param_sources.get(lname)
+                        if (
+                            lname in ("rstd_cache", "rstd", "inv_rms", "inv_rms_cache")
+                            and isinstance(io_outputs.get("rstd_cache"), str)
+                        ):
+                            bound_source = "output:rstd_cache"
                         expr = _choose_tensor_for_ptr(
                             atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                            param_source=bound_source,
+                            fallback_state=ptr_fallback_state,
+                        )
+                    else:
+                        bound_source = binding_param_sources.get(str(aname).lower())
+                        expr = _choose_tensor_for_ptr(
+                            atype, aname, io_inputs, io_outputs, io_weights, tensors, tvars_f32, tvars_i32,
+                            param_source=bound_source,
                             fallback_state=ptr_fallback_state,
                         )
                     call_args.append(expr)
@@ -2670,6 +4158,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                             bounds_checks.append((expr, int(n)))
                 else:
                     lname = str(aname).lower()
+                    scalar_source = binding_param_sources.get(lname)
                     if gemm_fwd_mnk is not None:
                         m_i, n_i, k_i = gemm_fwd_mnk
                         if lname in ("m", "rows"):
@@ -2681,8 +4170,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         if lname in ("k", "inner", "in_dim"):
                             call_args.append(str(int(k_i)))
                             continue
-                    if swiglu_dim is not None and lname in ("dim", "hidden_dim", "intermediate_dim"):
-                        call_args.append(str(int(swiglu_dim)))
+                    if activation_dim is not None and lname in ("dim", "hidden_dim", "intermediate_dim"):
+                        call_args.append(str(int(activation_dim)))
                         continue
                     if ("numel" in lname) or ("size_t" in atype):
                         call_args.append(_choose_numel_expr(aname, io_inputs, io_outputs, io_weights, tensor_numel))
@@ -2691,7 +4180,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     elif gemm_dims is not None and "aligned_out" in lname:
                         call_args.append(str(int(gemm_dims.get("aligned_out", 1))))
                     else:
-                        call_args.append(_arg_scalar_expr(atype, aname, cfg))
+                        call_args.append(_arg_scalar_expr(atype, aname, cfg, param_source=scalar_source))
 
             ap("    /* op_id=%s op=%s kernel_id=%s */" % (op_id, op_name, kid))
             disp_note = _exec_plan_dispatch_comment(op_plan)
@@ -2984,6 +4473,10 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     summary = {
         "forward_ops": len(forward_ops),
         "backward_ops": len(backward_ops),
+        "bridge_lowering": bridge_lowering,
+        "explicit_forward_bridge_plans": int(explicit_forward_bridge_plans),
+        "explicit_backward_bridge_plans": int(explicit_backward_bridge_plans),
+        "checkpoint_rematerialize_ops": int(checkpoint_rematerialize_ops),
         "callable_kernels": len(used_decl),
         "optimizer_pairs": len(opt_pairs),
         "optimizer_skipped_non_fp32": skipped_opt_non_fp32,

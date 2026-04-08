@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
+import build_ir_v7
 
 try:
     import torch
@@ -60,6 +61,13 @@ def _rms_norm(x: "torch.Tensor", gamma: "torch.Tensor", eps: float) -> "torch.Te
     return xn * gamma
 
 
+def _first_present(*values):
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
 def _apply_affine(x: "torch.Tensor", w: "torch.Tensor", b: Optional["torch.Tensor"]) -> "torch.Tensor":
     # Handles both [in,out] and [out,in] stored layouts.
     if w.ndim != 2:
@@ -88,6 +96,217 @@ def _apply_affine(x: "torch.Tensor", w: "torch.Tensor", b: Optional["torch.Tenso
     return y
 
 
+def _normalize_mlp_activation(name: object) -> str:
+    text = str(name or "").strip().lower()
+    if text in {"geglu", "gelu_glu", "gelu"}:
+        return "geglu"
+    return "swiglu"
+
+
+def _template_mlp_activation(manifest: Mapping[str, object]) -> str:
+    template = manifest.get("template") if isinstance(manifest, Mapping) else None
+    template = template if isinstance(template, Mapping) else {}
+    contract = template.get("contract") if isinstance(template, Mapping) else None
+    contract = contract if isinstance(contract, Mapping) else {}
+    block_contract = contract.get("block_contract") if isinstance(contract, Mapping) else None
+    block_contract = block_contract if isinstance(block_contract, Mapping) else {}
+    flags = template.get("flags") if isinstance(template, Mapping) else None
+    flags = flags if isinstance(flags, Mapping) else {}
+    activation = (
+        block_contract.get("activation")
+        or flags.get("activation")
+        or "swiglu"
+    )
+    return _normalize_mlp_activation(activation)
+
+
+def _activation_slot_name(activation: object) -> str:
+    return "geglu" if _normalize_mlp_activation(activation) == "geglu" else "silu_mul"
+
+
+def _normalize_attention_variant(name: object) -> str:
+    text = str(name or "").strip().lower()
+    if text in {"sliding", "sliding_window", "attn_sliding"}:
+        return "sliding_window"
+    if text in {"hybrid_recurrent_attention", "hybrid", "qwen35_hybrid"}:
+        return "hybrid_recurrent_attention"
+    return "dense"
+
+
+def _template_attention_variant(manifest: Mapping[str, object]) -> str:
+    template = manifest.get("template") if isinstance(manifest, Mapping) else None
+    template = template if isinstance(template, Mapping) else {}
+    contract = template.get("contract") if isinstance(template, Mapping) else None
+    contract = contract if isinstance(contract, Mapping) else {}
+    attention_contract = contract.get("attention_contract") if isinstance(contract, Mapping) else None
+    attention_contract = attention_contract if isinstance(attention_contract, Mapping) else {}
+    flags = template.get("flags") if isinstance(template, Mapping) else None
+    flags = flags if isinstance(flags, Mapping) else {}
+    variant = (
+        attention_contract.get("attn_variant")
+        or flags.get("attention")
+        or "dense"
+    )
+    return _normalize_attention_variant(variant)
+
+
+def _attention_slot_name(variant: object) -> str:
+    return "attn_sliding" if _normalize_attention_variant(variant) == "sliding_window" else "attn"
+
+
+def _layer_kind(cfg: Mapping[str, object], layer_idx: int) -> str:
+    raw = cfg.get("layer_kinds")
+    if isinstance(raw, list) and layer_idx < len(raw):
+        return str(raw[layer_idx] or "").strip().lower() or "recurrent"
+    interval = int(cfg.get("full_attention_interval", 0) or 0)
+    if interval > 0 and ((layer_idx + 1) % interval) == 0:
+        return "full_attention"
+    return "recurrent" if _normalize_attention_variant(cfg.get("attn_variant")) == "hybrid_recurrent_attention" else "dense"
+
+
+def _recurrent_conv_state_update(
+    q: "torch.Tensor",
+    k: "torch.Tensor",
+    v: "torch.Tensor",
+    *,
+    history_len: int,
+    state_in: Optional["torch.Tensor"] = None,
+) -> tuple["torch.Tensor", "torch.Tensor"]:
+    # Runtime contract:
+    #   state_in:  [B, C, history]
+    #   conv_x:    [B, C, history + T]
+    #   state_out: [B, C, history]
+    packed = torch.cat([q, k, v], dim=-1).transpose(1, 2).contiguous()
+    bsz, channels = int(packed.shape[0]), int(packed.shape[1])
+    history = max(0, int(history_len))
+    if state_in is None:
+        state_in = torch.zeros((bsz, channels, history), dtype=packed.dtype, device=packed.device)
+    conv_x = torch.cat([state_in, packed], dim=-1)
+    if history > 0:
+        state_out = conv_x[:, :, -history:].contiguous()
+    else:
+        state_out = torch.zeros((bsz, channels, 0), dtype=packed.dtype, device=packed.device)
+    return conv_x.contiguous(), state_out
+
+
+def _depthwise_causal_conv(conv_x: "torch.Tensor", kernel: "torch.Tensor") -> "torch.Tensor":
+    # conv_x: [B,C,K-1+T], kernel: [C,K] -> out: [B,T,C]
+    bsz, channels, width = int(conv_x.shape[0]), int(conv_x.shape[1]), int(conv_x.shape[2])
+    kernel_size = int(kernel.shape[1])
+    tsz = max(0, width - kernel_size + 1)
+    out = torch.zeros((bsz, tsz, channels), dtype=conv_x.dtype, device=conv_x.device)
+    for tap in range(kernel_size):
+        window = conv_x[:, :, tap : tap + tsz].transpose(1, 2).contiguous()
+        out = out + window * kernel[:, tap].view(1, 1, channels)
+    return out
+
+
+def _recurrent_qk_l2_norm(
+    q: "torch.Tensor",
+    k: "torch.Tensor",
+    *,
+    num_heads: int,
+    head_dim: int,
+    eps: float,
+) -> tuple["torch.Tensor", "torch.Tensor"]:
+    bsz, tsz = int(q.shape[0]), int(q.shape[1])
+    qh = q.view(bsz, tsz, num_heads, head_dim)
+    kh = k.view(bsz, tsz, num_heads, head_dim)
+    qh = qh / torch.sqrt(torch.sum(qh * qh, dim=-1, keepdim=True) + float(eps))
+    kh = kh / torch.sqrt(torch.sum(kh * kh, dim=-1, keepdim=True) + float(eps))
+    return qh.view(bsz, tsz, -1), kh.view(bsz, tsz, -1)
+
+
+def _torch_deltanet_sequence(
+    q: "torch.Tensor",
+    k: "torch.Tensor",
+    v: "torch.Tensor",
+    g: "torch.Tensor",
+    beta: "torch.Tensor",
+    *,
+    num_heads: int,
+    state_dim: int,
+) -> tuple["torch.Tensor", "torch.Tensor"]:
+    # q/k/v: [B,T,H*D], g/beta: [B,T,H]
+    bsz, tsz = int(q.shape[0]), int(q.shape[1])
+    qh = q.view(bsz, tsz, num_heads, state_dim)
+    kh = k.view(bsz, tsz, num_heads, state_dim)
+    vh = v.view(bsz, tsz, num_heads, state_dim)
+    state = torch.zeros((bsz, num_heads, state_dim, state_dim), dtype=q.dtype, device=q.device)
+    outs: List["torch.Tensor"] = []
+    for tok in range(tsz):
+        q_t = qh[:, tok, :, :]
+        k_t = kh[:, tok, :, :]
+        v_t = vh[:, tok, :, :]
+        g_t = g[:, tok, :]
+        beta_t = beta[:, tok, :]
+        q_scale = 1.0 / math.sqrt(float(max(1, state_dim)))
+        q_hat = q_t * q_scale
+        beta_s = torch.sigmoid(beta_t).unsqueeze(-1)
+        gate = torch.exp(g_t).unsqueeze(-1).unsqueeze(-1)
+        gated_state = state * gate
+        kv_mem = torch.matmul(gated_state.transpose(-1, -2), k_t.unsqueeze(-1)).squeeze(-1)
+        delta = (v_t - kv_mem) * beta_s
+        state = gated_state + torch.matmul(k_t.unsqueeze(-1), delta.unsqueeze(-2))
+        out_t = torch.matmul(state.transpose(-1, -2), q_hat.unsqueeze(-1)).squeeze(-1)
+        outs.append(out_t.reshape(bsz, -1))
+    out = torch.stack(outs, dim=1) if outs else torch.zeros((bsz, 0, num_heads * state_dim), dtype=q.dtype, device=q.device)
+    return out, state
+
+
+def _recurrent_norm_gate(
+    x: "torch.Tensor",
+    gate: "torch.Tensor",
+    weight: "torch.Tensor",
+    *,
+    num_heads: int,
+    head_dim: int,
+    eps: float,
+) -> "torch.Tensor":
+    bsz, tsz = int(x.shape[0]), int(x.shape[1])
+    xh = x.view(bsz, tsz, num_heads, head_dim)
+    gh = gate.view(bsz, tsz, num_heads, head_dim)
+    var = torch.mean(xh * xh, dim=-1, keepdim=True)
+    xn = xh * torch.rsqrt(var + eps)
+    return (xn * weight.view(1, 1, 1, head_dim) * F.silu(gh)).view(bsz, tsz, num_heads * head_dim)
+
+
+def _normalize_rope_layout(name: object) -> str:
+    text = str(name or "").strip().lower()
+    if text in {"pairwise", "interleaved", "llama_pairwise"}:
+        return "pairwise"
+    return "split"
+
+
+def _template_rope_layout(manifest: Mapping[str, object]) -> str:
+    template = manifest.get("template") if isinstance(manifest, Mapping) else None
+    template = template if isinstance(template, Mapping) else {}
+    contract = template.get("contract") if isinstance(template, Mapping) else None
+    contract = contract if isinstance(contract, Mapping) else {}
+    attention_contract = contract.get("attention_contract") if isinstance(contract, Mapping) else None
+    attention_contract = attention_contract if isinstance(attention_contract, Mapping) else {}
+    cfg = manifest.get("config") if isinstance(manifest, Mapping) else None
+    cfg = cfg if isinstance(cfg, Mapping) else {}
+    layout = (
+        attention_contract.get("rope_layout")
+        or cfg.get("rope_layout")
+        or "split"
+    )
+    return _normalize_rope_layout(layout)
+
+
+def _apply_glu_activation(gate_up: "torch.Tensor", activation: object) -> "torch.Tensor":
+    act = _normalize_mlp_activation(activation)
+    if int(gate_up.shape[-1]) % 2 != 0:
+        raise ValueError(f"Invalid {act} width: {tuple(gate_up.shape)}")
+    half = int(gate_up.shape[-1]) // 2
+    gate = gate_up[..., :half]
+    up = gate_up[..., half:]
+    if act == "geglu":
+        return F.gelu(gate, approximate="tanh") * up
+    return F.silu(gate) * up
+
+
 def _apply_head_rms_norm(x: "torch.Tensor", gamma: Optional["torch.Tensor"], eps: float) -> "torch.Tensor":
     # x: [B, H, T, Dh]
     if gamma is None:
@@ -97,10 +316,13 @@ def _apply_head_rms_norm(x: "torch.Tensor", gamma: Optional["torch.Tensor"], eps
     return xn * gamma.view(1, 1, 1, -1)
 
 
-def _apply_rope(q: "torch.Tensor", k: "torch.Tensor", theta: float) -> Tuple["torch.Tensor", "torch.Tensor"]:
+def _apply_rope(
+    q: "torch.Tensor",
+    k: "torch.Tensor",
+    theta: float,
+    rope_layout: object = "split",
+) -> Tuple["torch.Tensor", "torch.Tensor"]:
     # q/k: [B,H,T,Dh]
-    # IMPORTANT: match CK rope_kernels.c semantics (split-half rotation), not
-    # interleaved even/odd pair rotation.
     dh = int(q.shape[-1])
     if dh < 2:
         return q, k
@@ -119,22 +341,37 @@ def _apply_rope(q: "torch.Tensor", k: "torch.Tensor", theta: float) -> Tuple["to
     freqs = torch.outer(pos, inv_freq)  # [T, half]
     cos = torch.cos(freqs).to(dtype=dtype).view(1, 1, t, half)
     sin = torch.sin(freqs).to(dtype=dtype).view(1, 1, t, half)
+    layout = _normalize_rope_layout(rope_layout)
 
     def _rope_one(x: "torch.Tensor") -> "torch.Tensor":
         x_rot = x[..., :rotary_dim]
         x_pass = x[..., rotary_dim:]
-        x0 = x_rot[..., :half]
-        x1 = x_rot[..., half:rotary_dim]
+        if layout == "pairwise":
+            x0 = x_rot[..., 0:rotary_dim:2]
+            x1 = x_rot[..., 1:rotary_dim:2]
+        else:
+            x0 = x_rot[..., :half]
+            x1 = x_rot[..., half:rotary_dim]
         r0 = (x0 * cos) - (x1 * sin)
         r1 = (x0 * sin) + (x1 * cos)
-        out_rot = torch.cat([r0, r1], dim=-1)
+        if layout == "pairwise":
+            out_rot = torch.empty_like(x_rot)
+            out_rot[..., 0:rotary_dim:2] = r0
+            out_rot[..., 1:rotary_dim:2] = r1
+        else:
+            out_rot = torch.cat([r0, r1], dim=-1)
         return torch.cat([out_rot, x_pass], dim=-1)
 
     return _rope_one(q), _rope_one(k)
 
 
 def _causal_attention(
-    q: "torch.Tensor", k: "torch.Tensor", v: "torch.Tensor", *, scale: float
+    q: "torch.Tensor",
+    k: "torch.Tensor",
+    v: "torch.Tensor",
+    *,
+    scale: float,
+    sliding_window: int = 0,
 ) -> "torch.Tensor":
     # q: [B,Hq,T,Dh], k/v: [B,Hk,T,Dh]
     hq = int(q.shape[1])
@@ -150,7 +387,11 @@ def _causal_attention(
 
     scores = torch.matmul(q, k.transpose(-2, -1)) * float(scale)
     t = int(scores.shape[-1])
-    mask = torch.triu(torch.ones((t, t), dtype=torch.bool, device=scores.device), diagonal=1)
+    q_idx = torch.arange(t, dtype=torch.int64, device=scores.device).view(t, 1)
+    k_idx = torch.arange(t, dtype=torch.int64, device=scores.device).view(1, t)
+    mask = k_idx > q_idx
+    if int(sliding_window) > 0:
+        mask = torch.logical_or(mask, k_idx < (q_idx - int(sliding_window) + 1))
     scores = scores.masked_fill(mask.view(1, 1, t, t), float("-inf"))
     probs = torch.softmax(scores, dim=-1)
     ctx = torch.matmul(probs, v)
@@ -208,17 +449,12 @@ def _decode_weight_snapshot(
         vals = flat.reshape(shape)
         tensors[name] = torch.from_numpy(vals.copy())
 
-    model_cfg = {
-        "num_layers": int(cfg.get("num_layers", 0) or 0),
-        "embed_dim": int(cfg.get("embed_dim", 0) or 0),
-        "hidden_size": int(cfg.get("hidden_size", cfg.get("intermediate_size", 0)) or 0),
-        "vocab_size": int(cfg.get("vocab_size", 0) or 0),
-        "num_heads": int(cfg.get("num_heads", 0) or 0),
-        "num_kv_heads": int(cfg.get("num_kv_heads", cfg.get("num_heads", 0)) or 0),
-        "head_dim": int(cfg.get("head_dim", 0) or 0),
-        "rope_theta": float(cfg.get("rope_theta", 10000.0) or 10000.0),
-        "rms_eps": 1e-5,
-    }
+    model_cfg = build_ir_v7._normalize_manifest_config(dict(cfg))
+    model_cfg["rope_layout"] = _template_rope_layout(manifest)
+    model_cfg["rms_eps"] = float(model_cfg.get("rms_eps", 1e-5) or 1e-5)
+    model_cfg["mlp_activation"] = _template_mlp_activation(manifest)
+    model_cfg["attn_variant"] = _template_attention_variant(manifest)
+    model_cfg["sliding_window"] = int(model_cfg.get("sliding_window", manifest.get("sliding_window", 0)) or 0)
 
     # Derive missing dims from tensors when config fields are absent.
     tok = tensors.get("token_emb")
@@ -281,7 +517,13 @@ class SnapshotQwenLikeOracle:
         n_kv_heads_cfg = int(self.cfg.get("num_kv_heads", n_heads) or n_heads)
         head_dim = int(self.cfg.get("head_dim", 0) or 0)
         theta = float(self.cfg.get("rope_theta", 10000.0) or 10000.0)
+        rope_layout = _normalize_rope_layout(self.cfg.get("rope_layout", "split"))
         eps = float(self.cfg.get("rms_eps", 1e-5) or 1e-5)
+        mlp_activation = _normalize_mlp_activation(self.cfg.get("mlp_activation", "swiglu"))
+        mlp_activation_slot = _activation_slot_name(mlp_activation)
+        attn_variant = _normalize_attention_variant(self.cfg.get("attn_variant", "dense"))
+        attn_slot = _attention_slot_name(attn_variant)
+        sliding_window = int(self.cfg.get("sliding_window", 0) or 0)
 
         tok = self._get("token_emb")
         assert tok is not None
@@ -303,117 +545,252 @@ class SnapshotQwenLikeOracle:
         for layer in range(n_layers):
             pref = f"layer.{layer}."
             sp = f"act.L{layer}."
+            layer_kind = _layer_kind(self.cfg, layer)
 
             residual = x
 
-            ln1 = self._get(pref + "ln1_gamma")
+            ln1 = _first_present(
+                self._get(pref + "attn_norm", required=False),
+                self._get(pref + "ln1_gamma", required=False),
+            )
             assert ln1 is not None
             x_norm, rstd1 = self._rms_norm_with_cache(x, ln1, eps)
             if capture_slots:
                 slot_map[sp + "rmsnorm.0.output"] = self._npflat(x_norm)
                 slot_map[sp + "rmsnorm.0.rstd_cache"] = self._npflat(rstd1)
 
-            wq = self._get(pref + "wq")
-            wk = self._get(pref + "wk")
-            wv = self._get(pref + "wv")
-            wo = self._get(pref + "wo")
-            bq = self._get(pref + "bq", required=False)
-            bk = self._get(pref + "bk", required=False)
-            bv = self._get(pref + "bv", required=False)
-            bo = self._get(pref + "bo", required=False)
+            if layer_kind == "recurrent":
+                recurrent_q = int(self.cfg.get("q_dim", 0) or 0)
+                recurrent_k = int(self.cfg.get("k_dim", recurrent_q) or recurrent_q)
+                recurrent_v = int(self.cfg.get("v_dim", 0) or 0)
+                gate_dim = int(self.cfg.get("gate_dim", self.cfg.get("ssm_time_step_rank", n_heads)) or n_heads)
+                recurrent_head_dim = int(self.cfg.get("recurrent_head_dim", max(1, recurrent_v // max(1, gate_dim))) or max(1, recurrent_v // max(1, gate_dim)))
 
-            assert wq is not None and wk is not None and wv is not None and wo is not None
+                packed_qkv = _apply_affine(x_norm, self._get(pref + "attn_qkv"), None)
+                z = _apply_affine(x_norm, self._get(pref + "attn_gate"), None)
+                alpha = _apply_affine(x_norm, self._get(pref + "ssm_alpha"), None)
+                beta = _apply_affine(x_norm, self._get(pref + "ssm_beta"), None)
+                if capture_slots:
+                    slot_map[sp + "recurrent_qkv_proj.0.y"] = self._npflat(packed_qkv)
+                    slot_map[sp + "recurrent_gate_proj.0.y"] = self._npflat(z)
+                    slot_map[sp + "recurrent_alpha_proj.0.y"] = self._npflat(alpha)
+                    slot_map[sp + "recurrent_beta_proj.0.y"] = self._npflat(beta)
 
-            q = _apply_affine(x_norm, wq, bq)
-            k = _apply_affine(x_norm, wk, bk)
-            v = _apply_affine(x_norm, wv, bv)
+                q_pre = packed_qkv[..., :recurrent_q]
+                k_pre = packed_qkv[..., recurrent_q : recurrent_q + recurrent_k]
+                v_pre = packed_qkv[..., recurrent_q + recurrent_k : recurrent_q + recurrent_k + recurrent_v]
+                if capture_slots:
+                    slot_map[sp + "recurrent_split_qkv.0.q"] = self._npflat(q_pre)
+                    slot_map[sp + "recurrent_split_qkv.0.k"] = self._npflat(k_pre)
+                    slot_map[sp + "recurrent_split_qkv.0.v"] = self._npflat(v_pre)
 
-            # Runtime IR for GQA may use packed wk/wv tensors where only the
-            # first (num_kv_heads * head_dim) channels are materialized.
-            q_expected = max(1, int(n_heads) * int(head_dim))
-            kv_expected = max(1, int(n_kv_heads_cfg) * int(head_dim))
-            if int(q.shape[-1]) >= q_expected:
-                q = q[..., :q_expected]
-            if int(k.shape[-1]) >= kv_expected:
-                k = k[..., :kv_expected]
-            if int(v.shape[-1]) >= kv_expected:
-                v = v[..., :kv_expected]
+                dt_bias = self._get(pref + "ssm_dt_bias")
+                ssm_a = self._get(pref + "ssm_a")
+                gate = F.softplus(alpha + dt_bias.view(1, 1, -1)) * ssm_a.view(1, 1, -1)
+                if capture_slots:
+                    slot_map[sp + "recurrent_dt_gate.0.gate"] = self._npflat(gate)
 
-            if capture_slots:
-                slot_map[sp + "q_proj.0.y"] = self._npflat(q)
-                slot_map[sp + "k_proj.0.y"] = self._npflat(k)
-                slot_map[sp + "v_proj.0.y"] = self._npflat(v)
+                history_len = int(self.cfg.get("ssm_conv_history", max(0, int(self.cfg.get("ssm_conv_kernel", 0) or 0) - 1)) or 0)
+                conv_x, conv_state_out = _recurrent_conv_state_update(
+                    q_pre,
+                    k_pre,
+                    v_pre,
+                    history_len=history_len,
+                )
+                if capture_slots:
+                    slot_map[sp + "recurrent_conv_state_update.0.conv_x"] = self._npflat(conv_x)
+                    slot_map[sp + "recurrent_conv_state_update.0.state_out"] = self._npflat(conv_state_out)
 
-            q_out = int(q.shape[-1])
-            k_out = int(k.shape[-1])
-            q_heads = n_heads if (n_heads * head_dim) == q_out else max(1, q_out // max(1, head_dim))
-            kv_heads_nom = n_kv_heads_cfg if (n_kv_heads_cfg * head_dim) == k_out else max(1, k_out // max(1, head_dim))
+                conv_raw = _depthwise_causal_conv(conv_x, self._get(pref + "ssm_conv1d"))
+                if capture_slots:
+                    slot_map[sp + "recurrent_ssm_conv.0.out"] = self._npflat(conv_raw)
+                conv_act = F.silu(conv_raw)
+                if capture_slots:
+                    slot_map[sp + "recurrent_silu.0.out"] = self._npflat(conv_act)
 
-            qh = q.view(bsz, tsz, q_heads, head_dim).permute(0, 2, 1, 3).contiguous()
-            kh = k.view(bsz, tsz, kv_heads_nom, head_dim).permute(0, 2, 1, 3).contiguous()
-            vh = v.view(bsz, tsz, kv_heads_nom, head_dim).permute(0, 2, 1, 3).contiguous()
+                q = conv_act[..., :recurrent_q]
+                k = conv_act[..., recurrent_q : recurrent_q + recurrent_k]
+                v = conv_act[..., recurrent_q + recurrent_k : recurrent_q + recurrent_k + recurrent_v]
+                if capture_slots:
+                    slot_map[sp + "recurrent_split_conv_qkv.0.q"] = self._npflat(q)
+                    slot_map[sp + "recurrent_split_conv_qkv.0.k"] = self._npflat(k)
+                    slot_map[sp + "recurrent_split_conv_qkv.0.v"] = self._npflat(v)
 
-            qn = self._get(pref + "q_norm", required=False)
-            kn = self._get(pref + "k_norm", required=False)
-            qh = _apply_head_rms_norm(qh, qn, eps)
-            kh = _apply_head_rms_norm(kh, kn, eps)
-            if capture_slots:
-                qn_flat = qh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
-                kn_flat = kh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
-                slot_map[sp + "qk_norm.0.q"] = self._npflat(qn_flat)
-                slot_map[sp + "qk_norm.0.k"] = self._npflat(kn_flat)
+                q, k = _recurrent_qk_l2_norm(q, k, num_heads=gate_dim, head_dim=recurrent_head_dim, eps=eps)
+                if capture_slots:
+                    slot_map[sp + "recurrent_qk_l2_norm.0.q"] = self._npflat(q)
+                    slot_map[sp + "recurrent_qk_l2_norm.0.k"] = self._npflat(k)
 
-            qh, kh = _apply_rope(qh, kh, theta)
-            if capture_slots:
-                qr_flat = qh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
-                kr_flat = kh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
-                slot_map[sp + "rope_qk.0.q"] = self._npflat(qr_flat)
-                slot_map[sp + "rope_qk.0.k"] = self._npflat(kr_flat)
+                rec_out, _ = _torch_deltanet_sequence(
+                    q,
+                    k,
+                    v,
+                    gate,
+                    beta,
+                    num_heads=gate_dim,
+                    state_dim=recurrent_head_dim,
+                )
+                if capture_slots:
+                    slot_map[sp + "recurrent_core.0.out"] = self._npflat(rec_out)
 
-            scale = 1.0 / math.sqrt(float(max(1, head_dim)))
-            hq = int(qh.shape[1])
-            hk = int(kh.shape[1])
-            if hk <= 0:
-                raise ValueError("Invalid K heads")
-            kh_eff = kh
-            vh_eff = vh
-            if hq != hk:
-                if (hq % hk) != 0:
-                    raise ValueError(f"Unsupported GQA mapping: q_heads={hq}, kv_heads={hk}")
-                rep = hq // hk
-                kh_eff = kh.repeat_interleave(rep, dim=1)
-                vh_eff = vh.repeat_interleave(rep, dim=1)
+                normed = _recurrent_norm_gate(
+                    rec_out,
+                    z,
+                    self._get(pref + "ssm_norm"),
+                    num_heads=gate_dim,
+                    head_dim=recurrent_head_dim,
+                    eps=eps,
+                )
+                if capture_slots:
+                    slot_map[sp + "recurrent_norm_gate.0.out"] = self._npflat(normed)
 
-            scores = torch.matmul(qh, kh_eff.transpose(-2, -1)) * float(scale)
-            t = int(scores.shape[-1])
-            mask = torch.triu(torch.ones((t, t), dtype=torch.bool, device=scores.device), diagonal=1)
-            scores = scores.masked_fill(mask.view(1, 1, t, t), float("-inf"))
-            probs = torch.softmax(scores, dim=-1)
-            ctx = torch.matmul(probs, vh_eff)
-            if capture_slots:
-                saved_probs.append(self._npflat(probs))
+                attn_out = _apply_affine(normed, self._get(pref + "ssm_out"), None)
+                if capture_slots:
+                    slot_map[sp + "recurrent_out_proj.0.y"] = self._npflat(attn_out)
+                x = residual + attn_out
+                if capture_slots:
+                    slot_map[sp + "residual_add.0.out"] = self._npflat(x)
+            else:
+                wq = _first_present(
+                    self._get(pref + "attn_q_gate", required=False),
+                    self._get(pref + "wq", required=False),
+                )
+                wk = _first_present(
+                    self._get(pref + "attn_k", required=False),
+                    self._get(pref + "wk", required=False),
+                )
+                wv = _first_present(
+                    self._get(pref + "attn_v", required=False),
+                    self._get(pref + "wv", required=False),
+                )
+                wo = _first_present(
+                    self._get(pref + "attn_output", required=False),
+                    self._get(pref + "wo", required=False),
+                )
+                bq = self._get(pref + "bq", required=False)
+                bk = self._get(pref + "bk", required=False)
+                bv = self._get(pref + "bv", required=False)
+                bo = self._get(pref + "bo", required=False)
 
-            ctx = ctx.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
-            if capture_slots:
-                slot_map[sp + "attn.0.out"] = self._npflat(ctx)
+                assert wq is not None and wk is not None and wv is not None and wo is not None
 
-            attn_out = _apply_affine(ctx, wo, bo)
-            if capture_slots:
-                slot_map[sp + "out_proj.0.y"] = self._npflat(attn_out)
-            x = residual + attn_out
-            if capture_slots:
-                slot_map[sp + "residual_add.0.out"] = self._npflat(x)
+                if layer_kind == "full_attention" and self._get(pref + "attn_q_gate", required=False) is not None:
+                    packed_qg = _apply_affine(x_norm, wq, bq)
+                    attn_out_dim = int(self.cfg.get("attn_out_dim", n_heads * head_dim) or (n_heads * head_dim))
+                    attn_gate_dim = int(self.cfg.get("attn_gate_dim", attn_out_dim) or attn_out_dim)
+                    q = packed_qg[..., :attn_out_dim]
+                    gate = packed_qg[..., attn_out_dim : attn_out_dim + attn_gate_dim]
+                    if capture_slots:
+                        slot_map[sp + "q_gate_proj.0.y"] = self._npflat(packed_qg)
+                        slot_map[sp + "split_q_gate.0.q"] = self._npflat(q)
+                        slot_map[sp + "split_q_gate.0.gate"] = self._npflat(gate)
+                else:
+                    q = _apply_affine(x_norm, wq, bq)
+                    gate = None
+                    if capture_slots:
+                        slot_map[sp + "q_proj.0.y"] = self._npflat(q)
+
+                k = _apply_affine(x_norm, wk, bk)
+                v = _apply_affine(x_norm, wv, bv)
+
+                q_expected = max(1, int(n_heads) * int(head_dim))
+                kv_expected = max(1, int(n_kv_heads_cfg) * int(head_dim))
+                if int(q.shape[-1]) >= q_expected:
+                    q = q[..., :q_expected]
+                if int(k.shape[-1]) >= kv_expected:
+                    k = k[..., :kv_expected]
+                if int(v.shape[-1]) >= kv_expected:
+                    v = v[..., :kv_expected]
+
+                if capture_slots:
+                    slot_map[sp + "k_proj.0.y"] = self._npflat(k)
+                    slot_map[sp + "v_proj.0.y"] = self._npflat(v)
+
+                q_out = int(q.shape[-1])
+                k_out = int(k.shape[-1])
+                q_heads = n_heads if (n_heads * head_dim) == q_out else max(1, q_out // max(1, head_dim))
+                kv_heads_nom = n_kv_heads_cfg if (n_kv_heads_cfg * head_dim) == k_out else max(1, k_out // max(1, head_dim))
+
+                qh = q.view(bsz, tsz, q_heads, head_dim).permute(0, 2, 1, 3).contiguous()
+                kh = k.view(bsz, tsz, kv_heads_nom, head_dim).permute(0, 2, 1, 3).contiguous()
+                vh = v.view(bsz, tsz, kv_heads_nom, head_dim).permute(0, 2, 1, 3).contiguous()
+
+                qn = _first_present(
+                    self._get(pref + "attn_q_norm", required=False),
+                    self._get(pref + "q_norm", required=False),
+                )
+                kn = _first_present(
+                    self._get(pref + "attn_k_norm", required=False),
+                    self._get(pref + "k_norm", required=False),
+                )
+                qh = _apply_head_rms_norm(qh, qn, eps)
+                kh = _apply_head_rms_norm(kh, kn, eps)
+                if capture_slots:
+                    qn_flat = qh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
+                    kn_flat = kh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
+                    slot_map[sp + "qk_norm.0.q"] = self._npflat(qn_flat)
+                    slot_map[sp + "qk_norm.0.k"] = self._npflat(kn_flat)
+
+                qh, kh = _apply_rope(qh, kh, theta, rope_layout)
+                if capture_slots:
+                    qr_flat = qh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
+                    kr_flat = kh.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
+                    slot_map[sp + "rope_qk.0.q"] = self._npflat(qr_flat)
+                    slot_map[sp + "rope_qk.0.k"] = self._npflat(kr_flat)
+
+                scale = 1.0 / math.sqrt(float(max(1, head_dim)))
+                ctx = _causal_attention(
+                    qh,
+                    kh,
+                    vh,
+                    scale=scale,
+                    sliding_window=(sliding_window if attn_variant == "sliding_window" else 0),
+                )
+                if capture_slots and attn_variant != "sliding_window":
+                    scores = torch.matmul(
+                        qh,
+                        (kh.repeat_interleave(int(qh.shape[1] // max(1, kh.shape[1])), dim=1) if int(qh.shape[1]) != int(kh.shape[1]) else kh).transpose(-2, -1),
+                    ) * float(scale)
+                    t = int(scores.shape[-1])
+                    q_idx = torch.arange(t, dtype=torch.int64, device=scores.device).view(t, 1)
+                    k_idx = torch.arange(t, dtype=torch.int64, device=scores.device).view(1, t)
+                    scores = scores.masked_fill((k_idx > q_idx).view(1, 1, t, t), float("-inf"))
+                    saved_probs.append(self._npflat(torch.softmax(scores, dim=-1)))
+
+                ctx = ctx.permute(0, 2, 1, 3).contiguous().view(bsz, tsz, -1)
+                if capture_slots:
+                    slot_map[sp + f"{attn_slot}.0.out"] = self._npflat(ctx)
+                if gate is not None:
+                    ctx = ctx * torch.sigmoid(gate)
+                    if capture_slots:
+                        slot_map[sp + "attn_gate_sigmoid_mul.0.out"] = self._npflat(ctx)
+
+                attn_out = _apply_affine(ctx, wo, bo)
+                if capture_slots:
+                    slot_map[sp + "out_proj.0.y"] = self._npflat(attn_out)
+                x = residual + attn_out
+                if capture_slots:
+                    slot_map[sp + "residual_add.0.out"] = self._npflat(x)
 
             residual2 = x
-            ln2 = self._get(pref + "ln2_gamma")
+            ln2 = _first_present(
+                self._get(pref + "post_attention_norm", required=False),
+                self._get(pref + "ln2_gamma", required=False),
+            )
             assert ln2 is not None
             x_norm2, rstd2 = self._rms_norm_with_cache(x, ln2, eps)
             if capture_slots:
                 slot_map[sp + "rmsnorm.1.output"] = self._npflat(x_norm2)
                 slot_map[sp + "rmsnorm.1.rstd_cache"] = self._npflat(rstd2)
 
-            w1 = self._get(pref + "w1")
-            w2 = self._get(pref + "w2")
+            w1 = _first_present(
+                self._get(pref + "ffn_gate", required=False),
+                self._get(pref + "w1", required=False),
+            )
+            w2 = _first_present(
+                self._get(pref + "ffn_down", required=False),
+                self._get(pref + "w2", required=False),
+            )
             b1 = self._get(pref + "b1", required=False)
             b2 = self._get(pref + "b2", required=False)
             assert w1 is not None and w2 is not None
@@ -421,14 +798,9 @@ class SnapshotQwenLikeOracle:
             gate_up = _apply_affine(x_norm2, w1, b1)
             if capture_slots:
                 slot_map[sp + "mlp_gate_up.0.y"] = self._npflat(gate_up)
-            if int(gate_up.shape[-1]) % 2 != 0:
-                raise ValueError(f"Invalid SwiGLU width at {pref}w1: {tuple(gate_up.shape)}")
-            half = int(gate_up.shape[-1]) // 2
-            gate = gate_up[..., :half]
-            up = gate_up[..., half:]
-            mlp_hidden = F.silu(gate) * up
+            mlp_hidden = _apply_glu_activation(gate_up, mlp_activation)
             if capture_slots:
-                slot_map[sp + "silu_mul.0.out"] = self._npflat(mlp_hidden)
+                slot_map[sp + f"{mlp_activation_slot}.0.out"] = self._npflat(mlp_hidden)
             mlp_out = _apply_affine(mlp_hidden, w2, b2)
             if capture_slots:
                 slot_map[sp + "mlp_down.0.y"] = self._npflat(mlp_out)
@@ -505,6 +877,7 @@ def compute_loss_logits_and_slots_from_snapshot_array(
     snapshot: np.ndarray,
     input_ids: Sequence[int],
     targets: Sequence[int],
+    valid_tokens: Optional[int] = None,
 ) -> tuple[float, np.ndarray, Dict[str, np.ndarray]]:
     _require_torch()
 
@@ -526,7 +899,13 @@ def compute_loss_logits_and_slots_from_snapshot_array(
             f"Oracle logits/targets shape mismatch: logits={tuple(logits.shape)} targets={tuple(y.shape)}"
         )
 
-    loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), y.reshape(-1), reduction="mean")
+    active = int(valid_tokens) if valid_tokens is not None else int(y.shape[1])
+    active = max(1, min(active, int(logits.shape[1]), int(y.shape[1])))
+    loss = F.cross_entropy(
+        logits[:, :active, :].reshape(-1, logits.shape[-1]),
+        y[:, :active].reshape(-1),
+        reduction="mean",
+    )
     loss_val = float(loss.detach().cpu().item())
     logits_flat = logits.detach().cpu().float().reshape(-1).numpy().astype(np.float32, copy=False)
     slot_map["aux.loss"] = np.array([loss_val], dtype=np.float32)
@@ -539,6 +918,7 @@ def compute_loss_and_logits_from_snapshot_array(
     snapshot: np.ndarray,
     input_ids: Sequence[int],
     targets: Sequence[int],
+    valid_tokens: Optional[int] = None,
 ) -> tuple[float, np.ndarray]:
     loss, logits, _ = compute_loss_logits_and_slots_from_snapshot_array(
         run_dir=run_dir,
@@ -546,6 +926,7 @@ def compute_loss_and_logits_from_snapshot_array(
         snapshot=snapshot,
         input_ids=input_ids,
         targets=targets,
+        valid_tokens=valid_tokens,
     )
     return float(loss), logits
 
@@ -556,6 +937,7 @@ def compute_loss_from_snapshot_array(
     snapshot: np.ndarray,
     input_ids: Sequence[int],
     targets: Sequence[int],
+    valid_tokens: Optional[int] = None,
 ) -> float:
     loss, _ = compute_loss_and_logits_from_snapshot_array(
         run_dir=run_dir,
@@ -563,6 +945,7 @@ def compute_loss_from_snapshot_array(
         snapshot=snapshot,
         input_ids=input_ids,
         targets=targets,
+        valid_tokens=valid_tokens,
     )
     return float(loss)
 

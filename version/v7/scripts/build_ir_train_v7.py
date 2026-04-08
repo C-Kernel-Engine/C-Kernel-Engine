@@ -32,59 +32,120 @@ TEMPLATES_DIR = V7_ROOT / "templates"
 # NOTE: some forward kernels below are in-place at C API level (currently qk_norm_forward
 # and rope_forward_qk). IR1 intentionally remains out-of-place (explicit input/output tensors)
 # for deterministic graph semantics. Codegen must stage/copy before invoking those kernels.
+# Training maps activation ops to exact forward kernels so the train runtime uses the
+# same stable math as the backward path. Fast approximations remain available to inference.
 FORWARD_KERNEL_BY_OP = {
     "dense_embedding_lookup": "dense_embedding_lookup",
     "rmsnorm": "rmsnorm_forward",
     "q_proj": "gemm_blocked_serial",
+    "q_gate_proj": "gemm_blocked_serial",
     "k_proj": "gemm_blocked_serial",
     "v_proj": "gemm_blocked_serial",
+    "recurrent_qkv_proj": "gemm_blocked_serial",
+    "recurrent_gate_proj": "gemm_blocked_serial",
+    "recurrent_alpha_proj": "gemm_blocked_serial",
+    "recurrent_beta_proj": "gemm_blocked_serial",
+    "recurrent_out_proj": "gemm_blocked_serial",
     "qk_norm": "qk_norm_forward",
     "rope_qk": "rope_forward_qk",
+    "split_q_gate": "split_q_gate_forward",
+    "recurrent_split_qkv": "recurrent_split_qkv_forward",
+    "recurrent_dt_gate": "recurrent_dt_gate_forward",
+    "recurrent_conv_state_update": "recurrent_conv_state_update_forward",
+    "recurrent_ssm_conv": "ssm_conv1d_forward",
+    "recurrent_silu": "recurrent_silu_forward",
+    "recurrent_split_conv_qkv": "recurrent_split_conv_qkv_forward",
+    "recurrent_qk_l2_norm": "recurrent_qk_l2_norm_forward",
+    "recurrent_core": "gated_deltanet_autoregressive_forward",
+    "recurrent_norm_gate": "recurrent_norm_gate_forward",
     "attn": "attention_forward_causal_head_major_gqa_flash_strided",
     "attn_sliding": "attention_forward_causal_head_major_gqa_flash_strided_sliding",
+    "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul_forward",
     "out_proj": "gemm_blocked_serial",
     "residual_add": "ck_residual_add_token_major",
     "mlp_gate_up": "gemm_blocked_serial",
-    "silu_mul": "swiglu_forward",
-    "geglu": "geglu_forward_fp32",
+    "silu_mul": "swiglu_forward_exact",
+    "geglu": "geglu_forward_exact",
     "mlp_down": "gemm_blocked_serial",
     "logits": "gemm_blocked_serial",
 }
 
-
-WEIGHT_PATTERNS = {
-    "token_emb": ["token_emb", "token_embd.weight", "embed_tokens.weight"],
-    "output_weight": ["output.weight", "lm_head.weight"],
-    "final_ln_weight": ["final_ln_weight", "norm.weight"],
-    "final_ln_bias": ["final_ln_bias", "norm.bias"],
-    "ln1_gamma": ["layer.{L}.ln1_gamma", "layers.{L}.attention_norm.weight"],
-    "ln2_gamma": ["layer.{L}.ln2_gamma", "layers.{L}.ffn_norm.weight"],
-    "post_attention_norm": ["layer.{L}.post_attention_norm", "layers.{L}.post_attention_norm.weight"],
-    "post_ffn_norm": ["layer.{L}.post_ffn_norm", "layer.{L}.post_ffw_norm", "layers.{L}.post_ffn_norm.weight", "layers.{L}.post_ffw_norm.weight"],
-    "wq": ["layer.{L}.wq", "layers.{L}.attention.wq"],
-    "wk": ["layer.{L}.wk", "layers.{L}.attention.wk"],
-    "wv": ["layer.{L}.wv", "layers.{L}.attention.wv"],
-    "bq": ["layer.{L}.bq", "layers.{L}.attention.bq"],
-    "bk": ["layer.{L}.bk", "layers.{L}.attention.bk"],
-    "bv": ["layer.{L}.bv", "layers.{L}.attention.bv"],
-    "q_norm": ["layer.{L}.q_norm", "layers.{L}.attention.q_norm"],
-    "k_norm": ["layer.{L}.k_norm", "layers.{L}.attention.k_norm"],
-    "wo": ["layer.{L}.wo", "layers.{L}.attention.wo"],
-    "bo": ["layer.{L}.bo", "layers.{L}.attention.bo"],
-    "w1": ["layer.{L}.w1", "layers.{L}.feed_forward.w1"],
-    "w2": ["layer.{L}.w2", "layers.{L}.feed_forward.w2"],
-    "w3": ["layer.{L}.w3", "layers.{L}.feed_forward.w3"],
-    "b1": ["layer.{L}.b1", "layers.{L}.feed_forward.b1"],
-    "b2": ["layer.{L}.b2", "layers.{L}.feed_forward.b2"]
+FORWARD_BRIDGE_PLAN_SPECS: Dict[str, Dict[str, Any]] = {
+    "qk_norm": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "pre_roles": (
+            {"role": "q", "input_key": "q", "tmp_role": "q_pre", "head_group": "num_heads"},
+            {"role": "k", "input_key": "k", "tmp_role": "k_pre", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (
+            {"role": "q", "output_key": "q", "head_group": "num_heads", "source": "pre:q"},
+            {"role": "k", "output_key": "k", "head_group": "num_kv_heads", "source": "pre:k"},
+        ),
+    },
+    "rope_qk": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "pre_roles": (
+            {"role": "q", "input_key": "q", "tmp_role": "q_pre", "head_group": "num_heads"},
+            {"role": "k", "input_key": "k", "tmp_role": "k_pre", "head_group": "num_kv_heads"},
+        ),
+        "post_roles": (
+            {"role": "q", "output_key": "q", "head_group": "num_heads", "source": "pre:q"},
+            {"role": "k", "output_key": "k", "head_group": "num_kv_heads", "source": "pre:k"},
+        ),
+    },
+    "attn": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "pre_roles": (
+            {"role": "q", "input_key": "q", "tmp_role": "q_pre", "head_group": "num_heads"},
+            {"role": "k", "input_key": "k", "tmp_role": "k_pre", "head_group": "num_kv_heads"},
+            {"role": "v", "input_key": "v", "tmp_role": "v_pre", "head_group": "num_kv_heads"},
+        ),
+        "kernel_output_roles": (
+            {"name": "out", "tmp_role": "out_post", "head_group": "num_heads"},
+        ),
+        "post_roles": (
+            {"role": "out", "output_key": "out", "head_group": "num_heads", "source": "kernel:out"},
+        ),
+    },
+    "attn_sliding": {
+        "kernel_layout": "head_major",
+        "tensor_layout": "token_major",
+        "pre_roles": (
+            {"role": "q", "input_key": "q", "tmp_role": "q_pre", "head_group": "num_heads"},
+            {"role": "k", "input_key": "k", "tmp_role": "k_pre", "head_group": "num_kv_heads"},
+            {"role": "v", "input_key": "v", "tmp_role": "v_pre", "head_group": "num_kv_heads"},
+        ),
+        "kernel_output_roles": (
+            {"name": "out", "tmp_role": "out_post", "head_group": "num_heads"},
+        ),
+        "post_roles": (
+            {"role": "out", "output_key": "out", "head_group": "num_heads", "source": "kernel:out"},
+        ),
+    },
 }
+
+
+WEIGHT_PATTERNS = dict(build_ir_v7.WEIGHT_PATTERNS)
 
 
 WEIGHTS_BY_LOGICAL_OP = {
     "dense_embedding_lookup": [("weight", "token_emb", True)],
     "rmsnorm": [("gamma", "ln1_gamma", True)],  # remapped to ln2/final per context
     "q_proj": [("W", "wq", True), ("bias", "bq", False)],
+    "q_gate_proj": [("W", "wq", True), ("bias", "bq", False)],
     "k_proj": [("W", "wk", True), ("bias", "bk", False)],
     "v_proj": [("W", "wv", True), ("bias", "bv", False)],
+    "recurrent_qkv_proj": [("W", "attn_qkv", True)],
+    "recurrent_gate_proj": [("W", "attn_gate", True)],
+    "recurrent_alpha_proj": [("W", "ssm_alpha", True)],
+    "recurrent_beta_proj": [("W", "ssm_beta", True)],
+    "recurrent_dt_gate": [("dt_bias", "ssm_dt_bias", True), ("A", "ssm_a", True)],
+    "recurrent_ssm_conv": [("kernel", "ssm_conv1d", True)],
+    "recurrent_norm_gate": [("weight", "ssm_norm", True)],
+    "recurrent_out_proj": [("W", "ssm_out", True)],
     "qk_norm": [("q_gamma", "q_norm", False), ("k_gamma", "k_norm", False)],
     "out_proj": [("W", "wo", True), ("bias", "bo", False)],
     "mlp_gate_up": [("W", "w1", True), ("bias", "b1", False), ("W_aux", "w3", False)],
@@ -104,7 +165,7 @@ def _save_json(path: Path, payload: Dict[str, Any]) -> None:
         json.dump(payload, f, indent=2)
 
 
-def _template_sections(template: Dict[str, Any]) -> Tuple[List[str], List[str], List[str]]:
+def _template_sections(template: Dict[str, Any]) -> Tuple[List[str], Any, List[str]]:
     sequence = template.get("sequence", [])
     if not sequence:
         raise RuntimeError("Template missing `sequence`")
@@ -112,10 +173,7 @@ def _template_sections(template: Dict[str, Any]) -> Tuple[List[str], List[str], 
     block = template.get("block_types", {}).get(block_name, {})
     header = list(block.get("header", []))
     body_def = block.get("body", {})
-    if isinstance(body_def, dict):
-        body = list(body_def.get("ops", []))
-    else:
-        body = list(body_def or [])
+    body = body_def if isinstance(body_def, dict) else list(body_def or [])
     footer = list(block.get("footer", []))
     return header, body, footer
 
@@ -191,9 +249,20 @@ def _train_dims(config: Dict[str, Any]) -> Dict[str, int]:
     num_heads = _cfg_int(config, ["num_heads"], 1)
     num_kv_heads = _cfg_int(config, ["num_kv_heads"], num_heads)
     head_dim = _cfg_int(config, ["head_dim"], max(1, d_model // max(1, num_heads)))
+    aligned_head_dim = _cfg_int(config, ["aligned_head_dim"], head_dim)
+    attn_out_dim = _cfg_int(config, ["attn_out_dim"], max(1, num_heads * head_dim))
+    q_gate_proj_dim = _cfg_int(config, ["q_gate_proj_dim", "attn_q_gate_proj_dim"], max(1, 2 * attn_out_dim))
+    attn_gate_dim = _cfg_int(config, ["attn_gate_dim"], max(1, q_gate_proj_dim - attn_out_dim))
+    q_dim = _cfg_int(config, ["q_dim"], max(1, num_heads * head_dim))
+    k_dim = _cfg_int(config, ["k_dim"], q_dim)
+    v_dim = _cfg_int(config, ["v_dim"], hidden)
+    gate_dim = _cfg_int(config, ["gate_dim", "ssm_time_step_rank"], max(1, num_heads))
+    recurrent_head_dim = _cfg_int(config, ["recurrent_head_dim"], max(1, v_dim // max(1, gate_dim)))
+    ssm_conv_kernel = _cfg_int(config, ["ssm_conv_kernel"], 4)
+    ssm_conv_history = _cfg_int(config, ["ssm_conv_history"], max(0, ssm_conv_kernel - 1))
+    ssm_conv_channels = _cfg_int(config, ["ssm_conv_channels"], max(1, q_dim + k_dim + v_dim))
     # Runtime token count is compile-time today; default 1 for legacy parity.
     token_count = _cfg_int(config, ["train_tokens", "tokens", "seq_len"], 1)
-    q_dim = max(1, num_heads * head_dim)
     kv_dim = max(1, num_kv_heads * head_dim)
     gate_up_dim = max(1, 2 * hidden)
     return {
@@ -204,7 +273,18 @@ def _train_dims(config: Dict[str, Any]) -> Dict[str, int]:
         "num_heads": num_heads,
         "num_kv_heads": num_kv_heads,
         "head_dim": head_dim,
+        "aligned_head_dim": aligned_head_dim,
+        "attn_out_dim": attn_out_dim,
+        "q_gate_proj_dim": q_gate_proj_dim,
+        "attn_gate_dim": attn_gate_dim,
         "q_dim": q_dim,
+        "k_dim": k_dim,
+        "v_dim": v_dim,
+        "gate_dim": gate_dim,
+        "recurrent_head_dim": recurrent_head_dim,
+        "ssm_conv_kernel": ssm_conv_kernel,
+        "ssm_conv_history": ssm_conv_history,
+        "ssm_conv_channels": ssm_conv_channels,
         "kv_dim": kv_dim,
         "gate_up_dim": gate_up_dim,
     }
@@ -216,7 +296,16 @@ def _infer_output_shape_numel(logical_op: str, out_name: str, config: Dict[str, 
     d_model = dims["d_model"]
     hidden = dims["hidden"]
     vocab = dims["vocab"]
+    attn_out_dim = dims["attn_out_dim"]
+    q_gate_proj_dim = dims["q_gate_proj_dim"]
+    attn_gate_dim = dims["attn_gate_dim"]
     q_dim = dims["q_dim"]
+    k_dim = dims["k_dim"]
+    v_dim = dims["v_dim"]
+    gate_dim = dims["gate_dim"]
+    recurrent_head_dim = dims["recurrent_head_dim"]
+    ssm_conv_history = dims["ssm_conv_history"]
+    ssm_conv_channels = dims["ssm_conv_channels"]
     kv_dim = dims["kv_dim"]
     gate_up_dim = dims["gate_up_dim"]
 
@@ -234,8 +323,46 @@ def _infer_output_shape_numel(logical_op: str, out_name: str, config: Dict[str, 
     if logical_op in ("qk_norm", "rope_qk"):
         dim = kv_dim if out_name == "k" else q_dim
         return [t, dim], t * dim
+    if logical_op == "q_gate_proj":
+        return [t, q_gate_proj_dim], t * q_gate_proj_dim
+    if logical_op == "split_q_gate":
+        dim = attn_gate_dim if out_name == "gate" else attn_out_dim
+        return [t, dim], t * dim
     if logical_op in ("attn", "attn_sliding"):
-        return [t, d_model], t * d_model
+        return [t, attn_out_dim], t * attn_out_dim
+    if logical_op == "attn_gate_sigmoid_mul":
+        return [t, attn_out_dim], t * attn_out_dim
+    if logical_op == "recurrent_qkv_proj":
+        packed = q_dim + k_dim + v_dim
+        return [t, packed], t * packed
+    if logical_op == "recurrent_gate_proj":
+        return [t, v_dim], t * v_dim
+    if logical_op in ("recurrent_alpha_proj", "recurrent_beta_proj", "recurrent_dt_gate"):
+        return [t, gate_dim], t * gate_dim
+    if logical_op == "recurrent_split_qkv":
+        dim = q_dim if out_name == "q" else (k_dim if out_name == "k" else v_dim)
+        return [t, dim], t * dim
+    if logical_op == "recurrent_conv_state_update":
+        if out_name == "conv_x":
+            numel = ssm_conv_channels * max(1, t + ssm_conv_history)
+            return [1, ssm_conv_channels, max(1, t + ssm_conv_history)], numel
+        numel = ssm_conv_channels * max(1, ssm_conv_history)
+        return [max(1, ssm_conv_history), ssm_conv_channels], numel
+    if logical_op in ("recurrent_ssm_conv", "recurrent_silu"):
+        return [t, ssm_conv_channels], t * ssm_conv_channels
+    if logical_op == "recurrent_split_conv_qkv":
+        dim = q_dim if out_name == "q" else (k_dim if out_name == "k" else v_dim)
+        return [t, dim], t * dim
+    if logical_op == "recurrent_qk_l2_norm":
+        dim = q_dim if out_name == "q" else k_dim
+        return [t, dim], t * dim
+    if logical_op == "recurrent_core":
+        if out_name == "state_out":
+            state_shape = list(build_ir_v7._recurrent_state_shape(config))
+            return state_shape, int(state_shape[0] * state_shape[1] * state_shape[2])
+        return [t, v_dim], t * v_dim
+    if logical_op == "recurrent_norm_gate":
+        return [t, v_dim], t * v_dim
     if logical_op == "mlp_gate_up":
         return [t, gate_up_dim], t * gate_up_dim
     if logical_op in ("silu_mul", "geglu"):
@@ -258,6 +385,35 @@ def _infer_saved_shape_numel(saved_key: str, config: Dict[str, Any]) -> Tuple[Li
         n = max(1, dims["num_heads"] * t * t)
         return [dims["num_heads"], t, t], n
     return [t, dims["d_model"]], max(1, t * dims["d_model"])
+
+
+def _infer_head_major_bridge_shape_numel(config: Dict[str, Any], head_group: str) -> Tuple[List[int], int]:
+    dims = _train_dims(config)
+    tokens = max(1, int(dims["tokens"]))
+    aligned_head_dim = max(1, int(dims.get("aligned_head_dim", dims["head_dim"])))
+    group = str(head_group or "num_heads").strip().lower()
+    if group in ("num_kv_heads", "kv", "k", "v"):
+        heads = max(1, int(dims["num_kv_heads"]))
+    else:
+        heads = max(1, int(dims["num_heads"]))
+    numel = max(1, tokens * heads * aligned_head_dim)
+    return [heads, tokens, aligned_head_dim], numel
+
+
+def _infer_external_input_shape_numel(
+    tensor_id: Optional[str],
+    external_from: Optional[str],
+    config: Dict[str, Any],
+) -> Tuple[Optional[List[int]], Optional[int]]:
+    ref = str(external_from or tensor_id or "").strip().lower()
+    dims = _train_dims(config)
+    if ref.endswith("recurrent_conv_state"):
+        shape = [max(1, dims["ssm_conv_history"]), dims["ssm_conv_channels"]]
+        return shape, int(shape[0] * shape[1])
+    if ref.endswith("recurrent_ssm_state"):
+        shape = list(build_ir_v7._recurrent_state_shape(config))
+        return shape, int(shape[0] * shape[1] * shape[2])
+    return None, None
 
 
 def _kernel_ids(registry: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -328,8 +484,33 @@ def _resolve_forward_kernels(config: Dict[str, Any], template: Dict[str, Any]) -
     return resolved
 
 
+def _template_attention_runtime_contract(template: Dict[str, Any]) -> Dict[str, Any]:
+    contract = ((template.get("contract") or {}).get("attention_contract") or {})
+    if not isinstance(contract, dict):
+        return {}
+    raw_train_contract = contract.get("train_runtime_contract")
+    if isinstance(raw_train_contract, dict):
+        out = dict(raw_train_contract)
+    else:
+        out = {}
+    saved_overrides = out.get("saved_tensor_kernel_overrides")
+    if not isinstance(saved_overrides, dict):
+        saved_overrides = {}
+    attn_variant = str(contract.get("attn_variant", "") or "").strip().lower()
+    if "attn_weights" not in saved_overrides:
+        saved_overrides["attn_weights"] = "attention_forward_causal_head_major_gqa_exact"
+    out["saved_tensor_kernel_overrides"] = saved_overrides
+    zero_saved = out.get("requires_zero_sliding_window_for_saved_tensors")
+    if not isinstance(zero_saved, list):
+        zero_saved = []
+    if attn_variant == "sliding_window" and "attn_weights" not in zero_saved:
+        zero_saved = list(zero_saved) + ["attn_weights"]
+    out["requires_zero_sliding_window_for_saved_tensors"] = zero_saved
+    return out
+
+
 def _resolve_train_config(manifest_config: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
-    config = dict(manifest_config or {})
+    config = build_ir_v7._normalize_manifest_config(dict(manifest_config or {}))
     rope_layout = build_ir_v7._normalize_rope_layout_value(config.get("rope_layout"))
     if rope_layout:
         config["rope_layout"] = rope_layout
@@ -348,10 +529,14 @@ def build_ir1_train(
     bindings_doc: Dict[str, Any],
     grad_rules: Dict[str, Any],
     max_layers: Optional[int],
-    strict: bool
+    strict: bool,
+    bridge_lowering: str = "legacy",
 ) -> Dict[str, Any]:
     template = _choose_template(manifest, explicit_template=None)
     config = _resolve_train_config(manifest.get("config", {}), template)
+    bridge_lowering = str(bridge_lowering or "legacy").strip().lower()
+    if bridge_lowering not in {"legacy", "explicit"}:
+        raise RuntimeError("Unsupported bridge_lowering=%r (expected legacy|explicit)" % bridge_lowering)
     num_layers = int(config.get("num_layers", 0) or 0)
     if max_layers is not None:
         num_layers = min(num_layers, int(max_layers))
@@ -360,7 +545,7 @@ def build_ir1_train(
 
     token_count = int(_train_dims(config).get("tokens", 1) or 1)
 
-    header_ops, body_ops, footer_ops = _template_sections(template)
+    header_ops, body_def, footer_ops = _template_sections(template)
     forward_kernels = _resolve_forward_kernels(config, template)
     weight_index = _manifest_weight_index(manifest)
     kernels = _kernel_ids(registry)
@@ -370,6 +555,7 @@ def build_ir1_train(
     tensors: Dict[str, Dict[str, Any]] = {}
     issues: List[str] = []
     warnings: List[str] = []
+    bridge_enabled = bridge_lowering == "explicit"
 
     op_id = 0
     instance_counter: Dict[str, int] = {}
@@ -412,7 +598,8 @@ def build_ir1_train(
     ) -> None:
         if tensor_id in tensors:
             cur = tensors[tensor_id]
-            if shape is not None and "shape" not in cur:
+            cur_shape = cur.get("shape")
+            if shape is not None and (not isinstance(cur_shape, list) or not cur_shape):
                 cur["shape"] = list(shape)
             if isinstance(numel, int) and numel > 0:
                 cur_numel = cur.get("numel")
@@ -487,6 +674,134 @@ def build_ir1_train(
             alias["alias_of"] = "W_tied"
             resolved["W"] = alias
         return resolved
+
+    def _bridge_output_spec(
+        *,
+        tensor_id: str,
+        shape: List[int],
+        numel: int,
+        kind: str = "tmp",
+        requires_grad: bool = False,
+        dtype: str = "fp32",
+        persistent: bool = False,
+    ) -> Dict[str, Any]:
+        return {
+            "tensor": tensor_id,
+            "dtype": dtype,
+            "kind": kind,
+            "requires_grad": bool(requires_grad),
+            "persistent": bool(persistent),
+            "shape": list(shape),
+            "numel": int(numel),
+        }
+
+    def _make_bridge_tmp_spec(owner_op: str, role: str, layer: int, section: str, head_group: str) -> Dict[str, Any]:
+        shape, numel = _infer_head_major_bridge_shape_numel(config, head_group)
+        layer_tag = "L%d" % int(layer) if int(layer) >= 0 else str(section)
+        tid = "tmp.bridge.%s.%s.%s.%d" % (layer_tag, owner_op, role, op_id)
+        return _bridge_output_spec(
+            tensor_id=tid,
+            shape=shape,
+            numel=numel,
+            kind="tmp",
+            requires_grad=False,
+            dtype="fp32",
+            persistent=False,
+        )
+
+    def add_bridge_op(
+        bridge_kind: str,
+        section: str,
+        layer: int,
+        *,
+        input_ref: Dict[str, Any],
+        output_spec: Dict[str, Any],
+        owner_op: str,
+        role: str,
+        head_group: str,
+        layout_in: str,
+        layout_out: str,
+    ) -> Dict[str, Any]:
+        nonlocal op_id
+        instance = next_instance(bridge_kind, layer, section)
+        ensure_tensor(
+            tensor_id=str(output_spec.get("tensor")),
+            dtype=str(output_spec.get("dtype", "fp32") or "fp32"),
+            kind=str(output_spec.get("kind", "tmp") or "tmp"),
+            requires_grad=bool(output_spec.get("requires_grad", False)),
+            persistent=bool(output_spec.get("persistent", False)),
+            producer={"op_id": op_id, "output_name": "dst"},
+            shape=output_spec.get("shape") if isinstance(output_spec.get("shape"), list) else None,
+            numel=output_spec.get("numel") if isinstance(output_spec.get("numel"), int) else None,
+        )
+        in_ref = {
+            "tensor": input_ref.get("tensor"),
+            "dtype": input_ref.get("dtype", "fp32"),
+            "kind": input_ref.get("kind", "activation"),
+            "requires_grad": bool(input_ref.get("requires_grad", False)),
+            "shape": input_ref.get("shape") if isinstance(input_ref.get("shape"), list) else None,
+            "numel": input_ref.get("numel") if isinstance(input_ref.get("numel"), int) else None,
+        }
+        if "from_op" in input_ref:
+            in_ref["from_op"] = input_ref["from_op"]
+            in_ref["from_output"] = input_ref["from_output"]
+        else:
+            in_ref["from"] = input_ref.get("from", "bridge")
+        out_ref = {
+            "tensor": output_spec["tensor"],
+            "dtype": output_spec.get("dtype", "fp32"),
+            "kind": output_spec.get("kind", "tmp"),
+            "requires_grad": bool(output_spec.get("requires_grad", False)),
+            "shape": output_spec.get("shape"),
+            "numel": output_spec.get("numel"),
+        }
+        op = {
+            "op_id": op_id,
+            "op": bridge_kind,
+            "kernel_id": None,
+            "section": section,
+            "layer": layer,
+            "instance": instance,
+            "phase": "bridge",
+            "dataflow": {
+                "inputs": {"src": in_ref},
+                "outputs": {"dst": out_ref},
+            },
+            "weights": {},
+            "grad_rule": None,
+            "requires_grad": False,
+            "save_for_backward": {},
+            "attrs": {
+                "owner_op": owner_op,
+                "role": role,
+                "head_group": head_group,
+                "layout_in": layout_in,
+                "layout_out": layout_out,
+            },
+        }
+        ops.append(op)
+        created_op_id = op_id
+        op_id += 1
+        return {
+            "op_id": created_op_id,
+            "op": bridge_kind,
+            "role": role,
+            "head_group": head_group,
+            "input_tensor": in_ref.get("tensor"),
+            "output_tensor": out_ref.get("tensor"),
+            "layout_in": layout_in,
+            "layout_out": layout_out,
+            "output_ref": {
+                "tensor": out_ref["tensor"],
+                "dtype": out_ref["dtype"],
+                "kind": out_ref["kind"],
+                "requires_grad": out_ref["requires_grad"],
+                "shape": out_ref.get("shape"),
+                "numel": out_ref.get("numel"),
+                "from_op": created_op_id,
+                "from_output": "dst",
+            },
+        }
 
     def derive_save_for_backward(op: Dict[str, Any]) -> None:
         # save_for_backward is derived from grad rules, not handwritten per op.
@@ -572,6 +887,200 @@ def build_ir1_train(
             else:
                 warnings.append(msg)
 
+    train_attention_runtime_contract = _template_attention_runtime_contract(template)
+
+    def _resolve_attention_runtime_contract(
+        logical_op: str,
+        kernel_id: str,
+        saved: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        saved_overrides = train_attention_runtime_contract.get("saved_tensor_kernel_overrides")
+        if not isinstance(saved_overrides, dict):
+            saved_overrides = {}
+        zero_saved = train_attention_runtime_contract.get("requires_zero_sliding_window_for_saved_tensors")
+        zero_saved_keys = {
+            str(item).strip()
+            for item in (zero_saved if isinstance(zero_saved, list) else [])
+            if str(item).strip()
+        }
+
+        materialized_saved: List[str] = []
+        matched_saved_key: Optional[str] = None
+        runtime_kernel_id = kernel_id
+        for key, value in saved.items():
+            if not isinstance(value, dict):
+                continue
+            tensor_id = str(value.get("tensor", "") or "").strip()
+            if not tensor_id:
+                continue
+            materialized_saved.append(str(key))
+            override = str(saved_overrides.get(key, "") or "").strip()
+            if override and matched_saved_key is None:
+                runtime_kernel_id = override
+                matched_saved_key = str(key)
+
+        runtime_contract = {
+            "version": 1,
+            "semantic_op": logical_op,
+            "kernel_id": runtime_kernel_id,
+            "base_kernel_id": kernel_id,
+            "materialize_saved_attn_weights": "attn_weights" in materialized_saved,
+            "materialized_saved_tensors": materialized_saved,
+            "contract_source": "template.contract.attention_contract.train_runtime_contract",
+        }
+        if matched_saved_key is not None:
+            runtime_contract["saved_tensor_kernel_key"] = matched_saved_key
+        if matched_saved_key in zero_saved_keys:
+            runtime_contract["requires_zero_sliding_window"] = True
+        return runtime_contract
+
+    def attach_runtime_contract(op: Dict[str, Any]) -> None:
+        logical_op = str(op.get("op", "") or "")
+        kernel_id = str(op.get("kernel_id", "") or "")
+        if logical_op not in ("attn", "attn_sliding") or not kernel_id:
+            return
+        saved = op.get("save_for_backward") if isinstance(op.get("save_for_backward"), dict) else {}
+        runtime_contract = _resolve_attention_runtime_contract(logical_op, kernel_id, saved if isinstance(saved, dict) else {})
+        runtime_kernel_id = str(runtime_contract.get("kernel_id", "") or kernel_id)
+        op["runtime_kernel_id"] = runtime_kernel_id
+        op["runtime_contract"] = runtime_contract
+
+    def prepare_forward_bridge_plan(
+        logical_op: str,
+        *,
+        section: str,
+        layer: int,
+        inputs: Dict[str, Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        if not bridge_enabled:
+            return None
+        spec = FORWARD_BRIDGE_PLAN_SPECS.get(logical_op)
+        if not isinstance(spec, dict):
+            return None
+
+        pre_entries: List[Dict[str, Any]] = []
+        pre_refs: Dict[str, Dict[str, Any]] = {}
+        for row in spec.get("pre_roles", ()):
+            input_key = str(row.get("input_key", "") or "")
+            input_ref = inputs.get(input_key)
+            if not isinstance(input_ref, dict):
+                return None
+            bridge = add_bridge_op(
+                "bridge_token_to_head_major",
+                section=section,
+                layer=layer,
+                input_ref=input_ref,
+                output_spec=_make_bridge_tmp_spec(
+                    logical_op,
+                    str(row.get("tmp_role", row.get("role", input_key)) or input_key),
+                    layer,
+                    section,
+                    str(row.get("head_group", "num_heads") or "num_heads"),
+                ),
+                owner_op=logical_op,
+                role=str(row.get("role", input_key) or input_key),
+                head_group=str(row.get("head_group", "num_heads") or "num_heads"),
+                layout_in="token_major",
+                layout_out="head_major",
+            )
+            pre_entries.append(bridge)
+            pre_refs[str(row.get("role", input_key) or input_key)] = bridge["output_ref"]
+
+        kernel_outputs: Dict[str, Dict[str, Any]] = {}
+        for row in spec.get("kernel_output_roles", ()):
+            head_group = str(row.get("head_group", "num_heads") or "num_heads")
+            tmp_spec = _make_bridge_tmp_spec(
+                logical_op,
+                str(row.get("tmp_role", row.get("name", "tmp")) or "tmp"),
+                layer,
+                section,
+                head_group,
+            )
+            ensure_tensor(
+                tensor_id=str(tmp_spec.get("tensor")),
+                dtype=str(tmp_spec.get("dtype", "fp32") or "fp32"),
+                kind=str(tmp_spec.get("kind", "tmp") or "tmp"),
+                requires_grad=bool(tmp_spec.get("requires_grad", False)),
+                persistent=bool(tmp_spec.get("persistent", False)),
+                producer=None,
+                shape=tmp_spec.get("shape") if isinstance(tmp_spec.get("shape"), list) else None,
+                numel=tmp_spec.get("numel") if isinstance(tmp_spec.get("numel"), int) else None,
+            )
+            kernel_outputs[str(row.get("name", "") or "")] = tmp_spec
+
+        return {
+            "logical_op": logical_op,
+            "section": section,
+            "layer": layer,
+            "spec": spec,
+            "pre_entries": pre_entries,
+            "pre_refs": pre_refs,
+            "kernel_outputs": kernel_outputs,
+        }
+
+    def finalize_forward_bridge_plan(
+        prepared: Optional[Dict[str, Any]],
+        *,
+        outputs: Dict[str, Dict[str, Any]],
+        runtime_contract: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(prepared, dict):
+            return None
+        spec = prepared.get("spec")
+        if not isinstance(spec, dict):
+            return None
+        logical_op = str(prepared.get("logical_op", "") or "")
+        section = str(prepared.get("section", "") or "")
+        layer = int(prepared.get("layer", 0) or 0)
+        pre_entries = list(prepared.get("pre_entries") or [])
+        pre_refs = prepared.get("pre_refs") if isinstance(prepared.get("pre_refs"), dict) else {}
+        kernel_outputs = prepared.get("kernel_outputs") if isinstance(prepared.get("kernel_outputs"), dict) else {}
+
+        post_entries: List[Dict[str, Any]] = []
+        for row in spec.get("post_roles", ()):
+            output_key = str(row.get("output_key", "") or "")
+            output_ref = outputs.get(output_key)
+            if not isinstance(output_ref, dict):
+                return None
+            source = str(row.get("source", "") or "")
+            source_kind, _, source_name = source.partition(":")
+            if not source_kind or not source_name:
+                return None
+            if source_kind == "pre":
+                input_ref = pre_refs.get(source_name)
+            elif source_kind == "kernel":
+                input_ref = kernel_outputs.get(source_name)
+            else:
+                return None
+            if not isinstance(input_ref, dict):
+                return None
+            bridge = add_bridge_op(
+                "bridge_head_to_token_major",
+                section=section,
+                layer=layer,
+                input_ref=input_ref,
+                output_spec=dict(output_ref),
+                owner_op=logical_op,
+                role=str(row.get("role", output_key) or output_key),
+                head_group=str(row.get("head_group", "num_heads") or "num_heads"),
+                layout_in="head_major",
+                layout_out="token_major",
+            )
+            post_entries.append(bridge)
+
+        plan: Dict[str, Any] = {
+            "version": 1,
+            "mode": "explicit",
+            "semantic_op": logical_op,
+            "kernel_layout": str(spec.get("kernel_layout", "head_major") or "head_major"),
+            "tensor_layout": str(spec.get("tensor_layout", "token_major") or "token_major"),
+            "pre": pre_entries,
+            "post": post_entries,
+        }
+        if isinstance(runtime_contract, dict) and runtime_contract:
+            plan["runtime_contract"] = dict(runtime_contract)
+        return plan
+
     def add_op(
         logical_op: str,
         kernel_id: Optional[str],
@@ -621,13 +1130,43 @@ def build_ir1_train(
         # Classify inputs with manifest/dataflow truth.
         in_data = {}
         for in_name, src in inputs.items():
+            src_shape = src.get("shape")
+            src_numel = src.get("numel")
+            if not isinstance(src_shape, list) or _shape_numel(src_shape) is None:
+                src_shape = None
+            if not isinstance(src_numel, int) or src_numel <= 0:
+                src_numel = None
+            if src_shape is None or src_numel is None:
+                inferred_shape, inferred_numel = _infer_external_input_shape_numel(
+                    src.get("tensor"),
+                    src.get("from"),
+                    config,
+                )
+                if src_shape is None:
+                    src_shape = inferred_shape
+                if src_numel is None:
+                    src_numel = inferred_numel
+
+            tensor_id = src.get("tensor")
+            if isinstance(tensor_id, str) and tensor_id:
+                ensure_tensor(
+                    tensor_id=tensor_id,
+                    dtype=str(src.get("dtype", "fp32") or "fp32"),
+                    kind=str(src.get("kind", "activation") or "activation"),
+                    requires_grad=bool(src.get("requires_grad", True)),
+                    persistent=bool(src.get("persistent", False)),
+                    producer=None,
+                    shape=src_shape,
+                    numel=src_numel,
+                )
+
             item = {
-                "tensor": src.get("tensor"),
+                "tensor": tensor_id,
                 "dtype": src.get("dtype", "fp32"),
                 "kind": src.get("kind", "activation"),
                 "requires_grad": bool(src.get("requires_grad", True)),
-                "shape": src.get("shape"),
-                "numel": src.get("numel"),
+                "shape": src_shape,
+                "numel": src_numel,
             }
             if "from_op" in src:
                 item["from_op"] = src["from_op"]
@@ -654,6 +1193,7 @@ def build_ir1_train(
         }
 
         derive_save_for_backward(op)
+        attach_runtime_contract(op)
         ops.append(op)
         op_id += 1
 
@@ -723,10 +1263,31 @@ def build_ir1_train(
         q_ref = None
         k_ref = None
         v_ref = None
-        for raw_op in body_ops:
+        recurrent_proj_input = None
+        layer_body_ops = (
+            build_ir_v7._resolve_body_ops_for_layer(body_def, config, layer)
+            if isinstance(body_def, dict)
+            else list(body_def)
+        )
+        recurrent_gate_ref = None
+        recurrent_alpha_ref = None
+        recurrent_beta_ref = None
+        recurrent_q_preconv_ref = None
+        recurrent_k_preconv_ref = None
+        recurrent_v_preconv_ref = None
+        attn_gate_ref = None
+        for body_idx, raw_op in enumerate(layer_body_ops):
+            prev_raw_op = layer_body_ops[body_idx - 1] if body_idx > 0 else None
             if raw_op in ("rmsnorm", "attn_norm", "ffn_norm", "post_attention_norm", "post_ffn_norm"):
-                if raw_op in ("rmsnorm", "attn_norm", "ffn_norm"):
+                should_snapshot_residual = raw_op in ("rmsnorm", "attn_norm", "ffn_norm")
+                if raw_op in ("post_attention_norm", "post_ffn_norm") and prev_raw_op == "residual_add":
+                    should_snapshot_residual = True
+                if should_snapshot_residual:
                     # Snapshot the branch input before norms that start an attention/MLP branch.
+                    # post_attention_norm/post_ffn_norm should only do this when they
+                    # follow an actual residual merge. Gemma-family templates place
+                    # those markers before the merge, and resnapshotting there would
+                    # incorrectly turn residual_add(a, b) into residual_add(a, a).
                     residual_slot = dict(current_main)
                 if raw_op in ("post_attention_norm", "post_ffn_norm"):
                     opt_key = raw_op
@@ -774,10 +1335,203 @@ def build_ir1_train(
                 q_ref = q_out["y"]
                 k_ref = k_out["y"]
                 v_ref = v_out["y"]
+            elif raw_op == "q_gate_proj":
+                qg_out = add_op(
+                    logical_op="q_gate_proj",
+                    kernel_id=forward_kernels["q_gate_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": current_main},
+                    output_specs={"y": "fp32"}
+                )
+                current_main = qg_out["y"]
+            elif raw_op == "split_q_gate":
+                split_out = add_op(
+                    logical_op="split_q_gate",
+                    kernel_id=forward_kernels["split_q_gate"],
+                    section="body",
+                    layer=layer,
+                    inputs={"packed_qg": current_main},
+                    output_specs={"q": "fp32", "gate": "fp32"}
+                )
+                q_ref = split_out["q"]
+                attn_gate_ref = split_out["gate"]
+            elif raw_op == "recurrent_qkv_proj":
+                recurrent_proj_input = current_main
+                rec_out = add_op(
+                    logical_op="recurrent_qkv_proj",
+                    kernel_id=forward_kernels["recurrent_qkv_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": current_main},
+                    output_specs={"y": "fp32"}
+                )
+                current_main = rec_out["y"]
+            elif raw_op == "recurrent_gate_proj":
+                rec_input = recurrent_proj_input or current_main
+                rec_gate_out = add_op(
+                    logical_op="recurrent_gate_proj",
+                    kernel_id=forward_kernels["recurrent_gate_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": rec_input},
+                    output_specs={"y": "fp32"}
+                )
+                recurrent_gate_ref = rec_gate_out["y"]
+            elif raw_op == "recurrent_alpha_proj":
+                rec_input = recurrent_proj_input or current_main
+                rec_alpha_out = add_op(
+                    logical_op="recurrent_alpha_proj",
+                    kernel_id=forward_kernels["recurrent_alpha_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": rec_input},
+                    output_specs={"y": "fp32"}
+                )
+                recurrent_alpha_ref = rec_alpha_out["y"]
+            elif raw_op == "recurrent_beta_proj":
+                rec_input = recurrent_proj_input or current_main
+                rec_beta_out = add_op(
+                    logical_op="recurrent_beta_proj",
+                    kernel_id=forward_kernels["recurrent_beta_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": rec_input},
+                    output_specs={"y": "fp32"}
+                )
+                recurrent_beta_ref = rec_beta_out["y"]
+            elif raw_op == "recurrent_split_qkv":
+                rec_split = add_op(
+                    logical_op="recurrent_split_qkv",
+                    kernel_id=forward_kernels["recurrent_split_qkv"],
+                    section="body",
+                    layer=layer,
+                    inputs={"packed_qkv": current_main},
+                    output_specs={"q": "fp32", "k": "fp32", "v": "fp32"}
+                )
+                recurrent_q_preconv_ref = rec_split["q"]
+                recurrent_k_preconv_ref = rec_split["k"]
+                recurrent_v_preconv_ref = rec_split["v"]
+            elif raw_op == "recurrent_dt_gate":
+                if recurrent_alpha_ref is None:
+                    issues.append("recurrent_dt_gate missing alpha input at layer=%d" % layer)
+                    continue
+                rec_gate = add_op(
+                    logical_op="recurrent_dt_gate",
+                    kernel_id=forward_kernels["recurrent_dt_gate"],
+                    section="body",
+                    layer=layer,
+                    inputs={"alpha": recurrent_alpha_ref},
+                    output_specs={"gate": "fp32"}
+                )
+                recurrent_alpha_ref = rec_gate["gate"]
+            elif raw_op == "recurrent_conv_state_update":
+                if recurrent_q_preconv_ref is None or recurrent_k_preconv_ref is None or recurrent_v_preconv_ref is None:
+                    issues.append("recurrent_conv_state_update missing q/k/v inputs at layer=%d" % layer)
+                    continue
+                rec_conv = add_op(
+                    logical_op="recurrent_conv_state_update",
+                    kernel_id=forward_kernels["recurrent_conv_state_update"],
+                    section="body",
+                    layer=layer,
+                    inputs={
+                        "state_in": {"tensor": "input.recurrent_conv_state", "dtype": "fp32", "kind": "input", "requires_grad": False, "from": "external:recurrent_conv_state"},
+                        "q": recurrent_q_preconv_ref,
+                        "k": recurrent_k_preconv_ref,
+                        "v": recurrent_v_preconv_ref,
+                    },
+                    output_specs={"conv_x": "fp32", "state_out": "fp32"}
+                )
+                current_main = rec_conv["conv_x"]
+            elif raw_op == "recurrent_ssm_conv":
+                rec_conv_out = add_op(
+                    logical_op="recurrent_ssm_conv",
+                    kernel_id=forward_kernels["recurrent_ssm_conv"],
+                    section="body",
+                    layer=layer,
+                    inputs={"conv_x": current_main},
+                    output_specs={"out": "fp32"}
+                )
+                current_main = rec_conv_out["out"]
+            elif raw_op == "recurrent_silu":
+                rec_silu = add_op(
+                    logical_op="recurrent_silu",
+                    kernel_id=forward_kernels["recurrent_silu"],
+                    section="body",
+                    layer=layer,
+                    inputs={"x": current_main},
+                    output_specs={"out": "fp32"}
+                )
+                current_main = rec_silu["out"]
+            elif raw_op == "recurrent_split_conv_qkv":
+                rec_split = add_op(
+                    logical_op="recurrent_split_conv_qkv",
+                    kernel_id=forward_kernels["recurrent_split_conv_qkv"],
+                    section="body",
+                    layer=layer,
+                    inputs={"packed_qkv": current_main},
+                    output_specs={"q": "fp32", "k": "fp32", "v": "fp32"}
+                )
+                q_ref = rec_split["q"]
+                k_ref = rec_split["k"]
+                v_ref = rec_split["v"]
+            elif raw_op == "recurrent_qk_l2_norm":
+                if q_ref is None or k_ref is None:
+                    issues.append("recurrent_qk_l2_norm missing q/k inputs at layer=%d" % layer)
+                    continue
+                rec_norm = add_op(
+                    logical_op="recurrent_qk_l2_norm",
+                    kernel_id=forward_kernels["recurrent_qk_l2_norm"],
+                    section="body",
+                    layer=layer,
+                    inputs={"q": q_ref, "k": k_ref},
+                    output_specs={"q": "fp32", "k": "fp32"}
+                )
+                q_ref = rec_norm["q"]
+                k_ref = rec_norm["k"]
+            elif raw_op == "recurrent_core":
+                if q_ref is None or k_ref is None or v_ref is None or recurrent_alpha_ref is None or recurrent_beta_ref is None:
+                    issues.append("recurrent_core missing q/k/v/g/beta inputs at layer=%d" % layer)
+                    continue
+                rec_core = add_op(
+                    logical_op="recurrent_core",
+                    kernel_id=forward_kernels["recurrent_core"],
+                    section="body",
+                    layer=layer,
+                    inputs={
+                        "q": q_ref,
+                        "k": k_ref,
+                        "v": v_ref,
+                        "g": recurrent_alpha_ref,
+                        "beta": recurrent_beta_ref,
+                        "state_in": {"tensor": "input.recurrent_ssm_state", "dtype": "fp32", "kind": "input", "requires_grad": False, "from": "external:recurrent_ssm_state"},
+                    },
+                    output_specs={"out": "fp32", "state_out": "fp32"}
+                )
+                current_main = rec_core["out"]
+            elif raw_op == "recurrent_norm_gate":
+                if recurrent_gate_ref is None:
+                    issues.append("recurrent_norm_gate missing gate input at layer=%d" % layer)
+                    continue
+                rec_norm = add_op(
+                    logical_op="recurrent_norm_gate",
+                    kernel_id=forward_kernels["recurrent_norm_gate"],
+                    section="body",
+                    layer=layer,
+                    inputs={"x": current_main, "gate": recurrent_gate_ref},
+                    output_specs={"out": "fp32"}
+                )
+                current_main = rec_norm["out"]
             elif raw_op == "qk_norm":
                 if q_ref is None or k_ref is None:
                     issues.append("qk_norm missing q/k inputs at layer=%d" % layer)
                     continue
+                prepared_plan = prepare_forward_bridge_plan(
+                    "qk_norm",
+                    section="body",
+                    layer=layer,
+                    inputs={"q": q_ref, "k": k_ref},
+                )
                 qk_out = add_op(
                     logical_op="qk_norm",
                     kernel_id=forward_kernels["qk_norm"],
@@ -786,12 +1540,25 @@ def build_ir1_train(
                     inputs={"q": q_ref, "k": k_ref},
                     output_specs={"q": "fp32", "k": "fp32"}
                 )
+                qk_op = ops[-1]
+                plan = finalize_forward_bridge_plan(
+                    prepared_plan,
+                    outputs={"q": qk_out["q"], "k": qk_out["k"]},
+                )
+                if isinstance(plan, dict):
+                    qk_op["bridge_plan"] = plan
                 q_ref = qk_out["q"]
                 k_ref = qk_out["k"]
             elif raw_op == "rope_qk":
                 if q_ref is None or k_ref is None:
                     issues.append("rope_qk missing q/k inputs at layer=%d" % layer)
                     continue
+                prepared_plan = prepare_forward_bridge_plan(
+                    "rope_qk",
+                    section="body",
+                    layer=layer,
+                    inputs={"q": q_ref, "k": k_ref},
+                )
                 rope_out = add_op(
                     logical_op="rope_qk",
                     kernel_id=forward_kernels["rope_qk"],
@@ -800,6 +1567,13 @@ def build_ir1_train(
                     inputs={"q": q_ref, "k": k_ref},
                     output_specs={"q": "fp32", "k": "fp32"}
                 )
+                rope_op = ops[-1]
+                plan = finalize_forward_bridge_plan(
+                    prepared_plan,
+                    outputs={"q": rope_out["q"], "k": rope_out["k"]},
+                )
+                if isinstance(plan, dict):
+                    rope_op["bridge_plan"] = plan
                 q_ref = rope_out["q"]
                 k_ref = rope_out["k"]
             elif raw_op in ("attn", "attn_sliding"):
@@ -808,6 +1582,12 @@ def build_ir1_train(
                     continue
                 op_name = "attn_sliding" if raw_op == "attn_sliding" else "attn"
                 kid = forward_kernels[op_name]
+                prepared_plan = prepare_forward_bridge_plan(
+                    op_name,
+                    section="body",
+                    layer=layer,
+                    inputs={"q": q_ref, "k": k_ref, "v": v_ref},
+                )
                 attn_out = add_op(
                     logical_op=op_name,
                     kernel_id=kid,
@@ -816,11 +1596,43 @@ def build_ir1_train(
                     inputs={"q": q_ref, "k": k_ref, "v": v_ref},
                     output_specs={"out": "fp32"}
                 )
+                attn_op = ops[-1]
+                runtime_contract = attn_op.get("runtime_contract") if isinstance(attn_op.get("runtime_contract"), dict) else {}
+                plan = finalize_forward_bridge_plan(
+                    prepared_plan,
+                    outputs={"out": attn_out["out"]},
+                    runtime_contract=runtime_contract,
+                )
+                if isinstance(plan, dict):
+                    attn_op["bridge_plan"] = plan
                 current_main = attn_out["out"]
+            elif raw_op == "attn_gate_sigmoid_mul":
+                if attn_gate_ref is None:
+                    issues.append("attn_gate_sigmoid_mul missing gate input at layer=%d" % layer)
+                    continue
+                gate_out = add_op(
+                    logical_op="attn_gate_sigmoid_mul",
+                    kernel_id=forward_kernels["attn_gate_sigmoid_mul"],
+                    section="body",
+                    layer=layer,
+                    inputs={"x": current_main, "gate": attn_gate_ref},
+                    output_specs={"out": "fp32"}
+                )
+                current_main = gate_out["out"]
             elif raw_op == "out_proj":
                 op_out = add_op(
                     logical_op="out_proj",
                     kernel_id=forward_kernels["out_proj"],
+                    section="body",
+                    layer=layer,
+                    inputs={"input": current_main},
+                    output_specs={"y": "fp32"}
+                )
+                current_main = op_out["y"]
+            elif raw_op == "recurrent_out_proj":
+                op_out = add_op(
+                    logical_op="recurrent_out_proj",
+                    kernel_id=forward_kernels["recurrent_out_proj"],
                     section="body",
                     layer=layer,
                     inputs={"input": current_main},
@@ -922,6 +1734,7 @@ def build_ir1_train(
     return {
         "format": "ir1-train-v7",
         "version": 1,
+        "bridge_lowering": bridge_lowering,
         "config": config,
         "template_name": template.get("name", "unknown"),
         "num_layers": num_layers,
@@ -929,6 +1742,7 @@ def build_ir1_train(
         "tensors": tensors,
         "stats": {
             "forward_ops": len([o for o in ops if o.get("phase") == "forward"]),
+            "bridge_ops": len([o for o in ops if o.get("phase") == "bridge"]),
             "metadata_ops": len([o for o in ops if o.get("kernel_id") is None]),
             "tensors": len(tensors),
             "weights": len([t for t in tensors.values() if t.get("kind") == "weight"]),
@@ -949,6 +1763,7 @@ def main() -> int:
     ap.add_argument("--max-layers", type=int, default=None, help="Optional cap for fast smoke runs")
     ap.add_argument("--tokens", type=int, default=1, help="Compile-time token count for train IR/runtime (default: 1)")
     ap.add_argument("--strict", action="store_true", help="Fail on unresolved weights/save-for-backward")
+    ap.add_argument("--bridge-lowering", choices=("legacy", "explicit"), default="legacy", help="How explicitly to model train layout bridges in IR1")
     ap.add_argument("--report-out", default=None, help="Optional report JSON path")
     args = ap.parse_args()
 
@@ -970,7 +1785,8 @@ def main() -> int:
         bindings_doc=bindings_doc,
         grad_rules=grad_rules,
         max_layers=args.max_layers,
-        strict=args.strict
+        strict=args.strict,
+        bridge_lowering=str(args.bridge_lowering),
     )
     _save_json(output_path, ir1)
     print("Wrote IR1 train-forward: %s (ops=%d tensors=%d)" % (output_path, len(ir1["ops"]), len(ir1["tensors"])))
