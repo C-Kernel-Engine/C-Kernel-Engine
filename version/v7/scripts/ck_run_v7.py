@@ -3549,6 +3549,24 @@ def _resolve_train_backend(args: argparse.Namespace) -> str:
     return backend
 
 
+def _train_run_uses_hybrid_recurrent_attention(run_dir: Path) -> bool:
+    manifest_path = Path(run_dir) / "weights_manifest.json"
+    if not manifest_path.exists():
+        return False
+    try:
+        manifest_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    template = manifest_doc.get("template") if isinstance(manifest_doc, dict) else None
+    template = template if isinstance(template, dict) else {}
+    contract = template.get("contract") if isinstance(template, dict) else None
+    contract = contract if isinstance(contract, dict) else {}
+    attention = contract.get("attention_contract") if isinstance(contract, dict) else None
+    attention = attention if isinstance(attention, dict) else {}
+    variant = str(attention.get("attn_variant") or "").strip().lower()
+    return variant in {"hybrid_recurrent_attention", "hybrid", "qwen35_hybrid"}
+
+
 def _assess_train_safety(args: argparse.Namespace, train_backend: str) -> dict:
     """Evaluate known-risk train configs and enforce policy when requested."""
     optimizer = str(getattr(args, "train_optimizer", "adamw") or "adamw").lower()
@@ -5627,6 +5645,7 @@ def _run_ck_train_runtime_body(
     snapshot_oracle_enabled = False
     snapshot_oracle_fn = None
     oracle_strict = False
+    hybrid_recurrent_snapshot_limited = bool(_train_run_uses_hybrid_recurrent_attention(run_dir))
 
     if parity_on:
         grad_accum_for_oracle = max(1, int(runtime_grad_accum_steps))
@@ -5635,7 +5654,11 @@ def _run_ck_train_runtime_body(
             oracle_max_steps = int(math.ceil(float(oracle_max_steps) / float(grad_accum_for_oracle)))
         oracle_max_steps_used = int(oracle_max_steps)
 
-        if has_weight_snapshot_api:
+        if hybrid_recurrent_snapshot_limited:
+            snapshot_oracle_error = (
+                "snapshot oracle disabled for hybrid_recurrent_attention until recurrent state-history parity is implemented"
+            )
+        elif has_weight_snapshot_api:
             try:
                 import oracle_snapshot_torch_v7 as _snapshot_oracle_mod
                 from oracle_snapshot_torch_v7 import compute_loss_logits_and_slots_from_snapshot_array

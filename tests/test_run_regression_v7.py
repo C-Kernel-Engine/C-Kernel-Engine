@@ -176,6 +176,8 @@ class RegressionHarnessTests(unittest.TestCase):
         self.assertEqual(by_id["nanbeige"].smoke_prompts, ["hello"])
         self.assertTrue(by_id["gemma"].parity.get("always_run"))
         self.assertTrue(by_id["nanbeige"].parity.get("always_run"))
+        self.assertFalse(by_id["gemma"].parity.get("require_top1_match"))
+        self.assertEqual(by_id["gemma"].parity.get("min_topk_overlap"), 0.875)
         self.assertEqual(by_id["gemma"].runtime_expect.get("config", {}).get("rope_layout"), "split")
         self.assertEqual(by_id["nanbeige"].runtime_expect.get("config", {}).get("rope_layout"), "pairwise")
         self.assertEqual(by_id["qwen35"].runtime_expect.get("config", {}).get("chat_contract.name"), "qwen35")

@@ -25,10 +25,26 @@ import numpy as np
 SCRIPT_DIR = Path(__file__).resolve().parent
 V7_ROOT = SCRIPT_DIR.parent
 TEMPLATES_DIR = V7_ROOT / "templates"
+TEMPLATE_ALIASES: dict[str, str] = {
+    "gemma": "gemma3",
+    "gemma3": "gemma3",
+    "llama": "llama",
+    "nanbeige": "nanbeige",
+    "qwen2": "qwen2",
+    "qwen3": "qwen3",
+    "qwen35": "qwen35",
+}
 
 
 def _align(n: int, a: int) -> int:
     return (n + (a - 1)) & ~(a - 1)
+
+
+def _resolve_template_name(name: str) -> str:
+    text = str(name or "").strip().lower()
+    if not text:
+        return "qwen3"
+    return TEMPLATE_ALIASES.get(text, text)
 
 
 def _append_tensor(
@@ -408,7 +424,7 @@ def main() -> int:
         "--template",
         type=str,
         default="qwen3",
-        help="Architecture template name (default: qwen3). Built-ins include qwen3, qwen2, gemma3, llama.",
+        help="Architecture template name (default: qwen3). Built-ins include qwen2, qwen3, qwen35, gemma/gemma3, llama, nanbeige.",
     )
     ap.add_argument(
         "--template-file",
@@ -427,7 +443,7 @@ def main() -> int:
     if not (float(args.adamw_weight_decay) >= 0.0):
         raise ValueError("--adamw-weight-decay must be >= 0")
 
-    template_name = str(args.template or "qwen3").strip().lower()
+    template_name = _resolve_template_name(str(args.template or "qwen3"))
     template_doc: Optional[Dict[str, Any]] = None
     if args.template_file is not None:
         tf = Path(args.template_file)

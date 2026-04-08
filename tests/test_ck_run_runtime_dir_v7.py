@@ -4,6 +4,7 @@ import sys
 import tempfile
 import time
 import unittest
+import json
 from pathlib import Path
 
 
@@ -45,6 +46,25 @@ class TestCKRunRuntimeDir(unittest.TestCase):
 
             resolved = ck_run_v7._resolve_chat_runtime_dir(run_dir)
             self.assertEqual(resolved, run_dir)
+
+    def test_detects_hybrid_recurrent_train_template_from_manifest(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_run_train_manifest_") as td:
+            run_dir = Path(td)
+            (run_dir / "weights_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "template": {
+                            "contract": {
+                                "attention_contract": {
+                                    "attn_variant": "hybrid_recurrent_attention"
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(ck_run_v7._train_run_uses_hybrid_recurrent_attention(run_dir))
 
 
 if __name__ == "__main__":

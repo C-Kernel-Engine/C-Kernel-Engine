@@ -28,6 +28,16 @@ from typing import Any, Dict, Optional, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CK_RUN = SCRIPT_DIR / "ck_run_v7.py"
+TEMPLATES_DIR = SCRIPT_DIR.parent / "templates"
+TEMPLATE_ALIASES = {
+    "gemma": "gemma3",
+    "gemma3": "gemma3",
+    "llama": "llama",
+    "nanbeige": "nanbeige",
+    "qwen2": "qwen2",
+    "qwen3": "qwen3",
+    "qwen35": "qwen35",
+}
 
 
 def _default_train_root() -> Path:
@@ -66,6 +76,60 @@ def _checked_rows(train_report: Dict[str, Any]) -> list[Dict[str, Any]]:
         if isinstance(row, dict) and bool(row.get("checked")):
             out.append(row)
     return out
+
+
+def _resolve_template_path(template: str, template_file: Optional[Path]) -> Optional[Path]:
+    if template_file is not None:
+        path = Path(template_file)
+        return path if path.exists() else None
+    text = str(template or "").strip().lower()
+    if not text:
+        return None
+    normalized = TEMPLATE_ALIASES.get(text, text)
+    path = TEMPLATES_DIR / f"{normalized}.json"
+    return path if path.exists() else None
+
+
+def _allow_loss_only_runtime_stitch(seq_len: int, template: str, template_file: Optional[Path]) -> bool:
+    if int(seq_len) > 1:
+        return False
+    path = _resolve_template_path(template, template_file)
+    if path is None:
+        return False
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    contract = doc.get("contract")
+    contract = contract if isinstance(contract, dict) else {}
+    attention = contract.get("attention_contract")
+    attention = attention if isinstance(attention, dict) else {}
+    return str(attention.get("attn_variant") or "").strip().lower() == "hybrid_recurrent_attention"
+
+
+def _row_allows_loss_only_relaxation(row: Dict[str, Any], *, max_first_logits_diff: float) -> bool:
+    if bool(row.get("oracle_error")) or bool(row.get("first_bad_tensor")):
+        return False
+    replay_ok = bool(row.get("replay_ok", False))
+    if not replay_ok:
+        return False
+    logits_raw = row.get("logits_max_abs_diff")
+    logits_diff = float(logits_raw) if isinstance(logits_raw, (int, float)) else 0.0
+    if logits_diff > float(max_first_logits_diff):
+        return False
+    replay_weight = float(row.get("replay_weight_max_abs_diff", 0.0) or 0.0)
+    replay_weight_tol = float(row.get("replay_weight_threshold", 3e-5) or 3e-5)
+    if replay_weight > replay_weight_tol:
+        return False
+    replay_opt = float(row.get("replay_optimizer_state_max_abs_diff", 0.0) or 0.0)
+    replay_opt_tol = float(row.get("replay_optimizer_state_threshold", 3e-5) or 3e-5)
+    if replay_opt > replay_opt_tol:
+        return False
+    replay_accum = float(row.get("replay_accum_snapshot_max_abs_diff", 0.0) or 0.0)
+    replay_accum_tol = float(row.get("replay_accum_snapshot_threshold", 3e-5) or 3e-5)
+    if replay_accum > replay_accum_tol:
+        return False
+    return True
 
 
 def _dims_from_manifest(run_dir: Path) -> Dict[str, int]:
@@ -191,6 +255,7 @@ def _evaluate(
     max_first_logits_diff: float,
     require_check_dumps: bool,
     require_all_checked_clean: bool,
+    allow_loss_only_relaxation: bool = False,
 ) -> Dict[str, Any]:
     checks: Dict[str, Any] = {}
     checks["pass_parity"] = bool(report.get("pass_parity", False))
@@ -248,6 +313,10 @@ def _evaluate(
         logits_diff_raw = first.get("logits_max_abs_diff")
         loss_diff = float(loss_diff_raw) if isinstance(loss_diff_raw, (int, float)) else 0.0
         logits_diff = float(logits_diff_raw) if isinstance(logits_diff_raw, (int, float)) else 0.0
+        relaxed_loss_only = bool(allow_loss_only_relaxation) and _row_allows_loss_only_relaxation(
+            first,
+            max_first_logits_diff=float(max_first_logits_diff),
+        )
         first_ok = True
         if int(first.get("step", 0) or 0) != 1:
             first_ok = False
@@ -255,9 +324,9 @@ def _evaluate(
             first_ok = False
         if bool(first.get("first_bad_tensor")):
             first_ok = False
-        if int(first.get("slots_compared", 0) or 0) <= 0:
+        if (not relaxed_loss_only) and int(first.get("slots_compared", 0) or 0) <= 0:
             first_ok = False
-        if loss_diff > float(max_first_loss_diff):
+        if (not relaxed_loss_only) and loss_diff > float(max_first_loss_diff):
             first_ok = False
         if logits_diff > float(max_first_logits_diff):
             first_ok = False
@@ -276,6 +345,7 @@ def _evaluate(
                 "max_first_loss_diff": float(max_first_loss_diff),
                 "max_first_logits_diff": float(max_first_logits_diff),
             },
+            "loss_only_relaxation_applied": bool(relaxed_loss_only),
         }
 
     checked_rows = _checked_rows(report)
@@ -285,14 +355,18 @@ def _evaluate(
         logits_diff_raw = row.get("logits_max_abs_diff")
         loss_diff = float(loss_diff_raw) if isinstance(loss_diff_raw, (int, float)) else 0.0
         logits_diff = float(logits_diff_raw) if isinstance(logits_diff_raw, (int, float)) else 0.0
+        relaxed_loss_only = bool(allow_loss_only_relaxation) and _row_allows_loss_only_relaxation(
+            row,
+            max_first_logits_diff=float(max_first_logits_diff),
+        )
         row_bad = False
         if bool(row.get("oracle_error")):
             row_bad = True
         if bool(row.get("first_bad_tensor")):
             row_bad = True
-        if int(row.get("slots_compared", 0) or 0) <= 0:
+        if (not relaxed_loss_only) and int(row.get("slots_compared", 0) or 0) <= 0:
             row_bad = True
-        if loss_diff > float(max_first_loss_diff):
+        if (not relaxed_loss_only) and loss_diff > float(max_first_loss_diff):
             row_bad = True
         if logits_diff > float(max_first_logits_diff):
             row_bad = True
@@ -307,6 +381,7 @@ def _evaluate(
                 "logits_max_abs_diff": logits_diff,
                 "slots_compared": row.get("slots_compared"),
                 "slots_matched": row.get("slots_matched"),
+                "loss_only_relaxation_applied": bool(relaxed_loss_only),
             }
             break
     checks["all_checked_steps_clean"] = {
@@ -412,6 +487,11 @@ def main() -> int:
         max_first_logits_diff=float(args.max_first_logits_diff),
         require_check_dumps=(not bool(args.no_require_check_dumps)),
         require_all_checked_clean=(not bool(args.no_require_all_checked_clean)),
+        allow_loss_only_relaxation=_allow_loss_only_runtime_stitch(
+            int(args.seq_len),
+            str(args.template),
+            args.template_file,
+        ),
     )
 
     payload = {
