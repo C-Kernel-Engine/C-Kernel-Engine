@@ -6579,12 +6579,14 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
             "a": ["A", "a", "input"],  # GEMM uses "A" in IR, "a" in binding
             "x": ["x", "X", "input"],  # GEMV uses "x"
             "src": ["src", "input", "a", "A"],  # memcpy source
+            "rstd_cache": ["rstd_cache", "rstd", "inv_rms", "inv_rms_cache"],
         }
         out_aliases = {
             "out": ["output", "out", "out_token", "C", "c"],
             "c": ["C", "c", "output"],  # GEMM uses "C" in IR, "c" in binding
             "y": ["y", "Y", "output"],  # GEMV output
             "dst": ["dst", "output"],  # memcpy destination
+            "rstd_cache": ["rstd_cache", "rstd", "inv_rms", "inv_rms_cache"],
         }
 
         args = []

@@ -5,7 +5,7 @@
     "generated_by": "gen_kernel_registry_from_maps.py",
     "source_dir": "/home/antshiv/Workspace/C-Kernel-Engine/version/v7/kernel_maps",
     "counts": {
-      "total": 108,
+      "total": 112,
       "by_op": {
         "add_backward": 1,
         "add_stream": 1,
@@ -21,8 +21,8 @@
         "fused_linear_bias": 3,
         "fused_mlp_block": 1,
         "fused_qkv_block": 1,
-        "gated_deltanet": 1,
-        "geglu": 2,
+        "gated_deltanet": 2,
+        "geglu": 4,
         "gelu": 1,
         "gemm": 12,
         "gemm_backward": 1,
@@ -58,7 +58,7 @@
         "split_q_gate_backward": 1,
         "ssm_conv1d": 1,
         "ssm_conv1d_backward": 1,
-        "swiglu": 2,
+        "swiglu": 3,
         "tokenizer": 1,
         "vision_patchify": 1
       }
@@ -3005,6 +3005,208 @@
       "_source_file": "fused_rmsnorm_qkv_prefill_head_major_quant.json"
     },
     {
+      "id": "gated_deltanet_autoregressive_backward_f32",
+      "op": "gated_deltanet",
+      "variant": "backward_fp32",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "d_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "d_state_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ]
+        },
+        {
+          "name": "q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "k",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "v",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "g",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ]
+        },
+        {
+          "name": "beta",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ]
+        },
+        {
+          "name": "state_in",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ]
+        },
+        {
+          "name": "state_out",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ]
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "d_q",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "d_k",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "d_v",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D"
+          ]
+        },
+        {
+          "name": "d_g",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ]
+        },
+        {
+          "name": "d_beta",
+          "dtype": "fp32",
+          "shape": [
+            "H"
+          ]
+        },
+        {
+          "name": "d_state_in",
+          "dtype": "fp32",
+          "shape": [
+            "H",
+            "D",
+            "D"
+          ]
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "H",
+        "D"
+      ],
+      "params": [
+        {
+          "name": "norm_eps",
+          "dtype": "float32",
+          "desc": "Normalization epsilon for Q/K scaling"
+        }
+      ],
+      "parallelization": {
+        "supported": [
+          "head"
+        ],
+        "preferred": {
+          "prefill": "head",
+          "decode": "head"
+        },
+        "strategies": [
+          {
+            "name": "head",
+            "partition_dim": "H",
+            "param_style": "ith_nth",
+            "notes": "Each DeltaNet head backward path is independent for the single-token update."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Backward kernel for the qwen3.5/qwen3next single-token DeltaNet recurrent update."
+      },
+      "impl": {
+        "function": "gated_deltanet_autoregressive_backward",
+        "c_declaration": "void gated_deltanet_autoregressive_backward(const float *d_out, const float *d_state_out, const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, const float *state_out, float *d_q, float *d_k, float *d_v, float *d_g, float *d_beta, float *d_state_in, int num_heads, int state_dim, float norm_eps);",
+        "sources": [
+          "src/kernels/deltanet_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "tests/test_deltanet.py"
+        ],
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": ".venv/bin/python tests/test_deltanet.py",
+            "tolerance": "5e-4",
+            "notes": "Backward parity against the local PyTorch DeltaNet reference."
+          }
+        ]
+      },
+      "name": "gated_deltanet_autoregressive_backward_f32",
+      "_source_file": "gated_deltanet_autoregressive_backward.json"
+    },
+    {
       "id": "gated_deltanet_autoregressive_forward",
       "op": "gated_deltanet",
       "variant": "fp32",
@@ -3186,6 +3388,106 @@
       "_source_file": "gated_deltanet_autoregressive_forward.json"
     },
     {
+      "id": "geglu_backward_exact",
+      "op": "geglu",
+      "variant": "fp32_backward_exact",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": true
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "2I"
+          ],
+          "desc": "Forward GeGLU input [tokens, 2*intermediate_dim]"
+        },
+        {
+          "name": "d_output",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Gradient from next op [tokens, intermediate_dim]"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "d_input",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "2I"
+          ],
+          "desc": "Gradient w.r.t. concatenated gate/up input"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "I"
+      ],
+      "params": [],
+      "parallelization": {
+        "supported": [
+          "token",
+          "feature"
+        ],
+        "preferred": {
+          "prefill": "feature",
+          "decode": "feature"
+        },
+        "strategies": [
+          {
+            "name": "feature",
+            "partition_dim": "I",
+            "param_style": "ith_nth",
+            "notes": "Feature-parallel exact GeGLU backward."
+          }
+        ]
+      },
+      "constraints": {
+        "notes": "Exact backward used for Gemma-family training/parity."
+      },
+      "impl": {
+        "function": "geglu_backward_fp32",
+        "c_declaration": "void geglu_backward_fp32(const float *x, const float *d_out, float *d_x, int tokens, int dim);",
+        "sources": [
+          "src/kernels/geglu_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "default",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "parity": [
+          {
+            "kind": "pytorch",
+            "command": "make v7-parity-1tok",
+            "tolerance": "5e-5",
+            "notes": "Reference backward parity check."
+          }
+        ]
+      },
+      "notes": "Exact GeGLU backward kernel for v7 training IR.",
+      "name": "geglu_backward_exact",
+      "_source_file": "geglu_backward_exact.json"
+    },
+    {
       "id": "geglu_forward_bf16",
       "op": "geglu",
       "variant": "geglu_bf16",
@@ -3283,6 +3585,70 @@
       "notes": "BF16 GeGLU activation. Converts to FP32, computes, converts back. Caller provides scratch buffer.",
       "name": "geglu_forward_bf16",
       "_source_file": "geglu_forward_bf16.json"
+    },
+    {
+      "id": "geglu_forward_exact",
+      "op": "geglu",
+      "variant": "geglu_fp32_exact",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "x",
+          "dtype": "fp32",
+          "shape": [
+            "tokens",
+            "2*dim"
+          ],
+          "desc": "Input tensor [tokens, 2*dim], split into [gate, up] along last dim"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "tokens",
+            "dim"
+          ],
+          "desc": "Exact GeGLU output tensor [tokens, dim], where out = GELU_tanh(gate) * up"
+        }
+      ],
+      "dims": [
+        "tokens",
+        "dim"
+      ],
+      "params": [],
+      "impl": {
+        "function": "geglu_forward_exact",
+        "c_declaration": "void geglu_forward_exact(const float *x, float *out, int tokens, int dim);",
+        "sources": [
+          "src/kernels/geglu_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_geglu.py"
+        ],
+        "parity": []
+      },
+      "notes": "Exact GeGLU forward for training/parity: out = GELU_tanh(gate) * up using scalar tanhf semantics.",
+      "name": "geglu_forward_exact",
+      "_source_file": "geglu_forward_exact.json"
     },
     {
       "id": "geglu_forward_fp32",
@@ -12708,6 +13074,106 @@
       "notes": "SwiGLU activation: SiLU(gate) * up = gate * sigmoid(gate) * up. Used in LLaMA-style MLP blocks.",
       "name": "swiglu_forward",
       "_source_file": "swiglu_forward.json"
+    },
+    {
+      "id": "swiglu_forward_exact",
+      "op": "swiglu",
+      "variant": "fp32_exact",
+      "modes": {
+        "inference": false,
+        "training": true,
+        "backward": false
+      },
+      "quant": {
+        "weight": "none",
+        "activation": "fp32",
+        "output": "fp32"
+      },
+      "inputs": [
+        {
+          "name": "gate",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Gate tensor [tokens, intermediate_dim] (first half of MLP intermediate)"
+        },
+        {
+          "name": "up",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"
+        }
+      ],
+      "weights": [],
+      "activations": [],
+      "outputs": [
+        {
+          "name": "out",
+          "dtype": "fp32",
+          "shape": [
+            "T",
+            "I"
+          ],
+          "desc": "Exact SwiGLU output: silu(gate) * up using scalar expf sigmoid"
+        }
+      ],
+      "scratch": [],
+      "dims": [
+        "T",
+        "I"
+      ],
+      "parallelization": {
+        "supported": [
+          "token"
+        ],
+        "preferred": {
+          "prefill": "token",
+          "decode": "token"
+        },
+        "strategies": [
+          {
+            "name": "token",
+            "partition_dim": "T",
+            "param_style": "ith_nth",
+            "notes": "Exact training/parity path processes complete tokens with scalar sigmoid semantics."
+          }
+        ]
+      },
+      "constraints": {
+        "alignment": {
+          "I": 1
+        },
+        "notes": "Exact SwiGLU reference path used for training/parity; no SIMD/alignment requirement."
+      },
+      "impl": {
+        "function": "swiglu_forward_exact",
+        "c_declaration": "void swiglu_forward_exact(const float *input, float *output, int tokens, int dim);",
+        "sources": [
+          "src/kernels/swiglu_kernels.c"
+        ],
+        "variants": [
+          {
+            "name": "ref",
+            "requires": [],
+            "compile_flags": []
+          }
+        ]
+      },
+      "tests": {
+        "unit": [
+          "unittest/test_swiglu.py"
+        ],
+        "bench": [],
+        "parity": []
+      },
+      "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid.",
+      "name": "swiglu_forward_exact",
+      "_source_file": "swiglu_forward_exact.json"
     },
     {
       "id": "tokenizer_bpe_trie",

@@ -22,6 +22,12 @@ class TestDeltaNetRegistryV7(unittest.TestCase):
         )
         self.assertIsNotNone(kernel)
         self.assertEqual(kernel.get("op"), "gated_deltanet")
+        backward = next(
+            (k for k in registry.get("kernels", []) if k.get("id") == "gated_deltanet_autoregressive_backward_f32"),
+            None,
+        )
+        self.assertIsNotNone(backward)
+        self.assertEqual(backward.get("op"), "gated_deltanet")
 
     def test_registry_contains_ssm_conv_kernels(self) -> None:
         registry = build_ir.load_kernel_registry()
@@ -68,6 +74,8 @@ class TestDeltaNetRegistryV7(unittest.TestCase):
                 "norm_eps",
             ],
         )
+        source_by_name = {str(p.get("name")): p.get("source") for p in binding.get("params", [])}
+        self.assertEqual(source_by_name.get("state_dim"), "dim:ssm_state_size")
 
     def test_bindings_contain_ssm_conv_signature(self) -> None:
         bindings = build_ir.load_kernel_bindings()
@@ -120,6 +128,36 @@ class TestDeltaNetRegistryV7(unittest.TestCase):
                 "rows",
                 "q_dim",
                 "gate_dim",
+                "group_dim",
+            ],
+        )
+
+    def test_bindings_contain_deltanet_backward_signature(self) -> None:
+        bindings = build_ir.load_kernel_bindings()
+        binding = bindings.get("gated_deltanet_autoregressive_backward_f32")
+        self.assertIsNotNone(binding)
+        params = [p.get("name") for p in binding.get("params", [])]
+        self.assertEqual(
+            params,
+            [
+                "d_out",
+                "d_state_out",
+                "q",
+                "k",
+                "v",
+                "g",
+                "beta",
+                "state_in",
+                "state_out",
+                "d_q",
+                "d_k",
+                "d_v",
+                "d_g",
+                "d_beta",
+                "d_state_in",
+                "num_heads",
+                "state_dim",
+                "norm_eps",
             ],
         )
 

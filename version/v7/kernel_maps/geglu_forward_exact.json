@@ -1,0 +1,35 @@
+{
+  "id": "geglu_forward_exact",
+  "op": "geglu",
+  "variant": "geglu_fp32_exact",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": false
+  },
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["tokens", "2*dim"], "desc": "Input tensor [tokens, 2*dim], split into [gate, up] along last dim"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["tokens", "dim"], "desc": "Exact GeGLU output tensor [tokens, dim], where out = GELU_tanh(gate) * up"}
+  ],
+  "dims": ["tokens", "dim"],
+  "params": [],
+  "impl": {
+    "function": "geglu_forward_exact",
+    "c_declaration": "void geglu_forward_exact(const float *x, float *out, int tokens, int dim);",
+    "sources": ["src/kernels/geglu_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_geglu.py"],
+    "parity": []
+  },
+  "notes": "Exact GeGLU forward for training/parity: out = GELU_tanh(gate) * up using scalar tanhf semantics."
+}

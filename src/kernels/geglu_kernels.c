@@ -7,14 +7,42 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ckernel_engine.h"
 #include "bf16_utils.h"
 
 /* Reuse existing optimized GELU implementation from gelu_kernels.c. */
 extern void gelu_fast_inplace(float *data, size_t n);
 
+static inline float ck_gelu_tanh_parity_f32(float x)
+{
+    const float sqrt_2_over_pi = 0.7978845608f;
+    const float coeff = 0.044715f;
+    const float x3 = x * x * x;
+    const float inner = sqrt_2_over_pi * (x + coeff * x3);
+    return 0.5f * x * (1.0f + tanhf(inner));
+}
+
+void geglu_forward_exact(const float *x, float *out, int tokens, int dim)
+{
+    const int inner_dim = dim * 2;
+    for (int t = 0; t < tokens; ++t) {
+        const float *x_ptr = x + (size_t)t * (size_t)inner_dim;
+        float *out_ptr = out + (size_t)t * (size_t)dim;
+
+        for (int d = 0; d < dim; ++d) {
+            out_ptr[d] = ck_gelu_tanh_parity_f32(x_ptr[d]) * x_ptr[dim + d];
+        }
+    }
+}
+
 void geglu_forward_fp32(const float *x, float *out, int tokens, int dim)
 {
     if (!x || !out || tokens <= 0 || dim <= 0) {
+        return;
+    }
+
+    if (ck_strict_parity_enabled()) {
+        geglu_forward_exact(x, out, tokens, dim);
         return;
     }
 

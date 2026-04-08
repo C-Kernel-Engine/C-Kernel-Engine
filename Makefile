@@ -3687,7 +3687,7 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-train-runtime-parity-prepare v7-train-runtime-parity-stress v7-train-runtime-parity-realistic v7-train-runtime-parity-long-horizon \
 	v7-backprop-long-epoch v7-backprop-long-epoch-nightly v7-backprop-production-ready test-v7-bpe-train-parity v7-replay-accum \
 	v7-backprop-plumbing v7-backprop-stitch-runtime v7-backprop-stitch-runtime-accum test-v7-svg-overfit-regression \
-	v7-train-data-pipeline v7-stabilization-nightly v7-ir-visualizer-e2e v7-runbook-e2e \
+	v7-train-data-pipeline v7-stabilization-nightly v7-ir-visualizer-e2e v7-runbook-e2e v7-kernel-map-contracts \
 	v7-ctop v7-ctop-demo
 
 v7-help:
@@ -3907,6 +3907,12 @@ v7-inference-smoke:
 v7-validate-contracts:
 	@$(PYTHON) version/v7/scripts/validate_v7_contracts.py --strict --training-mode --json-out $(V7_REPORT_DIR)/contract_report_latest.json
 	@$(PYTHON) version/v7/scripts/validate_tooling_contracts.py --strict --json-out $(V7_REPORT_DIR)/tooling_contract_report_latest.json
+	@$(MAKE) --no-print-directory v7-kernel-map-contracts
+
+v7-kernel-map-contracts:
+	@$(PYTHON) version/v7/kernel_maps/check_kernel_map_sync.py
+	@$(PYTHON) version/v7/kernel_maps/validate_kernel_maps.py --json-out $(V7_REPORT_DIR)/kernel_map_validation_latest.json
+	@$(PYTHON) -m unittest tests.test_v7_kernel_map_validator tests.test_v7_kernel_map_contracts tests.test_deltanet_registry_v7
 
 regression-fast:
 	@echo "Running v7 regression fast suite..."

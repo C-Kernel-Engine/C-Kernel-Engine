@@ -891,6 +891,29 @@
         }
       ]
     },
+    "gated_deltanet_autoregressive_backward_f32": {
+      "note": "Backward pass for gated_deltanet_autoregressive_forward.",
+      "params": [
+        {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
+        {"name": "d_state_out", "source": "activation:d_state_out", "cast": "const float*"},
+        {"name": "q", "source": "activation:q", "cast": "const float*"},
+        {"name": "k", "source": "activation:k", "cast": "const float*"},
+        {"name": "v", "source": "activation:v", "cast": "const float*"},
+        {"name": "g", "source": "activation:g", "cast": "const float*"},
+        {"name": "beta", "source": "activation:beta", "cast": "const float*"},
+        {"name": "state_in", "source": "activation:state_in", "cast": "const float*"},
+        {"name": "state_out", "source": "activation:state_out", "cast": "const float*"},
+        {"name": "d_q", "source": "output:d_q", "cast": "float*"},
+        {"name": "d_k", "source": "output:d_k", "cast": "float*"},
+        {"name": "d_v", "source": "output:d_v", "cast": "float*"},
+        {"name": "d_g", "source": "output:d_g", "cast": "float*"},
+        {"name": "d_beta", "source": "output:d_beta", "cast": "float*"},
+        {"name": "d_state_in", "source": "output:d_state_in", "cast": "float*"},
+        {"name": "num_heads", "source": "dim:ssm_time_step_rank"},
+        {"name": "state_dim", "source": "dim:recurrent_head_dim"},
+        {"name": "norm_eps", "source": "dim:rms_eps"}
+      ]
+    },
     "recurrent_split_qkv_forward": {
       "note": "Split packed recurrent QKV rows into explicit Q, K, and V outputs.",
       "params": [
@@ -1004,7 +1027,84 @@
         }
       ]
     },
+    "split_q_gate_backward_f32": {
+      "note": "Backward pass for split_q_gate_forward.",
+      "params": [
+        {
+          "name": "d_q",
+          "source": "activation:d_q",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_gate",
+          "source": "activation:d_gate",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_packed_qg",
+          "source": "output:d_packed_qg",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "q_dim",
+          "source": "dim:attn_out_dim"
+        },
+        {
+          "name": "gate_dim",
+          "source": "dim:attn_gate_dim"
+        },
+        {
+          "name": "group_dim",
+          "source": "dim:head_dim"
+        }
+      ]
+    },
     "recurrent_split_qkv_backward": {
+      "note": "Backward pass for the packed recurrent QKV split.",
+      "params": [
+        {
+          "name": "d_q",
+          "source": "activation:d_q",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_k",
+          "source": "activation:d_k",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_v",
+          "source": "activation:d_v",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_packed_qkv",
+          "source": "output:d_packed_qkv",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "q_dim",
+          "source": "dim:q_dim"
+        },
+        {
+          "name": "k_dim",
+          "source": "dim:k_dim"
+        },
+        {
+          "name": "v_dim",
+          "source": "dim:v_dim"
+        }
+      ]
+    },
+    "recurrent_split_qkv_backward_f32": {
       "note": "Backward pass for the packed recurrent QKV split.",
       "params": [
         {
@@ -1126,6 +1226,54 @@
         }
       ]
     },
+    "recurrent_dt_gate_backward_f32": {
+      "note": "Backward pass for the recurrent dt gate transform.",
+      "params": [
+        {
+          "name": "d_gate",
+          "source": "activation:d_gate",
+          "cast": "const float*"
+        },
+        {
+          "name": "alpha",
+          "source": "activation:alpha",
+          "cast": "const float*"
+        },
+        {
+          "name": "dt_bias",
+          "source": "weight:ssm_dt_bias",
+          "cast": "const float*"
+        },
+        {
+          "name": "a",
+          "source": "weight:ssm_a",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_alpha",
+          "source": "output:d_alpha",
+          "cast": "float*"
+        },
+        {
+          "name": "d_dt_bias",
+          "source": "output:d_dt_bias",
+          "cast": "float*"
+        },
+        {
+          "name": "d_a",
+          "source": "output:d_a",
+          "cast": "float*"
+        },
+        {
+          "name": "rows",
+          "source": "runtime:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:gate_dim"
+        }
+      ]
+    },
     "recurrent_conv_state_update_forward": {
       "note": "Build the recurrent convolution input window from cached history plus current Q/K/V rows.",
       "params": [
@@ -1147,7 +1295,30 @@
       "note": "Backward pass for recurrent convolution state window construction.",
       "params": [
         {"name": "d_conv_x", "source": "activation:d_conv_x", "cast": "const float*"},
-        {"name": "d_state_out", "source": "activation:d_state_out", "cast": "const float*"},
+        {"name": "state_in", "source": "activation:state_in", "cast": "const float*"},
+        {"name": "q", "source": "activation:q", "cast": "const float*"},
+        {"name": "k", "source": "activation:k", "cast": "const float*"},
+        {"name": "v", "source": "activation:v", "cast": "const float*"},
+        {"name": "d_state_in", "source": "output:d_state_in", "cast": "float*"},
+        {"name": "d_q", "source": "output:d_q", "cast": "float*"},
+        {"name": "d_k", "source": "output:d_k", "cast": "float*"},
+        {"name": "d_v", "source": "output:d_v", "cast": "float*"},
+        {"name": "history_len", "source": "dim:ssm_conv_history"},
+        {"name": "num_seqs", "source": "dim:num_seqs"},
+        {"name": "num_tokens", "source": "runtime:seq_len"},
+        {"name": "q_dim", "source": "dim:q_dim"},
+        {"name": "k_dim", "source": "dim:k_dim"},
+        {"name": "v_dim", "source": "dim:v_dim"}
+      ]
+    },
+    "recurrent_conv_state_update_backward_f32": {
+      "note": "Backward pass for recurrent convolution state window construction.",
+      "params": [
+        {"name": "d_conv_x", "source": "activation:d_conv_x", "cast": "const float*"},
+        {"name": "state_in", "source": "activation:state_in", "cast": "const float*"},
+        {"name": "q", "source": "activation:q", "cast": "const float*"},
+        {"name": "k", "source": "activation:k", "cast": "const float*"},
+        {"name": "v", "source": "activation:v", "cast": "const float*"},
         {"name": "d_state_in", "source": "output:d_state_in", "cast": "float*"},
         {"name": "d_q", "source": "output:d_q", "cast": "float*"},
         {"name": "d_k", "source": "output:d_k", "cast": "float*"},
@@ -1170,6 +1341,16 @@
       ]
     },
     "recurrent_silu_backward": {
+      "note": "Backward pass for recurrent_silu_forward.",
+      "params": [
+        {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "d_x", "source": "output:d_x", "cast": "float*"},
+        {"name": "rows", "source": "runtime:seq_len"},
+        {"name": "dim", "source": "dim:ssm_conv_channels"}
+      ]
+    },
+    "recurrent_silu_backward_f32": {
       "note": "Backward pass for recurrent_silu_forward.",
       "params": [
         {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
@@ -1205,6 +1386,19 @@
         {"name": "v_dim", "source": "dim:v_dim"}
       ]
     },
+    "recurrent_split_conv_qkv_backward_f32": {
+      "note": "Backward pass for the post-convolution recurrent QKV split.",
+      "params": [
+        {"name": "d_q", "source": "activation:d_q", "cast": "const float*"},
+        {"name": "d_k", "source": "activation:d_k", "cast": "const float*"},
+        {"name": "d_v", "source": "activation:d_v", "cast": "const float*"},
+        {"name": "d_packed_qkv", "source": "output:d_packed_qkv", "cast": "float*"},
+        {"name": "rows", "source": "runtime:seq_len"},
+        {"name": "q_dim", "source": "dim:q_dim"},
+        {"name": "k_dim", "source": "dim:k_dim"},
+        {"name": "v_dim", "source": "dim:v_dim"}
+      ]
+    },
     "recurrent_qk_l2_norm_forward": {
       "note": "Apply per-head L2 normalization to recurrent Q and K rows in-place before DeltaNet.",
       "params": [
@@ -1218,6 +1412,22 @@
       ]
     },
     "recurrent_qk_l2_norm_backward": {
+      "note": "Backward pass for recurrent_qk_l2_norm_forward.",
+      "params": [
+        {"name": "d_q_out", "source": "activation:d_q_out", "cast": "const float*"},
+        {"name": "d_k_out", "source": "activation:d_k_out", "cast": "const float*"},
+        {"name": "q", "source": "activation:q", "cast": "const float*"},
+        {"name": "k", "source": "activation:k", "cast": "const float*"},
+        {"name": "d_q", "source": "output:d_q", "cast": "float*"},
+        {"name": "d_k", "source": "output:d_k", "cast": "float*"},
+        {"name": "rows", "source": "runtime:seq_len"},
+        {"name": "q_dim", "source": "dim:q_dim"},
+        {"name": "k_dim", "source": "dim:k_dim"},
+        {"name": "head_dim", "source": "dim:recurrent_head_dim"},
+        {"name": "eps", "source": "dim:rms_eps"}
+      ]
+    },
+    "recurrent_qk_l2_norm_backward_f32": {
       "note": "Backward pass for recurrent_qk_l2_norm_forward.",
       "params": [
         {"name": "d_q_out", "source": "activation:d_q_out", "cast": "const float*"},
@@ -1262,6 +1472,22 @@
         {"name": "eps", "source": "dim:rms_eps"}
       ]
     },
+    "recurrent_norm_gate_backward_f32": {
+      "note": "Backward pass for recurrent_norm_gate_forward.",
+      "params": [
+        {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "gate", "source": "activation:gate", "cast": "const float*"},
+        {"name": "weight", "source": "weight:ssm_norm", "cast": "const float*"},
+        {"name": "d_x", "source": "output:d_x", "cast": "float*"},
+        {"name": "d_gate", "source": "output:d_gate", "cast": "float*"},
+        {"name": "d_weight", "source": "output:d_weight", "cast": "float*"},
+        {"name": "rows", "source": "runtime:seq_len"},
+        {"name": "num_heads", "source": "dim:recurrent_num_heads"},
+        {"name": "head_dim", "source": "dim:recurrent_head_dim"},
+        {"name": "eps", "source": "dim:rms_eps"}
+      ]
+    },
     "attn_gate_sigmoid_mul_forward": {
       "note": "Multiply attention output rows by sigmoid(gate) before the qwen3.5 output projection.",
       "params": [
@@ -1273,6 +1499,18 @@
       ]
     },
     "attn_gate_sigmoid_mul_backward": {
+      "note": "Backward pass for attn_gate_sigmoid_mul_forward.",
+      "params": [
+        {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
+        {"name": "x", "source": "activation:x", "cast": "const float*"},
+        {"name": "gate", "source": "activation:gate", "cast": "const float*"},
+        {"name": "d_x", "source": "output:d_x", "cast": "float*"},
+        {"name": "d_gate", "source": "output:d_gate", "cast": "float*"},
+        {"name": "rows", "source": "runtime:seq_len"},
+        {"name": "dim", "source": "dim:attn_out_dim"}
+      ]
+    },
+    "attn_gate_sigmoid_mul_backward_f32": {
       "note": "Backward pass for attn_gate_sigmoid_mul_forward.",
       "params": [
         {"name": "d_out", "source": "activation:d_out", "cast": "const float*"},
@@ -1956,6 +2194,29 @@
         }
       ]
     },
+    "geglu_forward_exact": {
+      "note": "Exact GeGLU: out = GELU_tanh(a) * b where x = [a, b] along last dim",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "out",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_size"
+        }
+      ]
+    },
     "geglu_forward_bf16": {
       "note": "BF16 GeGLU: converts to FP32, computes, converts back",
       "params": [
@@ -2150,6 +2411,28 @@
       ]
     },
     "swiglu_forward": {
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:gate",
+          "cast": "float*"
+        },
+        {
+          "name": "output",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_size"
+        }
+      ]
+    },
+    "swiglu_forward_exact": {
       "params": [
         {
           "name": "input",
@@ -3932,6 +4215,34 @@
         },
         {
           "name": "d_input",
+          "source": "output:d_input",
+          "cast": "float*"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "dim",
+          "source": "dim:intermediate_dim"
+        }
+      ]
+    },
+    "geglu_backward_exact": {
+      "note": "v7 training backward: exact geglu gradient",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_out",
+          "source": "activation:d_output",
+          "cast": "const float*"
+        },
+        {
+          "name": "d_x",
           "source": "output:d_input",
           "cast": "float*"
         },

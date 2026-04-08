@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any
 
@@ -11,9 +12,23 @@ BANNED_SPECIAL_TOKENS = {
     "[bundle]...[/bundle]",
 }
 
+_SYSTEM_SPECIAL_RE = re.compile(r"^<\|[A-Za-z0-9_]+\|>$")
+_ATOMIC_BRACKET_RE = re.compile(r"^\[/?[A-Za-z_][A-Za-z0-9_]*\]$")
+
+
+def is_atomic_visible_special_token(content: str) -> bool:
+    text = str(content or "").strip()
+    if not text:
+        return False
+    if _SYSTEM_SPECIAL_RE.fullmatch(text):
+        return True
+    if len(text) > 48:
+        return False
+    return _ATOMIC_BRACKET_RE.fullmatch(text) is not None
+
 
 def sanitize_tokenizer_doc(tokenizer_doc: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    """Drop known placeholder special tokens while preserving vocab ids."""
+    """Drop placeholder and non-atomic special tokens while preserving vocab ids."""
     doc = deepcopy(tokenizer_doc)
     removed: list[str] = []
     added_tokens = doc.get("added_tokens")
@@ -25,6 +40,9 @@ def sanitize_tokenizer_doc(tokenizer_doc: dict[str, Any]) -> tuple[dict[str, Any
                 continue
             content = str(row.get("content") or "")
             if content in BANNED_SPECIAL_TOKENS:
+                removed.append(content)
+                continue
+            if row.get("special") is True and not is_atomic_visible_special_token(content):
                 removed.append(content)
                 continue
             kept.append(row)

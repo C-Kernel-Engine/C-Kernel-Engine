@@ -1,0 +1,98 @@
+{
+  "id": "geglu_backward_exact",
+  "op": "geglu",
+  "variant": "fp32_backward_exact",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "2I"
+      ],
+      "desc": "Forward GeGLU input [tokens, 2*intermediate_dim]"
+    },
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "I"
+      ],
+      "desc": "Gradient from next op [tokens, intermediate_dim]"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "2I"
+      ],
+      "desc": "Gradient w.r.t. concatenated gate/up input"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "I"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "token",
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "I",
+        "param_style": "ith_nth",
+        "notes": "Feature-parallel exact GeGLU backward."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Exact backward used for Gemma-family training/parity."
+  },
+  "impl": {
+    "function": "geglu_backward_fp32",
+    "c_declaration": "void geglu_backward_fp32(const float *x, const float *d_out, float *d_x, int tokens, int dim);",
+    "sources": [
+      "src/kernels/geglu_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "5e-5",
+        "notes": "Reference backward parity check."
+      }
+    ]
+  },
+  "notes": "Exact GeGLU backward kernel for v7 training IR."
+}
