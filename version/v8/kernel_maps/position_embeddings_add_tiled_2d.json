@@ -31,10 +31,10 @@
       "desc": "In-place updated activation stream"
     }
   ],
-  "dims": ["grid_h", "grid_w", "embed_dim", "merge_size"],
+  "dims": ["grid_h", "grid_w", "embed_dim", "merge_size", "source_grid_size"],
   "impl": {
     "function": "position_embeddings_add_tiled_2d",
-    "c_declaration": "void position_embeddings_add_tiled_2d(float *x, const float *position_embd, int grid_h, int grid_w, int embed_dim, int merge_size);",
+    "c_declaration": "void position_embeddings_add_tiled_2d(float *x, const float *position_embd, int grid_h, int grid_w, int embed_dim, int merge_size, int source_grid_size);",
     "sources": ["src/kernels/vision_kernels.c"]
   },
   "notes": "Add learned absolute position embeddings to a stream that has already been reordered into merged-tile traversal."

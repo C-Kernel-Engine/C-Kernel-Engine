@@ -1,0 +1,42 @@
+{
+  "id": "attention_forward_decode_head_major_gqa_flash_sliding",
+  "op": "attention_sliding",
+  "variant": "decode_flash_fp32_sliding",
+  "mode": "decode",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "q_token", "dtype": "fp32", "shape": ["num_heads", "head_dim"], "desc": "Query for single token [num_heads, head_dim]"},
+    {"name": "k_cache", "dtype": "fp32", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "desc": "K cache [num_kv_heads, max_seq_len, head_dim]"},
+    {"name": "v_cache", "dtype": "fp32", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "desc": "V cache [num_kv_heads, max_seq_len, head_dim]"}
+  ],
+  "outputs": [
+    {"name": "out_token", "dtype": "fp32", "shape": ["num_heads", "head_dim"], "desc": "Output for single token [num_heads, head_dim]"}
+  ],
+  "dims": ["num_heads", "num_kv_heads", "kv_tokens", "cache_capacity", "head_dim", "aligned_head_dim"],
+  "params": [
+    {"name": "head_dim", "dtype": "int32", "desc": "Head dimension (unpadded)"},
+    {"name": "aligned_head_dim", "dtype": "int32", "desc": "Aligned head dimension for SIMD"},
+    {"name": "sliding_window", "dtype": "int32", "desc": "Sliding window size (0 = no limit)"}
+  ],
+  "impl": {
+    "function": "attention_forward_decode_head_major_gqa_flash_sliding",
+    "c_declaration": "void attention_forward_decode_head_major_gqa_flash_sliding(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim, int sliding_window);",
+    "sources": ["src/kernels/attention_kernels_sliding.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_attention_sliding.py"],
+    "bench": ["scripts/bench_attention.py"],
+    "parity": [
+      {
+        "kind": "llamacpp",
+        "command": "python test_mega_fusion_parity.py",
+        "tolerance": "1e-4",
+        "notes": "Compare against llama.cpp with sliding window"
+      }
+    ]
+  },
+  "notes": "Flash attention for decode mode with sliding window: single query token attends to the last W KV cache entries."
+}

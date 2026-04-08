@@ -28,17 +28,38 @@ build_ir_v7 = _load_module("build_ir_v7_for_v8_scaffold_tests", V7_BUILD_PATH)
 build_ir_v8 = _load_module("build_ir_v8_for_tests", V8_BUILD_PATH)
 
 
+def _normalized_template_doc(doc: dict) -> dict:
+    normalized = json.loads(json.dumps(doc))
+    flags = normalized.get("flags")
+    if isinstance(flags, dict):
+        for key in build_ir_v8._FORBIDDEN_TEMPLATE_FLAG_KEYS:
+            flags.pop(key, None)
+    attention_contract = normalized.get("contract", {}).get("attention_contract")
+    if isinstance(attention_contract, dict):
+        attention_contract.pop("train_runtime_contract", None)
+    return normalized
+
+
 class BuildIrV8ScaffoldTests(unittest.TestCase):
     def test_v8_template_root_is_isolated(self) -> None:
         self.assertEqual(build_ir_v8.V8_ROOT.name, "v8")
         self.assertTrue((build_ir_v8.V8_ROOT / "templates" / "qwen3.json").exists())
 
-    def test_v8_templates_match_current_v7_seed(self) -> None:
+    def test_v8_templates_match_current_v7_seed_after_runtime_policy_extraction(self) -> None:
         for name in ("gemma3", "llama", "qwen2", "qwen3", "qwen35"):
             with self.subTest(template=name):
                 v7_doc = json.loads((ROOT / "version" / "v7" / "templates" / f"{name}.json").read_text(encoding="utf-8"))
                 v8_doc = json.loads((ROOT / "version" / "v8" / "templates" / f"{name}.json").read_text(encoding="utf-8"))
-                self.assertEqual(v8_doc, v7_doc)
+                self.assertEqual(_normalized_template_doc(v8_doc), _normalized_template_doc(v7_doc))
+
+    def test_v8_seeded_templates_do_not_embed_runtime_policy_flags(self) -> None:
+        for name in ("gemma3", "llama", "qwen2", "qwen3", "qwen35"):
+            with self.subTest(template=name):
+                v8_doc = json.loads((ROOT / "version" / "v8" / "templates" / f"{name}.json").read_text(encoding="utf-8"))
+                flags = v8_doc.get("flags", {})
+                self.assertIsInstance(flags, dict)
+                for key in build_ir_v8._FORBIDDEN_TEMPLATE_FLAG_KEYS:
+                    self.assertNotIn(key, flags)
 
     def test_v8_uses_same_rope_resolution_as_v7(self) -> None:
         cases = [
@@ -54,12 +75,12 @@ class BuildIrV8ScaffoldTests(unittest.TestCase):
                     build_ir_v7._resolve_rope_qk_kernel(config, kernels),
                 )
 
-    def test_v8_uses_v7_kernel_registry_until_runtime_diverges(self) -> None:
+    def test_v8_uses_local_kernel_registry(self) -> None:
         registry = build_ir_v8.load_kernel_registry()
         self.assertIsInstance(registry, dict)
         self.assertTrue(registry)
-        self.assertEqual(build_ir_v8.V7_ROOT.name, "v7")
-        self.assertTrue((build_ir_v8.V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json").exists())
+        self.assertEqual(build_ir_v8.V8_ROOT.name, "v8")
+        self.assertTrue((build_ir_v8.V8_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json").exists())
 
 
 if __name__ == "__main__":

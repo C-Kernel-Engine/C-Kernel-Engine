@@ -5,11 +5,7 @@
   "flags": {
     "patch_frontend": "dual_patch_proj_sum",
     "activation": "gelu",
-    "normalization": "layernorm",
-    "prefer_q8_0_contract": true,
-    "activation_preference_by_op": {
-      "mlp_down": "fp32"
-    }
+    "normalization": "layernorm"
   },
   "contract": {
     "vision_contract": {
@@ -244,8 +240,7 @@
             "target": "branch.deepstack",
             "rows_from_config": "vision_merged_tokens",
             "slice_dim_from_config": "projector_out_dim",
-            "num_slices_from_config": "num_deepstack_layers",
-            "dtype": "fp32"
+            "num_slices_from_config": "num_deepstack_layers"
           }
         }
       ],

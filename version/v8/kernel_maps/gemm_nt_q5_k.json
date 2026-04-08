@@ -1,0 +1,30 @@
+{
+  "id": "gemm_nt_q5_k",
+  "op": "gemm",
+  "variant": "q5_k_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q5_k",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (FP32)"},
+    {"name": "B", "dtype": "q5_k", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q5_K quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q5_K uses 256-value super-blocks; K should be a multiple of 256."
+  },
+  "impl": {
+    "function": "gemm_nt_q5_k",
+    "c_declaration": "void gemm_nt_q5_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": ["src/kernels/gemm_kernels_q5_k.c"]
+  },
+  "notes": "GEMM for Q5_K weights with FP32 activation input. No activation quantization needed. Q5_K: 5-bit super-block quant with nested scales/mins."
+}

@@ -1,0 +1,75 @@
+{
+  "id": "fused_rmsnorm_qkv_prefill_head_major_quant",
+  "op": "fused_qkv_block",
+  "variant": "q5_0_w_fp32_a",
+  "quant": {
+    "weight": "q5_0|q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Input activations [tokens, aligned_embed_dim]"},
+    {"name": "ln_gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm gamma weight [embed_dim]"},
+    {"name": "wq", "dtype": "q5_0", "shape": ["H", "AD", "AE"], "desc": "Q projection weights [heads, aligned_head_dim, aligned_embed_dim] (Q5_0)"},
+    {"name": "bq", "dtype": "fp32", "shape": ["H", "AD"], "optional": true, "desc": "Q bias [heads, aligned_head_dim] (or NULL)"},
+    {"name": "wk", "dtype": "q5_0", "shape": ["KV", "AD", "AE"], "desc": "K projection weights [kv_heads, aligned_head_dim, aligned_embed_dim] (Q5_0)"},
+    {"name": "bk", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "K bias [kv_heads, aligned_head_dim] (or NULL)"},
+    {"name": "wv", "dtype": "q8_0", "shape": ["KV", "AD", "AE"], "desc": "V projection weights [kv_heads, aligned_head_dim, aligned_embed_dim] (Q8_0)"},
+    {"name": "bv", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "V bias [kv_heads, aligned_head_dim] (or NULL)"}
+  ],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "AD"], "desc": "Query output [heads, tokens, aligned_head_dim] (head-major)"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "AD"], "desc": "Key output [kv_heads, tokens, aligned_head_dim] (head-major)"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "T", "AD"], "desc": "Value output [kv_heads, tokens, aligned_head_dim] (head-major)"}
+  ],
+  "scratch": [
+    {"name": "temp", "dtype": "fp32", "size_bytes": "T * AE * 4", "desc": "Temporary buffer for RMSNorm output"}
+  ],
+  "dims": ["T", "E", "AE", "H", "KV", "D", "AD"],
+  "params": [
+    {"name": "kv_stride_tokens", "dtype": "int32", "desc": "Stride in tokens for KV cache layout"},
+    {"name": "eps", "dtype": "float32", "desc": "RMSNorm epsilon (typically 1e-5)"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across heads; each thread handles one or more heads."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64},
+    "notes": "Q5_0 requires K dimension multiple of 256 for dequantization. Produces head-major output for efficient attention."
+  },
+  "fuses": [
+    "rmsnorm_forward",
+    "gemv_q5_0_q8_0",
+    "gemv_q5_0_q8_0",
+    "gemv_q8_0_q8_0"
+  ],
+  "impl": {
+    "function": "fused_rmsnorm_qkv_prefill_head_major_quant",
+    "sources": ["src/kernels/fused/rmsnorm_qkv.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_fused_rmsnorm_qkv.py"],
+    "bench": ["scripts/bench_fused_qkv.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_fused_rmsnorm_qkv.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against unfused reference implementation"
+      }
+    ]
+  },
+  "notes": "Fused RMSNorm + QKV projection producing head-major output. Fuses 4 operations into 1, reducing memory traffic."
+}

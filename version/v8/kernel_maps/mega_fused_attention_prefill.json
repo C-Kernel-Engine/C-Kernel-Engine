@@ -1,0 +1,97 @@
+{
+  "id": "mega_fused_attention_prefill",
+  "op": "fused_attention_block",
+  "variant": "q5_0_w_q8_0_v_fp32_out",
+  "quant": {
+    "weight": "q5_0|q8_0",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Input activations"},
+    {"name": "residual", "dtype": "fp32", "shape": ["T", "AE"], "optional": true, "desc": "Residual input (or NULL)"}
+  ],
+  "weights": [
+    {"name": "ln_gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm gamma weight"},
+    {"name": "wq", "dtype": "q5_0", "shape": ["H", "AD", "AE"], "desc": "Q projection weights"},
+    {"name": "bq", "dtype": "fp32", "shape": ["H", "AD"], "optional": true, "desc": "Q bias (or NULL)"},
+    {"name": "wk", "dtype": "q5_0", "shape": ["KV", "AD", "AE"], "desc": "K projection weights"},
+    {"name": "bk", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "K bias (or NULL)"},
+    {"name": "wv", "dtype": "q8_0", "shape": ["KV", "AD", "AE"], "desc": "V projection weights"},
+    {"name": "bv", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "V bias (or NULL)"},
+    {"name": "wo", "dtype": "q5_0", "shape": ["H", "AE", "AD"], "desc": "Output projection weights"},
+    {"name": "bo", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "Output bias (or NULL)"}
+  ],
+  "activations": [],
+  "runtime_buffers": [
+    {"name": "kv_cache_k", "dtype": "fp32", "shape": ["KV", "max_T", "AD"], "desc": "K cache [written starting at start_pos]"},
+    {"name": "kv_cache_v", "dtype": "fp32", "shape": ["KV", "max_T", "AD"], "desc": "V cache [written starting at start_pos]"},
+    {"name": "rope_cos", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE cos [pos, :D/2]"},
+    {"name": "rope_sin", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE sin [pos, :D/2]"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Output [includes residual add]"}
+  ],
+  "scratch": [
+    {"name": "scratch", "dtype": "fp32", "size_bytes": "mega_fused_attention_prefill_scratch_size()", "desc": "Scratch buffer for attention computation"}
+  ],
+  "dims": ["T", "E", "AE", "H", "KV", "D", "AD", "max_T"],
+  "params": [
+    {"name": "start_pos", "dtype": "int32", "desc": "Starting position in KV cache"},
+    {"name": "tokens", "dtype": "int32", "desc": "Number of tokens to process"},
+    {"name": "cache_capacity", "dtype": "int32", "desc": "KV cache capacity (stride)"},
+    {"name": "eps", "dtype": "float32", "desc": "RMSNorm epsilon (typically 1e-5)"}
+  ],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "none"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Process tokens in parallel; each thread handles a slice of tokens."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64},
+    "notes": "Q5_0 uses 32-value blocks; AE should be multiple of 32 for correct layout."
+  },
+  "fuses": [
+    "rmsnorm_forward",
+    "gemv_q5_0_q8_0",
+    "gemv_q5_0_q8_0",
+    "gemv_q8_0_q8_0",
+    "rope_forward_qk",
+    "attention_forward_causal_head_major_gqa_flash_strided",
+    "gemv_q5_0_q8_0",
+    "ck_residual_add_token_major"
+  ],
+  "impl": {
+    "function": "mega_fused_attention_prefill",
+    "c_declaration": "void mega_fused_attention_prefill(float *output, const float *input, const float *residual, const float *ln1_gamma, const void *wq, const float *bq, CKDataType wq_dt, const void *wk, const float *bk, CKDataType wk_dt, const void *wv, const float *bv, CKDataType wv_dt, const void *wo, const float *bo, CKDataType wo_dt, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int start_pos, int tokens, int cache_capacity, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, float eps, void *scratch);",
+    "sources": [
+      "src/kernels/fused/mega_fused_attention_prefill.c",
+      "src/kernels/fused/prefill_fused_gemm.c",
+      "src/kernels/fused/attention_fused_gqa.c"
+    ],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_mega_fused_attention_prefill.py"],
+    "bench": ["scripts/bench_mega_fused_attention_prefill.py"],
+    "parity": [
+      {
+        "kind": "llamacpp",
+        "command": "make fusion-test-full-with-lamacpp",
+        "tolerance": "1e-4",
+        "notes": "Parity check for fused attention vs llama.cpp ggml_flash_attn_ext"
+      }
+    ]
+  },
+  "notes": "This is the 'holy grail' fusion - RMSNorm+QKV+RoPE+Attention+OutProj+Residual in single DRAM round-trip"
+}

@@ -1,0 +1,61 @@
+{
+  "id": "ck_attention_project_head_major_quant",
+  "op": "attention_projection",
+  "variant": "mixed_w_fp32_a",
+  "quant": {
+    "weight": "q5_0|q8_0|q4_k|q6_k|fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "attn_out", "dtype": "fp32", "shape": ["H", "T", "AD"], "desc": "Attention output [heads, tokens, aligned_head_dim]"},
+    {"name": "wo", "dtype": "mixed", "shape": ["H", "AE", "AD"], "desc": "Output projection weights [heads, aligned_embed_dim, aligned_head_dim]"},
+    {"name": "bo", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "Output bias [aligned_embed_dim] (or NULL)"},
+    {"name": "scratch", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Scratch buffer for head flattening"}
+  ],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Projected output [tokens, aligned_embed_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["T", "E", "AE", "H", "D", "AD"],
+  "params": [
+    {"name": "wo_dtype", "dtype": "int32", "desc": "CKDataType for Wo"}
+  ],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "token"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Split by tokens; each thread handles a range of rows."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64},
+    "notes": "Supports mixed quant Wo via ck_attention_project_head_major_quant."
+  },
+  "impl": {
+    "function": "ck_attention_project_head_major_quant",
+    "sources": ["src/ckernel_orchestration.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attention_project.py"],
+    "bench": ["scripts/bench_attention_project.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_attention_project.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against reference projection"
+      }
+    ]
+  },
+  "notes": "Head-major attention output projection with mixed quant weights."
+}

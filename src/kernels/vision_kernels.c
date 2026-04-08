@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <math.h>
 
 static int tile_order_index_2d(int linear_idx,
                                int grid_h,
@@ -38,6 +39,7 @@ static int tile_order_index_2d(int linear_idx,
 
     return y * grid_w + x;
 }
+
 
 /**
  * im2patch: Transforms an image into a sequence of flattened patches.
@@ -158,19 +160,80 @@ void position_embeddings_add_tiled_2d(float *x,
                                       int grid_h,
                                       int grid_w,
                                       int embed_dim,
-                                      int merge_size)
+                                      int merge_size,
+                                      int source_grid_size)
 {
     if (x == NULL || position_embd == NULL || grid_h <= 0 || grid_w <= 0 || embed_dim <= 0 || merge_size <= 0) {
         return;
     }
 
+    if (source_grid_size <= 0) {
+        source_grid_size = grid_h == grid_w ? grid_h : (grid_h > grid_w ? grid_h : grid_w);
+    }
+
     const int num_tokens = grid_h * grid_w;
+    const int source_tokens = source_grid_size * source_grid_size;
+    const int needs_resize = source_grid_size != grid_h || source_grid_size != grid_w;
+
+    const float sf_x = needs_resize ? (float) grid_w / (float) source_grid_size : 1.0f;
+    const float sf_y = needs_resize ? (float) grid_h / (float) source_grid_size : 1.0f;
+    const float pixel_offset = 0.5f;
+    const float support_x = needs_resize ? fmaxf(1.0f, 1.0f / sf_x) : 1.0f;
+    const float support_y = needs_resize ? fmaxf(1.0f, 1.0f / sf_y) : 1.0f;
+    const float invscale_x = needs_resize ? 1.0f / support_x : 1.0f;
+    const float invscale_y = needs_resize ? 1.0f / support_y : 1.0f;
+
     for (int tok = 0; tok < num_tokens; ++tok) {
         const int src_tok = tile_order_index_2d(tok, grid_h, grid_w, merge_size);
+        const int dst_y = src_tok / grid_w;
+        const int dst_x = src_tok % grid_w;
         float *dst = x + (size_t) tok * (size_t) embed_dim;
-        const float *src = position_embd + (size_t) src_tok * (size_t) embed_dim;
+
+        if (!needs_resize) {
+            const int flat = dst_y * source_grid_size + dst_x;
+            if (flat < 0 || flat >= source_tokens) {
+                continue;
+            }
+            const float *src = position_embd + (size_t) flat * (size_t) embed_dim;
+            for (int d = 0; d < embed_dim; ++d) {
+                dst[d] += src[d];
+            }
+            continue;
+        }
+
+        const float x_src = ((float) dst_x + pixel_offset) / sf_x;
+        const float y_src = ((float) dst_y + pixel_offset) / sf_y;
+        int x_min = (int) (x_src - support_x + pixel_offset);
+        int x_max = (int) (x_src + support_x + pixel_offset);
+        int y_min = (int) (y_src - support_y + pixel_offset);
+        int y_max = (int) (y_src + support_y + pixel_offset);
+        if (x_min < 0) x_min = 0;
+        if (y_min < 0) y_min = 0;
+        if (x_max > source_grid_size) x_max = source_grid_size;
+        if (y_max > source_grid_size) y_max = source_grid_size;
+
         for (int d = 0; d < embed_dim; ++d) {
-            dst[d] += src[d];
+            float val = 0.0f;
+            float total_weight = 0.0f;
+            for (int sy = y_min; sy < y_max; ++sy) {
+                const float wy = fmaxf(1.0f - fabsf(((float) sy - y_src + pixel_offset) * invscale_y), 0.0f);
+                if (wy <= 0.0f) {
+                    continue;
+                }
+                for (int sx = x_min; sx < x_max; ++sx) {
+                    const float wx = fmaxf(1.0f - fabsf(((float) sx - x_src + pixel_offset) * invscale_x), 0.0f);
+                    const float weight = wx * wy;
+                    if (weight <= 0.0f) {
+                        continue;
+                    }
+                    const float sample = position_embd[((size_t) sy * (size_t) source_grid_size + (size_t) sx) * (size_t) embed_dim + (size_t) d];
+                    val += sample * weight;
+                    total_weight += weight;
+                }
+            }
+            if (total_weight > 0.0f) {
+                dst[d] += val / total_weight;
+            }
         }
     }
 }

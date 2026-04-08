@@ -3455,7 +3455,10 @@ void attention_forward_decode_head_major_gqa_regular(const float *q_token,
         return;
     }
 
-    const float scale = 1.0f / sqrtf((float)head_dim);
+    const int strict = ck_strict_parity_enabled();
+    const float scale = strict
+        ? ck_attention_strict_scale_f32(head_dim)
+        : 1.0f / sqrtf((float) head_dim);
     const size_t head_stride = (size_t)cache_capacity * (size_t)aligned_head_dim;
 
     // Select SIMD implementation based on compile-time CPU features
@@ -3476,6 +3479,18 @@ void attention_forward_decode_head_major_gqa_regular(const float *q_token,
         const float *k_head = k_cache + (size_t)kv_head * head_stride;
         const float *v_head = v_cache + (size_t)kv_head * head_stride;
         float *out_vec = out_token + (size_t)h * (size_t)aligned_head_dim;
+
+        if (strict) {
+            attention_flash_query_causal_exact_f16kv(q_vec,
+                                                     k_head,
+                                                     v_head,
+                                                     kv_tokens,
+                                                     head_dim,
+                                                     aligned_head_dim,
+                                                     scale,
+                                                     out_vec);
+            continue;
+        }
 
         FLASH_QUERY_IMPL_DECODE(q_vec, k_head, v_head,
                                  kv_tokens, head_dim, aligned_head_dim,

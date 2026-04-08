@@ -10,9 +10,15 @@ import math
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - Pillow is optional at import time.
+    Image = None
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -20,12 +26,16 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 V8_TOOLS = REPO_ROOT / "version" / "v8" / "tools"
 BUILD_DIR = REPO_ROOT / "build"
 LLAMA_CPP_ROOT = REPO_ROOT / "llama.cpp"
+V7_SCRIPTS = REPO_ROOT / "version" / "v7" / "scripts"
 
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+if str(V7_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(V7_SCRIPTS))
 
 import parity_qwen3vl_mmproj_v8 as parity_harness  # type: ignore  # noqa: E402
 import build_ir_v8  # type: ignore  # noqa: E402
+import parity_test  # type: ignore  # noqa: E402
 from vision_bridge_runtime_v8 import (  # type: ignore  # noqa: E402
     declare_named_activation_api,
     resolve_vision_bridge_contract,
@@ -35,6 +45,52 @@ from vision_bridge_runtime_v8 import (  # type: ignore  # noqa: E402
 
 def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
     subprocess.run(cmd, cwd=str(cwd or REPO_ROOT), env=env, check=True)
+
+
+def _with_env_var(name: str, value: str | None) -> str | None:
+    old = os.environ.get(name)
+    if value is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = value
+    return old
+
+
+def _restore_env_var(name: str, old: str | None) -> None:
+    if old is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = old
+
+
+def _ensure_engine_lib() -> None:
+    _run(["make", "-B", "CK_ENABLE_OPENMP=1", "build/libckernel_engine.so"])
+
+
+def _load_runtime_metadata(report: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+    result = dict(report)
+    config = result.get("config")
+    if not isinstance(config, dict) or not config:
+        config_path = output_dir / "config.json"
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                result["config"] = loaded
+        else:
+            layout_path = output_dir / "layout.json"
+            if layout_path.exists():
+                layout_obj = _load_layout(layout_path)
+                loaded = layout_obj.get("config")
+                if isinstance(loaded, dict):
+                    result["config"] = dict(loaded)
+
+    weights_bump = result.get("weights_bump")
+    if not weights_bump:
+        bump_path = output_dir / "weights.bump"
+        if bump_path.exists():
+            result["weights_bump"] = str(bump_path)
+    return result
 
 
 def _ensure_runtime_artifacts(gguf_path: Path, output_dir: Path) -> dict[str, Any]:
@@ -65,7 +121,8 @@ def _ensure_runtime_artifacts(gguf_path: Path, output_dir: Path) -> dict[str, An
             raise RuntimeError(f"build_ir_v8 failed with rc={rc}")
 
     with report_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        report = json.load(f)
+    return _load_runtime_metadata(report, output_dir)
 
 
 def _compile_generated_model(output_dir: Path) -> Path:
@@ -81,11 +138,11 @@ def _compile_generated_model(output_dir: Path) -> Path:
         "-O3",
         "-fopenmp",
         "-Iinclude",
-        "-Iversion/v7/src",
+        "-Iversion/v8/src",
         str(c_path),
-        "version/v7/src/ckernel_model_load_v7.c",
-        "version/v7/src/ck_parallel_decode.c",
-        "version/v7/src/ck_parallel_prefill.c",
+        "version/v8/src/ckernel_model_load_v8.c",
+        "version/v8/src/ck_parallel_decode_v8.c",
+        "version/v8/src/ck_parallel_prefill_v8.c",
         "-Lbuild",
         "-lckernel_engine",
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -183,6 +240,45 @@ def _build_test_image(height: int, width: int, mode: str) -> tuple[list[float], 
     return interleaved, planar
 
 
+def _load_image_file(image_path: Path, height: int, width: int) -> dict[str, Any]:
+    if Image is None:
+        raise RuntimeError("Pillow is required for --image-path support")
+    if not image_path.exists():
+        raise FileNotFoundError(f"image file not found: {image_path}")
+
+    with Image.open(image_path) as src:
+        source_width, source_height = src.size
+        rgb = src.convert("RGB")
+        if rgb.size != (width, height):
+            if hasattr(Image, "Resampling"):
+                rgb = rgb.resize((width, height), Image.Resampling.BILINEAR)
+            else:  # pragma: no cover - compatibility with older Pillow.
+                rgb = rgb.resize((width, height), Image.BILINEAR)
+        pixels = list(rgb.getdata())
+
+    interleaved = [0.0] * (height * width * 3)
+    planar = [0.0] * (height * width * 3)
+    for idx, (r, g, b) in enumerate(pixels):
+        rf = float(r) / 255.0
+        gf = float(g) / 255.0
+        bf = float(b) / 255.0
+        base_i = idx * 3
+        interleaved[base_i + 0] = rf
+        interleaved[base_i + 1] = gf
+        interleaved[base_i + 2] = bf
+        planar[idx] = rf
+        planar[height * width + idx] = gf
+        planar[2 * height * width + idx] = bf
+    return {
+        "interleaved": interleaved,
+        "planar": planar,
+        "image_source": "file",
+        "image_path": str(image_path.resolve()),
+        "source_image_size": [source_width, source_height],
+        "preprocess": "rgb_bilinear_resize_to_square_0_1",
+    }
+
+
 def _load_generated_lib(model_so: Path) -> ctypes.CDLL:
     ctypes.CDLL(str(BUILD_DIR / "libckernel_engine.so"), mode=ctypes.RTLD_GLOBAL)
     lib = ctypes.CDLL(str(model_so))
@@ -256,6 +352,77 @@ def _load_mtmd_shim(shim_so: Path) -> ctypes.CDLL:
     return lib
 
 
+def _read_named_llama_dump_tensor(dump_path: Path, op_name: str) -> array:
+    dumps = parity_test.read_dump_file(dump_path)
+    matches = [dump for dump in dumps if dump.op_name == op_name]
+    if not matches:
+        available = sorted({dump.op_name for dump in dumps})
+        raise RuntimeError(
+            f"llama parity dump {dump_path} missing {op_name}; "
+            f"available ops: {', '.join(available) if available else '(none)'}"
+        )
+    flat = matches[-1].data.reshape(-1)
+    return array("f", (float(v) for v in flat))
+
+
+def _normalize_output_name(name: str | None) -> str:
+    value = str(name or "auto").strip()
+    return value or "auto"
+
+
+def _llama_reference_output_name(config: dict[str, Any]) -> str | None:
+    projector_out = int(config.get("projector_out_dim", config.get("projection_dim", 0)) or 0)
+    projector_total = int(config.get("projector_total_out_dim", projector_out) or 0)
+    # Qwen3-VL public mtmd image encode already returns the stitched
+    # multimodal prefix that includes deepstack slices. Compare that full
+    # bridge tensor directly instead of regressing to the legacy 4096-wide seam.
+    if projector_out > 0 and projector_total > projector_out:
+        return None
+    return None
+
+
+def _resolve_llama_reference_output_name(config: dict[str, Any], output_name: str | None = None) -> str | None:
+    requested = _normalize_output_name(output_name)
+    if requested == "auto":
+        return _llama_reference_output_name(config)
+    if requested in {"clip_encode_float_image", "public"}:
+        return None
+    return requested
+
+
+def _resolve_ck_output_contract(
+    layout: dict[str, Any],
+    offsets: dict[str, dict[str, Any]],
+    output_name: str | None = None,
+) -> dict[str, Any]:
+    requested = _normalize_output_name(output_name)
+    if requested == "auto":
+        contract = dict(resolve_vision_bridge_contract(layout, offsets, prefer_total_output=True))
+        contract["requested_output"] = requested
+        contract["resolved_output"] = str(
+            contract.get("named_activation") or contract.get("fallback_buffer_name") or ""
+        )
+        return contract
+
+    if requested == "vision_bridge_output":
+        contract = dict(resolve_vision_bridge_contract(layout, offsets, prefer_total_output=False))
+        if str(contract.get("named_activation") or "") != "vision_bridge_output":
+            raise RuntimeError("vision_bridge_output is not available for this encoder layout")
+        contract["requested_output"] = requested
+        contract["resolved_output"] = requested
+        return contract
+
+    contract = {
+        "named_activation": requested,
+        "fallback_buffer_name": requested if requested in offsets else "",
+        "used_nbytes": int(_buffer_nbytes(offsets.get(requested)) if requested in offsets else 0),
+        "reason": f"explicit:{requested}",
+        "requested_output": requested,
+        "resolved_output": requested,
+    }
+    return contract
+
+
 def _run_generated_encoder(
     model_so: Path,
     weights_bump: Path,
@@ -266,6 +433,7 @@ def _run_generated_encoder(
     strict_mtmd_oracle: bool = False,
     gguf_path: Path | None = None,
     shim_so: Path | None = None,
+    output_name: str | None = None,
 ) -> array:
     lib = _load_generated_lib(model_so)
     restore_env: dict[str, str | None] = {}
@@ -303,7 +471,7 @@ def _run_generated_encoder(
     try:
         layout = _load_layout(layout_path)
         offsets = _load_activation_offsets(layout_path)
-        bridge = resolve_vision_bridge_contract(layout, offsets)
+        bridge = _resolve_ck_output_contract(layout, offsets, output_name)
         image_buf = offsets["image_input"]
         base_ptr = int(lib.ck_model_get_base_ptr())
         if base_ptr == 0:
@@ -336,7 +504,7 @@ def _run_generated_encoder(
 
         output_len = output_nbytes // ctypes.sizeof(ctypes.c_float)
         if output_ptr == 0 or output_len <= 0:
-            raise RuntimeError("failed to resolve CK vision bridge output")
+            raise RuntimeError(f"failed to resolve CK encoder output {bridge.get('resolved_output') or bridge.get('fallback_buffer_name')}")
         output_arr = (ctypes.c_float * output_len).from_address(output_ptr)
         return array("f", output_arr)
     finally:
@@ -355,10 +523,25 @@ def _run_llamacpp_encoder(
     height: int,
     width: int,
     n_threads: int,
+    named_dump_output: str | None = None,
 ) -> array:
     lib = _load_mtmd_shim(shim_so)
+    dump_dir_ctx: tempfile.TemporaryDirectory[str] | None = None
+    dump_path: Path | None = None
+    restore_env: dict[str, str | None] = {}
+    if named_dump_output is not None:
+        dump_dir_ctx = tempfile.TemporaryDirectory(prefix="v8_llama_mmproj_dump_")
+        dump_path = Path(dump_dir_ctx.name) / "dump.bin"
+        restore_env["CK_LLAMA_PARITY_DIR"] = _with_env_var("CK_LLAMA_PARITY_DIR", str(Path(dump_dir_ctx.name)))
+        restore_env["CK_LLAMA_PARITY_ALL"] = _with_env_var("CK_LLAMA_PARITY_ALL", None)
+        restore_env["CK_LLAMA_PARITY_NAMES"] = _with_env_var("CK_LLAMA_PARITY_NAMES", named_dump_output)
+        restore_env["CK_LLAMA_PARITY_LAYER"] = _with_env_var("CK_LLAMA_PARITY_LAYER", None)
     ctx = lib.ck_mtmd_clip_init(str(gguf_path).encode(), 0, 0, 0, 0, 0)
     if not ctx:
+        for key, prior in restore_env.items():
+            _restore_env_var(key, prior)
+        if dump_dir_ctx is not None:
+            dump_dir_ctx.cleanup()
         raise RuntimeError("ck_mtmd_clip_init returned null")
 
     try:
@@ -373,9 +556,17 @@ def _run_llamacpp_encoder(
         ok = lib.ck_mtmd_clip_encode_float_image(ctx, n_threads, image_arr, height, width, out_arr)
         if ok != 1:
             raise RuntimeError("ck_mtmd_clip_encode_float_image failed")
+        if dump_path is not None:
+            if not dump_path.exists():
+                raise RuntimeError(f"expected llama parity dump at {dump_path}")
+            return _read_named_llama_dump_tensor(dump_path, named_dump_output or "")
         return array("f", out_arr)
     finally:
         lib.ck_mtmd_clip_free(ctx)
+        for key, prior in restore_env.items():
+            _restore_env_var(key, prior)
+        if dump_dir_ctx is not None:
+            dump_dir_ctx.cleanup()
 
 
 def _metrics(ref: array, got: array) -> dict[str, float]:
@@ -442,10 +633,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gguf", type=Path, required=True, help="Path to mmproj-Qwen3VL-*.gguf")
     ap.add_argument("--output-dir", type=Path, default=Path("/tmp/qwen3vl_mmproj_v8_numeric"), help="Workspace for generated artifacts")
     ap.add_argument("--image-mode", choices=("gradient", "gray", "checker"), default="gradient")
+    ap.add_argument("--image-path", type=Path, default=None, help="Optional real image path; overrides --image-mode")
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--ck-threads", type=int, default=None, help="Thread count for generated CK runtime; defaults to --threads")
     ap.add_argument("--strict-parity", action="store_true", help="Enable parity-only strict mode in CK and load ggml CPU helpers for full-attention replay")
     ap.add_argument("--strict-mtmd-oracle", action="store_true", help="In strict mode, allow the generated CK vision runtime to short-circuit to the local mtmd/ggml encoder oracle")
+    ap.add_argument("--ck-output-name", type=str, default="auto", help="CK encoder output to compare: auto, vision_output, vision_bridge_output, embedded_input, or another named activation/buffer")
+    ap.add_argument("--llama-output-name", type=str, default="auto", help="llama.cpp reference output to compare: auto, clip_encode_float_image, projector_out, vision_output, or another dumped tensor name")
     ap.add_argument("--report", type=Path, default=None, help="Optional JSON report output")
     args = ap.parse_args(argv)
 
@@ -456,6 +650,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     t0 = time.perf_counter()
+    _ensure_engine_lib()
     report = _ensure_runtime_artifacts(args.gguf, output_dir)
     model_so = _compile_generated_model(output_dir)
     shim_so = _compile_mtmd_shim(output_dir)
@@ -464,7 +659,27 @@ def main(argv: list[str] | None = None) -> int:
     config = report["config"]
     height = int(config["image_size"])
     width = int(config["image_size"])
-    interleaved, planar = _build_test_image(height, width, args.image_mode)
+    layout_path = output_dir / "layout.json"
+    layout = _load_layout(layout_path)
+    offsets = _load_activation_offsets(layout_path)
+    ck_output_contract = _resolve_ck_output_contract(layout, offsets, args.ck_output_name)
+    ck_resolved_output = str(
+        ck_output_contract.get("resolved_output") or ck_output_contract.get("fallback_buffer_name") or ""
+    )
+    llama_reference_output = _resolve_llama_reference_output_name(config, args.llama_output_name)
+    if args.image_path is not None:
+        image_report = _load_image_file(args.image_path.resolve(), height, width)
+        interleaved = image_report["interleaved"]
+        planar = image_report["planar"]
+    else:
+        interleaved, planar = _build_test_image(height, width, args.image_mode)
+        image_report = {
+            "image_source": "synthetic",
+            "image_mode": args.image_mode,
+            "image_path": None,
+            "source_image_size": [width, height],
+            "preprocess": "synthetic_generator",
+        }
     t_image = time.perf_counter()
 
     ck_out = _run_generated_encoder(
@@ -477,6 +692,7 @@ def main(argv: list[str] | None = None) -> int:
         strict_mtmd_oracle=args.strict_mtmd_oracle,
         gguf_path=args.gguf,
         shim_so=shim_so,
+        output_name=args.ck_output_name,
     )
     t_ck = time.perf_counter()
     llama_out = _run_llamacpp_encoder(
@@ -486,6 +702,7 @@ def main(argv: list[str] | None = None) -> int:
         height=height,
         width=width,
         n_threads=args.threads,
+        named_dump_output=llama_reference_output,
     )
     t_llama = time.perf_counter()
 
@@ -494,14 +711,27 @@ def main(argv: list[str] | None = None) -> int:
     lowering = report.get("lowering", {}) if isinstance(report, dict) else {}
     notes = [
         "llama.cpp reference uses clip_encode_float_image from libmtmd via a local C shim.",
-        "CK output is read from the resolved vision bridge activation, which prefers projector-width embeddings over stitched deepstack output.",
     ]
+    if _normalize_output_name(args.ck_output_name) == "auto":
+        notes.append(
+            "CK output is read from the resolved full vision bridge activation so Qwen3-VL compares the stitched decoder-facing prefix tensor."
+        )
+    else:
+        notes.append(f"CK output is read from the explicit {ck_resolved_output} seam.")
+    if llama_reference_output is not None:
+        notes.append(
+            f"llama.cpp numeric parity is pinned to the dumped {llama_reference_output} seam instead of the public image-encode output."
+        )
     if not lowering.get("has_vision_mrope", False):
         notes.append("Vision multi-section RoPE is still not lowered in the current v8 path, so parity is expected to fail.")
     result = {
         "gguf": str(args.gguf),
         "output_dir": str(output_dir),
-        "image_mode": args.image_mode,
+        "image_source": str(image_report["image_source"]),
+        "image_mode": image_report.get("image_mode"),
+        "image_path": image_report.get("image_path"),
+        "source_image_size": image_report.get("source_image_size"),
+        "preprocess": str(image_report["preprocess"]),
         "height": height,
         "width": width,
         "threads": {
@@ -510,6 +740,10 @@ def main(argv: list[str] | None = None) -> int:
         },
         "strict_parity": bool(args.strict_parity),
         "strict_mtmd_oracle": bool(args.strict_mtmd_oracle),
+        "ck_output_name": _normalize_output_name(args.ck_output_name),
+        "ck_resolved_output": ck_resolved_output,
+        "llama_requested_output": _normalize_output_name(args.llama_output_name),
+        "llama_reference_output": llama_reference_output or "clip_encode_float_image",
         "num_values": len(llama_out),
         "metrics": metrics,
         "top_diffs": _sample_diffs(llama_out, ck_out),

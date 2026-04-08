@@ -172,6 +172,58 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         self.assertEqual(doc["block_types"]["vision_encoder"]["footer"][-1]["op"], "branch_concat")
         self.assertEqual(doc["kernels"]["layernorm"], "layernorm_fp32_exact")
         self.assertEqual(doc["kernels"]["branch_layernorm"], "layernorm_fp32_exact")
+        self.assertNotIn("dtype", branch["collect"])
+
+    def test_template_dtype_metadata_is_rejected(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "declares dtype/quant policy"):
+            build_ir_v8._raise_on_forbidden_template_metadata({"dtype": "fp16"}, source="synthetic")
+
+    def test_template_activation_policy_flags_are_rejected(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "flags.activation_preference_by_op"):
+            build_ir_v8._raise_on_forbidden_template_metadata(
+                {"flags": {"activation_preference_by_op": {"mlp_down": "fp32"}}},
+                source="synthetic",
+            )
+
+    def test_template_q8_contract_policy_flags_are_rejected(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "flags.prefer_q8_0_contract"):
+            build_ir_v8._raise_on_forbidden_template_metadata(
+                {"flags": {"prefer_q8_0_contract": True}},
+                source="synthetic",
+            )
+        with self.assertRaisesRegex(RuntimeError, "flags.prefer_fp32_logits"):
+            build_ir_v8._raise_on_forbidden_template_metadata(
+                {"flags": {"prefer_fp32_logits": True}},
+                source="synthetic",
+            )
+
+    def test_hydrate_manifest_rejects_embedded_template_policy(self) -> None:
+        manifest = {
+            "config": {"model": "qwen3vl", "arch": "qwen3vl"},
+            "template": {
+                "name": "qwen3vl",
+                "flags": {"prefer_fp32_mlp_matmuls": True},
+            },
+        }
+        with self.assertRaisesRegex(RuntimeError, "flags.prefer_fp32_mlp_matmuls"):
+            build_ir_v8._hydrate_manifest_template(manifest)
+
+    def test_runtime_config_defaults_own_quant_policy(self) -> None:
+        gemma_cfg = build_ir_v8._inject_runtime_config_defaults({}, "gemma3")
+        self.assertTrue(gemma_cfg["prefer_q8_0_contract"])
+        self.assertTrue(gemma_cfg["prefer_fp32_logits"])
+
+        vision_cfg = build_ir_v8._inject_runtime_config_defaults({}, "qwen3_vl_vision")
+        self.assertEqual(
+            vision_cfg["activation_preference_by_op"],
+            {
+                "mlp_down": "fp32",
+                "out_proj": "fp32",
+                "branch_fc1": "fp32",
+                "branch_fc2": "fp32",
+            },
+        )
+        self.assertNotIn("prefer_q8_0_contract", vision_cfg)
 
     def test_qwen3vl_branch_plan_reads_template_declared_layers(self) -> None:
         manifest = _make_qwen3vl_manifest()
@@ -189,6 +241,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
         self.assertEqual(branch["collect_contract"]["rows"], 576)
         self.assertEqual(branch["collect_contract"]["slice_dim"], 4096)
         self.assertEqual(branch["collect_contract"]["num_slices"], 1)
+        self.assertEqual(branch["collect_contract"]["dtype"], "fp32")
         self.assertEqual(
             branch["producer_ops"],
             ["branch_spatial_merge", "branch_layernorm", "branch_fc1", "branch_gelu", "branch_fc2"],
@@ -303,10 +356,16 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             rope = next(op for op in call_ops if op.get("op") == "rope_qk")
             rope_positions = next(arg for arg in rope.get("args", []) if arg.get("name") == "positions")
             self.assertEqual(rope_positions.get("buffer_ref"), "vision_positions")
+            pos_embed = next(op for op in call_ops if op.get("op") == "position_embeddings")
+            pos_grid = next(arg for arg in pos_embed.get("args", []) if arg.get("name") == "source_grid_size")
+            self.assertEqual(pos_grid.get("expr"), "48")
             split_qkv = next(op for op in call_ops if op.get("op") == "split_qkv_packed")
             self.assertEqual(split_qkv.get("function"), "split_qkv_packed_head_major_forward")
             qkv_packed_proj = next(op for op in call_ops if op.get("op") == "qkv_packed_proj")
-            self.assertEqual(qkv_packed_proj.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(qkv_packed_proj.get("function"), "gemm_nt_q8_0_q8_0")
+            quantize_input_0 = next(op for op in call_ops if op.get("op") == "quantize_input_0")
+            quantize_input_rows = next(arg for arg in quantize_input_0.get("args", []) if arg.get("name") == "rows")
+            self.assertEqual(quantize_input_rows.get("expr"), str(manifest["config"]["context_length"]))
             attn = next(op for op in call_ops if op.get("op") == "attn")
             self.assertEqual(attn.get("function"), "attention_forward_full_head_major_gqa_ggml_strided")
             attn_idx = next(i for i, op in enumerate(call_ops) if op.get("op") == "attn")
@@ -315,22 +374,25 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertLess(attn_idx, transpose_idx)
             self.assertLess(transpose_idx, out_proj_idx)
             out_proj = next(op for op in call_ops if op.get("op") == "out_proj")
-            self.assertEqual(out_proj.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(out_proj.get("function"), "gemm_nt_q8_0")
+            self.assertNotIn("quantize_out_proj_input", [op.get("op") for op in call_ops])
             self.assertNotIn("kv_cache_batch_copy", [op.get("op") for op in call_ops])
             projector_fc1 = next(op for op in call_ops if op.get("op") == "projector_fc1")
-            self.assertEqual(projector_fc1.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(projector_fc1.get("function"), "gemm_nt_q8_0_q8_0")
             projector_fc1_bias = next(arg for arg in projector_fc1.get("args", []) if arg.get("name") == "bias")
             self.assertEqual(projector_fc1_bias.get("weight_ref"), "mm.0.bias")
             projector_fc2 = next(op for op in call_ops if op.get("op") == "projector_fc2")
-            self.assertEqual(projector_fc2.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(projector_fc2.get("function"), "gemm_nt_q8_0")
+            projector_fc2_input = next(arg for arg in projector_fc2.get("args", []) if arg.get("name") == "A")
+            self.assertEqual(projector_fc2_input.get("buffer_ref"), "mlp_scratch")
             projector_fc2_bias = next(arg for arg in projector_fc2.get("args", []) if arg.get("name") == "bias")
             self.assertEqual(projector_fc2_bias.get("weight_ref"), "mm.2.bias")
             branch_fc1 = next(op for op in call_ops if op.get("op") == "branch_fc1")
-            self.assertEqual(branch_fc1.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(branch_fc1.get("function"), "gemm_nt_q8_0")
             branch_fc1_bias = next(arg for arg in branch_fc1.get("args", []) if arg.get("name") == "bias")
             self.assertEqual(branch_fc1_bias.get("weight_ref"), "v.deepstack.0.fc1.bias")
             branch_fc2 = next(op for op in call_ops if op.get("op") == "branch_fc2")
-            self.assertEqual(branch_fc2.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(branch_fc2.get("function"), "gemm_nt_q8_0")
             branch_fc2_bias = next(arg for arg in branch_fc2.get("args", []) if arg.get("name") == "bias")
             self.assertEqual(branch_fc2_bias.get("weight_ref"), "v.deepstack.0.fc2.bias")
             patch_proj = next(op for op in call_ops if op.get("op") == "patch_proj")
@@ -342,7 +404,7 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             branch_norm = next(op for op in call_ops if op.get("op") == "branch_layernorm")
             self.assertEqual(branch_norm.get("function"), "layernorm_naive_serial_matched_precision")
             mlp_up = next(op for op in call_ops if op.get("op") == "mlp_up")
-            self.assertEqual(mlp_up.get("function"), "gemm_nt_q8_0_q8_0_contract")
+            self.assertEqual(mlp_up.get("function"), "gemm_nt_q8_0_q8_0")
             mlp_up_n = next(arg for arg in mlp_up.get("args", []) if arg.get("name") == "N")
             self.assertEqual(mlp_up_n.get("expr"), str(manifest["config"]["intermediate_size"]))
             gelu = next(op for op in call_ops if op.get("op") == "gelu")
@@ -356,6 +418,18 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertEqual(projector_gelu.get("function"), "gelu_ggml_inplace")
             branch_gelu = next(op for op in call_ops if op.get("op") == "branch_gelu")
             self.assertEqual(branch_gelu.get("function"), "gelu_ggml_inplace")
+            spatial_merge = next(op for op in call_ops if op.get("op") == "spatial_merge")
+            spatial_merge_out = next(arg for arg in spatial_merge.get("args", []) if arg.get("name") == "output")
+            self.assertEqual(spatial_merge_out.get("buffer_ref"), "embedded_input")
+            quantize_final_output = next(op for op in call_ops if op.get("op") == "quantize_final_output")
+            quant_x = next(arg for arg in quantize_final_output.get("args", []) if arg.get("name") == "x")
+            quant_y = next(arg for arg in quantize_final_output.get("args", []) if arg.get("name") == "y")
+            quant_k = next(arg for arg in quantize_final_output.get("args", []) if arg.get("name") == "k")
+            quant_rows = next(arg for arg in quantize_final_output.get("args", []) if arg.get("name") == "rows")
+            self.assertEqual(quant_x.get("buffer_ref"), "embedded_input")
+            self.assertEqual(quant_y.get("buffer_ref"), "layer_input")
+            self.assertEqual(quant_k.get("expr"), str(manifest["config"]["projector_in_dim"]))
+            self.assertEqual(quant_rows.get("expr"), str(manifest["config"]["vision_merged_tokens"]))
             mlp_down = next(op for op in call_ops if op.get("op") == "mlp_down")
             self.assertEqual(mlp_down.get("function"), "gemm_nt_f16")
 
@@ -377,6 +451,8 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             self.assertIn("gemm_naive_parallel", text)
             self.assertIn("position_embeddings_add_tiled_2d", text)
             self.assertIn("spatial_merge_contiguous_tiled", text)
+            self.assertIn("for (int _t = 0; _t < _rows; ++_t)", text)
+            self.assertIn("quantize_row_q8_0(_x_base + (size_t)_t * (size_t)_k, (void*)(_y_base + (size_t)_t * _row_bytes), _k);", text)
             self.assertIn("add_stream_reorder_2d", text)
             self.assertIn("vision_bridge_output", text)
             self.assertIn("ck_strict_mtmd_clip_encode_planar_f32", text)

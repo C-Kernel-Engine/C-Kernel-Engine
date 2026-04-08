@@ -1,0 +1,26 @@
+{
+  "id": "bias_add",
+  "op": "bias_add",
+  "variant": "fp32_inplace",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["N"], "desc": "Input/output vector [N]"}
+  ],
+  "weights": [
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "desc": "Bias vector [N]"}
+  ],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["N"], "desc": "Output vector [N] (in-place)"}
+  ],
+  "dims": ["N"],
+  "impl": {
+    "function": "add_inplace_f32",
+    "c_declaration": "void add_inplace_f32(float *a, const float *b, size_t n);",
+    "sources": ["src/kernels/add_kernels_bf16.c"]
+  },
+  "notes": "In-place bias add: y += bias"
+}

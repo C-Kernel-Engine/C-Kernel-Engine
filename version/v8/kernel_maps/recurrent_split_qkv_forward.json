@@ -1,0 +1,65 @@
+{
+  "id": "recurrent_split_qkv_forward",
+  "op": "recurrent_split_qkv",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "packed_qkv", "dtype": "fp32", "shape": ["R", "Q+K+V"], "desc": "Packed recurrent QKV rows"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["R", "Q"], "desc": "Split query rows"},
+    {"name": "k", "dtype": "fp32", "shape": ["R", "K"], "desc": "Split key rows"},
+    {"name": "v", "dtype": "fp32", "shape": ["R", "V"], "desc": "Split value rows"}
+  ],
+  "scratch": [],
+  "dims": ["R", "Q", "K", "V"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each packed row can be split independently."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Pure graph-stitch split for recurrent packed QKV rows."
+  },
+  "impl": {
+    "function": "recurrent_split_qkv_forward",
+    "c_declaration": "void recurrent_split_qkv_forward(const float *packed_qkv, float *q, float *k, float *v, int rows, int q_dim, int k_dim, int v_dim);",
+    "sources": ["src/kernels/recurrent_split_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_split_qkv.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_recurrent_split_qkv.py",
+        "tolerance": "0",
+        "notes": "Forward/backward parity against torch.split."
+      },
+      {
+        "kind": "llamacpp",
+        "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_split_qkv",
+        "tolerance": "0",
+        "notes": "Forward parity against the helper reference split."
+      }
+    ]
+  },
+  "notes": "Explicit split kernel for recurrent packed QKV rows."
+}

@@ -1,0 +1,73 @@
+{
+  "id": "gemm_nt_q4_k_q8_k",
+  "op": "gemm",
+  "variant": "q4_k_w_q8_k_a",
+  "quant": {
+    "weight": "q4_k",
+    "activation": "q8_k",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "q8_k", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (Q8_K quantized)"},
+    {"name": "B", "dtype": "q4_k", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q4_K quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [
+    {"name": "temp", "dtype": "fp32", "size_bytes": "M * N * 4", "desc": "Temporary accumulation buffer"}
+  ],
+  "dims": ["M", "N", "K"],
+  "params": [],
+  "parallelization": {
+    "supported": ["token", "feature"],
+    "preferred": {"prefill": "token", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "M",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Split by rows (tokens); good for prefill with many tokens."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "range": {"min_chunk": 16, "align_bytes": 64, "allow_tail": true},
+        "notes": "Split by output features; good for decode."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q4_K requires K dimension multiple of 256 for dequantization. Most aggressive quantization for W2 (down) projection."
+  },
+  "impl": {
+    "function": "gemm_nt_q4_k_q8_k",
+    "sources": ["src/kernels/gemm_kernels_q4k.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_gemm_q4_k.py"],
+    "bench": ["scripts/bench_gemm_q4_k.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_gemm_q4_k.py --compare-numpy",
+        "tolerance": "1e-3",
+        "notes": "Compare against numpy matmul (higher tolerance due to quantization)"
+      },
+      {
+        "kind": "llamacpp",
+        "command": "make llamacpp-parity-gemm-q4k",
+        "tolerance": "1e-3",
+        "notes": "Compare against llama.cpp ggml_gemm_q4k"
+      }
+    ]
+  },
+  "notes": "General matrix multiplication with Q4_K weights and Q8_K activations. Used for W2 (down) projection in MLP. High compression ratio."
+}

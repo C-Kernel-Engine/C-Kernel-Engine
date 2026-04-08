@@ -1,0 +1,60 @@
+{
+  "id": "ck_residual_add_token_major",
+  "op": "residual_add",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "a", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input A [tokens, aligned_embed_dim]"},
+    {"name": "b", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Residual input B [tokens, aligned_embed_dim]"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Output [tokens, aligned_embed_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["T", "E", "AE"],
+  "params": [],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "token"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Split by tokens; each thread handles a range of rows."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64},
+    "notes": "Token-major residual add."
+  },
+  "impl": {
+    "function": "ck_residual_add_token_major",
+    "c_declaration": "void ck_residual_add_token_major(const float *a, const float *b, float *out, int tokens, int aligned_embed_dim);",
+    "sources": ["src/ckernel_orchestration.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_residual_add.py"],
+    "bench": ["scripts/bench_residual_add.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_residual_add.py --compare-numpy",
+        "tolerance": "1e-6",
+        "notes": "Compare against numpy add"
+      }
+    ]
+  },
+  "notes": "Simple fp32 residual add for token-major activations."
+}

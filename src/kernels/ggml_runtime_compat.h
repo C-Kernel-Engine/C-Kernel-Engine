@@ -39,6 +39,10 @@ enum ggml_status {
 #define GGML_ROPE_TYPE_VISION 24
 #endif
 
+#ifndef GGML_ROPE_TYPE_IMROPE
+#define GGML_ROPE_TYPE_IMROPE 40
+#endif
+
 float ggml_fp16_to_fp32(ggml_fp16_t value);
 ggml_fp16_t ggml_fp32_to_fp16(float value);
 void *ggml_get_data(const struct ggml_tensor *tensor);

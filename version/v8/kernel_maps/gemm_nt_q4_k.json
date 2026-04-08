@@ -1,0 +1,30 @@
+{
+  "id": "gemm_nt_q4_k",
+  "op": "gemm",
+  "variant": "q4_k_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q4_k",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "A", "dtype": "fp32", "shape": ["M", "K"], "desc": "Activation matrix [rows, cols] (FP32)"},
+    {"name": "B", "dtype": "q4_k", "shape": ["N", "K"], "desc": "Weight matrix [cols, cols] (Q4_K quantized)"},
+    {"name": "bias", "dtype": "fp32", "shape": ["N"], "optional": true, "desc": "Bias [N] (optional)"}
+  ],
+  "outputs": [
+    {"name": "C", "dtype": "fp32", "shape": ["M", "N"], "desc": "Result [M, N]"}
+  ],
+  "scratch": [],
+  "dims": ["M", "N", "K"],
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q4_K uses 256-value super-blocks; K should be a multiple of 256."
+  },
+  "impl": {
+    "function": "gemm_nt_q4_k",
+    "c_declaration": "void gemm_nt_q4_k(const float *A, const void *B, const float *bias, float *C, int M, int N, int K);",
+    "sources": ["src/kernels/gemm_kernels_q4k.c"]
+  },
+  "notes": "GEMM for Q4_K weights with FP32 activation input. No activation quantization needed."
+}

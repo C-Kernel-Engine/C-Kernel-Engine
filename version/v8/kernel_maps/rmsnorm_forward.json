@@ -1,0 +1,76 @@
+{
+  "id": "rmsnorm_forward",
+  "op": "rmsnorm",
+  "variant": "fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["T", "E"], "desc": "Input activations [tokens, embed_dim]"}
+  ],
+  "weights": [
+    {"name": "gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm scale weight"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["T", "E"], "desc": "Normalized output"},
+    {"name": "rstd", "dtype": "fp32", "shape": ["T"], "desc": "Running stddev (can be used for backward pass)"}
+  ],
+  "scratch": [
+    {"name": "mean", "dtype": "fp32", "size_bytes": "T * 4", "desc": "Mean per row (reuse for variance)"},
+    {"name": "variance", "dtype": "fp32", "size_bytes": "T * 4", "desc": "Variance per row"}
+  ],
+  "dims": ["T", "E"],
+  "params": [
+    {"name": "eps", "dtype": "float32", "desc": "Epsilon for numerical stability (typically 1e-5)"}
+  ],
+  "parallelization": {
+    "supported": ["token", "feature"],
+    "preferred": {"prefill": "feature", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Process tokens in parallel; each thread normalizes one or more tokens."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "E",
+        "param_style": "range",
+        "range": {"min_chunk": 64, "align_bytes": 32, "allow_tail": true},
+        "notes": "Parallelize across embed dimension; reduction needed for mean/variance."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"E": 64},
+    "notes": "For optimal performance, E should be multiple of 64 for SIMD vectorization"
+  },
+  "impl": {
+    "function": "rmsnorm_forward",
+    "c_declaration": "void rmsnorm_forward(const float *input, const float *gamma, float *output, float *rstd_cache, int tokens, int d_model, int aligned_embed_dim, float eps);",
+    "sources": ["src/kernels/rmsnorm_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_rmsnorm.py"],
+    "bench": ["scripts/bench_rmsnorm.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_rmsnorm.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against numpy reference implementation"
+      }
+    ]
+  },
+  "notes": "Root Mean Square Layer Normalization. Computes: output = input / sqrt(mean(x^2) + eps) * gamma"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "gelu_fast_inplace",
+  "op": "gelu",
+  "variant": "fast_inplace_fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "x",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "Input/output buffer (in-place)"
+    }
+  ],
+  "weights": [],
+  "outputs": [
+    {
+      "name": "out",
+      "dtype": "fp32",
+      "shape": ["N"],
+      "desc": "GELU output (same buffer as input)"
+    }
+  ],
+  "dims": ["N"],
+  "impl": {
+    "function": "gelu_fast_inplace",
+    "c_declaration": "void gelu_fast_inplace(float *data, size_t n);",
+    "sources": ["src/kernels/gelu_kernels.c"]
+  },
+  "tests": {
+    "unit": ["unittest/test_gelu.py"]
+  },
+  "notes": "Fast in-place GELU used by the first v8 Qwen3-VL projector footer."
+}

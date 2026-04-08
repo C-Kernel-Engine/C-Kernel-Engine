@@ -133,11 +133,11 @@ def _compile_generated_model(c_path: Path, so_path: Path) -> None:
         "-O3",
         "-fopenmp",
         "-Iinclude",
-        "-Iversion/v7/src",
+        "-Iversion/v8/src",
         str(c_path),
-        "version/v7/src/ckernel_model_load_v7.c",
-        "version/v7/src/ck_parallel_decode.c",
-        "version/v7/src/ck_parallel_prefill.c",
+        "version/v8/src/ckernel_model_load_v8.c",
+        "version/v8/src/ck_parallel_decode_v8.c",
+        "version/v8/src/ck_parallel_prefill_v8.c",
         "-Lbuild",
         "-lckernel_engine",
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -240,6 +240,206 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertEqual(bridge["prefix_tokens"], 576)
         self.assertEqual(bridge["used_nbytes"], 576 * 4096 * 4)
         self.assertEqual(bridge["reason"], "projector_output")
+
+    def test_format_prompt_with_qwen3vl_contract_matches_chatml_shell(self) -> None:
+        template_doc = build_ir_v8._load_builtin_template_doc("qwen3vl")
+        self.assertIsNotNone(template_doc)
+        contract = template_doc["contract"]["chat_contract"]
+
+        formatted = bridge_runner_v8._format_prompt_with_chat_contract(
+            "Describe the image.",
+            contract,
+            thinking_mode="auto",
+        )
+
+        self.assertEqual(
+            formatted,
+            "<|im_start|>user\nDescribe the image.<|im_end|>\n<|im_start|>assistant\n",
+        )
+
+    def test_format_prompt_with_qwen3vl_contract_honors_suppressed_thinking(self) -> None:
+        template_doc = build_ir_v8._load_builtin_template_doc("qwen3vl")
+        self.assertIsNotNone(template_doc)
+        contract = template_doc["contract"]["chat_contract"]
+
+        formatted = bridge_runner_v8._format_prompt_with_chat_contract(
+            "Describe the image.",
+            contract,
+            thinking_mode="suppressed",
+        )
+
+        self.assertEqual(
+            formatted,
+            "<|im_start|>user\n/no_think\nDescribe the image.<|im_end|>\n"
+            "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+        )
+
+    def test_format_multimodal_prompt_segments_wraps_qwen3vl_image_chunk(self) -> None:
+        template_doc = build_ir_v8._load_builtin_template_doc("qwen3vl")
+        self.assertIsNotNone(template_doc)
+        contract = template_doc["contract"]["chat_contract"]
+
+        segments = bridge_runner_v8._format_multimodal_prompt_segments(
+            "Describe the image.",
+            contract,
+            include_image=True,
+        )
+
+        self.assertTrue(segments["uses_image_chunks"])
+        self.assertEqual(segments["before_text"], "<|im_start|>user\n<|vision_start|>")
+        self.assertEqual(segments["after_text"], "<|vision_end|>Describe the image.<|im_end|>\n<|im_start|>assistant\n")
+        self.assertEqual(
+            segments["formatted_prompt"],
+            "<|im_start|>user\n<|vision_start|><image_embeds><|vision_end|>Describe the image.<|im_end|>\n<|im_start|>assistant\n",
+        )
+
+    def test_fallback_chat_contract_from_template_text_preserves_vision_markers(self) -> None:
+        template = (
+            "{%- for message in messages %}"
+            "{{- '<|im_start|>' + message.role + '\\n' }}"
+            "<|vision_start|><|image_pad|><|vision_end|>"
+            "{{- '<|im_end|>\\n' }}"
+            "{%- endfor %}"
+            "{%- if add_generation_prompt %}{{- '<|im_start|>assistant\\n' }}{%- endif %}"
+        )
+
+        contract = bridge_runner_v8._fallback_chat_contract_from_template_text(template)
+
+        self.assertIsNotNone(contract)
+        self.assertEqual(contract["name"], "chatml_auto")
+        self.assertEqual(contract["image_begin_marker"], "<|vision_start|>")
+        self.assertEqual(contract["image_end_marker"], "<|vision_end|>")
+        self.assertEqual(contract["assistant_generation_prefix_by_thinking_mode"], {})
+        self.assertEqual(contract["last_user_prefix_by_thinking_mode"], {})
+        self.assertIn("<|vision_start|>", contract["template_markers"])
+        self.assertIn("<|vision_end|>", contract["template_markers"])
+
+    def test_resolve_decoder_chat_contract_auto_prefers_gguf_template_over_arch_builtin(self) -> None:
+        gguf_template = (
+            "{%- for message in messages %}"
+            "{{- '<|im_start|>' + message.role + '\\n' }}"
+            "<|vision_start|><|image_pad|><|vision_end|>"
+            "{{- '<|im_end|>\\n' }}"
+            "{%- endfor %}"
+            "{%- if add_generation_prompt %}{{- '<|im_start|>assistant\\n' }}{%- endif %}"
+        )
+
+        with mock.patch.object(
+            bridge_runner_v8,
+            "_read_gguf_metadata",
+            return_value={
+                "general.architecture": "qwen3vl",
+                "tokenizer.chat_template": gguf_template,
+            },
+        ):
+            contract = bridge_runner_v8._resolve_decoder_chat_contract(
+                Path("/tmp/fake-qwen3vl.gguf"),
+                chat_template_mode="auto",
+            )
+
+        self.assertIsNotNone(contract)
+        self.assertEqual(contract["name"], "chatml_auto")
+        formatted = bridge_runner_v8._format_multimodal_prompt_segments(
+            "Explain this image.",
+            contract,
+            include_image=True,
+            thinking_mode="suppressed",
+        )
+        self.assertEqual(formatted["before_text"], "<|im_start|>user\n<|vision_start|>")
+        self.assertEqual(
+            formatted["after_text"],
+            "<|vision_end|>Explain this image.<|im_end|>\n<|im_start|>assistant\n",
+        )
+        self.assertEqual(
+            formatted["formatted_prompt"],
+            "<|im_start|>user\n<|vision_start|><image_embeds><|vision_end|>Explain this image.<|im_end|>\n<|im_start|>assistant\n",
+        )
+
+    def test_resolve_stop_token_policy_uses_eos_and_chat_contract_markers(self) -> None:
+        class FakeTokenizer:
+            eos_id = 151645
+            token_to_id = {"<|im_end|>": 151645, "<|eot_id|>": 151643}
+
+            def encode(self, text: str, add_bos: bool = False, add_eos: bool = False) -> list[int]:
+                token_id = self.token_to_id.get(text)
+                return [] if token_id is None else [token_id]
+
+        policy = bridge_runner_v8._resolve_stop_token_policy(
+            FakeTokenizer(),
+            {
+                "token_stop_markers": ["<|im_end|>", "<|eot_id|>"],
+            },
+        )
+
+        self.assertEqual(policy["eos_id"], 151645)
+        self.assertEqual(policy["stop_ids"], [151643, 151645])
+        self.assertEqual(policy["stop_markers"], ["<|im_end|>", "<|eot_id|>"])
+
+    def test_bridge_runner_auto_formats_prompt_from_decoder_arch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_native_bridge_prompt_") as tmpdir:
+            tmp = Path(tmpdir)
+            workdir = tmp / "work"
+            fake_decoder_gguf = tmp / "decoder.gguf"
+
+            class FakeTokenizer:
+                def __init__(self) -> None:
+                    self.calls: list[str] = []
+
+                def encode(self, text: str) -> list[int]:
+                    self.calls.append(text)
+                    return [11, 22]
+
+                def decode(self, ids: list[int], skip_special: bool = False) -> str:
+                    return f"<tok:{ids[0]}>"
+
+            tokenizer = FakeTokenizer()
+            fake_runtime = {
+                "embed_dim": 16,
+                "input_embed_dim": 64,
+                "vocab_size": 4,
+                "so_path": workdir / "decoder" / "libdecoder_v8.so",
+                "c_path": workdir / "decoder" / "decoder_v8.c",
+            }
+            fake_logits = array("f", [0.1, 0.9, -0.4, 0.0])
+
+            with mock.patch.object(bridge_runner_v8, "_ensure_engine_lib") as ensure_engine, \
+                 mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_runtime), \
+                 mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}) as run_decoder, \
+                 mock.patch.object(bridge_runner_v8, "_read_gguf_metadata", return_value={"general.architecture": "qwen3vl"}), \
+                 mock.patch.object(bridge_runner_v8.GGUFTokenizer, "from_gguf", return_value=tokenizer):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    rc = bridge_runner_v8.main(
+                        [
+                            "--decoder-gguf",
+                            str(fake_decoder_gguf),
+                            "--workdir",
+                            str(workdir),
+                            "--prompt",
+                            "Describe the image.",
+                            "--synthetic-prefix-tokens",
+                            "3",
+                            "--top-k",
+                            "2",
+                        ]
+                    )
+
+            self.assertEqual(rc, 0)
+            ensure_engine.assert_called_once_with(openmp=False)
+            self.assertEqual(
+                tokenizer.calls,
+                [
+                    "<|im_start|>user\n<|vision_start|>",
+                    "<|vision_end|>Describe the image.<|im_end|>\n<|im_start|>assistant\n",
+                ],
+            )
+            _, decoder_kwargs = run_decoder.call_args
+            self.assertEqual(decoder_kwargs["tokens_before"], [11, 22])
+            report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                report["formatted_prompt"],
+                "<|im_start|>user\n<|vision_start|><image_embeds><|vision_end|>Describe the image.<|im_end|>\n<|im_start|>assistant\n",
+            )
+            self.assertEqual(report["chat_contract_name"], "qwen3vl")
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -403,6 +603,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
 
             fake_runtime = {
                 "embed_dim": 16,
+                "input_embed_dim": 64,
                 "vocab_size": 4,
                 "so_path": workdir / "decoder" / "libdecoder_v8.so",
                 "c_path": workdir / "decoder" / "decoder_v8.c",
@@ -434,12 +635,13 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             ensure_engine.assert_called_once_with(openmp=False)
             self.assertTrue(dump_path.exists())
-            self.assertEqual(dump_path.stat().st_size, 3 * 16 * 4)
+            self.assertEqual(dump_path.stat().st_size, 3 * 64 * 4)
 
             report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "ok")
             self.assertEqual(report["prefix_source"], "synthetic_zero")
             self.assertEqual(report["prefix_tokens"], 3)
+            self.assertEqual(report["prefix_embed_dim"], 64)
             self.assertEqual(report["decoder_embed_dim"], 16)
             self.assertEqual(report["decoder_context_len"], 32)
             self.assertEqual(report["prompt_tokens"], [11, 22])
@@ -527,6 +729,9 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 "embed_dim": 16,
                 "prefix_tokens": 3,
                 "embeddings": array("f", [0.0] * (3 * 16)),
+                "prefix_grid_x": 3,
+                "prefix_grid_y": 1,
+                "prefix_text_pos": 3,
                 "bridge_activation": "vision_bridge_output",
                 "bridge_reason": "projector_output",
                 "image_source": "synthetic",
@@ -535,6 +740,8 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                 "source_image_size": [768, 768],
                 "preprocess": "synthetic_generator",
                 "image_size": 768,
+                "image_height": 768,
+                "image_width": 768,
                 "interleaved_image": [0.0, 0.0, 0.0],
             }
             fake_logits = array("f", [0.1, 0.9, -0.4, 0.0])
@@ -543,7 +750,7 @@ class V8NativeBridgeHostTests(unittest.TestCase):
                  mock.patch.object(bridge_runner_v8, "_prepare_encoder_runtime", return_value=fake_encoder_runtime), \
                  mock.patch.object(bridge_runner_v8, "_run_encoder", return_value=fake_encoder_report), \
                  mock.patch.object(bridge_runner_v8, "_prepare_decoder_runtime", return_value=fake_decoder_runtime), \
-                 mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}), \
+                 mock.patch.object(bridge_runner_v8, "_run_decoder", return_value={"vocab_size": 4, "logits": fake_logits}) as run_decoder, \
                  mock.patch.object(bridge_runner_v8.GGUFTokenizer, "from_gguf", return_value=FakeTokenizer()):
                 with contextlib.redirect_stdout(io.StringIO()):
                     rc = bridge_runner_v8.main(
@@ -563,10 +770,126 @@ class V8NativeBridgeHostTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             ensure_engine.assert_called_once_with(openmp=True)
+            _, decoder_kwargs = run_decoder.call_args
+            self.assertEqual(decoder_kwargs["prefix_grid"], (3, 1))
+            self.assertEqual(decoder_kwargs["prefix_text_pos"], 3)
             report = json.loads((workdir / "bridge_report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["prefix_source"], "encoder")
             self.assertEqual(report["prefix_tokens"], 3)
+            self.assertEqual(report["prefix_grid_x"], 3)
+            self.assertEqual(report["prefix_grid_y"], 1)
             self.assertEqual(report["decoder_context_len"], 32)
+
+    def test_run_decoder_uses_decode_runtime_for_mixed_prefix_continuation(self) -> None:
+        used_paths: list[Path] = []
+
+        class FakeLib:
+            def __init__(self, path: Path) -> None:
+                self.path = path
+
+            def ck_model_init_with_manifest(self, weights: bytes, manifest: bytes) -> int:
+                return 0
+
+            def ck_model_get_vocab_size(self) -> int:
+                return 4
+
+            def ck_model_forward_mixed(self, prefix_ptr, prefix_tokens: int, token_arr, token_count: int, logits) -> int:
+                logits[0] = 0.1
+                logits[1] = 0.2
+                logits[2] = 0.3
+                logits[3] = 0.4
+                return 0
+
+            def ck_model_free(self) -> None:
+                return None
+
+        def fake_loader(path: Path) -> FakeLib:
+            resolved = Path(path)
+            used_paths.append(resolved)
+            return FakeLib(resolved)
+
+        runtime = {
+            "so_path": ROOT / "decode_runtime.so",
+            "prefill_so_path": ROOT / "prefill_runtime.so",
+            "weights_bump": ROOT / "weights.bump",
+            "manifest_map": ROOT / "weights_manifest.map",
+            "vocab_size": 4,
+        }
+
+        with mock.patch.object(bridge_runner_v8, "_load_decoder_lib", side_effect=fake_loader):
+            result = bridge_runner_v8._run_decoder(
+                runtime,
+                array("f", [0.0] * 16),
+                1,
+                [1, 2],
+            )
+
+        self.assertEqual(used_paths, [ROOT / "decode_runtime.so"])
+        self.assertEqual(result["runtime_mode"], "decode")
+        self.assertEqual(result["vocab_size"], 4)
+
+    def test_run_decoder_generation_stops_on_resolved_stop_token(self) -> None:
+        class FakeTokenizer:
+            def decode(self, ids: list[int], skip_special: bool = True) -> str:
+                mapping = {
+                    1: "This",
+                    2: " image",
+                    9: "<|im_end|>",
+                }
+                text = "".join(mapping.get(int(token_id), f"<tok:{int(token_id)}>") for token_id in ids)
+                return text.replace("<|im_end|>", "") if skip_special else text
+
+        class FakeLib:
+            def __init__(self) -> None:
+                self.decode_calls = 0
+
+            def ck_model_init_with_manifest(self, weights: bytes, manifest: bytes) -> int:
+                return 0
+
+            def ck_model_get_vocab_size(self) -> int:
+                return 10
+
+            def ck_model_forward_mixed(self, prefix_ptr, prefix_tokens: int, token_arr, token_count: int, logits) -> int:
+                for idx in range(10):
+                    logits[idx] = 0.0
+                logits[1] = 5.0
+                return 0
+
+            def ck_model_decode(self, token: int, logits) -> int:
+                for idx in range(10):
+                    logits[idx] = 0.0
+                if self.decode_calls == 0:
+                    logits[2] = 7.0
+                else:
+                    logits[9] = 11.0
+                self.decode_calls += 1
+                return 0
+
+            def ck_model_free(self) -> None:
+                return None
+
+        runtime = {
+            "so_path": ROOT / "decode_runtime.so",
+            "weights_bump": ROOT / "weights.bump",
+            "manifest_map": ROOT / "weights_manifest.map",
+            "vocab_size": 10,
+        }
+
+        with mock.patch.object(bridge_runner_v8, "_load_decoder_lib", return_value=FakeLib()):
+            result = bridge_runner_v8._run_decoder(
+                runtime,
+                array("f", [0.0] * 16),
+                1,
+                [1, 2],
+                tokenizer=FakeTokenizer(),
+                stop_token_ids=[9],
+                max_tokens=8,
+            )
+
+        self.assertEqual(result["generated_token_ids"], [1, 2])
+        self.assertEqual(result["generated_text"], "This image")
+        self.assertEqual(result["generated_text_raw"], "This image")
+        self.assertEqual(result["generation_stop_reason"], "stop_token")
 
 
 if __name__ == "__main__":

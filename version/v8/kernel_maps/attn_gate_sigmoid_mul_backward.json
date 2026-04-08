@@ -1,0 +1,60 @@
+{
+  "id": "attn_gate_sigmoid_mul_backward_f32",
+  "op": "attn_gate_sigmoid_mul_backward",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "d_out", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gradient of gated attention output"},
+    {"name": "x", "dtype": "fp32", "shape": ["R", "D"], "desc": "Attention output rows"},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gate rows"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_x", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gradient wrt attention output"},
+    {"name": "d_gate", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gradient wrt gate rows"}
+  ],
+  "scratch": [],
+  "dims": ["R", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each token row gradient can be computed independently."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Backward for the fused qwen3.5 full-attention gate."
+  },
+  "impl": {
+    "function": "attn_gate_sigmoid_mul_backward",
+    "c_declaration": "void attn_gate_sigmoid_mul_backward(const float *d_out, const float *x, const float *gate, float *d_x, float *d_gate, int rows, int dim);",
+    "sources": ["src/kernels/hybrid_attention_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attn_gate_sigmoid_mul.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_attn_gate_sigmoid_mul.py",
+        "tolerance": "1e-6",
+        "notes": "Backward parity against torch autograd."
+      }
+    ]
+  },
+  "notes": "Backward kernel for qwen3.5 full-attention gate sigmoid multiply."
+}

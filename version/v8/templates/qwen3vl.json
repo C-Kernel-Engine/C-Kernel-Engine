@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "name": "qwen3vl",
+  "family": "qwen3vl",
+  "flags": {
+    "use_qkv_bias": false,
+    "has_qk_norm": true,
+    "activation": "swiglu",
+    "rope": "mrope",
+    "tokenizer": "bpe"
+  },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "bpe",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "chat_contract": {
+      "version": 1,
+      "name": "qwen3vl",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<|im_start|>{role}\n",
+      "turn_suffix": "<|im_end|>\n",
+      "assistant_generation_prefix": "<|im_start|>assistant\n",
+      "role_labels": {
+        "system": "system",
+        "user": "user",
+        "assistant": "assistant"
+      },
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "force_bos_text_if_tokenizer_add_bos_false": "",
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": ["/no_think", "/nothink", "/think"],
+      "thinking_mode_default": "visible",
+      "image_begin_marker": "<|vision_start|>",
+      "image_end_marker": "<|vision_end|>",
+      "assistant_generation_prefix_by_thinking_mode": {
+        "visible": "<|im_start|>assistant\n",
+        "suppressed": "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+      },
+      "last_user_prefix_by_thinking_mode": {
+        "visible": "",
+        "suppressed": "/no_think\n"
+      },
+      "stop_text_markers": ["<|im_end|>"],
+      "token_stop_markers": ["<|im_end|>"],
+      "template_markers": ["<|im_start|>", "<|im_end|>", "<|vision_start|>", "<|vision_end|>", "<think>", "</think>"],
+      "min_response_tokens": 8
+    },
+    "attention_contract": {
+      "rope_layout": "multi_section_1d",
+      "rope_type": "mrope",
+      "qk_norm": true,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "dense"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> silu_mul -> down",
+      "activation": "swiglu",
+      "qkv_bias": false
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "lm_head",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "kv_cache_batch_copy": [
+          "activation:k_src",
+          "activation:v_src",
+          "output:k_dst",
+          "output:v_dst",
+          "dim:_kv_copy_bytes"
+        ]
+      }
+    }
+  },
+  "kernels": {
+    "rope_qk": "mrope_qk_text",
+    "attn_decode": "attention_forward_decode_head_major_gqa_regular"
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "dense",
+        "ops": [
+          "rmsnorm",
+          "qkv_proj",
+          "qk_norm",
+          "rope_qk",
+          "attn",
+          "out_proj",
+          "residual_add",
+          "rmsnorm",
+          "mlp_gate_up",
+          "silu_mul",
+          "mlp_down",
+          "residual_add"
+        ]
+      },
+      "footer": [
+        "rmsnorm",
+        "lm_head",
+        "logits"
+      ]
+    }
+  }
+}

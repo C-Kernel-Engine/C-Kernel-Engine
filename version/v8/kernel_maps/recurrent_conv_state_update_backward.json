@@ -1,0 +1,45 @@
+{
+  "id": "recurrent_conv_state_update_backward_f32",
+  "op": "recurrent_conv_state_update",
+  "variant": "backward_fp32",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "d_conv_x", "dtype": "fp32", "shape": ["S", "Q+K+V", "H+T"]},
+    {"name": "d_state_out", "dtype": "fp32", "shape": ["S", "Q+K+V", "H"]}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_state_in", "dtype": "fp32", "shape": ["S", "C", "H"]},
+    {"name": "d_q", "dtype": "fp32", "shape": ["R", "Q"]},
+    {"name": "d_k", "dtype": "fp32", "shape": ["R", "K"]},
+    {"name": "d_v", "dtype": "fp32", "shape": ["R", "V"]}
+  ],
+  "scratch": [],
+  "dims": ["H", "S", "T", "Q", "K", "V"],
+  "params": [],
+  "parallelization": {
+    "supported": ["seq"],
+    "preferred": {"prefill": "seq", "decode": "seq"},
+    "strategies": [
+      {"name": "seq", "partition_dim": "S", "param_style": "range", "range": {"min_chunk": 1}}
+    ]
+  },
+  "impl": {
+    "function": "recurrent_conv_state_update_backward",
+    "c_declaration": "void recurrent_conv_state_update_backward(const float *d_conv_x, const float *d_state_out, float *d_state_in, float *d_q, float *d_k, float *d_v, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim);",
+    "sources": ["src/kernels/recurrent_state_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_conv_state_update.py"],
+    "parity": [
+      {"kind": "pytorch", "command": ".venv/bin/python unittest/test_recurrent_conv_state_update.py", "tolerance": "5e-5"}
+    ]
+  }
+}

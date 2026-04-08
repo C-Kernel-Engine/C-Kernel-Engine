@@ -27,6 +27,8 @@ def buffer_nbytes(buf: Mapping[str, Any] | None) -> int:
 def resolve_vision_bridge_contract(
     layout_obj: Mapping[str, Any],
     activation_buffers: Mapping[str, Mapping[str, Any]] | None = None,
+    *,
+    prefer_total_output: bool = False,
 ) -> dict[str, Any]:
     cfg = dict(layout_obj.get("config", {}) or {})
     by_name = dict(activation_buffers or {})
@@ -56,7 +58,12 @@ def resolve_vision_bridge_contract(
             or projector_total_out_dim != bridge_embed_dim
         )
     )
-    if prefer_projector_output:
+    if prefer_total_output and "vision_output" in by_name and projector_total_out_dim > 0:
+        bridge_embed_dim = projector_total_out_dim
+        named_activation = "vision_output"
+        fallback_buffer_name = "vision_output"
+        reason = "vision_output_total"
+    elif prefer_projector_output:
         named_activation = "vision_bridge_output"
         fallback_buffer_name = "embedded_input"
         reason = "projector_output"

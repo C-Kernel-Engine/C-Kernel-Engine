@@ -1,0 +1,69 @@
+{
+  "id": "swiglu_forward",
+  "op": "swiglu",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "gate", "dtype": "fp32", "shape": ["T", "I"], "desc": "Gate tensor [tokens, intermediate_dim] (first half of MLP intermediate)"},
+    {"name": "up", "dtype": "fp32", "shape": ["T", "I"], "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["T", "I"], "desc": "SwiGLU output: silu(gate) * up"}
+  ],
+  "scratch": [
+    {"name": "gate_activated", "dtype": "fp32", "size_bytes": "T * I * 4", "desc": "SiLU(gate) activation (can reuse output if careful)"}
+  ],
+  "dims": ["T", "I"],
+  "parallelization": {
+    "supported": ["token", "feature"],
+    "preferred": {"prefill": "feature", "decode": "feature"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "ith_nth",
+        "notes": "Each thread processes one or more complete tokens."
+      },
+      {
+        "name": "feature",
+        "partition_dim": "I",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across intermediate dimension; requires sigmoid and multiplication."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"I": 64},
+    "notes": "SiLU(x) = x * sigmoid(x). I should be multiple of 64 for optimal SIMD."
+  },
+  "impl": {
+    "function": "swiglu_forward",
+    "c_declaration": "void swiglu_forward(const float *input, float *output, int tokens, int dim);",
+    "sources": ["src/kernels/swiglu_kernels.c", "src/kernels/sigmoid_kernels.c"],
+    "variants": [
+      {"name": "avx512", "requires": ["avx512f", "fma"], "compile_flags": ["-mavx512f", "-mfma"]},
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]},
+      {"name": "avx", "requires": ["avx"], "compile_flags": ["-mavx"]},
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_swiglu.py"],
+    "bench": ["scripts/bench_swiglu.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_swiglu.py --compare-numpy",
+        "tolerance": "1e-5",
+        "notes": "Verify SiLU(x) * up matches numpy reference"
+      }
+    ]
+  },
+  "notes": "SwiGLU activation: SiLU(gate) * up = gate * sigmoid(gate) * up. Used in LLaMA-style MLP blocks."
+}

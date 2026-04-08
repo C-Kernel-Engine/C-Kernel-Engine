@@ -174,11 +174,10 @@ def _load_builtin_template_doc(template_name: Optional[str]) -> Optional[Dict[st
     path = V8_ROOT / "templates" / f"{name}.json"
     if not path.exists():
         return None
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
+    with open(path, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+    _raise_on_forbidden_template_metadata(doc, source=str(path))
+    return doc
 
 
 def _merge_template_defaults(
@@ -198,6 +197,96 @@ def _merge_template_defaults(
     return merged
 
 
+_FORBIDDEN_TEMPLATE_FLAG_KEYS: Dict[str, str] = {
+    "activation_preference_by_op": "per-op activation dtype policy",
+    "prefer_fp32_mlp_matmuls": "MLP activation dtype policy",
+    "prefer_q8_0_contract": "quantized activation contract policy",
+    "prefer_fp32_logits": "logits activation dtype policy",
+}
+
+_FORBIDDEN_TEMPLATE_KEY_NAMES: Dict[str, str] = {
+    "dtype": "tensor dtype metadata",
+    "weight_dtype": "weight dtype metadata",
+    "weight_dtypes": "weight dtype metadata",
+    "weight_quant": "weight quant metadata",
+    "weight_quant_type": "weight quant metadata",
+    "quant_type_by_op": "per-op quant metadata",
+}
+
+
+def _inject_runtime_config_defaults(config: Dict[str, Any], arch: str) -> Dict[str, Any]:
+    arch_lc = str(arch or "").strip().lower()
+
+    def _merge_activation_defaults(defaults: Dict[str, str]) -> None:
+        prefs = config.get("activation_preference_by_op")
+        if not isinstance(prefs, dict):
+            prefs = {}
+        else:
+            prefs = dict(prefs)
+        for key, value in defaults.items():
+            prefs.setdefault(str(key), str(value))
+        config["activation_preference_by_op"] = prefs
+
+    if arch_lc == "qwen2":
+        config.setdefault("prefer_fp32_mlp_matmuls", True)
+    elif arch_lc == "qwen35":
+        _merge_activation_defaults(
+            {
+                "recurrent_gate_proj": "fp32",
+                "recurrent_alpha_proj": "fp32",
+                "recurrent_beta_proj": "fp32",
+            }
+        )
+    elif arch_lc == "qwen3_vl_vision":
+        _merge_activation_defaults({
+            "mlp_down": "fp32",
+            "out_proj": "fp32",
+            "branch_fc1": "fp32",
+            "branch_fc2": "fp32",
+        })
+    elif arch_lc == "gemma3":
+        config.setdefault("prefer_q8_0_contract", True)
+        config.setdefault("prefer_fp32_logits", True)
+    return config
+
+
+def _collect_forbidden_template_metadata(
+    node: Any,
+    path: Tuple[str, ...] = (),
+) -> List[Tuple[str, str]]:
+    issues: List[Tuple[str, str]] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            key_str = str(key)
+            next_path = path + (key_str,)
+            if len(next_path) == 2 and next_path[0] == "flags" and key_str in _FORBIDDEN_TEMPLATE_FLAG_KEYS:
+                issues.append((".".join(next_path), _FORBIDDEN_TEMPLATE_FLAG_KEYS[key_str]))
+            if key_str in _FORBIDDEN_TEMPLATE_KEY_NAMES:
+                issues.append((".".join(next_path), _FORBIDDEN_TEMPLATE_KEY_NAMES[key_str]))
+            issues.extend(_collect_forbidden_template_metadata(value, next_path))
+    elif isinstance(node, list):
+        for idx, item in enumerate(node):
+            issues.extend(_collect_forbidden_template_metadata(item, path + (f"[{idx}]",)))
+    return issues
+
+
+def _raise_on_forbidden_template_metadata(
+    template_doc: Optional[Dict[str, Any]],
+    *,
+    source: str,
+) -> None:
+    if not isinstance(template_doc, dict):
+        return
+    issues = _collect_forbidden_template_metadata(template_doc)
+    if not issues:
+        return
+    details = "; ".join(f"{path} ({reason})" for path, reason in issues)
+    raise RuntimeError(
+        f"Template '{source}' declares dtype/quant policy that must not live in templates: {details}. "
+        "Keep templates to graph/order metadata; derive weight dtypes from the weights manifest and runtime config."
+    )
+
+
 def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
     template_doc = manifest.get("template") if isinstance(manifest.get("template"), dict) else None
     cfg = manifest.get("config") if isinstance(manifest.get("config"), dict) else {}
@@ -206,11 +295,17 @@ def _hydrate_manifest_template(manifest: Dict[str, Any]) -> Dict[str, Any]:
         template_name = str(template_doc.get("name", "") or "").strip().lower()
     if not template_name:
         template_name = str(cfg.get("model", "") or "").strip().lower()
+    cfg = _inject_runtime_config_defaults(dict(cfg), template_name or str(cfg.get("arch", "") or ""))
+    manifest["config"] = cfg
     built_in = _load_builtin_template_doc(template_name)
     if built_in and isinstance(template_doc, dict):
         manifest["template"] = _merge_template_defaults(built_in, template_doc)
     elif built_in:
         manifest["template"] = copy.deepcopy(built_in)
+    _raise_on_forbidden_template_metadata(
+        manifest.get("template") if isinstance(manifest.get("template"), dict) else None,
+        source=f"manifest:{template_name or '<embedded>'}",
+    )
     return manifest
 
 
@@ -1481,12 +1576,13 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
         context_len = min(context_len, max_context)
 
     seq_len = 1 if mode == "decode" else context_len
-    image_size = int(config.get("image_size", 0) or 0)
+    image_height = int(config.get("image_height", config.get("image_size", 0)) or 0)
+    image_width = int(config.get("image_width", config.get("image_size", 0)) or 0)
     patch_size = int(config.get("patch_size", 0) or 0)
     vision_channels = int(config.get("vision_channels", 3) or 3)
     patch_dim = int(config.get("patch_dim", vision_channels * patch_size * patch_size) or 0)
-    vision_grid_h = int(config.get("vision_grid_h", (image_size // patch_size) if image_size and patch_size else 0) or 0)
-    vision_grid_w = int(config.get("vision_grid_w", (image_size // patch_size) if image_size and patch_size else 0) or 0)
+    vision_grid_h = int(config.get("vision_grid_h", (image_height // patch_size) if image_height and patch_size else 0) or 0)
+    vision_grid_w = int(config.get("vision_grid_w", (image_width // patch_size) if image_width and patch_size else 0) or 0)
     vision_num_patches = int(
         config.get(
             "vision_num_patches",
@@ -1512,9 +1608,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     token_ids_size = seq_len * 4
     add("token_ids", token_ids_size, f"[{seq_len}]", "i32")
 
-    if image_size > 0:
-        image_input_size = vision_channels * image_size * image_size * 4
-        add("image_input", image_input_size, f"[{vision_channels}, {image_size}, {image_size}]")
+    if image_height > 0 and image_width > 0:
+        image_input_size = vision_channels * image_height * image_width * 4
+        add("image_input", image_input_size, f"[{vision_channels}, {image_height}, {image_width}]")
     if vision_num_patches > 0 and patch_dim > 0:
         patch_scratch_size = vision_num_patches * patch_dim * 4
         add("patch_scratch", patch_scratch_size, f"[{vision_num_patches}, {patch_dim}]")
@@ -1631,7 +1727,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent  # version/v8
 REPO_ROOT = PROJECT_ROOT.parent.parent  # repo root
 V8_ROOT = REPO_ROOT / "version" / "v8"
-V7_ROOT = REPO_ROOT / "version" / "v7"
 
 # Template Op → Kernel Op Mapping
 # This is the single source of truth for how template ops map to kernel registry ops.
@@ -2190,7 +2285,7 @@ def _resolve_branch_collect_contract(
     default_slice_dim = int(
         config.get("projector_out_dim", config.get("projection_dim", config.get("embed_dim", 0))) or 0
     )
-    dtype = _template_str_param(collect, "dtype", config, "fp32") or "fp32"
+    dtype = "fp32"
     return {
         "target": _template_str_param(
             collect,
@@ -2313,7 +2408,7 @@ def _template_uses_rope(template: Dict[str, Any], config: Optional[Dict[str, Any
     rope_layout = _normalize_rope_layout_value(attention_contract.get("rope_layout"))
     if rope_layout == "none":
         return False
-    if rope_layout in {"split", "pairwise", "multi_section_2d"}:
+    if rope_layout in {"split", "pairwise", "multi_section_1d", "multi_section_2d"}:
         return True
     template_ops = _collect_template_ops(template, config)
     return "rope_qk" in template_ops or "mrope_qk" in template_ops
@@ -2502,7 +2597,13 @@ def compute_matmul_dims(op_name: str, config: Dict) -> Tuple[Optional[int], Opti
     # quantize_out_proj_input: quantize embed_dim (attention output)
     # quantize_mlp_down_input: quantize intermediate_size (swiglu output)
     # quantize_final_output: quantize embed_dim (footer rmsnorm output before logits)
-    if op_name in ("quantize_input_0", "quantize_input_1", "quantize_final_output"):
+    if op_name in ("quantize_input_0", "quantize_input_1"):
+        return embed, embed  # output_dim not used, but _input_dim = embed
+    if op_name == "quantize_final_output":
+        projector_in_dim = int(config.get("projector_in_dim", 0) or 0)
+        is_qwen3vl_vision = str(config.get("model", config.get("name", config.get("arch", "")))).lower() == "qwen3_vl_vision"
+        if is_qwen3vl_vision and projector_in_dim > 0:
+            return projector_in_dim, projector_in_dim
         return embed, embed  # output_dim not used, but _input_dim = embed
     if op_name in ("quantize_out_proj_input",):
         return attn_out, attn_out  # output_dim not used, but _input_dim = attn_out_dim
@@ -2523,8 +2624,8 @@ def _align_up(value: int, alignment: int) -> int:
 
 
 def load_kernel_registry() -> Dict:
-    """Load kernel registry with optional v8 overlay kernel maps."""
-    registry_path = V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
+    """Load the v8-local kernel registry."""
+    registry_path = V8_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"
     with open(registry_path, 'r') as f:
         registry = json.load(f)
 
@@ -2543,7 +2644,8 @@ def load_kernel_registry() -> Dict:
         if isinstance(kernel, dict) and str(kernel.get("id", "") or "").strip()
     }
     for overlay_path in sorted(overlay_dir.glob("*.json")):
-        if overlay_path.name in {"kernel_bindings.overlay.json"}:
+        upper_name = overlay_path.name.upper()
+        if upper_name.startswith("KERNEL_") or overlay_path.name in {"kernel_bindings.json", "kernel_bindings.overlay.json"}:
             continue
         try:
             with open(overlay_path, "r", encoding="utf-8") as f:
@@ -2662,6 +2764,16 @@ def _normalize_manifest_config(config: Dict) -> Dict:
     if context_length is not None:
         out["context_length"] = int(context_length)
         out.setdefault("max_seq_len", int(context_length))
+
+    image_size = _pick("image_size")
+    image_height = _pick("image_height", "image_h", default=image_size)
+    image_width = _pick("image_width", "image_w", default=image_size)
+    if image_size is not None:
+        out["image_size"] = int(image_size)
+    if image_height is not None:
+        out["image_height"] = int(image_height)
+    if image_width is not None:
+        out["image_width"] = int(image_width)
 
     # RoPE config (fallbacks remain model-agnostic and are overridden by converter when present)
     out["rope_theta"] = float(_pick("rope_theta", "rope_base", "theta", default=10000.0))
@@ -2913,6 +3025,9 @@ def _normalize_rope_layout_value(value: Any) -> str:
         "pairwise": "pairwise",
         "interleaved": "pairwise",
         "even_odd": "pairwise",
+        "mrope": "multi_section_1d",
+        "multi_section": "multi_section_1d",
+        "multi_section_text": "multi_section_1d",
     }
     return aliases.get(rope_layout, rope_layout)
 
@@ -2930,6 +3045,11 @@ def _resolve_rope_qk_kernel(config: Dict, template_kernels: Dict[str, Any]) -> s
         if override and "pairwise" not in override.lower():
             return override
         return "rope_forward_qk"
+
+    if rope_layout == "multi_section_1d":
+        if override:
+            return override
+        return "mrope_qk_text"
 
     if rope_layout == "multi_section_2d":
         if override:
@@ -3612,7 +3732,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     logits_weight_source = _resolve_logits_weight_source(config, weight_index)
     print(f"  [contract/logits] source={logits_weight_source}")
     model_family = str(config.get("model", "")).strip().lower()
-    activation_preference_by_op = template_flags.get("activation_preference_by_op", {})
+    activation_preference_by_op = config.get("activation_preference_by_op", {})
     if not isinstance(activation_preference_by_op, dict):
         activation_preference_by_op = {}
     # Default to Q8 activation preference for the v7 baseline path.
@@ -3623,12 +3743,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
     # Keep this as an explicit manifest/template opt-in rather than a default.
     prefer_fp32_mlp_matmuls = (
         prefer_q8_activation
-        and bool(
-            config.get(
-                "prefer_fp32_mlp_matmuls",
-                template_flags.get("prefer_fp32_mlp_matmuls", False),
-            )
-        )
+        and bool(config.get("prefer_fp32_mlp_matmuls", False))
     )
     registry = load_kernel_registry()
 
@@ -3667,7 +3782,7 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
             print(f"   Found GGUF: {gguf_file}")
             print(f"   Running converter...")
 
-            converter_script = V7_ROOT / "scripts" / "convert_gguf_to_bump_v7.py"
+            converter_script = V8_ROOT / "scripts" / "convert_gguf_to_bump_v8.py"
             bump_output = manifest_dir / "weights.bump"
 
             cmd = [
@@ -3695,14 +3810,13 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
 
     template_flags = template.get("flags", {}) if isinstance(template.get("flags"), dict) else {}
     template_kernels = template.get("kernels", {}) if isinstance(template.get("kernels"), dict) else {}
-    # Template-controlled opt-in: use FP32->Q8_0 contract adapters for Q8_0 kernels.
-    # Keep this disabled by default so non-Gemma families (e.g., Qwen2/Qwen3) stay on
-    # the standard gemv_q8_0/gemm_nt_q8_0 implementations.
-    prefer_q8_contract = bool(template_flags.get("prefer_q8_0_contract", False))
+    # Runtime-config opt-in: use FP32->Q8_0 contract adapters for Q8_0 kernels.
+    # Weight dtype still comes from the manifest; this only selects the activation
+    # contract path when a model family explicitly requests it.
+    prefer_q8_contract = bool(config.get("prefer_q8_0_contract", False))
     # Gemma parity guardrail: keep logits projection on FP32-activation kernels.
-    # This prevents footer quantize+q8 logits paths from changing token ranking
-    # while we stabilize Gemma prefill/decode behavior.
-    prefer_fp32_logits = bool(template_flags.get("prefer_fp32_logits", False))
+    # This remains a runtime config knob rather than template metadata.
+    prefer_fp32_logits = bool(config.get("prefer_fp32_logits", False))
     # Gemma-family input contract: scale token embeddings by sqrt(embed_dim)
     # before layer-0 residual_save. Keep a Gemma fallback so older cached
     # manifests (without the new template flag) still generate correctly.
@@ -4073,6 +4187,11 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
                 weight_dtype = header_quant.get(weight_info[0], weight_dtype)
             kernel_prefer_q8_activation = _prefer_q8_activation_for_op(op, prefer_q8_activation)
             if op in ("mlp_gate_up", "mlp_up", "mlp_down") and prefer_fp32_mlp_matmuls:
+                kernel_prefer_q8_activation = False
+            if op == "projector_fc2":
+                # projector_fc2 consumes the fp32 GELU output from projector_fc1.
+                # There is no intervening quantize op in the vision footer, so it
+                # must stay on an fp32-activation kernel.
                 kernel_prefer_q8_activation = False
             allow_q8_contract = bool(
                 prefer_q8_contract
@@ -5123,7 +5242,7 @@ def insert_bias_add_ops(
         print("  Warning: bias_add kernel not found in registry; skipping bias ops")
         return ir_ops
 
-    kernel_maps_dir = V7_ROOT / "kernel_maps"
+    kernel_maps_dir = V8_ROOT / "kernel_maps"
     kernel_map_cache: Dict[str, Dict] = {}
     entry_by_name: Dict[str, Dict[str, Any]] = {
         e.get("name"): e for e in (manifest.get("entries", []) or []) if e.get("name")
@@ -5315,7 +5434,7 @@ def generate_ir_lower_1(
 
     # Build kernel map index by loading individual kernel map files
     # KERNEL_REGISTRY.json is only used for validation, not as source of truth
-    kernel_maps_dir = V7_ROOT / "kernel_maps"
+    kernel_maps_dir = V8_ROOT / "kernel_maps"
     kernel_map_index = {}
     for kernel in registry.get("kernels", []):
         kernel_id = kernel["id"]
@@ -6270,13 +6389,14 @@ def generate_memory_layout(
     token_ids_size = seq_len * 4  # int32
     add_buffer("token_ids", token_ids_size, f"[{seq_len}]", "i32")
 
-    image_size = int(config.get("image_size", 0) or 0)
+    image_height = int(config.get("image_height", config.get("image_size", 0)) or 0)
+    image_width = int(config.get("image_width", config.get("image_size", 0)) or 0)
     patch_size = int(config.get("patch_size", 0) or 0)
     vision_channels = int(config.get("vision_channels", 3) or 3)
     patch_dim = int(config.get("patch_dim", vision_channels * patch_size * patch_size) or 0)
     vision_num_patches = int(config.get("vision_num_patches", 0) or 0)
-    if image_size > 0:
-        add_buffer("image_input", vision_channels * image_size * image_size * 4, f"[{vision_channels}, {image_size}, {image_size}]")
+    if image_height > 0 and image_width > 0:
+        add_buffer("image_input", vision_channels * image_height * image_width * 4, f"[{vision_channels}, {image_height}, {image_width}]")
     if vision_num_patches > 0 and patch_dim > 0:
         add_buffer("patch_scratch", vision_num_patches * patch_dim * 4, f"[{vision_num_patches}, {patch_dim}]")
     if vision_num_patches > 0:
@@ -7329,7 +7449,11 @@ def generate_ir_lower_2(
             last_output_buffer = "q_scratch"
         elif op_type == "spatial_merge":
             input_buf_name = last_output_buffer or current_input_buffer
-            output_buf_name = "layer_input" if input_buf_name == "embedded_input" else "embedded_input"
+            is_qwen3vl_vision = str(config.get("model", config.get("name", config.get("arch", "")))).lower() == "qwen3_vl_vision"
+            if str(ir_op.get("section", "")).lower() == "footer" and is_qwen3vl_vision:
+                output_buf_name = "embedded_input"
+            else:
+                output_buf_name = "layer_input" if input_buf_name == "embedded_input" else "embedded_input"
             src_buf = activation_buffers.get(input_buf_name)
             dst_buf = activation_buffers.get(output_buf_name)
             if src_buf:
@@ -7385,6 +7509,11 @@ def generate_ir_lower_2(
                 }
                 last_output_buffer = "mlp_scratch"
         elif op_type == "projector_fc2":
+            kernel_id = str(ir_op.get("kernel", "") or "")
+            if kernel_needs_q8_activation(registry, kernel_id):
+                raise RuntimeError(
+                    "projector_fc2 selected a q8-activation kernel without an explicit quantize stage"
+                )
             src_buf = activation_buffers.get("mlp_scratch")
             dst_buf = activation_buffers.get("embedded_input")
             if src_buf:
@@ -7845,6 +7974,8 @@ def generate_ir_lower_2(
             params.setdefault("sliding_window", sliding_window)
         if op_type in ("patchify", "patch_proj"):
             params.setdefault("image_size", config.get("image_size", 0))
+            params.setdefault("image_height", config.get("image_height", config.get("image_size", 0)))
+            params.setdefault("image_width", config.get("image_width", config.get("image_size", 0)))
             params.setdefault("patch_size", config.get("patch_size", 0))
             params.setdefault("vision_channels", config.get("vision_channels", 3))
             params.setdefault("vision_num_patches", config.get("vision_num_patches", 0))
@@ -7897,12 +8028,27 @@ def generate_ir_lower_2(
             params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
         if op_type == "position_embeddings":
             params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
+            source_grid_size = int(config.get("position_grid_size", 0) or 0)
+            if source_grid_size <= 0:
+                source_image_size = int(config.get("image_size", 0) or 0)
+                patch_size = int(config.get("patch_size", 0) or 0)
+                if source_image_size > 0 and patch_size > 0:
+                    source_grid_size = source_image_size // patch_size
+            if source_grid_size > 0:
+                params.setdefault("source_grid_size", source_grid_size)
         if op_type in ("spatial_merge", "branch_spatial_merge"):
             params["merge_size"] = _required_template_int_param(params, "merge_size", config, op_type)
         if op_type in ("projector_gelu", "branch_gelu"):
             merged_tokens = int(params.get("vision_merged_tokens", 0) or 0)
             hidden_dim = int(params.get("projector_hidden_dim", 0) or 0)
             params.setdefault("gelu_elems", merged_tokens * hidden_dim)
+        if op_type in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_final_output"):
+            default_quant_rows = int(params.get("_m", params.get("seq_len", 1)) or 1)
+            params.setdefault("rows", default_quant_rows)
+        if op_type == "quantize_final_output":
+            is_qwen3vl_vision = str(config.get("model", config.get("name", config.get("arch", "")))).lower() == "qwen3_vl_vision"
+            if is_qwen3vl_vision:
+                params["rows"] = int(params.get("vision_merged_tokens", config.get("vision_merged_tokens", params.get("rows", 1))) or 1)
         if op_type == "branch_concat":
             params.setdefault(
                 "rows",
@@ -7937,6 +8083,27 @@ def generate_ir_lower_2(
             params.setdefault("beta_fast", float(config.get("vision_mrope_beta_fast", 32.0)))
             params.setdefault("beta_slow", float(config.get("vision_mrope_beta_slow", 1.0)))
             params.setdefault("n_ctx_orig", int(config.get("vision_mrope_original_context_length", 32768)))
+        if op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_text":
+            sections = config.get("mrope_sections")
+            if not isinstance(sections, list) or len(sections) != 4:
+                default_section = max(1, int(params.get("head_dim", 0) or 0) // 4)
+                sections = [default_section, default_section, default_section, default_section]
+            default_n_dims = max(1, int(sum(int(v) for v in sections) or int(params.get("head_dim", 0) or 0) // 2))
+            params.setdefault("n_dims", int(config.get("mrope_n_dims", default_n_dims)))
+            params.setdefault("section_0", int(sections[0]))
+            params.setdefault("section_1", int(sections[1]))
+            params.setdefault("section_2", int(sections[2]))
+            params.setdefault("section_3", int(sections[3]))
+            params.setdefault("freq_base", float(config.get("rope_theta", 10000.0)))
+            params.setdefault(
+                "freq_scale",
+                float(config.get("rope_scaling_factor", 1.0)) if str(config.get("rope_scaling_type", "none")).strip().lower() != "none" else 1.0,
+            )
+            params.setdefault("ext_factor", float(config.get("rope_ext_factor", 0.0)))
+            params.setdefault("attn_factor", float(config.get("rope_attn_factor", 1.0)))
+            params.setdefault("beta_fast", float(config.get("rope_beta_fast", 32.0)))
+            params.setdefault("beta_slow", float(config.get("rope_beta_slow", 1.0)))
+            params.setdefault("n_ctx_orig", int(config.get("rope_original_context_length", config.get("context_length", 32768))))
 
         if mode == "decode":
             effective_seq_len = 1
@@ -7980,12 +8147,17 @@ def generate_ir_lower_2(
             "branch_gelu",
             "branch_fc2",
             "branch_concat",
+            "quantize_final_output",
         ) or op_type == "branch_layernorm":
             params["_m"] = int(params.get("vision_merged_tokens", params.get("_m", 1)) or 1)
         if op_type in ("vision_position_ids", "position_ids_2d", "mrope_qk") or (
             op_type == "rope_qk" and ir_op.get("kernel", "") == "mrope_qk_vision"
         ):
             params["_m"] = int(params.get("vision_num_patches", params.get("_m", 1)) or 1)
+        if op_type in ("quantize_input_0", "quantize_input_1", "quantize_out_proj_input", "quantize_mlp_down_input", "quantize_recurrent_out_proj_input", "quantize_final_output"):
+            inferred_quant_rows = int(params.get("_m", params.get("seq_len", params.get("rows", 1))) or 1)
+            if int(params.get("rows", 0) or 0) <= 1 and inferred_quant_rows > 1:
+                params["rows"] = inferred_quant_rows
         if op_type in ("projector_gelu", "branch_gelu"):
             params["gelu_elems"] = (
                 int(params.get("_m", 0) or 0)
@@ -8228,7 +8400,7 @@ def validate_buffer_assignments(lowered_ir: Dict) -> None:
 
 def load_kernel_bindings() -> Dict[str, Dict]:
     """Load kernel parameter bindings for IR Lower 3, with optional v8 overlays."""
-    bindings_path = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
+    bindings_path = V8_ROOT / "kernel_maps" / "kernel_bindings.json"
     with open(bindings_path, "r") as f:
         data = json.load(f)
     bindings = data.get("bindings", {})
@@ -8579,7 +8751,7 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                 elif key == "rope_sin":
                     expr = "model->rope_sin"
                 elif key == "pos":
-                    expr = "model->pos"
+                    expr = "model->rope_pos" if name == "pos_offset" else "model->pos"
                 elif key == "seq_len":
                     expr = str(params.get("seq_len", 1))
                 elif key in ("kv_tokens", "cache_len"):

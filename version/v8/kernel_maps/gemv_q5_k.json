@@ -1,0 +1,32 @@
+{
+  "id": "gemv_q5_k",
+  "op": "gemv",
+  "variant": "q5_k_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q5_k",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q5_k", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] Q5_K quantized"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q5_K uses 256-value super-blocks; K should be a multiple of 256."
+  },
+  "impl": {
+    "function": "gemv_q5_k",
+    "c_declaration": "void gemv_q5_k(float *y, const void *W, const float *x, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_q5_k.c"]
+  },
+  "notes": "GEMV for Q5_K weights with FP32 activation input; kernel quantizes activations internally to Q8_K for llama-compatible dot math. Q5_K: 5-bit super-block quant with nested scales/mins."
+}

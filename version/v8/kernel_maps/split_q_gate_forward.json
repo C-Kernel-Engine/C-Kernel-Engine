@@ -1,0 +1,64 @@
+{
+  "id": "split_q_gate_forward",
+  "op": "split_q_gate",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "packed_qg", "dtype": "fp32", "shape": ["R", "Q+G"], "desc": "Packed full-attention Q+gate rows"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["R", "Q"], "desc": "Split query rows"},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "G"], "desc": "Split gate rows"}
+  ],
+  "scratch": [],
+  "dims": ["R", "Q", "G", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each Q+gate row can be split independently."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Graph-stitch split for the qwen3.5 full-attention joint Q+gate projection."
+  },
+  "impl": {
+    "function": "split_q_gate_forward",
+    "c_declaration": "void split_q_gate_forward(const float *packed_qg, float *q, float *gate, int rows, int q_dim, int gate_dim, int group_dim);",
+    "sources": ["src/kernels/hybrid_attention_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_split_q_gate.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_split_q_gate.py",
+        "tolerance": "0",
+        "notes": "Forward/backward parity against grouped or contiguous torch reference splits."
+      },
+      {
+        "kind": "llamacpp",
+        "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel split_q_gate",
+        "tolerance": "0",
+        "notes": "Forward parity against grouped/interleaved q+gate helper reference."
+      }
+    ]
+  },
+  "notes": "Explicit split kernel for qwen3.5 full-attention joint Q+gate projections."
+}

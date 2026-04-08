@@ -1,0 +1,124 @@
+{
+  "id": "rmsnorm_backward",
+  "op": "rmsnorm",
+  "variant": "fp32_backward",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient from next op [tokens, embed_dim]"
+    },
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Forward input activations [tokens, embed_dim]"
+    },
+    {
+      "name": "gamma",
+      "dtype": "fp32",
+      "shape": [
+        "E"
+      ],
+      "desc": "RMSNorm scale weights"
+    },
+    {
+      "name": "rstd_cache",
+      "dtype": "fp32",
+      "shape": [
+        "T"
+      ],
+      "desc": "Cached reciprocal std from forward"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient w.r.t. input"
+    },
+    {
+      "name": "d_gamma",
+      "dtype": "fp32",
+      "shape": [
+        "E"
+      ],
+      "desc": "Gradient w.r.t. gamma weights"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "E",
+    "AE"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "token",
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "notes": "Parallelize by token rows; reduction for d_gamma."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Deterministic fp32 reference backward path for v7.0."
+  },
+  "impl": {
+    "function": "rmsnorm_backward",
+    "c_declaration": "void rmsnorm_backward(const float *d_output, const float *input, const float *gamma, const float *rstd_cache, float *d_input, float *d_gamma, int tokens, int d_model, int aligned_embed_dim);",
+    "sources": [
+      "src/kernels/rmsnorm_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "1e-4",
+        "notes": "Reference backward parity check."
+      }
+    ]
+  },
+  "notes": "RMSNorm backward kernel for v7 training IR."
+}
+

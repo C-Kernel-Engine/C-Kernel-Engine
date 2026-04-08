@@ -47,6 +47,20 @@ def _first_output_arg(op: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _first_arg_named(op: dict[str, Any], name: str) -> dict[str, Any] | None:
+    for arg in op.get("args", []):
+        if str(arg.get("name", "")) == name:
+            return arg
+    return None
+
+
+def _select_probe_arg(op: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    function = str(op.get("function", ""))
+    if function == "quantize_row_q8_0":
+        return _first_arg_named(op, "x"), "input"
+    return _first_output_arg(op), "output"
+
+
 def _buffer_stats(values: ctypes.Array[Any]) -> dict[str, Any]:
     finite = 0
     nan = 0
@@ -86,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gguf", type=Path, default=None, help="Optional GGUF path to materialize artifacts if missing")
     ap.add_argument("--stops", type=str, default="", help="Stop indices: empty=all, a:b range, or comma list")
     ap.add_argument("--image-mode", choices=("gradient", "gray", "checker"), default="gradient")
+    ap.add_argument("--image-path", type=Path, default=None, help="Optional real image path; overrides --image-mode")
     ap.add_argument("--threads", type=int, default=1, help="CK runtime thread count")
     args = ap.parse_args(argv)
 
@@ -104,7 +119,12 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("no valid stops selected")
 
     config = report["config"]
-    _, planar = npv8._build_test_image(int(config["image_size"]), int(config["image_size"]), args.image_mode)
+    image_size = int(config["image_size"])
+    if args.image_path is not None:
+        image_report = npv8._load_image_file(args.image_path.resolve(), image_size, image_size)
+        planar = image_report["planar"]
+    else:
+        _, planar = npv8._build_test_image(image_size, image_size, args.image_mode)
     weights_bump = Path(report["weights_bump"])
     manifest_map = args.output_dir / "weights_manifest.map"
     image_buf = offsets["image_input"]
@@ -115,14 +135,16 @@ def main(argv: list[str] | None = None) -> int:
     for stop in stops:
         os.environ["CK_STOP_OP"] = str(stop)
         op = ops[stop]
-        out_arg = _first_output_arg(op)
+        probe_arg, probe_mode = _select_probe_arg(op)
         summary: dict[str, Any] = {
             "stop": stop,
             "op": op.get("op"),
             "function": op.get("function"),
             "layer": op.get("layer"),
             "section": op.get("section"),
-            "buffer": out_arg.get("buffer_ref") if out_arg else None,
+            "probe_mode": probe_mode,
+            "buffer": probe_arg.get("buffer_ref") if probe_arg else None,
+            "buffer_source": probe_arg.get("source") if probe_arg else None,
         }
 
         lib = npv8._load_generated_lib(model_so)
@@ -150,12 +172,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(summary), flush=True)
                 return rc
 
-            if out_arg is None:
-                summary["warning"] = "stop op has no output buffer"
+            if probe_arg is None or not probe_arg.get("buffer_ref"):
+                summary["warning"] = "stop op has no probe buffer"
                 print(json.dumps(summary), flush=True)
                 continue
 
-            buf = offsets[out_arg["buffer_ref"]]
+            buf = offsets[probe_arg["buffer_ref"]]
             n = npv8._buffer_nbytes(buf) // ctypes.sizeof(ctypes.c_float)
             values = (ctypes.c_float * n).from_address(
                 base_ptr + npv8._activation_runtime_offset(layout, buf)

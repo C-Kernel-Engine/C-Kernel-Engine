@@ -1,0 +1,72 @@
+{
+  "id": "mega_fused_attention_decode",
+  "op": "fused_attention_block",
+  "variant": "fp32_decode",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "input", "dtype": "fp32", "shape": ["1", "AE"], "desc": "Input activation [1, aligned_embed_dim]"},
+    {"name": "residual", "dtype": "fp32", "shape": ["1", "AE"], "desc": "Residual input [1, aligned_embed_dim]"}
+  ],
+  "weights": [
+    {"name": "ln1_gamma", "dtype": "fp32", "shape": ["E"], "desc": "RMSNorm gamma weight"},
+    {"name": "wq", "dtype": "fp32", "shape": ["H", "AD", "AE"], "desc": "Q projection weights"},
+    {"name": "bq", "dtype": "fp32", "shape": ["H", "AD"], "optional": true, "desc": "Q bias (or NULL)"},
+    {"name": "wk", "dtype": "fp32", "shape": ["KV", "AD", "AE"], "desc": "K projection weights"},
+    {"name": "bk", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "K bias (or NULL)"},
+    {"name": "wv", "dtype": "fp32", "shape": ["KV", "AD", "AE"], "desc": "V projection weights"},
+    {"name": "bv", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "V bias (or NULL)"},
+    {"name": "wo", "dtype": "fp32", "shape": ["H", "AE", "AD"], "desc": "Output projection weights"},
+    {"name": "bo", "dtype": "fp32", "shape": ["AE"], "optional": true, "desc": "Output bias (or NULL)"}
+  ],
+  "activations": [],
+  "runtime_buffers": [
+    {"name": "kv_cache_k", "dtype": "fp32", "shape": ["KV", "max_T", "AD"], "desc": "K cache"},
+    {"name": "kv_cache_v", "dtype": "fp32", "shape": ["KV", "max_T", "AD"], "desc": "V cache"},
+    {"name": "rope_cos", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE cos"},
+    {"name": "rope_sin", "dtype": "fp32", "shape": ["max_T", "D", 2], "desc": "RoPE sin"}
+  ],
+  "outputs": [
+    {"name": "output", "dtype": "fp32", "shape": ["1", "AE"], "desc": "Output [1, aligned_embed_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["E", "AE", "H", "KV", "D", "AD", "max_T"],
+  "params": [
+    {"name": "pos", "dtype": "int32", "desc": "Current position in sequence"},
+    {"name": "cache_capacity", "dtype": "int32", "desc": "KV cache capacity"},
+    {"name": "eps", "dtype": "float32", "desc": "RMSNorm epsilon"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "none", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across heads for decode."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64},
+    "notes": "Single-token decode path. FP32 weights for simplicity."
+  },
+  "impl": {
+    "function": "mega_fused_attention_decode",
+    "c_declaration": "void mega_fused_attention_decode(float *output, const float *input, const float *residual, const float *ln1_gamma, const float *wq, const float *bq, const float *wk, const float *bk, const float *wv, const float *bv, const float *wo, const float *bo, float *kv_cache_k, float *kv_cache_v, const float *rope_cos, const float *rope_sin, int pos, int embed_dim, int aligned_embed_dim, int num_heads, int num_kv_heads, int head_dim, int aligned_head_dim, int cache_capacity, float eps);",
+    "sources": ["src/kernels/fused/mega_fused_attention.c"],
+    "variants": [
+      {"name": "default", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_mega_fused_attention_decode.py"],
+    "bench": ["scripts/bench_mega_fused_attention_decode.py"],
+    "parity": []
+  },
+  "notes": "Mega-fused attention block for decode (single token). Fuses RMSNorm + QKV + RoPE + Attention + OutProj."
+}

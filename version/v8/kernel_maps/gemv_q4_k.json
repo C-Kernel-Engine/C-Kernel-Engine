@@ -1,0 +1,32 @@
+{
+  "id": "gemv_q4_k",
+  "op": "gemv",
+  "variant": "q4_k_w_fp32_a_fp32_out",
+  "quant": {
+    "weight": "q4_k",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["K"], "desc": "Input vector [K] (FP32)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q4_k", "shape": ["M", "K"], "desc": "Weight matrix [rows, cols] Q4_K quantized"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "constraints": {
+    "alignment": {"K": 256},
+    "notes": "Q4_K uses 256-value super-blocks; K should be a multiple of 256."
+  },
+  "impl": {
+    "function": "gemv_q4_k",
+    "c_declaration": "void gemv_q4_k(float *y, const void *W, const float *x, int M, int K);",
+    "sources": ["src/kernels/gemm_kernels_q4k.c"]
+  },
+  "notes": "GEMV for Q4_K weights with FP32 activation input. No activation quantization needed."
+}

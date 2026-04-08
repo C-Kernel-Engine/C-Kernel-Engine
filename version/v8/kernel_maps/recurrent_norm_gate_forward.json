@@ -1,0 +1,39 @@
+{
+  "id": "recurrent_norm_gate_forward",
+  "op": "recurrent_norm_gate",
+  "variant": "fp32",
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
+  "quant": {"weight": "fp32", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["R", "H*D"]},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "H*D"]}
+  ],
+  "weights": [{"name": "weight", "dtype": "fp32", "shape": ["D"]}],
+  "activations": [],
+  "outputs": [{"name": "out", "dtype": "fp32", "shape": ["R", "H*D"]}],
+  "scratch": [],
+  "dims": ["R", "H", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [{"name": "row", "partition_dim": "R", "param_style": "range", "range": {"min_chunk": 1}}]
+  },
+  "impl": {
+    "function": "recurrent_norm_gate_forward",
+    "c_declaration": "void recurrent_norm_gate_forward(const float *x, const float *gate, const float *weight, float *out, int rows, int num_heads, int head_dim, float eps);",
+    "sources": ["src/kernels/recurrent_norm_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_norm_gate.py"],
+    "parity": [
+      {"kind": "pytorch", "command": ".venv/bin/python unittest/test_recurrent_norm_gate.py", "tolerance": "8e-5"},
+      {"kind": "llamacpp", "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_norm_gate", "tolerance": "8e-5"}
+    ]
+  }
+}

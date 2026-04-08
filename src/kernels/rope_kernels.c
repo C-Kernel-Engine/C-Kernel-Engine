@@ -993,7 +993,7 @@ static void vision_mrope_apply_head(
     }
 }
 
-static int vision_mrope_apply_ggml_exact(
+static int explicit_mrope_apply_ggml_exact(
     float *x,
     const int32_t *positions,
     int num_heads,
@@ -1008,7 +1008,8 @@ static int vision_mrope_apply_ggml_exact(
     float ext_factor,
     float attn_factor,
     float beta_fast,
-    float beta_slow
+    float beta_slow,
+    int rope_type
 ) {
     ck_ggml_cpu_init_fn ggml_cpu_init_fn = ck_resolve_ggml_cpu_init();
     ck_ggml_init_fn ggml_init_fn = ck_resolve_ggml_init();
@@ -1090,7 +1091,7 @@ static int vision_mrope_apply_ggml_exact(
                                                           NULL,
                                                           n_dims,
                                                           ggml_sections,
-                                                          GGML_ROPE_TYPE_VISION,
+                                                          rope_type,
                                                           n_ctx_orig,
                                                           freq_base,
                                                           freq_scale,
@@ -1118,6 +1119,255 @@ static int vision_mrope_apply_ggml_exact(
     ok = 1;
     ggml_free_fn(ctx);
     return ok;
+}
+
+static void explicit_mrope_apply_head(
+    float *x,
+    const int32_t *positions,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int n_dims,
+    const int sections[4],
+    int n_ctx_orig,
+    float freq_base,
+    float freq_scale,
+    float ext_factor,
+    float attn_factor,
+    float beta_fast,
+    float beta_slow,
+    int is_imrope
+) {
+    if (!x || !positions || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim || n_dims <= 0) {
+        return;
+    }
+
+    if (n_dims * 2 > head_dim) {
+        n_dims = head_dim / 2;
+    }
+    if (n_dims <= 0) {
+        return;
+    }
+
+    const int num_pos = num_tokens;
+    const int sec_w = sections[0] + sections[1];
+    const int sec_e = sec_w + sections[2];
+    const int sect_dims = sections[0] + sections[1] + sections[2] + sections[3];
+    const float theta_scale = powf(freq_base, -2.0f / (float) n_dims);
+    float corr_dims[2] = {0.0f, (float) (n_dims - 1)};
+    vision_mrope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
+
+    for (int tok = 0; tok < num_tokens; ++tok) {
+        float theta_t = (float) positions[tok];
+        float theta_h = (float) positions[tok + num_pos];
+        float theta_w = (float) positions[tok + 2 * num_pos];
+        float theta_e = (float) positions[tok + 3 * num_pos];
+        float *row = x + (size_t) tok * (size_t) aligned_head_dim;
+
+        for (int chan = 0; chan < n_dims; ++chan) {
+            const int sector = sect_dims > 0 ? (chan % sect_dims) : chan;
+            if (!is_imrope) {
+                if (sector == 0) {
+                    theta_t = (float) positions[tok];
+                } else if (sector == sections[0]) {
+                    theta_h = (float) positions[tok + num_pos];
+                } else if (sector == sec_w) {
+                    theta_w = (float) positions[tok + 2 * num_pos];
+                } else if (sector == sec_e) {
+                    theta_e = (float) positions[tok + 3 * num_pos];
+                }
+            }
+
+            float theta = theta_t;
+            if (is_imrope) {
+                if (sector % 3 == 1 && sector < 3 * sections[1]) {
+                    theta = theta_h;
+                } else if (sector % 3 == 2 && sector < 3 * sections[2]) {
+                    theta = theta_w;
+                } else if (sector % 3 == 0 && sector < 3 * sections[0]) {
+                    theta = theta_t;
+                } else {
+                    theta = theta_e;
+                }
+            } else if (sector >= sections[0] && sector < sec_w) {
+                theta = theta_h;
+            } else if (sector >= sec_w && sector < sec_e) {
+                theta = theta_w;
+            } else if (sector >= sec_e) {
+                theta = theta_e;
+            }
+
+            float cos_theta = 0.0f;
+            float sin_theta = 0.0f;
+            vision_mrope_yarn(
+                theta,
+                freq_scale,
+                corr_dims,
+                chan,
+                ext_factor,
+                attn_factor,
+                &cos_theta,
+                &sin_theta
+            );
+
+            const float x0 = row[chan];
+            const float x1 = row[chan + n_dims];
+            row[chan] = x0 * cos_theta - x1 * sin_theta;
+            row[chan + n_dims] = x0 * sin_theta + x1 * cos_theta;
+
+            theta_t *= theta_scale;
+            theta_h *= theta_scale;
+            theta_w *= theta_scale;
+            theta_e *= theta_scale;
+        }
+    }
+}
+
+static void text_mrope_apply_head(
+    float *x,
+    int num_tokens,
+    int head_dim,
+    int aligned_head_dim,
+    int pos_offset,
+    int n_dims,
+    const int sections[4],
+    int n_ctx_orig,
+    float freq_base,
+    float freq_scale,
+    float ext_factor,
+    float attn_factor,
+    float beta_fast,
+    float beta_slow
+) {
+    if (!x || num_tokens <= 0 || head_dim <= 0 || aligned_head_dim < head_dim || n_dims <= 0) {
+        return;
+    }
+
+    if (n_dims * 2 > head_dim) {
+        n_dims = head_dim / 2;
+    }
+    if (n_dims <= 0) {
+        return;
+    }
+
+    const int sec_w = sections[0] + sections[1];
+    const int sec_e = sec_w + sections[2];
+    const int sect_dims = sections[0] + sections[1] + sections[2] + sections[3];
+    const float theta_scale = powf(freq_base, -2.0f / (float) n_dims);
+    float corr_dims[2] = {0.0f, (float) (n_dims - 1)};
+    vision_mrope_yarn_corr_dims(n_dims, n_ctx_orig, freq_base, beta_fast, beta_slow, corr_dims);
+
+    for (int tok = 0; tok < num_tokens; ++tok) {
+        const float base_pos = (float) (pos_offset + tok);
+        float theta_t = base_pos;
+        float theta_h = base_pos;
+        float theta_w = base_pos;
+        float theta_e = 0.0f;
+        float *row = x + (size_t) tok * (size_t) aligned_head_dim;
+
+        for (int chan = 0; chan < n_dims; ++chan) {
+            const int sector = sect_dims > 0 ? (chan % sect_dims) : chan;
+            float theta = theta_t;
+            if (sector >= sections[0] && sector < sec_w) {
+                theta = theta_h;
+            } else if (sector >= sec_w && sector < sec_e) {
+                theta = theta_w;
+            } else if (sector >= sec_e) {
+                theta = theta_e;
+            }
+
+            float cos_theta = 0.0f;
+            float sin_theta = 0.0f;
+            vision_mrope_yarn(
+                theta,
+                freq_scale,
+                corr_dims,
+                chan,
+                ext_factor,
+                attn_factor,
+                &cos_theta,
+                &sin_theta
+            );
+
+            const float x0 = row[chan];
+            const float x1 = row[chan + n_dims];
+            row[chan] = x0 * cos_theta - x1 * sin_theta;
+            row[chan + n_dims] = x0 * sin_theta + x1 * cos_theta;
+
+            theta_t *= theta_scale;
+            theta_h *= theta_scale;
+            theta_w *= theta_scale;
+            theta_e *= theta_scale;
+        }
+    }
+}
+
+void mrope_qk_text(float *q,
+                   float *k,
+                   int num_heads,
+                   int num_kv_heads,
+                   int num_tokens,
+                   int head_dim,
+                   int aligned_head_dim,
+                   int pos_offset,
+                   int n_dims,
+                   int section_0,
+                   int section_1,
+                   int section_2,
+                   int section_3,
+                   int n_ctx_orig,
+                   float freq_base,
+                   float freq_scale,
+                   float ext_factor,
+                   float attn_factor,
+                   float beta_fast,
+                   float beta_slow)
+{
+    if (!q || !k || num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+
+    const int sections[4] = {section_0, section_1, section_2, section_3};
+    const size_t q_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+    const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        text_mrope_apply_head(
+            q + (size_t) h * q_head_stride,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow
+        );
+    }
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        text_mrope_apply_head(
+            k + (size_t) h * k_head_stride,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            pos_offset,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow
+        );
+    }
 }
 
 void mrope_qk_vision(float *q,
@@ -1148,12 +1398,12 @@ void mrope_qk_vision(float *q,
     const int sections[4] = {section_0, section_1, section_2, section_3};
 
     if (ck_strict_parity_enabled()) {
-        if (vision_mrope_apply_ggml_exact(
+        if (explicit_mrope_apply_ggml_exact(
                 q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
-                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow) &&
-            vision_mrope_apply_ggml_exact(
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, GGML_ROPE_TYPE_VISION) &&
+            explicit_mrope_apply_ggml_exact(
                 k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
-                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow)) {
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, GGML_ROPE_TYPE_VISION)) {
             return;
         }
     }
@@ -1162,7 +1412,7 @@ void mrope_qk_vision(float *q,
     const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
 
     for (int h = 0; h < num_heads; ++h) {
-        vision_mrope_apply_head(
+        explicit_mrope_apply_head(
             q + (size_t) h * q_head_stride,
             positions,
             num_tokens,
@@ -1176,12 +1426,13 @@ void mrope_qk_vision(float *q,
             ext_factor,
             attn_factor,
             beta_fast,
-            beta_slow
+            beta_slow,
+            0
         );
     }
 
     for (int h = 0; h < num_kv_heads; ++h) {
-        vision_mrope_apply_head(
+        explicit_mrope_apply_head(
             k + (size_t) h * k_head_stride,
             positions,
             num_tokens,
@@ -1195,7 +1446,90 @@ void mrope_qk_vision(float *q,
             ext_factor,
             attn_factor,
             beta_fast,
-            beta_slow
+            beta_slow,
+            0
+        );
+    }
+}
+
+void mrope_qk_imrope_positions(float *q,
+                               float *k,
+                               const int32_t *positions,
+                               int num_heads,
+                               int num_kv_heads,
+                               int num_tokens,
+                               int head_dim,
+                               int aligned_head_dim,
+                               int n_dims,
+                               int section_0,
+                               int section_1,
+                               int section_2,
+                               int section_3,
+                               int n_ctx_orig,
+                               float freq_base,
+                               float freq_scale,
+                               float ext_factor,
+                               float attn_factor,
+                               float beta_fast,
+                               float beta_slow)
+{
+    if (!q || !k || !positions || num_heads <= 0 || num_kv_heads <= 0 || num_tokens <= 0) {
+        return;
+    }
+
+    const int sections[4] = {section_0, section_1, section_2, section_3};
+
+    if (ck_strict_parity_enabled()) {
+        if (explicit_mrope_apply_ggml_exact(
+                q, positions, num_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, GGML_ROPE_TYPE_IMROPE) &&
+            explicit_mrope_apply_ggml_exact(
+                k, positions, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, sections,
+                n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow, GGML_ROPE_TYPE_IMROPE)) {
+            return;
+        }
+    }
+
+    const size_t q_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+    const size_t k_head_stride = (size_t) num_tokens * (size_t) aligned_head_dim;
+
+    for (int h = 0; h < num_heads; ++h) {
+        explicit_mrope_apply_head(
+            q + (size_t) h * q_head_stride,
+            positions,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow,
+            1
+        );
+    }
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        explicit_mrope_apply_head(
+            k + (size_t) h * k_head_stride,
+            positions,
+            num_tokens,
+            head_dim,
+            aligned_head_dim,
+            n_dims,
+            sections,
+            n_ctx_orig,
+            freq_base,
+            freq_scale,
+            ext_factor,
+            attn_factor,
+            beta_fast,
+            beta_slow,
+            1
         );
     }
 }

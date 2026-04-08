@@ -1,0 +1,97 @@
+{
+  "id": "residual_add_backward_f32",
+  "op": "add_backward",
+  "variant": "fp32_split",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "d_out",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient of residual output"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_a",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient to first residual input"
+    },
+    {
+      "name": "d_b",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "E"
+      ],
+      "desc": "Gradient to second residual input"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "E"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "token"
+    ],
+    "preferred": {
+      "prefill": "token",
+      "decode": "token"
+    },
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "range",
+        "notes": "Simple split copy: d_a=d_out, d_b=d_out"
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Reference residual split gradient."
+  },
+  "impl": {
+    "function": "ck_residual_add_backward",
+    "c_declaration": "void ck_residual_add_backward(const float *d_out, float *d_a, float *d_b, int tokens, int aligned_embed_dim);",
+    "sources": [
+      "src/ckernel_orchestration.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "python unittest/test_add.py",
+        "tolerance": "1e-6",
+        "notes": "Residual split gradient reference check."
+      }
+    ]
+  },
+  "notes": "Residual-add backward split kernel for v7 training IR."
+}

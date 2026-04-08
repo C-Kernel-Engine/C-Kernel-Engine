@@ -1,0 +1,45 @@
+{
+  "id": "gemv_q8_0_q8_0_parallel_omp",
+  "op": "gemv",
+  "variant": "q8_0_w_q8_0_a_fp32_out_parallel_omp",
+  "parallel": true,
+  "mode": "decode",
+  "quant": {
+    "weight": "q8_0",
+    "activation": "q8_0",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "q8_0", "shape": ["K"], "desc": "Input vector [K] (quantized q8_0)"}
+  ],
+  "weights": [
+    {"name": "W", "dtype": "q8_0", "shape": ["M", "K"], "desc": "Weight matrix [M, K] row-major"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "y", "dtype": "fp32", "shape": ["M"], "desc": "Output vector [M] = W @ x"}
+  ],
+  "scratch": [],
+  "dims": ["M", "K"],
+  "parallelization": {
+    "supported": ["output"],
+    "strategies": [
+      {
+        "name": "openmp_rows",
+        "partition_dim": "M",
+        "notes": "Uses #pragma omp parallel for over output rows"
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"K": 32},
+    "notes": "Q8_0 requires K multiple of 32 for SIMD alignment."
+  },
+  "impl": {
+    "function": "gemv_q8_0_q8_0_parallel_omp",
+    "c_declaration": "void gemv_q8_0_q8_0_parallel_omp(float *y, const void *W, const void *x_q8, int M, int K);",
+    "sources": ["src/kernels/gemv_omp.c"],
+    "requires_flags": ["-fopenmp"]
+  },
+  "notes": "OpenMP-parallel version of gemv_q8_0_q8_0 for single-stream decode throughput."
+}

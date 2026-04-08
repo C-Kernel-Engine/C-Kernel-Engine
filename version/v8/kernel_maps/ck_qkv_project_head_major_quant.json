@@ -1,0 +1,68 @@
+{
+  "id": "ck_qkv_project_head_major_quant",
+  "op": "qkv_projection",
+  "variant": "mixed_w_fp32_a",
+  "quant": {
+    "weight": "mixed",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["T", "AE"], "desc": "Input activations [tokens, aligned_embed_dim]"},
+    {"name": "wq", "dtype": "mixed", "shape": ["H", "AD", "AE"], "desc": "Q weights [heads, aligned_head_dim, aligned_embed_dim]"},
+    {"name": "bq", "dtype": "fp32", "shape": ["H", "AD"], "optional": true, "desc": "Q bias [heads, aligned_head_dim] (or NULL)"},
+    {"name": "wk", "dtype": "mixed", "shape": ["KV", "AD", "AE"], "desc": "K weights [kv_heads, aligned_head_dim, aligned_embed_dim]"},
+    {"name": "bk", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "K bias [kv_heads, aligned_head_dim] (or NULL)"},
+    {"name": "wv", "dtype": "mixed", "shape": ["KV", "AD", "AE"], "desc": "V weights [kv_heads, aligned_head_dim, aligned_embed_dim]"},
+    {"name": "bv", "dtype": "fp32", "shape": ["KV", "AD"], "optional": true, "desc": "V bias [kv_heads, aligned_head_dim] (or NULL)"}
+  ],
+  "outputs": [
+    {"name": "q", "dtype": "fp32", "shape": ["H", "T", "AD"], "desc": "Query output [heads, tokens, aligned_head_dim]"},
+    {"name": "k", "dtype": "fp32", "shape": ["KV", "T", "AD"], "desc": "Key output [kv_heads, tokens, aligned_head_dim]"},
+    {"name": "v", "dtype": "fp32", "shape": ["KV", "T", "AD"], "desc": "Value output [kv_heads, tokens, aligned_head_dim]"}
+  ],
+  "scratch": [],
+  "dims": ["T", "E", "AE", "H", "KV", "D", "AD"],
+  "params": [
+    {"name": "wq_dtype", "dtype": "int32", "desc": "CKDataType for Wq"},
+    {"name": "wk_dtype", "dtype": "int32", "desc": "CKDataType for Wk"},
+    {"name": "wv_dtype", "dtype": "int32", "desc": "CKDataType for Wv"},
+    {"name": "kv_stride_tokens", "dtype": "int32", "desc": "Stride in tokens for KV cache layout"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Parallelize across heads; each thread handles one or more heads."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"AE": 64, "AD": 64},
+    "notes": "Supports mixed quant weights; input/output are fp32. Weights are head-major."
+  },
+  "impl": {
+    "function": "ck_qkv_project_head_major_quant",
+    "sources": ["src/ckernel_orchestration.c"],
+    "variants": [
+      {"name": "avx2", "requires": ["avx2", "fma"], "compile_flags": ["-mavx2", "-mfma"]}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_fused_rmsnorm_qkv.py"],
+    "bench": ["scripts/bench_fused_qkv.py"],
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_fused_rmsnorm_qkv.py --compare-numpy",
+        "tolerance": "1e-4",
+        "notes": "Compare against unfused reference implementation"
+      }
+    ]
+  },
+  "notes": "Head-major QKV projection with mixed quantized weights. Uses ck_qkv_project_head_major_quant with per-weight dtypes."
+}

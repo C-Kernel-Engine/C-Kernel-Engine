@@ -797,9 +797,14 @@ static int write_run_index(const char *run_dir, const char *output_path) {
 
 static const char *get_cache_dir(void) {
     static char cache_path[4096];
+    const char *env = getenv("CK_CACHE_DIR");
+    if (env && env[0]) {
+        snprintf(cache_path, sizeof(cache_path), "%s", env);
+        return cache_path;
+    }
     const char *home = getenv("HOME");
     if (!home) home = "/tmp";
-    snprintf(cache_path, sizeof(cache_path), "%s/.cache/ck-engine-v7/models", home);
+    snprintf(cache_path, sizeof(cache_path), "%s/.cache/ck-engine-v8/models", home);
     return cache_path;
 }
 
@@ -843,11 +848,13 @@ static bool resolve_model_runtime_paths(
     if (!model_dir || !lib_out || !weights_out || out_size == 0) return false;
 
     static const char *lib_patterns[] = {
+        "%s/.ck_build_v8/libmodel.so",
         "%s/.ck_build/libmodel.so",
         "%s/libmodel.so",
         "%s/ck-kernel-inference.so",
     };
     static const char *weights_patterns[] = {
+        "%s/.ck_build_v8/weights.bump",
         "%s/.ck_build/weights.bump",
         "%s/weights.bump",
         "%s/weights.bump",
@@ -1011,9 +1018,9 @@ static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_s
         fprintf(stderr, "\n  No model cache found.\n");
         fprintf(stderr, "  Looked in: %s\n\n", cache_dir);
         fprintf(stderr, "  To get started, compile a model first:\n");
-        fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run <model-name>\n\n");
+        fprintf(stderr, "    python version/v8/scripts/ck_run_v8.py run <model-name>\n\n");
         fprintf(stderr, "  Example:\n");
-        fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+        fprintf(stderr, "    python version/v8/scripts/ck_run_v8.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf\n\n");
         return false;
     }
 
@@ -1065,11 +1072,11 @@ static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_s
             fprintf(stderr, "  Found %d model folder%s, but none are compiled yet.\n\n",
                    uncompiled, uncompiled > 1 ? "s" : "");
             fprintf(stderr, "  To compile, run:\n");
-            fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run <model-name> --force-compile\n\n");
+            fprintf(stderr, "    python version/v8/scripts/ck_run_v8.py run <model-name> --force-compile\n\n");
         } else {
             fprintf(stderr, "  No models found.\n\n");
             fprintf(stderr, "  To get started, download and compile a model:\n");
-            fprintf(stderr, "    python version/v7/scripts/ck_run_v7.py run Qwen/Qwen2-0.5B-Instruct-GGUF\n\n");
+            fprintf(stderr, "    python version/v8/scripts/ck_run_v8.py run hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf\n\n");
         }
         return false;
     }
@@ -1092,7 +1099,7 @@ static bool scan_and_select_model(char *lib_out, char *weights_out, size_t out_s
                    format_size(weights_sizes[i], size_buf, sizeof(size_buf)));
         }
         if (uncompiled > 0) {
-            fprintf(stderr, "\n  (%d other folder%s not yet compiled — run ck_run_v7.py to compile)\n",
+            fprintf(stderr, "\n  (%d other folder%s not yet compiled — run ck_run_v8.py to compile)\n",
                    uncompiled, uncompiled > 1 ? "s" : "");
         }
         fprintf(stderr, "\n  Which model would you like to use? [1-%d]: ", count);
@@ -3986,10 +3993,10 @@ static void print_help(const char *prog) {
     fprintf(stderr, "\nWorkflow:\n");
     fprintf(stderr, "  This CLI runs pre-compiled models. To compile a new model:\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "  Step 1: Compile (once)    python version/v7/scripts/ck_run_v7.py run <model>\n");
+    fprintf(stderr, "  Step 1: Compile (once)    python version/v8/scripts/ck_run_v8.py run <model>\n");
     fprintf(stderr, "  Step 2: Run (fast)        %s\n", prog);
     fprintf(stderr, "\n");
-    fprintf(stderr, "  Models are cached in: ~/.cache/ck-engine-v7/models/\n");
+    fprintf(stderr, "  Models are cached in: ~/.cache/ck-engine-v8/models/\n");
 }
 
 static bool parse_args(int argc, char **argv, CLIOptions *opt) {
@@ -4101,7 +4108,7 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
             fprintf(stderr, "Model '%s' not found in cache.\n\n", opt->model_name);
             list_available_models();
             fprintf(stderr, "\nTo use an existing model:  %s --model <name>\n", argv[0]);
-            fprintf(stderr, "To compile '%s':           python version/v7/scripts/ck_run_v7.py run %s\n",
+            fprintf(stderr, "To compile '%s':           python version/v8/scripts/ck_run_v8.py run %s\n",
                     opt->model_name, opt->model_name);
             return false;
         }

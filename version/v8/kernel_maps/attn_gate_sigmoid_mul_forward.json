@@ -1,0 +1,64 @@
+{
+  "id": "attn_gate_sigmoid_mul_forward",
+  "op": "attn_gate_sigmoid_mul",
+  "variant": "fp32",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "x", "dtype": "fp32", "shape": ["R", "D"], "desc": "Attention output rows"},
+    {"name": "gate", "dtype": "fp32", "shape": ["R", "D"], "desc": "Gate rows to sigmoid"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["R", "D"], "desc": "Attention output scaled by sigmoid(gate)"}
+  ],
+  "scratch": [],
+  "dims": ["R", "D"],
+  "params": [],
+  "parallelization": {
+    "supported": ["row"],
+    "preferred": {"prefill": "row", "decode": "row"},
+    "strategies": [
+      {
+        "name": "row",
+        "partition_dim": "R",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each token row can be gated independently."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Fused sigmoid(gate) * attention-output kernel used by qwen3.5 full-attention layers."
+  },
+  "impl": {
+    "function": "attn_gate_sigmoid_mul_forward",
+    "c_declaration": "void attn_gate_sigmoid_mul_forward(const float *x, const float *gate, float *out, int rows, int dim);",
+    "sources": ["src/kernels/hybrid_attention_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_attn_gate_sigmoid_mul.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_attn_gate_sigmoid_mul.py",
+        "tolerance": "1e-6",
+        "notes": "Forward/backward parity against torch.sigmoid and elementwise multiply."
+      },
+      {
+        "kind": "llamacpp",
+        "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel attn_gate_sigmoid_mul",
+        "tolerance": "1e-6",
+        "notes": "Forward parity against the qwen35 helper reference."
+      }
+    ]
+  },
+  "notes": "Applies the qwen3.5 full-attention gate after attention and before the output projection."
+}

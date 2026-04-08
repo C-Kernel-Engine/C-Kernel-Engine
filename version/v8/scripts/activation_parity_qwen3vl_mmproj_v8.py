@@ -42,12 +42,11 @@ def _compile_generated_dump_model(output_dir: Path, c_path: Path) -> Path:
         "-O3",
         "-fopenmp",
         "-Iinclude",
-        "-Iversion/v7/include",
-        "-Iversion/v7/src",
+        "-Iversion/v8/src",
         str(c_path),
-        "version/v7/src/ckernel_model_load_v7.c",
-        "version/v7/src/ck_parallel_decode.c",
-        "version/v7/src/ck_parallel_prefill.c",
+        "version/v8/src/ckernel_model_load_v8.c",
+        "version/v8/src/ck_parallel_decode_v8.c",
+        "version/v8/src/ck_parallel_prefill_v8.c",
         "-Lbuild",
         "-lckernel_engine",
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -205,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gguf", type=Path, required=True, help="Path to mmproj-Qwen3VL-*.gguf")
     ap.add_argument("--output-dir", type=Path, default=Path("/tmp/qwen3vl_mmproj_v8_activation_parity"))
     ap.add_argument("--image-mode", choices=("gradient", "gray", "checker"), default="gradient")
+    ap.add_argument("--image-path", type=Path, default=None, help="Optional real image path; overrides --image-mode")
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--ck-threads", type=int, default=None)
     ap.add_argument("--strict-parity", action="store_true", help="Enable parity-only strict mode in CK during the generated encoder run")
@@ -236,7 +236,19 @@ def main(argv: list[str] | None = None) -> int:
     config = report["config"]
     height = int(config["image_size"])
     width = int(config["image_size"])
-    interleaved, planar = npv8._build_test_image(height, width, args.image_mode)
+    if args.image_path is not None:
+        image_report = npv8._load_image_file(args.image_path.resolve(), height, width)
+        interleaved = image_report["interleaved"]
+        planar = image_report["planar"]
+    else:
+        interleaved, planar = npv8._build_test_image(height, width, args.image_mode)
+        image_report = {
+            "image_source": "synthetic",
+            "image_mode": args.image_mode,
+            "image_path": None,
+            "source_image_size": [width, height],
+            "preprocess": "synthetic_generator",
+        }
 
     ck_dump_dir = output_dir / "ck_parity_dumps"
     llama_dump_dir = output_dir / "llama_parity_dumps"
@@ -285,7 +297,11 @@ def main(argv: list[str] | None = None) -> int:
     artifact_report = {
         "gguf": str(args.gguf),
         "output_dir": str(output_dir),
-        "image_mode": args.image_mode,
+        "image_source": str(image_report.get("image_source", "synthetic")),
+        "image_mode": image_report.get("image_mode"),
+        "image_path": image_report.get("image_path"),
+        "source_image_size": image_report.get("source_image_size"),
+        "preprocess": image_report.get("preprocess"),
         "threads": {
             "llama_cpp": args.threads,
             "ck_runtime": ck_threads,

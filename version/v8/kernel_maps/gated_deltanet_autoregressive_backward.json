@@ -1,0 +1,75 @@
+{
+  "id": "gated_deltanet_autoregressive_backward_f32",
+  "op": "gated_deltanet",
+  "variant": "backward_fp32",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "d_out", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "d_state_out", "dtype": "fp32", "shape": ["H", "D", "D"]},
+    {"name": "q", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "k", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "v", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "g", "dtype": "fp32", "shape": ["H"]},
+    {"name": "beta", "dtype": "fp32", "shape": ["H"]},
+    {"name": "state_in", "dtype": "fp32", "shape": ["H", "D", "D"]},
+    {"name": "state_out", "dtype": "fp32", "shape": ["H", "D", "D"]}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_q", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "d_k", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "d_v", "dtype": "fp32", "shape": ["H", "D"]},
+    {"name": "d_g", "dtype": "fp32", "shape": ["H"]},
+    {"name": "d_beta", "dtype": "fp32", "shape": ["H"]},
+    {"name": "d_state_in", "dtype": "fp32", "shape": ["H", "D", "D"]}
+  ],
+  "scratch": [],
+  "dims": ["H", "D"],
+  "params": [
+    {"name": "norm_eps", "dtype": "float32", "desc": "Normalization epsilon for Q/K scaling"}
+  ],
+  "parallelization": {
+    "supported": ["head"],
+    "preferred": {"prefill": "head", "decode": "head"},
+    "strategies": [
+      {
+        "name": "head",
+        "partition_dim": "H",
+        "param_style": "ith_nth",
+        "notes": "Each DeltaNet head backward path is independent for the single-token update."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Backward kernel for the qwen3.5/qwen3next single-token DeltaNet recurrent update."
+  },
+  "impl": {
+    "function": "gated_deltanet_autoregressive_backward",
+    "c_declaration": "void gated_deltanet_autoregressive_backward(const float *d_out, const float *d_state_out, const float *q, const float *k, const float *v, const float *g, const float *beta, const float *state_in, const float *state_out, float *d_q, float *d_k, float *d_v, float *d_g, float *d_beta, float *d_state_in, int num_heads, int state_dim, float norm_eps);",
+    "sources": ["src/kernels/deltanet_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["tests/test_deltanet.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python tests/test_deltanet.py",
+        "tolerance": "5e-4",
+        "notes": "Backward parity against the local PyTorch DeltaNet reference."
+      }
+    ]
+  }
+}

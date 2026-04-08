@@ -1,0 +1,25 @@
+{
+  "id": "attention_forward_decode_head_major_gqa_regular",
+  "op": "attention",
+  "variant": "decode_head_major_gqa_regular",
+  "mode": "decode",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "q_token", "dtype": "fp32", "shape": ["num_heads", "head_dim"], "desc": "Query for single token [num_heads, head_dim]"},
+    {"name": "k_cache", "dtype": "fp32", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "desc": "K cache [num_kv_heads, max_seq_len, head_dim]"},
+    {"name": "v_cache", "dtype": "fp32", "shape": ["num_kv_heads", "cache_capacity", "head_dim"], "desc": "V cache [num_kv_heads, max_seq_len, head_dim]"}
+  ],
+  "outputs": [
+    {"name": "out_token", "dtype": "fp32", "shape": ["num_heads", "head_dim"], "desc": "Output for single token [num_heads, head_dim]"}
+  ],
+  "dims": ["num_heads", "num_kv_heads", "kv_tokens", "cache_capacity", "head_dim", "aligned_head_dim"],
+  "impl": {
+    "function": "attention_forward_decode_head_major_gqa_regular",
+    "c_declaration": "void attention_forward_decode_head_major_gqa_regular(const float *q_token, const float *k_cache, const float *v_cache, float *out_token, int num_heads, int num_kv_heads, int kv_tokens, int cache_capacity, int head_dim, int aligned_head_dim);",
+    "sources": ["src/kernels/attention_kernels.c"]
+  },
+  "notes": "Regular decode attention for head-major KV cache: single query token attends to all KV cache entries (0..kv_tokens-1)."
+}

@@ -224,6 +224,82 @@ def write_bumpv5_footer(f: BinaryIO, meta_size: int, meta_sha256: bytes) -> None
     f.write(meta_sha256)
 
 
+_FORBIDDEN_TEMPLATE_FLAG_KEYS = {
+    "activation_preference_by_op": "per-op activation dtype policy",
+    "prefer_fp32_mlp_matmuls": "MLP activation dtype policy",
+    "prefer_q8_0_contract": "quantized activation contract policy",
+    "prefer_fp32_logits": "logits activation dtype policy",
+}
+
+_FORBIDDEN_TEMPLATE_KEY_NAMES = {
+    "dtype": "tensor dtype metadata",
+    "weight_dtype": "weight dtype metadata",
+    "weight_dtypes": "weight dtype metadata",
+    "weight_quant": "weight quant metadata",
+    "weight_quant_type": "weight quant metadata",
+    "quant_type_by_op": "per-op quant metadata",
+}
+
+
+def _collect_forbidden_template_metadata(node: Any, path: Tuple[str, ...] = ()) -> list[tuple[str, str]]:
+    issues: list[tuple[str, str]] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            key_str = str(key)
+            next_path = path + (key_str,)
+            if len(next_path) == 2 and next_path[0] == "flags" and key_str in _FORBIDDEN_TEMPLATE_FLAG_KEYS:
+                issues.append((".".join(next_path), _FORBIDDEN_TEMPLATE_FLAG_KEYS[key_str]))
+            if key_str in _FORBIDDEN_TEMPLATE_KEY_NAMES:
+                issues.append((".".join(next_path), _FORBIDDEN_TEMPLATE_KEY_NAMES[key_str]))
+            issues.extend(_collect_forbidden_template_metadata(value, next_path))
+    elif isinstance(node, list):
+        for idx, item in enumerate(node):
+            issues.extend(_collect_forbidden_template_metadata(item, path + (f"[{idx}]",)))
+    return issues
+
+
+def _validate_template_runtime_metadata(template_data: dict, *, source: str) -> None:
+    issues = _collect_forbidden_template_metadata(template_data)
+    if not issues:
+        return
+    details = "; ".join(f"{path} ({reason})" for path, reason in issues)
+    raise GGUFError(
+        f"Template '{source}' declares dtype/quant policy that must not live in templates: {details}. "
+        "Keep templates to graph/order metadata; derive weight dtypes from the weights file and runtime config."
+    )
+
+
+def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
+    arch_lc = str(arch or "").strip().lower()
+
+    def _merge_activation_defaults(defaults: dict[str, str]) -> None:
+        prefs = config.get("activation_preference_by_op")
+        if not isinstance(prefs, dict):
+            prefs = {}
+        else:
+            prefs = dict(prefs)
+        for key, value in defaults.items():
+            prefs.setdefault(str(key), str(value))
+        config["activation_preference_by_op"] = prefs
+
+    if arch_lc == "qwen2":
+        config.setdefault("prefer_fp32_mlp_matmuls", True)
+    elif arch_lc == "qwen35":
+        _merge_activation_defaults(
+            {
+                "recurrent_gate_proj": "fp32",
+                "recurrent_alpha_proj": "fp32",
+                "recurrent_beta_proj": "fp32",
+            }
+        )
+    elif arch_lc == "qwen3_vl_vision":
+        _merge_activation_defaults({"mlp_down": "fp32", "out_proj": "fp32"})
+    elif arch_lc == "gemma3":
+        config.setdefault("prefer_q8_0_contract", True)
+        config.setdefault("prefer_fp32_logits", True)
+    return config
+
+
 def load_template_for_arch(arch: str) -> dict:
     # Intentional contract: template selection is strict (arch -> templates/<arch>.json).
     # We do not alias or guess here; supported models are explicit via templates.
@@ -237,7 +313,9 @@ def load_template_for_arch(arch: str) -> dict:
             "Add a template or use --bump-version=4."
         )
     with open(template_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        template_data = json.load(f)
+    _validate_template_runtime_metadata(template_data, source=template_path)
+    return template_data
 
 
 def apply_model_contract_overrides(
@@ -1759,6 +1837,11 @@ def main() -> None:
         "clip.vision.feed_forward_length",
         "clip.vision.attention.head_count",
         "clip.vision.projection_dim",
+        "clip.vision.image_mean",
+        "clip.vision.image_std",
+        "clip.vision.image_min_pixels",
+        "clip.vision.image_max_pixels",
+        "clip.vision.preproc_image_size",
         "clip.vision.spatial_merge_size",
         "clip.vision.is_deepstack_layers",
         # Llama-style keys
@@ -1817,6 +1900,19 @@ def main() -> None:
         "qwen3.attention.layer_norm_rms_epsilon",
         "qwen3.attention.key_length",
         "qwen3.attention.value_length",
+        # Qwen3-VL decoder keys
+        "qwen3vl.block_count",
+        "qwen3vl.context_length",
+        "qwen3vl.embedding_length",
+        "qwen3vl.feed_forward_length",
+        "qwen3vl.attention.head_count",
+        "qwen3vl.attention.head_count_kv",
+        "qwen3vl.rope.freq_base",
+        "qwen3vl.attention.layer_norm_rms_epsilon",
+        "qwen3vl.attention.key_length",
+        "qwen3vl.attention.value_length",
+        "qwen3vl.rope.dimension_sections",
+        "qwen3vl.n_deepstack_layers",
         # Qwen3.5-style hybrid keys
         "qwen35.block_count",
         "qwen35.context_length",
@@ -1867,6 +1963,7 @@ def main() -> None:
         "llama.tie_word_embeddings",
         "qwen2.tie_word_embeddings",
         "qwen3.tie_word_embeddings",
+        "qwen3vl.tie_word_embeddings",
         "gemma3.tie_word_embeddings",
         "mistral.tie_word_embeddings",
         "mistral3.tie_word_embeddings",
@@ -1876,6 +1973,7 @@ def main() -> None:
         "llama.embedding_weight_tying",
         "qwen2.embedding_weight_tying",
         "qwen3.embedding_weight_tying",
+        "qwen3vl.embedding_weight_tying",
         "gemma3.embedding_weight_tying",
         "mistral.embedding_weight_tying",
         "mistral3.embedding_weight_tying",
@@ -1962,7 +2060,7 @@ def main() -> None:
             try:
                 template_data = load_template_for_arch(template_probe_arch)
                 template_flags = template_data.get("flags", {})
-                uses_rope = template_flags.get("rope") in ["rope", "yarn", "llama", True, None]
+                uses_rope = template_flags.get("rope") in ["rope", "mrope", "imrope", "yarn", "llama", True, None]
             except Exception as e:
                 print(f"[template] Warning: Could not load template for {template_probe_arch}: {e}")
 
@@ -2149,6 +2247,24 @@ def main() -> None:
                         return False
             return None
 
+        def meta_float_list(*keys: str) -> Optional[List[float]]:
+            """Get float-list metadata, trying multiple keys in order."""
+            for key in keys:
+                v = meta.get(key)
+                if not isinstance(v, (list, tuple, np.ndarray)):
+                    continue
+                out: List[float] = []
+                ok = True
+                for item in v:
+                    if isinstance(item, (float, np.floating, int, np.integer)):
+                        out.append(float(item))
+                    else:
+                        ok = False
+                        break
+                if ok and out:
+                    return out
+            return None
+
         def weight_dtype(info: TensorInfo, label: str) -> int:
             # Support all common quantization types
             supported_types = (
@@ -2179,6 +2295,8 @@ def main() -> None:
             num_heads = meta_int("clip.vision.attention.head_count")
             projection_dim = meta_int("clip.vision.projection_dim")
             spatial_merge_size = meta_int("clip.vision.spatial_merge_size") or 1
+            image_mean = meta_float_list("clip.vision.image_mean") or [0.5, 0.5, 0.5]
+            image_std = meta_float_list("clip.vision.image_std") or [0.5, 0.5, 0.5]
             has_vision_encoder = bool(meta_bool("clip.has_vision_encoder"))
             deepstack_layers = meta.get("clip.vision.is_deepstack_layers")
 
@@ -2211,6 +2329,10 @@ def main() -> None:
             vision_num_patches = vision_grid_h * vision_grid_w
             spatial_merge_factor = spatial_merge_size * spatial_merge_size
             vision_merged_tokens = vision_num_patches // spatial_merge_factor
+            patch_area = patch_size * patch_size * spatial_merge_factor
+            image_min_pixels = meta_int("clip.vision.image_min_pixels") or (8 * patch_area)
+            image_max_pixels = meta_int("clip.vision.image_max_pixels") or (4096 * patch_area)
+            preproc_image_size = meta_int("clip.vision.preproc_image_size") or image_size
             context_len = vision_num_patches
             vocab_size = 1
             num_kv_heads = num_heads
@@ -2390,17 +2512,24 @@ def main() -> None:
             projector_hidden_dim = int(mm0.ne1)
             projector_out_dim = int(mm1.ne1)
 
-            vision_config = {
+            vision_config = _inject_runtime_config_defaults({
                 "model": vision_arch,
                 "arch": vision_arch,
                 "model_type": vision_arch,
                 "image_size": int(image_size),
+                "image_height": int(image_size),
+                "image_width": int(image_size),
                 "patch_size": int(patch_size),
                 "vision_channels": 3,
                 "patch_dim": int(patch_size * patch_size * 3),
                 "vision_grid_h": int(vision_grid_h),
                 "vision_grid_w": int(vision_grid_w),
                 "vision_num_patches": int(vision_num_patches),
+                "image_mean": [float(v) for v in image_mean[:3]],
+                "image_std": [float(v) for v in image_std[:3]],
+                "image_min_pixels": int(image_min_pixels),
+                "image_max_pixels": int(image_max_pixels),
+                "preproc_image_size": int(preproc_image_size),
                 "spatial_merge_size": int(spatial_merge_size),
                 "spatial_merge_factor": int(spatial_merge_factor),
                 "vision_merged_tokens": int(vision_merged_tokens),
@@ -2430,7 +2559,7 @@ def main() -> None:
                 "deepstack_layer_indices": deepstack_layer_indices,
                 "num_deepstack_layers": len(deepstack_layer_indices),
                 "dtype": "fp32",
-            }
+            }, vision_arch)
 
             template_data = load_template_for_arch(vision_arch)
 
@@ -2612,7 +2741,7 @@ def main() -> None:
             raise GGUFError(f"{tok_name}: expected 2D, got dims={tok.dims}")
         embed_dim = meta_int(
             "deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length",
-            "llama.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length",
+            "llama.embedding_length", "qwen3vl.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length",
             "gemma3.embedding_length"
         ) or tok.ne0
         vocab_size = tok.ne1
@@ -2667,7 +2796,7 @@ def main() -> None:
 
         num_layers = meta_int(
             "deepseek2.block_count", "mistral3.block_count", "mistral.block_count",
-            "llama.block_count", "qwen35.block_count", "qwen3.block_count", "qwen2.block_count",
+            "llama.block_count", "qwen35.block_count", "qwen3vl.block_count", "qwen3.block_count", "qwen2.block_count",
             "gemma3.block_count"
         )
         if num_layers is None:
@@ -2685,7 +2814,7 @@ def main() -> None:
 
         intermediate = meta_int(
             "deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length",
-            "llama.feed_forward_length", "qwen35.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length",
+            "llama.feed_forward_length", "qwen35.feed_forward_length", "qwen3vl.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length",
             "gemma3.feed_forward_length"
         )
         if intermediate is None:
@@ -2697,20 +2826,20 @@ def main() -> None:
 
         num_heads = meta_int(
             "deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count",
-            "llama.attention.head_count", "qwen35.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
+            "llama.attention.head_count", "qwen35.attention.head_count", "qwen3vl.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
             "gemma3.attention.head_count"
         )
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
         num_kv_heads = meta_int(
             "deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv",
-            "llama.attention.head_count_kv", "qwen35.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv",
+            "llama.attention.head_count_kv", "qwen35.attention.head_count_kv", "qwen3vl.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv",
             "gemma3.attention.head_count_kv"
         ) or num_heads
 
         context_len = meta_int(
             "deepseek2.context_length", "mistral3.context_length", "mistral.context_length",
-            "llama.context_length", "qwen35.context_length", "qwen3.context_length", "qwen2.context_length",
+            "llama.context_length", "qwen35.context_length", "qwen3vl.context_length", "qwen3.context_length", "qwen2.context_length",
             "gemma3.context_length"
         ) or 0
         if args.context is not None:
@@ -2729,19 +2858,21 @@ def main() -> None:
 
         rope_theta = meta_float(
             "deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base",
-            "llama.rope.freq_base", "qwen35.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
+            "llama.rope.freq_base", "qwen35.rope.freq_base", "qwen3vl.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
             "gemma3.rope.freq_base"
         ) or 10000.0
 
         # Q/K/V head dimensions (some models report explicit key/value lengths)
         key_length_meta = meta_int(
             "qwen35.attention.key_length",
+            "qwen3vl.attention.key_length",
             "qwen3.attention.key_length",
             "gemma3.attention.key_length",
             "llama.attention.key_length",
         )
         value_length_meta = meta_int(
             "qwen35.attention.value_length",
+            "qwen3vl.attention.value_length",
             "qwen3.attention.value_length",
             "gemma3.attention.value_length",
             "llama.attention.value_length",
@@ -2754,6 +2885,7 @@ def main() -> None:
             "llama.rope.dim",
             "attention.rotary_dim",
             "qwen2.rotary_dim",
+            "qwen3vl.attention.key_length",
             "qwen3.attention.key_length",
             "gemma.attention.key_length",
             "gemma3.attention.key_length",
@@ -2844,7 +2976,7 @@ def main() -> None:
         rms_eps = meta_float(
             "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
             "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
-            "qwen35.attention.layer_norm_rms_epsilon", "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon",
+            "qwen35.attention.layer_norm_rms_epsilon", "qwen3vl.attention.layer_norm_rms_epsilon", "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon",
             "gemma3.attention.layer_norm_rms_epsilon"
         ) or 1e-5
 
@@ -2887,6 +3019,15 @@ def main() -> None:
             "even_odd": "pairwise",
         }
         rope_layout = rope_layout_aliases.get(rope_layout, rope_layout)
+        mrope_sections_meta = meta.get("qwen3vl.rope.dimension_sections")
+        mrope_sections = None
+        if isinstance(mrope_sections_meta, (list, tuple)) and len(mrope_sections_meta) == 4:
+            try:
+                mrope_sections = [int(v) for v in mrope_sections_meta]
+            except Exception:
+                mrope_sections = None
+        if arch == "qwen3vl" and mrope_sections:
+            rope_layout = "multi_section_1d"
         rope_original_context_length = int(rope_original_context_length_meta or context_len)
         rope_beta_fast = float(rope_beta_fast_meta) if rope_beta_fast_meta is not None else 0.0
         rope_beta_slow = float(rope_beta_slow_meta) if rope_beta_slow_meta is not None else 0.0
@@ -2907,7 +3048,7 @@ def main() -> None:
                 if rope_scaling_type == "yarn":
                     if rope_beta_fast <= 0.0 or rope_beta_slow <= 0.0:
                         raise GGUFError("Missing rope_beta_fast/rope_beta_slow for yarn (strict mode)")
-            if rope_layout and rope_layout not in {"split", "pairwise"}:
+            if rope_layout and rope_layout not in {"split", "pairwise", "multi_section_1d"}:
                 raise GGUFError(f"Unsupported rope_layout '{rope_layout}' (strict mode)")
 
         if rotary_dim > head_dim:
@@ -2971,6 +3112,7 @@ def main() -> None:
             "llama.tie_word_embeddings",
             "qwen2.tie_word_embeddings",
             "qwen3.tie_word_embeddings",
+            "qwen3vl.tie_word_embeddings",
             "gemma3.tie_word_embeddings",
             "mistral.tie_word_embeddings",
             "mistral3.tie_word_embeddings",
@@ -2980,6 +3122,7 @@ def main() -> None:
             "llama.embedding_weight_tying",
             "qwen2.embedding_weight_tying",
             "qwen3.embedding_weight_tying",
+            "qwen3vl.embedding_weight_tying",
             "gemma3.embedding_weight_tying",
             "mistral.embedding_weight_tying",
             "mistral3.embedding_weight_tying",
@@ -3860,7 +4003,7 @@ def main() -> None:
                 print(f"[convert] Writing BUMPWGT5 with embedded metadata...")
 
                 # Build config from GGUF metadata
-                config = {
+                config = _inject_runtime_config_defaults({
                     "model": arch,
                     "embed_dim": int(embed_dim),
                     "attn_out_dim": int(attn_out_dim),
@@ -3881,7 +4024,14 @@ def main() -> None:
                     "vocab_size": int(vocab_size),
                     "rms_eps": float(rms_eps) if rms_eps else 1e-5,
                     "tie_word_embeddings": bool(tie_word_embeddings),
-                }
+                }, arch)
+                if arch == "qwen3vl":
+                    num_deepstack_layers = int(meta_int("qwen3vl.n_deepstack_layers") or 0)
+                    if num_deepstack_layers > 0:
+                        config["num_deepstack_layers"] = num_deepstack_layers
+                    if mrope_sections:
+                        config["mrope_sections"] = [int(v) for v in mrope_sections]
+                        config["mrope_n_dims"] = int(sum(int(v) for v in mrope_sections))
                 chat_template = meta.get("tokenizer.chat_template")
                 if isinstance(chat_template, str) and chat_template.strip():
                     config["chat_template"] = chat_template
@@ -4071,6 +4221,13 @@ def main() -> None:
         cfg["tie_word_embeddings"] = bool(tie_word_embeddings)
         cfg["num_merges"] = num_merges
         cfg["total_vocab_bytes"] = total_vocab_bytes
+        if arch == "qwen3vl":
+            num_deepstack_layers = int(meta_int("qwen3vl.n_deepstack_layers") or 0)
+            if num_deepstack_layers > 0:
+                cfg["num_deepstack_layers"] = num_deepstack_layers
+            if mrope_sections:
+                cfg["mrope_sections"] = [int(v) for v in mrope_sections]
+                cfg["mrope_n_dims"] = int(sum(int(v) for v in mrope_sections))
         if sliding_window and sliding_window > 0:
             cfg["sliding_window"] = int(sliding_window)
         if rope_layout:

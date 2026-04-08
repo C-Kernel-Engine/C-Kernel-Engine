@@ -1,0 +1,26 @@
+{
+  "id": "kv_cache_store",
+  "op": "kv_cache_store",
+  "variant": "fp32",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "k", "dtype": "fp32", "shape": ["num_kv_heads", "head_dim"], "desc": "K tensor after RoPE [num_kv_heads, head_dim]"},
+    {"name": "v", "dtype": "fp32", "shape": ["num_kv_heads", "head_dim"], "desc": "V tensor [num_kv_heads, head_dim]"}
+  ],
+  "outputs": [
+    {"name": "kv_cache_k", "dtype": "fp32", "shape": ["num_layers", "num_kv_heads", "max_seq_len", "head_dim"], "desc": "K cache slice at current pos"},
+    {"name": "kv_cache_v", "dtype": "fp32", "shape": ["num_layers", "num_kv_heads", "max_seq_len", "head_dim"], "desc": "V cache slice at current pos"}
+  ],
+  "dims": ["num_kv_heads", "head_dim", "num_layers", "max_seq_len"],
+  "impl": {
+    "function": "kv_cache_store",
+    "c_declaration": "void kv_cache_store(float *kv_cache_k, float *kv_cache_v, const float *k, const float *v, int layer, int pos, int num_kv_heads, int head_dim, int max_seq_len);",
+    "sources": ["src/kernels/kv_cache.c"],
+    "inline": true,
+    "inline_code": "/* KV cache store is inlined as memcpy in codegen */"
+  },
+  "notes": "Store K and V to KV cache at current position. Typically inlined as memcpy in generated code."
+}

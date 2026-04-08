@@ -1,0 +1,47 @@
+{
+  "id": "recurrent_conv_state_update_forward",
+  "op": "recurrent_conv_state_update",
+  "variant": "fp32",
+  "modes": {
+    "inference": true,
+    "training": true,
+    "backward": false
+  },
+  "quant": {"weight": "none", "activation": "fp32", "output": "fp32"},
+  "inputs": [
+    {"name": "state_in", "dtype": "fp32", "shape": ["S", "C", "H"], "desc": "Cached recurrent convolution history"},
+    {"name": "q", "dtype": "fp32", "shape": ["R", "Q"], "desc": "Pre-convolution recurrent Q rows"},
+    {"name": "k", "dtype": "fp32", "shape": ["R", "K"], "desc": "Pre-convolution recurrent K rows"},
+    {"name": "v", "dtype": "fp32", "shape": ["R", "V"], "desc": "Pre-convolution recurrent V rows"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "conv_x", "dtype": "fp32", "shape": ["S", "Q+K+V", "H+T"], "desc": "Channel-major history plus current token rows"},
+    {"name": "state_out", "dtype": "fp32", "shape": ["S", "Q+K+V", "H"], "desc": "Updated cached history window"}
+  ],
+  "scratch": [],
+  "dims": ["H", "S", "T", "Q", "K", "V"],
+  "params": [],
+  "parallelization": {
+    "supported": ["seq"],
+    "preferred": {"prefill": "seq", "decode": "seq"},
+    "strategies": [
+      {"name": "seq", "partition_dim": "S", "param_style": "range", "range": {"min_chunk": 1}}
+    ]
+  },
+  "constraints": {"notes": "Pure graph-stitch state update before qwen3next/Qwen3.5 SSM convolution."},
+  "impl": {
+    "function": "recurrent_conv_state_update_forward",
+    "c_declaration": "void recurrent_conv_state_update_forward(const float *state_in, const float *q, const float *k, const float *v, float *conv_x, float *state_out, int history_len, int num_seqs, int num_tokens, int q_dim, int k_dim, int v_dim);",
+    "sources": ["src/kernels/recurrent_state_kernels.c"],
+    "variants": [{"name": "ref", "requires": [], "compile_flags": []}]
+  },
+  "tests": {
+    "unit": ["unittest/test_recurrent_conv_state_update.py"],
+    "parity": [
+      {"kind": "pytorch", "command": ".venv/bin/python unittest/test_recurrent_conv_state_update.py", "tolerance": "5e-5"},
+      {"kind": "llamacpp", "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel recurrent_conv_state_update", "tolerance": "0"}
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "ssm_conv1d_backward",
+  "op": "ssm_conv1d_backward",
+  "variant": "fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "d_out", "dtype": "fp32", "shape": ["S", "T", "C"], "desc": "Gradient of the SSM conv output [num_seqs, num_tokens, num_channels]"},
+    {"name": "conv_x", "dtype": "fp32", "shape": ["S", "C", "K-1+T"], "desc": "Forward input history + current tokens"},
+    {"name": "kernel", "dtype": "fp32", "shape": ["C", "K"], "desc": "Forward convolution kernel"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "d_conv_x", "dtype": "fp32", "shape": ["S", "C", "K-1+T"], "desc": "Input gradient matching conv_x layout"},
+    {"name": "d_kernel", "dtype": "fp32", "shape": ["C", "K"], "desc": "Kernel gradient matching kernel layout"}
+  ],
+  "scratch": [],
+  "dims": ["K", "C", "T", "S"],
+  "params": [],
+  "parallelization": {
+    "supported": ["channel", "sequence"],
+    "preferred": {"prefill": "channel", "decode": "channel"},
+    "strategies": [
+      {
+        "name": "channel",
+        "partition_dim": "C",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Channels are independent in the depthwise SSM convolution backward pass."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Backward pass for the qwen3next/Qwen3.5 SSM causal depthwise convolution."
+  },
+  "impl": {
+    "function": "ssm_conv1d_backward",
+    "c_declaration": "void ssm_conv1d_backward(const float *d_out, const float *conv_x, const float *kernel, float *d_conv_x, float *d_kernel, int kernel_size, int num_channels, int num_tokens, int num_seqs);",
+    "sources": ["src/kernels/ssm_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_ssm_conv.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_ssm_conv.py",
+        "tolerance": "5e-5",
+        "notes": "Backward parity against grouped torch.conv1d autograd."
+      }
+    ]
+  },
+  "notes": "Backward kernel for the qwen3next/Qwen3.5 SSM causal depthwise convolution."
+}

@@ -1,0 +1,94 @@
+{
+  "id": "gradient_accumulate_f32",
+  "op": "optimizer",
+  "variant": "fp32_accumulate",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "dst",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Accumulation destination (in-place)"
+    },
+    {
+      "name": "src",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Source gradient to add"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "dst",
+      "dtype": "fp32",
+      "shape": [
+        "N"
+      ],
+      "desc": "Updated destination gradient buffer"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "N"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "N",
+        "param_style": "range",
+        "notes": "In-place vector add over gradient elements."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Used for gradient fanout and microbatch accumulation."
+  },
+  "impl": {
+    "function": "gradient_accumulate_f32",
+    "c_declaration": "void gradient_accumulate_f32(float *dst, const float *src, size_t numel);",
+    "sources": [
+      "src/kernels/optimizer_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "numpy",
+        "command": "python unittest/test_optimizer_kernels.py -k accumulate",
+        "tolerance": "1e-6",
+        "notes": "Vector accumulation correctness."
+      }
+    ]
+  },
+  "notes": "FP32 in-place gradient accumulation kernel."
+}
+

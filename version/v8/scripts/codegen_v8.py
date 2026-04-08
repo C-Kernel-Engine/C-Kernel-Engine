@@ -4,10 +4,9 @@ from __future__ import annotations
 """
 v8 codegen wrapper.
 
-v8 still reuses the stable v7 emitter, but vision-only bring-up needs a small
-normalization layer because the v7 generator assumes every runtime has decoder
-fields such as vocab_size. For encoder-only vision graphs we inject minimal
-safe defaults and then delegate to the stable emitter.
+v8 keeps its own vendored emitter copy so multimodal bring-up can evolve
+without reaching back into version/v7. For encoder-only vision graphs we inject
+minimal safe defaults and then delegate to the local v8 emitter copy.
 """
 
 import argparse
@@ -21,13 +20,12 @@ from typing import Any, Dict
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
-V7_SCRIPTS = REPO_ROOT / "version" / "v7" / "scripts"
 
-if str(V7_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(V7_SCRIPTS))
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
-import codegen_v7  # type: ignore  # noqa: E402
-import codegen_prefill_v7  # type: ignore  # noqa: E402
+import codegen_core_v8  # type: ignore  # noqa: E402
+import codegen_prefill_v8  # type: ignore  # noqa: E402
 from vision_bridge_runtime_v8 import resolve_vision_bridge_contract  # type: ignore  # noqa: E402
 
 
@@ -275,6 +273,32 @@ def _normalize_prefill_for_decode_layout(
     return out
 
 
+def _build_hybrid_decode_prefill_layout(
+    decode_layout_obj: Dict[str, Any],
+    prefill_layout_obj: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    """Use prefill-sized activations with decode-runtime config/contracts."""
+    if prefill_layout_obj is None:
+        return decode_layout_obj
+
+    out = json.loads(json.dumps(prefill_layout_obj))
+    out["mode"] = decode_layout_obj.get("mode", out.get("mode", "decode"))
+
+    out_cfg = dict(out.get("config", {}) or {})
+    decode_cfg = dict(decode_layout_obj.get("config", {}) or {})
+    out_cfg.update(decode_cfg)
+    if "logits_layout" not in decode_cfg:
+        out_cfg["logits_layout"] = str(out_cfg.get("logits_layout", "last")).lower()
+    out["config"] = out_cfg
+
+    decode_memory = dict(decode_layout_obj.get("memory", {}) or {})
+    out_memory = dict(out.get("memory", {}) or {})
+    if decode_memory.get("weights"):
+        out_memory["weights"] = decode_memory["weights"]
+    out["memory"] = out_memory
+    return out
+
+
 def _extract_c_function(code: str, signature: str) -> tuple[int, int, str] | None:
     start = code.find(signature)
     if start < 0:
@@ -307,17 +331,83 @@ def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, 
     if embed_dim <= 0:
         return code
 
+    is_qwen3vl = str(cfg.get("model", cfg.get("name", ""))).lower() == "qwen3vl"
+    num_deepstack_layers = int(cfg.get("num_deepstack_layers", 0) or 0) if is_qwen3vl else 0
+    input_embed_dim = int(cfg.get("input_embed_dim", 0) or 0)
+    if input_embed_dim <= 0 and embed_dim > 0 and num_deepstack_layers > 0:
+        input_embed_dim = embed_dim * (1 + num_deepstack_layers)
+    if input_embed_dim <= 0:
+        input_embed_dim = embed_dim
+    deepstack_elems = max(1, num_deepstack_layers * embed_dim)
+
+    def _inject_qwen3vl_deepstack_residuals(src: str) -> str:
+        if not (is_qwen3vl and num_deepstack_layers > 0):
+            return src
+
+        comment_pat = re.compile(
+            r"^    /\* Op (?P<op>\d+): ck_residual_add_token_major \(residual_add\) layer=(?P<layer>\d+) section=body \*/$"
+        )
+        counts: Dict[int, int] = {}
+        lines = src.splitlines(keepends=True)
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            match = comment_pat.match(line.rstrip("\n"))
+            if match is None:
+                out.append(line)
+                i += 1
+                continue
+
+            op = int(match.group("op"))
+            layer = int(match.group("layer"))
+            counts[layer] = counts.get(layer, 0) + 1
+
+            out.append(line)
+            i += 1
+            while i < len(lines):
+                out.append(lines[i])
+                if lines[i] == f"    if (stop_seq == {op}) return;\n":
+                    i += 1
+                    break
+                i += 1
+
+            if counts[layer] == 2 and layer < num_deepstack_layers:
+                offset = layer * embed_dim
+                out.append(
+                    f"""    if (g_bridge_deepstack_active) {{
+        ck_residual_add_token_major(
+            (float*)(model->bump + A_EMBEDDED_INPUT),
+            g_bridge_deepstack_slices + {offset},
+            (float*)(model->bump + A_EMBEDDED_INPUT),
+            1,
+            {embed_dim}
+        );
+    }}
+"""
+                )
+
+        return "".join(out)
+
     decode_sig = "static void ck_decode(CKModel *model, int32_t token) {"
+    if "static int g_bridge_prefix_tokens;\n" not in code:
+        code = code.replace(decode_sig, "static int g_bridge_prefix_tokens;\n\n" + decode_sig, 1)
     decode_fn = _extract_c_function(code, decode_sig)
     if decode_fn is None:
         raise RuntimeError("unable to locate ck_decode for decode-runtime multimodal fallback")
     _, decode_end, decode_src = decode_fn
-
+    decode_src = _inject_qwen3vl_deepstack_residuals(decode_src)
     embedded_decode = decode_src.replace(
         "static void ck_decode(CKModel *model, int32_t token) {",
         "static void ck_decode_embedded(CKModel *model) {",
         1,
     )
+    if is_qwen3vl and num_deepstack_layers > 0:
+        embedded_decode = (
+            f"static int g_bridge_deepstack_active;\n"
+            f"static float g_bridge_deepstack_slices[{deepstack_elems}];\n\n"
+            + embedded_decode
+        )
     embedded_decode, removed = re.subn(
         r"\n    /\* Store token at offset [^\n]*\n"
         r"    \*\(int32_t\*\)\([^\n]*\) = token;\n\n"
@@ -329,6 +419,28 @@ def _inject_decode_runtime_multimodal_fallback(code: str, layout_obj: Dict[str, 
     if removed != 1:
         raise RuntimeError("unable to derive ck_decode_embedded from ck_decode")
     code = code[:decode_end] + "\n\n" + embedded_decode + code[decode_end:]
+
+    if is_qwen3vl:
+        rope_wrapper = """static void ck_qwen3vl_runtime_mrope_qk(CKModel *model, float *q, float *k, int num_heads, int num_kv_heads, int num_tokens, int head_dim, int aligned_head_dim, int pos_offset, int n_dims, int section_0, int section_1, int section_2, int section_3, int n_ctx_orig, float freq_base, float freq_scale, float ext_factor, float attn_factor, float beta_fast, float beta_slow) {
+    if (model && model->bridge_has_explicit_positions) {
+        mrope_qk_imrope_positions(q, k, model->bridge_positions, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
+        return;
+    }
+    mrope_qk_text(q, k, num_heads, num_kv_heads, num_tokens, head_dim, aligned_head_dim, pos_offset, n_dims, section_0, section_1, section_2, section_3, n_ctx_orig, freq_base, freq_scale, ext_factor, attn_factor, beta_fast, beta_slow);
+}
+"""
+        code = code.replace(decode_sig, rope_wrapper + "\n" + decode_sig, 1)
+        code = code.replace("mrope_qk_text(", "ck_qwen3vl_runtime_mrope_qk(model, ")
+        code = code.replace("    ck_qwen3vl_runtime_mrope_qk(model, q, k, ", "    mrope_qk_text(q, k, ", 1)
+        prefill_helper = _extract_c_function(code, "static void ck_qwen3vl_prefill_mrope_qk(")
+        if prefill_helper is not None:
+            helper_start, helper_end, helper_src = prefill_helper
+            helper_patched = helper_src.replace(
+                "    ck_qwen3vl_runtime_mrope_qk(model, q, k, ",
+                "    mrope_qk_text(q, k, ",
+                1,
+            )
+            code = code[:helper_start] + helper_patched + code[helper_end:]
 
     decode_decl = "static void ck_decode(CKModel *model, int32_t token);\n"
     if decode_decl in code and "static void ck_bridge_free(void);" not in code:
@@ -385,9 +497,17 @@ enum {{
 }};
 
 static float *g_bridge_embedding_rows = NULL;
+static int g_bridge_embedding_dim = {embed_dim};
 static int32_t *g_bridge_token_rows = NULL;
 static uint8_t *g_bridge_row_kind = NULL;
 static int g_bridge_row_capacity = 0;
+static int g_bridge_prefix_start_pos = 0;
+static int g_bridge_prefix_tokens = 0;
+static int g_bridge_prefix_grid_x = 0;
+static int g_bridge_prefix_grid_y = 0;
+static int g_bridge_prefix_text_pos = 0;
+static int g_bridge_deepstack_active = 0;
+static float g_bridge_deepstack_slices[{deepstack_elems}] = {{0}};
 
 static void ck_bridge_free(void) {{
     free(g_bridge_embedding_rows);
@@ -397,20 +517,33 @@ static void ck_bridge_free(void) {{
     g_bridge_token_rows = NULL;
     g_bridge_row_kind = NULL;
     g_bridge_row_capacity = 0;
+    g_bridge_embedding_dim = {embed_dim};
+    g_bridge_deepstack_active = 0;
+    memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
 }}
 
 static void ck_bridge_clear_rows(void) {{
     if (g_bridge_row_kind && g_bridge_row_capacity > 0) {{
         memset(g_bridge_row_kind, 0, (size_t)g_bridge_row_capacity * sizeof(uint8_t));
     }}
+    g_bridge_prefix_start_pos = 0;
+    g_bridge_prefix_tokens = 0;
+    g_bridge_prefix_grid_x = 0;
+    g_bridge_prefix_grid_y = 0;
+    g_bridge_prefix_text_pos = 0;
+    g_bridge_embedding_dim = {embed_dim};
+    g_bridge_deepstack_active = 0;
+    memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
 }}
 
-static int ck_bridge_ensure_capacity(int rows) {{
-    if (rows <= g_bridge_row_capacity) return 0;
+static int ck_bridge_ensure_capacity(int rows, int row_dim) {{
+    if (row_dim < {embed_dim}) return -9;
+    if (rows <= g_bridge_row_capacity && row_dim == g_bridge_embedding_dim) return 0;
 
     size_t old_cap = (size_t)(g_bridge_row_capacity > 0 ? g_bridge_row_capacity : 0);
-    size_t new_cap = (size_t)rows;
-    float *new_embeddings = (float*)malloc(new_cap * (size_t)({embed_dim}) * sizeof(float));
+    size_t new_cap = (size_t)((rows > g_bridge_row_capacity) ? rows : g_bridge_row_capacity);
+    if (new_cap == 0) new_cap = (size_t)rows;
+    float *new_embeddings = (float*)malloc(new_cap * (size_t)row_dim * sizeof(float));
     int32_t *new_tokens = (int32_t*)malloc(new_cap * sizeof(int32_t));
     uint8_t *new_kind = (uint8_t*)malloc(new_cap * sizeof(uint8_t));
     if (!new_embeddings || !new_tokens || !new_kind) {{
@@ -419,15 +552,21 @@ static int ck_bridge_ensure_capacity(int rows) {{
         free(new_kind);
         return -7;
     }}
-    if (old_cap > 0) {{
-        memcpy(new_embeddings, g_bridge_embedding_rows, old_cap * (size_t)({embed_dim}) * sizeof(float));
-        memcpy(new_tokens, g_bridge_token_rows, old_cap * sizeof(int32_t));
-        memcpy(new_kind, g_bridge_row_kind, old_cap * sizeof(uint8_t));
-    }}
-    if (new_cap > old_cap) {{
-        memset(new_embeddings + old_cap * (size_t)({embed_dim}), 0, (new_cap - old_cap) * (size_t)({embed_dim}) * sizeof(float));
-        memset(new_tokens + old_cap, 0, (new_cap - old_cap) * sizeof(int32_t));
-        memset(new_kind + old_cap, 0, (new_cap - old_cap) * sizeof(uint8_t));
+    memset(new_embeddings, 0, new_cap * (size_t)row_dim * sizeof(float));
+    memset(new_tokens, 0, new_cap * sizeof(int32_t));
+    memset(new_kind, 0, new_cap * sizeof(uint8_t));
+    if (old_cap > 0 && g_bridge_embedding_rows) {{
+        size_t copy_cap = old_cap < new_cap ? old_cap : new_cap;
+        size_t copy_dim = (size_t)(g_bridge_embedding_dim < row_dim ? g_bridge_embedding_dim : row_dim);
+        for (size_t i = 0; i < copy_cap; ++i) {{
+            memcpy(
+                new_embeddings + i * (size_t)row_dim,
+                g_bridge_embedding_rows + i * (size_t)g_bridge_embedding_dim,
+                copy_dim * sizeof(float)
+            );
+        }}
+        memcpy(new_tokens, g_bridge_token_rows, copy_cap * sizeof(int32_t));
+        memcpy(new_kind, g_bridge_row_kind, copy_cap * sizeof(uint8_t));
     }}
     free(g_bridge_embedding_rows);
     free(g_bridge_token_rows);
@@ -435,23 +574,23 @@ static int ck_bridge_ensure_capacity(int rows) {{
     g_bridge_embedding_rows = new_embeddings;
     g_bridge_token_rows = new_tokens;
     g_bridge_row_kind = new_kind;
-
+    g_bridge_embedding_dim = row_dim;
     g_bridge_row_capacity = (int)new_cap;
     return 0;
 }}
 
-static int ck_bridge_stage_embeddings(const float *embeddings, int count, int start_pos) {{
+static int ck_bridge_stage_embeddings(const float *embeddings, int count, int start_pos, int row_dim) {{
     if (!embeddings || count <= 0) return -1;
     if (start_pos < 0 || start_pos >= MAX_SEQ_LEN) return -2;
     if (count > MAX_SEQ_LEN - start_pos) {{
         count = MAX_SEQ_LEN - start_pos;
     }}
-    int rc = ck_bridge_ensure_capacity(start_pos + count);
+    int rc = ck_bridge_ensure_capacity(start_pos + count, row_dim);
     if (rc != 0) return rc;
     memcpy(
-        g_bridge_embedding_rows + (size_t)start_pos * (size_t)({embed_dim}),
+        g_bridge_embedding_rows + (size_t)start_pos * (size_t)row_dim,
         embeddings,
-        (size_t)count * (size_t)({embed_dim}) * sizeof(float)
+        (size_t)count * (size_t)row_dim * sizeof(float)
     );
     memset(g_bridge_token_rows + start_pos, 0, (size_t)count * sizeof(int32_t));
     memset(g_bridge_row_kind + start_pos, CK_BRIDGE_ROW_EMBED, (size_t)count * sizeof(uint8_t));
@@ -464,7 +603,7 @@ static int ck_bridge_stage_tokens(const int32_t *tokens, int count, int start_po
     if (count > MAX_SEQ_LEN - start_pos) {{
         count = MAX_SEQ_LEN - start_pos;
     }}
-    int rc = ck_bridge_ensure_capacity(start_pos + count);
+    int rc = ck_bridge_ensure_capacity(start_pos + count, g_bridge_embedding_dim > 0 ? g_bridge_embedding_dim : {embed_dim});
     if (rc != 0) return rc;
     memcpy(g_bridge_token_rows + start_pos, tokens, (size_t)count * sizeof(int32_t));
     memset(g_bridge_row_kind + start_pos, CK_BRIDGE_ROW_TOKEN, (size_t)count * sizeof(uint8_t));
@@ -480,22 +619,63 @@ static int ck_bridge_forward_staged(CKModel *model, int total_tokens) {{
 
     memset(model->kv_cache, 0, KV_CACHE_SIZE);
     model->pos = 0;
+    model->rope_pos = 0;
+    model->bridge_has_explicit_positions = 0;
+    g_bridge_deepstack_active = 0;
+    memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
 
     float *embedded_out = (float*)(model->bump + A_EMBEDDED_INPUT);
     int32_t *token_ids = (int32_t*)(model->bump + A_TOKEN_IDS);
+    const int prefix_start = g_bridge_prefix_start_pos;
+    const int prefix_end = prefix_start + g_bridge_prefix_tokens;
+    const int use_explicit_prefix_positions = g_bridge_prefix_tokens > 0 && g_bridge_prefix_grid_x > 0 && g_bridge_prefix_grid_y > 0;
     for (int i = 0; i < total_tokens; ++i) {{
         int kind = (i < g_bridge_row_capacity) ? (int)g_bridge_row_kind[i] : CK_BRIDGE_ROW_NONE;
         if (kind == CK_BRIDGE_ROW_EMBED) {{
+            const float *row = g_bridge_embedding_rows + (size_t)i * (size_t)g_bridge_embedding_dim;
+            if (use_explicit_prefix_positions && i >= prefix_start && i < prefix_end) {{
+                const int local_idx = i - prefix_start;
+                const int x = local_idx % g_bridge_prefix_grid_x;
+                const int y = local_idx / g_bridge_prefix_grid_x;
+                model->bridge_positions[0] = prefix_start;
+                model->bridge_positions[1] = prefix_start + y;
+                model->bridge_positions[2] = prefix_start + x;
+                model->bridge_positions[3] = 0;
+                model->bridge_has_explicit_positions = 1;
+            }} else {{
+                model->bridge_has_explicit_positions = 0;
+            }}
             memcpy(
                 embedded_out,
-                g_bridge_embedding_rows + (size_t)i * (size_t)({embed_dim}),
+                row,
                 (size_t)({embed_dim}) * sizeof(float)
             );
+            g_bridge_deepstack_active = 0;
+            memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
+            if ({num_deepstack_layers} > 0 && g_bridge_embedding_dim > {embed_dim}) {{
+                size_t extra_floats = (size_t)(g_bridge_embedding_dim - {embed_dim});
+                size_t copy_floats = extra_floats < (size_t){num_deepstack_layers * embed_dim} ? extra_floats : (size_t){num_deepstack_layers * embed_dim};
+                if (copy_floats > 0) {{
+                    memcpy(g_bridge_deepstack_slices, row + {embed_dim}, copy_floats * sizeof(float));
+                    g_bridge_deepstack_active = 1;
+                }}
+            }}
             token_ids[0] = g_bridge_token_rows[i];
             ck_decode_embedded(model);
+            model->bridge_has_explicit_positions = 0;
+            g_bridge_deepstack_active = 0;
+            memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
+            if (i + 1 == prefix_end) {{
+                model->rope_pos = g_bridge_prefix_text_pos;
+            }}
             continue;
         }}
         if (kind == CK_BRIDGE_ROW_TOKEN) {{
+            g_bridge_deepstack_active = 0;
+            memset(g_bridge_deepstack_slices, 0, sizeof(g_bridge_deepstack_slices));
+            if (i == prefix_end && model->rope_pos < g_bridge_prefix_text_pos) {{
+                model->rope_pos = g_bridge_prefix_text_pos;
+            }}
             ck_decode(model, g_bridge_token_rows[i]);
             continue;
         }}
@@ -505,7 +685,11 @@ static int ck_bridge_forward_staged(CKModel *model, int total_tokens) {{
 }}
 
 CK_EXPORT int ck_model_write_embeddings(const float *embeddings, int count, int start_pos) {{
-    return ck_bridge_stage_embeddings(embeddings, count, start_pos);
+    return ck_bridge_stage_embeddings(embeddings, count, start_pos, {embed_dim});
+}}
+
+CK_EXPORT int ck_model_write_embeddings_ex(const float *embeddings, int count, int row_dim, int start_pos) {{
+    return ck_bridge_stage_embeddings(embeddings, count, start_pos, row_dim);
 }}
 
 CK_EXPORT int ck_model_embed_tokens_at(const int32_t *tokens, int count, int start_pos) {{
@@ -520,36 +704,202 @@ CK_EXPORT int ck_model_forward_from_embeddings(int total_tokens, float *output) 
     return 0;
 }}
 
+CK_EXPORT int ck_model_forward_segments_grid_ex(const int32_t *tokens_before,
+                                                int tokens_before_count,
+                                                const float *prefix_embeddings,
+                                                int prefix_tokens,
+                                                int prefix_embed_dim,
+                                                int prefix_grid_x,
+                                                int prefix_grid_y,
+                                                int prefix_text_pos,
+                                                const int32_t *tokens_after,
+                                                int tokens_after_count,
+                                                float *output) {{
+    if (!g_model) return -1;
+    if (tokens_before_count < 0 || prefix_tokens < 0 || tokens_after_count < 0) return -2;
+    if (tokens_before_count > 0 && !tokens_before) return -3;
+    if (prefix_tokens > 0 && !prefix_embeddings) return -4;
+    if (tokens_after_count > 0 && !tokens_after) return -5;
+    if (prefix_tokens > 0 && prefix_embed_dim < {embed_dim}) return -6;
+    if ((prefix_grid_x > 0) != (prefix_grid_y > 0)) return -7;
+    if (prefix_grid_x < 0 || prefix_grid_y < 0) return -8;
+    if ((prefix_grid_x > 0 || prefix_grid_y > 0) && prefix_tokens <= 0) return -9;
+    if (prefix_grid_x > 0 && prefix_grid_y > 0 && prefix_grid_x * prefix_grid_y != prefix_tokens) return -10;
+
+    const int total_tokens = tokens_before_count + prefix_tokens + tokens_after_count;
+    if (total_tokens <= 0) return -11;
+    if (total_tokens > MAX_SEQ_LEN) return -12;
+
+    ck_bridge_clear_rows();
+    g_bridge_prefix_start_pos = tokens_before_count;
+    g_bridge_prefix_tokens = prefix_tokens;
+    g_bridge_prefix_text_pos = tokens_before_count + prefix_tokens;
+    if (prefix_tokens > 0) {{
+        if (prefix_grid_x > 0 && prefix_grid_y > 0) {{
+            g_bridge_prefix_grid_x = prefix_grid_x;
+            g_bridge_prefix_grid_y = prefix_grid_y;
+            g_bridge_prefix_text_pos = prefix_text_pos > 0
+                ? prefix_text_pos
+                : (tokens_before_count + (prefix_grid_x > prefix_grid_y ? prefix_grid_x : prefix_grid_y));
+        }} else {{
+            g_bridge_prefix_text_pos = prefix_text_pos > 0
+                ? prefix_text_pos
+                : (tokens_before_count + prefix_tokens);
+        }}
+    }}
+    if (tokens_before_count > 0) {{
+        int rc = ck_bridge_stage_tokens(tokens_before, tokens_before_count, 0);
+        if (rc < 0) return rc;
+    }}
+    if (prefix_tokens > 0) {{
+        int rc = ck_bridge_stage_embeddings(
+            prefix_embeddings,
+            prefix_tokens,
+            tokens_before_count,
+            prefix_embed_dim > 0 ? prefix_embed_dim : {embed_dim}
+        );
+        if (rc < 0) return rc;
+    }}
+    if (tokens_after_count > 0) {{
+        int rc = ck_bridge_stage_tokens(tokens_after, tokens_after_count, tokens_before_count + prefix_tokens);
+        if (rc < 0) return rc;
+    }}
+    int rc = ck_bridge_forward_staged(g_model, total_tokens);
+    if (rc != 0) return rc;
+    if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));
+    return 0;
+}}
+
+CK_EXPORT int ck_model_forward_mixed_grid_ex(const float *prefix_embeddings,
+                                             int prefix_tokens,
+                                             int prefix_embed_dim,
+                                             int prefix_grid_x,
+                                             int prefix_grid_y,
+                                             int prefix_text_pos,
+                                             const int32_t *tokens,
+                                             int token_count,
+                                             float *output) {{
+    return ck_model_forward_segments_grid_ex(
+        NULL,
+        0,
+        prefix_embeddings,
+        prefix_tokens,
+        prefix_embed_dim,
+        prefix_grid_x,
+        prefix_grid_y,
+        prefix_text_pos,
+        tokens,
+        token_count,
+        output
+    );
+}}
+
+CK_EXPORT int ck_model_forward_mixed_ex(const float *prefix_embeddings,
+                                        int prefix_tokens,
+                                        int prefix_embed_dim,
+                                        const int32_t *tokens,
+                                        int token_count,
+                                        float *output) {{
+    return ck_model_forward_mixed_grid_ex(
+        prefix_embeddings,
+        prefix_tokens,
+        prefix_embed_dim,
+        0,
+        0,
+        0,
+        tokens,
+        token_count,
+        output
+    );
+}}
+
 CK_EXPORT int ck_model_forward_mixed(const float *prefix_embeddings,
                                      int prefix_tokens,
                                      const int32_t *tokens,
                                      int token_count,
                                      float *output) {{
-    if (!g_model) return -1;
-    if (prefix_tokens < 0 || token_count < 0) return -2;
-    if (prefix_tokens + token_count <= 0) return -3;
-    if (prefix_tokens + token_count > MAX_SEQ_LEN) return -4;
-    if (prefix_tokens > 0 && !prefix_embeddings) return -5;
-    if (token_count > 0 && !tokens) return -6;
-
-    ck_bridge_clear_rows();
-    if (prefix_tokens > 0) {{
-        int rc = ck_bridge_stage_embeddings(prefix_embeddings, prefix_tokens, 0);
-        if (rc < 0) return rc;
-    }}
-    if (token_count > 0) {{
-        int rc = ck_bridge_stage_tokens(tokens, token_count, prefix_tokens);
-        if (rc < 0) return rc;
-    }}
-    int rc = ck_bridge_forward_staged(g_model, prefix_tokens + token_count);
-    if (rc != 0) return rc;
-    if (output) memcpy(output, g_model->logits, VOCAB_SIZE * sizeof(float));
-    return 0;
+    return ck_model_forward_mixed_ex(prefix_embeddings, prefix_tokens, {embed_dim}, tokens, token_count, output);
 }}
 """
     code, bridge_replaced = bridge_pat.subn(bridge_block, code, count=1)
     if bridge_replaced != 1:
         raise RuntimeError("unable to replace multimodal bridge block for decode-runtime fallback")
+
+    return code
+
+def _inject_prefill_multimodal_bridge(
+    code: str,
+    ir_obj: Dict[str, Any],
+    *,
+    profile: bool = False,
+    dump: bool = False,
+) -> str:
+    if "ck_model_forward_mixed(" in code or "ck_prefill_from_embedded(" in code:
+        return code
+
+    ops = ir_obj.get("operations", [])
+    config = ir_obj.get("config", {})
+    if not isinstance(ops, list) or not isinstance(config, dict):
+        return code
+
+    embedded_prefill = codegen_prefill_v8.emit_prefill_from_embedded_function(
+        ops,
+        config,
+        profile=profile,
+        dump=dump,
+    )
+    bridge_api = codegen_prefill_v8.emit_multimodal_bridge_api(ops, config)
+    if not embedded_prefill and not bridge_api:
+        return code
+
+    extra_parts = []
+    if embedded_prefill:
+        extra_parts.append(embedded_prefill)
+    if bridge_api:
+        extra_parts.append(bridge_api)
+    return code + "\n\n" + "\n\n".join(extra_parts)
+
+
+def _patch_standalone_prefill_runtime(code: str, layout_obj: Dict[str, Any]) -> str:
+    if str(layout_obj.get("mode", "")).lower() != "prefill":
+        return code
+
+    helper_sig = "static void kv_cache_batch_copy("
+    if "kv_cache_batch_copy(" in code and helper_sig not in code:
+        helper_block = """
+/* v8 standalone prefill compat: generic codegen leaves kv_cache_batch_copy as
+ * a pseudo-op call. The real multimodal prefill path uses the explicit helper
+ * emitted later in this file; this shim only makes the standalone runtime
+ * self-contained enough to compile. */
+static void kv_cache_batch_copy(void *k_dst, const void *k_src, void *v_dst, const void *v_src, size_t nbytes) {
+    if (k_dst && k_src && nbytes > 0) memcpy(k_dst, k_src, nbytes);
+    if (v_dst && v_src && nbytes > 0) memcpy(v_dst, v_src, nbytes);
+}
+"""
+        insert_after = "#include <math.h>"
+        if insert_after in code:
+            code = code.replace(insert_after, insert_after + "\n\n" + helper_block.strip(), 1)
+        else:
+            code = helper_block.strip() + "\n\n" + code
+
+    code = code.replace("vocab_size * sizeof(float)", "VOCAB_SIZE * sizeof(float)")
+
+    bad_copy_pat = re.compile(
+        r"(    /\* Op \d+: memmove \(copy_last_logits\) layer=-1 section=footer \*/\n)"
+        r"    memmove\(\n"
+        r"        \(void\*\)\(model->bump \+ A_EMBEDDED_INPUT\),\n"
+        r"        \(const void\*\)\(model->bump \+ A_LAYER_INPUT\),\n"
+        r"        VOCAB_SIZE \* sizeof\(float\)\n"
+        r"    \);\n"
+    )
+    code = bad_copy_pat.sub(
+        r"\1"
+        "    /* v8 standalone prefill compat: skip invalid generic copy_last_logits.\n"
+        "     * The real prefill bridge emits a correct logits fixup later in the file. */\n"
+        "    (void)0;\n",
+        code,
+        count=1,
+    )
 
     return code
 
@@ -560,7 +910,7 @@ def _inject_decode_attention_parity_dumps(code: str, layout_obj: Dict[str, Any])
         return code
 
     attn_pat = re.compile(
-        r"(/\* Op \d+: attention_forward_decode_head_major_gqa_flash \(attn\) layer=(\d+) section=body \*/\n"
+        r"(/\* Op \d+: attention_forward_decode_head_major_gqa_[A-Za-z0-9_]+ \(attn\) layer=(\d+) section=body \*/\n"
         r"(?:    [^\n]*\n)+?"
         r"    \);\n)"
         r"(    if \(stop_seq == \d+\) return;\n)",
@@ -587,6 +937,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--layout", type=Path, required=True, help="Memory layout JSON")
     ap.add_argument("--output", type=Path, required=True, help="Output C file")
     ap.add_argument("--prefill", type=Path, default=None, help="Optional lowered prefill IR for decoder runtimes")
+    ap.add_argument("--prefill-layout", type=Path, default=None, help="Optional prefill layout JSON for hybrid decode+prefill runtimes")
     ap.add_argument("--init", type=Path, default=None, help="Optional init_call.json")
     ap.add_argument("--debug", action="store_true", help="Emit debug dumps")
     ap.add_argument("--profile", action="store_true", help="Emit profiling wrappers")
@@ -599,6 +950,11 @@ def main(argv: list[str] | None = None) -> int:
     with open(args.layout, "r", encoding="utf-8") as f:
         layout_obj = _patch_codegen_config(json.load(f))
     prefill_obj = None
+    prefill_layout_obj = None
+    if args.prefill_layout is not None:
+        with open(args.prefill_layout, "r", encoding="utf-8") as f:
+            prefill_layout_obj = _patch_codegen_config(json.load(f))
+        layout_obj = _build_hybrid_decode_prefill_layout(layout_obj, prefill_layout_obj)
     if args.prefill is not None:
         with open(args.prefill, "r", encoding="utf-8") as f:
             prefill_obj = _patch_codegen_config(json.load(f))
@@ -620,12 +976,12 @@ def main(argv: list[str] | None = None) -> int:
         if prefill_obj is not None:
             prefill_path = td_path / "prefill.v8.json"
             prefill_path.write_text(json.dumps(prefill_obj, indent=2), encoding="utf-8")
-            prefill_code = codegen_prefill_v7.generate_prefill(
+            prefill_code = codegen_prefill_v8.generate_prefill(
                 prefill_path,
                 profile=args.profile,
                 dump=args.parity_dump,
             )
-        code = codegen_v7.generate(
+        code = codegen_core_v8.generate(
             ir_path,
             layout_path,
             debug=args.debug,
@@ -643,10 +999,19 @@ def main(argv: list[str] | None = None) -> int:
                     1,
                 )
             code = code + "\n\n" + prefill_code
-            code = _inject_decode_runtime_multimodal_fallback(code, layout_obj)
+            if args.prefill_layout is None:
+                code = _inject_decode_runtime_multimodal_fallback(code, layout_obj)
+        elif str(layout_obj.get("mode", "")).lower() == "prefill":
+            code = _inject_prefill_multimodal_bridge(
+                code,
+                ir_obj,
+                profile=args.profile,
+                dump=args.parity_dump,
+            )
         if args.parity_dump:
             code = _inject_decode_attention_parity_dumps(code, layout_obj)
         code = _inject_vision_only_fallbacks(code, layout_obj)
+        code = _patch_standalone_prefill_runtime(code, layout_obj)
         code = _inject_missing_rope_init(code, layout_obj, init_call_obj)
         code = _inject_strict_vision_encoder_oracle(code, layout_obj)
         code = _inject_activation_lookup_api(code, layout_obj)

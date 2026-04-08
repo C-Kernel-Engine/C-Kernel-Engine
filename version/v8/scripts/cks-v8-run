@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+VENV_PY="$PROJECT_ROOT/.venv/bin/python"
+SYSTEM_PY="${PYTHON3:-python3}"
+REQS="$PROJECT_ROOT/requirements-v8.txt"
+SELECTED_PY=""
+
+print_run_quickstart() {
+  cat <<EOF
+[v8] model argument required for 'run'
+
+Quick start:
+  version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \\
+    --context-len 1024 --force-compile --force-convert
+
+Raw CLI examples:
+  version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \\
+    --context-len 1024 --force-compile --force-convert
+
+  version/v8/scripts/cks-v8-run run /path/to/model.gguf \\
+    --context-len 1024
+
+  version/v8/scripts/cks-v8-run run /path/to/decoder.gguf \\
+    --mmproj /path/to/mmproj.gguf --image-path ./image.png \\
+    --prompt "Describe the image."
+
+After a run exists:
+  ./build/ck-cli-v8 --list
+
+Advanced options:
+  version/v8/scripts/cks-v8-run run --help
+EOF
+}
+
+check_python_reqs() {
+  local py="$1"
+  "$py" - "$REQS" <<'PY'
+import importlib.util
+import re
+import sys
+from pathlib import Path
+
+reqs = Path(sys.argv[1])
+if not reqs.exists():
+    raise SystemExit(0)
+
+packages = []
+for raw in reqs.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#") or line.startswith("--") or line.startswith("-e "):
+        continue
+    if "://" in line:
+        continue
+    pkg = re.split(r"[<>=!~\[\]\s]", line, maxsplit=1)[0].strip()
+    if pkg:
+        packages.append(pkg)
+
+missing = [pkg for pkg in packages if importlib.util.find_spec(pkg.replace("-", "_")) is None]
+if missing:
+    print("\n".join(missing))
+    raise SystemExit(1)
+PY
+}
+
+bootstrap_venv() {
+  local bootstrap_py="${PYTHON3:-python3}"
+  echo "[v8] creating repo-local .venv"
+  "$bootstrap_py" -m venv "$PROJECT_ROOT/.venv"
+  "$VENV_PY" -m pip install --upgrade pip
+  "$VENV_PY" -m pip install -r "$REQS"
+}
+
+ensure_bootstrap() {
+  if [ ! -f "$REQS" ]; then
+    if [ -n "$SELECTED_PY" ]; then
+      return 0
+    fi
+    if command -v "$SYSTEM_PY" >/dev/null 2>&1; then
+      SELECTED_PY="$(command -v "$SYSTEM_PY")"
+      return 0
+    fi
+    return 0
+  fi
+
+  if [ -x "$VENV_PY" ] && check_python_reqs "$VENV_PY" >/dev/null 2>&1; then
+    SELECTED_PY="$VENV_PY"
+    return 0
+  fi
+
+  if command -v "$SYSTEM_PY" >/dev/null 2>&1; then
+    local resolved_py
+    resolved_py="$(command -v "$SYSTEM_PY")"
+    if check_python_reqs "$resolved_py" >/dev/null 2>&1; then
+      SELECTED_PY="$resolved_py"
+      return 0
+    fi
+  fi
+
+  if [ -n "$SELECTED_PY" ]; then
+    return 0
+  fi
+
+  echo "[v8] missing repo-local Python environment or required packages."
+  echo "[v8] supported bootstrap:"
+  echo "      python3 -m venv .venv"
+  echo "      .venv/bin/pip install -r requirements-v8.txt"
+
+  if [ ! -t 0 ]; then
+    echo "[v8] non-interactive shell: refusing to auto-bootstrap."
+    exit 1
+  fi
+
+  printf "[v8] create .venv and install requirements-v8.txt now? [y/N] "
+  read -r answer
+  case "${answer:-}" in
+    y|Y|yes|YES)
+      bootstrap_venv
+      ;;
+    *)
+      echo "[v8] bootstrap skipped. Install requirements-v8.txt and retry."
+      exit 1
+      ;;
+  esac
+}
+
+needs_bootstrap() {
+  local cmd="${1:-}"
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      -h|--help)
+        return 1
+        ;;
+    esac
+  done
+  case "$cmd" in
+    ""|help|list|clean)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+if needs_bootstrap "$@"; then
+  ensure_bootstrap
+fi
+
+if [ "${1:-}" = "run" ] && [ "$#" -eq 1 ]; then
+  print_run_quickstart
+  exit 2
+fi
+
+if [ -n "$SELECTED_PY" ]; then
+  exec "$SELECTED_PY" "$SCRIPT_DIR/ck_run_v8.py" "$@"
+fi
+
+if [ -x "$VENV_PY" ]; then
+  exec "$VENV_PY" "$SCRIPT_DIR/ck_run_v8.py" "$@"
+fi
+
+exec python3 "$SCRIPT_DIR/ck_run_v8.py" "$@"

@@ -1,0 +1,65 @@
+{
+  "id": "ssm_conv1d_forward",
+  "op": "ssm_conv1d",
+  "variant": "fp32",
+  "quant": {
+    "weight": "fp32",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "conv_x", "dtype": "fp32", "shape": ["S", "C", "K-1+T"], "desc": "Packed convolution history + new tokens [num_seqs, num_channels, kernel_size - 1 + num_tokens]"}
+  ],
+  "weights": [
+    {"name": "kernel", "dtype": "fp32", "shape": ["C", "K"], "desc": "Per-channel causal depthwise SSM convolution weights"}
+  ],
+  "activations": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["S", "T", "C"], "desc": "Convolved per-token recurrent inputs [num_seqs, num_tokens, num_channels]"}
+  ],
+  "scratch": [],
+  "dims": ["K", "C", "T", "S"],
+  "params": [],
+  "parallelization": {
+    "supported": ["channel", "sequence"],
+    "preferred": {"prefill": "channel", "decode": "channel"},
+    "strategies": [
+      {
+        "name": "channel",
+        "partition_dim": "C",
+        "param_style": "range",
+        "range": {"min_chunk": 1},
+        "notes": "Each channel is independent for the causal depthwise convolution."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Matches ggml's GGML_OP_SSM_CONV used by qwen3next/Qwen3.5 before the recurrent DeltaNet update."
+  },
+  "impl": {
+    "function": "ssm_conv1d_forward",
+    "c_declaration": "void ssm_conv1d_forward(const float *conv_x, const float *kernel, float *out, int kernel_size, int num_channels, int num_tokens, int num_seqs);",
+    "sources": ["src/kernels/ssm_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_ssm_conv.py"],
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": ".venv/bin/python unittest/test_ssm_conv.py",
+        "tolerance": "5e-5",
+        "notes": "Forward/backward parity against grouped torch.conv1d."
+      },
+      {
+        "kind": "llamacpp",
+        "command": "python3 scripts/test_kernels_vs_llamacpp.py --kernel ssm_conv1d",
+        "tolerance": "1e-6",
+        "notes": "Forward parity against the llama.cpp helper implementation matching GGML_OP_SSM_CONV."
+      }
+    ]
+  },
+  "notes": "SSM causal depthwise convolution used by qwen3next/Qwen3.5 recurrent blocks."
+}

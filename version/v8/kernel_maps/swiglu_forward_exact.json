@@ -1,0 +1,51 @@
+{
+  "id": "swiglu_forward_exact",
+  "op": "swiglu",
+  "variant": "fp32_exact",
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {"name": "gate", "dtype": "fp32", "shape": ["T", "I"], "desc": "Gate tensor [tokens, intermediate_dim] (first half of MLP intermediate)"},
+    {"name": "up", "dtype": "fp32", "shape": ["T", "I"], "desc": "Up tensor [tokens, intermediate_dim] (second half of MLP intermediate)"}
+  ],
+  "weights": [],
+  "activations": [],
+  "outputs": [
+    {"name": "out", "dtype": "fp32", "shape": ["T", "I"], "desc": "Exact SwiGLU output: silu(gate) * up using scalar expf sigmoid"}
+  ],
+  "scratch": [],
+  "dims": ["T", "I"],
+  "parallelization": {
+    "supported": ["token"],
+    "preferred": {"prefill": "token", "decode": "token"},
+    "strategies": [
+      {
+        "name": "token",
+        "partition_dim": "T",
+        "param_style": "ith_nth",
+        "notes": "Exact training/parity path processes complete tokens with scalar sigmoid semantics."
+      }
+    ]
+  },
+  "constraints": {
+    "alignment": {"I": 1},
+    "notes": "Exact SwiGLU reference path used for training/parity; no SIMD/alignment requirement."
+  },
+  "impl": {
+    "function": "swiglu_forward_exact",
+    "c_declaration": "void swiglu_forward_exact(const float *input, float *output, int tokens, int dim);",
+    "sources": ["src/kernels/swiglu_kernels.c"],
+    "variants": [
+      {"name": "ref", "requires": [], "compile_flags": []}
+    ]
+  },
+  "tests": {
+    "unit": ["unittest/test_swiglu.py"],
+    "bench": [],
+    "parity": []
+  },
+  "notes": "Exact SwiGLU forward for training/parity: silu(gate) * up with scalar expf-based sigmoid."
+}

@@ -980,6 +980,7 @@ void gelu_backward_fast_bf16(const uint16_t *input,
 // GeGLU: out = GELU(a) * b where x = [a, b] along last dimension
 // Input shape: [tokens, 2 * dim], Output shape: [tokens, dim]
 void geglu_forward_fp32(const float *x, float *out, int tokens, int dim);
+void geglu_forward_exact(const float *x, float *out, int tokens, int dim);
 void geglu_forward_bf16(const uint16_t *x, uint16_t *out, int tokens, int dim, float *scratch);
 void geglu_backward_fp32(const float *x,
                          const float *d_out,
@@ -2136,6 +2137,27 @@ void rope_forward_qk_pairwise_with_rotary_dim(float *q,
                                               int pos_offset,
                                               int rotary_dim);
 
+void mrope_qk_text(float *q,
+                   float *k,
+                   int num_heads,
+                   int num_kv_heads,
+                   int num_tokens,
+                   int head_dim,
+                   int aligned_head_dim,
+                   int pos_offset,
+                   int n_dims,
+                   int section_0,
+                   int section_1,
+                   int section_2,
+                   int section_3,
+                   int n_ctx_orig,
+                   float freq_base,
+                   float freq_scale,
+                   float ext_factor,
+                   float attn_factor,
+                   float beta_fast,
+                   float beta_slow);
+
 void mrope_qk_vision(float *q,
                      float *k,
                      const int32_t *positions,
@@ -2156,6 +2178,27 @@ void mrope_qk_vision(float *q,
                      float attn_factor,
                      float beta_fast,
                      float beta_slow);
+
+void mrope_qk_imrope_positions(float *q,
+                               float *k,
+                               const int32_t *positions,
+                               int num_heads,
+                               int num_kv_heads,
+                               int num_tokens,
+                               int head_dim,
+                               int aligned_head_dim,
+                               int n_dims,
+                               int section_0,
+                               int section_1,
+                               int section_2,
+                               int section_3,
+                               int n_ctx_orig,
+                               float freq_base,
+                               float freq_scale,
+                               float ext_factor,
+                               float attn_factor,
+                               float beta_fast,
+                               float beta_slow);
 
 void rope_forward_qk_strided(float *q,
                              float *k,
@@ -2395,7 +2438,8 @@ void embedding_forward_q8_0(const int32_t *token_ids,
 	                                      int grid_h,
 	                                      int grid_w,
 	                                      int embed_dim,
-	                                      int merge_size);
+	                                      int merge_size,
+	                                      int source_grid_size);
 	void vision_position_ids_2d_merge(int32_t *positions,
 	                                 int grid_h,
 	                                 int grid_w,

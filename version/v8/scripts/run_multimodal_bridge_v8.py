@@ -6,8 +6,10 @@ import ctypes
 import heapq
 import importlib.util
 import json
+import math
 import subprocess
 import sys
+import time
 from array import array
 from pathlib import Path
 from typing import Any
@@ -51,8 +53,325 @@ build_ir_v8 = _load_module("build_ir_v8_bridge", SCRIPT_DIR / "build_ir_v8.py")
 codegen_v8 = _load_module("codegen_v8_bridge", SCRIPT_DIR / "codegen_v8.py")
 
 
+_CHAT_TEMPLATE_ALIASES = {
+    "qwen": "qwen2",
+    "gemma": "gemma3",
+}
+
+
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=str(REPO_ROOT), check=True)
+
+
+def _log_progress(message: str) -> None:
+    print(f"[v8-bridge] {message}", file=sys.stderr, flush=True)
+
+
+def _json_write(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _normalize_chat_template_choice(mode: str | None) -> str:
+    value = str(mode or "auto").strip().lower()
+    if not value:
+        return "auto"
+    return _CHAT_TEMPLATE_ALIASES.get(value, value)
+
+
+def _read_gguf_metadata(gguf_path: Path, wanted_keys: set[str]) -> dict[str, Any]:
+    if not wanted_keys:
+        return {}
+    try:
+        with open(gguf_path, "rb") as f:
+            r = convert_gguf_to_bump_v8.GGUFReader(f)
+            magic = r._read_exact(4)
+            if magic != b"GGUF":
+                return {}
+            version = r.u32()
+            if version >= 2:
+                _ = r.u64()
+                n_kv = r.u64()
+            else:
+                _ = r.u32()
+                n_kv = r.u32()
+
+            data: dict[str, Any] = {}
+            for _ in range(int(n_kv)):
+                key = r.key_str()
+                vtype = r.u32()
+                if key in wanted_keys:
+                    data[key] = convert_gguf_to_bump_v8._gguf_read_value(r, vtype)
+                else:
+                    convert_gguf_to_bump_v8._gguf_skip_value(r, vtype)
+            return data
+    except Exception:
+        return {}
+
+
+def _load_builtin_chat_contract(template_name: str | None) -> dict[str, Any] | None:
+    doc = build_ir_v8._load_builtin_template_doc(_normalize_chat_template_choice(template_name))
+    if not isinstance(doc, dict):
+        return None
+    contract_doc = doc.get("contract") if isinstance(doc.get("contract"), dict) else None
+    if not isinstance(contract_doc, dict):
+        return None
+    chat_contract = contract_doc.get("chat_contract")
+    if not isinstance(chat_contract, dict):
+        return None
+    return chat_contract
+
+
+def _fallback_chat_contract_from_template_text(chat_template: str | None) -> dict[str, Any] | None:
+    template = str(chat_template or "")
+    if "<|im_start|>" in template and "<|im_end|>" in template:
+        template_markers = ["<|im_start|>", "<|im_end|>"]
+        image_begin_marker = ""
+        image_end_marker = ""
+        if "<|vision_start|>" in template and "<|vision_end|>" in template:
+            image_begin_marker = "<|vision_start|>"
+            image_end_marker = "<|vision_end|>"
+            template_markers.extend(["<|vision_start|>", "<|vision_end|>"])
+        return {
+            "version": 1,
+            "name": "chatml_auto",
+            "raw_prompt_allowed": False,
+            "turn_prefix": "<|im_start|>{role}\n",
+            "turn_suffix": "<|im_end|>\n",
+            "assistant_generation_prefix": "<|im_start|>assistant\n",
+            "role_labels": {"system": "system", "user": "user", "assistant": "assistant"},
+            "system_prompt_mode": "dedicated_turn",
+            "system_prompt_separator": "\n\n",
+            "default_system_prompt": "",
+            "inject_default_system_prompt": False,
+            "force_bos_text_if_tokenizer_add_bos_false": "",
+            "last_user_prefix": "",
+            "last_user_prefix_suppression_markers": [],
+            "thinking_mode_default": "",
+            "assistant_generation_prefix_by_thinking_mode": {},
+            "last_user_prefix_by_thinking_mode": {},
+            "stop_text_markers": ["<|im_end|>"],
+            "token_stop_markers": ["<|im_end|>"],
+            "image_begin_marker": image_begin_marker,
+            "image_end_marker": image_end_marker,
+            "template_markers": template_markers,
+            "min_response_tokens": 8,
+        }
+    if "<start_of_turn>" in template and "<end_of_turn>" in template:
+        return {
+            "version": 1,
+            "name": "gemma_auto",
+            "raw_prompt_allowed": False,
+            "turn_prefix": "<start_of_turn>{role}\n",
+            "turn_suffix": "<end_of_turn>\n",
+            "assistant_generation_prefix": "<start_of_turn>model\n",
+            "role_labels": {"system": "system", "user": "user", "assistant": "model"},
+            "system_prompt_mode": "dedicated_turn",
+            "system_prompt_separator": "\n\n",
+            "default_system_prompt": "",
+            "inject_default_system_prompt": False,
+            "force_bos_text_if_tokenizer_add_bos_false": "",
+            "last_user_prefix": "",
+            "last_user_prefix_suppression_markers": [],
+            "thinking_mode_default": "",
+            "assistant_generation_prefix_by_thinking_mode": {},
+            "last_user_prefix_by_thinking_mode": {},
+            "stop_text_markers": ["<end_of_turn>"],
+            "token_stop_markers": ["<end_of_turn>"],
+            "template_markers": ["<start_of_turn>", "<end_of_turn>"],
+            "min_response_tokens": 8,
+        }
+    return None
+
+
+def _resolve_decoder_chat_contract(
+    decoder_gguf: Path,
+    *,
+    chat_template_mode: str = "auto",
+) -> dict[str, Any] | None:
+    resolved_mode = _normalize_chat_template_choice(chat_template_mode)
+    if resolved_mode == "none":
+        return None
+
+    if resolved_mode != "auto":
+        explicit = _load_builtin_chat_contract(resolved_mode)
+        if explicit is not None:
+            return explicit
+
+    meta = _read_gguf_metadata(
+        decoder_gguf,
+        {"general.architecture", "tokenizer.chat_template"},
+    )
+    gguf_template_contract = _fallback_chat_contract_from_template_text(meta.get("tokenizer.chat_template"))
+    if resolved_mode == "auto" and gguf_template_contract is not None:
+        return gguf_template_contract
+    arch = str(meta.get("general.architecture") or "").strip().lower()
+    if arch:
+        contract = _load_builtin_chat_contract(arch)
+        if contract is not None:
+            return contract
+
+    return gguf_template_contract
+
+
+def _resolve_contract_thinking_overrides(
+    contract: dict[str, Any],
+    thinking_mode: str | None,
+) -> tuple[str, str]:
+    assistant_generation_prefix = str(contract.get("assistant_generation_prefix") or "")
+    last_user_prefix = str(contract.get("last_user_prefix") or "")
+    requested_mode = str(thinking_mode or "auto").strip().lower()
+    default_mode = str(contract.get("thinking_mode_default") or "").strip().lower()
+    resolved_mode = default_mode if requested_mode in {"", "auto"} else requested_mode
+
+    assistant_by_mode = contract.get("assistant_generation_prefix_by_thinking_mode")
+    if isinstance(assistant_by_mode, dict):
+        override = assistant_by_mode.get(resolved_mode)
+        if isinstance(override, str):
+            assistant_generation_prefix = override
+
+    last_user_prefix_by_mode = contract.get("last_user_prefix_by_thinking_mode")
+    if isinstance(last_user_prefix_by_mode, dict):
+        override = last_user_prefix_by_mode.get(resolved_mode)
+        if isinstance(override, str):
+            last_user_prefix = override
+
+    return assistant_generation_prefix, last_user_prefix
+
+
+def _format_prompt_with_chat_contract(
+    prompt: str,
+    contract: dict[str, Any] | None,
+    *,
+    thinking_mode: str = "auto",
+    system_prompt: str | None = None,
+) -> str:
+    if not isinstance(contract, dict):
+        return str(prompt or "")
+
+    role_labels = contract.get("role_labels") if isinstance(contract.get("role_labels"), dict) else {}
+    turn_prefix = str(contract.get("turn_prefix") or "")
+    turn_suffix = str(contract.get("turn_suffix") or "")
+    system_prompt_mode = str(contract.get("system_prompt_mode") or "disabled").strip().lower()
+    system_prompt_separator = str(contract.get("system_prompt_separator") or "\n\n")
+    default_system_prompt = str(contract.get("default_system_prompt") or "")
+    inject_default_system_prompt = bool(contract.get("inject_default_system_prompt"))
+    bos_prefix = str(contract.get("force_bos_text_if_tokenizer_add_bos_false") or "")
+    suppression_markers = [
+        str(marker).lower()
+        for marker in list(contract.get("last_user_prefix_suppression_markers") or [])
+        if str(marker or "").strip()
+    ]
+    assistant_generation_prefix, last_user_prefix = _resolve_contract_thinking_overrides(contract, thinking_mode)
+
+    user_text = str(prompt or "")
+    if last_user_prefix:
+        lowered = user_text.lower()
+        if last_user_prefix.lower() not in lowered and not any(marker in lowered for marker in suppression_markers):
+            user_text = f"{last_user_prefix}{user_text}"
+
+    system_text = str(system_prompt or "")
+    if not system_text and inject_default_system_prompt:
+        system_text = default_system_prompt
+
+    if system_text and system_prompt_mode == "prepend_first_user":
+        user_text = f"{system_text}{system_prompt_separator}{user_text}" if user_text else system_text
+        system_text = ""
+
+    def _render_turn(role: str, content: str) -> str:
+        label = str(role_labels.get(role) or role)
+        prefix = turn_prefix.replace("{role}", label)
+        return f"{prefix}{content}{turn_suffix}"
+
+    formatted = ""
+    if bos_prefix:
+        formatted += bos_prefix
+    if system_text and system_prompt_mode == "dedicated_turn":
+        formatted += _render_turn("system", system_text)
+    formatted += _render_turn("user", user_text)
+    formatted += assistant_generation_prefix
+    return formatted if formatted else user_text
+
+
+def _resolve_multimodal_image_markers(contract: dict[str, Any] | None) -> tuple[str, str] | None:
+    if not isinstance(contract, dict):
+        return None
+    image_begin = str(contract.get("image_begin_marker") or "")
+    image_end = str(contract.get("image_end_marker") or "")
+    if image_begin and image_end:
+        return image_begin, image_end
+    return None
+
+
+def _format_multimodal_prompt_segments(
+    prompt: str,
+    contract: dict[str, Any] | None,
+    *,
+    include_image: bool,
+    thinking_mode: str = "auto",
+    system_prompt: str | None = None,
+) -> dict[str, Any]:
+    if not include_image:
+        formatted = _format_prompt_with_chat_contract(
+            prompt,
+            contract,
+            thinking_mode=thinking_mode,
+            system_prompt=system_prompt,
+        )
+        return {
+            "formatted_prompt": formatted,
+            "before_text": "",
+            "after_text": formatted,
+            "uses_image_chunks": False,
+            "image_begin_marker": "",
+            "image_end_marker": "",
+        }
+
+    markers = _resolve_multimodal_image_markers(contract)
+    if markers is None:
+        formatted = _format_prompt_with_chat_contract(
+            prompt,
+            contract,
+            thinking_mode=thinking_mode,
+            system_prompt=system_prompt,
+        )
+        return {
+            "formatted_prompt": formatted,
+            "before_text": "",
+            "after_text": formatted,
+            "uses_image_chunks": False,
+            "image_begin_marker": "",
+            "image_end_marker": "",
+        }
+
+    image_begin, image_end = markers
+    sentinel = "<<CK_IMAGE_EMBED_CHUNK>>"
+    if sentinel in str(prompt or ""):
+        raise ValueError("prompt contains reserved multimodal bridge sentinel")
+    formatted = _format_prompt_with_chat_contract(
+        f"{image_begin}{sentinel}{image_end}{str(prompt or '')}",
+        contract,
+        thinking_mode=thinking_mode,
+        system_prompt=system_prompt,
+    )
+    if sentinel not in formatted:
+        return {
+            "formatted_prompt": formatted,
+            "before_text": "",
+            "after_text": formatted,
+            "uses_image_chunks": False,
+            "image_begin_marker": image_begin,
+            "image_end_marker": image_end,
+        }
+    before_text, after_text = formatted.split(sentinel, 1)
+    return {
+        "formatted_prompt": formatted.replace(sentinel, "<image_embeds>"),
+        "before_text": before_text,
+        "after_text": after_text,
+        "uses_image_chunks": True,
+        "image_begin_marker": image_begin,
+        "image_end_marker": image_end,
+    }
 
 
 def _ensure_engine_lib(openmp: bool = False) -> None:
@@ -99,6 +418,97 @@ def _run_converter(
     return manifest, manifest_path, bump_path, config_path
 
 
+def _round_by_factor(x: float, factor: int) -> int:
+    return int(round(float(x) / float(factor))) * int(factor)
+
+
+def _ceil_by_factor(x: float, factor: int) -> int:
+    return int(math.ceil(float(x) / float(factor))) * int(factor)
+
+
+def _floor_by_factor(x: float, factor: int) -> int:
+    return int(math.floor(float(x) / float(factor))) * int(factor)
+
+
+def _calc_qwen_vl_smart_resize(width: int, height: int, align_size: int, min_pixels: int, max_pixels: int) -> tuple[int, int]:
+    if width <= 0 or height <= 0 or align_size <= 0:
+        raise ValueError(f"invalid smart-resize inputs width={width} height={height} align={align_size}")
+    w_bar = max(align_size, _round_by_factor(width, align_size))
+    h_bar = max(align_size, _round_by_factor(height, align_size))
+    if h_bar * w_bar > max_pixels:
+        beta = math.sqrt(float(width * height) / float(max_pixels))
+        w_bar = max(align_size, _floor_by_factor(width / beta, align_size))
+        h_bar = max(align_size, _floor_by_factor(height / beta, align_size))
+    elif h_bar * w_bar < min_pixels:
+        beta = math.sqrt(float(min_pixels) / float(width * height))
+        w_bar = _ceil_by_factor(width * beta, align_size)
+        h_bar = _ceil_by_factor(height * beta, align_size)
+    return int(w_bar), int(h_bar)
+
+
+def _coerce_float_triplet(values: Any, default: list[float]) -> list[float]:
+    if isinstance(values, (list, tuple)) and len(values) >= 3:
+        out: list[float] = []
+        for item in list(values)[:3]:
+            try:
+                out.append(float(item))
+            except (TypeError, ValueError):
+                return [float(v) for v in default]
+        return out
+    return [float(v) for v in default]
+
+
+def _qwen3vl_geometry_overrides(config: dict[str, Any], image_path: Path) -> dict[str, Any]:
+    if Image is None:
+        raise RuntimeError("Pillow is required for Qwen3-VL real-image geometry overrides")
+    with Image.open(image_path) as src:
+        source_width, source_height = src.size
+    patch_size = int(config.get("patch_size", 0) or 0)
+    merge_size = int(config.get("spatial_merge_size", 2) or 2)
+    align_size = patch_size * merge_size
+    if patch_size <= 0 or align_size <= 0:
+        raise RuntimeError(f"invalid Qwen3-VL patch/merge config patch={patch_size} merge={merge_size}")
+    patch_area = patch_size * patch_size * merge_size * merge_size
+    min_pixels = int(config.get("image_min_pixels", 8 * patch_area) or (8 * patch_area))
+    max_pixels = int(config.get("image_max_pixels", 4096 * patch_area) or (4096 * patch_area))
+    image_width, image_height = _calc_qwen_vl_smart_resize(
+        int(source_width),
+        int(source_height),
+        int(align_size),
+        int(min_pixels),
+        int(max_pixels),
+    )
+    if image_width % patch_size != 0 or image_height % patch_size != 0:
+        raise RuntimeError(
+            f"Qwen3-VL smart-resize produced non-divisible size {image_width}x{image_height} for patch_size={patch_size}"
+        )
+    vision_grid_w = image_width // patch_size
+    vision_grid_h = image_height // patch_size
+    if vision_grid_w % merge_size != 0 or vision_grid_h % merge_size != 0:
+        raise RuntimeError(
+            f"Qwen3-VL grid not divisible by merge_size: grid={vision_grid_w}x{vision_grid_h} merge={merge_size}"
+        )
+    vision_num_patches = vision_grid_w * vision_grid_h
+    spatial_merge_factor = merge_size * merge_size
+    vision_merged_tokens = vision_num_patches // spatial_merge_factor
+    merged_grid_x = vision_grid_w // merge_size
+    merged_grid_y = vision_grid_h // merge_size
+    return {
+        "image_width": int(image_width),
+        "image_height": int(image_height),
+        "vision_grid_w": int(vision_grid_w),
+        "vision_grid_h": int(vision_grid_h),
+        "vision_num_patches": int(vision_num_patches),
+        "vision_merged_tokens": int(vision_merged_tokens),
+        "context_length": int(vision_num_patches),
+        "max_seq_len": int(vision_num_patches),
+        "merged_grid_x": int(merged_grid_x),
+        "merged_grid_y": int(merged_grid_y),
+        "image_source_width": int(source_width),
+        "image_source_height": int(source_height),
+    }
+
+
 def _compile_generated_model(c_path: Path, so_path: Path) -> Path:
     if so_path.exists() and so_path.stat().st_mtime >= c_path.stat().st_mtime:
         return so_path
@@ -109,12 +519,11 @@ def _compile_generated_model(c_path: Path, so_path: Path) -> Path:
         "-O3",
         "-fopenmp",
         "-Iinclude",
-        "-Iversion/v7/include",
-        "-Iversion/v7/src",
+        "-Iversion/v8/src",
         str(c_path),
-        "version/v7/src/ckernel_model_load_v7.c",
-        "version/v7/src/ck_parallel_decode.c",
-        "version/v7/src/ck_parallel_prefill.c",
+        "version/v8/src/ckernel_model_load_v8.c",
+        "version/v8/src/ck_parallel_decode_v8.c",
+        "version/v8/src/ck_parallel_prefill_v8.c",
         "-Lbuild",
         "-lckernel_engine",
         f"-Wl,-rpath,{BUILD_DIR}",
@@ -182,11 +591,20 @@ def _build_test_image(height: int, width: int, mode: str) -> tuple[list[float], 
     return interleaved, planar
 
 
-def _load_image_file(image_path: Path, height: int, width: int) -> dict[str, Any]:
+def _load_image_file(
+    image_path: Path,
+    height: int,
+    width: int,
+    *,
+    image_mean: list[float] | None = None,
+    image_std: list[float] | None = None,
+) -> dict[str, Any]:
     if Image is None:
         raise RuntimeError("Pillow is required for --image-path support")
     if not image_path.exists():
         raise FileNotFoundError(f"image file not found: {image_path}")
+    mean = _coerce_float_triplet(image_mean, [0.5, 0.5, 0.5])
+    std = _coerce_float_triplet(image_std, [0.5, 0.5, 0.5])
 
     with Image.open(image_path) as src:
         source_width, source_height = src.size
@@ -201,9 +619,9 @@ def _load_image_file(image_path: Path, height: int, width: int) -> dict[str, Any
     interleaved = [0.0] * (height * width * 3)
     planar = [0.0] * (height * width * 3)
     for idx, (r, g, b) in enumerate(pixels):
-        rf = float(r) / 255.0
-        gf = float(g) / 255.0
-        bf = float(b) / 255.0
+        rf = (float(r) / 255.0 - mean[0]) / max(std[0], 1.0e-12)
+        gf = (float(g) / 255.0 - mean[1]) / max(std[1], 1.0e-12)
+        bf = (float(b) / 255.0 - mean[2]) / max(std[2], 1.0e-12)
         base_i = idx * 3
         interleaved[base_i + 0] = rf
         interleaved[base_i + 1] = gf
@@ -217,12 +635,22 @@ def _load_image_file(image_path: Path, height: int, width: int) -> dict[str, Any
         "image_source": "file",
         "image_path": str(image_path.resolve()),
         "source_image_size": [source_width, source_height],
-        "preprocess": "rgb_bilinear_resize_to_square_0_1",
+        "preprocess": f"rgb_bilinear_resize_{width}x{height}_normalize_mean_std",
     }
 
 
-def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path) -> dict[str, Any]:
+def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path, image_path: Path | None = None) -> dict[str, Any]:
     manifest, manifest_path, bump_path, config_path = _run_converter(gguf_path, output_dir)
+    config = dict(manifest.get("config", {}) or {})
+    if str(config.get("model", config.get("arch", ""))).lower() == "qwen3_vl_vision":
+        base_image = int(config.get("image_size", 0) or 0)
+        config.setdefault("image_height", base_image)
+        config.setdefault("image_width", base_image)
+        if image_path is not None:
+            config.update(_qwen3vl_geometry_overrides(config, image_path))
+        manifest["config"] = config
+        _json_write(manifest_path, manifest)
+        _json_write(config_path, config)
     layout_path = output_dir / "layout.json"
     call_path = output_dir / "call.json"
     lowered_path = output_dir / "lowered.json"
@@ -305,6 +733,8 @@ def _prepare_decoder_runtime(
     decode_call = output_dir / "call_decode.json"
     manifest_map = output_dir / "weights_manifest.map"
     suffix = "_parity_dump" if parity_dump else ""
+    prefill_c_path = output_dir / f"decoder_v8_prefill{suffix}.c"
+    prefill_so_path = output_dir / f"libdecoder_v8_prefill{suffix}.so"
     c_path = output_dir / f"decoder_v8{suffix}.c"
     so_path = output_dir / f"libdecoder_v8{suffix}.so"
 
@@ -350,6 +780,9 @@ def _prepare_decoder_runtime(
 
     old_argv = sys.argv[:]
     try:
+        # Keep the combined decoder runtime on the decode layout so
+        # codegen_v8 replaces the mixed multimodal entrypoint with the
+        # staged single-token bridge instead of the batched prefill bridge.
         sys.argv = [
             str(SCRIPT_DIR / "codegen_v8.py"),
             "--ir",
@@ -370,7 +803,35 @@ def _prepare_decoder_runtime(
         raise RuntimeError(f"codegen_v8 decoder failed with rc={codegen_rc}")
 
     _compile_generated_model(c_path, so_path)
+    old_argv = sys.argv[:]
+    try:
+        sys.argv = [
+            str(SCRIPT_DIR / "codegen_v8.py"),
+            "--ir",
+            str(prefill_call),
+            "--layout",
+            str(prefill_layout),
+            "--output",
+            str(prefill_c_path),
+        ]
+        if parity_dump:
+            sys.argv.append("--parity-dump")
+        prefill_codegen_rc = codegen_v8.main()
+    finally:
+        sys.argv = old_argv
+    if prefill_codegen_rc != 0:
+        raise RuntimeError(f"codegen_v8 decoder prefill bridge failed with rc={prefill_codegen_rc}")
+
+    _compile_generated_model(prefill_c_path, prefill_so_path)
     layout = _load_layout(decode_layout)
+    cfg = dict(layout.get("config", {}) or {})
+    embed_dim = int(cfg.get("embed_dim", 0) or 0)
+    num_deepstack_layers = int(cfg.get("num_deepstack_layers", 0) or 0)
+    input_embed_dim = int(cfg.get("input_embed_dim", 0) or 0)
+    if input_embed_dim <= 0 and embed_dim > 0 and num_deepstack_layers > 0:
+        input_embed_dim = embed_dim * (1 + num_deepstack_layers)
+    if input_embed_dim <= 0:
+        input_embed_dim = embed_dim
     return {
         "gguf": str(gguf_path),
         "manifest": manifest,
@@ -379,10 +840,14 @@ def _prepare_decoder_runtime(
         "config_path": config_path,
         "prefill_layout_path": prefill_layout,
         "decode_layout_path": decode_layout,
+        "prefill_c_path": prefill_c_path,
+        "prefill_so_path": prefill_so_path,
         "c_path": c_path,
         "so_path": so_path,
-        "embed_dim": int(layout.get("config", {}).get("embed_dim", 0)),
-        "vocab_size": int(layout.get("config", {}).get("vocab_size", 0)),
+        "embed_dim": embed_dim,
+        "input_embed_dim": input_embed_dim,
+        "num_deepstack_layers": num_deepstack_layers,
+        "vocab_size": int(cfg.get("vocab_size", 0)),
     }
 
 
@@ -406,6 +871,8 @@ def _load_decoder_lib(model_so: Path) -> ctypes.CDLL:
     lib = ctypes.CDLL(str(model_so))
     lib.ck_model_init_with_manifest.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     lib.ck_model_init_with_manifest.restype = ctypes.c_int
+    lib.ck_model_decode.argtypes = [ctypes.c_int32, ctypes.POINTER(ctypes.c_float)]
+    lib.ck_model_decode.restype = ctypes.c_int
     lib.ck_model_forward_mixed.argtypes = [
         ctypes.POINTER(ctypes.c_float),
         ctypes.c_int,
@@ -414,8 +881,54 @@ def _load_decoder_lib(model_so: Path) -> ctypes.CDLL:
         ctypes.POINTER(ctypes.c_float),
     ]
     lib.ck_model_forward_mixed.restype = ctypes.c_int
+    try:
+        lib.ck_model_forward_mixed_ex.argtypes = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.ck_model_forward_mixed_ex.restype = ctypes.c_int
+    except AttributeError:
+        pass
+    try:
+        lib.ck_model_forward_mixed_grid_ex.argtypes = [
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.ck_model_forward_mixed_grid_ex.restype = ctypes.c_int
+    except AttributeError:
+        pass
+    try:
+        lib.ck_model_forward_segments_grid_ex.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.ck_model_forward_segments_grid_ex.restype = ctypes.c_int
+    except AttributeError:
+        pass
     lib.ck_model_get_vocab_size.argtypes = []
     lib.ck_model_get_vocab_size.restype = ctypes.c_int
+    lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+    lib.ck_set_strict_parity.restype = None
     lib.ck_model_free.argtypes = []
     lib.ck_model_free.restype = None
     declare_named_activation_api(lib)
@@ -424,6 +937,7 @@ def _load_decoder_lib(model_so: Path) -> ctypes.CDLL:
 
 def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | None = None) -> dict[str, Any]:
     lib = _load_encoder_lib(runtime["so_path"])
+    _log_progress("encoder: init start")
     rc = lib.ck_model_init_with_manifest(
         str(runtime["weights_bump"]).encode(),
         str(runtime["manifest_map"]).encode(),
@@ -431,28 +945,42 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
     if rc != 0:
         raise RuntimeError(f"encoder init failed with rc={rc}")
     try:
+        _log_progress("encoder: init done")
         layout = _load_layout(runtime["layout_path"])
         offsets = _load_activation_offsets(runtime["layout_path"])
-        bridge = resolve_vision_bridge_contract(layout, offsets)
+        bridge = resolve_vision_bridge_contract(layout, offsets, prefer_total_output=True)
         image_buf = offsets["image_input"]
         base_ptr = int(lib.ck_model_get_base_ptr())
         if base_ptr == 0:
             raise RuntimeError("encoder base ptr is null")
-        image_size = int(layout.get("config", {}).get("image_size", 0))
-        if image_size <= 0:
-            raise RuntimeError("encoder image_size missing from layout")
+        layout_cfg = dict(layout.get("config", {}) or {})
+        image_height = int(layout_cfg.get("image_height", layout_cfg.get("image_size", 0)) or 0)
+        image_width = int(layout_cfg.get("image_width", layout_cfg.get("image_size", 0)) or 0)
+        if image_height <= 0 or image_width <= 0:
+            raise RuntimeError("encoder image dimensions missing from layout")
+        image_mean = _coerce_float_triplet(layout_cfg.get("image_mean"), [0.5, 0.5, 0.5])
+        image_std = _coerce_float_triplet(layout_cfg.get("image_std"), [0.5, 0.5, 0.5])
+        merge_size = int(layout_cfg.get("spatial_merge_size", 1) or 1)
+        merged_grid_x = int(layout_cfg.get("merged_grid_x", 0) or 0)
+        merged_grid_y = int(layout_cfg.get("merged_grid_y", 0) or 0)
 
         if image_path is not None:
-            image_report = _load_image_file(image_path, image_size, image_size)
+            image_report = _load_image_file(
+                image_path,
+                image_height,
+                image_width,
+                image_mean=image_mean,
+                image_std=image_std,
+            )
             interleaved = image_report["interleaved"]
             planar = image_report["planar"]
         else:
-            interleaved, planar = _build_test_image(image_size, image_size, image_mode)
+            interleaved, planar = _build_test_image(image_height, image_width, image_mode)
             image_report = {
                 "image_source": "synthetic",
                 "image_mode": image_mode,
                 "image_path": None,
-                "source_image_size": [image_size, image_size],
+                "source_image_size": [image_width, image_height],
                 "preprocess": "synthetic_generator",
             }
         image_len = _buffer_nbytes(image_buf) // ctypes.sizeof(ctypes.c_float)
@@ -463,9 +991,14 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
             base_ptr + _activation_runtime_offset(layout, image_buf)
         )
         image_arr[:] = planar
+        _log_progress(
+            f"encoder: decode start image={image_width}x{image_height} prefix_activation={bridge.get('fallback_buffer_name')}"
+        )
+        decode_t0 = time.perf_counter()
         rc = lib.ck_model_decode(0, None)
         if rc != 0:
             raise RuntimeError(f"encoder decode failed with rc={rc}")
+        _log_progress(f"encoder: decode done elapsed={time.perf_counter() - decode_t0:.2f}s")
 
         embed_dim = int(bridge["embed_dim"])
         if embed_dim <= 0:
@@ -491,6 +1024,12 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
             "embed_dim": embed_dim,
             "prefix_tokens": output_len // embed_dim,
             "embeddings": array("f", output_arr),
+            "prefix_grid_x": int(merged_grid_x or max(1, int(layout_cfg.get("vision_grid_w", 0) or 0) // max(1, merge_size))),
+            "prefix_grid_y": int(merged_grid_y or max(1, int(layout_cfg.get("vision_grid_h", 0) or 0) // max(1, merge_size))),
+            "prefix_text_pos": int(max(
+                int(merged_grid_x or max(1, int(layout_cfg.get("vision_grid_w", 0) or 0) // max(1, merge_size))),
+                int(merged_grid_y or max(1, int(layout_cfg.get("vision_grid_h", 0) or 0) // max(1, merge_size))),
+            )),
             "bridge_activation": bridge_name or str(bridge["fallback_buffer_name"]),
             "bridge_reason": str(bridge["reason"]),
             "image_source": str(image_report["image_source"]),
@@ -498,15 +1037,41 @@ def _run_encoder(runtime: dict[str, Any], image_mode: str, image_path: Path | No
             "image_path": image_report.get("image_path"),
             "source_image_size": image_report.get("source_image_size"),
             "preprocess": str(image_report["preprocess"]),
-            "image_size": image_size,
+            "image_height": image_height,
+            "image_width": image_width,
             "interleaved_image": interleaved,
         }
     finally:
         lib.ck_model_free()
 
 
-def _run_decoder(runtime: dict[str, Any], prefix_embeddings: array, prefix_tokens: int, token_ids: list[int]) -> dict[str, Any]:
-    lib = _load_decoder_lib(runtime["so_path"])
+def _run_decoder(
+    runtime: dict[str, Any],
+    prefix_embeddings: array,
+    prefix_tokens: int,
+    token_ids: list[int],
+    *,
+    tokens_before: list[int] | None = None,
+    prefix_embed_dim: int | None = None,
+    prefix_grid: tuple[int, int] | None = None,
+    prefix_text_pos: int | None = None,
+    strict_parity: bool = False,
+    tokenizer: GGUFTokenizer | Any | None = None,
+    stop_token_ids: list[int] | None = None,
+    max_tokens: int = 0,
+) -> dict[str, Any]:
+    # Keep mixed prefix replay on the decode-layout runtime.
+    #
+    # The standalone prefill runtime is useful for batched prefill entrypoints,
+    # but its generated ck_decode() still follows the prefill layout and can
+    # replay full-sequence GEMM/transposes when used for continuation. That
+    # breaks token 2+ after an external prefix. The decode-layout runtime's
+    # ck_model_forward_mixed already stages prefix rows through the true
+    # single-token decode path, which is the correctness-first contract we need
+    # for multimodal bridge parity.
+    model_so = Path(runtime["so_path"])
+    lib = _load_decoder_lib(model_so)
+    _log_progress("decoder: init start")
     rc = lib.ck_model_init_with_manifest(
         str(runtime["weights_bump"]).encode(),
         str(runtime["manifest_map"]).encode(),
@@ -514,30 +1079,208 @@ def _run_decoder(runtime: dict[str, Any], prefix_embeddings: array, prefix_token
     if rc != 0:
         raise RuntimeError(f"decoder init failed with rc={rc}")
     try:
+        _log_progress("decoder: init done")
+        if hasattr(lib, "ck_set_strict_parity"):
+            lib.ck_set_strict_parity(1 if strict_parity else 0)
         vocab_size = int(lib.ck_model_get_vocab_size())
         if vocab_size <= 0:
             vocab_size = int(runtime["vocab_size"])
         logits = (ctypes.c_float * vocab_size)()
+        before_token_ids = [int(tok) for tok in list(tokens_before or [])]
+        after_token_ids = [int(tok) for tok in list(token_ids or [])]
+        resolved_prefix_dim = int(prefix_embed_dim or runtime.get("embed_dim", 0) or 0)
         prefix_ptr: ctypes.Array[ctypes.c_float] | None
         if prefix_tokens > 0:
+            if resolved_prefix_dim <= 0 and len(prefix_embeddings) % prefix_tokens == 0:
+                resolved_prefix_dim = len(prefix_embeddings) // prefix_tokens
+            if resolved_prefix_dim <= 0:
+                raise RuntimeError("decoder prefix embed_dim must be positive when prefix rows are present")
+            expected = prefix_tokens * resolved_prefix_dim
+            if len(prefix_embeddings) != expected:
+                raise RuntimeError(
+                    f"prefix float count mismatch: got={len(prefix_embeddings)} expected={expected} "
+                    f"(tokens={prefix_tokens} row_dim={resolved_prefix_dim})"
+                )
             prefix_ptr = (ctypes.c_float * len(prefix_embeddings))(*prefix_embeddings)
         else:
             prefix_ptr = None
-        token_arr = (ctypes.c_int32 * len(token_ids))(*token_ids) if token_ids else None
-        rc = lib.ck_model_forward_mixed(prefix_ptr, prefix_tokens, token_arr, len(token_ids), logits)
+        before_token_arr = (ctypes.c_int32 * len(before_token_ids))(*before_token_ids) if before_token_ids else None
+        after_token_arr = (ctypes.c_int32 * len(after_token_ids))(*after_token_ids) if after_token_ids else None
+        _log_progress(
+            "decoder: forward_mixed start "
+            f"prefix_tokens={prefix_tokens} prefix_dim={resolved_prefix_dim} "
+            f"prompt_tokens_before={len(before_token_ids)} prompt_tokens_after={len(after_token_ids)} "
+            f"grid={prefix_grid}"
+        )
+        forward_t0 = time.perf_counter()
+        if before_token_ids and hasattr(lib, "ck_model_forward_segments_grid_ex"):
+            grid_x, grid_y = prefix_grid if prefix_grid is not None else (0, 0)
+            default_text_pos = (
+                len(before_token_ids) + max(int(grid_x), int(grid_y))
+                if prefix_grid is not None
+                else len(before_token_ids) + max(0, int(prefix_tokens))
+            )
+            resolved_text_pos = int(prefix_text_pos or default_text_pos)
+            rc = lib.ck_model_forward_segments_grid_ex(
+                before_token_arr,
+                len(before_token_ids),
+                prefix_ptr,
+                prefix_tokens,
+                resolved_prefix_dim,
+                int(grid_x),
+                int(grid_y),
+                resolved_text_pos,
+                after_token_arr,
+                len(after_token_ids),
+                logits,
+            )
+        elif hasattr(lib, "ck_model_forward_mixed_grid_ex") and prefix_grid is not None:
+            grid_x, grid_y = prefix_grid
+            resolved_text_pos = int(prefix_text_pos or max(int(grid_x), int(grid_y), int(prefix_tokens)))
+            rc = lib.ck_model_forward_mixed_grid_ex(
+                prefix_ptr,
+                prefix_tokens,
+                resolved_prefix_dim,
+                int(grid_x),
+                int(grid_y),
+                resolved_text_pos,
+                after_token_arr,
+                len(after_token_ids),
+                logits,
+            )
+        elif hasattr(lib, "ck_model_forward_mixed_ex"):
+            rc = lib.ck_model_forward_mixed_ex(prefix_ptr, prefix_tokens, resolved_prefix_dim, after_token_arr, len(after_token_ids), logits)
+        else:
+            rc = lib.ck_model_forward_mixed(prefix_ptr, prefix_tokens, after_token_arr, len(after_token_ids), logits)
         if rc != 0:
             raise RuntimeError(f"decoder forward_mixed failed with rc={rc}")
+        _log_progress(f"decoder: forward_mixed done elapsed={time.perf_counter() - forward_t0:.2f}s")
         logits_arr = array("f", logits)
+        stop_ids = {int(token_id) for token_id in list(stop_token_ids or [])}
+        generated_token_ids: list[int] = []
+        generation_stop_reason = "disabled"
+        if max_tokens > 0:
+            _log_progress(
+                "decoder: generation start "
+                f"max_tokens={int(max_tokens)} stop_ids={sorted(stop_ids)}"
+            )
+            gen_t0 = time.perf_counter()
+            next_token = _argmax(logits_arr)
+            generation_stop_reason = "max_tokens"
+            for step in range(int(max_tokens)):
+                if int(next_token) in stop_ids:
+                    generation_stop_reason = "stop_token"
+                    break
+                generated_token_ids.append(int(next_token))
+                if step + 1 >= int(max_tokens):
+                    break
+                rc = lib.ck_model_decode(ctypes.c_int32(int(next_token)), logits)
+                if rc != 0:
+                    raise RuntimeError(f"decoder decode failed with rc={rc} at generated_step={step}")
+                next_token = _argmax(logits)
+            _log_progress(
+                "decoder: generation done "
+                f"elapsed={time.perf_counter() - gen_t0:.2f}s generated_tokens={len(generated_token_ids)} "
+                f"stop={generation_stop_reason}"
+            )
+        generated_text = ""
+        generated_text_raw = ""
+        if tokenizer is not None and generated_token_ids:
+            generated_text = str(tokenizer.decode(generated_token_ids, skip_special=True))
+            generated_text_raw = str(tokenizer.decode(generated_token_ids, skip_special=False))
         return {
             "vocab_size": vocab_size,
             "logits": logits_arr,
+            "runtime_mode": "decode",
+            "generated_token_ids": generated_token_ids,
+            "generated_text": generated_text,
+            "generated_text_raw": generated_text_raw,
+            "generation_stop_reason": generation_stop_reason,
         }
     finally:
+        if hasattr(lib, "ck_set_strict_parity"):
+            lib.ck_set_strict_parity(0)
         lib.ck_model_free()
 
 
 def _topk(values: array, k: int) -> list[tuple[int, float]]:
     return heapq.nlargest(k, enumerate(values), key=lambda item: float(item[1]))
+
+
+def _argmax(values: array | ctypes.Array[Any]) -> int:
+    if len(values) <= 0:
+        raise ValueError("cannot argmax empty logits")
+    best_idx = 0
+    best_val = float(values[0])
+    for idx in range(1, len(values)):
+        cur = float(values[idx])
+        if cur > best_val:
+            best_idx = idx
+            best_val = cur
+    return int(best_idx)
+
+
+def _lookup_single_token_id(tokenizer: GGUFTokenizer | Any, text: str) -> int:
+    value = str(text or "")
+    if not value:
+        return -1
+
+    token_to_id = getattr(tokenizer, "token_to_id", None)
+    if isinstance(token_to_id, dict) and value in token_to_id:
+        try:
+            return int(token_to_id[value])
+        except Exception:
+            pass
+
+    get_vocab = getattr(tokenizer, "get_vocab", None)
+    if callable(get_vocab):
+        try:
+            vocab = get_vocab()
+        except Exception:
+            vocab = None
+        if isinstance(vocab, dict) and value in vocab:
+            try:
+                return int(vocab[value])
+            except Exception:
+                pass
+
+    lookup = getattr(tokenizer, "lookup_token_id", None)
+    if callable(lookup):
+        try:
+            token_id = int(lookup(value))
+        except Exception:
+            token_id = -1
+        if token_id >= 0:
+            return token_id
+    return -1
+
+
+def _resolve_stop_token_policy(
+    tokenizer: GGUFTokenizer | Any,
+    chat_contract: dict[str, Any] | None,
+) -> dict[str, Any]:
+    stop_ids: set[int] = set()
+    stop_markers: list[str] = []
+
+    eos_id = int(getattr(tokenizer, "eos_id", -1) or -1)
+    if eos_id >= 0:
+        stop_ids.add(eos_id)
+
+    if isinstance(chat_contract, dict):
+        for marker in list(chat_contract.get("token_stop_markers") or []):
+            marker_text = str(marker or "")
+            if not marker_text:
+                continue
+            token_id = _lookup_single_token_id(tokenizer, marker_text)
+            if token_id >= 0:
+                stop_ids.add(int(token_id))
+                stop_markers.append(marker_text)
+
+    return {
+        "eos_id": eos_id,
+        "stop_ids": sorted(stop_ids),
+        "stop_markers": stop_markers,
+    }
 
 
 def _derive_decoder_context_len(
@@ -559,11 +1302,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--encoder-gguf", type=Path, default=None, help="Optional vision encoder/mmproj GGUF")
     ap.add_argument("--workdir", type=Path, required=True, help="Artifact/output directory")
     ap.add_argument("--prompt", type=str, default="Describe the image.", help="Prompt text for decoder tokenization")
+    ap.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3"], default="auto")
+    ap.add_argument("--no-chat-template", action="store_true")
+    ap.add_argument("--allow-raw-prompt", action="store_true", help="Acknowledge raw prompt formatting when chat templates are disabled")
+    ap.add_argument("--thinking-mode", choices=["auto", "visible", "suppressed"], default="auto")
     ap.add_argument("--image-mode", choices=["checker", "gradient", "gray"], default="checker", help="Synthetic image generator to use when --image-path is not provided")
     ap.add_argument("--image-path", type=Path, default=None, help="Optional real image path for encoder input; overrides --image-mode")
     ap.add_argument("--synthetic-prefix-tokens", type=int, default=0, help="Use zero prefix embeddings when a real encoder bridge is unavailable")
     ap.add_argument("--decoder-context-len", type=int, default=None, help="Override decoder context length; default is prompt+prefix budget with small headroom")
     ap.add_argument("--dump-prefix-f32", type=Path, default=None, help="Optional output path for resolved float32 prefix embeddings")
+    ap.add_argument("--max-tokens", type=int, default=0, help="Generate up to N tokens after multimodal prefill; 0 reports first-token logits only")
     ap.add_argument("--top-k", type=int, default=8, help="How many top logits to report")
     args = ap.parse_args(argv)
 
@@ -572,23 +1320,57 @@ def main(argv: list[str] | None = None) -> int:
     encoder_dir = workdir / "encoder"
     decoder_dir = workdir / "decoder"
 
+    _log_progress(f"start workdir={workdir}")
     _ensure_engine_lib(openmp=args.encoder_gguf is not None)
+    _log_progress(f"engine ready openmp={'on' if args.encoder_gguf is not None else 'off'}")
 
     tokenizer = GGUFTokenizer.from_gguf(str(args.decoder_gguf.resolve()))
-    token_ids = tokenizer.encode(args.prompt)
+    chat_template_mode = "none" if args.no_chat_template else args.chat_template
+    chat_contract = _resolve_decoder_chat_contract(args.decoder_gguf.resolve(), chat_template_mode=chat_template_mode)
+    include_image_chunks = bool(args.encoder_gguf is not None or int(args.synthetic_prefix_tokens) > 0)
+    prompt_segments = _format_multimodal_prompt_segments(
+        args.prompt,
+        chat_contract,
+        include_image=include_image_chunks,
+        thinking_mode=args.thinking_mode,
+    )
+    formatted_prompt = str(prompt_segments["formatted_prompt"])
+    prompt_prefix_token_ids = tokenizer.encode(str(prompt_segments["before_text"])) if str(prompt_segments["before_text"]) else []
+    token_ids = tokenizer.encode(str(prompt_segments["after_text"])) if str(prompt_segments["after_text"]) else []
+    total_text_prompt_tokens = len(prompt_prefix_token_ids) + len(token_ids)
+    contract_name = str((chat_contract or {}).get("name") or "none")
+    _log_progress(
+        "tokenizer ready "
+        f"prompt_tokens_before={len(prompt_prefix_token_ids)} prompt_tokens_after={len(token_ids)} "
+        f"chat_template={chat_template_mode} contract={contract_name}"
+    )
 
     prefix_source = "none"
     prefix_tokens = 0
     prefix_embeddings = array("f")
+    prefix_grid: tuple[int, int] | None = None
+    prefix_text_pos: int | None = None
     encoder_report: dict[str, Any] | None = None
     dim_mismatch: dict[str, int] | None = None
 
     if args.encoder_gguf is not None:
-        encoder_runtime = _prepare_encoder_runtime(args.encoder_gguf.resolve(), encoder_dir)
+        _log_progress(f"encoder runtime prepare start gguf={args.encoder_gguf.resolve()}")
+        encoder_prep_t0 = time.perf_counter()
+        encoder_runtime = _prepare_encoder_runtime(
+            args.encoder_gguf.resolve(),
+            encoder_dir,
+            image_path=args.image_path.resolve() if args.image_path is not None else None,
+        )
+        _log_progress(f"encoder runtime prepare done elapsed={time.perf_counter() - encoder_prep_t0:.2f}s")
+        _log_progress("encoder execution start")
         encoder_report = _run_encoder(
             encoder_runtime,
             args.image_mode,
             image_path=args.image_path.resolve() if args.image_path is not None else None,
+        )
+        _log_progress(
+            "encoder execution done "
+            f"prefix_tokens={int(encoder_report['prefix_tokens'])} embed_dim={int(encoder_report['embed_dim'])}"
         )
 
     decoder_prefix_budget = max(
@@ -596,36 +1378,65 @@ def main(argv: list[str] | None = None) -> int:
         max(0, int(args.synthetic_prefix_tokens)),
     )
     decoder_context_len = _derive_decoder_context_len(
-        prompt_token_count=len(token_ids),
+        prompt_token_count=total_text_prompt_tokens,
         prefix_tokens=decoder_prefix_budget,
         requested=args.decoder_context_len,
+        slack_tokens=max(16, int(args.max_tokens or 0)),
     )
+    _log_progress(
+        "decoder runtime prepare start "
+        f"gguf={args.decoder_gguf.resolve()} context={decoder_context_len} prefix_budget={decoder_prefix_budget}"
+    )
+    decoder_prep_t0 = time.perf_counter()
     decoder_runtime = _prepare_decoder_runtime(
         args.decoder_gguf.resolve(),
         decoder_dir,
         context_override=decoder_context_len,
     )
+    _log_progress(f"decoder runtime prepare done elapsed={time.perf_counter() - decoder_prep_t0:.2f}s")
 
+    prefix_embed_dim = int(decoder_runtime["embed_dim"])
     if encoder_report is not None:
-        if int(encoder_report["embed_dim"]) == int(decoder_runtime["embed_dim"]):
+        encoder_embed_dim = int(encoder_report["embed_dim"])
+        decoder_input_embed_dim = int(decoder_runtime.get("input_embed_dim", decoder_runtime["embed_dim"]))
+        if encoder_embed_dim in {int(decoder_runtime["embed_dim"]), decoder_input_embed_dim}:
             prefix_source = "encoder"
             prefix_tokens = int(encoder_report["prefix_tokens"])
             prefix_embeddings = encoder_report["embeddings"]
+            prefix_embed_dim = encoder_embed_dim
+            grid_x = int(encoder_report.get("prefix_grid_x", 0) or 0)
+            grid_y = int(encoder_report.get("prefix_grid_y", 0) or 0)
+            if grid_x > 0 and grid_y > 0:
+                prefix_grid = (grid_x, grid_y)
+                local_prefix_text_pos = int(
+                    encoder_report.get("prefix_text_pos", max(grid_x, grid_y)) or max(grid_x, grid_y)
+                )
+                prefix_text_pos = len(prompt_prefix_token_ids) + local_prefix_text_pos
         else:
             dim_mismatch = {
-                "encoder_embed_dim": int(encoder_report["embed_dim"]),
+                "encoder_embed_dim": encoder_embed_dim,
                 "decoder_embed_dim": int(decoder_runtime["embed_dim"]),
+                "decoder_input_embed_dim": decoder_input_embed_dim,
             }
 
     if prefix_source != "encoder" and args.synthetic_prefix_tokens > 0:
         prefix_source = "synthetic_zero"
         prefix_tokens = args.synthetic_prefix_tokens
-        prefix_embeddings = array("f", [0.0] * (prefix_tokens * int(decoder_runtime["embed_dim"])))
+        prefix_embed_dim = int(decoder_runtime.get("input_embed_dim", decoder_runtime["embed_dim"]) or decoder_runtime["embed_dim"])
+        prefix_embeddings = array("f", [0.0] * (prefix_tokens * prefix_embed_dim))
+        side = int(math.isqrt(int(prefix_tokens)))
+        if prefix_tokens > 0 and side > 0 and side * side == int(prefix_tokens):
+            prefix_grid = (side, side)
+            prefix_text_pos = len(prompt_prefix_token_ids) + side
 
     if prefix_source == "none":
         raise SystemExit(
             "No usable prefix source: encoder/decode dims do not match and no --synthetic-prefix-tokens was provided"
         )
+    _log_progress(
+        f"bridge ready prefix_source={prefix_source} prefix_tokens={prefix_tokens} prefix_dim={prefix_embed_dim}"
+    )
+    stop_policy = _resolve_stop_token_policy(tokenizer, chat_contract)
 
     dumped_prefix_path: str | None = None
     if args.dump_prefix_f32 is not None:
@@ -634,7 +1445,20 @@ def main(argv: list[str] | None = None) -> int:
         dump_path.write_bytes(prefix_embeddings.tobytes())
         dumped_prefix_path = str(dump_path)
 
-    decoder_report = _run_decoder(decoder_runtime, prefix_embeddings, prefix_tokens, token_ids)
+    decoder_report = _run_decoder(
+        decoder_runtime,
+        prefix_embeddings,
+        prefix_tokens,
+        token_ids,
+        tokens_before=prompt_prefix_token_ids,
+        prefix_embed_dim=prefix_embed_dim,
+        prefix_grid=prefix_grid,
+        prefix_text_pos=prefix_text_pos,
+        tokenizer=tokenizer,
+        stop_token_ids=list(stop_policy["stop_ids"]),
+        max_tokens=max(0, int(args.max_tokens)),
+    )
+    _log_progress("report assembly start")
     top = _topk(decoder_report["logits"], max(1, args.top_k))
     top_tokens = [
         {
@@ -649,13 +1473,27 @@ def main(argv: list[str] | None = None) -> int:
         "status": "ok",
         "prefix_source": prefix_source,
         "prompt": args.prompt,
-        "prompt_token_count": len(token_ids),
-        "prompt_tokens": token_ids,
+        "formatted_prompt": formatted_prompt,
+        "chat_template_mode": chat_template_mode,
+        "chat_contract_name": None if chat_contract is None else str(chat_contract.get("name") or ""),
+        "eos_token_id": int(stop_policy["eos_id"]),
+        "stop_token_ids": [int(tok) for tok in stop_policy["stop_ids"]],
+        "stop_token_markers": [str(marker) for marker in stop_policy["stop_markers"]],
+        "prompt_token_count": total_text_prompt_tokens,
+        "prompt_tokens": [int(tok) for tok in (prompt_prefix_token_ids + token_ids)],
+        "prompt_tokens_before_image": [int(tok) for tok in prompt_prefix_token_ids],
+        "prompt_tokens_after_image": [int(tok) for tok in token_ids],
+        "multimodal_prompt_segmented": bool(prompt_segments["uses_image_chunks"]),
         "decoder_embed_dim": int(decoder_runtime["embed_dim"]),
+        "decoder_input_embed_dim": int(decoder_runtime.get("input_embed_dim", decoder_runtime["embed_dim"])),
         "decoder_context_len": int(decoder_context_len),
         "prefix_tokens": prefix_tokens,
+        "prefix_embed_dim": int(prefix_embed_dim),
+        "prefix_grid_x": None if prefix_grid is None else int(prefix_grid[0]),
+        "prefix_grid_y": None if prefix_grid is None else int(prefix_grid[1]),
+        "prefix_text_pos": None if prefix_text_pos is None else int(prefix_text_pos),
         "prefix_dump_path": dumped_prefix_path,
-        "total_prefill_tokens": prefix_tokens + len(token_ids),
+        "total_prefill_tokens": len(prompt_prefix_token_ids) + prefix_tokens + len(token_ids),
         "decoder_runtime": {
             "gguf": str(args.decoder_gguf.resolve()),
             "workdir": str(decoder_dir),
@@ -676,18 +1514,38 @@ def main(argv: list[str] | None = None) -> int:
             "image_path": encoder_report["image_path"],
             "source_image_size": encoder_report["source_image_size"],
             "preprocess": str(encoder_report["preprocess"]),
-            "image_size": int(encoder_report["image_size"]),
+            "image_size": int(
+                encoder_report.get(
+                    "image_size",
+                    max(
+                        int(encoder_report.get("image_height", 0) or 0),
+                        int(encoder_report.get("image_width", 0) or 0),
+                    ),
+                )
+                or 0
+            ),
+            "image_height": int(encoder_report.get("image_height", 0) or 0),
+            "image_width": int(encoder_report.get("image_width", 0) or 0),
+            "prefix_grid_x": int(encoder_report.get("prefix_grid_x", 0) or 0),
+            "prefix_grid_y": int(encoder_report.get("prefix_grid_y", 0) or 0),
+            "prefix_text_pos": int(encoder_report.get("prefix_text_pos", 0) or 0),
         } if encoder_report is not None else None,
         "dim_mismatch": dim_mismatch,
         "top_logits": top_tokens,
+        "generated_token_ids": [int(tok) for tok in decoder_report.get("generated_token_ids", [])],
+        "generated_token_count": int(len(decoder_report.get("generated_token_ids", []) or [])),
+        "generated_text": str(decoder_report.get("generated_text") or ""),
+        "generated_text_raw": str(decoder_report.get("generated_text_raw") or ""),
+        "generation_stop_reason": str(decoder_report.get("generation_stop_reason") or "disabled"),
         "notes": [
             "This runner keeps the encoder->decoder bridge in orchestration instead of baking a multimodal special-case into templates.",
             "Synthetic-prefix mode only validates the decoder bridge seam; it is not a substitute for real multimodal parity.",
-            "Real-image mode resizes the provided image to the encoder square input in Python; exact llama.cpp parity still depends on matching the reference preprocessing path.",
+            "Real-image mode follows the Qwen3-VL smart-resize contract and replays explicit merged-grid positions into the decoder bridge.",
         ],
     }
     report_path = workdir / "bridge_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    _log_progress(f"done report={report_path}")
     print(json.dumps(report, indent=2))
     return 0
 

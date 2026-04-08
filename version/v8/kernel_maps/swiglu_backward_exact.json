@@ -1,0 +1,99 @@
+{
+  "id": "swiglu_backward_exact",
+  "op": "swiglu",
+  "variant": "fp32_backward_exact",
+  "modes": {
+    "inference": false,
+    "training": true,
+    "backward": true
+  },
+  "quant": {
+    "weight": "none",
+    "activation": "fp32",
+    "output": "fp32"
+  },
+  "inputs": [
+    {
+      "name": "input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "2I"
+      ],
+      "desc": "Forward SwiGLU input [tokens, 2*intermediate_dim]"
+    },
+    {
+      "name": "d_output",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "I"
+      ],
+      "desc": "Gradient from next op [tokens, intermediate_dim]"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "d_input",
+      "dtype": "fp32",
+      "shape": [
+        "T",
+        "2I"
+      ],
+      "desc": "Gradient w.r.t. concatenated gate/up input"
+    }
+  ],
+  "scratch": [],
+  "dims": [
+    "T",
+    "I"
+  ],
+  "params": [],
+  "parallelization": {
+    "supported": [
+      "token",
+      "feature"
+    ],
+    "preferred": {
+      "prefill": "feature",
+      "decode": "feature"
+    },
+    "strategies": [
+      {
+        "name": "feature",
+        "partition_dim": "I",
+        "param_style": "ith_nth",
+        "notes": "Feature-parallel exact SwiGLU backward."
+      }
+    ]
+  },
+  "constraints": {
+    "notes": "Exact backward used as reference-first v7.0 path."
+  },
+  "impl": {
+    "function": "swiglu_backward_exact",
+    "c_declaration": "void swiglu_backward_exact(const float *input, const float *d_output, float *d_input, int tokens, int dim);",
+    "sources": [
+      "src/kernels/swiglu_kernels.c"
+    ],
+    "variants": [
+      {
+        "name": "default",
+        "requires": [],
+        "compile_flags": []
+      }
+    ]
+  },
+  "tests": {
+    "parity": [
+      {
+        "kind": "pytorch",
+        "command": "make v7-parity-1tok",
+        "tolerance": "5e-5",
+        "notes": "Reference backward parity check."
+      }
+    ]
+  },
+  "notes": "Exact SwiGLU backward kernel for v7 training IR."
+}
+

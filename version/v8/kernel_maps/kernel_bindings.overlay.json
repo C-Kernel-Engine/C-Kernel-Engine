@@ -1,5 +1,36 @@
 {
   "bindings": {
+    "im2patch": {
+      "note": "Allow rectangular vision inputs by binding explicit image_height/image_width.",
+      "params": [
+        {
+          "name": "image",
+          "source": "activation:image",
+          "cast": "const float*"
+        },
+        {
+          "name": "patches",
+          "source": "output:patches",
+          "cast": "float*"
+        },
+        {
+          "name": "C",
+          "source": "dim:vision_channels"
+        },
+        {
+          "name": "H",
+          "source": "dim:image_height"
+        },
+        {
+          "name": "W",
+          "source": "dim:image_width"
+        },
+        {
+          "name": "P",
+          "source": "dim:patch_size"
+        }
+      ]
+    },
     "gemm_nt_fp32_exact": {
       "note": "Exact FP32 NT GEMM binding for parity-sensitive matmuls.",
       "params": [
@@ -70,6 +101,52 @@
         }
       ]
     },
+    "rmsnorm_forward": {
+      "note": "RMSNorm does not require an rstd cache in v8 runtimes.",
+      "params": [
+        {
+          "name": "input",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "gamma",
+          "source": "weight_f:_gamma",
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "post_attention_norm",
+            "post_ffn_norm",
+            "final_ln_weight"
+          ]
+        },
+        {
+          "name": "output",
+          "source": "output:output",
+          "cast": "float*"
+        },
+        {
+          "name": "rstd_cache",
+          "source": "null"
+        },
+        {
+          "name": "tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "d_model",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "aligned_embed_dim",
+          "source": "dim:embed_dim"
+        },
+        {
+          "name": "eps",
+          "source": "dim:rms_eps"
+        }
+      ]
+    },
     "layernorm_fp32_exact": {
       "note": "Exact LayerNorm binding for parity-sensitive templates.",
       "params": [
@@ -81,12 +158,22 @@
         {
           "name": "gamma",
           "source": "weight_f:gamma",
-          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "final_ln_weight",
+            "branch_norm_gamma"
+          ]
         },
         {
           "name": "beta",
           "source": "weight_f:beta",
-          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+          "alt": [
+            "ln1_beta",
+            "ln2_beta",
+            "final_ln_bias",
+            "branch_norm_beta"
+          ]
         },
         {
           "name": "output",
@@ -126,12 +213,22 @@
         {
           "name": "gamma",
           "source": "weight_f:gamma",
-          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "final_ln_weight",
+            "branch_norm_gamma"
+          ]
         },
         {
           "name": "beta",
           "source": "weight_f:beta",
-          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+          "alt": [
+            "ln1_beta",
+            "ln2_beta",
+            "final_ln_bias",
+            "branch_norm_beta"
+          ]
         },
         {
           "name": "output",
@@ -277,6 +374,10 @@
         {
           "name": "merge_size",
           "source": "dim:merge_size"
+        },
+        {
+          "name": "source_grid_size",
+          "source": "dim:source_grid_size"
         }
       ]
     },
@@ -322,57 +423,22 @@
         {
           "name": "gamma",
           "source": "weight_f:gamma",
-          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "final_ln_weight",
+            "branch_norm_gamma"
+          ]
         },
         {
           "name": "beta",
           "source": "weight_f:beta",
-          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
-        },
-        {
-          "name": "output",
-          "source": "output:output",
-          "cast": "float*"
-        },
-        {
-          "name": "mean_cache_slice",
-          "source": "null"
-        },
-        {
-          "name": "rstd_cache_slice",
-          "source": "null"
-        },
-        {
-          "name": "num_tokens_in_slice",
-          "source": "dim:seq_len"
-        },
-        {
-          "name": "d_model",
-          "source": "dim:embed_dim"
-        },
-        {
-          "name": "eps",
-          "source": "dim:rms_eps"
-        }
-      ]
-    },
-    "layernorm_forward_unrolled_slice": {
-      "note": "Direct function-name alias for the generic LayerNorm binding.",
-      "params": [
-        {
-          "name": "input",
-          "source": "activation:input",
-          "cast": "const float*"
-        },
-        {
-          "name": "gamma",
-          "source": "weight_f:gamma",
-          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight"]
-        },
-        {
-          "name": "beta",
-          "source": "weight_f:beta",
-          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias"]
+          "alt": [
+            "ln1_beta",
+            "ln2_beta",
+            "final_ln_bias",
+            "branch_norm_beta"
+          ]
         },
         {
           "name": "output",
@@ -412,12 +478,22 @@
         {
           "name": "gamma",
           "source": "weight_f:gamma",
-          "alt": ["ln1_gamma", "ln2_gamma", "final_ln_weight", "branch_norm_gamma"]
+          "alt": [
+            "ln1_gamma",
+            "ln2_gamma",
+            "final_ln_weight",
+            "branch_norm_gamma"
+          ]
         },
         {
           "name": "beta",
           "source": "weight_f:beta",
-          "alt": ["ln1_beta", "ln2_beta", "final_ln_bias", "branch_norm_beta"]
+          "alt": [
+            "ln1_beta",
+            "ln2_beta",
+            "final_ln_bias",
+            "branch_norm_beta"
+          ]
         },
         {
           "name": "output",
@@ -795,6 +871,139 @@
         {
           "name": "beta_slow",
           "source": "dim:beta_slow"
+        }
+      ]
+    },
+    "mrope_qk_text": {
+      "note": "Text multi-section RoPE driven by runtime token position offset.",
+      "params": [
+        {
+          "name": "q",
+          "source": "output:q",
+          "cast": "float*"
+        },
+        {
+          "name": "k",
+          "source": "output:k",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "num_tokens",
+          "source": "dim:seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "pos_offset",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "n_dims",
+          "source": "dim:n_dims"
+        },
+        {
+          "name": "section_0",
+          "source": "dim:section_0"
+        },
+        {
+          "name": "section_1",
+          "source": "dim:section_1"
+        },
+        {
+          "name": "section_2",
+          "source": "dim:section_2"
+        },
+        {
+          "name": "section_3",
+          "source": "dim:section_3"
+        },
+        {
+          "name": "n_ctx_orig",
+          "source": "dim:n_ctx_orig"
+        },
+        {
+          "name": "freq_base",
+          "source": "dim:freq_base"
+        },
+        {
+          "name": "freq_scale",
+          "source": "dim:freq_scale"
+        },
+        {
+          "name": "ext_factor",
+          "source": "dim:ext_factor"
+        },
+        {
+          "name": "attn_factor",
+          "source": "dim:attn_factor"
+        },
+        {
+          "name": "beta_fast",
+          "source": "dim:beta_fast"
+        },
+        {
+          "name": "beta_slow",
+          "source": "dim:beta_slow"
+        }
+      ]
+    },
+    "quantize_row_q8_0": {
+      "note": "Allow vision/footer quantize ops to request batched row emission when rows is present.",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "y",
+          "source": "output:output",
+          "cast": "void*"
+        },
+        {
+          "name": "k",
+          "source": "dim:_input_dim"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
+        }
+      ]
+    },
+    "quantize_row_q8_k": {
+      "note": "Allow vision/footer quantize ops to request batched row emission when rows is present.",
+      "params": [
+        {
+          "name": "x",
+          "source": "activation:input",
+          "cast": "const float*"
+        },
+        {
+          "name": "y",
+          "source": "output:output",
+          "cast": "void*"
+        },
+        {
+          "name": "k",
+          "source": "dim:_input_dim"
+        },
+        {
+          "name": "rows",
+          "source": "dim:rows"
         }
       ]
     }
