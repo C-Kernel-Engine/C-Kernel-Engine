@@ -2551,7 +2551,9 @@ help:
 	@echo "  │  TESTING                                                            │"
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make test             Run core kernel tests"
-	@echo "  make regression-fast  Run family smoke/coherence regression suite"
+	@echo "  make regression-fast  Run promoted v8 family smoke/coherence regression suite"
+	@echo "  make v8-regression-fast  Run explicit v8 fast regression suite"
+	@echo "  make v7-regression-fast  Run legacy v7 fast regression suite"
 	@echo "  make regression-full  Run family regression suite with stitch/parity triage"
 	@echo "  make regression-family FAMILY=qwen35  Run regression debug for one family"
 	@echo "  make test-attention-sliding  Run sliding-window kernel contract test"
@@ -3346,10 +3348,13 @@ report-md:
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
+.PHONY: regression-fast v7-regression-fast v8-regression-fast regression-full regression-family
 .PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
 .PHONY: v7-regression-training-fast v7-regression-training-full regression-training-fast regression-training-full training-fast training-full
 .PHONY: v7-benchmark-training-fp32-prepare v7-benchmark-training-fp32 benchmark-training-fp32
 .PHONY: v7-profile-training-fp32-perf v7-profile-training-fp32-vtune v7-profile-training-fp32-advisor
+.PHONY: v7-profile-training-spec19-qwen3-prepare v7-profile-training-spec19-qwen3-parity
+.PHONY: v7-profile-training-spec19-qwen3-perf v7-profile-training-spec19-qwen3-vtune v7-profile-training-spec19-qwen3-advisor
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
@@ -3658,6 +3663,33 @@ V7_TRAIN_BENCHMARK_PROMPT ?= Hello!
 V7_TRAIN_BENCHMARK_BRIDGE ?= legacy
 V7_TRAIN_BENCHMARK_CHECKPOINT ?= none
 V7_TRAIN_BENCHMARK_AFFINITY ?=
+V7_TRAIN_SPEC19_QWEN3_CACHE_DIR ?= version/v7/.cache/models
+V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT ?= $(V7_REPORT_DIR)/train_profile_spec19_qwen3
+V7_TRAIN_SPEC19_QWEN3_RUN_DIR ?= version/v7/.cache/models/train/spec19_qwen3_profile_l3_d192_h384_ctx768
+V7_TRAIN_SPEC19_QWEN3_TEMPLATE ?= qwen3
+V7_TRAIN_SPEC19_QWEN3_INIT ?= xavier_uniform
+V7_TRAIN_SPEC19_QWEN3_LAYERS ?= 3
+V7_TRAIN_SPEC19_QWEN3_VOCAB ?= 1024
+V7_TRAIN_SPEC19_QWEN3_D_MODEL ?= 192
+V7_TRAIN_SPEC19_QWEN3_HIDDEN ?= 384
+V7_TRAIN_SPEC19_QWEN3_NUM_HEADS ?= 8
+V7_TRAIN_SPEC19_QWEN3_NUM_KV_HEADS ?= 4
+V7_TRAIN_SPEC19_QWEN3_CONTEXT_LEN ?= 768
+V7_TRAIN_SPEC19_QWEN3_SEQ_LEN ?= 32
+V7_TRAIN_SPEC19_QWEN3_TOTAL_TOKENS ?= 4096
+V7_TRAIN_SPEC19_QWEN3_GRAD_ACCUM ?= 4
+V7_TRAIN_SPEC19_QWEN3_EPOCHS ?= 1
+V7_TRAIN_SPEC19_QWEN3_LR ?= 5e-4
+V7_TRAIN_SPEC19_QWEN3_THREADS ?= 8
+V7_TRAIN_SPEC19_QWEN3_SEED ?= 42
+V7_TRAIN_SPEC19_QWEN3_PROMPT ?= Hello!
+V7_TRAIN_SPEC19_QWEN3_BRIDGE ?= legacy
+V7_TRAIN_SPEC19_QWEN3_CHECKPOINT ?= none
+V7_TRAIN_SPEC19_QWEN3_PARITY_PROFILE ?= strict
+V7_TRAIN_SPEC19_QWEN3_PARITY_JSON ?= $(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/parity/training_parity_regimen_latest.json
+V7_TRAIN_SPEC19_QWEN3_PARITY_MD ?= $(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/parity/training_parity_regimen_latest.md
+V7_TRAIN_SPEC19_QWEN3_PARITY_LOGS ?= $(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/parity/training_parity_regimen_logs
+V7_TRAIN_SPEC19_QWEN3_PARITY_FORCE ?= 0
 V7_BACKPROP_MATRIX_JSON ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.json
 V7_BACKPROP_MATRIX_MD ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.md
 V7_BACKPROP_MATRIX_EXTENDED ?= 0
@@ -3794,6 +3826,10 @@ v7-help:
 	@echo "  make v7-profile-training-fp32-perf"
 	@echo "  make v7-profile-training-fp32-vtune"
 	@echo "  make v7-profile-training-fp32-advisor"
+	@echo "  make v7-profile-training-spec19-qwen3-parity"
+	@echo "  make v7-profile-training-spec19-qwen3-perf"
+	@echo "  make v7-profile-training-spec19-qwen3-vtune"
+	@echo "  make v7-profile-training-spec19-qwen3-advisor"
 	@echo "  make regression-backprop-fast"
 	@echo "  make regression-backprop-full"
 	@echo "  make v7-regression-backprop-fast"
@@ -3831,6 +3867,8 @@ v7-help:
 	@echo "  - family override for smoke/triage: V7_BACKPROP_MATRIX_FAMILIES=qwen3 or qwen2,qwen3"
 	@echo "  - canonical CK-vs-Torch train benchmark: make v7-benchmark-training-fp32"
 	@echo "  - locked workload profiler captures: make v7-profile-training-fp32-perf|vtune|advisor"
+	@echo "  - spec19/qwen3 profiler lane: make v7-profile-training-spec19-qwen3-parity before perf|vtune|advisor"
+	@echo "  - spec19 parity order is A1/A4 Python-oracle first, then D/E/F generated C runtime checks"
 	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
 	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
 
@@ -3964,9 +4002,15 @@ v7-kernel-map-contracts:
 	@$(PYTHON) version/v7/kernel_maps/validate_kernel_maps.py --json-out $(V7_REPORT_DIR)/kernel_map_validation_latest.json
 	@$(PYTHON) -m unittest tests.test_v7_kernel_map_validator tests.test_v7_kernel_map_contracts tests.test_deltanet_registry_v7
 
-regression-fast:
+v7-regression-fast:
 	@echo "Running v7 regression fast suite..."
 	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode fast --force-rebuild $(REGRESSION_ARGS)
+
+v8-regression-fast:
+	@echo "Running v8 regression fast suite..."
+	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
+
+regression-fast: v8-regression-fast
 
 regression-full:
 	@echo "Running v7 regression full suite..."
@@ -4487,6 +4531,149 @@ v7-profile-training-fp32-advisor: v7-benchmark-training-fp32-prepare
 		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor/v7_train_benchmark_fp32_advisor.json" \
 		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
+
+v7-profile-training-spec19-qwen3-prepare:
+	@mkdir -p "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)"
+	@CK_CACHE_DIR="$(V7_TRAIN_SPEC19_QWEN3_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py init \
+		--run "$(V7_TRAIN_SPEC19_QWEN3_RUN_DIR)" \
+		--init "$(V7_TRAIN_SPEC19_QWEN3_INIT)" \
+		--train-seed "$(V7_TRAIN_SPEC19_QWEN3_SEED)" \
+		--layers "$(V7_TRAIN_SPEC19_QWEN3_LAYERS)" \
+		--vocab-size "$(V7_TRAIN_SPEC19_QWEN3_VOCAB)" \
+		--embed-dim "$(V7_TRAIN_SPEC19_QWEN3_D_MODEL)" \
+		--hidden-dim "$(V7_TRAIN_SPEC19_QWEN3_HIDDEN)" \
+		--num-heads "$(V7_TRAIN_SPEC19_QWEN3_NUM_HEADS)" \
+		--num-kv-heads "$(V7_TRAIN_SPEC19_QWEN3_NUM_KV_HEADS)" \
+		--context-len "$(V7_TRAIN_SPEC19_QWEN3_CONTEXT_LEN)" \
+		--template "$(V7_TRAIN_SPEC19_QWEN3_TEMPLATE)" \
+		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
+
+v7-profile-training-spec19-qwen3-parity: v7-profile-training-spec19-qwen3-prepare
+	@mkdir -p "$(dir $(V7_TRAIN_SPEC19_QWEN3_PARITY_JSON))" "$(V7_TRAIN_SPEC19_QWEN3_PARITY_LOGS)"
+	@extra_flags=""; \
+	if [ "$(V7_TRAIN_SPEC19_QWEN3_PARITY_FORCE)" = "1" ]; then extra_flags="$$extra_flags --force"; fi; \
+	CK_CACHE_DIR="$(V7_TRAIN_SPEC19_QWEN3_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/run_training_parity_regimen_v7.py \
+		--run-dir "$(V7_TRAIN_SPEC19_QWEN3_RUN_DIR)" \
+		--family qwen3 \
+		--template "$(V7_TRAIN_SPEC19_QWEN3_TEMPLATE)" \
+		--stage-profile "$(V7_TRAIN_SPEC19_QWEN3_PARITY_PROFILE)" \
+		--seq-len "$(V7_TRAIN_SPEC19_QWEN3_SEQ_LEN)" \
+		--vocab "$(V7_TRAIN_SPEC19_QWEN3_VOCAB)" \
+		--d-model "$(V7_TRAIN_SPEC19_QWEN3_D_MODEL)" \
+		--hidden "$(V7_TRAIN_SPEC19_QWEN3_HIDDEN)" \
+		--num-layers "$(V7_TRAIN_SPEC19_QWEN3_LAYERS)" \
+		--lr "$(V7_TRAIN_SPEC19_QWEN3_LR)" \
+		--seed "$(V7_TRAIN_SPEC19_QWEN3_SEED)" \
+		--json-out "$(V7_TRAIN_SPEC19_QWEN3_PARITY_JSON)" \
+		--md-out "$(V7_TRAIN_SPEC19_QWEN3_PARITY_MD)" \
+		--logs-dir "$(V7_TRAIN_SPEC19_QWEN3_PARITY_LOGS)" \
+		$$extra_flags
+
+v7-profile-training-spec19-qwen3-perf: v7-profile-training-spec19-qwen3-parity
+	@mkdir -p "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/perf"
+	@CK_CACHE_DIR="$(V7_TRAIN_SPEC19_QWEN3_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	perf stat -d -d -d -o "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/perf/perf_stat.txt" -- \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_SPEC19_QWEN3_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_SPEC19_QWEN3_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_SPEC19_QWEN3_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_SPEC19_QWEN3_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_SPEC19_QWEN3_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_SPEC19_QWEN3_LR)" \
+		--train-seed "$(V7_TRAIN_SPEC19_QWEN3_SEED)" \
+		--train-vocab "$(V7_TRAIN_SPEC19_QWEN3_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_SPEC19_QWEN3_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_SPEC19_QWEN3_HIDDEN)" \
+		--prompt "$(V7_TRAIN_SPEC19_QWEN3_PROMPT)" \
+		--profile-train none \
+		--train-json-out "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/perf/v7_train_spec19_qwen3_perf.json" \
+		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
+
+v7-profile-training-spec19-qwen3-vtune: v7-profile-training-spec19-qwen3-parity
+	@mkdir -p "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/vtune"
+	@CK_CACHE_DIR="$(V7_TRAIN_SPEC19_QWEN3_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	vtune -collect hotspots -result-dir "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/vtune/hotspots" -quiet -- \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_SPEC19_QWEN3_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_SPEC19_QWEN3_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_SPEC19_QWEN3_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_SPEC19_QWEN3_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_SPEC19_QWEN3_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_SPEC19_QWEN3_LR)" \
+		--train-seed "$(V7_TRAIN_SPEC19_QWEN3_SEED)" \
+		--train-vocab "$(V7_TRAIN_SPEC19_QWEN3_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_SPEC19_QWEN3_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_SPEC19_QWEN3_HIDDEN)" \
+		--prompt "$(V7_TRAIN_SPEC19_QWEN3_PROMPT)" \
+		--profile-train none \
+		--train-json-out "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/vtune/v7_train_spec19_qwen3_vtune.json" \
+		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
+	@vtune -report summary -r "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/vtune/hotspots" -format text \
+		-report-output "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/vtune/vtune_summary.txt" >/dev/null 2>&1 || true
+
+v7-profile-training-spec19-qwen3-advisor: v7-profile-training-spec19-qwen3-parity
+	@mkdir -p "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/advisor"
+	@CK_CACHE_DIR="$(V7_TRAIN_SPEC19_QWEN3_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_SPEC19_QWEN3_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	advisor --collect=roofline --project-dir "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/advisor/roofline" -- \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_SPEC19_QWEN3_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_SPEC19_QWEN3_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_SPEC19_QWEN3_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_SPEC19_QWEN3_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_SPEC19_QWEN3_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_SPEC19_QWEN3_LR)" \
+		--train-seed "$(V7_TRAIN_SPEC19_QWEN3_SEED)" \
+		--train-vocab "$(V7_TRAIN_SPEC19_QWEN3_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_SPEC19_QWEN3_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_SPEC19_QWEN3_HIDDEN)" \
+		--prompt "$(V7_TRAIN_SPEC19_QWEN3_PROMPT)" \
+		--profile-train none \
+		--train-json-out "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/advisor/v7_train_spec19_qwen3_advisor.json" \
+		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
 
 v7-backprop-plumbing:
 	@set -e; \

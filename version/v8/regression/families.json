@@ -202,6 +202,55 @@
       }
     },
     {
+      "id": "qwen3vl",
+      "label": "Qwen3-VL 8B Instruct",
+      "enabled": true,
+      "model": "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--image-path",
+        "version/v8/test_assets/v8_vision_doc_card_72.png",
+        "--thinking-mode",
+        "suppressed",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "vision_doc_card"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "[v8-bridge] done report=",
+          "Wrote bridge report to "
+        ],
+        "config": {
+          "rope_layout": "multi_section_1d"
+        },
+        "manifest": {
+          "config.model": "qwen3vl",
+          "config.chat_contract.name": "qwen",
+          "config.rope_layout": "multi_section_1d"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "mrope_qk_text",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
       "id": "nanbeige",
       "label": "Nanbeige 4.1 3B",
       "enabled": true,

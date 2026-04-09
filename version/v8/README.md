@@ -33,6 +33,9 @@ Notes:
 - `NaanBeige`: if the first reply echoes `<|im_start|>assistant` or starts with `<think>`, keep `--chat-template auto`, do not force `none`, and treat it as a prompt-wrapper/chat-contract symptom rather than a stable expected reply shape.
 
 Canonical vision bring-up example:
-- `version/v8/scripts/cks-v8-run run /path/to/decoder.gguf --mmproj /path/to/mmproj.gguf --image-path ./image.png --prompt "Describe the image."`
+- `version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf --image-path version/v8/test_assets/v8_vision_doc_card_72.png --prompt "Explain this image."`
+
+Notes:
+- For the validated Qwen3-VL 8B path, omitting `--mmproj` now auto-resolves the matching HF companion projector.
 
 That keeps `v8` small and honest: the version split now includes the inference runner, local kernel registry/maps, and multimodal bridge entrypoint, while broader profiling/report tooling can still be copied forward later as needed.

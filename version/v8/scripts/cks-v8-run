@@ -22,9 +22,10 @@ Raw CLI examples:
   version/v8/scripts/cks-v8-run run /path/to/model.gguf \\
     --context-len 1024
 
-  version/v8/scripts/cks-v8-run run /path/to/decoder.gguf \\
-    --mmproj /path/to/mmproj.gguf --image-path ./image.png \\
-    --prompt "Describe the image."
+  version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \\
+    --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \\
+    --image-path version/v8/test_assets/v8_vision_doc_card_72.png \\
+    --prompt "Explain this image."
 
 After a run exists:
   ./build/ck-cli-v8 --list

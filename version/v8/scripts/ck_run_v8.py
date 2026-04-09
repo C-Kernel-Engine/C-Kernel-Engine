@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,11 +37,68 @@ KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
 V8_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v8.txt"
 V8_VISUALIZER_PATH = V8_ROOT / "tools" / "open_ir_visualizer_v8.py"
 REPO_VENV_PY = PROJECT_ROOT / ".venv" / "bin" / "python"
+DEFAULT_CACHE_DIR = Path.home() / ".cache" / "ck-engine-v8" / "models"
+AUTO_MMPROJ_SPECS = (
+    {
+        "match_any": (
+            "qwen/qwen3-vl-8b-instruct-gguf",
+            "qwen3-vl-8b-instruct-gguf",
+            "qwen3-vl-8b-instruct",
+            "qwen3vl-8b-instruct",
+        ),
+        "mmproj": "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+    },
+)
+
+
+def _can_write_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".ck_write_probe"
+        probe.write_text("", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _fallback_cache_dir() -> Path:
+    return Path(tempfile.gettempdir()) / "ck-engine-v8" / "models"
 
 
 def _get_cache_dir() -> Path:
     env = os.environ.get("CK_CACHE_DIR")
-    return Path(env).expanduser() if env else (Path.home() / ".cache" / "ck-engine-v8" / "models")
+    if env:
+        return Path(env).expanduser()
+    if _can_write_dir(DEFAULT_CACHE_DIR):
+        return DEFAULT_CACHE_DIR
+    return _fallback_cache_dir()
+
+
+def _cache_roots() -> list[Path]:
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for root in (CACHE_DIR, DEFAULT_CACHE_DIR, LEGACY_CACHE_DIR):
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        roots.append(root)
+    return roots
+
+
+def _hf_hub_cache_dir(cache_dir: Path) -> Path:
+    return cache_dir / ".hf-hub"
+
+
+def _infer_auto_mmproj_spec(model_input: str) -> str | None:
+    normalized = str(model_input or "").strip().lower().replace("\\", "/")
+    if not normalized:
+        return None
+    for row in AUTO_MMPROJ_SPECS:
+        if any(token in normalized for token in row["match_any"]):
+            return str(row["mmproj"])
+    return None
 
 
 CACHE_DIR = _get_cache_dir()
@@ -342,16 +400,18 @@ def step_regenerate_kernel_registry(force: bool = False) -> Path:
 
 def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
     log_step(1, f"Downloading {model_id}")
+    if not force:
+        repo_dir = model_id.replace("/", "--")
+        for root in _cache_roots():
+            candidate_dir = root / repo_dir
+            if candidate_dir.exists() and any(candidate_dir.glob("*.gguf")):
+                if root == cache_dir:
+                    log(f"  Using cached model at {candidate_dir}", C_DIM)
+                else:
+                    log(f"  Reusing cached model at {candidate_dir}", C_DIM)
+                return candidate_dir
     model_dir = cache_dir / model_id.replace("/", "--")
     model_dir.mkdir(parents=True, exist_ok=True)
-    if any(model_dir.glob("*.gguf")) and not force:
-        log(f"  Using cached model at {model_dir}", C_DIM)
-        return model_dir
-    if not force:
-        legacy_dir = LEGACY_CACHE_DIR / model_id.replace("/", "--")
-        if legacy_dir.exists() and any(legacy_dir.glob("*.gguf")):
-            log(f"  Reusing cached model at {legacy_dir}", C_DIM)
-            return legacy_dir
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
@@ -359,6 +419,7 @@ def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
     snapshot_download(
         repo_id=model_id,
         local_dir=str(model_dir),
+        cache_dir=str(_hf_hub_cache_dir(cache_dir)),
         ignore_patterns=["*.bin", "*.msgpack", "*.h5", "*.ot"],
     )
     return model_dir
@@ -366,17 +427,20 @@ def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
 
 def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool = False) -> Path:
     log_step(1, f"Downloading {filename} from {repo_id}")
+    if not force:
+        repo_dir = repo_id.replace("/", "--")
+        filename_only = Path(filename).name
+        for root in _cache_roots():
+            candidate = root / repo_dir / filename_only
+            if candidate.exists():
+                if root == cache_dir:
+                    log(f"  Using cached GGUF at {candidate}", C_DIM)
+                else:
+                    log(f"  Reusing cached GGUF at {candidate}", C_DIM)
+                return candidate
     model_dir = cache_dir / repo_id.replace("/", "--")
     model_dir.mkdir(parents=True, exist_ok=True)
     gguf_path = model_dir / Path(filename).name
-    if gguf_path.exists() and not force:
-        log(f"  Using cached GGUF at {gguf_path}", C_DIM)
-        return gguf_path
-    if not force:
-        legacy_path = LEGACY_CACHE_DIR / repo_id.replace("/", "--") / Path(filename).name
-        if legacy_path.exists():
-            log(f"  Reusing cached GGUF at {legacy_path}", C_DIM)
-            return legacy_path
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
@@ -386,6 +450,7 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
             repo_id=repo_id,
             filename=filename,
             local_dir=str(model_dir),
+            cache_dir=str(_hf_hub_cache_dir(cache_dir)),
         )
     )
     if downloaded.resolve() != gguf_path.resolve():
@@ -403,7 +468,7 @@ def _strip_gguf_suffix(model_id: str) -> str:
 
 def _find_cached_tokenizer_json(repo_id: str) -> Path | None:
     repo_dir = repo_id.replace("/", "--")
-    for root in (CACHE_DIR, LEGACY_CACHE_DIR):
+    for root in _cache_roots():
         candidate = root / repo_dir / "tokenizer.json"
         if candidate.exists():
             return candidate
@@ -435,7 +500,12 @@ def ensure_tokenizer_files(model_id: str, work_dir: Path) -> None:
         return
     for repo_id in candidates:
         try:
-            hf_hub_download(repo_id=repo_id, filename="tokenizer.json", local_dir=str(work_dir))
+            hf_hub_download(
+                repo_id=repo_id,
+                filename="tokenizer.json",
+                local_dir=str(work_dir),
+                cache_dir=str(_hf_hub_cache_dir(CACHE_DIR)),
+            )
             if tokenizer_path.exists():
                 return
         except Exception:
@@ -849,8 +919,17 @@ def run_pipeline(args: argparse.Namespace) -> int:
     if args.mmproj is not None or args.image_path is not None or args.synthetic_prefix_tokens > 0:
         decoder_gguf, decoder_repo_id = _resolve_gguf_input(model_input, force_download=args.force_download)
         encoder_gguf = None
-        if args.mmproj is not None:
-            encoder_gguf, _ = _resolve_gguf_input(args.mmproj, force_download=args.force_download)
+        mmproj_spec = str(args.mmproj or "").strip() or _infer_auto_mmproj_spec(model_input)
+        auto_mmproj = not bool(args.mmproj) and bool(mmproj_spec)
+        if mmproj_spec:
+            if auto_mmproj:
+                log(f"  Auto-selected mmproj: {mmproj_spec}", C_DIM)
+            encoder_gguf, _ = _resolve_gguf_input(mmproj_spec, force_download=args.force_download)
+        elif args.image_path is not None:
+            raise RuntimeError(
+                "vision run requested with --image-path but no mmproj was provided and no known default companion "
+                f"was found for {model_input}. Pass --mmproj /path/to/mmproj.gguf or --mmproj hf://repo/file.gguf."
+            )
         if decoder_repo_id:
             ensure_tokenizer_files(decoder_repo_id, work_dir)
         bridge_dir = work_dir / "multimodal_bridge"
@@ -971,8 +1050,9 @@ Examples:
   version/v8/scripts/cks-v8-run run hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \\
     --context-len 1034 --force-convert --force-compile
 
-  version/v8/scripts/cks-v8-run run /path/to/decoder.gguf \\
-    --mmproj /path/to/mmproj.gguf --image-path ./image.png --prompt "Describe the image."
+  version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \\
+    --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \\
+    --image-path version/v8/test_assets/v8_vision_doc_card_72.png --prompt "Explain this image."
 """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -1002,7 +1082,11 @@ Examples:
     run_parser.add_argument("--generate-visualizer", action="store_true")
     run_parser.add_argument("--generate-only", action="store_true")
 
-    run_parser.add_argument("--mmproj", default=None, help="Optional encoder/mmproj GGUF for vision runs")
+    run_parser.add_argument(
+        "--mmproj",
+        default=None,
+        help="Optional encoder/mmproj GGUF for vision runs; accepts local paths or hf://repo/file.gguf",
+    )
     run_parser.add_argument("--image-path", default=None, help="Optional real image path for multimodal runs")
     run_parser.add_argument("--image-mode", choices=["checker", "gradient", "gray"], default="checker")
     run_parser.add_argument("--synthetic-prefix-tokens", type=int, default=0)

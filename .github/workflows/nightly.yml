@@ -184,7 +184,13 @@ jobs:
                   "version/v7/scripts/",
                   "version/v7/templates/",
                   "version/v7/regression/",
+                  "version/v7/test_assets/",
                   "version/v7/src/",
+                  "version/v8/scripts/",
+                  "version/v8/templates/",
+                  "version/v8/regression/",
+                  "version/v8/test_assets/",
+                  "version/v8/src/",
               )
               exact = {
                   "Makefile",
@@ -192,6 +198,7 @@ jobs:
                   ".githooks/pre-push",
                   ".github/workflows/nightly.yml",
                   "version/v7/README.md",
+                  "version/v8/README.md",
               }
               for path in paths:
                   if path in exact or path.startswith(prefixes):
@@ -204,21 +211,21 @@ jobs:
           with out_path.open("a", encoding="utf-8") as f:
               f.write(f"should_run={'true' if run else 'false'}\n")
               f.write(f"reason={reason}\n")
-          print(f"v7 regression-fast should_run={run} ({reason})")
+          print(f"fast regression should_run={run} ({reason})")
           PY
 
-      - name: Run v7 Fast Regression
-        id: run_v7_fast_regression
+      - name: Run Fast Regression
+        id: run_fast_regression
         if: steps.regression_scope.outputs.should_run == 'true'
         continue-on-error: true
         env:
-          CK_CACHE_DIR: ${{ runner.temp }}/ck-engine-v7/models
+          CK_CACHE_DIR: ${{ runner.temp }}/ck-engine-v8/models
         run: |
           set -o pipefail
-          echo "=== Running v7 Fast Regression ==="
+          echo "=== Running Fast Regression ==="
           echo "Reason: ${{ steps.regression_scope.outputs.reason }}"
-          mkdir -p build/v7-regression-runs build/v7-regression-reports
-          make regression-fast REGRESSION_ARGS="--run-root build/v7-regression-runs --report-root build/v7-regression-reports" 2>&1 | tee build/v7_regression_fast.log
+          mkdir -p build/regression-runs build/regression-reports
+          make regression-fast REGRESSION_ARGS="--run-root build/regression-runs --report-root build/regression-reports" 2>&1 | tee build/regression_fast.log
 
       - name: Run Nightly Test Suite
         run: |
@@ -241,11 +248,11 @@ jobs:
             python3 -c "import json; d=json.load(open('docs/site/site/nightly-results/latest.json')); s=d['summary']; print(f\"Passed: {s['passed']}\"); print(f\"Failed: {s['failed']}\"); print(f\"Total:  {s['total']}\")"
           fi
 
-      - name: Attach v7 Nightly Summaries
+      - name: Attach Nightly Summaries
         env:
           REGRESSION_SHOULD_RUN: ${{ steps.regression_scope.outputs.should_run }}
           REGRESSION_REASON: ${{ steps.regression_scope.outputs.reason }}
-          REGRESSION_OUTCOME: ${{ steps.run_v7_fast_regression.outcome }}
+          REGRESSION_OUTCOME: ${{ steps.run_fast_regression.outcome }}
         run: |
           python3 - <<'PY'
           import json
@@ -264,7 +271,7 @@ jobs:
               for row in results
               if isinstance(row, dict) and row.get("name")
           }
-          reports_root = Path("build/v7-regression-reports")
+          reports_root = Path("build/regression-reports")
           summary_files = sorted(reports_root.glob("*/summary.json"))
           repo_latest_path = Path("docs/site/nightly-results/latest.json")
           requested = str(os.environ.get("REGRESSION_SHOULD_RUN", "")).lower() == "true"
@@ -337,7 +344,7 @@ jobs:
                   "family_rows": [],
                   "note": (
                       f"make regression-fast was requested but failed before publishing a summary "
-                      f"(outcome={outcome}). See build/v7_regression_fast.log."
+                      f"(outcome={outcome}). See build/regression_fast.log."
                   ),
               }
           else:
@@ -524,7 +531,7 @@ jobs:
           path: |
             build/*.log
             build/*.json
-            build/v7-regression-reports/**
+            build/regression-reports/**
             version/v7/.cache/reports/kernel_map_validation_latest.json
             version/v7/.cache/reports/backprop_family_matrix/**
           retention-days: 7

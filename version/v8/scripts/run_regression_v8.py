@@ -23,6 +23,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
@@ -34,6 +35,8 @@ ROOT = Path(__file__).resolve().parents[3]
 V8_ROOT = ROOT / "version" / "v8"
 REGRESSION_DIR = V8_ROOT / "regression"
 CKS_RUN = V8_ROOT / "scripts" / "cks-v8-run"
+DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "ck-engine-v8"
+LEGACY_CACHE_ROOT = Path.home() / ".cache" / "ck-engine-v7"
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -73,7 +76,28 @@ def _cache_root() -> Path:
         if base.name == "models":
             return base.parent
         return base
-    return Path.home() / ".cache" / "ck-engine-v8"
+    preferred = DEFAULT_CACHE_ROOT
+    try:
+        models_dir = preferred / "models"
+        models_dir.mkdir(parents=True, exist_ok=True)
+        probe = models_dir / ".ck_write_probe"
+        probe.write_text("", encoding="utf-8")
+        probe.unlink()
+        return preferred
+    except OSError:
+        return Path(tempfile.gettempdir()) / "ck-engine-v8"
+
+
+def _cache_roots() -> list[Path]:
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for root in (_cache_root(), DEFAULT_CACHE_ROOT, LEGACY_CACHE_ROOT):
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        roots.append(root)
+    return roots
 
 
 def _default_run_root() -> Path:
@@ -99,11 +123,13 @@ def _run_stream(
     *,
     cwd: Path | None = None,
     prefix: str = "",
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     proc = subprocess.Popen(
         cmd,
         cwd=str(cwd or ROOT),
         text=True,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -230,14 +256,11 @@ def _resolve_gguf_path(model_spec: str) -> Path | None:
         repo = payload.rsplit("/", 1)[0]
         filename = payload.rsplit("/", 1)[1]
         repo_dir = repo.replace("/", "--")
-        roots = [
-            _cache_root() / "models" / repo_dir,
-            _cache_root() / repo_dir,
-        ]
-        for cache_dir in roots:
-            candidate = cache_dir / filename
-            if candidate.exists():
-                return candidate
+        for root in _cache_roots():
+            for cache_dir in (root / "models" / repo_dir, root / repo_dir):
+                candidate = cache_dir / filename
+                if candidate.exists():
+                    return candidate
         return None
     candidate = Path(text).expanduser()
     return candidate if candidate.exists() else None
@@ -363,19 +386,41 @@ def assess_coherence(text: str, heuristics: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_runtime_dir(run_dir: Path) -> Path:
-    candidates = [run_dir / ".ck_build_v8", run_dir / ".ck_build", run_dir / "ck_build", run_dir]
+    candidates = [
+        run_dir / "multimodal_bridge" / "decoder",
+        run_dir / ".ck_build_v8",
+        run_dir / ".ck_build",
+        run_dir / "ck_build",
+        run_dir,
+    ]
     for candidate in candidates:
-        if (candidate / "libmodel.so").exists() and (candidate / "weights.bump").exists():
+        has_runtime_lib = (candidate / "libmodel.so").exists() or (candidate / "libdecoder_v8.so").exists()
+        if has_runtime_lib and (candidate / "weights.bump").exists():
             return candidate
     return run_dir
 
 
 def _resolve_artifact(run_dir: Path, runtime_dir: Path, name: str) -> Path | None:
+    fallback_names = {
+        "lowered_decode_call.json": ["lowered_decode_call.json", "call_decode.json"],
+    }
+    candidate_names = fallback_names.get(name, [name])
     for base in (run_dir, runtime_dir):
-        path = base / name
-        if path.exists():
-            return path
+        for candidate_name in candidate_names:
+            path = base / candidate_name
+            if path.exists():
+                return path
     return None
+
+
+def _load_bridge_report(run_dir: Path) -> tuple[Path | None, dict[str, Any] | None]:
+    report_path = run_dir / "multimodal_bridge" / "bridge_report.json"
+    if not report_path.exists():
+        return None, None
+    try:
+        return report_path, _load_json(report_path)
+    except Exception:
+        return report_path, None
 
 
 def _lookup_path(doc: Any, dotted_path: str) -> Any:
@@ -395,6 +440,7 @@ def run_prompt(
     run_dir: Path,
     *,
     force_rebuild: bool,
+    cache_dir: Path,
 ) -> dict[str, Any]:
     cached_gguf = _resolve_gguf_path(family.model)
     model_arg = str(cached_gguf) if cached_gguf is not None else family.model
@@ -415,8 +461,15 @@ def run_prompt(
         cmd.extend(["--force-convert", "--force-compile"])
     cmd.extend(family.runtime_args)
     print(f"[{family.family_id}] smoke prompt={prompt.prompt_id} run={run_dir}", flush=True)
-    proc = _run_stream(cmd, prefix=f"[{family.family_id}] ")
+    env = os.environ.copy()
+    env["CK_CACHE_DIR"] = str(cache_dir)
+    proc = _run_stream(cmd, prefix=f"[{family.family_id}] ", env=env)
+    bridge_report_path, bridge_report = _load_bridge_report(run_dir)
     assistant_raw = _extract_assistant_output(proc.stdout)
+    if isinstance(bridge_report, dict):
+        bridge_text = str(bridge_report.get("generated_text") or bridge_report.get("generated_text_raw") or "").strip()
+        if bridge_text:
+            assistant_raw = bridge_text
     assistant = normalize_assistant_output(assistant_raw, family.response_contract)
     coherence = (
         assess_coherence(assistant, prompt.heuristics)
@@ -433,6 +486,8 @@ def run_prompt(
         "assistant_raw": assistant_raw,
         "assistant": assistant,
         "coherence": coherence,
+        "bridge_report_path": None if bridge_report_path is None else str(bridge_report_path),
+        "bridge_report": bridge_report,
     }
 
 
@@ -635,6 +690,7 @@ def run_family(
     run_root: Path,
     report_dir: Path,
     force_rebuild: bool,
+    cache_dir: Path,
 ) -> dict[str, Any]:
     print(f"\n=== [{family.family_id}] {family.label} ===", flush=True)
     run_dir = run_root / family.family_id
@@ -650,7 +706,13 @@ def run_family(
 
     for idx, prompt_id in enumerate(family.smoke_prompts):
         prompt = prompts[prompt_id]
-        row = run_prompt(family, prompt, run_dir, force_rebuild=bool(force_rebuild and idx == 0))
+        row = run_prompt(
+            family,
+            prompt,
+            run_dir,
+            force_rebuild=bool(force_rebuild and idx == 0),
+            cache_dir=cache_dir,
+        )
         row["prompt_id"] = prompt_id
         prompt_rows.append(row)
         if row["status"] != PASS:
@@ -731,6 +793,8 @@ def main() -> int:
     report_dir.mkdir(parents=True, exist_ok=True)
     run_root = args.run_root
     run_root.mkdir(parents=True, exist_ok=True)
+    cache_dir = _cache_root() / "models"
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     family_results = [
         run_family(
@@ -740,6 +804,7 @@ def main() -> int:
             run_root=run_root,
             report_dir=report_dir,
             force_rebuild=bool(args.force_rebuild),
+            cache_dir=cache_dir,
         )
         for family in families
     ]

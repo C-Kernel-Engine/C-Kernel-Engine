@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from array import array
 from pathlib import Path
@@ -1586,6 +1587,80 @@ class V8NativeBridgeHostTests(unittest.TestCase):
         self.assertIn("out_proj=q8", cmd)
         self.assertIn("mlp_down=q8", cmd)
 
+    def test_ck_run_v8_auto_resolves_qwen3vl_mmproj_from_decoder_input(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_multimodal_auto_mmproj_") as tmpdir:
+            tmp = Path(tmpdir)
+            decoder = tmp / "Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+            encoder = tmp / "mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf"
+            image = tmp / "image.png"
+            decoder.write_bytes(b"gguf")
+            encoder.write_bytes(b"gguf")
+            image.write_bytes(b"png")
+
+            args = argparse.Namespace(
+                model=str(decoder),
+                run_dir=str(tmp / "run"),
+                mmproj=None,
+                image_path=str(image),
+                synthetic_prefix_tokens=0,
+                force_download=False,
+                prompt="Explain this image.",
+                image_mode="checker",
+                vision_top_k=8,
+                vision_activation_pref=[],
+                max_tokens=16,
+                no_chat_template=False,
+                chat_template="auto",
+                allow_raw_prompt=False,
+                thinking_mode="suppressed",
+                context_len=1024,
+                temperature=0.0,
+                top_k=40,
+                top_p=1.0,
+                min_p=0.0,
+                repeat_penalty=1.1,
+                repeat_last_n=64,
+                force_convert=False,
+                force_compile=False,
+                memory=False,
+                python_tokenizer=False,
+                generate_only=False,
+            )
+
+            calls: list[str] = []
+            captured_cmds: list[list[str]] = []
+
+            def fake_resolve_gguf_input(spec: str, *, force_download: bool):
+                calls.append(spec)
+                if spec == str(decoder):
+                    return decoder, None
+                self.assertEqual(
+                    spec,
+                    "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+                )
+                return encoder, "Qwen/Qwen3-VL-8B-Instruct-GGUF"
+
+            def fake_run_cmd(cmd: list[str], **kwargs):
+                captured_cmds.append([str(part) for part in cmd])
+                return None
+
+            with mock.patch.object(ck_run_v8, "_resolve_gguf_input", side_effect=fake_resolve_gguf_input), \
+                 mock.patch.object(ck_run_v8, "run_cmd", side_effect=fake_run_cmd):
+                rc = ck_run_v8.run_pipeline(args)
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            calls,
+            [
+                str(decoder),
+                "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+            ],
+        )
+        self.assertEqual(len(captured_cmds), 1)
+        cmd = captured_cmds[0]
+        self.assertIn("--encoder-gguf", cmd)
+        self.assertIn(str(encoder), cmd)
+
     def test_ck_run_v8_generate_visualizer_refreshes_report_for_text_run(self) -> None:
         with tempfile.TemporaryDirectory(prefix="v8_generate_visualizer_") as tmpdir:
             tmp = Path(tmpdir)
@@ -2203,6 +2278,45 @@ class V8NativeBridgeHostTests(unittest.TestCase):
             copied = work_dir / "tokenizer.json"
             self.assertTrue(copied.exists())
             self.assertEqual(copied.read_text(encoding="utf-8"), '{"version":"cached"}')
+
+    def test_ck_run_v8_falls_back_to_tmp_cache_when_default_is_unwritable(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_tmp_cache_") as tmpdir:
+            with mock.patch.dict(ck_run_v8.os.environ, {}, clear=True), \
+                 mock.patch.object(ck_run_v8, "_can_write_dir", return_value=False), \
+                 mock.patch.object(ck_run_v8, "DEFAULT_CACHE_DIR", Path("/readonly/ck-engine-v8/models")), \
+                 mock.patch.object(ck_run_v8.tempfile, "gettempdir", return_value=tmpdir):
+                resolved = ck_run_v8._get_cache_dir()
+
+        self.assertEqual(resolved, Path(tmpdir) / "ck-engine-v8" / "models")
+
+    def test_ck_run_v8_download_redirects_hf_cache_under_selected_cache_dir(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="v8_hf_cache_") as tmpdir:
+            tmp = Path(tmpdir)
+            cache_dir = tmp / "models"
+            seen: dict[str, str] = {}
+
+            def fake_hf_hub_download(**kwargs: str) -> str:
+                seen.update({k: str(v) for k, v in kwargs.items()})
+                local_dir = Path(kwargs["local_dir"])
+                local_dir.mkdir(parents=True, exist_ok=True)
+                target = local_dir / Path(kwargs["filename"]).name
+                target.write_bytes(b"gguf")
+                return str(target)
+
+            fake_module = types.SimpleNamespace(hf_hub_download=fake_hf_hub_download)
+            with mock.patch.object(ck_run_v8, "CACHE_DIR", cache_dir), \
+                 mock.patch.object(ck_run_v8, "DEFAULT_CACHE_DIR", tmp / "default-home-models"), \
+                 mock.patch.object(ck_run_v8, "LEGACY_CACHE_DIR", tmp / "legacy-models"), \
+                 mock.patch.dict(sys.modules, {"huggingface_hub": fake_module}):
+                resolved = ck_run_v8.step_download_gguf(
+                    "mradermacher/Nanbeige4.1-3B-GGUF",
+                    "Nanbeige4.1-3B.Q4_K_M.gguf",
+                    cache_dir,
+                    force=False,
+                )
+                self.assertTrue(resolved.exists())
+                self.assertEqual(seen["cache_dir"], str(cache_dir / ".hf-hub"))
+                self.assertEqual(seen["local_dir"], str(cache_dir / "mradermacher--Nanbeige4.1-3B-GGUF"))
 
 
 if __name__ == "__main__":
