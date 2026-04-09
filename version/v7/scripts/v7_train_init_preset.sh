@@ -34,7 +34,7 @@ Usage:
 
 Options:
   --name NAME
-  --template qwen3|qwen2|gemma3|llama
+  --template qwen3|qwen2|qwen35|gemma3|nanbeige|llama
   --init normal_0p02|xavier_uniform|xavier_normal|kaiming_uniform|zeros
   --tokenizer byte|bpe|ascii_bpe
   --optimizer adamw|sgd

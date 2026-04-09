@@ -1589,6 +1589,139 @@
     </div>
 </div>
 
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    <div class="alert-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <div>
+        <strong>Demo Lane</strong><br>
+        For a short operator demo, show three things only: <code>GGUF -&gt; IR visualizer</code>, one SVG-backed training run, and the family training matrix via <code>make regression-training-fast</code> or <code>make regression-training-full</code>.
+    </div>
+</div>
+
+<h2 id="demo-lane">Demo Lane: Shortest Video Path</h2>
+
+<div class="grid grid-2">
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">1. GGUF -&gt; IR Visualizer -&gt; Chat</h3>
+        <p style="margin-bottom: 0.45rem;">Use this when you want the fastest visual proof that v7 lowers, codegens, and serves an interactive run directory.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>version/v7/scripts/cks-v7-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --generate-visualizer</pre>
+        </div>
+        <p class="mini-note">This leaves a run root under <code>${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v7/models}/Qwen--Qwen3-0.6B-GGUF</code> with <code>ir_report.html</code> ready to open.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">2. SVG Training Demo -&gt; Dashboard</h3>
+        <p style="margin-bottom: 0.45rem;">This is the shortest end-to-end training demo: repo SVG assets become staged corpora, tokenizer, parity gate, checkpoints, and refreshed visualizer artifacts.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_qwen3_l16_d128_h512_ctx512 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 512 --vocab-size 1024 \
+  --num-heads 8 --num-kv-heads 4 \
+  --mode commands | bash</pre>
+        </div>
+        <p class="mini-note">The helper seeds <code>training_plan.json</code>, builds the SVG corpora from <code>docs/site/assets/*.svg</code>, bootstraps the run, runs parity, then refreshes <code>$RUN/ir_report.html</code>.</p>
+    </div>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">3. Family Training Proof Table</h3>
+    <p style="margin-bottom: 0.45rem;">Use this when you want the neat nightly-style table that shows the v7 training parity surface across the supported families.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make regression-training-fast
+make regression-training-full</pre>
+    </div>
+    <p class="mini-note"><code>fast</code> covers <code>qwen2</code>, <code>qwen3</code>, <code>gemma</code>, and <code>nanbeige</code>. <code>full</code> adds <code>qwen35</code> and matches the heavier nightly-sized training lane.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Training Family Quick Starts</h3>
+    <p style="margin-bottom: 0.45rem;">These are toy-scale operator starters for the supported v7 training families. They all use the same SVG-backed pipeline and the same helper, so the demo shape stays stable while the family changes.</p>
+
+    <h4 style="margin-bottom: 0.35rem;">Qwen2</h4>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_qwen2_l12_d96_h384_ctx512 \
+  --template qwen2 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 12 --embed-dim 96 --hidden-dim 384 \
+  --context-len 512 --vocab-size 1024 \
+  --num-heads 8 --num-kv-heads 4 \
+  --mode commands | bash</pre>
+    </div>
+
+    <h4 style="margin-bottom: 0.35rem;">Qwen3</h4>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_qwen3_l16_d128_h512_ctx512 \
+  --template qwen3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 512 --vocab-size 1024 \
+  --num-heads 8 --num-kv-heads 4 \
+  --mode commands | bash</pre>
+    </div>
+
+    <h4 style="margin-bottom: 0.35rem;">Qwen3.5</h4>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_qwen35_l12_d128_h512_ctx1024 \
+  --template qwen35 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 12 --embed-dim 128 --hidden-dim 512 \
+  --context-len 1024 --vocab-size 1024 \
+  --num-heads 8 --num-kv-heads 4 \
+  --mode commands | bash</pre>
+    </div>
+
+    <h4 style="margin-bottom: 0.35rem;">Gemma 3</h4>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_gemma3_l18_d160_h640_ctx1024 \
+  --template gemma3 --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 18 --embed-dim 160 --hidden-dim 640 \
+  --context-len 1024 --vocab-size 1536 \
+  --num-heads 10 --num-kv-heads 5 \
+  --mode commands | bash</pre>
+    </div>
+
+    <h4 style="margin-bottom: 0.35rem;">Nanbeige</h4>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>bash version/v7/scripts/v7_train_init_preset.sh \
+  --name demo_nanbeige_l16_d128_h512_ctx1024 \
+  --template nanbeige --init xavier_uniform \
+  --tokenizer ascii_bpe --optimizer adamw \
+  --layers 16 --embed-dim 128 --hidden-dim 512 \
+  --context-len 1024 --vocab-size 1024 \
+  --num-heads 8 --num-kv-heads 8 \
+  --mode commands | bash</pre>
+    </div>
+
+    <p class="mini-note"><strong>After any family run</strong>, regenerate and open the dashboard with the matching run path.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>RUN="$HOME/.cache/ck-engine-v7/models/train/demo_qwen3_l16_d128_h512_ctx512"
+python3 version/v7/tools/open_ir_visualizer.py --generate --run "$RUN" --html-only --strict-run-artifacts
+python3 version/v7/tools/open_ir_hub.py --open</pre>
+    </div>
+    <p class="mini-note">Swap the <code>RUN=...</code> value to the family you just trained. These presets are demo-sized starters, not full published model sizes.</p>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════════
      Operator Progress Bar
      ═══════════════════════════════════════════════════════════ -->
@@ -1650,6 +1783,7 @@
 
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange,#ffb400);margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Foundation</div>
     <ul>
+        <li><a href="#demo-lane">Demo Lane</a></li>
         <li><a href="#run-hub-quick-launch">IR Hub Quick Launch</a></li>
         <li><a href="#why-svg">Why SVG for v7</a></li>
     </ul>
@@ -2452,7 +2586,7 @@ window.pgDeleteStage      = pgDeleteStage;
         <p class="mini-note"><strong>Preset note:</strong> family defaults here are toy-scale operator starters (not exact published model sizes).</p>
         <div class="preset-grid">
             <div class="preset-field"><label for="cfg-name">Run Name</label><input id="cfg-name" type="text" value="svg_l16_d128_h512_v1024_ctx512_clean02" /></div>
-            <div class="preset-field"><label for="cfg-family">Model Family</label><select id="cfg-family"><option value="qwen3" selected>qwen3</option><option value="qwen2">qwen2</option><option value="gemma3">gemma3</option><option value="llama">llama</option></select></div>
+            <div class="preset-field"><label for="cfg-family">Model Family</label><select id="cfg-family"><option value="qwen3" selected>qwen3</option><option value="qwen2">qwen2</option><option value="qwen35">qwen35</option><option value="gemma3">gemma3</option><option value="nanbeige">nanbeige</option><option value="llama">llama</option></select></div>
             <div class="preset-field"><label for="cfg-init">Init</label><select id="cfg-init"><option value="xavier_uniform" selected>xavier_uniform</option><option value="xavier_normal">xavier_normal</option><option value="normal_0p02">normal_0p02</option><option value="kaiming_uniform">kaiming_uniform</option><option value="zeros">zeros</option></select></div>
             <div class="preset-field"><label for="cfg-tokenizer">Tokenizer</label><select id="cfg-tokenizer"><option value="ascii_bpe" selected>ascii_bpe</option><option value="bpe">bpe</option><option value="byte">byte</option></select></div>
             <div class="preset-field"><label for="cfg-optimizer">Optimizer</label><select id="cfg-optimizer"><option value="adamw" selected>adamw</option><option value="sgd">sgd</option></select></div>
@@ -4165,7 +4299,7 @@ make v7-profile-dashboard \
   --chat-template auto \
   --generate-visualizer</pre>
     </div>
-    <p class="mini-note">Current scope: documented inference/parity bring-up. The v7 training preset list still centers on Qwen2/Qwen3/Gemma3 templates.</p>
+    <p class="mini-note">Current scope: documented inference/parity bring-up plus the supported v7 training families <code>qwen2</code>, <code>qwen3</code>, <code>qwen35</code>, <code>gemma3</code>, and <code>nanbeige</code>.</p>
 
     <h3 id="step-8-visualize-hf">Step 8.1: Inference + IR Visualizer for GGUF Runs</h3>
     <p style="margin-bottom: 0.4rem;">
@@ -4538,7 +4672,7 @@ python3 scripts/ck_chat.py --help</pre>
         <table>
             <tr><th>Command</th><th>Useful flags</th></tr>
             <tr><td><code>ck_run_v7.py run</code></td><td><code>--context-len</code>, <code>--force-compile</code>, <code>--force-convert</code>, <code>--chat-template</code>, <code>--generate-only</code>, <code>--generate-visualizer</code></td></tr>
-            <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen3</code>, <code>--curriculum-stage stage_a|stage_b</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code>, <code>--roundtrip-max-lines</code>, <code>--strict-data-gates</code>, <code>--min-valid-svg-rate</code>, <code>--post-train-eval</code></td></tr>
+            <tr><td><code>train_data_pipeline_v7.py</code></td><td><code>--template qwen2|qwen3|qwen35|gemma3|nanbeige|llama</code>, <code>--curriculum-stage stage_a|stage_b</code>, <code>--tokenizer bpe|ascii_bpe</code>, <code>--require-svg-rows</code>, <code>--require-ascii-data</code>, <code>--bpe-vocab-size</code>, <code>--seq-len</code>, <code>--total-tokens</code>, <code>--lr</code>, <code>--train-driver ck_cli</code>, <code>--ck-cli-log-every</code>, <code>--prepare-only</code>, <code>--roundtrip-max-lines</code>, <code>--strict-data-gates</code>, <code>--min-valid-svg-rate</code>, <code>--post-train-eval</code></td></tr>
             <tr><td><code>promote_latest_checkpoint_v7.py</code></td><td><code>--run</code>, <code>--list-runs</code>, <code>--stage</code>, <code>--stage-pass</code>, <code>--run-id</code>, <code>--dry-run</code>, <code>--step</code></td></tr>
             <tr><td><code>run_ablation_matrix_v7.py</code></td><td><code>--embed-dims</code>, <code>--layers-list</code>, <code>--bpe-vocab-sizes</code>, <code>--dataset-fracs</code>, <code>--kv-divisors</code>, <code>--resume</code></td></tr>
             <tr><td><code>ck_chat.py</code></td><td><code>--python-tokenizer</code>, <code>--show-token-ids</code>, <code>--show-token-pieces</code>, <code>--ascii-display</code>, <code>--temperature</code></td></tr>
@@ -4593,7 +4727,9 @@ python3 scripts/ck_chat.py --help</pre>
     var FAMILY_PRESETS = {
         qwen3: { layers: 16, embed: 128, hidden: 512, context: 512, vocab: 1024, heads: 8, kvHeads: 4, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
         qwen2: { layers: 12, embed: 96, hidden: 384, context: 512, vocab: 1024, heads: 8, kvHeads: 4, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
+        qwen35: { layers: 12, embed: 128, hidden: 512, context: 1024, vocab: 1024, heads: 8, kvHeads: 4, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
         gemma3: { layers: 18, embed: 160, hidden: 640, context: 1024, vocab: 1536, heads: 10, kvHeads: 5, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1572864, lrPre: '2e-4', lrMid: '2e-4', lrSft: '1e-4' },
+        nanbeige: { layers: 16, embed: 128, hidden: 512, context: 1024, vocab: 1024, heads: 8, kvHeads: 8, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' },
         llama: { layers: 16, embed: 128, hidden: 512, context: 1024, vocab: 1024, heads: 8, kvHeads: 8, tokenizer: 'ascii_bpe', init: 'xavier_uniform', optimizer: 'adamw', seq: 512, tokens: 1048576, lrPre: '3e-4', lrMid: '3e-4', lrSft: '1e-4' }
     };
     function _cfgEl(id) { return document.getElementById(id); }
