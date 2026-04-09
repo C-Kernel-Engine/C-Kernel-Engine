@@ -315,6 +315,46 @@ static int test_parallel_sum(void)
 }
 
 /* ============================================================================
+ * Test 8: Subset Dispatch
+ * ============================================================================ */
+
+static int test_subset_dispatch(void)
+{
+    printf("  [8] Subset dispatch...\n");
+
+    int n = 4;
+    int active = 2;
+    ck_threadpool_t *pool = ck_threadpool_create(n);
+
+    for (int i = 0; i < MAX_TEST_THREADS; i++) {
+        atomic_store(&g_thread_seen[i], 0);
+    }
+
+    ck_threadpool_dispatch_n(pool, active, multi_work, &active);
+    for (int i = 0; i < active; i++) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "subset thread %d was called", i);
+        TEST_ASSERT(atomic_load(&g_thread_seen[i]) == 1, msg);
+    }
+    for (int i = active; i < n; i++) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "inactive thread %d was not called", i);
+        TEST_ASSERT(atomic_load(&g_thread_seen[i]) == 0, msg);
+    }
+
+    atomic_store(&g_phase1_done, 0);
+    atomic_store(&g_phase2_started, 0);
+    g_barrier_ok = 1;
+    ck_threadpool_dispatch_n(pool, active, barrier_work, pool);
+    TEST_ASSERT(g_barrier_ok, "subset barrier synchronized correctly");
+    TEST_ASSERT(atomic_load(&g_phase2_started) == active,
+                "only active subset reached phase 2");
+
+    ck_threadpool_destroy(pool);
+    return 1;
+}
+
+/* ============================================================================
  * Benchmark: Dispatch Latency
  * ============================================================================ */
 
@@ -429,6 +469,7 @@ int main(int argc, char **argv)
         ok &= test_sequential_dispatch();
         ok &= test_pause_resume();
         ok &= test_parallel_sum();
+        ok &= test_subset_dispatch();
 
         printf("\n  Results: %d/%d passed\n", g_tests_passed, g_tests_run);
 

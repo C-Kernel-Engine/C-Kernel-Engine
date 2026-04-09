@@ -30,7 +30,6 @@ typedef struct {
     int N;
     int K;
     int split_n;
-    int active_nth;
 } ck_train_gemm_args_t;
 
 #if defined(__AVX__) && !defined(__AVX512F__)
@@ -102,6 +101,21 @@ static void ck_train_gemm_nt_compute_rows(const float *A,
     }
 }
 
+static int ck_train_pick_active_threads(int nth, size_t work_items, size_t min_chunk)
+{
+    if (nth <= 1 || work_items == 0 || min_chunk == 0) {
+        return 1;
+    }
+    size_t active = (work_items + min_chunk - 1u) / min_chunk;
+    if (active < 1u) {
+        active = 1u;
+    }
+    if (active > (size_t)nth) {
+        active = (size_t)nth;
+    }
+    return (int)active;
+}
+
 static void ck_train_gemm_work(int ith, int nth, void *argp) {
     ck_train_gemm_args_t *a = (ck_train_gemm_args_t *)argp;
     if (!a || a->M <= 0 || a->N <= 0 || a->K <= 0) {
@@ -133,11 +147,7 @@ static void ck_train_gemm_work(int ith, int nth, void *argp) {
     }
 
     /* Prefill/train path (M>1): split rows. */
-    const int active_nth = (a->active_nth > 0 && a->active_nth < nth) ? a->active_nth : nth;
-    if (ith >= active_nth) {
-        return;
-    }
-    int dm = (a->M + active_nth - 1) / active_nth;
+    int dm = (a->M + nth - 1) / nth;
     int m0 = dm * ith;
     int m1 = m0 + dm;
     if (m0 >= a->M) {
@@ -207,10 +217,9 @@ void gemm_blocked_serial_train_parallel_dispatch(const float *A,
         .N = N,
         .K = K,
         .split_n = split_n,
-        .active_nth = active_nth,
     };
 
-    ck_threadpool_dispatch(pool, ck_train_gemm_work, &args);
+    ck_threadpool_dispatch_n(pool, active_nth, ck_train_gemm_work, &args);
 }
 
 typedef struct {
@@ -635,6 +644,7 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
         if (aligned_out < nth * 2 || aligned_in < 64 || outer_work < (size_t)524288) {
             ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
         } else {
+            const int active_outer = ck_train_pick_active_threads(nth, (size_t)aligned_out, (size_t)64);
             ck_train_outer_t1_args_t t1_args = {
                 .d_output = d_output,
                 .input = input,
@@ -643,7 +653,11 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
                 .aligned_in = aligned_in,
                 .aligned_out = aligned_out,
             };
-            ck_threadpool_dispatch(pool, ck_train_outer_t1_work, &t1_args);
+            if (active_outer <= 1) {
+                ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
+            } else {
+                ck_threadpool_dispatch_n(pool, active_outer, ck_train_outer_t1_work, &t1_args);
+            }
         }
         return;
     }
@@ -666,7 +680,15 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
         .aligned_in = aligned_in,
         .aligned_out = aligned_out,
     };
-    ck_threadpool_dispatch(pool, ck_train_gemm_backward_work, &bw_args);
+    {
+        const size_t bw_rows = (size_t)aligned_out > (size_t)T ? (size_t)aligned_out : (size_t)T;
+        const int active_bw = ck_train_pick_active_threads(nth, bw_rows, (size_t)64);
+        if (active_bw <= 1) {
+            ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
+        } else {
+            ck_threadpool_dispatch_n(pool, active_bw, ck_train_gemm_backward_work, &bw_args);
+        }
+    }
 }
 
 /*
@@ -705,6 +727,7 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
     if (T == 1) {
         const size_t nn_work = (size_t)aligned_in * (size_t)aligned_out;
         if (aligned_in >= nth * 32 && nn_work >= (size_t)131072) {
+            const int active_nn = ck_train_pick_active_threads(nth, (size_t)aligned_in, (size_t)64);
             ck_train_gemm_nn_args_t nn_args = {
                 .A = d_output,
                 .B = W,
@@ -715,13 +738,18 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
                 .K = aligned_out,
                 .split_n = 1,
             };
-            ck_threadpool_dispatch(pool, ck_train_gemm_nn_work, &nn_args);
+            if (active_nn <= 1) {
+                gemm_nn_simd(d_output, W, NULL, d_input, 1, aligned_in, aligned_out);
+            } else {
+                ck_threadpool_dispatch_n(pool, active_nn, ck_train_gemm_nn_work, &nn_args);
+            }
         } else {
             gemm_nn_simd(d_output, W, NULL, d_input, 1, aligned_in, aligned_out);
         }
 
         const size_t outer_work = (size_t)aligned_out * (size_t)aligned_in;
         if (aligned_out >= nth && outer_work >= (size_t)131072) {
+            const int active_outer = ck_train_pick_active_threads(nth, (size_t)aligned_out, (size_t)64);
             ck_train_outer_t1_args_t t1_args = {
                 .d_output = d_output,
                 .input = input,
@@ -730,7 +758,11 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
                 .aligned_in = aligned_in,
                 .aligned_out = aligned_out,
             };
-            ck_threadpool_dispatch(pool, ck_train_outer_t1_work, &t1_args);
+            if (active_outer <= 1) {
+                ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
+            } else {
+                ck_threadpool_dispatch_n(pool, active_outer, ck_train_outer_t1_work, &t1_args);
+            }
         } else {
             ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
         }
@@ -755,5 +787,13 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
         .aligned_in = aligned_in,
         .aligned_out = aligned_out,
     };
-    ck_threadpool_dispatch(pool, ck_train_gemm_backward_work, &bw_args);
+    {
+        const size_t bw_rows = (size_t)aligned_out > (size_t)T ? (size_t)aligned_out : (size_t)T;
+        const int active_bw = ck_train_pick_active_threads(nth, bw_rows, (size_t)64);
+        if (active_bw <= 1) {
+            ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
+        } else {
+            ck_threadpool_dispatch_n(pool, active_bw, ck_train_gemm_backward_work, &bw_args);
+        }
+    }
 }
