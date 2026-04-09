@@ -1006,6 +1006,100 @@
           "source": "dim:rows"
         }
       ]
+    },
+    "kv_cache_store_f16": {
+      "note": "Store K,V into the packed FP16 decode KV cache.",
+      "params": [
+        {
+          "name": "kv_cache_k",
+          "source": "runtime:kv_cache_k_layer_f16",
+          "cast": "uint16_t*"
+        },
+        {
+          "name": "kv_cache_v",
+          "source": "runtime:kv_cache_v_layer_f16",
+          "cast": "uint16_t*"
+        },
+        {
+          "name": "k",
+          "source": "scratch:k_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "v",
+          "source": "scratch:v_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "layer",
+          "source": "runtime:layer"
+        },
+        {
+          "name": "pos",
+          "source": "runtime:pos"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "max_seq_len",
+          "source": "dim:max_seq_len"
+        }
+      ]
+    },
+    "attention_forward_decode_head_major_gqa_flash_f16cache": {
+      "note": "Decode flash attention over packed FP16 KV-cache storage.",
+      "params": [
+        {
+          "name": "q_token",
+          "source": "scratch:q_scratch",
+          "cast": "const float*"
+        },
+        {
+          "name": "k_cache",
+          "source": "runtime:kv_cache_k_layer_f16",
+          "cast": "const uint16_t*"
+        },
+        {
+          "name": "v_cache",
+          "source": "runtime:kv_cache_v_layer_f16",
+          "cast": "const uint16_t*"
+        },
+        {
+          "name": "out_token",
+          "source": "output:out",
+          "cast": "float*"
+        },
+        {
+          "name": "num_heads",
+          "source": "dim:num_heads"
+        },
+        {
+          "name": "num_kv_heads",
+          "source": "dim:num_kv_heads"
+        },
+        {
+          "name": "kv_tokens",
+          "source": "runtime:kv_tokens"
+        },
+        {
+          "name": "cache_capacity",
+          "source": "dim:max_seq_len"
+        },
+        {
+          "name": "head_dim",
+          "source": "dim:head_dim"
+        },
+        {
+          "name": "aligned_head_dim",
+          "source": "dim:head_dim"
+        }
+      ]
     }
   }
 }

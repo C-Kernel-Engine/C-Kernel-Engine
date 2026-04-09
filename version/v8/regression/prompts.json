@@ -1,0 +1,83 @@
+{
+  "prompts": {
+    "hello": {
+      "label": "Greeting",
+      "prompt": "Hello",
+      "max_tokens": 96,
+      "heuristics": {
+        "min_chars": 8,
+        "min_words": 3,
+        "max_chars": 240,
+        "max_words": 48,
+        "max_lines": 8,
+        "min_printable_ratio": 0.96,
+        "max_replacement_chars": 0,
+        "max_repeated_4gram": 2,
+        "max_duplicate_lines": 1,
+        "expected_keywords": [
+          "hello",
+          "hi",
+          "help",
+          "assist",
+          "here",
+          "today",
+          "how can"
+        ],
+        "min_keyword_hits": 1
+      }
+    },
+    "france_capital": {
+      "label": "France Capital",
+      "prompt": "What is the capital of France?",
+      "max_tokens": 64,
+      "heuristics": {
+        "min_chars": 6,
+        "min_words": 1,
+        "max_chars": 160,
+        "max_words": 32,
+        "max_lines": 6,
+        "min_printable_ratio": 0.96,
+        "max_replacement_chars": 0,
+        "max_repeated_4gram": 2,
+        "max_duplicate_lines": 1,
+        "expected_keywords": [
+          "paris"
+        ],
+        "min_keyword_hits": 1
+      }
+    },
+    "code_bundle": {
+      "label": "C Python SQL",
+      "prompt": "Give me an example of C, Python and SQL code.",
+      "max_tokens": 240,
+      "heuristics": {
+        "min_chars": 48,
+        "min_words": 12,
+        "min_printable_ratio": 0.96,
+        "max_replacement_chars": 0,
+        "max_repeated_4gram": 4,
+        "max_duplicate_lines": 6,
+        "expected_keywords": [
+          "c",
+          "python",
+          "sql",
+          "```",
+          "#include",
+          "def ",
+          "select "
+        ],
+        "min_keyword_hits": 2,
+        "required_substrings_any_of": [
+          "```",
+          "#include",
+          "def ",
+          "select ",
+          "SELECT ",
+          "int main",
+          "import sqlite3"
+        ],
+        "min_required_substrings_any_of_hits": 1
+      }
+    }
+  }
+}

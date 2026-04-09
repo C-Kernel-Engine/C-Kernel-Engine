@@ -282,9 +282,7 @@ def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
             prefs.setdefault(str(key), str(value))
         config["activation_preference_by_op"] = prefs
 
-    if arch_lc == "qwen2":
-        config.setdefault("prefer_fp32_mlp_matmuls", True)
-    elif arch_lc == "qwen35":
+    if arch_lc == "qwen35":
         _merge_activation_defaults(
             {
                 "recurrent_gate_proj": "fp32",
@@ -295,6 +293,9 @@ def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
     elif arch_lc == "qwen3_vl_vision":
         _merge_activation_defaults({"mlp_down": "fp32", "out_proj": "fp32"})
     elif arch_lc == "gemma3":
+        config.setdefault("prefer_q8_0_contract", True)
+        config.setdefault("prefer_fp32_logits", True)
+    elif arch_lc == "gemma4":
         config.setdefault("prefer_q8_0_contract", True)
         config.setdefault("prefer_fp32_logits", True)
     return config
@@ -908,9 +909,26 @@ def classify_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int) -> str
         "ffn_down.weight",
         "ffn_norm.weight",
     }
+    gemma4_hybrid = {
+        "attn_q.weight",
+        "attn_k.weight",
+        "attn_v.weight",
+        "attn_output.weight",
+        "attn_q_norm.weight",
+        "attn_k_norm.weight",
+        "attn_norm.weight",
+        "post_attention_norm.weight",
+        "ffn_gate.weight",
+        "ffn_up.weight",
+        "ffn_down.weight",
+        "inp_gate.weight",
+        "proj.weight",
+    }
 
     if recurrent_qwen35.issubset(names):
         return "qwen35_recurrent_hybrid"
+    if gemma4_hybrid.issubset(names):
+        return "gemma4_hybrid"
     if full_attention_qwen35.issubset(names) and "ffn_norm.weight" not in names:
         return "qwen35_full_attention_hybrid"
     if dense_decoder.issubset(names):
@@ -953,10 +971,22 @@ def describe_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
             f"({', '.join(sorted(n for n in names if 'attn_' in n or n.startswith('ssm_')))}). "
             "This does not match the current dense q/k/v/o inspector contract."
         )
+    if kind == "gemma4_hybrid":
+        return (
+            f"Layer {layer}: found a Gemma4 hybrid block "
+            "(q/k/v/o + qk_norm + inp_gate/proj + post_attention_norm). "
+            "Gemma4 needs layer-kind-aware attention dimensions and per-layer projection lowering "
+            "that v8 does not support yet."
+        )
     if arch_name == "qwen35":
         return (
             f"Layer {layer}: qwen35 architecture detected but layer tensors do not match "
             "the current dense q/k/v/o + ffn_norm assumptions used by v7 inspection/conversion."
+        )
+    if arch_name == "gemma4":
+        return (
+            f"Layer {layer}: gemma4 architecture detected but layer tensors do not match "
+            "the current dense/hybrid decoder assumptions used by v8 conversion."
         )
     return None
 
@@ -1944,6 +1974,26 @@ def main() -> None:
         "gemma3.attention.layer_norm_rms_epsilon",
         "gemma3.attention.sliding_window",
         "gemma3.rope.freq_base",
+        # Gemma4-style keys
+        "gemma4.block_count",
+        "gemma4.context_length",
+        "gemma4.embedding_length",
+        "gemma4.embedding_length_per_layer_input",
+        "gemma4.feed_forward_length",
+        "gemma4.attention.head_count",
+        "gemma4.attention.head_count_kv",
+        "gemma4.attention.key_length",
+        "gemma4.attention.value_length",
+        "gemma4.attention.key_length_swa",
+        "gemma4.attention.value_length_swa",
+        "gemma4.attention.layer_norm_rms_epsilon",
+        "gemma4.attention.sliding_window",
+        "gemma4.attention.sliding_window_pattern",
+        "gemma4.attention.shared_kv_layers",
+        "gemma4.rope.freq_base",
+        "gemma4.rope.freq_base_swa",
+        "gemma4.rope.dimension_count",
+        "gemma4.rope.dimension_count_swa",
         # Tokenizer keys (for automatic extraction from GGUF)
         "tokenizer.ggml.tokens",
         "tokenizer.ggml.merges",
@@ -1975,6 +2025,8 @@ def main() -> None:
         "qwen3.embedding_weight_tying",
         "qwen3vl.embedding_weight_tying",
         "gemma3.embedding_weight_tying",
+        "gemma4.tie_word_embeddings",
+        "gemma4.embedding_weight_tying",
         "mistral.embedding_weight_tying",
         "mistral3.embedding_weight_tying",
         "deepseek2.embedding_weight_tying",
@@ -2742,7 +2794,7 @@ def main() -> None:
         embed_dim = meta_int(
             "deepseek2.embedding_length", "mistral3.embedding_length", "mistral.embedding_length",
             "llama.embedding_length", "qwen3vl.embedding_length", "qwen3.embedding_length", "qwen2.embedding_length",
-            "gemma3.embedding_length"
+            "gemma3.embedding_length", "gemma4.embedding_length"
         ) or tok.ne0
         vocab_size = tok.ne1
 
@@ -2797,7 +2849,7 @@ def main() -> None:
         num_layers = meta_int(
             "deepseek2.block_count", "mistral3.block_count", "mistral.block_count",
             "llama.block_count", "qwen35.block_count", "qwen3vl.block_count", "qwen3.block_count", "qwen2.block_count",
-            "gemma3.block_count"
+            "gemma3.block_count", "gemma4.block_count"
         )
         if num_layers is None:
             # Infer from present blocks.
@@ -2815,7 +2867,7 @@ def main() -> None:
         intermediate = meta_int(
             "deepseek2.feed_forward_length", "mistral3.feed_forward_length", "mistral.feed_forward_length",
             "llama.feed_forward_length", "qwen35.feed_forward_length", "qwen3vl.feed_forward_length", "qwen3.feed_forward_length", "qwen2.feed_forward_length",
-            "gemma3.feed_forward_length"
+            "gemma3.feed_forward_length", "gemma4.feed_forward_length"
         )
         if intermediate is None:
             gate0 = tensors.get("blk.0.ffn_gate.weight")
@@ -2827,20 +2879,20 @@ def main() -> None:
         num_heads = meta_int(
             "deepseek2.attention.head_count", "mistral3.attention.head_count", "mistral.attention.head_count",
             "llama.attention.head_count", "qwen35.attention.head_count", "qwen3vl.attention.head_count", "qwen3.attention.head_count", "qwen2.attention.head_count",
-            "gemma3.attention.head_count"
+            "gemma3.attention.head_count", "gemma4.attention.head_count"
         )
         if num_heads is None:
             raise GGUFError("Missing attention.head_count (num_heads)")
         num_kv_heads = meta_int(
             "deepseek2.attention.head_count_kv", "mistral3.attention.head_count_kv", "mistral.attention.head_count_kv",
             "llama.attention.head_count_kv", "qwen35.attention.head_count_kv", "qwen3vl.attention.head_count_kv", "qwen3.attention.head_count_kv", "qwen2.attention.head_count_kv",
-            "gemma3.attention.head_count_kv"
+            "gemma3.attention.head_count_kv", "gemma4.attention.head_count_kv"
         ) or num_heads
 
         context_len = meta_int(
             "deepseek2.context_length", "mistral3.context_length", "mistral.context_length",
             "llama.context_length", "qwen35.context_length", "qwen3vl.context_length", "qwen3.context_length", "qwen2.context_length",
-            "gemma3.context_length"
+            "gemma3.context_length", "gemma4.context_length"
         ) or 0
         if args.context is not None:
             context_len = int(args.context)
@@ -2852,6 +2904,7 @@ def main() -> None:
             "llama.attention.sliding_window",
             "gemma.attention.sliding_window",
             "gemma3.attention.sliding_window",
+            "gemma4.attention.sliding_window",
         )
         # Note: sliding_window attention is now supported via attention_sliding kernels
         # The value is stored in config and passed to attention_sliding ops
@@ -2859,7 +2912,7 @@ def main() -> None:
         rope_theta = meta_float(
             "deepseek2.rope.freq_base", "mistral3.rope.freq_base", "mistral.rope.freq_base",
             "llama.rope.freq_base", "qwen35.rope.freq_base", "qwen3vl.rope.freq_base", "qwen3.rope.freq_base", "qwen2.rope.freq_base",
-            "gemma3.rope.freq_base"
+            "gemma3.rope.freq_base", "gemma4.rope.freq_base"
         ) or 10000.0
 
         # Q/K/V head dimensions (some models report explicit key/value lengths)
@@ -2868,6 +2921,7 @@ def main() -> None:
             "qwen3vl.attention.key_length",
             "qwen3.attention.key_length",
             "gemma3.attention.key_length",
+            "gemma4.attention.key_length",
             "llama.attention.key_length",
         )
         value_length_meta = meta_int(
@@ -2875,6 +2929,7 @@ def main() -> None:
             "qwen3vl.attention.value_length",
             "qwen3.attention.value_length",
             "gemma3.attention.value_length",
+            "gemma4.attention.value_length",
             "llama.attention.value_length",
         )
 
@@ -2889,6 +2944,7 @@ def main() -> None:
             "qwen3.attention.key_length",
             "gemma.attention.key_length",
             "gemma3.attention.key_length",
+            "gemma4.rope.dimension_count",
         )
 
         # RoPE scaling (supports scalar and structured GGUF metadata)
@@ -2977,7 +3033,7 @@ def main() -> None:
             "deepseek2.attention.layer_norm_rms_epsilon", "mistral3.attention.layer_norm_rms_epsilon",
             "mistral.attention.layer_norm_rms_epsilon", "llama.norm_rms_eps",
             "qwen35.attention.layer_norm_rms_epsilon", "qwen3vl.attention.layer_norm_rms_epsilon", "qwen3.attention.layer_norm_rms_epsilon", "qwen2.attention.layer_norm_rms_epsilon",
-            "gemma3.attention.layer_norm_rms_epsilon"
+            "gemma3.attention.layer_norm_rms_epsilon", "gemma4.attention.layer_norm_rms_epsilon"
         ) or 1e-5
 
         if embed_dim != tok.ne0:
@@ -3114,6 +3170,7 @@ def main() -> None:
             "qwen3.tie_word_embeddings",
             "qwen3vl.tie_word_embeddings",
             "gemma3.tie_word_embeddings",
+            "gemma4.tie_word_embeddings",
             "mistral.tie_word_embeddings",
             "mistral3.tie_word_embeddings",
             "deepseek2.tie_word_embeddings",
@@ -3124,6 +3181,7 @@ def main() -> None:
             "qwen3.embedding_weight_tying",
             "qwen3vl.embedding_weight_tying",
             "gemma3.embedding_weight_tying",
+            "gemma4.embedding_weight_tying",
             "mistral.embedding_weight_tying",
             "mistral3.embedding_weight_tying",
             "deepseek2.embedding_weight_tying",
@@ -3605,6 +3663,56 @@ def main() -> None:
                     mf.write("\n")
                 print(f"[manifest] Written: {args.manifest_out} ({len(manifest_entries)} entries)")
             return
+
+        if arch == "gemma4":
+            layer_kinds: list[str] = []
+            q_dims: set[int] = set()
+            kv_dims: set[int] = set()
+            rotary_dims: set[int] = set()
+            for layer in range(num_layers):
+                kind = classify_layer_contract(tensors, layer)
+                if kind != "gemma4_hybrid":
+                    detail = describe_layer_contract(tensors, layer, arch=arch)
+                    if detail:
+                        raise GGUFError(detail)
+                    raise GGUFError(f"Layer {layer}: unsupported gemma4 layer contract ({kind})")
+
+                q_info = tensors.get(f"blk.{layer}.attn_q.weight")
+                k_info = tensors.get(f"blk.{layer}.attn_k.weight")
+                q_norm = tensors.get(f"blk.{layer}.attn_q_norm.weight")
+                if q_info is not None:
+                    q_dims.add(int(q_info.ne1))
+                if k_info is not None:
+                    kv_dims.add(int(k_info.ne1))
+                if q_norm is not None and q_norm.dims:
+                    rotary_dims.add(int(q_norm.ne0))
+
+            sliding_window_pattern = meta.get("gemma4.attention.sliding_window_pattern")
+            if isinstance(sliding_window_pattern, list) and len(sliding_window_pattern) == num_layers:
+                layer_kinds = [
+                    "sliding_attention" if bool(flag) else "full_attention"
+                    for flag in sliding_window_pattern
+                ]
+
+            extra_tensors = [
+                name
+                for name in (
+                    "per_layer_model_proj.weight",
+                    "per_layer_proj_norm.weight",
+                    "per_layer_token_embd.weight",
+                    "blk.0.inp_gate.weight",
+                    "blk.0.proj.weight",
+                )
+                if name in tensors
+            ]
+            raise GGUFError(
+                "Gemma4 bring-up reached family recognition, but v8 cannot lower it yet. "
+                f"Detected layer_kinds={layer_kinds[:8]}{'...' if len(layer_kinds) > 8 else ''}, "
+                f"attention_q_dims={sorted(q_dims)}, kv_dims={sorted(kv_dims)}, rotary_dims={sorted(rotary_dims)}, "
+                f"extra_projection_tensors={extra_tensors}. "
+                "Gemma4 needs layer-kind-aware attention dimensions plus inp_gate/proj/per-layer projection lowering "
+                "before it can run as a promoted v8 family."
+            )
 
         layer_infos = []
         dtype_table = [token_dtype]

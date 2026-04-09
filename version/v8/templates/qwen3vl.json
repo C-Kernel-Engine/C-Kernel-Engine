@@ -58,6 +58,7 @@
       "rope_type": "mrope",
       "qk_norm": true,
       "kv_layout": "layer_major_kv_cache",
+      "decode_kv_cache_dtype": "fp16",
       "attn_variant": "dense"
     },
     "block_contract": {
@@ -90,7 +91,7 @@
   },
   "kernels": {
     "rope_qk": "mrope_qk_text",
-    "attn_decode": "attention_forward_decode_head_major_gqa_regular"
+    "attn_decode": "attention_forward_decode_head_major_gqa_flash"
   },
   "sequence": ["decoder"],
   "block_types": {

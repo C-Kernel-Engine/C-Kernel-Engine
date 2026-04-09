@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import heapq
 import importlib.util
 import json
 import math
+import random
 import subprocess
 import sys
 import time
@@ -59,6 +61,45 @@ _CHAT_TEMPLATE_ALIASES = {
 }
 
 
+def _parse_activation_preference_overrides(values: list[str] | None) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for raw in list(values or []):
+        item = str(raw or "").strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError(
+                f"invalid activation preference override '{item}'; expected op=dtype"
+            )
+        op_name, pref = item.split("=", 1)
+        op_name = op_name.strip()
+        pref = pref.strip().lower()
+        if not op_name or not pref:
+            raise ValueError(
+                f"invalid activation preference override '{item}'; expected op=dtype"
+            )
+        overrides[op_name] = pref
+    return overrides
+
+
+def _apply_activation_preference_overrides(
+    config: dict[str, Any],
+    overrides: dict[str, str] | None,
+) -> dict[str, Any]:
+    if not overrides:
+        return config
+    updated = dict(config)
+    prefs = updated.get("activation_preference_by_op")
+    if not isinstance(prefs, dict):
+        prefs = {}
+    else:
+        prefs = dict(prefs)
+    for op_name, pref in overrides.items():
+        prefs[str(op_name)] = str(pref)
+    updated["activation_preference_by_op"] = prefs
+    return updated
+
+
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=str(REPO_ROOT), check=True)
 
@@ -68,8 +109,78 @@ def _log_progress(message: str) -> None:
 
 
 def _json_write(path: Path, payload: dict[str, Any]) -> None:
+    encoded = json.dumps(payload, indent=2)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if path.exists():
+        try:
+            if path.read_text(encoding="utf-8") == encoded:
+                return
+        except Exception:
+            pass
+    path.write_text(encoded, encoding="utf-8")
+
+
+def _json_read(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _sha256_path(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _path_identity(path: Path, *, hash_content: bool = False) -> dict[str, Any]:
+    stat = path.stat()
+    payload: dict[str, Any] = {
+        "path": str(path.resolve()),
+        "size": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+    }
+    if hash_content:
+        payload["sha256"] = _sha256_path(path)
+    return payload
+
+
+def _artifacts_match_fingerprint(
+    stamp_path: Path,
+    fingerprint: dict[str, Any],
+    required_paths: list[Path],
+) -> bool:
+    if not all(path.exists() for path in required_paths):
+        return False
+    return _json_read(stamp_path) == fingerprint
+
+
+def _converter_fingerprint(gguf_path: Path) -> dict[str, Any]:
+    return {
+        "version": 1,
+        "gguf": _path_identity(gguf_path),
+        "converter_script": _path_identity(SCRIPT_DIR / "convert_gguf_to_bump_v8.py", hash_content=True),
+    }
+
+
+def _runtime_fingerprint(
+    *,
+    manifest_path: Path,
+    mode: str,
+    context_override: int | None = None,
+    parity_dump: bool = False,
+) -> dict[str, Any]:
+    return {
+        "version": 1,
+        "mode": str(mode),
+        "manifest": _path_identity(manifest_path, hash_content=True),
+        "context_override": int(context_override) if context_override is not None else None,
+        "parity_dump": bool(parity_dump),
+        "build_ir_script": _path_identity(SCRIPT_DIR / "build_ir_v8.py", hash_content=True),
+        "codegen_script": _path_identity(SCRIPT_DIR / "codegen_v8.py", hash_content=True),
+    }
 
 
 def _normalize_chat_template_choice(mode: str | None) -> str:
@@ -377,9 +488,9 @@ def _format_multimodal_prompt_segments(
 def _ensure_engine_lib(openmp: bool = False) -> None:
     cmd = ["make"]
     if openmp:
-        # The default engine build keeps OpenMP disabled; force a refresh here so
-        # multimodal encoder runs do not silently link against the serial library.
-        cmd.extend(["-B", "CK_ENABLE_OPENMP=1"])
+        # BUILD_STAMP tracks compiler flags, so toggling CK_ENABLE_OPENMP only
+        # rebuilds when the cached engine library was built for the wrong mode.
+        cmd.append("CK_ENABLE_OPENMP=1")
     cmd.append("build/libckernel_engine.so")
     _run(cmd)
 
@@ -393,6 +504,13 @@ def _run_converter(
     bump_path = output_dir / "weights.bump"
     manifest_path = output_dir / "weights_manifest.json"
     config_path = output_dir / "config.json"
+    stamp_path = output_dir / "convert.cache.json"
+    fingerprint = _converter_fingerprint(gguf_path)
+
+    if _artifacts_match_fingerprint(stamp_path, fingerprint, [bump_path, manifest_path, config_path]):
+        with manifest_path.open("r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        return manifest, manifest_path, bump_path, config_path
 
     old_argv = sys.argv[:]
     try:
@@ -407,14 +525,16 @@ def _run_converter(
             "--config-out",
             str(config_path),
         ]
-        if context_override is not None and int(context_override) > 0:
-            sys.argv.extend(["--context", str(int(context_override))])
+        # Keep conversion artifact metadata model-native. Decoder context overrides
+        # are enforced later during IR/layout generation, not by mutating config.json.
+        _ = context_override
         convert_gguf_to_bump_v8.main()
     finally:
         sys.argv = old_argv
 
     with manifest_path.open("r", encoding="utf-8") as f:
         manifest = json.load(f)
+    _json_write(stamp_path, fingerprint)
     return manifest, manifest_path, bump_path, config_path
 
 
@@ -510,8 +630,19 @@ def _qwen3vl_geometry_overrides(config: dict[str, Any], image_path: Path) -> dic
 
 
 def _compile_generated_model(c_path: Path, so_path: Path) -> Path:
-    if so_path.exists() and so_path.stat().st_mtime >= c_path.stat().st_mtime:
-        return so_path
+    stamp_path = so_path.with_suffix(so_path.suffix + ".build.json")
+    source_hash = hashlib.sha256(c_path.read_bytes()).hexdigest()
+    source_size = int(c_path.stat().st_size)
+    build_fingerprint = {
+        "version": 1,
+        "source_path": str(c_path.resolve()),
+        "source_sha256": source_hash,
+        "source_size": source_size,
+    }
+    if so_path.exists():
+        cached = _json_read(stamp_path)
+        if cached == build_fingerprint:
+            return so_path
     cmd = [
         "cc",
         "-shared",
@@ -533,6 +664,7 @@ def _compile_generated_model(c_path: Path, so_path: Path) -> Path:
         "-lpthread",
     ]
     _run(cmd)
+    _json_write(stamp_path, build_fingerprint)
     return so_path
 
 
@@ -639,7 +771,13 @@ def _load_image_file(
     }
 
 
-def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path, image_path: Path | None = None) -> dict[str, Any]:
+def _prepare_encoder_runtime(
+    gguf_path: Path,
+    output_dir: Path,
+    image_path: Path | None = None,
+    *,
+    activation_overrides: dict[str, str] | None = None,
+) -> dict[str, Any]:
     manifest, manifest_path, bump_path, config_path = _run_converter(gguf_path, output_dir)
     config = dict(manifest.get("config", {}) or {})
     if str(config.get("model", config.get("arch", ""))).lower() == "qwen3_vl_vision":
@@ -648,9 +786,10 @@ def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path, image_path: Path
         config.setdefault("image_width", base_image)
         if image_path is not None:
             config.update(_qwen3vl_geometry_overrides(config, image_path))
-        manifest["config"] = config
-        _json_write(manifest_path, manifest)
-        _json_write(config_path, config)
+    config = _apply_activation_preference_overrides(config, activation_overrides)
+    manifest["config"] = config
+    _json_write(manifest_path, manifest)
+    _json_write(config_path, config)
     layout_path = output_dir / "layout.json"
     call_path = output_dir / "call.json"
     lowered_path = output_dir / "lowered.json"
@@ -658,6 +797,37 @@ def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path, image_path: Path
     manifest_map = output_dir / "weights_manifest.map"
     c_path = output_dir / "encoder_v8.c"
     so_path = output_dir / "libencoder_v8.so"
+    runtime_stamp = output_dir / "encoder_runtime.cache.json"
+    runtime_fingerprint = _runtime_fingerprint(
+        manifest_path=manifest_path,
+        mode="encoder_prefill",
+    )
+    reusable_outputs = [
+        manifest_path,
+        config_path,
+        bump_path,
+        layout_path,
+        call_path,
+        lowered_path,
+        ir1_path,
+        c_path,
+    ]
+
+    if _artifacts_match_fingerprint(runtime_stamp, runtime_fingerprint, reusable_outputs):
+        _log_progress(f"encoder runtime reuse workdir={output_dir}")
+        _compile_generated_model(c_path, so_path)
+        layout = _load_layout(layout_path)
+        return {
+            "gguf": str(gguf_path),
+            "manifest": manifest,
+            "weights_bump": bump_path,
+            "manifest_map": manifest_map,
+            "config_path": config_path,
+            "layout_path": layout_path,
+            "c_path": c_path,
+            "so_path": so_path,
+            "embed_dim": int(layout.get("config", {}).get("embed_dim", 0)),
+        }
 
     rc = build_ir_v8.main(
         [
@@ -698,6 +868,7 @@ def _prepare_encoder_runtime(gguf_path: Path, output_dir: Path, image_path: Path
         raise RuntimeError(f"codegen_v8 encoder failed with rc={codegen_rc}")
 
     _compile_generated_model(c_path, so_path)
+    _json_write(runtime_stamp, runtime_fingerprint)
     layout = _load_layout(layout_path)
     return {
         "gguf": str(gguf_path),
@@ -737,52 +908,119 @@ def _prepare_decoder_runtime(
     prefill_so_path = output_dir / f"libdecoder_v8_prefill{suffix}.so"
     c_path = output_dir / f"decoder_v8{suffix}.c"
     so_path = output_dir / f"libdecoder_v8{suffix}.so"
-
-    rc = build_ir_v8.main(
-        [
-            "--manifest",
-            str(manifest_path),
-            "--mode",
-            "prefill",
-            "--output",
-            str(prefill_ir1),
-            "--layout-output",
-            str(prefill_layout),
-            "--lowered-output",
-            str(prefill_lowered),
-            "--call-output",
-            str(prefill_call),
-        ]
+    runtime_stamp = output_dir / f"decoder_runtime{suffix}.cache.json"
+    runtime_fingerprint = _runtime_fingerprint(
+        manifest_path=manifest_path,
+        mode="decoder_hybrid",
+        context_override=context_override,
+        parity_dump=parity_dump,
     )
+    reusable_outputs = [
+        manifest_path,
+        config_path,
+        bump_path,
+        prefill_ir1,
+        prefill_layout,
+        prefill_lowered,
+        prefill_call,
+        decode_ir1,
+        decode_layout,
+        decode_lowered,
+        decode_call,
+        manifest_map,
+        prefill_c_path,
+        c_path,
+    ]
+
+    if _artifacts_match_fingerprint(runtime_stamp, runtime_fingerprint, reusable_outputs):
+        _log_progress(
+            f"decoder runtime reuse workdir={output_dir} parity_dump={int(bool(parity_dump))}"
+        )
+        _compile_generated_model(c_path, so_path)
+        _compile_generated_model(prefill_c_path, prefill_so_path)
+        layout = _load_layout(decode_layout)
+        if context_override is not None:
+            decode_cfg = layout.get("config", {}) if isinstance(layout.get("config"), dict) else {}
+            effective_context = int(decode_cfg.get("context_length", decode_cfg.get("context_len", 0)) or 0)
+            if effective_context != int(context_override):
+                raise RuntimeError(
+                    "decoder runtime layout context mismatch: "
+                    f"requested={int(context_override)} effective={effective_context}"
+                )
+        cfg = dict(layout.get("config", {}) or {})
+        embed_dim = int(cfg.get("embed_dim", 0) or 0)
+        num_deepstack_layers = int(cfg.get("num_deepstack_layers", 0) or 0)
+        input_embed_dim = int(cfg.get("input_embed_dim", 0) or 0)
+        if input_embed_dim <= 0 and embed_dim > 0 and num_deepstack_layers > 0:
+            input_embed_dim = embed_dim * (1 + num_deepstack_layers)
+        if input_embed_dim <= 0:
+            input_embed_dim = embed_dim
+        return {
+            "gguf": str(gguf_path),
+            "manifest": manifest,
+            "weights_bump": bump_path,
+            "manifest_map": manifest_map,
+            "config_path": config_path,
+            "prefill_layout_path": prefill_layout,
+            "decode_layout_path": decode_layout,
+            "prefill_c_path": prefill_c_path,
+            "prefill_so_path": prefill_so_path,
+            "c_path": c_path,
+            "so_path": so_path,
+            "embed_dim": embed_dim,
+            "input_embed_dim": input_embed_dim,
+            "num_deepstack_layers": num_deepstack_layers,
+            "context_length": effective_context,
+            "vocab_size": int(cfg.get("vocab_size", 0)),
+        }
+
+    prefill_args = [
+        "--manifest",
+        str(manifest_path),
+        "--mode",
+        "prefill",
+        "--output",
+        str(prefill_ir1),
+        "--layout-output",
+        str(prefill_layout),
+        "--lowered-output",
+        str(prefill_lowered),
+        "--call-output",
+        str(prefill_call),
+    ]
+    if context_override is not None:
+        prefill_args.extend(["--context-len", str(int(context_override))])
+    rc = build_ir_v8.main(prefill_args)
     if rc != 0:
         raise RuntimeError(f"build_ir_v8 decoder prefill failed with rc={rc}")
 
-    rc = build_ir_v8.main(
-        [
-            "--manifest",
-            str(manifest_path),
-            "--mode",
-            "decode",
-            "--output",
-            str(decode_ir1),
-            "--layout-output",
-            str(decode_layout),
-            "--lowered-output",
-            str(decode_lowered),
-            "--call-output",
-            str(decode_call),
-            "--manifest-map-output",
-            str(manifest_map),
-        ]
-    )
+    decode_args = [
+        "--manifest",
+        str(manifest_path),
+        "--mode",
+        "decode",
+        "--output",
+        str(decode_ir1),
+        "--layout-output",
+        str(decode_layout),
+        "--lowered-output",
+        str(decode_lowered),
+        "--call-output",
+        str(decode_call),
+        "--manifest-map-output",
+        str(manifest_map),
+    ]
+    if context_override is not None:
+        decode_args.extend(["--context-len", str(int(context_override))])
+    rc = build_ir_v8.main(decode_args)
     if rc != 0:
         raise RuntimeError(f"build_ir_v8 decoder decode failed with rc={rc}")
 
     old_argv = sys.argv[:]
     try:
-        # Keep the combined decoder runtime on the decode layout so
-        # codegen_v8 replaces the mixed multimodal entrypoint with the
-        # staged single-token bridge instead of the batched prefill bridge.
+        # Build the staged decoder runtime on the decode layout. This keeps
+        # multimodal replay on the faster decode path and allows decode-only KV
+        # cache contracts to evolve without coupling them to prefill layout.
         sys.argv = [
             str(SCRIPT_DIR / "codegen_v8.py"),
             "--ir",
@@ -823,7 +1061,16 @@ def _prepare_decoder_runtime(
         raise RuntimeError(f"codegen_v8 decoder prefill bridge failed with rc={prefill_codegen_rc}")
 
     _compile_generated_model(prefill_c_path, prefill_so_path)
+    _json_write(runtime_stamp, runtime_fingerprint)
     layout = _load_layout(decode_layout)
+    if context_override is not None:
+        decode_cfg = layout.get("config", {}) if isinstance(layout.get("config"), dict) else {}
+        effective_context = int(decode_cfg.get("context_length", decode_cfg.get("context_len", 0)) or 0)
+        if effective_context != int(context_override):
+            raise RuntimeError(
+                "decoder runtime layout context mismatch: "
+                f"requested={int(context_override)} effective={effective_context}"
+            )
     cfg = dict(layout.get("config", {}) or {})
     embed_dim = int(cfg.get("embed_dim", 0) or 0)
     num_deepstack_layers = int(cfg.get("num_deepstack_layers", 0) or 0)
@@ -847,6 +1094,7 @@ def _prepare_decoder_runtime(
         "embed_dim": embed_dim,
         "input_embed_dim": input_embed_dim,
         "num_deepstack_layers": num_deepstack_layers,
+        "context_length": int(cfg.get("context_length", cfg.get("context_len", 0)) or 0),
         "vocab_size": int(cfg.get("vocab_size", 0)),
     }
 
@@ -1059,6 +1307,15 @@ def _run_decoder(
     tokenizer: GGUFTokenizer | Any | None = None,
     stop_token_ids: list[int] | None = None,
     max_tokens: int = 0,
+    temperature: float = 0.0,
+    sample_top_k: int = 40,
+    top_p: float = 1.0,
+    min_p: float = 0.0,
+    repeat_penalty: float = 1.0,
+    repeat_last_n: int = 64,
+    min_response_tokens: int = 0,
+    stream_output: bool = False,
+    generation_progress_every: int = 0,
 ) -> dict[str, Any]:
     # Keep mixed prefix replay on the decode-layout runtime.
     #
@@ -1160,24 +1417,56 @@ def _run_decoder(
         generated_token_ids: list[int] = []
         generation_stop_reason = "disabled"
         if max_tokens > 0:
+            runtime_context_len = int(runtime.get("context_length", 0) or 0)
+            prefill_tokens_total = int(len(before_token_ids)) + int(prefix_tokens) + int(len(after_token_ids))
+            available_generation_budget = max(0, runtime_context_len - prefill_tokens_total) if runtime_context_len > 0 else int(max_tokens)
+            effective_max_tokens = min(int(max_tokens), int(available_generation_budget))
+            if effective_max_tokens < int(max_tokens):
+                _log_progress(
+                    "decoder: generation clamp "
+                    f"requested={int(max_tokens)} effective={int(effective_max_tokens)} "
+                    f"context={runtime_context_len} prefill_tokens={prefill_tokens_total}"
+                )
             _log_progress(
                 "decoder: generation start "
-                f"max_tokens={int(max_tokens)} stop_ids={sorted(stop_ids)}"
+                f"max_tokens={int(effective_max_tokens)} stop_ids={sorted(stop_ids)} "
+                f"temp={float(temperature):.3f} sample_top_k={int(sample_top_k)} "
+                f"top_p={float(top_p):.3f} min_p={float(min_p):.3f} "
+                f"repeat_penalty={float(repeat_penalty):.3f} repeat_last_n={int(repeat_last_n)}"
             )
             gen_t0 = time.perf_counter()
-            next_token = _argmax(logits_arr)
             generation_stop_reason = "max_tokens"
-            for step in range(int(max_tokens)):
+            current_logits: array | ctypes.Array[Any] = logits_arr
+            streamed_text = ""
+            for step in range(int(effective_max_tokens)):
+                banned_ids = stop_ids if len(generated_token_ids) < int(min_response_tokens) else set()
+                next_token = _sample_next_token(
+                    current_logits,
+                    temperature=float(temperature),
+                    sample_top_k=int(sample_top_k),
+                    top_p=float(top_p),
+                    min_p=float(min_p),
+                    recent_tokens=generated_token_ids,
+                    repeat_penalty=float(repeat_penalty),
+                    repeat_last_n=int(repeat_last_n),
+                    banned_ids=banned_ids,
+                )
                 if int(next_token) in stop_ids:
                     generation_stop_reason = "stop_token"
                     break
                 generated_token_ids.append(int(next_token))
-                if step + 1 >= int(max_tokens):
+                if stream_output:
+                    streamed_text = _emit_stream_delta(tokenizer, generated_token_ids, streamed_text)
+                if int(generation_progress_every) > 0 and (step + 1) % int(generation_progress_every) == 0:
+                    _log_progress(f"decoder: generation progress tokens={len(generated_token_ids)}")
+                if step + 1 >= int(effective_max_tokens):
                     break
                 rc = lib.ck_model_decode(ctypes.c_int32(int(next_token)), logits)
                 if rc != 0:
                     raise RuntimeError(f"decoder decode failed with rc={rc} at generated_step={step}")
-                next_token = _argmax(logits)
+                current_logits = logits
+            if stream_output and generated_token_ids:
+                print("", flush=True)
             _log_progress(
                 "decoder: generation done "
                 f"elapsed={time.perf_counter() - gen_t0:.2f}s generated_tokens={len(generated_token_ids)} "
@@ -1196,6 +1485,7 @@ def _run_decoder(
             "generated_text": generated_text,
             "generated_text_raw": generated_text_raw,
             "generation_stop_reason": generation_stop_reason,
+            "streamed_output": bool(stream_output and tokenizer is not None and max_tokens > 0),
         }
     finally:
         if hasattr(lib, "ck_set_strict_parity"):
@@ -1218,6 +1508,119 @@ def _argmax(values: array | ctypes.Array[Any]) -> int:
             best_idx = idx
             best_val = cur
     return int(best_idx)
+
+
+def _masked_argmax(values: array | ctypes.Array[Any] | list[float], banned_ids: set[int] | None = None) -> int:
+    if len(values) <= 0:
+        raise ValueError("cannot argmax empty logits")
+    banned = banned_ids or set()
+    best_idx = -1
+    best_val = float("-inf")
+    for idx in range(len(values)):
+        if idx in banned:
+            continue
+        cur = float(values[idx])
+        if best_idx < 0 or cur > best_val:
+            best_idx = idx
+            best_val = cur
+    if best_idx >= 0:
+        return int(best_idx)
+    return _argmax(values)
+
+
+def _sample_next_token(
+    logits: array | ctypes.Array[Any],
+    *,
+    temperature: float,
+    sample_top_k: int,
+    top_p: float,
+    min_p: float,
+    recent_tokens: list[int] | None = None,
+    repeat_penalty: float = 1.0,
+    repeat_last_n: int = 64,
+    banned_ids: set[int] | None = None,
+) -> int:
+    if len(logits) <= 0:
+        raise ValueError("cannot sample empty logits")
+
+    adjusted = [float(v) for v in logits]
+    banned = banned_ids or set()
+
+    history = list(recent_tokens or [])
+    if repeat_penalty > 1.0 and history:
+        if repeat_last_n > 0:
+            history = history[-int(repeat_last_n):]
+        for token_id in set(int(tok) for tok in history):
+            if 0 <= token_id < len(adjusted):
+                value = adjusted[token_id]
+                adjusted[token_id] = value / repeat_penalty if value > 0.0 else value * repeat_penalty
+
+    if temperature <= 0.0:
+        return _masked_argmax(adjusted, banned)
+
+    live_indices = [idx for idx in range(len(adjusted)) if idx not in banned]
+    if not live_indices:
+        return _argmax(logits)
+
+    max_logit = max(adjusted[idx] for idx in live_indices)
+    probs: list[tuple[int, float]] = []
+    inv_temp = 1.0 / max(float(temperature), 1.0e-6)
+    for idx in live_indices:
+        probs.append((idx, math.exp((adjusted[idx] - max_logit) * inv_temp)))
+    probs.sort(key=lambda row: row[1], reverse=True)
+
+    if sample_top_k > 0 and sample_top_k < len(probs):
+        probs = probs[: int(sample_top_k)]
+
+    if probs and min_p > 0.0:
+        threshold = probs[0][1] * float(min_p)
+        filtered = [row for row in probs if row[1] >= threshold]
+        if filtered:
+            probs = filtered
+
+    if probs and 0.0 < top_p < 1.0:
+        total = sum(prob for _, prob in probs)
+        if total > 0.0:
+            nucleus: list[tuple[int, float]] = []
+            cumulative = 0.0
+            for token_id, prob in probs:
+                nucleus.append((token_id, prob))
+                cumulative += prob / total
+                if cumulative >= top_p:
+                    break
+            if nucleus:
+                probs = nucleus
+
+    total = sum(prob for _, prob in probs)
+    if total <= 0.0:
+        return _masked_argmax(adjusted, banned)
+
+    draw = random.random() * total
+    cumulative = 0.0
+    for token_id, prob in probs:
+        cumulative += prob
+        if cumulative >= draw:
+            return int(token_id)
+    return int(probs[-1][0])
+
+
+def _emit_stream_delta(
+    tokenizer: GGUFTokenizer | Any | None,
+    generated_token_ids: list[int],
+    rendered_text: str,
+) -> str:
+    if tokenizer is None or not generated_token_ids:
+        return rendered_text
+    current_text = str(tokenizer.decode(generated_token_ids, skip_special=True))
+    if not current_text:
+        return rendered_text
+    if current_text.startswith(rendered_text):
+        delta = current_text[len(rendered_text):]
+    else:
+        delta = current_text
+    if delta:
+        print(delta, end="", flush=True)
+    return current_text
 
 
 def _lookup_single_token_id(tokenizer: GGUFTokenizer | Any, text: str) -> int:
@@ -1312,13 +1715,29 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--decoder-context-len", type=int, default=None, help="Override decoder context length; default is prompt+prefix budget with small headroom")
     ap.add_argument("--dump-prefix-f32", type=Path, default=None, help="Optional output path for resolved float32 prefix embeddings")
     ap.add_argument("--max-tokens", type=int, default=0, help="Generate up to N tokens after multimodal prefill; 0 reports first-token logits only")
-    ap.add_argument("--top-k", type=int, default=8, help="How many top logits to report")
+    ap.add_argument("--report-top-k", "--top-k", dest="report_top_k", type=int, default=8, help="How many top logits to report in bridge_report.json")
+    ap.add_argument("--print-json-report", action="store_true", help="Print the full bridge_report.json payload to stdout instead of concise operator output")
+    ap.add_argument("--generation-progress-every", type=int, default=0, help="Emit generation heartbeat every N tokens; 0 disables periodic progress logs")
+    ap.add_argument("--no-stream-output", action="store_true", help="Disable live text streaming during generation and print only the final response")
+    ap.add_argument("--temperature", type=float, default=0.0, help="Decode temperature; 0 keeps greedy generation")
+    ap.add_argument("--sample-top-k", type=int, default=40, help="Top-k sampling cutoff used during bridge generation")
+    ap.add_argument("--top-p", type=float, default=1.0, help="Nucleus top-p used during bridge generation")
+    ap.add_argument("--min-p", type=float, default=0.0, help="Relative min-p floor used during bridge generation")
+    ap.add_argument("--repeat-penalty", type=float, default=1.0, help="Penalty applied to recently generated tokens")
+    ap.add_argument("--repeat-last-n", type=int, default=64, help="How many recent tokens the repetition penalty should inspect")
+    ap.add_argument(
+        "--vision-activation-pref",
+        action="append",
+        default=[],
+        help="Optional vision encoder activation override(s) in op=dtype form, e.g. out_proj=q8",
+    )
     args = ap.parse_args(argv)
 
     workdir = args.workdir.resolve()
     workdir.mkdir(parents=True, exist_ok=True)
     encoder_dir = workdir / "encoder"
     decoder_dir = workdir / "decoder"
+    vision_activation_overrides = _parse_activation_preference_overrides(args.vision_activation_pref)
 
     _log_progress(f"start workdir={workdir}")
     _ensure_engine_lib(openmp=args.encoder_gguf is not None)
@@ -1360,6 +1779,7 @@ def main(argv: list[str] | None = None) -> int:
             args.encoder_gguf.resolve(),
             encoder_dir,
             image_path=args.image_path.resolve() if args.image_path is not None else None,
+            activation_overrides=vision_activation_overrides,
         )
         _log_progress(f"encoder runtime prepare done elapsed={time.perf_counter() - encoder_prep_t0:.2f}s")
         _log_progress("encoder execution start")
@@ -1437,6 +1857,7 @@ def main(argv: list[str] | None = None) -> int:
         f"bridge ready prefix_source={prefix_source} prefix_tokens={prefix_tokens} prefix_dim={prefix_embed_dim}"
     )
     stop_policy = _resolve_stop_token_policy(tokenizer, chat_contract)
+    min_response_tokens = max(0, int((chat_contract or {}).get("min_response_tokens", 0) or 0))
 
     dumped_prefix_path: str | None = None
     if args.dump_prefix_f32 is not None:
@@ -1457,9 +1878,18 @@ def main(argv: list[str] | None = None) -> int:
         tokenizer=tokenizer,
         stop_token_ids=list(stop_policy["stop_ids"]),
         max_tokens=max(0, int(args.max_tokens)),
+        temperature=float(args.temperature),
+        sample_top_k=int(args.sample_top_k),
+        top_p=float(args.top_p),
+        min_p=float(args.min_p),
+        repeat_penalty=float(args.repeat_penalty),
+        repeat_last_n=int(args.repeat_last_n),
+        min_response_tokens=min_response_tokens,
+        stream_output=bool(args.max_tokens) and not bool(args.no_stream_output),
+        generation_progress_every=int(args.generation_progress_every),
     )
     _log_progress("report assembly start")
-    top = _topk(decoder_report["logits"], max(1, args.top_k))
+    top = _topk(decoder_report["logits"], max(1, args.report_top_k))
     top_tokens = [
         {
             "token_id": int(tok_id),
@@ -1529,6 +1959,7 @@ def main(argv: list[str] | None = None) -> int:
             "prefix_grid_x": int(encoder_report.get("prefix_grid_x", 0) or 0),
             "prefix_grid_y": int(encoder_report.get("prefix_grid_y", 0) or 0),
             "prefix_text_pos": int(encoder_report.get("prefix_text_pos", 0) or 0),
+            "activation_preference_overrides": dict(vision_activation_overrides),
         } if encoder_report is not None else None,
         "dim_mismatch": dim_mismatch,
         "top_logits": top_tokens,
@@ -1537,6 +1968,15 @@ def main(argv: list[str] | None = None) -> int:
         "generated_text": str(decoder_report.get("generated_text") or ""),
         "generated_text_raw": str(decoder_report.get("generated_text_raw") or ""),
         "generation_stop_reason": str(decoder_report.get("generation_stop_reason") or "disabled"),
+        "generation_config": {
+            "temperature": float(args.temperature),
+            "sample_top_k": int(args.sample_top_k),
+            "top_p": float(args.top_p),
+            "min_p": float(args.min_p),
+            "repeat_penalty": float(args.repeat_penalty),
+            "repeat_last_n": int(args.repeat_last_n),
+            "min_response_tokens": int(min_response_tokens),
+        },
         "notes": [
             "This runner keeps the encoder->decoder bridge in orchestration instead of baking a multimodal special-case into templates.",
             "Synthetic-prefix mode only validates the decoder bridge seam; it is not a substitute for real multimodal parity.",
@@ -1546,7 +1986,24 @@ def main(argv: list[str] | None = None) -> int:
     report_path = workdir / "bridge_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     _log_progress(f"done report={report_path}")
-    print(json.dumps(report, indent=2))
+    if args.print_json_report:
+        print(json.dumps(report, indent=2))
+    else:
+        generated_text = str(report.get("generated_text") or "").strip()
+        streamed_output = bool(decoder_report.get("streamed_output"))
+        if generated_text and not streamed_output:
+            print(generated_text)
+        else:
+            print(
+                json.dumps(
+                    {
+                        "status": report["status"],
+                        "top_logits": report["top_logits"],
+                        "report_path": str(report_path),
+                    },
+                    indent=2,
+                )
+            )
     return 0
 
 

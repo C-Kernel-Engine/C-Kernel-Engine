@@ -522,26 +522,27 @@ def _normalize_arg_expr(expr: str) -> str:
     into the product chain while keeping the rest of the lowered expression
     intact.
     """
-    marker = "model->kv_cache + "
-    if marker not in expr or "1ULL*" in expr:
-        return expr
+    for marker in ("model->kv_cache + ", "model->kv_cache_f16 + "):
+        if marker not in expr or "1ULL*" in expr:
+            continue
 
-    prefix, rest = expr.split(marker, 1)
-    tail = ""
-    if rest.endswith("))"):
-        core = rest[:-2]
-        tail = "))"
-    elif rest.endswith(")"):
-        core = rest[:-1]
-        tail = ")"
-    else:
-        core = rest
+        prefix, rest = expr.split(marker, 1)
+        tail = ""
+        if rest.endswith("))"):
+            core = rest[:-2]
+            tail = "))"
+        elif rest.endswith(")"):
+            core = rest[:-1]
+            tail = ")"
+        else:
+            core = rest
 
-    core = core.strip()
-    if not core:
-        return expr
+        core = core.strip()
+        if not core:
+            return expr
 
-    return f"{prefix}{marker}(1ULL*{core}){tail}"
+        return f"{prefix}{marker}(1ULL*{core}){tail}"
+    return expr
 
 
 def _annotate_kv_transpose_roles(ops: list[dict]) -> None:
@@ -1630,6 +1631,7 @@ typedef struct {{
     uint8_t *bump_weights;   /* Weights section */
     float *activations;      /* Activations section */
     float *kv_cache;         /* KV cache section */
+    uint16_t *kv_cache_f16;  /* Packed FP16 KV cache section */
     float *rope_cos;         /* RoPE cos table */
     float *rope_sin;         /* RoPE sin table */
     float *logits;           /* Output logits */
@@ -1677,6 +1679,7 @@ static int do_init(void) {{
     g_model->bump_weights = g_model->bump + BUMP_WEIGHTS_OFFSET;
     g_model->activations = (float*)(g_model->bump + BUMP_ACT_OFFSET);
     g_model->kv_cache = (float*)(g_model->bump + A_KV_CACHE);
+    g_model->kv_cache_f16 = (uint16_t*)(g_model->bump + A_KV_CACHE);
     g_model->rope_cos = (float*)(g_model->bump + A_ROPE_CACHE);
     g_model->rope_sin = g_model->rope_cos + MAX_SEQ_LEN * ROTARY_DIM / 2;
     g_model->logits = (float*)(g_model->bump + A_LOGITS);

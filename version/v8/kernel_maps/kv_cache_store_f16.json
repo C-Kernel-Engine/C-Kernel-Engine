@@ -1,0 +1,24 @@
+{
+  "id": "kv_cache_store_f16",
+  "op": "kv_cache_store",
+  "variant": "fp16_cache",
+  "quant": {
+    "activation": "fp32",
+    "output": "fp16"
+  },
+  "inputs": [
+    {"name": "k", "dtype": "fp32", "shape": ["num_kv_heads", "head_dim"], "desc": "K tensor after RoPE [num_kv_heads, head_dim]"},
+    {"name": "v", "dtype": "fp32", "shape": ["num_kv_heads", "head_dim"], "desc": "V tensor [num_kv_heads, head_dim]"}
+  ],
+  "outputs": [
+    {"name": "kv_cache_k", "dtype": "fp16", "shape": ["num_layers", "num_kv_heads", "max_seq_len", "head_dim"], "desc": "Packed FP16 K cache slice at current pos"},
+    {"name": "kv_cache_v", "dtype": "fp16", "shape": ["num_layers", "num_kv_heads", "max_seq_len", "head_dim"], "desc": "Packed FP16 V cache slice at current pos"}
+  ],
+  "dims": ["num_kv_heads", "head_dim", "num_layers", "max_seq_len"],
+  "impl": {
+    "function": "kv_cache_store_f16",
+    "c_declaration": "void kv_cache_store_f16(uint16_t *kv_cache_k, uint16_t *kv_cache_v, const float *k, const float *v, int layer, int pos, int num_kv_heads, int head_dim, int max_seq_len);",
+    "sources": ["src/kernels/kv_cache_kernels.c"]
+  },
+  "notes": "Store K and V to a packed FP16 decode KV cache at the current position."
+}

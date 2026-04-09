@@ -1,0 +1,167 @@
+{
+  "version": 2,
+  "name": "gemma4",
+  "family": "gemma4",
+  "flags": {
+    "use_qkv_bias": false,
+    "activation": "geglu",
+    "rope": "rope",
+    "tokenizer": "sentencepiece",
+    "scale_embeddings_sqrt_dim": true,
+    "has_qk_norm": true,
+    "post_attention_norm": true,
+    "attention": "hybrid_sliding_window"
+  },
+  "contract": {
+    "tokenizer_contract": {
+      "tokenizer_type": "sentencepiece",
+      "bos_policy": "model_defined",
+      "eos_policy": "model_defined",
+      "special_tokens": {
+        "source": "manifest_or_gguf"
+      }
+    },
+    "chat_contract": {
+      "version": 1,
+      "name": "gemma4",
+      "raw_prompt_allowed": false,
+      "turn_prefix": "<|turn>{role}\n",
+      "turn_suffix": "<turn|>\n",
+      "assistant_generation_prefix": "<|turn>model\n",
+      "role_labels": {
+        "system": "system",
+        "user": "user",
+        "assistant": "model"
+      },
+      "system_prompt_mode": "dedicated_turn",
+      "system_prompt_separator": "\n\n",
+      "default_system_prompt": "",
+      "inject_default_system_prompt": false,
+      "force_bos_text_if_tokenizer_add_bos_false": "",
+      "last_user_prefix": "",
+      "last_user_prefix_suppression_markers": [],
+      "stop_text_markers": ["<turn|>"],
+      "token_stop_markers": ["<turn|>"],
+      "template_markers": ["<|turn>", "<turn|>"],
+      "min_response_tokens": 8
+    },
+    "attention_contract": {
+      "rope_layout": "split",
+      "rope_type": "rope",
+      "qk_norm": true,
+      "kv_layout": "layer_major_kv_cache",
+      "attn_variant": "hybrid_sliding_attention"
+    },
+    "block_contract": {
+      "norm_type": "rmsnorm",
+      "mlp_formula": "gate_up -> geglu -> down",
+      "activation": "geglu",
+      "qkv_bias": false,
+      "body_type": "hybrid_sliding_attention"
+    },
+    "logits_contract": {
+      "final_norm": "rmsnorm",
+      "lm_head": "weight_tying",
+      "logits_layout": "auto"
+    },
+    "quant_contract": {
+      "kernel_select": "weight_dtype_registry",
+      "activation_dtype": "fp32_or_q8_path",
+      "per_tensor_mixed_quant": true
+    },
+    "runtime_invariants": {
+      "required_call_args": {
+        "kv_cache_batch_copy": [
+          "activation:k_src",
+          "activation:v_src",
+          "output:k_dst",
+          "output:v_dst",
+          "dim:_kv_copy_bytes"
+        ]
+      }
+    }
+  },
+  "kernels": {
+    "rope_qk": "rope_forward_qk",
+    "rope_init": "rope_precompute_cache_split"
+  },
+  "sequence": ["decoder"],
+  "block_types": {
+    "decoder": {
+      "sequence": ["header", "body", "footer"],
+      "header": [
+        "bpe_tokenizer",
+        "dense_embedding_lookup"
+      ],
+      "body": {
+        "type": "hybrid_sliding_attention",
+        "kind_config_key": "layer_kinds",
+        "default_kind": "sliding_attention",
+        "quant_aliases_common": {
+          "ln1_gamma": "attn_norm",
+          "ln2_gamma": "post_attention_norm",
+          "w1": "ffn_gate",
+          "w3": "ffn_up",
+          "w2": "ffn_down"
+        },
+        "quant_aliases_by_kind": {
+          "sliding_attention": {
+            "wq": "attn_q",
+            "wk": "attn_k",
+            "wv": "attn_v",
+            "wo": "attn_output",
+            "q_norm": "attn_q_norm",
+            "k_norm": "attn_k_norm"
+          },
+          "full_attention": {
+            "wq": "attn_q",
+            "wk": "attn_k",
+            "wv": "attn_v",
+            "wo": "attn_output",
+            "q_norm": "attn_q_norm",
+            "k_norm": "attn_k_norm"
+          }
+        },
+        "ops_by_kind": {
+          "sliding_attention": [
+            "attn_norm",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "qk_norm",
+            "rope_qk",
+            "attn_sliding",
+            "out_proj",
+            "residual_add",
+            "post_attention_norm",
+            "mlp_gate_up",
+            "geglu",
+            "mlp_down",
+            "residual_add"
+          ],
+          "full_attention": [
+            "attn_norm",
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "qk_norm",
+            "rope_qk",
+            "attn",
+            "out_proj",
+            "residual_add",
+            "post_attention_norm",
+            "mlp_gate_up",
+            "geglu",
+            "mlp_down",
+            "residual_add"
+          ]
+        }
+      },
+      "footer": [
+        "final_rmsnorm",
+        "weight_tying",
+        "logits"
+      ]
+    }
+  }
+}

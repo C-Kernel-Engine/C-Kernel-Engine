@@ -415,7 +415,9 @@ void gemm_nt_q8_0_q8_0_contract(const float *A,
 
     const float *A_use = A;
     const int strict = ck_strict_parity_enabled();
+    const int dump_enabled = strict && ck_q80_contract_dump_enabled();
     int strict_cached_layer = -1;
+    int strict_dump_layer = -1;
     if (ck_strict_parity_enabled()) {
         const float *cached = ck_strict_consume_next_gemm_a((size_t) M * (size_t) K);
         if (cached) {
@@ -423,19 +425,26 @@ void gemm_nt_q8_0_q8_0_contract(const float *A,
             strict_cached_layer = ck_q80_contract_cached_gemm_seq++;
         }
     }
+    if (dump_enabled) {
+        strict_dump_layer = strict_cached_layer >= 0
+            ? strict_cached_layer
+            : ck_q80_contract_cached_gemm_seq++;
+    }
 
-    if (strict && strict_cached_layer >= 0 && ck_q80_contract_dump_enabled()) {
-        ck_q80_contract_dump_tensor("strict_out_proj_input",
-                                    strict_cached_layer,
+    if (dump_enabled && strict_dump_layer >= 0) {
+        ck_q80_contract_dump_tensor(strict_cached_layer >= 0
+                                        ? "strict_out_proj_input_cached"
+                                        : "strict_out_proj_input_live",
+                                    strict_dump_layer,
                                     A_use,
                                     (size_t) M * (size_t) K);
     }
 
     if (strict &&
         gemm_nt_q8_0_q8_0_ggml_strict(A_use, B, bias, C, M, N, K)) {
-        if (strict && strict_cached_layer >= 0 && ck_q80_contract_dump_enabled()) {
-            ck_q80_contract_dump_tensor("strict_out_proj_output",
-                                        strict_cached_layer,
+        if (dump_enabled && strict_dump_layer >= 0) {
+            ck_q80_contract_dump_tensor("strict_out_proj_output_ggml",
+                                        strict_dump_layer,
                                         C,
                                         (size_t) M * (size_t) N);
         }
@@ -464,9 +473,9 @@ void gemm_nt_q8_0_q8_0_contract(const float *A,
         }
     }
 
-    if (strict_cached_layer >= 0 && ck_q80_contract_dump_enabled()) {
-        ck_q80_contract_dump_tensor("strict_out_proj_output",
-                                    strict_cached_layer,
+    if (dump_enabled && strict_dump_layer >= 0) {
+        ck_q80_contract_dump_tensor("strict_out_proj_output_fallback",
+                                    strict_dump_layer,
                                     C,
                                     (size_t) M * (size_t) N);
     }

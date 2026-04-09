@@ -209,6 +209,9 @@ class V8Qwen3VLTemplateTests(unittest.TestCase):
             build_ir_v8._hydrate_manifest_template(manifest)
 
     def test_runtime_config_defaults_own_quant_policy(self) -> None:
+        qwen2_cfg = build_ir_v8._inject_runtime_config_defaults({}, "qwen2")
+        self.assertNotIn("prefer_fp32_mlp_matmuls", qwen2_cfg)
+
         gemma_cfg = build_ir_v8._inject_runtime_config_defaults({}, "gemma3")
         self.assertTrue(gemma_cfg["prefer_q8_0_contract"])
         self.assertTrue(gemma_cfg["prefer_fp32_logits"])
