@@ -25,6 +25,16 @@ def _load_lib():
     lib = load_lib("libckernel_engine.so")
     lib.ck_set_num_threads.argtypes = [ctypes.c_int]
     lib.ck_set_num_threads.restype = None
+    lib.gemm_blocked_serial_train_parallel_dispatch.argtypes = [
+        ctypes.POINTER(ctypes.c_float),  # A [M, K]
+        ctypes.POINTER(ctypes.c_float),  # B [N, K]
+        ctypes.POINTER(ctypes.c_float),  # bias [N] or NULL
+        ctypes.POINTER(ctypes.c_float),  # C [M, N]
+        ctypes.c_int,                    # M
+        ctypes.c_int,                    # N
+        ctypes.c_int,                    # K
+    ]
+    lib.gemm_blocked_serial_train_parallel_dispatch.restype = None
     for name in (
         "gemm_backward_f32_train_parallel_dispatch",
         "gemm_backward_f32_train_parallel_dispatch_v2",
@@ -50,6 +60,43 @@ LIB = _load_lib()
 
 
 class TrainParallelGemmBackwardTests(unittest.TestCase):
+    def test_forward_dispatch_matches_numpy_reference(self) -> None:
+        LIB.ck_set_num_threads(4)
+        rng = np.random.default_rng(4321)
+        shapes = [
+            (4, 128, 256),
+            (8, 256, 256),
+            (8, 2048, 256),
+        ]
+
+        for (m, n, k) in shapes:
+            for with_bias in (True, False):
+                a = rng.standard_normal((m, k), dtype=np.float32)
+                b = rng.standard_normal((n, k), dtype=np.float32)
+                c = np.zeros((m, n), dtype=np.float32)
+                bias = (rng.standard_normal(n, dtype=np.float32) * 0.01).astype(np.float32)
+
+                bias_ptr = _ptr(bias) if with_bias else ctypes.POINTER(ctypes.c_float)()
+                LIB.gemm_blocked_serial_train_parallel_dispatch(
+                    _ptr(a.reshape(-1)),
+                    _ptr(b.reshape(-1)),
+                    bias_ptr,
+                    _ptr(c.reshape(-1)),
+                    ctypes.c_int(m),
+                    ctypes.c_int(n),
+                    ctypes.c_int(k),
+                )
+
+                c_ref = (a @ b.T).astype(np.float32)
+                if with_bias:
+                    c_ref = (c_ref + bias.reshape(1, n)).astype(np.float32)
+
+                self.assertLessEqual(
+                    float(np.max(np.abs(c - c_ref))),
+                    2e-4,
+                    msg=f"forward dispatch mismatch for {(m, n, k)}",
+                )
+
     def test_dispatch_wrappers_match_numpy_reference(self) -> None:
         LIB.ck_set_num_threads(4)
         rng = np.random.default_rng(1234)

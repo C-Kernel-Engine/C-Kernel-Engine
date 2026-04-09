@@ -30,7 +30,77 @@ typedef struct {
     int N;
     int K;
     int split_n;
+    int active_nth;
 } ck_train_gemm_args_t;
+
+#if defined(__AVX__) && !defined(__AVX512F__)
+static inline float ck_train_hsum256_ps(__m256 v) {
+    __m128 lo = _mm256_castps256_ps128(v);
+    __m128 hi = _mm256_extractf128_ps(v, 1);
+    __m128 sum128 = _mm_add_ps(lo, hi);
+    __m128 shuf = _mm_movehdup_ps(sum128);
+    __m128 sums = _mm_add_ps(sum128, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+#endif
+
+static void ck_train_gemm_nt_compute_rows(const float *A,
+                                          const float *B,
+                                          const float *bias,
+                                          float *C,
+                                          int row_start,
+                                          int row_end,
+                                          int N,
+                                          int K) {
+    if (!A || !B || !C || row_start >= row_end || N <= 0 || K <= 0) {
+        return;
+    }
+
+    for (int i = row_start; i < row_end; ++i) {
+        const float *a_row = A + (size_t)i * (size_t)K;
+        float *c_row = C + (size_t)i * (size_t)N;
+        for (int j = 0; j < N; ++j) {
+            const float *b_row = B + (size_t)j * (size_t)K;
+            float sum = bias ? bias[j] : 0.0f;
+#if defined(__AVX512F__)
+            __m512 acc = _mm512_setzero_ps();
+            int k = 0;
+            for (; k <= K - 16; k += 16) {
+                __m512 a_vec = _mm512_loadu_ps(a_row + k);
+                __m512 b_vec = _mm512_loadu_ps(b_row + k);
+                acc = _mm512_fmadd_ps(a_vec, b_vec, acc);
+            }
+            sum += _mm512_reduce_add_ps(acc);
+            for (; k < K; ++k) {
+                sum += a_row[k] * b_row[k];
+            }
+#elif defined(__AVX2__)
+            __m256 acc = _mm256_setzero_ps();
+            int k = 0;
+            for (; k <= K - 8; k += 8) {
+                __m256 a_vec = _mm256_loadu_ps(a_row + k);
+                __m256 b_vec = _mm256_loadu_ps(b_row + k);
+#if defined(__FMA__)
+                acc = _mm256_fmadd_ps(a_vec, b_vec, acc);
+#else
+                acc = _mm256_add_ps(acc, _mm256_mul_ps(a_vec, b_vec));
+#endif
+            }
+            sum += ck_train_hsum256_ps(acc);
+            for (; k < K; ++k) {
+                sum += a_row[k] * b_row[k];
+            }
+#else
+            for (int k = 0; k < K; ++k) {
+                sum += a_row[k] * b_row[k];
+            }
+#endif
+            c_row[j] = sum;
+        }
+    }
+}
 
 static void ck_train_gemm_work(int ith, int nth, void *argp) {
     ck_train_gemm_args_t *a = (ck_train_gemm_args_t *)argp;
@@ -63,7 +133,11 @@ static void ck_train_gemm_work(int ith, int nth, void *argp) {
     }
 
     /* Prefill/train path (M>1): split rows. */
-    int dm = (a->M + nth - 1) / nth;
+    const int active_nth = (a->active_nth > 0 && a->active_nth < nth) ? a->active_nth : nth;
+    if (ith >= active_nth) {
+        return;
+    }
+    int dm = (a->M + active_nth - 1) / active_nth;
     int m0 = dm * ith;
     int m1 = m0 + dm;
     if (m0 >= a->M) {
@@ -77,9 +151,7 @@ static void ck_train_gemm_work(int ith, int nth, void *argp) {
         return;
     }
 
-    const float *A_chunk = a->A + (size_t)m0 * (size_t)a->K;
-    float *C_chunk = a->C + (size_t)m0 * (size_t)a->N;
-    gemm_blocked_serial(A_chunk, a->B, a->bias, C_chunk, m_chunk, a->N, a->K);
+    ck_train_gemm_nt_compute_rows(a->A, a->B, a->bias, a->C, m0, m1, a->N, a->K);
 }
 
 void gemm_blocked_serial_train_parallel_dispatch(const float *A,
@@ -104,6 +176,7 @@ void gemm_blocked_serial_train_parallel_dispatch(const float *A,
     }
 
     int split_n = 0;
+    int active_nth = nth;
     if (M == 1) {
         /* Tensor-parallel decode-style split only when each worker has enough columns. */
         const int cols_per_worker = (N + nth - 1) / nth;
@@ -114,8 +187,12 @@ void gemm_blocked_serial_train_parallel_dispatch(const float *A,
             return;
         }
     } else {
-        /* Row split for prefill/train batches. */
-        if (M < nth * 2) {
+        /* Row split for prefill/train batches with coarser chunks. */
+        active_nth = M / 2;
+        if (active_nth > nth) {
+            active_nth = nth;
+        }
+        if (active_nth <= 1) {
             gemm_blocked_serial(A, B, bias, C, M, N, K);
             return;
         }
@@ -130,6 +207,7 @@ void gemm_blocked_serial_train_parallel_dispatch(const float *A,
         .N = N,
         .K = K,
         .split_n = split_n,
+        .active_nth = active_nth,
     };
 
     ck_threadpool_dispatch(pool, ck_train_gemm_work, &args);
