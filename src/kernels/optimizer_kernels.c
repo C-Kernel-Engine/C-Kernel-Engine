@@ -68,6 +68,14 @@ typedef struct {
 } ck_accum_parallel_args_t;
 
 typedef struct {
+    float *const *dsts;
+    const float *const *srcs;
+    const size_t *numels;
+    int tensor_count;
+    size_t total_numel;
+} ck_accum_multi_parallel_args_t;
+
+typedef struct {
     float *grad;
     size_t numel;
     float scale;
@@ -179,6 +187,46 @@ static void ck_accum_parallel_work(int ith, int nth, void *argp)
         end = a->numel;
     }
     gradient_accumulate_f32_impl(a->dst + start, a->src + start, end - start);
+}
+
+static void ck_accum_multi_parallel_work(int ith, int nth, void *argp)
+{
+    ck_accum_multi_parallel_args_t *a = (ck_accum_multi_parallel_args_t *)argp;
+    if (!a || !a->dsts || !a->srcs || !a->numels || a->tensor_count <= 0 || a->total_numel == 0) {
+        return;
+    }
+
+    size_t chunk = (a->total_numel + (size_t)nth - 1u) / (size_t)nth;
+    size_t start = (size_t)ith * chunk;
+    if (start >= a->total_numel) {
+        return;
+    }
+    size_t end = start + chunk;
+    if (end > a->total_numel) {
+        end = a->total_numel;
+    }
+
+    size_t cursor = 0;
+    for (int ti = 0; ti < a->tensor_count; ++ti) {
+        float *dst = a->dsts[ti];
+        const float *src = a->srcs[ti];
+        size_t n = a->numels[ti];
+        if (!dst || !src || n == 0) {
+            continue;
+        }
+        size_t next = cursor + n;
+        if (end <= cursor) {
+            break;
+        }
+        if (start < next && end > cursor) {
+            size_t local_start = (start > cursor) ? (start - cursor) : 0u;
+            size_t local_end = (end < next) ? (end - cursor) : n;
+            if (local_end > local_start) {
+                gradient_accumulate_f32_impl(dst + local_start, src + local_start, local_end - local_start);
+            }
+        }
+        cursor = next;
+    }
 }
 
 static void ck_scale_parallel_work(int ith, int nth, void *argp)
@@ -898,6 +946,71 @@ void gradient_accumulate_f32(float *dst, const float *src, size_t numel)
         .numel = numel,
     };
     ck_threadpool_dispatch_n(pool, active_nth, ck_accum_parallel_work, &args);
+}
+
+void gradient_accumulate_multi_f32(
+    float *const *dsts,
+    const float *const *srcs,
+    const size_t *numels,
+    int tensor_count)
+{
+    if (!dsts || !srcs || !numels || tensor_count <= 0) {
+        return;
+    }
+
+    size_t total_numel = 0;
+    int valid_tensors = 0;
+    for (int i = 0; i < tensor_count; ++i) {
+        float *dst = dsts[i];
+        const float *src = srcs[i];
+        size_t n = numels[i];
+        if (!dst || !src || n == 0) {
+            continue;
+        }
+        total_numel += n;
+        valid_tensors += 1;
+    }
+    if (total_numel == 0 || valid_tensors == 0) {
+        return;
+    }
+
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+    if (!pool || nth <= 1 || nth > CK_OPT_PAR_MAX_THREADS || total_numel < CK_OPT_PAR_MIN_NUMEL) {
+        for (int i = 0; i < tensor_count; ++i) {
+            float *dst = dsts[i];
+            const float *src = srcs[i];
+            size_t n = numels[i];
+            if (!dst || !src || n == 0) {
+                continue;
+            }
+            gradient_accumulate_f32_impl(dst, src, n);
+        }
+        return;
+    }
+
+    int active_nth = ck_opt_pick_active_threads(nth, total_numel, CK_OPT_PAR_MIN_NUMEL);
+    if (active_nth <= 1) {
+        for (int i = 0; i < tensor_count; ++i) {
+            float *dst = dsts[i];
+            const float *src = srcs[i];
+            size_t n = numels[i];
+            if (!dst || !src || n == 0) {
+                continue;
+            }
+            gradient_accumulate_f32_impl(dst, src, n);
+        }
+        return;
+    }
+
+    ck_accum_multi_parallel_args_t args = {
+        .dsts = dsts,
+        .srcs = srcs,
+        .numels = numels,
+        .tensor_count = tensor_count,
+        .total_numel = total_numel,
+    };
+    ck_threadpool_dispatch_n(pool, active_nth, ck_accum_multi_parallel_work, &args);
 }
 
 

@@ -53,6 +53,13 @@ def _load_lib():
             ctypes.c_int,                    # num_threads
         ]
         fn.restype = None
+    lib.gradient_accumulate_multi_f32.argtypes = [
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_float)),
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_float)),
+        ctypes.POINTER(ctypes.c_size_t),
+        ctypes.c_int,
+    ]
+    lib.gradient_accumulate_multi_f32.restype = None
     return lib
 
 
@@ -163,6 +170,34 @@ class TrainParallelGemmBackwardTests(unittest.TestCase):
                             0.0,
                             msg=f"{symbol} unexpectedly wrote NULL bias for {(t, aligned_in, aligned_out)}",
                         )
+
+    def test_gradient_accumulate_multi_matches_reference(self) -> None:
+        LIB.ck_set_num_threads(4)
+        rng = np.random.default_rng(777)
+        dsts = [
+            rng.standard_normal(2048, dtype=np.float32),
+            rng.standard_normal(262144, dtype=np.float32),
+            rng.standard_normal(32768, dtype=np.float32),
+        ]
+        srcs = [
+            rng.standard_normal(arr.shape[0], dtype=np.float32)
+            for arr in dsts
+        ]
+        refs = [dst.copy() + src for dst, src in zip(dsts, srcs)]
+
+        dst_ptrs = (ctypes.POINTER(ctypes.c_float) * len(dsts))(*[_ptr(arr) for arr in dsts])
+        src_ptrs = (ctypes.POINTER(ctypes.c_float) * len(srcs))(*[_ptr(arr) for arr in srcs])
+        numels = (ctypes.c_size_t * len(dsts))(*[arr.shape[0] for arr in dsts])
+
+        LIB.gradient_accumulate_multi_f32(
+            dst_ptrs,
+            src_ptrs,
+            numels,
+            ctypes.c_int(len(dsts)),
+        )
+
+        for got, ref in zip(dsts, refs):
+            self.assertLessEqual(float(np.max(np.abs(got - ref))), 2e-4)
 
 
 if __name__ == "__main__":

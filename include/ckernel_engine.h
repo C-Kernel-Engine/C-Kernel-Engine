@@ -154,6 +154,10 @@ void adamw_clip_update_multi_f32(float *const *grads,
                                  int step);
 
 void gradient_accumulate_f32(float *dst, const float *src, size_t numel);
+void gradient_accumulate_multi_f32(float *const *dsts,
+                                   const float *const *srcs,
+                                   const size_t *numels,
+                                   int tensor_count);
 void gradient_scale_f32(float *grad, size_t numel, float scale);
 float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);
 float gradient_global_norm_multi_f32(const float *const *grads,
