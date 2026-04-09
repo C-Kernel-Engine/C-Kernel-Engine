@@ -6,6 +6,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +142,58 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertEqual(contract.get("kernel_id"), "attention_forward_causal_head_major_gqa_flash_strided")
         self.assertEqual(contract.get("saved_tensor_kernel_key"), "attn_weights")
         self.assertEqual(contract.get("contract_source"), "template.contract.attention_contract.train_runtime_contract")
+
+    def test_embedded_manifest_template_missing_train_runtime_contract_uses_compatibility_warning(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        attention_contract = (((manifest.get("template") or {}).get("contract") or {}).get("attention_contract") or {})
+        attention_contract.pop("train_runtime_contract", None)
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="legacy",
+        )
+        attn_ops = [op for op in ir1.get("ops", []) if str(op.get("op")) == "attn"]
+        self.assertEqual(len(attn_ops), 1)
+        contract = attn_ops[0].get("runtime_contract") or {}
+        self.assertEqual(contract.get("kernel_id"), "attention_forward_causal_head_major_gqa_exact")
+        warnings = ir1.get("warnings", [])
+        self.assertTrue(
+            any("Embedded manifest template" in str(item) and "train_runtime_contract" in str(item) for item in warnings)
+        )
+
+    def test_repo_template_requires_explicit_train_runtime_contract(self) -> None:
+        template = copy.deepcopy(self.manifest.get("template") or {})
+        attention_contract = (((template.get("contract") or {}).get("attention_contract") or {}))
+        attention_contract.pop("train_runtime_contract", None)
+        base_manifest = {
+            "config": copy.deepcopy(self.manifest.get("config") or {}),
+            "entries": copy.deepcopy(self.manifest.get("entries") or []),
+        }
+        original_load_json = build_ir_train_v7._load_json
+
+        def fake_load_json(path: Path) -> dict:
+            if Path(path).name == "qwen3.json":
+                return copy.deepcopy(template)
+            return original_load_json(path)
+
+        with mock.patch.object(build_ir_train_v7, "_load_json", side_effect=fake_load_json):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Repo template `qwen3` must define contract.attention_contract.train_runtime_contract",
+            ):
+                build_ir_train_v7.build_ir1_train(
+                    manifest=base_manifest,
+                    registry=self.registry,
+                    bindings_doc=self.bindings,
+                    grad_rules=self.grad_rules,
+                    max_layers=1,
+                    strict=False,
+                    bridge_lowering="legacy",
+                )
 
     def test_gemma_sliding_attention_contract_uses_template_runtime_policy(self) -> None:
         manifest = _test_manifest("gemma3")

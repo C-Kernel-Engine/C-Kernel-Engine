@@ -53,10 +53,20 @@ Operator-facing make entrypoints:
 - `make regression-training-full`
 - `make training-fast`
 - `make training-full`
+- `make v7-benchmark-training-fp32`
+- `make v7-profile-training-fp32-perf`
+- `make v7-profile-training-fp32-vtune`
+- `make v7-profile-training-fp32-advisor`
 
 Those generic training targets are the stable user-facing interface. Today they route to the
 `v7` text-backprop lane. If a later version becomes the primary training lane, the
 Makefile should update that routing internally without changing the user command.
+
+Performance workflow:
+
+- `v7-benchmark-training-fp32` is the canonical CK-vs-PyTorch FP32 comparison on a locked tiny-train workload.
+- `v7-profile-training-fp32-*` reuses the same model shape and token budget, but runs the CK-only path under
+  `perf`, `vtune`, or `advisor` so performance captures stay attached to the same benchmark surface.
 
 Compatibility aliases still exist:
 

@@ -461,16 +461,24 @@ def _weight_key_override(op_name: str, alias: str, layer: int, rmsnorm_idx: int,
     return alias
 
 
-def _choose_template(manifest: Dict[str, Any], explicit_template: Optional[Path]) -> Dict[str, Any]:
+def _choose_template_with_source(
+    manifest: Dict[str, Any],
+    explicit_template: Optional[Path],
+) -> Tuple[Dict[str, Any], str]:
     if isinstance(manifest.get("template"), dict) and manifest.get("template"):
-        return manifest["template"]
+        return manifest["template"], "manifest.template"
     if explicit_template is not None:
-        return _load_json(explicit_template)
+        return _load_json(explicit_template), "repo.template"
     model = str((manifest.get("config") or {}).get("model", "qwen3")).lower()
     candidate = TEMPLATES_DIR / ("%s.json" % model)
     if candidate.exists():
-        return _load_json(candidate)
+        return _load_json(candidate), "repo.template"
     raise RuntimeError("No template found in manifest and no template file for model=%s" % model)
+
+
+def _choose_template(manifest: Dict[str, Any], explicit_template: Optional[Path]) -> Dict[str, Any]:
+    template, _template_source = _choose_template_with_source(manifest, explicit_template)
+    return template
 
 
 def _make_saved_tensor_id(op_id: int, key: str) -> str:
@@ -484,29 +492,82 @@ def _resolve_forward_kernels(config: Dict[str, Any], template: Dict[str, Any]) -
     return resolved
 
 
-def _template_attention_runtime_contract(template: Dict[str, Any]) -> Dict[str, Any]:
-    contract = ((template.get("contract") or {}).get("attention_contract") or {})
-    if not isinstance(contract, dict):
-        return {}
-    raw_train_contract = contract.get("train_runtime_contract")
-    if isinstance(raw_train_contract, dict):
-        out = dict(raw_train_contract)
-    else:
-        out = {}
+def _normalize_train_attention_runtime_contract(raw_train_contract: Any) -> Dict[str, Any]:
+    out = dict(raw_train_contract) if isinstance(raw_train_contract, dict) else {}
     saved_overrides = out.get("saved_tensor_kernel_overrides")
-    if not isinstance(saved_overrides, dict):
+    if isinstance(saved_overrides, dict):
+        saved_overrides = {
+            str(key).strip(): str(value).strip()
+            for key, value in saved_overrides.items()
+            if str(key).strip() and str(value).strip()
+        }
+    else:
         saved_overrides = {}
-    attn_variant = str(contract.get("attn_variant", "") or "").strip().lower()
-    if "attn_weights" not in saved_overrides:
-        saved_overrides["attn_weights"] = "attention_forward_causal_head_major_gqa_exact"
     out["saved_tensor_kernel_overrides"] = saved_overrides
     zero_saved = out.get("requires_zero_sliding_window_for_saved_tensors")
-    if not isinstance(zero_saved, list):
+    if isinstance(zero_saved, list):
+        zero_saved = [str(item).strip() for item in zero_saved if str(item).strip()]
+    else:
         zero_saved = []
-    if attn_variant == "sliding_window" and "attn_weights" not in zero_saved:
-        zero_saved = list(zero_saved) + ["attn_weights"]
     out["requires_zero_sliding_window_for_saved_tensors"] = zero_saved
     return out
+
+
+def _default_train_attention_runtime_contract(attn_variant: str) -> Dict[str, Any]:
+    out = {
+        "saved_tensor_kernel_overrides": {
+            "attn_weights": "attention_forward_causal_head_major_gqa_exact"
+        },
+        "requires_zero_sliding_window_for_saved_tensors": [],
+    }
+    if attn_variant == "sliding_window":
+        out["requires_zero_sliding_window_for_saved_tensors"] = ["attn_weights"]
+    return out
+
+
+def _template_attention_runtime_contract(
+    template: Dict[str, Any],
+    *,
+    template_source: str,
+) -> Tuple[Dict[str, Any], Optional[str]]:
+    contract = ((template.get("contract") or {}).get("attention_contract") or {})
+    if not isinstance(contract, dict):
+        contract = {}
+    template_name = str(template.get("name") or "unknown")
+    attn_variant = str(contract.get("attn_variant", "") or "").strip().lower()
+    out = _normalize_train_attention_runtime_contract(contract.get("train_runtime_contract"))
+    saved_overrides = out["saved_tensor_kernel_overrides"]
+    zero_saved = out["requires_zero_sliding_window_for_saved_tensors"]
+    missing_fields: List[str] = []
+    if not str(saved_overrides.get("attn_weights") or "").strip():
+        missing_fields.append("saved_tensor_kernel_overrides.attn_weights")
+    if attn_variant == "sliding_window" and "attn_weights" not in set(zero_saved):
+        missing_fields.append("requires_zero_sliding_window_for_saved_tensors.attn_weights")
+    if not missing_fields:
+        return out, None
+
+    if template_source == "manifest.template":
+        fallback = _default_train_attention_runtime_contract(attn_variant)
+        merged_saved = dict(fallback["saved_tensor_kernel_overrides"])
+        merged_saved.update(saved_overrides)
+        merged_zero = list(zero_saved)
+        for item in fallback["requires_zero_sliding_window_for_saved_tensors"]:
+            if item not in merged_zero:
+                merged_zero.append(item)
+        out["saved_tensor_kernel_overrides"] = merged_saved
+        out["requires_zero_sliding_window_for_saved_tensors"] = merged_zero
+        warning = (
+            "Embedded manifest template `%s` is missing training attention runtime contract "
+            "fields (%s); applied compatibility defaults. Regenerate the run manifest so "
+            "the template carries explicit train_runtime_contract truth."
+        ) % (template_name, ", ".join(missing_fields))
+        return out, warning
+
+    raise RuntimeError(
+        "Repo template `%s` must define contract.attention_contract.train_runtime_contract "
+        "fields: %s"
+        % (template_name, ", ".join(missing_fields))
+    )
 
 
 def _resolve_train_config(manifest_config: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
@@ -532,7 +593,7 @@ def build_ir1_train(
     strict: bool,
     bridge_lowering: str = "legacy",
 ) -> Dict[str, Any]:
-    template = _choose_template(manifest, explicit_template=None)
+    template, template_source = _choose_template_with_source(manifest, explicit_template=None)
     config = _resolve_train_config(manifest.get("config", {}), template)
     bridge_lowering = str(bridge_lowering or "legacy").strip().lower()
     if bridge_lowering not in {"legacy", "explicit"}:
@@ -556,6 +617,12 @@ def build_ir1_train(
     issues: List[str] = []
     warnings: List[str] = []
     bridge_enabled = bridge_lowering == "explicit"
+    train_attention_runtime_contract, train_attention_contract_warning = _template_attention_runtime_contract(
+        template,
+        template_source=template_source,
+    )
+    if train_attention_contract_warning:
+        warnings.append(train_attention_contract_warning)
 
     op_id = 0
     instance_counter: Dict[str, int] = {}
@@ -886,8 +953,6 @@ def build_ir1_train(
                 issues.append(msg)
             else:
                 warnings.append(msg)
-
-    train_attention_runtime_contract = _template_attention_runtime_contract(template)
 
     def _resolve_attention_runtime_contract(
         logical_op: str,
@@ -1737,6 +1802,7 @@ def build_ir1_train(
         "bridge_lowering": bridge_lowering,
         "config": config,
         "template_name": template.get("name", "unknown"),
+        "template_source": template_source,
         "num_layers": num_layers,
         "ops": ops,
         "tensors": tensors,

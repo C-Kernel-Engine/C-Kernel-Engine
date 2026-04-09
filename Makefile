@@ -3348,6 +3348,8 @@ report-md:
 .PHONY: v7-grad-fd v7-replay
 .PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
 .PHONY: v7-regression-training-fast v7-regression-training-full regression-training-fast regression-training-full training-fast training-full
+.PHONY: v7-benchmark-training-fp32-prepare v7-benchmark-training-fp32 benchmark-training-fp32
+.PHONY: v7-profile-training-fp32-perf v7-profile-training-fp32-vtune v7-profile-training-fp32-advisor
 .PHONY: v7-backprop-long-epoch v7-backprop-long-epoch-nightly
 .PHONY: visualizer visualizer-full v7-ir-visualizer-e2e v7-ir-visualizer-e2e-nightly
 .PHONY: v7-visualizer-health v7-visualizer-generated-e2e
@@ -3630,6 +3632,32 @@ V7_BACKPROP_STITCH_TOTAL_TOKENS ?= 32
 V7_BACKPROP_PLUMBING_RUNTIME_REPORT ?=
 V7_BACKPROP_PLUMBING_RUNTIME_SUMMARY ?=
 V7_BACKPROP_MATRIX_REPORT_ROOT ?= $(V7_REPORT_DIR)/backprop_family_matrix
+V7_TRAIN_BENCHMARK_SCRIPT ?= version/v7/scripts/benchmark_train_fp32_v7.py
+V7_TRAIN_BENCHMARK_CACHE_DIR ?= version/v7/.cache/models
+V7_TRAIN_BENCHMARK_REPORT_ROOT ?= $(V7_REPORT_DIR)/train_benchmark_fp32
+V7_TRAIN_BENCHMARK_JSON ?= $(V7_TRAIN_BENCHMARK_REPORT_ROOT)/v7_train_benchmark_fp32_latest.json
+V7_TRAIN_BENCHMARK_MD ?= $(V7_TRAIN_BENCHMARK_REPORT_ROOT)/v7_train_benchmark_fp32_latest.md
+V7_TRAIN_BENCHMARK_RUN_DIR ?= version/v7/.cache/models/train/benchmark_fp32_canonical
+V7_TRAIN_BENCHMARK_TEMPLATE ?= qwen3
+V7_TRAIN_BENCHMARK_INIT ?= xavier_uniform
+V7_TRAIN_BENCHMARK_LAYERS ?= 2
+V7_TRAIN_BENCHMARK_VOCAB ?= 1024
+V7_TRAIN_BENCHMARK_D_MODEL ?= 256
+V7_TRAIN_BENCHMARK_HIDDEN ?= 1024
+V7_TRAIN_BENCHMARK_NUM_HEADS ?= 8
+V7_TRAIN_BENCHMARK_NUM_KV_HEADS ?= 4
+V7_TRAIN_BENCHMARK_CONTEXT_LEN ?= 128
+V7_TRAIN_BENCHMARK_SEQ_LEN ?= 8
+V7_TRAIN_BENCHMARK_TOTAL_TOKENS ?= 2048
+V7_TRAIN_BENCHMARK_GRAD_ACCUM ?= 8
+V7_TRAIN_BENCHMARK_EPOCHS ?= 1
+V7_TRAIN_BENCHMARK_LR ?= 1e-3
+V7_TRAIN_BENCHMARK_THREADS ?= 8
+V7_TRAIN_BENCHMARK_SEED ?= 42
+V7_TRAIN_BENCHMARK_PROMPT ?= Hello!
+V7_TRAIN_BENCHMARK_BRIDGE ?= legacy
+V7_TRAIN_BENCHMARK_CHECKPOINT ?= none
+V7_TRAIN_BENCHMARK_AFFINITY ?=
 V7_BACKPROP_MATRIX_JSON ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.json
 V7_BACKPROP_MATRIX_MD ?= $(V7_BACKPROP_MATRIX_REPORT_ROOT)/v7_backprop_family_matrix_latest.md
 V7_BACKPROP_MATRIX_EXTENDED ?= 0
@@ -3762,6 +3790,10 @@ v7-help:
 	@echo "  make regression-training-full"
 	@echo "  make training-fast"
 	@echo "  make training-full"
+	@echo "  make v7-benchmark-training-fp32"
+	@echo "  make v7-profile-training-fp32-perf"
+	@echo "  make v7-profile-training-fp32-vtune"
+	@echo "  make v7-profile-training-fp32-advisor"
 	@echo "  make regression-backprop-fast"
 	@echo "  make regression-backprop-full"
 	@echo "  make v7-regression-backprop-fast"
@@ -3797,6 +3829,8 @@ v7-help:
 	@echo "  - versioned v7-regression-training-* and older backprop-named targets remain compatibility shims"
 	@echo "  - current v7 fast matrix covers qwen2/qwen3/gemma/nanbeige; full adds qwen35"
 	@echo "  - family override for smoke/triage: V7_BACKPROP_MATRIX_FAMILIES=qwen3 or qwen2,qwen3"
+	@echo "  - canonical CK-vs-Torch train benchmark: make v7-benchmark-training-fp32"
+	@echo "  - locked workload profiler captures: make v7-profile-training-fp32-perf|vtune|advisor"
 	@echo "  - live terminal monitor: make v7-ctop RUN=/tmp/v7_runtime_parity (or use v7-ctop-demo)"
 	@echo "  - profiling toggles: V7_WITH_VTUNE=$(V7_WITH_VTUNE), V7_WITH_ADVISOR=$(V7_WITH_ADVISOR), V7_VTUNE_DEEP=$(V7_VTUNE_DEEP)"
 
@@ -4309,6 +4343,148 @@ regression-training-full: $(BACKPROP_FULL_TARGET)
 training-fast: $(BACKPROP_FAST_TARGET)
 
 training-full: $(BACKPROP_FULL_TARGET)
+
+v7-benchmark-training-fp32-prepare:
+	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)"
+	@CK_CACHE_DIR="$(V7_TRAIN_BENCHMARK_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py init \
+		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
+		--init "$(V7_TRAIN_BENCHMARK_INIT)" \
+		--train-seed "$(V7_TRAIN_BENCHMARK_SEED)" \
+		--layers "$(V7_TRAIN_BENCHMARK_LAYERS)" \
+		--vocab-size "$(V7_TRAIN_BENCHMARK_VOCAB)" \
+		--embed-dim "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
+		--hidden-dim "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
+		--num-heads "$(V7_TRAIN_BENCHMARK_NUM_HEADS)" \
+		--num-kv-heads "$(V7_TRAIN_BENCHMARK_NUM_KV_HEADS)" \
+		--context-len "$(V7_TRAIN_BENCHMARK_CONTEXT_LEN)" \
+		--template "$(V7_TRAIN_BENCHMARK_TEMPLATE)" \
+		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
+
+v7-benchmark-training-fp32:
+	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)"
+	@$(PYTHON) "$(V7_TRAIN_BENCHMARK_SCRIPT)" \
+		--run-dir "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
+		--report-root "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)" \
+		--json-out "$(V7_TRAIN_BENCHMARK_JSON)" \
+		--md-out "$(V7_TRAIN_BENCHMARK_MD)" \
+		--template "$(V7_TRAIN_BENCHMARK_TEMPLATE)" \
+		--init "$(V7_TRAIN_BENCHMARK_INIT)" \
+		--layers "$(V7_TRAIN_BENCHMARK_LAYERS)" \
+		--vocab-size "$(V7_TRAIN_BENCHMARK_VOCAB)" \
+		--d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
+		--hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
+		--num-heads "$(V7_TRAIN_BENCHMARK_NUM_HEADS)" \
+		--num-kv-heads "$(V7_TRAIN_BENCHMARK_NUM_KV_HEADS)" \
+		--context-len "$(V7_TRAIN_BENCHMARK_CONTEXT_LEN)" \
+		--epochs "$(V7_TRAIN_BENCHMARK_EPOCHS)" \
+		--seq-len "$(V7_TRAIN_BENCHMARK_SEQ_LEN)" \
+		--total-tokens "$(V7_TRAIN_BENCHMARK_TOTAL_TOKENS)" \
+		--grad-accum "$(V7_TRAIN_BENCHMARK_GRAD_ACCUM)" \
+		--lr "$(V7_TRAIN_BENCHMARK_LR)" \
+		--seed "$(V7_TRAIN_BENCHMARK_SEED)" \
+		--threads "$(V7_TRAIN_BENCHMARK_THREADS)" \
+		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
+		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)" \
+		$(if $(strip $(V7_TRAIN_BENCHMARK_AFFINITY)),--affinity-cpulist "$(V7_TRAIN_BENCHMARK_AFFINITY)",)
+
+benchmark-training-fp32: v7-benchmark-training-fp32
+
+v7-profile-training-fp32-perf: v7-benchmark-training-fp32-prepare
+	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf"
+	@CK_CACHE_DIR="$(V7_TRAIN_BENCHMARK_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_BENCHMARK_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_BENCHMARK_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_BENCHMARK_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_BENCHMARK_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_BENCHMARK_LR)" \
+		--train-seed "$(V7_TRAIN_BENCHMARK_SEED)" \
+		--train-vocab "$(V7_TRAIN_BENCHMARK_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
+		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
+		--profile-train perf \
+		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf" \
+		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf/v7_train_benchmark_fp32_perf.json" \
+		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
+
+v7-profile-training-fp32-vtune: v7-benchmark-training-fp32-prepare
+	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune"
+	@CK_CACHE_DIR="$(V7_TRAIN_BENCHMARK_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_BENCHMARK_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_BENCHMARK_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_BENCHMARK_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_BENCHMARK_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_BENCHMARK_LR)" \
+		--train-seed "$(V7_TRAIN_BENCHMARK_SEED)" \
+		--train-vocab "$(V7_TRAIN_BENCHMARK_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
+		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
+		--profile-train vtune \
+		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune" \
+		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune/v7_train_benchmark_fp32_vtune.json" \
+		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
+
+v7-profile-training-fp32-advisor: v7-benchmark-training-fp32-prepare
+	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor"
+	@CK_CACHE_DIR="$(V7_TRAIN_BENCHMARK_CACHE_DIR)" \
+	CK_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	MKL_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OPENBLAS_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
+	OMP_PROC_BIND=close \
+	OMP_PLACES=cores \
+	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
+		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
+		--backend ck \
+		--train-epochs "$(V7_TRAIN_BENCHMARK_EPOCHS)" \
+		--train-seq-len "$(V7_TRAIN_BENCHMARK_SEQ_LEN)" \
+		--train-total-tokens "$(V7_TRAIN_BENCHMARK_TOTAL_TOKENS)" \
+		--train-grad-accum "$(V7_TRAIN_BENCHMARK_GRAD_ACCUM)" \
+		--train-lr "$(V7_TRAIN_BENCHMARK_LR)" \
+		--train-seed "$(V7_TRAIN_BENCHMARK_SEED)" \
+		--train-vocab "$(V7_TRAIN_BENCHMARK_VOCAB)" \
+		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
+		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
+		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
+		--profile-train advisor \
+		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor" \
+		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor/v7_train_benchmark_fp32_advisor.json" \
+		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
+		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
 
 v7-backprop-plumbing:
 	@set -e; \
