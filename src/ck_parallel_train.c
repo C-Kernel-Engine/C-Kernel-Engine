@@ -4,6 +4,13 @@
  *
  * The training runtime currently emits many gemm_blocked_serial calls.
  * This wrapper keeps kernel math unchanged and only parallelizes dispatch.
+ *
+ * OpenMP removal note:
+ * Training backward used to fall back into legacy OpenMP GEMM paths for T>1
+ * micro-batches, which mixed libiomp barriers with the CK threadpool and
+ * showed up as fork/barrier overhead in profiling. Keep the hot training
+ * path on the CK threadpool here, and leave older kernel-level OpenMP paths
+ * as compatibility fallbacks until they are fully retired.
  */
 
 #include "ckernel_engine.h"
@@ -165,6 +172,213 @@ typedef struct {
     int aligned_out;
 } ck_train_outer_t1_args_t;
 
+typedef struct {
+    const float *d_output;
+    const float *input;
+    const float *W;
+    float *d_input;
+    float *d_W;
+    float *d_b;
+    int T;
+    int aligned_in;
+    int aligned_out;
+} ck_train_gemm_backward_args_t;
+
+static void ck_train_gemm_nn_compute_rows(const float *A,
+                                          const float *B,
+                                          const float *bias,
+                                          float *C,
+                                          int row_start,
+                                          int row_end,
+                                          int N,
+                                          int K) {
+    if (!A || !B || !C || row_start >= row_end || N <= 0 || K <= 0) {
+        return;
+    }
+
+    for (int i = row_start; i < row_end; ++i) {
+        const float *a_row = A + (size_t)i * (size_t)K;
+        float *c_row = C + (size_t)i * (size_t)N;
+#if defined(__AVX512F__)
+        int j = 0;
+        for (; j <= N - 16; j += 16) {
+            __m512 sum = bias ? _mm512_loadu_ps(bias + j) : _mm512_setzero_ps();
+            for (int k = 0; k < K; ++k) {
+                __m512 av = _mm512_set1_ps(a_row[k]);
+                __m512 bv = _mm512_loadu_ps(B + (size_t)k * (size_t)N + (size_t)j);
+                sum = _mm512_fmadd_ps(av, bv, sum);
+            }
+            _mm512_storeu_ps(c_row + j, sum);
+        }
+        for (; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += a_row[k] * B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#elif defined(__AVX2__)
+        int j = 0;
+        for (; j <= N - 8; j += 8) {
+            __m256 sum = bias ? _mm256_loadu_ps(bias + j) : _mm256_setzero_ps();
+            for (int k = 0; k < K; ++k) {
+                __m256 av = _mm256_set1_ps(a_row[k]);
+                __m256 bv = _mm256_loadu_ps(B + (size_t)k * (size_t)N + (size_t)j);
+#if defined(__FMA__)
+                sum = _mm256_fmadd_ps(av, bv, sum);
+#else
+                sum = _mm256_add_ps(sum, _mm256_mul_ps(av, bv));
+#endif
+            }
+            _mm256_storeu_ps(c_row + j, sum);
+        }
+        for (; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += a_row[k] * B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#else
+        for (int j = 0; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += a_row[k] * B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#endif
+    }
+}
+
+static void ck_train_gemm_tn_compute_rows(const float *A,
+                                          const float *B,
+                                          const float *bias,
+                                          float *C,
+                                          int row_start,
+                                          int row_end,
+                                          int M,
+                                          int N,
+                                          int K) {
+    if (!A || !B || !C || row_start >= row_end || M <= 0 || N <= 0 || K <= 0) {
+        return;
+    }
+
+    for (int i = row_start; i < row_end; ++i) {
+        float *c_row = C + (size_t)i * (size_t)N;
+#if defined(__AVX512F__)
+        int j = 0;
+        for (; j <= N - 16; j += 16) {
+            __m512 sum = bias ? _mm512_loadu_ps(bias + j) : _mm512_setzero_ps();
+            for (int k = 0; k < K; ++k) {
+                __m512 av = _mm512_set1_ps(A[(size_t)k * (size_t)M + (size_t)i]);
+                __m512 bv = _mm512_loadu_ps(B + (size_t)k * (size_t)N + (size_t)j);
+                sum = _mm512_fmadd_ps(av, bv, sum);
+            }
+            _mm512_storeu_ps(c_row + j, sum);
+        }
+        for (; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += A[(size_t)k * (size_t)M + (size_t)i] *
+                       B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#elif defined(__AVX2__)
+        int j = 0;
+        for (; j <= N - 8; j += 8) {
+            __m256 sum = bias ? _mm256_loadu_ps(bias + j) : _mm256_setzero_ps();
+            for (int k = 0; k < K; ++k) {
+                __m256 av = _mm256_set1_ps(A[(size_t)k * (size_t)M + (size_t)i]);
+                __m256 bv = _mm256_loadu_ps(B + (size_t)k * (size_t)N + (size_t)j);
+#if defined(__FMA__)
+                sum = _mm256_fmadd_ps(av, bv, sum);
+#else
+                sum = _mm256_add_ps(sum, _mm256_mul_ps(av, bv));
+#endif
+            }
+            _mm256_storeu_ps(c_row + j, sum);
+        }
+        for (; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += A[(size_t)k * (size_t)M + (size_t)i] *
+                       B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#else
+        for (int j = 0; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                sum += A[(size_t)k * (size_t)M + (size_t)i] *
+                       B[(size_t)k * (size_t)N + (size_t)j];
+            }
+            c_row[j] = sum;
+        }
+#endif
+    }
+}
+
+static void ck_train_bias_reduce_compute_range(const float *d_output,
+                                               float *d_bias,
+                                               int T,
+                                               int out_start,
+                                               int out_end,
+                                               int aligned_out) {
+    if (!d_output || !d_bias || T <= 0 || out_start >= out_end || aligned_out <= 0) {
+        return;
+    }
+
+    for (int out_idx = out_start; out_idx < out_end; ++out_idx) {
+        float bias_grad = 0.0f;
+        for (int t = 0; t < T; ++t) {
+            bias_grad += d_output[(size_t)t * (size_t)aligned_out + (size_t)out_idx];
+        }
+        d_bias[out_idx] += bias_grad;
+    }
+}
+
+static void ck_train_outer_t1_compute_range(const float *d_output,
+                                            const float *input,
+                                            float *d_W,
+                                            float *d_b,
+                                            int out_start,
+                                            int out_end,
+                                            int aligned_in) {
+    if (!d_output || !input || !d_W || out_start >= out_end || aligned_in <= 0) {
+        return;
+    }
+
+    for (int out_idx = out_start; out_idx < out_end; ++out_idx) {
+        float g = d_output[out_idx];
+        if (d_b) {
+            d_b[out_idx] += g;
+        }
+        float *dw_row = d_W + (size_t)out_idx * (size_t)aligned_in;
+        for (int j = 0; j < aligned_in; ++j) {
+            dw_row[j] = g * input[j];
+        }
+    }
+}
+
+static void ck_train_gemm_backward_serial(const float *d_output,
+                                          const float *input,
+                                          const float *W,
+                                          float *d_input,
+                                          float *d_W,
+                                          float *d_b,
+                                          int T,
+                                          int aligned_in,
+                                          int aligned_out) {
+    ck_train_gemm_nn_compute_rows(d_output, W, NULL, d_input, 0, T, aligned_in, aligned_out);
+    ck_train_gemm_tn_compute_rows(d_output, input, NULL, d_W, 0, aligned_out, aligned_out, aligned_in, T);
+    if (d_b) {
+        ck_train_bias_reduce_compute_range(d_output, d_b, T, 0, aligned_out, aligned_out);
+    }
+}
+
 static void ck_train_gemm_nn_work(int ith, int nth, void *argp) {
     ck_train_gemm_nn_args_t *a = (ck_train_gemm_nn_args_t *)argp;
     if (!a || a->M <= 0 || a->N <= 0 || a->K <= 0) {
@@ -230,91 +444,8 @@ static void ck_train_gemm_nn_work(int ith, int nth, void *argp) {
         return;
     }
 
-    const float *A_chunk = a->A + (size_t)m0 * (size_t)a->K;
-    float *C_chunk = a->C + (size_t)m0 * (size_t)a->N;
-    gemm_nn_simd(A_chunk, a->B, a->bias, C_chunk, m_chunk, a->N, a->K);
+    ck_train_gemm_nn_compute_rows(a->A, a->B, a->bias, a->C, m0, m1, a->N, a->K);
 }
-
-static void ck_train_gemm_tn_work(int ith, int nth, void *argp) {
-    ck_train_gemm_tn_args_t *a = (ck_train_gemm_tn_args_t *)argp;
-    if (!a || a->M <= 0 || a->N <= 0 || a->K <= 0) {
-        return;
-    }
-
-    int dm = (a->M + nth - 1) / nth;
-    int m0 = dm * ith;
-    int m1 = m0 + dm;
-    if (m0 >= a->M) {
-        return;
-    }
-    if (m1 > a->M) {
-        m1 = a->M;
-    }
-
-    for (int i = m0; i < m1; ++i) {
-        float *c_row = a->C + (size_t)i * (size_t)a->N;
-#if defined(__AVX2__)
-        int j = 0;
-        for (; j <= a->N - 8; j += 8) {
-            __m256 sum = a->bias ? _mm256_loadu_ps(a->bias + j) : _mm256_setzero_ps();
-            for (int k = 0; k < a->K; ++k) {
-                const float aval = a->A[(size_t)k * (size_t)a->M + (size_t)i];
-                __m256 av = _mm256_set1_ps(aval);
-                __m256 bv = _mm256_loadu_ps(a->B + (size_t)k * (size_t)a->N + (size_t)j);
-#if defined(__FMA__)
-                sum = _mm256_fmadd_ps(av, bv, sum);
-#else
-                sum = _mm256_add_ps(sum, _mm256_mul_ps(av, bv));
-#endif
-            }
-            _mm256_storeu_ps(c_row + j, sum);
-        }
-        for (; j < a->N; ++j) {
-            float sum = a->bias ? a->bias[j] : 0.0f;
-            for (int k = 0; k < a->K; ++k) {
-                sum += a->A[(size_t)k * (size_t)a->M + (size_t)i] *
-                       a->B[(size_t)k * (size_t)a->N + (size_t)j];
-            }
-            c_row[j] = sum;
-        }
-#else
-        for (int j = 0; j < a->N; ++j) {
-            float sum = a->bias ? a->bias[j] : 0.0f;
-            for (int k = 0; k < a->K; ++k) {
-                sum += a->A[(size_t)k * (size_t)a->M + (size_t)i] *
-                       a->B[(size_t)k * (size_t)a->N + (size_t)j];
-            }
-            c_row[j] = sum;
-        }
-#endif
-    }
-}
-
-static void ck_train_bias_reduce_work(int ith, int nth, void *argp) {
-    ck_train_bias_reduce_args_t *a = (ck_train_bias_reduce_args_t *)argp;
-    if (!a || a->T <= 0 || a->aligned_out <= 0) {
-        return;
-    }
-
-    int dn = (a->aligned_out + nth - 1) / nth;
-    int n0 = dn * ith;
-    int n1 = n0 + dn;
-    if (n0 >= a->aligned_out) {
-        return;
-    }
-    if (n1 > a->aligned_out) {
-        n1 = a->aligned_out;
-    }
-
-    for (int out_idx = n0; out_idx < n1; ++out_idx) {
-        float bias_grad = 0.0f;
-        for (int t = 0; t < a->T; ++t) {
-            bias_grad += a->d_output[(size_t)t * (size_t)a->aligned_out + (size_t)out_idx];
-        }
-        a->d_bias[out_idx] += bias_grad;
-    }
-}
-
 
 static void ck_train_outer_t1_work(int ith, int nth, void *argp) {
     ck_train_outer_t1_args_t *a = (ck_train_outer_t1_args_t *)argp;
@@ -332,12 +463,59 @@ static void ck_train_outer_t1_work(int ith, int nth, void *argp) {
         n1 = a->aligned_out;
     }
 
-    for (int out_idx = n0; out_idx < n1; ++out_idx) {
-        float g = a->d_output[out_idx];
-        a->d_b[out_idx] += g;
-        float *dw_row = a->d_W + (size_t)out_idx * (size_t)a->aligned_in;
-        for (int j = 0; j < a->aligned_in; ++j) {
-            dw_row[j] = g * a->input[j];
+    ck_train_outer_t1_compute_range(a->d_output, a->input, a->d_W, a->d_b, n0, n1, a->aligned_in);
+}
+
+static void ck_train_gemm_backward_work(int ith, int nth, void *argp) {
+    ck_train_gemm_backward_args_t *a = (ck_train_gemm_backward_args_t *)argp;
+    if (!a || !a->d_output || !a->input || !a->W || !a->d_input || !a->d_W ||
+        a->T <= 0 || a->aligned_in <= 0 || a->aligned_out <= 0) {
+        return;
+    }
+
+    int dt = (a->T + nth - 1) / nth;
+    int t0 = dt * ith;
+    int t1 = t0 + dt;
+    if (t1 > a->T) {
+        t1 = a->T;
+    }
+    if (t0 < t1) {
+        ck_train_gemm_nn_compute_rows(
+            a->d_output,
+            a->W,
+            NULL,
+            a->d_input,
+            t0,
+            t1,
+            a->aligned_in,
+            a->aligned_out);
+    }
+
+    int dn = (a->aligned_out + nth - 1) / nth;
+    int n0 = dn * ith;
+    int n1 = n0 + dn;
+    if (n1 > a->aligned_out) {
+        n1 = a->aligned_out;
+    }
+    if (n0 < n1) {
+        ck_train_gemm_tn_compute_rows(
+            a->d_output,
+            a->input,
+            NULL,
+            a->d_W,
+            n0,
+            n1,
+            a->aligned_out,
+            a->aligned_in,
+            a->T);
+        if (a->d_b) {
+            ck_train_bias_reduce_compute_range(
+                a->d_output,
+                a->d_b,
+                a->T,
+                n0,
+                n1,
+                a->aligned_out);
         }
     }
 }
@@ -352,7 +530,7 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
                                                int aligned_in,
                                                int aligned_out,
                                                int num_threads) {
-    if (!d_output || !input || !W || !d_input || !d_W || !d_b) {
+    if (!d_output || !input || !W || !d_input || !d_W) {
         return;
     }
     if (T <= 0 || aligned_in <= 0 || aligned_out <= 0) {
@@ -366,16 +544,7 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
     }
 
     if (!pool || nth <= 1) {
-        fc2_backward_kernel(d_output,
-                            input,
-                            W,
-                            d_input,
-                            d_W,
-                            d_b,
-                            T,
-                            aligned_in,
-                            aligned_out,
-                            1);
+        ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
         return;
     }
 
@@ -386,14 +555,7 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
 
         const size_t outer_work = (size_t)aligned_out * (size_t)aligned_in;
         if (aligned_out < nth * 2 || aligned_in < 64 || outer_work < (size_t)524288) {
-            for (int out_idx = 0; out_idx < aligned_out; ++out_idx) {
-                float g = d_output[out_idx];
-                d_b[out_idx] += g;
-                float *dw_row = d_W + (size_t)out_idx * (size_t)aligned_in;
-                for (int j = 0; j < aligned_in; ++j) {
-                    dw_row[j] = g * input[j];
-                }
-            }
+            ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
         } else {
             ck_train_outer_t1_args_t t1_args = {
                 .d_output = d_output,
@@ -408,53 +570,25 @@ void gemm_backward_f32_train_parallel_dispatch(const float *d_output,
         return;
     }
 
-    /*
-     * Stability guard for T>1 train micro-batches:
-     * use the proven FC2 reference backward path for d_input/dW/db.
-     * The custom threaded TN worker path is only kept for T==1 currently.
-     */
-    fc2_backward_kernel(d_output,
-                        input,
-                        W,
-                        d_input,
-                        d_W,
-                        d_b,
-                        T,
-                        aligned_in,
-                        aligned_out,
-                        1);
-    return;
+    const size_t nn_work = (size_t)T * (size_t)aligned_in * (size_t)aligned_out;
+    const size_t tn_work = (size_t)aligned_out * (size_t)aligned_in * (size_t)T;
+    if ((T < 2 && aligned_out < nth * 2) || (nn_work < (size_t)131072 && tn_work < (size_t)131072)) {
+        ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
+        return;
+    }
 
-    ck_train_gemm_nn_args_t nn_args = {
-        .A = d_output,
-        .B = W,
-        .bias = NULL,
-        .C = d_input,
-        .M = T,
-        .N = aligned_in,
-        .K = aligned_out,
-        .split_n = 0,
-    };
-    ck_threadpool_dispatch(pool, ck_train_gemm_nn_work, &nn_args);
-
-    ck_train_gemm_tn_args_t tn_args = {
-        .A = d_output,
-        .B = input,
-        .bias = NULL,
-        .C = d_W,
-        .M = aligned_out,
-        .N = aligned_in,
-        .K = T,
-    };
-    ck_threadpool_dispatch(pool, ck_train_gemm_tn_work, &tn_args);
-
-    ck_train_bias_reduce_args_t b_args = {
+    ck_train_gemm_backward_args_t bw_args = {
         .d_output = d_output,
-        .d_bias = d_b,
+        .input = input,
+        .W = W,
+        .d_input = d_input,
+        .d_W = d_W,
+        .d_b = d_b,
         .T = T,
+        .aligned_in = aligned_in,
         .aligned_out = aligned_out,
     };
-    ck_threadpool_dispatch(pool, ck_train_bias_reduce_work, &b_args);
+    ck_threadpool_dispatch(pool, ck_train_gemm_backward_work, &bw_args);
 }
 
 /*
@@ -472,7 +606,7 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
                                                   int aligned_in,
                                                   int aligned_out,
                                                   int num_threads) {
-    if (!d_output || !input || !W || !d_input || !d_W || !d_b) {
+    if (!d_output || !input || !W || !d_input || !d_W) {
         return;
     }
     if (T <= 0 || aligned_in <= 0 || aligned_out <= 0) {
@@ -486,8 +620,7 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
     }
 
     if (!pool || nth <= 1) {
-        gemm_backward_f32_train_parallel_dispatch(
-            d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out, 1);
+        ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
         return;
     }
 
@@ -521,63 +654,28 @@ void gemm_backward_f32_train_parallel_dispatch_v2(const float *d_output,
             };
             ck_threadpool_dispatch(pool, ck_train_outer_t1_work, &t1_args);
         } else {
-            for (int out_idx = 0; out_idx < aligned_out; ++out_idx) {
-                float g = d_output[out_idx];
-                d_b[out_idx] += g;
-                float *dw_row = d_W + (size_t)out_idx * (size_t)aligned_in;
-                for (int j = 0; j < aligned_in; ++j) {
-                    dw_row[j] = g * input[j];
-                }
-            }
+            ck_train_outer_t1_compute_range(d_output, input, d_W, d_b, 0, aligned_out, aligned_in);
         }
         return;
     }
 
-    /*
-     * Stability-first fallback for T>1:
-     * keep v2 fast-threaded path for T==1 only, and route larger T to
-     * the reference backward kernel while we harden the TN threaded worker.
-     */
-    fc2_backward_kernel(d_output,
-                        input,
-                        W,
-                        d_input,
-                        d_W,
-                        d_b,
-                        T,
-                        aligned_in,
-                        aligned_out,
-                        1);
-    return;
+    const size_t nn_work = (size_t)T * (size_t)aligned_in * (size_t)aligned_out;
+    const size_t tn_work = (size_t)aligned_out * (size_t)aligned_in * (size_t)T;
+    if ((T < nth && aligned_out < nth) || (nn_work < (size_t)131072 && tn_work < (size_t)131072)) {
+        ck_train_gemm_backward_serial(d_output, input, W, d_input, d_W, d_b, T, aligned_in, aligned_out);
+        return;
+    }
 
-    ck_train_gemm_nn_args_t nn_args = {
-        .A = d_output,
-        .B = W,
-        .bias = NULL,
-        .C = d_input,
-        .M = T,
-        .N = aligned_in,
-        .K = aligned_out,
-        .split_n = 0,
-    };
-    ck_threadpool_dispatch(pool, ck_train_gemm_nn_work, &nn_args);
-
-    ck_train_gemm_tn_args_t tn_args = {
-        .A = d_output,
-        .B = input,
-        .bias = NULL,
-        .C = d_W,
-        .M = aligned_out,
-        .N = aligned_in,
-        .K = T,
-    };
-    ck_threadpool_dispatch(pool, ck_train_gemm_tn_work, &tn_args);
-
-    ck_train_bias_reduce_args_t b_args = {
+    ck_train_gemm_backward_args_t bw_args = {
         .d_output = d_output,
-        .d_bias = d_b,
+        .input = input,
+        .W = W,
+        .d_input = d_input,
+        .d_W = d_W,
+        .d_b = d_b,
         .T = T,
+        .aligned_in = aligned_in,
         .aligned_out = aligned_out,
     };
-    ck_threadpool_dispatch(pool, ck_train_bias_reduce_work, &b_args);
+    ck_threadpool_dispatch(pool, ck_train_gemm_backward_work, &bw_args);
 }

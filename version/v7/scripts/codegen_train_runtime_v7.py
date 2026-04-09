@@ -30,6 +30,9 @@ DEFAULT_BINDINGS = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
 
 
 FALLBACK_DECLS: Dict[str, str] = {
+    "gradient_global_norm_multi_f32": (
+        "float gradient_global_norm_multi_f32(const float *const *grads, const size_t *numels, int tensor_count);"
+    ),
     "gradient_clip_norm_f32": (
         "float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);"
     ),
@@ -1202,7 +1205,12 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     # Optimizer kernels are required by generated ck_train_optimizer_step
     # even when the current IR2 does not carry explicit optimizer nodes.
-    for opt_kernel in ("adamw_update_f32", "gradient_clip_norm_f32", "adamw_clip_update_multi_f32"):
+    for opt_kernel in (
+        "adamw_update_f32",
+        "gradient_clip_norm_f32",
+        "gradient_global_norm_multi_f32",
+        "adamw_clip_update_multi_f32",
+    ):
         if opt_kernel not in used_decl:
             resolved = resolve_decl_for_kernel(opt_kernel)
             if resolved is not None:
@@ -1615,19 +1623,19 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     else:
         ap("    /*")
         ap("     * Global grad norm (L2 over all grad.weight.* tensors).")
-        ap("     * This is telemetry for operator visibility; it runs once per step.")
+        ap("     * This is telemetry for operator visibility; keep it on the shared")
+        ap("     * vectorized/threadpool optimizer helper instead of emitting scalar")
+        ap("     * per-tensor loops into every generated runtime.")
         ap("     */")
-        ap("    double sum_sq = 0.0;")
+        ap("    const float *grads[%d] = {" % len(opt_pairs))
         for _wname, gvar, _wvar, _mvar, _vvar, numel in sorted(opt_pairs, key=lambda x: x[0]):
-            n_expr = str(int(numel))
-            ap("    if (%s != NULL) {" % gvar)
-            ap("        for (size_t gi = 0; gi < (size_t)%s; ++gi) {" % n_expr)
-            ap("            double gv = (double)%s[gi];" % gvar)
-            ap("            sum_sq += gv * gv;")
-            ap("        }")
-            ap("    }")
-        ap("    if (!(sum_sq > 0.0)) return 0.0f;")
-        ap("    return (float)sqrt(sum_sq);")
+            ap("        %s," % gvar)
+        ap("    };")
+        ap("    const size_t numels[%d] = {" % len(opt_pairs))
+        for _wname, _gvar, _wvar, _mvar, _vvar, numel in sorted(opt_pairs, key=lambda x: x[0]):
+            ap("        (size_t)%d," % int(numel))
+        ap("    };")
+        ap("    return gradient_global_norm_multi_f32(grads, numels, %d);" % len(opt_pairs))
     ap("}")
     ap("")
 

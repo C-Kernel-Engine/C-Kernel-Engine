@@ -592,6 +592,36 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertIn("checkpoint_rematerialize_saved_tensor", c_src)
         self.assertIn("explicit checkpoint rematerialization via shared attention_forward bridge", c_src)
 
+    def test_codegen_uses_shared_global_grad_norm_helper(self) -> None:
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=self.manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="explicit",
+        )
+        ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
+            ir1=ir1,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            strict=False,
+            allow_partial=True,
+            checkpoint_policy="none",
+        )
+        layout = generate_train_layout_v7.build_layout(ir2, self.manifest, 64, strict=False)
+        c_src, _summary = codegen_train_runtime_v7.generate_c(
+            ir2,
+            self.registry,
+            manifest=self.manifest,
+            layout=layout,
+            exec_plan=None,
+        )
+        self.assertIn("gradient_global_norm_multi_f32(grads, numels,", c_src)
+        self.assertNotIn("double gv = (double)", c_src)
+
 
 if __name__ == "__main__":
     unittest.main()

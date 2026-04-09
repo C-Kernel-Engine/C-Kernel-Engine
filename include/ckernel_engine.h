@@ -156,6 +156,9 @@ void adamw_clip_update_multi_f32(float *const *grads,
 void gradient_accumulate_f32(float *dst, const float *src, size_t numel);
 void gradient_scale_f32(float *grad, size_t numel, float scale);
 float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);
+float gradient_global_norm_multi_f32(const float *const *grads,
+                                     const size_t *numels,
+                                     int tensor_count);
 
 	// Reference BF16 GEMM (A/B/bias in BF16, output BF16).
 void gemm_blocked_serial_bf16(const uint16_t *A,

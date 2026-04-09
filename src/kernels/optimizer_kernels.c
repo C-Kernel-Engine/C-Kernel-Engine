@@ -80,6 +80,13 @@ typedef struct {
 } ck_sum_sq_parallel_args_t;
 
 typedef struct {
+    const float *const *grads;
+    const size_t *numels;
+    int tensor_count;
+    double partial[CK_OPT_PAR_MAX_THREADS];
+} ck_sum_sq_multi_parallel_args_t;
+
+typedef struct {
     float *const *grads;
     float *const *weights;
     float *const *m_states;
@@ -194,6 +201,26 @@ static void ck_sum_sq_parallel_work(int ith, int nth, void *argp)
         end = a->numel;
     }
     a->partial[ith] = gradient_sum_sq_f32_impl(a->grad + start, end - start);
+}
+
+static void ck_sum_sq_multi_parallel_work(int ith, int nth, void *argp)
+{
+    ck_sum_sq_multi_parallel_args_t *a = (ck_sum_sq_multi_parallel_args_t *)argp;
+    if (!a || !a->grads || !a->numels || a->tensor_count <= 0 ||
+        ith < 0 || ith >= CK_OPT_PAR_MAX_THREADS) {
+        return;
+    }
+
+    double sum_sq = 0.0;
+    for (int ti = ith; ti < a->tensor_count; ti += nth) {
+        const float *g = a->grads[ti];
+        size_t n = a->numels[ti];
+        if (!g || n == 0) {
+            continue;
+        }
+        sum_sq += gradient_sum_sq_f32_impl(g, n);
+    }
+    a->partial[ith] = sum_sq;
 }
 
 static void ck_adamw_multi_parallel_work(int ith, int nth, void *argp)
@@ -573,20 +600,9 @@ void adamw_clip_update_multi_f32(
 
     float grad_scale = 1.0f;
     if (max_grad_norm > 0.0f) {
-        double total_sum_sq = 0.0;
-        for (int i = 0; i < tensor_count; ++i) {
-            const float *g = grads[i];
-            size_t n = numels[i];
-            if (!g || n == 0) {
-                continue;
-            }
-            total_sum_sq += gradient_sum_sq_f32_impl(g, n);
-        }
-        if (total_sum_sq > 0.0) {
-            double global_norm = sqrt(total_sum_sq);
-            if (global_norm > (double)max_grad_norm) {
-                grad_scale = max_grad_norm / (float)global_norm;
-            }
+        float global_norm = gradient_global_norm_multi_f32((const float *const *)grads, numels, tensor_count);
+        if (global_norm > max_grad_norm) {
+            grad_scale = max_grad_norm / global_norm;
         }
     }
 
@@ -1017,4 +1033,57 @@ float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm)
         gradient_scale_f32(grad, numel, scale);
     }
     return norm;
+}
+
+float gradient_global_norm_multi_f32(const float *const *grads, const size_t *numels, int tensor_count)
+{
+    if (!grads || !numels || tensor_count <= 0) {
+        return 0.0f;
+    }
+
+    size_t total_numel = 0;
+    int valid_tensors = 0;
+    for (int i = 0; i < tensor_count; ++i) {
+        if (!grads[i] || numels[i] == 0) {
+            continue;
+        }
+        total_numel += numels[i];
+        valid_tensors += 1;
+    }
+    if (total_numel == 0 || valid_tensors == 0) {
+        return 0.0f;
+    }
+
+    double sum_sq = 0.0;
+    ck_threadpool_t *pool = ck_threadpool_global();
+    int nth = pool ? ck_threadpool_n_threads(pool) : 1;
+
+    if (pool && nth > 1 && nth <= CK_OPT_PAR_MAX_THREADS &&
+        total_numel >= CK_OPT_PAR_MIN_NUMEL && valid_tensors > 1) {
+        ck_sum_sq_multi_parallel_args_t args;
+        args.grads = grads;
+        args.numels = numels;
+        args.tensor_count = tensor_count;
+        for (int i = 0; i < CK_OPT_PAR_MAX_THREADS; ++i) {
+            args.partial[i] = 0.0;
+        }
+        ck_threadpool_dispatch(pool, ck_sum_sq_multi_parallel_work, &args);
+        for (int i = 0; i < nth; ++i) {
+            sum_sq += args.partial[i];
+        }
+    } else {
+        for (int i = 0; i < tensor_count; ++i) {
+            const float *g = grads[i];
+            size_t n = numels[i];
+            if (!g || n == 0) {
+                continue;
+            }
+            sum_sq += gradient_sum_sq_f32_impl(g, n);
+        }
+    }
+
+    if (!(sum_sq > 0.0)) {
+        return 0.0f;
+    }
+    return sqrtf((float)sum_sq);
 }
