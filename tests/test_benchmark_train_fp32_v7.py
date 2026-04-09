@@ -26,9 +26,51 @@ def _load_module(name: str, path: Path):
 
 
 bench = _load_module("benchmark_train_fp32_v7_test", SCRIPT)
+cpu_policy = _load_module("cpu_policy_v7_test", SCRIPT.parent / "cpu_policy_v7.py")
 
 
 class BenchmarkTrainFp32V7Tests(unittest.TestCase):
+    def test_cpu_policy_auto_prefers_fast_physical_cores_on_hybrid_sysfs(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            cpu_base = Path(td)
+            spec = {
+                0: {"siblings": "0-1", "core_id": "0", "core_type": "0", "max_freq": "4700000"},
+                1: {"siblings": "0-1", "core_id": "0", "core_type": "0", "max_freq": "4700000"},
+                2: {"siblings": "2-3", "core_id": "1", "core_type": "0", "max_freq": "4700000"},
+                3: {"siblings": "2-3", "core_id": "1", "core_type": "0", "max_freq": "4700000"},
+                4: {"siblings": "4", "core_id": "2", "core_type": "1", "max_freq": "3400000"},
+                5: {"siblings": "5", "core_id": "3", "core_type": "1", "max_freq": "3400000"},
+            }
+            for cpu, meta in spec.items():
+                cpu_dir = cpu_base / f"cpu{cpu}"
+                (cpu_dir / "topology").mkdir(parents=True)
+                (cpu_dir / "cpufreq").mkdir(parents=True)
+                (cpu_dir / "topology" / "thread_siblings_list").write_text(meta["siblings"], encoding="utf-8")
+                (cpu_dir / "topology" / "core_id").write_text(meta["core_id"], encoding="utf-8")
+                (cpu_dir / "topology" / "core_type").write_text(meta["core_type"], encoding="utf-8")
+                (cpu_dir / "cpufreq" / "cpuinfo_max_freq").write_text(meta["max_freq"], encoding="utf-8")
+
+            resolved = cpu_policy.resolve_dense_cpu_policy(
+                8,
+                None,
+                cpu_policy="auto",
+                cpu_base=cpu_base,
+            )
+            self.assertEqual(resolved["resolved_threads"], 2)
+            self.assertEqual(resolved["resolved_affinity_cpulist"], "0,2")
+            self.assertEqual(resolved["policy_source"], "auto-fast-cores")
+
+    def test_cpu_policy_respects_explicit_affinity(self) -> None:
+        resolved = cpu_policy.resolve_dense_cpu_policy(
+            8,
+            "0-7",
+            cpu_policy="auto",
+            cpu_base=Path("/definitely/missing"),
+        )
+        self.assertEqual(resolved["resolved_threads"], 8)
+        self.assertEqual(resolved["resolved_affinity_cpulist"], "0-7")
+        self.assertEqual(resolved["policy_source"], "explicit")
+
     def test_extract_step_profile_accepts_train_report_shape(self) -> None:
         report = {
             "step_profile": {

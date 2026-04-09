@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from cpu_policy_v7 import resolve_dense_cpu_policy
+
 
 def _repo_root_from_file(path: Path) -> Path:
     return path.resolve().parents[3]
@@ -95,8 +97,14 @@ def _render_markdown(summary: dict) -> str:
         "",
         "| Setting | Value |",
         "|---|---|",
-        f"| threads | {env_policy.get('threads', 'NA')} |",
+        f"| requested_threads | {env_policy.get('requested_threads', env_policy.get('threads', 'NA'))} |",
+        f"| resolved_threads | {env_policy.get('resolved_threads', env_policy.get('threads', 'NA'))} |",
+        f"| cpu_policy | `{env_policy.get('cpu_policy', 'NA')}` |",
+        f"| policy_source | `{env_policy.get('policy_source', 'NA')}` |",
         f"| affinity_cpulist | `{env_policy.get('affinity_cpulist', '') or ''}` |",
+        f"| topology_detection | `{env_policy.get('topology_detection', '') or ''}` |",
+        f"| fast_core_count | {env_policy.get('fast_core_count', 'NA')} |",
+        f"| fast_logical_count | {env_policy.get('fast_logical_count', 'NA')} |",
         f"| CK_NUM_THREADS | {env_policy.get('CK_NUM_THREADS', 'NA')} |",
         f"| OMP_NUM_THREADS | {env_policy.get('OMP_NUM_THREADS', 'NA')} |",
         f"| MKL_NUM_THREADS | {env_policy.get('MKL_NUM_THREADS', 'NA')} |",
@@ -181,6 +189,12 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument(
+        "--cpu-policy",
+        choices=["auto", "unrestricted", "prefer-fast-cores", "prefer-fast-cores-smt"],
+        default="auto",
+        help="Dense training CPU policy. 'auto' prefers one logical per fast core on hybrid CPUs.",
+    )
     ap.add_argument("--prompt", default="Hello!")
     ap.add_argument("--train-bridge-lowering", choices=["legacy", "explicit"], default="legacy")
     ap.add_argument("--train-checkpoint-policy", choices=["none", "recompute_attn"], default="none")
@@ -204,13 +218,20 @@ def main() -> int:
 
     env = os.environ.copy()
     env.setdefault("CK_CACHE_DIR", str(default_cache_dir))
-    env.update(_default_env_threads(args.threads))
+    cpu_policy = resolve_dense_cpu_policy(
+        args.threads,
+        args.affinity_cpulist,
+        cpu_policy=str(args.cpu_policy),
+    )
+    resolved_threads = int(cpu_policy["resolved_threads"])
+    resolved_affinity = str(cpu_policy.get("resolved_affinity_cpulist") or "")
+    env.update(_default_env_threads(resolved_threads))
 
     taskset_prefix: List[str] = []
-    if args.affinity_cpulist:
+    if resolved_affinity:
         if shutil.which("taskset") is None:
             raise RuntimeError("--affinity-cpulist requested but taskset is not available")
-        taskset_prefix = ["taskset", "-c", str(args.affinity_cpulist)]
+        taskset_prefix = ["taskset", "-c", resolved_affinity]
 
     init_needed = not (args.reuse_run and (run_dir / "weights.bump").exists() and (run_dir / "weights_manifest.json").exists())
     init_wall_s = 0.0
@@ -298,10 +319,17 @@ def main() -> int:
             "train_checkpoint_policy": str(args.train_checkpoint_policy),
         },
         "env_policy": {
-            "threads": int(args.threads),
-            "affinity_cpulist": str(args.affinity_cpulist or ""),
+            "threads": resolved_threads,
+            "requested_threads": int(args.threads),
+            "resolved_threads": resolved_threads,
+            "cpu_policy": str(args.cpu_policy),
+            "policy_source": str(cpu_policy.get("policy_source") or ""),
+            "affinity_cpulist": resolved_affinity,
+            "topology_detection": str((cpu_policy.get("topology") or {}).get("detection") or ""),
+            "fast_core_count": int((cpu_policy.get("topology") or {}).get("fast_core_count") or 0),
+            "fast_logical_count": int((cpu_policy.get("topology") or {}).get("fast_logical_count") or 0),
             "CK_CACHE_DIR": str(env.get("CK_CACHE_DIR", "")),
-            **_default_env_threads(args.threads),
+            **_default_env_threads(resolved_threads),
         },
         "performance": {
             "init_wall_s": init_wall_s,
