@@ -3640,7 +3640,7 @@ V7_TRAIN_BENCHMARK_MD ?= $(V7_TRAIN_BENCHMARK_REPORT_ROOT)/v7_train_benchmark_fp
 V7_TRAIN_BENCHMARK_RUN_DIR ?= version/v7/.cache/models/train/benchmark_fp32_canonical
 V7_TRAIN_BENCHMARK_TEMPLATE ?= qwen3
 V7_TRAIN_BENCHMARK_INIT ?= xavier_uniform
-V7_TRAIN_BENCHMARK_LAYERS ?= 2
+V7_TRAIN_BENCHMARK_LAYERS ?= 1
 V7_TRAIN_BENCHMARK_VOCAB ?= 1024
 V7_TRAIN_BENCHMARK_D_MODEL ?= 256
 V7_TRAIN_BENCHMARK_HIDDEN ?= 1024
@@ -3651,7 +3651,7 @@ V7_TRAIN_BENCHMARK_SEQ_LEN ?= 8
 V7_TRAIN_BENCHMARK_TOTAL_TOKENS ?= 2048
 V7_TRAIN_BENCHMARK_GRAD_ACCUM ?= 8
 V7_TRAIN_BENCHMARK_EPOCHS ?= 1
-V7_TRAIN_BENCHMARK_LR ?= 1e-3
+V7_TRAIN_BENCHMARK_LR ?= 5e-4
 V7_TRAIN_BENCHMARK_THREADS ?= 8
 V7_TRAIN_BENCHMARK_SEED ?= 42
 V7_TRAIN_BENCHMARK_PROMPT ?= Hello!
@@ -4409,6 +4409,7 @@ v7-profile-training-fp32-perf: v7-benchmark-training-fp32-prepare
 	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
 	OMP_PROC_BIND=close \
 	OMP_PLACES=cores \
+	perf stat -d -d -d -o "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf/perf_stat.txt" -- \
 	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
 		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
 		--backend ck \
@@ -4422,8 +4423,7 @@ v7-profile-training-fp32-perf: v7-benchmark-training-fp32-prepare
 		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
 		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
 		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
-		--profile-train perf \
-		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf" \
+		--profile-train none \
 		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/perf/v7_train_benchmark_fp32_perf.json" \
 		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
@@ -4438,6 +4438,7 @@ v7-profile-training-fp32-vtune: v7-benchmark-training-fp32-prepare
 	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
 	OMP_PROC_BIND=close \
 	OMP_PLACES=cores \
+	vtune -collect hotspots -result-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune/hotspots" -quiet -- \
 	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
 		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
 		--backend ck \
@@ -4451,11 +4452,12 @@ v7-profile-training-fp32-vtune: v7-benchmark-training-fp32-prepare
 		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
 		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
 		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
-		--profile-train vtune \
-		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune" \
+		--profile-train none \
 		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune/v7_train_benchmark_fp32_vtune.json" \
 		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
+	@vtune -report summary -r "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune/hotspots" -format text \
+		-report-output "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/vtune/vtune_summary.txt" >/dev/null 2>&1 || true
 
 v7-profile-training-fp32-advisor: v7-benchmark-training-fp32-prepare
 	@mkdir -p "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor"
@@ -4467,6 +4469,7 @@ v7-profile-training-fp32-advisor: v7-benchmark-training-fp32-prepare
 	NUMEXPR_NUM_THREADS="$(V7_TRAIN_BENCHMARK_THREADS)" \
 	OMP_PROC_BIND=close \
 	OMP_PLACES=cores \
+	advisor --collect=roofline --project-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor/roofline" -- \
 	$(PYTHON) version/v7/scripts/ck_run_v7.py train \
 		--run "$(V7_TRAIN_BENCHMARK_RUN_DIR)" \
 		--backend ck \
@@ -4480,8 +4483,7 @@ v7-profile-training-fp32-advisor: v7-benchmark-training-fp32-prepare
 		--train-d-model "$(V7_TRAIN_BENCHMARK_D_MODEL)" \
 		--train-hidden "$(V7_TRAIN_BENCHMARK_HIDDEN)" \
 		--prompt "$(V7_TRAIN_BENCHMARK_PROMPT)" \
-		--profile-train advisor \
-		--train-profile-dir "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor" \
+		--profile-train none \
 		--train-json-out "$(V7_TRAIN_BENCHMARK_REPORT_ROOT)/advisor/v7_train_benchmark_fp32_advisor.json" \
 		--train-bridge-lowering "$(V7_TRAIN_BENCHMARK_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_BENCHMARK_CHECKPOINT)"
