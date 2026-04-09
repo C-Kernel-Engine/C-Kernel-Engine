@@ -1,0 +1,54 @@
+{
+  "header": {
+    "headline": "IR Kernel Registry Chain",
+    "subtitle": "The registry chain connects high-level intent to concrete kernel implementations and their callable metadata."
+  },
+  "nodes": {
+    "intent": {
+      "title": "IR Intent",
+      "body": "Operations arrive with semantic intent, data type, and shape requirements.",
+      "detail": [
+        "op",
+        "dtype",
+        "shape"
+      ]
+    },
+    "registry": {
+      "title": "Registry Match",
+      "body": "Lookup resolves those requirements against known kernel families and variants.",
+      "detail": [
+        "registry",
+        "variants"
+      ]
+    },
+    "binding": {
+      "title": "Kernel Binding",
+      "body": "Resolved kernels receive concrete argument bindings and runtime-facing metadata.",
+      "detail": [
+        "bindings",
+        "args"
+      ]
+    },
+    "runtime": {
+      "title": "Runtime Call",
+      "body": "The runtime invokes one selected implementation with explicit dispatch context.",
+      "detail": [
+        "dispatch",
+        "invoke"
+      ]
+    },
+    "outcome": {
+      "title": "Traceable Dispatch",
+      "body": "The chain works when each dispatch step remains inspectable end to end."
+    }
+  },
+  "edges": {
+    "edge_1": "lookup",
+    "edge_2": "select",
+    "edge_3": "bind",
+    "edge_4": "execute"
+  },
+  "footer": {
+    "note": "Registry-chain assets should teach how intent becomes runnable code, not just that a registry exists."
+  }
+}

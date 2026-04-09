@@ -1,0 +1,66 @@
+{
+  "header": {
+    "headline": "IR v66 Failure Decision Tree",
+    "subtitle": "Start from the first failing gate. Do not debug every symptom at once."
+  },
+  "entry": {
+    "label": "ENTRYPOINT"
+  },
+  "nodes": {
+    "start": {
+      "title": "Which gate failed first?",
+      "body": "Classify the failure before touching unrelated subsystems."
+    },
+    "left": {
+      "title": "Contract / Build",
+      "body": "Kernel maps, scripts, or build contracts drifted.",
+      "detail": [
+        "kernel maps",
+        "build flags"
+      ]
+    },
+    "center": {
+      "title": "Matrix / Probe",
+      "body": "A specific validation row or probe path failed.",
+      "detail": [
+        "matrix row",
+        "probe output"
+      ]
+    },
+    "right": {
+      "title": "Parity / Decode",
+      "body": "Parity or longer decode behavior regressed.",
+      "detail": [
+        "parity",
+        "decode"
+      ]
+    }
+  },
+  "edges": {
+    "start_left": "contracts",
+    "start_center": "matrix",
+    "start_right": "parity",
+    "center_finish": "retest"
+  },
+  "outcomes": {
+    "left_outcome": {
+      "title": "Contract Branch",
+      "body": "Diff scripts, kernel maps, and build inputs first."
+    },
+    "center_outcome": {
+      "title": "Matrix Branch",
+      "body": "Rerun the failing row in isolation and inspect artifacts."
+    },
+    "right_outcome": {
+      "title": "Parity Branch",
+      "body": "Check runtime availability and parity drift before anything else."
+    }
+  },
+  "finish": {
+    "title": "Finish",
+    "body": "Once the branch is green, rerun the full gate and archive the result."
+  },
+  "footer": {
+    "note": "Operational rule: isolate one failing branch at a time."
+  }
+}

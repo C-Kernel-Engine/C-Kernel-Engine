@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Streaming Algorithms",
+    "headline": "Online Softmax Algorithm",
+    "subtitle": "Compute stable softmax statistics incrementally so long streams can stay exact without materializing everything at once."
+  },
+  "principles": {
+    "left": {
+      "title": "Naive softmax",
+      "body": "Collect all scores first, then normalize. It is simple, but it assumes full materialization is affordable.",
+      "bullets": [
+        "Store all scores",
+        "Normalize afterward",
+        "Memory cost grows fast"
+      ]
+    },
+    "right": {
+      "title": "Online update",
+      "body": "Track running maxima and partial sums so normalization can stay exact while data streams through.",
+      "bullets": [
+        "Update max on the fly",
+        "Renormalize incrementally",
+        "Preserve stability"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Numerics",
+      "title": "Stable running max",
+      "summary": "The online form keeps a stable maximum so the exponentials stay numerically sane.",
+      "bullets": [
+        "Track current max",
+        "Adjust previous sum",
+        "Avoid overflow"
+      ],
+      "accent": "green",
+      "note": "Numerical hygiene is part of the algorithm."
+    },
+    {
+      "tag": "Systems",
+      "title": "Streaming state",
+      "summary": "Only a compact state needs to live in fast memory while the input tiles stream through.",
+      "bullets": [
+        "Small working set",
+        "Natural for tiles",
+        "Fits flash-style loops"
+      ],
+      "accent": "blue",
+      "note": "The algebra lines up with the memory story."
+    },
+    {
+      "tag": "Result",
+      "title": "Exact normalization",
+      "summary": "You trade materialization for a structured recurrence, not for a weaker answer.",
+      "bullets": [
+        "Exact result",
+        "Lower memory pressure",
+        "Better long-context viability"
+      ],
+      "accent": "amber",
+      "note": "The outcome matches the dense version."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "Online softmax is a bridge between numerical analysis and systems design.",
+      "That bridge is easier to teach with structured editorial panels.",
+      "The DSL should expose the recurrence, not just the headline."
+    ],
+    "footer": "online_softmax"
+  }
+}

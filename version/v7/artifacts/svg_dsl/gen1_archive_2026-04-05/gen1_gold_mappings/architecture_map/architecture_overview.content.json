@@ -1,0 +1,54 @@
+{
+  "header": {
+    "headline": "Architecture Overview",
+    "subtitle": "A broad overview diagram should surface the major runtime lanes and their handoff points."
+  },
+  "nodes": {
+    "input": {
+      "title": "Input Surface",
+      "body": "Requests, tokens, and configuration enter the system through one visible ingress.",
+      "detail": [
+        "prompt",
+        "config"
+      ]
+    },
+    "planner": {
+      "title": "Planner Layer",
+      "body": "Routing and configuration decisions turn user intent into executable structure.",
+      "detail": [
+        "routing",
+        "contract"
+      ]
+    },
+    "runtime": {
+      "title": "Runtime Core",
+      "body": "Kernels, memory layout, and scheduling perform the actual work.",
+      "detail": [
+        "kernels",
+        "memory",
+        "schedule"
+      ]
+    },
+    "artifacts": {
+      "title": "Artifacts",
+      "body": "Outputs, logs, and probes emerge as the visible products of the run.",
+      "detail": [
+        "svg",
+        "reports"
+      ]
+    },
+    "outcome": {
+      "title": "Operational View",
+      "body": "A good overview keeps the main lanes legible without drowning in local detail."
+    }
+  },
+  "edges": {
+    "edge_1": "intent",
+    "edge_2": "plan",
+    "edge_3": "execute",
+    "edge_4": "observe"
+  },
+  "footer": {
+    "note": "Overviews are useful when they compress the system into a stable handoff map."
+  }
+}

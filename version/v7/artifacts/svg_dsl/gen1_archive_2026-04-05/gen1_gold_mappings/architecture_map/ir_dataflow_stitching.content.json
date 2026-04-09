@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "IR Dataflow Stitching",
+    "subtitle": "Stitching keeps producer-consumer relationships explicit so codegen can preserve the intended graph semantics."
+  },
+  "nodes": {
+    "producers": {
+      "title": "Producer Ops",
+      "body": "Early graph operators define the upstream values and dependencies.",
+      "detail": [
+        "producer ids",
+        "shapes"
+      ]
+    },
+    "stitch": {
+      "title": "Stitch Layer",
+      "body": "The IR reifies the handoff points so later passes can preserve dataflow structure.",
+      "detail": [
+        "edges",
+        "anchors"
+      ]
+    },
+    "kernels": {
+      "title": "Kernel Groups",
+      "body": "Stitched values are lowered into kernel-level work units without losing origin.",
+      "detail": [
+        "kernels",
+        "groups"
+      ]
+    },
+    "artifacts": {
+      "title": "IR Artifacts",
+      "body": "The final artifacts keep lineage visible to debugging and runtime tooling.",
+      "detail": [
+        "json",
+        "reports"
+      ]
+    },
+    "outcome": {
+      "title": "Visible Lineage",
+      "body": "A healthy stitched architecture keeps provenance visible from graph to kernel."
+    }
+  },
+  "edges": {
+    "edge_1": "edges",
+    "edge_2": "lower",
+    "edge_3": "emit",
+    "edge_4": "trace"
+  },
+  "footer": {
+    "note": "Dataflow stitching is an architecture problem because lineage must survive lowering."
+  }
+}

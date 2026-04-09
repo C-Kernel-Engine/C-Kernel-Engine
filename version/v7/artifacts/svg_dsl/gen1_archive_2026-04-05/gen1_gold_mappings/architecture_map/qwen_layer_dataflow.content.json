@@ -1,0 +1,54 @@
+{
+  "header": {
+    "headline": "Qwen Layer Dataflow",
+    "subtitle": "A compact left-to-right view of the dominant compute path through one layer."
+  },
+  "nodes": {
+    "tokens": {
+      "title": "Token State",
+      "body": "Normalized token features enter the layer.",
+      "detail": [
+        "state",
+        "norm"
+      ]
+    },
+    "attn": {
+      "title": "Attention Block",
+      "body": "Project, route, and aggregate context.",
+      "detail": [
+        "qkv",
+        "rope",
+        "attn"
+      ]
+    },
+    "mix": {
+      "title": "Projection Mix",
+      "body": "Fold the attended representation back into the model width.",
+      "detail": [
+        "proj",
+        "residual"
+      ]
+    },
+    "mlp": {
+      "title": "MLP Block",
+      "body": "Gate, expand, and compress token features.",
+      "detail": [
+        "gate",
+        "expand"
+      ]
+    },
+    "outcome": {
+      "title": "Residual Output",
+      "body": "The layer returns an updated token state for the next block."
+    }
+  },
+  "edges": {
+    "edge_1": "normalized",
+    "edge_2": "context",
+    "edge_3": "residual stream",
+    "edge_4": "updated state"
+  },
+  "footer": {
+    "note": "Many architecture assets are really structured dataflow diagrams with one stable lane of computation."
+  }
+}

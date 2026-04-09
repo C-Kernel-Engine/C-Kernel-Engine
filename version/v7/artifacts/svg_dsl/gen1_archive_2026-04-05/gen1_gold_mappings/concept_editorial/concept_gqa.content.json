@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Attention Variants",
+    "headline": "Grouped Query Attention",
+    "subtitle": "Share K/V heads across query groups to cut cache cost without collapsing the whole model into one KV pair."
+  },
+  "principles": {
+    "left": {
+      "title": "MHA baseline",
+      "body": "Every attention head gets its own K/V heads, which maximizes flexibility but grows cache and bandwidth.",
+      "bullets": [
+        "Many KV heads",
+        "Highest cache cost",
+        "Clean mental model"
+      ]
+    },
+    "right": {
+      "title": "GQA compromise",
+      "body": "Queries stay numerous, but K/V heads are shared in groups for a better quality-cost tradeoff.",
+      "bullets": [
+        "Shared KV pairs",
+        "Cache shrinks meaningfully",
+        "Quality often holds"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Tradeoff",
+      "title": "Why not MQA?",
+      "summary": "Single-KV attention is cheaper still, but can erase too much representational flexibility.",
+      "bullets": [
+        "One KV pair is extreme",
+        "GQA keeps groups",
+        "Quality stays steadier"
+      ],
+      "accent": "purple",
+      "note": "The sweet spot is not always the cheapest point."
+    },
+    {
+      "tag": "Mechanics",
+      "title": "Shared KV",
+      "summary": "Multiple query heads point at the same K/V pair, so the cache scales with groups instead of heads.",
+      "bullets": [
+        "Query heads stay many",
+        "KV heads shrink",
+        "Group wiring stays regular"
+      ],
+      "accent": "green",
+      "note": "A structural change becomes a memory win."
+    },
+    {
+      "tag": "Systems",
+      "title": "KV cache drop",
+      "summary": "Lower KV cardinality means less memory traffic and smaller serving footprint.",
+      "bullets": [
+        "Serving becomes cheaper",
+        "Latency pressure drops",
+        "Long context is easier"
+      ],
+      "accent": "amber",
+      "note": "Inference cost often follows cache shape."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "GQA is a systems compromise, not just an architecture fad.",
+      "It preserves multiple queries while trimming cache cost.",
+      "Shared structure is exactly what the DSL should expose."
+    ],
+    "footer": "gqa"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "header": {
+    "headline": "AMX Pipeline",
+    "subtitle": "AMX-ready inference depends on a clean dataflow from quantized input blocks to tile-backed kernels."
+  },
+  "nodes": {
+    "input": {
+      "title": "Packed Inputs",
+      "body": "Quantized blocks and scale metadata enter the runtime as one predictable feed.",
+      "detail": [
+        "q4/q8 blocks",
+        "scales",
+        "strides"
+      ]
+    },
+    "prepare": {
+      "title": "Tile Prep",
+      "body": "Expand or align blocks into AMX-friendly tile shapes before compute begins.",
+      "detail": [
+        "tile shape",
+        "BF16 lanes"
+      ]
+    },
+    "kernel": {
+      "title": "AMX Kernel",
+      "body": "Execute matrix-heavy inner loops with one stable tile program.",
+      "detail": [
+        "dot products",
+        "accumulate"
+      ]
+    },
+    "commit": {
+      "title": "Commit Path",
+      "body": "Write the result into the next stage buffer with explicit layout guarantees.",
+      "detail": [
+        "output tile",
+        "store order"
+      ]
+    },
+    "outcome": {
+      "title": "Runtime Output",
+      "body": "The architecture succeeds when tile preparation and commit order stay deterministic."
+    }
+  },
+  "edges": {
+    "edge_1": "pack",
+    "edge_2": "tiles",
+    "edge_3": "accumulate",
+    "edge_4": "emit"
+  },
+  "footer": {
+    "note": "AMX architecture maps should read like a systems pipeline, not raw geometry."
+  }
+}

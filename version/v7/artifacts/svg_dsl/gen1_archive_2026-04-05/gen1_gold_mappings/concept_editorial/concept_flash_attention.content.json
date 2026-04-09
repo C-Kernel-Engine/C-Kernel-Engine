@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Attention Systems",
+    "headline": "Flash Attention",
+    "subtitle": "Exact attention stays exact by tiling memory pressure down to a streaming problem."
+  },
+  "principles": {
+    "left": {
+      "title": "Old path",
+      "body": "Materialize the full score matrix and memory explodes with sequence length.",
+      "bullets": [
+        "Scores matrix is O(N^2)",
+        "HBM becomes the gate",
+        "Latency follows memory traffic"
+      ]
+    },
+    "right": {
+      "title": "Flash path",
+      "body": "Stream tiles, keep one working set in fast memory, and preserve exactness.",
+      "bullets": [
+        "Online softmax updates state",
+        "One tile in SRAM",
+        "Same output, smaller memory bill"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Problem",
+      "title": "Memory wall",
+      "summary": "Long context attention is often bounded by matrix materialization, not arithmetic.",
+      "bullets": [
+        "N grows, matrix squares",
+        "GPU memory fills first",
+        "Speedups do not help if it cannot fit"
+      ],
+      "accent": "amber",
+      "note": "Capacity fails before FLOPS matter."
+    },
+    {
+      "tag": "Mechanism",
+      "title": "Tile loop",
+      "summary": "Process Q against streamed K/V tiles and update partial normalization in place.",
+      "bullets": [
+        "Load one query tile",
+        "Scan key/value tiles",
+        "Accumulate exact statistics"
+      ],
+      "accent": "green",
+      "note": "The loop is structured, not approximate."
+    },
+    {
+      "tag": "Payoff",
+      "title": "Exact result",
+      "summary": "The algorithm changes memory movement while preserving the mathematical answer.",
+      "bullets": [
+        "Lower memory footprint",
+        "Higher effective throughput",
+        "No approximation tax"
+      ],
+      "accent": "blue",
+      "note": "Systems win without changing semantics."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "Treat attention as a memory problem first.",
+      "Tile the computation before asking for more hardware.",
+      "Compiler-visible structure beats raw SVG trivia."
+    ],
+    "footer": "flash_attention"
+  }
+}

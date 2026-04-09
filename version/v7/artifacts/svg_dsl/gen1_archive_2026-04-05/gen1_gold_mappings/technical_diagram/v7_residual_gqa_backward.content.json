@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "V7 Residual GQA Backward",
+    "subtitle": "Backward-path diagrams should keep residual routing and grouped-query attention on the same technical sheet."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Input State",
+      "body": "V7 Residual GQA Backward starts from normalized or packed inputs that set the compute boundary.",
+      "detail": [
+        "residual",
+        "gqa"
+      ]
+    },
+    "stage_2": {
+      "title": "Kernel Math",
+      "body": "The middle of the diagram should expose the key transformation rather than hide it behind a generic box.",
+      "detail": [
+        "gqa",
+        "backward"
+      ]
+    },
+    "stage_3": {
+      "title": "Fused Path",
+      "body": "Show how kernels fuse, gate, or rotate state before the output contract is formed.",
+      "detail": [
+        "fusion",
+        "state update"
+      ]
+    },
+    "stage_4": {
+      "title": "Output Contract",
+      "body": "The last stage should state what artifact or activation shape the runtime emits.",
+      "detail": [
+        "artifact output",
+        "runtime state"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "dL/dx <- residual + gqa_backward",
+    "bullets": [
+      "residual",
+      "gqa",
+      "backward"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Math Trace",
+      "body": "Preserve the local equation or activation story for v7 residual gqa backward.",
+      "detail": [
+        "equation",
+        "activation path"
+      ]
+    },
+    "right": {
+      "title": "Runtime Trace",
+      "body": "Show the resulting kernel artifact, buffer change, or residual handoff.",
+      "detail": [
+        "buffer handoff",
+        "kernel artifact"
+      ]
+    }
+  },
+  "footer": {
+    "note": "V7 Residual GQA Backward belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}

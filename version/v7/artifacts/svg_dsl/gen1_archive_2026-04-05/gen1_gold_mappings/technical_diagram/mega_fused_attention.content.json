@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "Mega Fused Attention",
+    "subtitle": "Mega fused attention only makes sense when the fused path and the artifact savings are visible together."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Input State",
+      "body": "Mega Fused Attention starts from normalized or packed inputs that set the compute boundary.",
+      "detail": [
+        "mega fuse",
+        "single launch"
+      ]
+    },
+    "stage_2": {
+      "title": "Kernel Math",
+      "body": "The middle of the diagram should expose the key transformation rather than hide it behind a generic box.",
+      "detail": [
+        "single launch",
+        "artifact shrink"
+      ]
+    },
+    "stage_3": {
+      "title": "Fused Path",
+      "body": "Show how kernels fuse, gate, or rotate state before the output contract is formed.",
+      "detail": [
+        "fusion",
+        "state update"
+      ]
+    },
+    "stage_4": {
+      "title": "Output Contract",
+      "body": "The last stage should state what artifact or activation shape the runtime emits.",
+      "detail": [
+        "artifact output",
+        "runtime state"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "fused(qkv, rope, softmax, proj)",
+    "bullets": [
+      "mega fuse",
+      "single launch",
+      "artifact shrink"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Math Trace",
+      "body": "Preserve the local equation or activation story for mega fused attention.",
+      "detail": [
+        "equation",
+        "activation path"
+      ]
+    },
+    "right": {
+      "title": "Runtime Trace",
+      "body": "Show the resulting kernel artifact, buffer change, or residual handoff.",
+      "detail": [
+        "buffer handoff",
+        "kernel artifact"
+      ]
+    }
+  },
+  "footer": {
+    "note": "Mega Fused Attention belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}

@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Gen1 Existing/Precursor Smoke</title>
+  <style>
+    :root {
+      --bg: #f2eee7;
+      --ink: #182635;
+      --muted: #5e6975;
+      --line: rgba(24,38,53,0.10);
+      --card: rgba(255,255,255,0.92);
+      --accent: #0c6a83;
+      --ok: #1f6d42;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "IBM Plex Sans", "Segoe UI", sans-serif; background: linear-gradient(180deg, #faf7f2 0%, var(--bg) 100%); color: var(--ink); }
+    main { max-width: 1440px; margin: 0 auto; padding: 40px 24px 56px; }
+    h1 { margin: 0 0 8px; font-size: 40px; }
+    .lede { color: var(--muted); font-size: 17px; line-height: 1.6; max-width: 980px; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 26px 0 34px; }
+    .box, .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 16px 40px rgba(21,34,47,0.08); }
+    .box { padding: 16px 18px; }
+    .k { font: 700 26px/1.1 "IBM Plex Sans", "Segoe UI", sans-serif; }
+    .v { color: var(--muted); margin-top: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }
+    .card { padding: 18px; }
+    .meta { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .meta h2 { margin: 0 0 6px; font-size: 24px; line-height: 1.15; }
+    .sub { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .pill { padding: 8px 12px; border-radius: 999px; background: rgba(12,106,131,0.10); color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .checks, .paths { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 12px; font-weight: 600; }
+    .checks span, .paths a { padding: 7px 10px; border-radius: 999px; background: rgba(24,38,53,0.06); color: var(--ink); text-decoration: none; }
+    .checks .ok { background: rgba(31,109,66,0.12); color: var(--ok); }
+    .frame { margin-top: 18px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: white; min-height: 220px; }
+    .frame img { display: block; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Gen1 Existing/Precursor Smoke</h1>
+      <p class="lede">
+        This gate proves that the widened existing/precursor contract compiles cleanly before the first true
+        <code>gen1_full_mix</code> training run. The cases are gold DSL/compiler seeds, not hand-entered training rows.
+      </p>
+    </header>
+    <section class="summary">
+      <div class="box"><div class="k">30</div><div class="v">Gold Cases</div></div>
+      <div class="box"><div class="k">7/7</div><div class="v">comparison_span_chart</div></div><div class="box"><div class="k">5/5</div><div class="v">dashboard_cards</div></div><div class="box"><div class="k">5/5</div><div class="v">memory_training_map</div></div><div class="box"><div class="k">6/6</div><div class="v">poster_stack</div></div><div class="box"><div class="k">5/5</div><div class="v">table_matrix</div></div><div class="box"><div class="k">2/2</div><div class="v">timeline_flow</div></div>
+    </section>
+    <section class="grid">
+      
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>comparison-diagram.svg</h2>
+                  <p class="sub">Broader comparison seed for Comparison Diagram.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9537</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/comparison_diagram.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/comparison_diagram.content.json">content JSON</a>
+                <a href="comparison_span_chart/comparison_diagram.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/comparison_diagram.svg" alt="comparison_diagram"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>cpu-gpu-analysis.svg</h2>
+                  <p class="sub">Broader comparison seed for CPU GPU Analysis.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9414</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/cpu_gpu_analysis.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/cpu_gpu_analysis.content.json">content JSON</a>
+                <a href="comparison_span_chart/cpu_gpu_analysis.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/cpu_gpu_analysis.svg" alt="cpu_gpu_analysis"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>performance-balance.svg</h2>
+                  <p class="sub">Broader comparison seed for Performance Balance.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9544</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/performance_balance.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/performance_balance.content.json">content JSON</a>
+                <a href="comparison_span_chart/performance_balance.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/performance_balance.svg" alt="performance_balance"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>scale-economics.svg</h2>
+                  <p class="sub">Broader comparison seed for Scale Economics.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9407</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/scale_economics.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/scale_economics.content.json">content JSON</a>
+                <a href="comparison_span_chart/scale_economics.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/scale_economics.svg" alt="scale_economics"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>theory-of-constraints.svg</h2>
+                  <p class="sub">Broader comparison seed for Theory Of Constraints.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9593</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/theory_of_constraints.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/theory_of_constraints.content.json">content JSON</a>
+                <a href="comparison_span_chart/theory_of_constraints.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/theory_of_constraints.svg" alt="theory_of_constraints"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>v7-cross-entropy-parity-map.svg</h2>
+                  <p class="sub">Broader comparison seed for V7 Cross Entropy Parity Map.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9527</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/v7_cross_entropy_parity_map.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/v7_cross_entropy_parity_map.content.json">content JSON</a>
+                <a href="comparison_span_chart/v7_cross_entropy_parity_map.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/v7_cross_entropy_parity_map.svg" alt="v7_cross_entropy_parity_map"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>hybrid-bottleneck.svg</h2>
+                  <p class="sub">Broader comparison seed for Hybrid Bottleneck.</p>
+                </div>
+                <div class="pill">comparison_span_chart</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=27</span>
+                <span>rects=11</span>
+                <span>paths=2</span>
+                <span>bytes=9532</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/comparison_span_chart/hybrid_bottleneck.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/comparison_span_chart/hybrid_bottleneck.content.json">content JSON</a>
+                <a href="comparison_span_chart/hybrid_bottleneck.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="comparison_span_chart/hybrid_bottleneck.svg" alt="hybrid_bottleneck"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>bf16_format.svg</h2>
+                  <p class="sub">Promoted precursor table seed for BF16 Format.</p>
+                </div>
+                <div class="pill">table_matrix</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=48</span>
+                <span>rects=26</span>
+                <span>paths=0</span>
+                <span>bytes=14723</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/table_matrix/bf16_format.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/table_matrix/bf16_format.content.json">content JSON</a>
+                <a href="table_matrix/bf16_format.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="table_matrix/bf16_format.svg" alt="bf16_format"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-v66-edge-case-matrix.svg</h2>
+                  <p class="sub">Promoted precursor table seed for IR V66 Edge Case Matrix.</p>
+                </div>
+                <div class="pill">table_matrix</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=48</span>
+                <span>rects=26</span>
+                <span>paths=0</span>
+                <span>bytes=14771</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/table_matrix/ir_v66_edge_case_matrix.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/table_matrix/ir_v66_edge_case_matrix.content.json">content JSON</a>
+                <a href="table_matrix/ir_v66_edge_case_matrix.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="table_matrix/ir_v66_edge_case_matrix.svg" alt="ir_v66_edge_case_matrix"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>quantization_grouping.svg</h2>
+                  <p class="sub">Promoted precursor table seed for Quantization Grouping.</p>
+                </div>
+                <div class="pill">table_matrix</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=48</span>
+                <span>rects=26</span>
+                <span>paths=0</span>
+                <span>bytes=14763</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/table_matrix/quantization_grouping.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/table_matrix/quantization_grouping.content.json">content JSON</a>
+                <a href="table_matrix/quantization_grouping.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="table_matrix/quantization_grouping.svg" alt="quantization_grouping"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>quantization_overview.svg</h2>
+                  <p class="sub">Promoted precursor table seed for Quantization Overview.</p>
+                </div>
+                <div class="pill">table_matrix</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=48</span>
+                <span>rects=26</span>
+                <span>paths=0</span>
+                <span>bytes=14763</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/table_matrix/quantization_overview.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/table_matrix/quantization_overview.content.json">content JSON</a>
+                <a href="table_matrix/quantization_overview.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="table_matrix/quantization_overview.svg" alt="quantization_overview"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>quantization_infographic.svg</h2>
+                  <p class="sub">Promoted precursor table seed for Quantization Infographic.</p>
+                </div>
+                <div class="pill">table_matrix</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=48</span>
+                <span>rects=26</span>
+                <span>paths=0</span>
+                <span>bytes=14775</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/table_matrix/quantization_infographic.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/table_matrix/quantization_infographic.content.json">content JSON</a>
+                <a href="table_matrix/quantization_infographic.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="table_matrix/quantization_infographic.svg" alt="quantization_infographic"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>training-intuition-map.svg</h2>
+                  <p class="sub">Broader dashboard seed for Training Intuition Map.</p>
+                </div>
+                <div class="pill">dashboard_cards</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=18</span>
+                <span>rects=13</span>
+                <span>paths=0</span>
+                <span>bytes=5983</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/dashboard_cards/training_intuition_map.scene.compact.dsl">scene DSL</a>
+                
+                <a href="dashboard_cards/training_intuition_map.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="dashboard_cards/training_intuition_map.svg" alt="training_intuition_map"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>v6_plan.svg</h2>
+                  <p class="sub">Broader dashboard seed for V6 Plan.</p>
+                </div>
+                <div class="pill">dashboard_cards</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=18</span>
+                <span>rects=13</span>
+                <span>paths=0</span>
+                <span>bytes=5938</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/dashboard_cards/v6_plan.scene.compact.dsl">scene DSL</a>
+                
+                <a href="dashboard_cards/v6_plan.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="dashboard_cards/v6_plan.svg" alt="v6_plan"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>v6_plan_inkscape.svg</h2>
+                  <p class="sub">Broader dashboard seed for V6 Plan Inkscape.</p>
+                </div>
+                <div class="pill">dashboard_cards</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=18</span>
+                <span>rects=13</span>
+                <span>paths=0</span>
+                <span>bytes=5965</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/dashboard_cards/v6_plan_inkscape.scene.compact.dsl">scene DSL</a>
+                
+                <a href="dashboard_cards/v6_plan_inkscape.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="dashboard_cards/v6_plan_inkscape.svg" alt="v6_plan_inkscape"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-v66-operator-cheatsheet.svg</h2>
+                  <p class="sub">Broader dashboard seed for IR V66 Operator Cheatsheet.</p>
+                </div>
+                <div class="pill">dashboard_cards</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=18</span>
+                <span>rects=13</span>
+                <span>paths=0</span>
+                <span>bytes=5995</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/dashboard_cards/ir_v66_operator_cheatsheet.scene.compact.dsl">scene DSL</a>
+                
+                <a href="dashboard_cards/ir_v66_operator_cheatsheet.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="dashboard_cards/ir_v66_operator_cheatsheet.svg" alt="ir_v66_operator_cheatsheet"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-output-artifacts.svg</h2>
+                  <p class="sub">Broader dashboard seed for IR Output Artifacts.</p>
+                </div>
+                <div class="pill">dashboard_cards</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=18</span>
+                <span>rects=13</span>
+                <span>paths=0</span>
+                <span>bytes=5974</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/dashboard_cards/ir_output_artifacts.scene.compact.dsl">scene DSL</a>
+                
+                <a href="dashboard_cards/ir_output_artifacts.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="dashboard_cards/ir_output_artifacts.svg" alt="ir_output_artifacts"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>activation-memory-infographic.svg</h2>
+                  <p class="sub">Broader poster seed for Activation Memory Infographic.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10188</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/activation_memory_infographic.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/activation_memory_infographic.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/activation_memory_infographic.svg" alt="activation_memory_infographic"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>memory-reality-infographic.svg</h2>
+                  <p class="sub">Broader poster seed for Memory Reality Infographic.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10111</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/memory_reality_infographic.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/memory_reality_infographic.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/memory_reality_infographic.svg" alt="memory_reality_infographic"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>power-delivery-infographic.svg</h2>
+                  <p class="sub">Broader poster seed for Power Delivery Infographic.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10111</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/power_delivery_infographic.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/power_delivery_infographic.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/power_delivery_infographic.svg" alt="power_delivery_infographic"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>c-kernel-engine-overview.svg</h2>
+                  <p class="sub">Broader poster seed for C Kernel Engine Overview.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10105</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/c_kernel_engine_overview.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/c_kernel_engine_overview.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/c_kernel_engine_overview.svg" alt="c_kernel_engine_overview"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>commodity-hardware-pattern.svg</h2>
+                  <p class="sub">Broader poster seed for Commodity Hardware Pattern.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10111</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/commodity_hardware_pattern.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/commodity_hardware_pattern.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/commodity_hardware_pattern.svg" alt="commodity_hardware_pattern"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>infra-ocean-stability.svg</h2>
+                  <p class="sub">Broader poster seed for Infra Ocean Stability.</p>
+                </div>
+                <div class="pill">poster_stack</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=20</span>
+                <span>rects=14</span>
+                <span>paths=0</span>
+                <span>bytes=10096</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/poster_stack/infra_ocean_stability.scene.compact.dsl">scene DSL</a>
+                
+                <a href="poster_stack/infra_ocean_stability.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="poster_stack/infra_ocean_stability.svg" alt="infra_ocean_stability"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>concept-weight-tying.svg</h2>
+                  <p class="sub">Promoted precursor memory/training map seed for Concept Weight Tying.</p>
+                </div>
+                <div class="pill">memory_training_map</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=58</span>
+                <span>rects=31</span>
+                <span>paths=1</span>
+                <span>bytes=17902</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/memory_training_map/concept_weight_tying.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/memory_training_map/concept_weight_tying.content.json">content JSON</a>
+                <a href="memory_training_map/concept_weight_tying.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="memory_training_map/concept_weight_tying.svg" alt="concept_weight_tying"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-logic-vs-memory.svg</h2>
+                  <p class="sub">Promoted precursor memory/training map seed for IR Logic Vs Memory.</p>
+                </div>
+                <div class="pill">memory_training_map</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=58</span>
+                <span>rects=31</span>
+                <span>paths=1</span>
+                <span>bytes=17862</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/memory_training_map/ir_logic_vs_memory.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/memory_training_map/ir_logic_vs_memory.content.json">content JSON</a>
+                <a href="memory_training_map/ir_logic_vs_memory.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="memory_training_map/ir_logic_vs_memory.svg" alt="ir_logic_vs_memory"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>v7-backprop-ir-stack.svg</h2>
+                  <p class="sub">Promoted precursor memory/training map seed for V7 Backprop IR Stack.</p>
+                </div>
+                <div class="pill">memory_training_map</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=58</span>
+                <span>rects=31</span>
+                <span>paths=1</span>
+                <span>bytes=17902</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/memory_training_map/v7_backprop_ir_stack.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/memory_training_map/v7_backprop_ir_stack.content.json">content JSON</a>
+                <a href="memory_training_map/v7_backprop_ir_stack.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="memory_training_map/v7_backprop_ir_stack.svg" alt="v7_backprop_ir_stack"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>v7-grad-accum-window.svg</h2>
+                  <p class="sub">Promoted precursor memory/training map seed for V7 Grad Accum Window.</p>
+                </div>
+                <div class="pill">memory_training_map</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=58</span>
+                <span>rects=31</span>
+                <span>paths=1</span>
+                <span>bytes=17902</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/memory_training_map/v7_grad_accum_window.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/memory_training_map/v7_grad_accum_window.content.json">content JSON</a>
+                <a href="memory_training_map/v7_grad_accum_window.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="memory_training_map/v7_grad_accum_window.svg" alt="v7_grad_accum_window"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>weight_memory_layout.svg</h2>
+                  <p class="sub">Promoted precursor memory/training map seed for Weight Memory Layout.</p>
+                </div>
+                <div class="pill">memory_training_map</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=58</span>
+                <span>rects=31</span>
+                <span>paths=1</span>
+                <span>bytes=17902</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/memory_training_map/weight_memory_layout.scene.compact.dsl">scene DSL</a>
+                <a href="../gen1_gold_mappings/memory_training_map/weight_memory_layout.content.json">content JSON</a>
+                <a href="memory_training_map/weight_memory_layout.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="memory_training_map/weight_memory_layout.svg" alt="weight_memory_layout"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-v66-gate-ladder.svg</h2>
+                  <p class="sub">Broader timeline seed for IR V66 Gate Ladder.</p>
+                </div>
+                <div class="pill">timeline_flow</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=16</span>
+                <span>rects=7</span>
+                <span>paths=1</span>
+                <span>bytes=6204</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/timeline_flow/ir_v66_gate_ladder.scene.compact.dsl">scene DSL</a>
+                
+                <a href="timeline_flow/ir_v66_gate_ladder.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="timeline_flow/ir_v66_gate_ladder.svg" alt="ir_v66_gate_ladder"/>
+              </div>
+            </section>
+            
+            <section class="card">
+              <div class="meta">
+                <div>
+                  <h2>ir-v66-runtime-modes.svg</h2>
+                  <p class="sub">Broader timeline seed for IR V66 Runtime Modes.</p>
+                </div>
+                <div class="pill">timeline_flow</div>
+              </div>
+              <div class="checks">
+                <span class="ok">compile_ok=true</span>
+                <span>text=16</span>
+                <span>rects=7</span>
+                <span>paths=1</span>
+                <span>bytes=6208</span>
+              </div>
+              <div class="paths">
+                <a href="../gen1_gold_mappings/timeline_flow/ir_v66_runtime_modes.scene.compact.dsl">scene DSL</a>
+                
+                <a href="timeline_flow/ir_v66_runtime_modes.svg">compiled SVG</a>
+              </div>
+              <div class="frame">
+                <img src="timeline_flow/ir_v66_runtime_modes.svg" alt="ir_v66_runtime_modes"/>
+              </div>
+            </section>
+            
+    </section>
+  </main>
+</body>
+</html>

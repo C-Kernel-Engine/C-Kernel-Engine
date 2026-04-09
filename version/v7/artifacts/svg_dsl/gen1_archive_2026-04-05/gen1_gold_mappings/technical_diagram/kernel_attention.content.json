@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "Kernel Attention",
+    "subtitle": "Attention diagrams should keep projection, score formation, and output projection on one visible path."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Input State",
+      "body": "Kernel Attention starts from normalized or packed inputs that set the compute boundary.",
+      "detail": [
+        "qkv",
+        "scores"
+      ]
+    },
+    "stage_2": {
+      "title": "Kernel Math",
+      "body": "The middle of the diagram should expose the key transformation rather than hide it behind a generic box.",
+      "detail": [
+        "scores",
+        "context"
+      ]
+    },
+    "stage_3": {
+      "title": "Fused Path",
+      "body": "Show how kernels fuse, gate, or rotate state before the output contract is formed.",
+      "detail": [
+        "fusion",
+        "state update"
+      ]
+    },
+    "stage_4": {
+      "title": "Output Contract",
+      "body": "The last stage should state what artifact or activation shape the runtime emits.",
+      "detail": [
+        "artifact output",
+        "runtime state"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "softmax(QK^T / sqrt(d)) V",
+    "bullets": [
+      "qkv",
+      "scores",
+      "context"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Math Trace",
+      "body": "Preserve the local equation or activation story for kernel attention.",
+      "detail": [
+        "equation",
+        "activation path"
+      ]
+    },
+    "right": {
+      "title": "Runtime Trace",
+      "body": "Show the resulting kernel artifact, buffer change, or residual handoff.",
+      "detail": [
+        "buffer handoff",
+        "kernel artifact"
+      ]
+    }
+  },
+  "footer": {
+    "note": "Kernel Attention belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}
