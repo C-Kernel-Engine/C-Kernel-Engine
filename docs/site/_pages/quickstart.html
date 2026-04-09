@@ -29,7 +29,7 @@
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#building">Building</a></li>
         <li><a href="#v7-runtime-quick">v7 Quick Runtime</a></li>
-        <li><a href="#v8-runtime-quick">v8 Qwen3-VL Quick Runtime</a></li>
+        <li><a href="#v8-runtime-quick">v8 Inference Quick Runtime</a></li>
         <li><a href="#v7-artifact-capture">v7 Artifact Capture</a></li>
         <li><a href="#v7-profile-dashboard">v7 Profiling Dashboard</a></li>
         <li><a href="#make-targets">Make Targets Reference</a></li>
@@ -136,7 +136,17 @@ make v7-demo-runtime \
     <p style="margin-bottom: 0;">This is the shortest supported path to a working v7 runtime. It creates the repo-local virtualenv, installs Python dependencies, downloads/converts/compiles the model, and enters the local chat loop.</p>
 </div>
 
-<h2 id="v8-runtime-quick">v8 Qwen3-VL Quick Runtime (Linux)</h2>
+<h2 id="v8-runtime-quick">v8 Inference Quick Runtime (Linux)</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Text Bring-Up</h3>
+    <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --generate-visualizer</pre>
+    <p style="margin-bottom: 0;">This is the short text-family <code>v8</code> path. The same runner surface now covers the promoted <code>qwen2</code>, <code>qwen3</code>, <code>qwen3.5</code>, <code>gemma3</code>, and <code>NanBeige</code> command shapes, with family-specific chat-template notes in the full runbook.</p>
+</div>
 
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Scoped Multimodal Bring-Up</h3>
@@ -149,8 +159,8 @@ make v7-demo-runtime \
   --force-convert --force-compile \
   --thinking-mode suppressed</pre>
     <p style="margin-bottom: 0.35rem;">Update <code>--mmproj</code> to the actual local path of your matching Qwen3-VL mmproj file.</p>
-    <p style="margin-bottom: 0.35rem;">This is the current <code>v8</code> bring-up lane for the validated Qwen3-VL decoder/mmproj pair.</p>
-    <p style="margin-bottom: 0.35rem;"><strong>Full operator notes:</strong> see <a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>. Other multimodal families are not implied by this quick path.</p>
+    <p style="margin-bottom: 0.35rem;">This is the current <code>v8</code> multimodal bring-up lane for the validated Qwen3-VL decoder/mmproj pair.</p>
+    <p style="margin-bottom: 0.35rem;"><strong>Full operator notes:</strong> see <a href="v8-runbook.html">v8 Inference Runbook</a>. Other multimodal families are not implied by this quick path.</p>
     <p style="margin-bottom: 0;"><strong>Under the hood:</strong> see <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a> for how the encoder, bridge, and decoder are stitched together.</p>
 </div>
 
