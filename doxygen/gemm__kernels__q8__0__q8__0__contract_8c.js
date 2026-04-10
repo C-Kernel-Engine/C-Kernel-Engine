@@ -1,5 +1,6 @@
 var gemm__kernels__q8__0__q8__0__contract_8c =
 [
+    [ "_GNU_SOURCE", "gemm__kernels__q8__0__q8__0__contract_8c.html#a369266c24eacffb87046522897a570d5", null ],
     [ "CK_Q80_STACK_Q8_BLOCKS", "gemm__kernels__q8__0__q8__0__contract_8c.html#ae652b58c404faf0f62f6b794572f367c", null ],
     [ "ck_q80_ggml_build_forward_expand_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#a7de54de0a60eba16519c23edd29168d7", null ],
     [ "ck_q80_ggml_cpu_init_fn", "gemm__kernels__q8__0__q8__0__contract_8c.html#aa0a465b3eedb7b68e16124898097d1c7", null ],
