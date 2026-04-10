@@ -497,4 +497,3 @@ void gemm_tn_bf16(const uint16_t *A,
     }
 #endif
 }
-

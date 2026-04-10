@@ -7,7 +7,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__SSE__) || defined(__SSE2__) || defined(__SSE3__) || defined(__SSSE3__) || \
+    defined(__SSE4_1__) || defined(__SSE4_2__) || defined(__AVX__) || defined(__AVX2__) || \
+    defined(__AVX512F__)
 #include <immintrin.h>
+#endif
 #include <stdio.h>
 #include "tokenizer/hash_table.h"
 #include "tokenizer/murmurhash3.h"

@@ -403,8 +403,10 @@ static inline float dot_fp32_q5_0_block(const float *x, const block_q5_0 *block)
         float v1 = x[j + 16] * id_x;
         int q0 = ck_round_nearest(v0);
         int q1 = ck_round_nearest(v1);
-        if (q0 > 127) q0 = 127; if (q0 < -127) q0 = -127;
-        if (q1 > 127) q1 = 127; if (q1 < -127) q1 = -127;
+        if (q0 > 127) q0 = 127;
+        if (q0 < -127) q0 = -127;
+        if (q1 > 127) q1 = 127;
+        if (q1 < -127) q1 = -127;
 
         sumi += q0 * w0 + q1 * w1;
     }

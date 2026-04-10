@@ -209,6 +209,49 @@ def _detect_default_ck_threads() -> int:
     return int(logical)
 
 
+def _host_machine() -> str:
+    return (os.uname().machine if hasattr(os, "uname") else "").lower()
+
+
+def _is_x86_machine(machine: str) -> bool:
+    return machine in {"x86_64", "amd64", "i386", "i486", "i586", "i686"}
+
+
+def _arch_defines(machine: str) -> list[str]:
+    if _is_x86_machine(machine):
+        return ["-DCK_TARGET_X86=1"]
+    if machine in {"aarch64", "arm64", "armv7l", "armv8l"}:
+        return ["-DCK_TARGET_ARM=1"]
+    return []
+
+
+def _compiler_supports_openmp(compiler: str, omp_flag: str) -> bool:
+    probe = tempfile.NamedTemporaryFile("w", suffix=".c", delete=False)
+    try:
+        probe.write("#include <omp.h>\nint main(void){return omp_get_max_threads() > 0 ? 0 : 0;}\n")
+        probe.flush()
+        probe.close()
+        out_path = probe.name + ".out"
+        cmd = [compiler, probe.name, omp_flag, "-o", out_path]
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        try:
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+        except OSError:
+            pass
+        return proc.returncode == 0
+    finally:
+        try:
+            os.unlink(probe.name)
+        except OSError:
+            pass
+
+
 def _parse_requirement_packages() -> list[str]:
     packages: list[str] = []
     if not V8_REQUIREMENTS_PATH.exists():
@@ -732,16 +775,17 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
     elif shutil.which("icx"):
         compiler = "icx"
     omp_flag = "-qopenmp" if compiler == "icx" else "-fopenmp"
+    machine = _host_machine()
+    use_openmp = _compiler_supports_openmp(compiler, omp_flag)
     cmd = [
         compiler,
         "-shared",
         "-fPIC",
-        "-mcmodel=large",
         "-O3",
         "-march=native",
         "-std=c11",
         "-fvisibility=default",
-        omp_flag,
+        *_arch_defines(machine),
         f"-I{include_dir}",
         f"-I{v8_src}",
         "-o",
@@ -759,6 +803,10 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
         "-Wl,-rpath,$ORIGIN",
         f"-Wl,-rpath,{BUILD_DIR}",
     ]
+    if _is_x86_machine(machine):
+        cmd.insert(3, "-mcmodel=large")
+    if use_openmp:
+        cmd.insert(8 if _is_x86_machine(machine) else 7, omp_flag)
     extra_cflags = (os.environ.get("CK_V8_EXTRA_CFLAGS", "") or os.environ.get("CK_V7_EXTRA_CFLAGS", "")).strip()
     extra_ldflags = (os.environ.get("CK_V8_EXTRA_LDFLAGS", "") or os.environ.get("CK_V7_EXTRA_LDFLAGS", "")).strip()
     if extra_cflags:

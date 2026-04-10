@@ -820,7 +820,6 @@ void fused_mlp_swiglu_prefill_bias(
             /* Down projection: accumulate into output
              * out[m_start:, :] += hidden_tile @ W_down[inter_start:, :]^T
              */
-            const float *W_down_slice = W_down + (size_t)inter_start;  /* Column slice */
             float *out_tile = output + (size_t)m_start * hidden;
 
             /* This is trickier - W_down is [hidden × intermediate]

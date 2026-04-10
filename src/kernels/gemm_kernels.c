@@ -21,7 +21,9 @@
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
