@@ -634,10 +634,9 @@ void gemv_q5_0_parallel_simd(float *y,
 
     if (r0 >= M) return;
 
+#if defined(__AVX__) || defined(__SSE4_1__)
     const block_q5_0 *blocks = (const block_q5_0 *)W;
     const int blocks_per_row = K / QK5_0;
-
-#if defined(__AVX__) || defined(__SSE4_1__)
     /* Prefetch first few rows */
     const int PREFETCH_ROWS = 4;
     for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {

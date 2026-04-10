@@ -31,7 +31,9 @@
  * independent dot product, so we partition rows across threads.
  */
 
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include "ckernel_quant.h"
 
 /* Existing vec_dot dispatch functions (in gemm_kernels_q8_0.c / gemm_kernels_q5_0.c) */

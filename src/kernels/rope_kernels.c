@@ -28,6 +28,10 @@
  *   cos_cache, sin_cache: [max_seq_len, rotary_dim/2] precomputed
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "ckernel_engine.h"
 #include "ggml_runtime_compat.h"
 

@@ -15,6 +15,10 @@
  * Fast approx: y = x * sigmoid(1.702 * x)
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <math.h>
 #include <stddef.h>
 #include <pthread.h>

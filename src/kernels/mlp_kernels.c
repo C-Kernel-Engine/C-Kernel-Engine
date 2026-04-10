@@ -27,7 +27,9 @@
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
 #include <immintrin.h>
 #endif
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <stdlib.h>
 
 /* Forward MLP kernel (FC1 -> GELU -> FC2) adapted from C-Transformer's */

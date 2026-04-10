@@ -576,8 +576,6 @@ int ck_tokenizer_load(CKTokenizer *tok, const char *path) {
 
                 char content[256] = "";
                 int id = -1;
-                bool special = false;
-
                 while (p->pos < p->end && *p->pos != '}') {
                     if (json_parse_string(p, key, sizeof(key)) < 0) break;
                     if (!json_match_char(p, ':')) break;
@@ -588,7 +586,6 @@ int ck_tokenizer_load(CKTokenizer *tok, const char *path) {
                         json_parse_int(p, &id);
                     } else if (strcmp(key, "special") == 0) {
                         json_skip_whitespace(p);
-                        special = (p->pos < p->end && *p->pos == 't');
                         json_skip_value(p);
                     } else {
                         json_skip_value(p);

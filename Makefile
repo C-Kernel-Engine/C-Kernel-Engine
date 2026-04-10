@@ -48,6 +48,17 @@ endif
 # You can override AVX/arch flags from the environment if needed, e.g.:
 #   make AVX_FLAGS="-mavx2"
 #   make AVX_FLAGS=""            # scalar build
+# Detect host architecture so we can avoid compiling x86-only kernels on ARM.
+UNAME_M := $(shell uname -m 2>/dev/null)
+IS_X86_ARCH := $(filter x86_64 amd64 i386 i486 i586 i686,$(UNAME_M))
+IS_ARM_ARCH := $(filter aarch64 arm64 armv7l armv8l,$(UNAME_M))
+ARCH_DEFINES :=
+ifneq ($(IS_X86_ARCH),)
+ARCH_DEFINES += -DCK_TARGET_X86=1
+endif
+ifneq ($(IS_ARM_ARCH),)
+ARCH_DEFINES += -DCK_TARGET_ARM=1
+endif
 # Get ALL flags lines (AVX-512/AMX might be on subsequent lines)
 CPU_FLAGS := $(shell grep '^flags' /proc/cpuinfo | tr '\n' ' ' 2>/dev/null)
 # Detect FMA support
@@ -118,8 +129,16 @@ else
 SSSE3_FLAGS :=
 endif
 
+WARNING_FLAGS := -Wall
+ifeq ($(CK_ENABLE_OPENMP),0)
+WARNING_FLAGS += -Wno-unknown-pragmas
+endif
+ifneq ($(IS_ARM_ARCH),)
+WARNING_FLAGS += -Wno-unused-function
+endif
+
 INCLUDES := -Iinclude
-CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
+CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(ARCH_DEFINES) $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
 CXX ?= g++
 BENCH_CC ?= gcc
 BENCH_CXX ?= $(CXX)
@@ -199,7 +218,11 @@ endif
 # Default message
 ifndef USE_MKL
 ifndef USE_ONEDNN
+ifneq ($(IS_ARM_ARCH),)
+    $(info Building with native ARM/generic kernels for GEMM)
+else
     $(info Building with native AVX kernels for GEMM)
+endif
 endif
 endif
 
@@ -318,6 +341,55 @@ SRCS    := src/backend_native.c \
 	           src/kernels/fused/attention_mlp_fused.c \
 	           src/ck_threadpool.c \
            src/ck_parallel_train.c
+
+X86_ONLY_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
+	           src/kernels/gemm_kernels_q4k_sse.c \
+	           src/kernels/gemm_kernels_q4k_avx.c \
+	           src/kernels/gemm_kernels_q6k_sse.c \
+	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
+	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	           src/kernels/gemm_kernels_amx.c \
+	           src/kernels/gemv_omp.c \
+	           src/kernels/quantize_row_q8_k_sse.c \
+	           src/kernels/quantize_row_q8_k_avx.c \
+	           src/kernels/quantize_row_q8_k_avx2.c \
+	           src/kernels/fused/rmsnorm_q8_k_fused.c
+
+ifeq ($(IS_ARM_ARCH),)
+else
+SRCS := $(filter-out $(X86_ONLY_SRCS),$(SRCS))
+AVX_FLAGS :=
+SSSE3_FLAGS :=
+endif
+
+QUANT_COMMON_SRCS := src/kernels/dequant_kernels.c \
+	src/kernels/gemm_kernels_q4_0.c \
+	src/kernels/gemm_kernels_q4_1.c \
+	src/kernels/gemm_kernels_q5_0.c \
+	src/kernels/gemm_kernels_q5_1.c \
+	src/kernels/gemm_kernels_q5_1_q8_1.c \
+	src/kernels/gemm_kernels_q4k.c \
+	src/kernels/gemm_kernels_q6k.c \
+	src/kernels/gemm_kernels_q4k_q8k.c \
+	src/kernels/gemm_kernels_q8_0.c \
+	src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
+	src/kernels/gemm_kernels_f16.c \
+	src/ckernel_strict.c \
+	src/ck_threadpool.c
+
+QUANT_X86_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
+	src/kernels/gemm_kernels_q4k_sse.c \
+	src/kernels/gemm_kernels_q4k_q8k_avx2.c \
+	src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	src/kernels/quantize_row_q8_k_sse.c \
+	src/kernels/quantize_row_q8_k_avx.c \
+	src/kernels/quantize_row_q8_k_avx2.c
+
+QUANT_SRCS := $(QUANT_COMMON_SRCS)
+ifneq ($(IS_ARM_ARCH),)
+else
+QUANT_SRCS += $(QUANT_X86_SRCS)
+endif
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so
@@ -966,8 +1038,8 @@ $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/att
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
-$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_quant.h include/ckernel_dtype.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
+$(LIB_QUANT): $(BUILD_STAMP) $(QUANT_SRCS) include/ckernel_quant.h include/ckernel_dtype.h
+	$(CC) $(CFLAGS) -shared -o $@ $(QUANT_SRCS) -lm -lpthread
 
 # Convenience alias targets so existing commands still work.
 libckernel_gelu.so: $(LIB_GELU)
@@ -5886,7 +5958,7 @@ v7-memory-signoff:
 
 TEST_THREADPOOL := $(BUILD_DIR)/test_threadpool
 
-THREADPOOL_CFLAGS := -O3 -fPIC -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
+THREADPOOL_CFLAGS := -O3 -fPIC $(WARNING_FLAGS) $(ARCH_DEFINES) $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
 
 $(TEST_THREADPOOL): tests/test_threadpool.c src/ck_threadpool.c src/ckernel_strict.c include/ck_threadpool.h
 	@mkdir -p $(BUILD_DIR)
