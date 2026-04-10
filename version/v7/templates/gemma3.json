@@ -53,7 +53,15 @@
       "rope_type": "rope",
       "qk_norm": true,
       "kv_layout": "layer_major_kv_cache",
-      "attn_variant": "sliding_window"
+      "attn_variant": "sliding_window",
+      "train_runtime_contract": {
+        "saved_tensor_kernel_overrides": {
+          "attn_weights": "attention_forward_causal_head_major_gqa_exact"
+        },
+        "requires_zero_sliding_window_for_saved_tensors": [
+          "attn_weights"
+        ]
+      }
     },
     "block_contract": {
       "norm_type": "rmsnorm",

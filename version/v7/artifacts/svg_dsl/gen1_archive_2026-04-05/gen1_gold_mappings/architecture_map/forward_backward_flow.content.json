@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "Forward / Backward Flow",
+    "subtitle": "Training architecture is a dual-lane system: activations move forward, gradients move back, and memory policy ties them together."
+  },
+  "nodes": {
+    "forward": {
+      "title": "Forward Pass",
+      "body": "Activations and logits move through the model in the user-visible direction.",
+      "detail": [
+        "activations",
+        "loss"
+      ]
+    },
+    "cache": {
+      "title": "Saved State",
+      "body": "Selected tensors must survive long enough for backward without exhausting memory.",
+      "detail": [
+        "saved tensors",
+        "checkpoints"
+      ]
+    },
+    "backward": {
+      "title": "Backward Pass",
+      "body": "Gradients consume saved state and propagate credit back through the graph.",
+      "detail": [
+        "grads",
+        "reduce"
+      ]
+    },
+    "update": {
+      "title": "Optimizer Step",
+      "body": "Weight updates close the loop and define the next forward contract.",
+      "detail": [
+        "adamw",
+        "step"
+      ]
+    },
+    "outcome": {
+      "title": "Training Loop",
+      "body": "The flow is healthy when forward, memory, backward, and update remain aligned."
+    }
+  },
+  "edges": {
+    "edge_1": "save",
+    "edge_2": "reuse",
+    "edge_3": "accumulate",
+    "edge_4": "next step"
+  },
+  "footer": {
+    "note": "Forward/backward diagrams teach composition across time, not just static topology."
+  }
+}

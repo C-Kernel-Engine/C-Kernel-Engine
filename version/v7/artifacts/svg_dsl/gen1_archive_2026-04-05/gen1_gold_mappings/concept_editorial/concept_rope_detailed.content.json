@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Sequence Encoding",
+    "headline": "RoPE Detailed",
+    "subtitle": "Rotary position encoding turns position into phase, so relative structure survives inside attention."
+  },
+  "principles": {
+    "left": {
+      "title": "Coordinate view",
+      "body": "Split channels into paired dimensions and rotate them by a position-dependent angle.",
+      "bullets": [
+        "Pairs become planes",
+        "Angles encode position",
+        "Rotation is deterministic"
+      ]
+    },
+    "right": {
+      "title": "Relative view",
+      "body": "Because both query and key rotate, their relative phase carries distance information into attention.",
+      "bullets": [
+        "Relative offsets survive",
+        "No learned table lookup",
+        "Long-range structure is smoother"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Geometry",
+      "title": "Phase bands",
+      "summary": "Different frequency bands rotate at different rates, giving the model coarse and fine positional signals.",
+      "bullets": [
+        "Low-frequency context",
+        "High-frequency detail",
+        "One shared rotation rule"
+      ],
+      "accent": "purple",
+      "note": "Bands create a multi-scale prior."
+    },
+    {
+      "tag": "Mechanism",
+      "title": "Rotate Q and K",
+      "summary": "Queries and keys are transformed before dot products, so position changes the interaction directly.",
+      "bullets": [
+        "Apply sinusoidal angles",
+        "Rotate paired channels",
+        "Attention sees phase"
+      ],
+      "accent": "blue",
+      "note": "Position enters as structure, not as prose."
+    },
+    {
+      "tag": "Serving",
+      "title": "Long context pressure",
+      "summary": "Scaling context still needs care, but RoPE gives a clean deterministic base for long-range reasoning.",
+      "bullets": [
+        "Extrapolation still matters",
+        "Angles can drift",
+        "The base contract remains elegant"
+      ],
+      "accent": "green",
+      "note": "Good priors still need disciplined scaling."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "RoPE is easiest to learn as geometry, not as formula memorization.",
+      "Relative phase is the point.",
+      "Structured editorial layouts help surface that intuition."
+    ],
+    "footer": "rope_detailed"
+  }
+}

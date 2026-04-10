@@ -59,6 +59,33 @@ static inline float ck_round_fp16_scalar(float x) {
     return CK_FP16_TO_FP32(CK_FP32_TO_FP16(x));
 }
 
+static inline void ck_local_fp16_to_fp32_row(const uint16_t *src, float *dst, int n)
+{
+    if (!src || !dst || n <= 0) {
+        return;
+    }
+    for (int i = 0; i < n; ++i) {
+        dst[i] = CK_FP16_TO_FP32(src[i]);
+    }
+}
+
+static inline void ck_local_fp16_to_fp32_2d(const uint16_t *src,
+                                             float *dst,
+                                             int rows,
+                                             int cols,
+                                             int src_stride,
+                                             int dst_stride)
+{
+    if (!src || !dst || rows <= 0 || cols <= 0) {
+        return;
+    }
+    for (int r = 0; r < rows; ++r) {
+        ck_local_fp16_to_fp32_row(src + (size_t)r * (size_t)src_stride,
+                                  dst + (size_t)r * (size_t)dst_stride,
+                                  cols);
+    }
+}
+
 #if defined(__GNUC__) || defined(__clang__)
 #define CK_NOINLINE __attribute__((noinline))
 #else
@@ -3417,6 +3444,115 @@ void attention_forward_decode_head_major_gqa_flash_f16kv(const float *q_token,
                                                  aligned_head_dim,
                                                  scale,
                                                  out_head);
+    }
+}
+
+void attention_forward_decode_head_major_gqa_flash_f16cache(const float *q_token,
+                                                            const uint16_t *k_cache,
+                                                            const uint16_t *v_cache,
+                                                            float *out_token,
+                                                            int num_heads,
+                                                            int num_kv_heads,
+                                                            int kv_tokens,
+                                                            int cache_capacity,
+                                                            int head_dim,
+                                                            int aligned_head_dim)
+{
+    if (!q_token || !k_cache || !v_cache || !out_token) {
+        return;
+    }
+    if (num_heads <= 0 || num_kv_heads <= 0 || kv_tokens <= 0 || cache_capacity <= 0) {
+        return;
+    }
+    if (kv_tokens > cache_capacity || head_dim <= 0 || aligned_head_dim <= 0) {
+        return;
+    }
+
+    const float scale = 1.0f / sqrtf((float)head_dim);
+    const size_t head_stride = (size_t)cache_capacity * (size_t)aligned_head_dim;
+    const size_t scratch_elems = (size_t)kv_tokens * (size_t)aligned_head_dim;
+    const size_t scratch_bytes = scratch_elems * sizeof(float);
+    const size_t max_stack_bytes = 1024u * 1024u;
+
+    if (scratch_bytes * 2u > max_stack_bytes) {
+        for (int h = 0; h < num_heads; ++h) {
+            int kv_head = (int)((long long)h * (long long)num_kv_heads / (long long)num_heads);
+            const float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;
+            const uint16_t *k_head = k_cache + (size_t)kv_head * head_stride;
+            const uint16_t *v_head = v_cache + (size_t)kv_head * head_stride;
+            float *out_head = out_token + (size_t)h * (size_t)aligned_head_dim;
+
+            for (int d = 0; d < aligned_head_dim; ++d) {
+                out_head[d] = 0.0f;
+            }
+
+            float max_score = -INFINITY;
+            for (int j = 0; j < kv_tokens; ++j) {
+                const uint16_t *k_vec = k_head + (size_t)j * (size_t)aligned_head_dim;
+                float dot = 0.0f;
+                for (int d = 0; d < head_dim; ++d) {
+                    dot += q_head[d] * CK_FP16_TO_FP32(k_vec[d]);
+                }
+                const float score = dot * scale;
+                if (score > max_score) {
+                    max_score = score;
+                }
+            }
+
+            float sum = 0.0f;
+            for (int j = 0; j < kv_tokens; ++j) {
+                const uint16_t *k_vec = k_head + (size_t)j * (size_t)aligned_head_dim;
+                const uint16_t *v_vec = v_head + (size_t)j * (size_t)aligned_head_dim;
+                float dot = 0.0f;
+                for (int d = 0; d < head_dim; ++d) {
+                    dot += q_head[d] * CK_FP16_TO_FP32(k_vec[d]);
+                }
+                const float w = expf(dot * scale - max_score);
+                sum += w;
+                for (int d = 0; d < head_dim; ++d) {
+                    out_head[d] += w * CK_FP16_TO_FP32(v_vec[d]);
+                }
+            }
+
+            if (sum > 0.0f) {
+                const float inv_sum = 1.0f / sum;
+                for (int d = 0; d < head_dim; ++d) {
+                    out_head[d] *= inv_sum;
+                }
+            }
+            for (int d = head_dim; d < aligned_head_dim; ++d) {
+                out_head[d] = 0.0f;
+            }
+        }
+        return;
+    }
+
+    float *k_head_fp32 = (float *)alloca(scratch_bytes);
+    float *v_head_fp32 = (float *)alloca(scratch_bytes);
+
+    for (int kv_head = 0; kv_head < num_kv_heads; ++kv_head) {
+        const uint16_t *k_head = k_cache + (size_t)kv_head * head_stride;
+        const uint16_t *v_head = v_cache + (size_t)kv_head * head_stride;
+        const int q_begin = (int)((long long)kv_head * (long long)num_heads / (long long)num_kv_heads);
+        const int q_end = (int)((long long)(kv_head + 1) * (long long)num_heads / (long long)num_kv_heads);
+
+        ck_local_fp16_to_fp32_2d(k_head, k_head_fp32, kv_tokens, aligned_head_dim, aligned_head_dim, aligned_head_dim);
+        ck_local_fp16_to_fp32_2d(v_head, v_head_fp32, kv_tokens, aligned_head_dim, aligned_head_dim, aligned_head_dim);
+
+        for (int h = q_begin; h < q_end; ++h) {
+            const float *q_head = q_token + (size_t)h * (size_t)aligned_head_dim;
+            float *out_head = out_token + (size_t)h * (size_t)aligned_head_dim;
+
+            attention_flash_decode(out_head,
+                                   q_head,
+                                   k_head_fp32,
+                                   v_head_fp32,
+                                   1,
+                                   kv_tokens,
+                                   1,
+                                   aligned_head_dim,
+                                   scale);
+        }
     }
 }
 

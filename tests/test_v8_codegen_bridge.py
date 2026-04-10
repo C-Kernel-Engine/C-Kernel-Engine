@@ -226,7 +226,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
         self.assertEqual(doc["contract"]["attention_contract"]["rope_layout"], "multi_section_1d")
         self.assertEqual(doc["kernels"]["rope_qk"], "mrope_qk_text")
 
-    def test_qwen2_decode_uses_fp32_mlp_kernels(self) -> None:
+    def test_qwen2_decode_uses_contracted_q8_kernels(self) -> None:
         manifest = _make_qwen2_decoder_manifest()
 
         ir1_ops = build_ir_v8.build_ir1_direct(
@@ -241,13 +241,13 @@ class V8CodegenBridgeTests(unittest.TestCase):
 
         ops = [op["op"] for op in ir1_ops]
         self.assertIn("quantize_input_0", ops)
-        self.assertNotIn("quantize_input_1", ops)
-        self.assertNotIn("quantize_mlp_down_input", ops)
+        self.assertIn("quantize_input_1", ops)
+        self.assertIn("quantize_mlp_down_input", ops)
         self.assertEqual(by_op["q_proj"][0]["kernel"], "gemv_q5_0_q8_0")
         self.assertEqual(by_op["k_proj"][0]["kernel"], "gemv_q5_0_q8_0")
         self.assertEqual(by_op["out_proj"][0]["kernel"], "gemv_q5_0_q8_0")
-        self.assertEqual(by_op["mlp_gate_up"][0]["kernel"], "gemv_q5_0")
-        self.assertEqual(by_op["mlp_down"][0]["kernel"], "gemv_q6_k")
+        self.assertEqual(by_op["mlp_gate_up"][0]["kernel"], "gemv_q5_0_q8_0")
+        self.assertEqual(by_op["mlp_down"][0]["kernel"], "gemv_q6_k_q8_k")
 
     def test_qwen3vl_decode_uses_text_mrope_kernel(self) -> None:
         manifest = _make_qwen3vl_decoder_manifest()
@@ -263,6 +263,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             by_op.setdefault(ir_op["op"], []).append(ir_op)
 
         self.assertEqual(by_op["rope_qk"][0]["kernel"], "mrope_qk_text")
+        self.assertEqual(by_op["attn"][0]["kernel"], "attention_forward_decode_head_major_gqa_flash_f16cache")
 
         with tempfile.TemporaryDirectory(prefix="v8_qwen3vl_text_mrope_") as tmpdir:
             tmp = Path(tmpdir)
@@ -292,8 +293,15 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertEqual(rc, 0)
 
             call_doc = json.loads(call_path.read_text(encoding="utf-8"))
+            layout_doc = json.loads(layout_path.read_text(encoding="utf-8"))
             rope_call = next(op for op in call_doc["operations"] if op["op"] == "rope_qk")
+            attn_call = next(op for op in call_doc["operations"] if op["op"] == "attn")
+            kv_store_call = next(op for op in call_doc["operations"] if op["op"] == "kv_cache_store")
+            kv_buf = next(buf for buf in layout_doc["memory"]["activations"]["buffers"] if buf["name"] == "kv_cache")
             self.assertEqual(rope_call["function"], "mrope_qk_text")
+            self.assertEqual(attn_call["function"], "attention_forward_decode_head_major_gqa_flash_f16cache")
+            self.assertEqual(kv_store_call["function"], "kv_cache_store_f16")
+            self.assertEqual(kv_buf["dtype"], "fp16")
             arg_map = {arg["name"]: arg["expr"] for arg in rope_call["args"]}
             self.assertEqual(arg_map["pos_offset"], "model->rope_pos")
             self.assertEqual(arg_map["section_0"], "1")
@@ -365,6 +373,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
 
             text = c_path.read_text(encoding="utf-8")
             self.assertIn("CK_EXPORT int ck_model_write_embeddings_ex", text)
+            self.assertIn("CK_EXPORT int ck_model_forward_segments_grid_ex", text)
             self.assertIn("CK_EXPORT int ck_model_forward_mixed_ex", text)
             self.assertIn("CK_EXPORT int ck_model_forward_mixed_grid_ex", text)
             self.assertIn("if (prefix_grid_x > 0 && prefix_grid_y > 0 && prefix_grid_x * prefix_grid_y != prefix_tokens) return -10;", text)
@@ -387,9 +396,16 @@ class V8CodegenBridgeTests(unittest.TestCase):
     } else {""",
                 text,
             )
-            self.assertIn("if (ck_qwen3vl_prefill_bridge_is_active()) {", text)
+            self.assertIn('const char *bridge_fp32_env = getenv("CK_V8_QWEN3VL_PREFILL_FP32");', text)
+            self.assertIn("int bridge_force_fp32 = bridge_fp32_env ? (atoi(bridge_fp32_env) != 0) : 0;", text)
+            self.assertIn("if (ck_qwen3vl_prefill_bridge_is_active() && bridge_force_fp32) {", text)
             self.assertIn("debug_outproj_fp32 = 1;", text)
             self.assertIn("debug_mlp_down_fp32 = 1;", text)
+            self.assertIn("g_qwen3vl_prefill_total_tokens = total_tokens;", text)
+            self.assertIn("g_qwen3vl_prefill_prefix_start = prefix_start;", text)
+            self.assertIn("g_qwen3vl_prefill_prefix_tokens = prefix_tokens;", text)
+            self.assertIn("int rc = ck_embed_tokens_at(g_model, tokens_after, tokens_after_count, tokens_before_count + prefix_tokens);", text)
+            self.assertIn("ck_prefill_from_embedded(g_model, total_tokens);", text)
             self.assertIn(
                 "int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;",
                 text,
@@ -471,7 +487,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertIn("static void ck_qwen3vl_runtime_mrope_qk(CKModel *model, float *q, float *k,", text)
             self.assertIn("if (model && model->bridge_has_explicit_positions)", text)
             self.assertIn("g_bridge_deepstack_slices", text)
-            self.assertIn("int rc = ck_bridge_forward_staged(g_model, prefix_tokens + token_count);", text)
+            self.assertIn("int rc = ck_bridge_forward_staged(g_model, total_tokens);", text)
             self.assertNotIn("ck_prefill_from_embedded(g_model, prefix_tokens);", text)
 
             make_result = subprocess.run(
@@ -723,7 +739,7 @@ class V8CodegenBridgeTests(unittest.TestCase):
             self.assertIn("transpose_v_to_head_major layer=0", text)
             self.assertIn("float *buf = (float*)(model->bump + A_V_SCRATCH);", text)
             self.assertIn("ck_qwen3vl_prefill_bridge_prepare", text)
-            self.assertIn("ck_prefill_from_embedded(g_model, prefix_tokens);", text)
+            self.assertIn("ck_prefill_from_embedded(g_model, total_tokens);", text)
             self.assertIn("ck_decode(g_model, tokens[i]);", text)
 
     def test_decoder_parity_dump_emits_decode_attention_kqv_dump(self) -> None:

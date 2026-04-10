@@ -30,6 +30,13 @@ DEFAULT_BINDINGS = V7_ROOT / "kernel_maps" / "kernel_bindings.json"
 
 
 FALLBACK_DECLS: Dict[str, str] = {
+    "gradient_accumulate_multi_f32": (
+        "void gradient_accumulate_multi_f32(float *const *dsts, const float *const *srcs, "
+        "const size_t *numels, int tensor_count);"
+    ),
+    "gradient_global_norm_multi_f32": (
+        "float gradient_global_norm_multi_f32(const float *const *grads, const size_t *numels, int tensor_count);"
+    ),
     "gradient_clip_norm_f32": (
         "float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);"
     ),
@@ -1202,7 +1209,13 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
 
     # Optimizer kernels are required by generated ck_train_optimizer_step
     # even when the current IR2 does not carry explicit optimizer nodes.
-    for opt_kernel in ("adamw_update_f32", "gradient_clip_norm_f32", "adamw_clip_update_multi_f32"):
+    for opt_kernel in (
+        "adamw_update_f32",
+        "gradient_accumulate_multi_f32",
+        "gradient_clip_norm_f32",
+        "gradient_global_norm_multi_f32",
+        "adamw_clip_update_multi_f32",
+    ):
         if opt_kernel not in used_decl:
             resolved = resolve_decl_for_kernel(opt_kernel)
             if resolved is not None:
@@ -1615,19 +1628,19 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
     else:
         ap("    /*")
         ap("     * Global grad norm (L2 over all grad.weight.* tensors).")
-        ap("     * This is telemetry for operator visibility; it runs once per step.")
+        ap("     * This is telemetry for operator visibility; keep it on the shared")
+        ap("     * vectorized/threadpool optimizer helper instead of emitting scalar")
+        ap("     * per-tensor loops into every generated runtime.")
         ap("     */")
-        ap("    double sum_sq = 0.0;")
+        ap("    const float *grads[%d] = {" % len(opt_pairs))
         for _wname, gvar, _wvar, _mvar, _vvar, numel in sorted(opt_pairs, key=lambda x: x[0]):
-            n_expr = str(int(numel))
-            ap("    if (%s != NULL) {" % gvar)
-            ap("        for (size_t gi = 0; gi < (size_t)%s; ++gi) {" % n_expr)
-            ap("            double gv = (double)%s[gi];" % gvar)
-            ap("            sum_sq += gv * gv;")
-            ap("        }")
-            ap("    }")
-        ap("    if (!(sum_sq > 0.0)) return 0.0f;")
-        ap("    return (float)sqrt(sum_sq);")
+            ap("        %s," % gvar)
+        ap("    };")
+        ap("    const size_t numels[%d] = {" % len(opt_pairs))
+        for _wname, _gvar, _wvar, _mvar, _vvar, numel in sorted(opt_pairs, key=lambda x: x[0]):
+            ap("        (size_t)%d," % int(numel))
+        ap("    };")
+        ap("    return gradient_global_norm_multi_f32(grads, numels, %d);" % len(opt_pairs))
     ap("}")
     ap("")
 
@@ -3260,6 +3273,83 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         checkpoint_rematerialize_ops += 1
         return True
 
+    batched_grad_accumulate_calls = 0
+    batched_grad_accumulate_tensors = 0
+
+    def _collect_grad_accumulate_batch(ops: List[Dict[str, Any]], start: int) -> List[Dict[str, Any]]:
+        batch: List[Dict[str, Any]] = []
+        idx = start
+        while idx < len(ops):
+            op = ops[idx]
+            if str(op.get("phase", "")).strip().lower() == "bridge":
+                break
+            if str(op.get("op", "")).strip().lower() != "grad_accumulate":
+                break
+            if str(op.get("kernel_id", "")).strip() != "gradient_accumulate_f32":
+                break
+            batch.append(op)
+            idx += 1
+        return batch
+
+    def _emit_grad_accumulate_batch(batch: List[Dict[str, Any]]) -> bool:
+        nonlocal batched_grad_accumulate_calls, batched_grad_accumulate_tensors
+        if len(batch) <= 1 or "gradient_accumulate_multi_f32" not in used_decl:
+            return False
+
+        batch_rows: List[Tuple[str, str, int, Any]] = []
+        seen_bounds: set[str] = set()
+        for op in batch:
+            op_id = op.get("op_id")
+            io_inputs, io_outputs, _io_weights = _op_io(op, op_by_id)
+            dst_tid = io_outputs.get("dst") or io_inputs.get("dst")
+            src_tid = io_inputs.get("src")
+            dst_var = tvars_f32.get(dst_tid or "", "g_dummy_f32")
+            src_var = tvars_f32.get(src_tid or "", "g_dummy_f32")
+            numel = int(tensor_numel.get(dst_tid or src_tid or "", 0) or 0)
+            batch_rows.append((dst_var, src_var, numel, op_id))
+            ap("    /* op_id=%s op=%s kernel_id=gradient_accumulate_f32 (batched) */" % (op_id, op.get("op")))
+            for expr in (dst_var, src_var):
+                if numel <= 0 or expr in seen_bounds:
+                    continue
+                seen_bounds.add(expr)
+                ap("    if (CK_RUNTIME_BOUNDS_ASSERT && ck_bounds_check_span_f32(%s, (size_t)%d) != 0) return -6000 - %s;" % (expr, numel, op_id))
+
+        batch_name = "ck_accum_batch_%s_%s" % (batch[0].get("op_id"), batch[-1].get("op_id"))
+        ap("    {")
+        ap("        float *%s_dsts[%d] = { %s };" % (
+            batch_name,
+            len(batch_rows),
+            ", ".join(row[0] for row in batch_rows),
+        ))
+        ap("        const float *%s_srcs[%d] = { %s };" % (
+            batch_name,
+            len(batch_rows),
+            ", ".join(row[1] for row in batch_rows),
+        ))
+        ap("        const size_t %s_numels[%d] = { %s };" % (
+            batch_name,
+            len(batch_rows),
+            ", ".join("(size_t)%d" % row[2] for row in batch_rows),
+        ))
+        ap("        gradient_accumulate_multi_f32(%s_dsts, %s_srcs, %s_numels, %d);" % (
+            batch_name,
+            batch_name,
+            batch_name,
+            len(batch_rows),
+        ))
+        ap("    }")
+        for _dst_var, _src_var, _numel, op_id in batch_rows:
+            ap("#if CK_RUNTIME_FAULT_INJECT")
+            ap("    if ((CK_RUNTIME_FAULT_INJECT != 0) && (CK_FAULT_INJECT_OP_ID == %s)) {" % op_id)
+            ap("        /* Deliberate +1 write for diagnostics: hit tail canary deterministically. */")
+            ap("        g_memory[CK_TRAIN_TOTAL_FLOATS] = 123.0f;")
+            ap("    }")
+            ap("#endif")
+        ap("    call_count += %d;" % len(batch_rows))
+        batched_grad_accumulate_calls += 1
+        batched_grad_accumulate_tensors += len(batch_rows)
+        return True
+
     def emit_ops(fn_name: str, ops: List[Dict[str, Any]], phase: str, *, trace_canary: bool = False) -> None:
         if trace_canary:
             ap("int %s(int *failed_op_id, int *first_corrupt_idx) {" % fn_name)
@@ -3270,35 +3360,48 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
             ap("int %s(void) {" % fn_name)
         ap("    /* %s ops: %d */" % (phase, len(ops)))
         ap("    int call_count = 0;")
-        for op in ops:
+        idx = 0
+        while idx < len(ops):
+            op = ops[idx]
             if str(op.get("phase", "")).strip().lower() == "bridge":
                 ap("    /* skip explicit bridge metadata op_id=%s (%s) */" % (op.get("op_id"), op.get("op")))
+                idx += 1
                 continue
+            if phase == "backward" and not trace_canary:
+                accum_batch = _collect_grad_accumulate_batch(ops, idx)
+                if _emit_grad_accumulate_batch(accum_batch):
+                    idx += len(accum_batch)
+                    continue
             kid = op.get("kernel_id")
             op_id = op.get("op_id")
             op_name = op.get("op")
             if not isinstance(kid, str):
                 skipped_ops.append("op_id=%s missing kernel_id" % op_id)
                 ap("    /* skip op_id=%s (%s): missing kernel_id */" % (op_id, op_name))
+                idx += 1
                 continue
 
             io_inputs, io_outputs, io_weights = _op_io(op, op_by_id)
             if phase == "backward":
                 if _emit_checkpoint_rematerialize_saved_tensor(op, io_inputs, io_outputs):
+                    idx += 1
                     continue
 
             resolved = used_decl.get(kid)
             if resolved is None:
                 skipped_ops.append("op_id=%s kernel_id=%s no callable declaration" % (op_id, kid))
                 ap("    /* skip op_id=%s (%s): kernel `%s` has no callable declaration */" % (op_id, op_name, kid))
+                idx += 1
                 continue
 
             fn, args, _decl = resolved
             if phase == "forward" and bridge_lowering == "explicit":
                 if _emit_explicit_forward_bridge(op, str(kid), io_inputs, io_outputs, io_weights):
+                    idx += 1
                     continue
             if phase == "backward" and bridge_lowering == "explicit":
                 if _emit_explicit_backward_bridge(op, str(kid), fn, io_inputs, io_outputs):
+                    idx += 1
                     continue
 
             # qk_norm_forward is in-place and head-major in kernel API, while IR
@@ -3365,6 +3468,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         q_out_var, k_out_var, q_gamma_var, k_gamma_var
                     ))
                     ap("    call_count++;")
+                idx += 1
                 continue
 
             # recurrent_qk_l2_norm_forward is also in-place at the kernel level,
@@ -3406,6 +3510,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                     float(recurrent_eps),
                 ))
                 ap("    call_count++;")
+                idx += 1
                 continue
 
             # rope_forward_qk* kernels are in-place and head-major, while IR tensors are token-major.
@@ -3474,6 +3579,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         k_out_var,
                     ))
                 ap("    call_count++;")
+                idx += 1
                 continue
 
             # attention_forward_* kernels in this runtime are head-major contracts.
@@ -3562,6 +3668,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         requires_zero_sliding_window=requires_zero_sliding_window,
                         sliding_window_expr=sliding_window_expr,
                     )
+                    idx += 1
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -3679,6 +3786,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         ds_var=ds_var,
                         ds_numel=ds_numel,
                     )
+                    idx += 1
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -3747,6 +3855,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                             "post_head_group": "num_kv_heads",
                         },
                     )
+                    idx += 1
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for rope backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -3857,6 +3966,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                         dq_gamma_numel=dq_gamma_numel,
                         dk_gamma_numel=dk_gamma_numel,
                     )
+                    idx += 1
                     continue
                 else:
                     ap("    /* op_id=%s op=%s kernel_id=%s: missing tmp.* scratch for qk_norm backward layout bridge; falling back to direct kernel call */" % (op_id, op_name, kid))
@@ -4224,6 +4334,7 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
                 ap("        if (first_corrupt_idx != NULL) *first_corrupt_idx = first;")
                 ap("        return -2;")
                 ap("    }")
+            idx += 1
 
         ap("    return call_count;")
         ap("}")
@@ -4477,6 +4588,8 @@ def generate_c(ir2: Dict[str, Any], registry: Dict[str, Any], manifest: Optional
         "explicit_forward_bridge_plans": int(explicit_forward_bridge_plans),
         "explicit_backward_bridge_plans": int(explicit_backward_bridge_plans),
         "checkpoint_rematerialize_ops": int(checkpoint_rematerialize_ops),
+        "batched_grad_accumulate_calls": int(batched_grad_accumulate_calls),
+        "batched_grad_accumulate_tensors": int(batched_grad_accumulate_tensors),
         "callable_kernels": len(used_decl),
         "optimizer_pairs": len(opt_pairs),
         "optimizer_skipped_non_fp32": skipped_opt_non_fp32,

@@ -51,6 +51,7 @@ struct ck_threadpool {
     /* Dispatch state — cache-line aligned */
     _Alignas(CK_CACHE_LINE) atomic_int      n_dispatch;    /* bumped to wake workers */
     _Alignas(CK_CACHE_LINE) atomic_int      n_complete;    /* workers signal completion */
+    _Alignas(CK_CACHE_LINE) atomic_int      active_threads; /* active threads for current dispatch */
     _Alignas(CK_CACHE_LINE) ck_work_fn_t    work_fn;       /* current work function */
     void                                    *work_args;     /* current work arguments */
 
@@ -124,6 +125,9 @@ static void *worker_main(void *arg)
     for (;;) {
         /* Spin-wait for new dispatch */
         int spins = 0;
+        int active = 0;
+        ck_work_fn_t fn = NULL;
+        void *args = NULL;
         for (;;) {
             /* Check shutdown */
             if (atomic_load_explicit(&pool->stop, memory_order_acquire)) {
@@ -132,38 +136,51 @@ static void *worker_main(void *arg)
 
             /* Check for new work */
             int current = atomic_load_explicit(&pool->n_dispatch, memory_order_acquire);
+            active = atomic_load_explicit(&pool->active_threads, memory_order_acquire);
             if (current != last_dispatch) {
                 last_dispatch = current;
-                break;
+                if (ith < active) {
+                    break;
+                }
+                spins = 0;
+            }
+
+            /* Threads outside the active subset sleep instead of spinning. */
+            if (ith >= active || spins >= CK_THREADPOOL_SPIN_COUNT) {
+                pthread_mutex_lock(&pool->mutex);
+                for (;;) {
+                    if (atomic_load_explicit(&pool->stop, memory_order_acquire)) {
+                        pthread_mutex_unlock(&pool->mutex);
+                        return NULL;
+                    }
+                    current = atomic_load_explicit(&pool->n_dispatch, memory_order_acquire);
+                    active = atomic_load_explicit(&pool->active_threads, memory_order_acquire);
+                    if (current != last_dispatch) {
+                        last_dispatch = current;
+                        if (ith < active) {
+                            pthread_mutex_unlock(&pool->mutex);
+                            goto worker_have_work;
+                        }
+                    }
+                    pthread_cond_wait(&pool->cond_dispatch, &pool->mutex);
+                }
             }
 
             CK_SPIN_PAUSE();
             spins++;
-
-            /* After spinning, fall back to condvar sleep */
-            if (spins >= CK_THREADPOOL_SPIN_COUNT) {
-                pthread_mutex_lock(&pool->mutex);
-                /* Re-check under lock to avoid missed wakeup */
-                current = atomic_load_explicit(&pool->n_dispatch, memory_order_acquire);
-                if (current == last_dispatch &&
-                    !atomic_load_explicit(&pool->stop, memory_order_acquire)) {
-                    pthread_cond_wait(&pool->cond_dispatch, &pool->mutex);
-                }
-                pthread_mutex_unlock(&pool->mutex);
-                spins = 0;
-            }
         }
 
+worker_have_work:
         /* Execute work */
-        ck_work_fn_t fn = pool->work_fn;
-        void *args = pool->work_args;
+        fn = pool->work_fn;
+        args = pool->work_args;
         if (fn) {
-            fn(ith, pool->n_threads, args);
+            fn(ith, active, args);
         }
 
         /* Signal completion */
         if (atomic_fetch_add_explicit(&pool->n_complete, 1, memory_order_acq_rel)
-            == pool->n_threads - 2) {
+            == active - 2) {
             /* Last worker done — wake main thread if it's waiting */
             pthread_mutex_lock(&pool->mutex);
             pthread_cond_signal(&pool->cond_done);
@@ -199,6 +216,7 @@ ck_threadpool_t *ck_threadpool_create(int n_threads)
     pool->n_threads = n_threads;
     atomic_store(&pool->n_dispatch, 0);
     atomic_store(&pool->n_complete, 0);
+    atomic_store(&pool->active_threads, n_threads);
     atomic_store(&pool->stop, 0);
     atomic_store(&pool->paused, 0);
     pool->work_fn = NULL;
@@ -268,22 +286,29 @@ void ck_threadpool_destroy(ck_threadpool_t *pool)
  * Dispatch & Synchronization
  * ============================================================================ */
 
-void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)
+void ck_threadpool_dispatch_n(ck_threadpool_t *pool, int active_threads, ck_work_fn_t fn, void *args)
 {
     if (!pool || !fn) return;
+    if (active_threads <= 0) {
+        active_threads = 1;
+    }
+    if (active_threads > pool->n_threads) {
+        active_threads = pool->n_threads;
+    }
 
     /* Single-thread fast path: just call directly */
-    if (pool->n_threads == 1) {
+    if (active_threads == 1 || pool->n_threads == 1) {
         fn(0, 1, args);
         return;
     }
 
     /* Reset barrier phase for this dispatch */
-    barrier_init(&pool->barrier, pool->n_threads);
+    barrier_init(&pool->barrier, active_threads);
 
     /* Set work descriptor */
     pool->work_fn = fn;
     pool->work_args = args;
+    atomic_store_explicit(&pool->active_threads, active_threads, memory_order_release);
     atomic_store_explicit(&pool->n_complete, 0, memory_order_release);
 
     /* Wake workers by bumping dispatch counter */
@@ -295,19 +320,19 @@ void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)
     pthread_mutex_unlock(&pool->mutex);
 
     /* Main thread (ith=0) does its share */
-    fn(0, pool->n_threads, args);
+    fn(0, active_threads, args);
 
     /* Wait for all workers to complete */
-    if (pool->n_threads > 1) {
+    if (active_threads > 1) {
         int spins = 0;
         while (atomic_load_explicit(&pool->n_complete, memory_order_acquire)
-               < pool->n_threads - 1) {
+               < active_threads - 1) {
             CK_SPIN_PAUSE();
             spins++;
             if (spins >= CK_THREADPOOL_SPIN_COUNT) {
                 pthread_mutex_lock(&pool->mutex);
                 if (atomic_load_explicit(&pool->n_complete, memory_order_acquire)
-                    < pool->n_threads - 1) {
+                    < active_threads - 1) {
                     pthread_cond_wait(&pool->cond_done, &pool->mutex);
                 }
                 pthread_mutex_unlock(&pool->mutex);
@@ -315,6 +340,12 @@ void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)
             }
         }
     }
+}
+
+void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args)
+{
+    if (!pool) return;
+    ck_threadpool_dispatch_n(pool, pool->n_threads, fn, args);
 }
 
 void ck_threadpool_barrier(ck_threadpool_t *pool)

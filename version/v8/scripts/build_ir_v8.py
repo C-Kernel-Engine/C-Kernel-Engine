@@ -227,9 +227,7 @@ def _inject_runtime_config_defaults(config: Dict[str, Any], arch: str) -> Dict[s
             prefs.setdefault(str(key), str(value))
         config["activation_preference_by_op"] = prefs
 
-    if arch_lc == "qwen2":
-        config.setdefault("prefer_fp32_mlp_matmuls", True)
-    elif arch_lc == "qwen35":
+    if arch_lc == "qwen35":
         _merge_activation_defaults(
             {
                 "recurrent_gate_proj": "fp32",
@@ -1568,6 +1566,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
     uses_kv_cache = bool(config.get("_template_uses_kv_cache", True))
     uses_rope = bool(config.get("_template_uses_rope", True))
     has_logits = bool(config.get("_template_has_logits", True))
+    decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+    kv_cache_dtype = "fp16" if mode == "decode" and decode_kv_cache_dtype in {"fp16", "f16"} else "fp32"
+    kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype)
 
     max_context = int(config.get("context_length", 32768))
     if context_len is None:
@@ -1625,9 +1626,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
 
     # KV cache + RoPE
     if uses_kv_cache:
-        kv_per_layer = num_kv_heads * context_len * head_dim * 4
+        kv_per_layer = num_kv_heads * context_len * head_dim * kv_elem_bytes
         total_kv_size = num_layers * 2 * kv_per_layer
-        add("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
+        add("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]", kv_cache_dtype)
 
     rotary_dim = config.get("rotary_dim", head_dim)
     rope_half = int(rotary_dim) // 2
@@ -2425,6 +2426,19 @@ def _template_uses_kv_cache(template: Dict[str, Any], config: Optional[Dict[str,
     return "attn" in _collect_template_ops(template, config) or "attn_sliding" in _collect_template_ops(template, config)
 
 
+def _resolve_decode_kv_cache_dtype(template: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> str:
+    cfg = config if isinstance(config, dict) else {}
+    explicit = str(cfg.get("decode_kv_cache_dtype", "") or "").strip().lower()
+    if explicit in {"fp16", "f16"}:
+        return "fp16"
+    contract = template.get("contract") if isinstance(template.get("contract"), dict) else {}
+    attention_contract = contract.get("attention_contract") if isinstance(contract.get("attention_contract"), dict) else {}
+    declared = str(attention_contract.get("decode_kv_cache_dtype", "") or "").strip().lower()
+    if declared in {"fp16", "f16"}:
+        return "fp16"
+    return "fp32"
+
+
 def _backfill_template_runtime_flags(manifest: Dict[str, Any]) -> None:
     config = manifest.get("config")
     if not isinstance(config, dict):
@@ -2434,6 +2448,7 @@ def _backfill_template_runtime_flags(manifest: Dict[str, Any]) -> None:
     config.setdefault("_template_has_logits", _template_declares_logits(template, config))
     config.setdefault("_template_uses_kv_cache", _template_uses_kv_cache(template, config))
     config.setdefault("_template_uses_rope", _template_uses_rope(template, config))
+    config.setdefault("decode_kv_cache_dtype", _resolve_decode_kv_cache_dtype(template, config))
 
 
 def _backfill_vision_contract_config(manifest: Dict[str, Any]) -> None:
@@ -4150,6 +4165,14 @@ def build_ir1_direct(manifest: Dict, manifest_path: Path, mode: str = "decode",
         if op in ("attn", "attn_sliding"):
             mode_key = f"{op}_{mode}"
             attn_kernel = template_kernels.get(mode_key) or template_kernels.get(op)
+            decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+            if (
+                op == "attn"
+                and mode == "decode"
+                and decode_kv_cache_dtype in {"fp16", "f16"}
+                and attn_kernel == "attention_forward_decode_head_major_gqa_flash"
+            ):
+                attn_kernel = "attention_forward_decode_head_major_gqa_flash_f16cache"
             if attn_kernel:
                 return [attn_kernel]
             if op == "attn" and mode == "prefill" and not _attention_contract_is_causal(template, config):
@@ -5474,6 +5497,12 @@ def generate_ir_lower_1(
         # Get kernel map
         kernel_map = kernel_map_index.get(kernel_id)
         if not kernel_map:
+            kernel_file = kernel_maps_dir / f"{kernel_id}.json"
+            if kernel_file.exists():
+                with open(kernel_file, 'r') as f:
+                    kernel_map = json.load(f)
+                kernel_map_index[kernel_id] = kernel_map
+        if not kernel_map:
             print(f"  Warning: Kernel '{kernel_id}' not in registry, skipping")
             continue
 
@@ -5596,6 +5625,8 @@ def generate_ir_lower_1(
     kv_store_count = 0
 
     force_decode_attn_regular = str(os.environ.get("CK_V7_DECODE_ATTN_REGULAR", "")).strip().lower() in ("1", "true", "yes", "on")
+    decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+    decode_uses_fp16_kv = decode_kv_cache_dtype in {"fp16", "f16"}
 
     for i, op in enumerate(lowered_ops):
         final_ops.append(op)
@@ -5606,11 +5637,11 @@ def generate_ir_lower_1(
                 layer = op["layer"]
                 kv_store_op = {
                     "idx": len(final_ops),  # Will be renumbered
-                    "kernel": "kv_cache_store",
+                    "kernel": "kv_cache_store_f16" if decode_uses_fp16_kv else "kv_cache_store",
                     "op": "kv_cache_store",
                     "layer": layer,
                     "section": op["section"],
-                    "function": "kv_cache_store",
+                    "function": "kv_cache_store_f16" if decode_uses_fp16_kv else "kv_cache_store",
                     "weights": {},
                     "inputs": {
                         "k": {"type": "scratch", "source": "k_scratch"},
@@ -5636,6 +5667,8 @@ def generate_ir_lower_1(
                         decode_kernel = "attention_forward_decode_head_major_gqa_regular"
                     else:
                         decode_kernel = template_kernels.get("attn_decode") or "attention_forward_decode_head_major_gqa_flash"
+                    if decode_uses_fp16_kv and decode_kernel == "attention_forward_decode_head_major_gqa_flash":
+                        decode_kernel = "attention_forward_decode_head_major_gqa_flash_f16cache"
                 op["kernel"] = decode_kernel
                 op["function"] = decode_kernel
                 # Update inputs to use KV cache instead of scratch
@@ -6342,6 +6375,9 @@ def generate_memory_layout(
     uses_kv_cache = bool(config.get("_template_uses_kv_cache", True))
     uses_rope = bool(config.get("_template_uses_rope", True))
     has_logits = bool(config.get("_template_has_logits", True))
+    decode_kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+    kv_cache_dtype = "fp16" if mode == "decode" and decode_kv_cache_dtype in {"fp16", "f16"} else "fp32"
+    kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype)
 
     # Use provided context_len or default from config
     max_context = config.get("context_length", 32768)
@@ -6425,9 +6461,9 @@ def generate_memory_layout(
     # KV cache: [num_layers, 2, num_kv_heads, context_len, head_dim]
     # Stores K and V for all layers, indexed by position
     if uses_kv_cache:
-        kv_per_layer = num_kv_heads * context_len * head_dim * 4
+        kv_per_layer = num_kv_heads * context_len * head_dim * kv_elem_bytes
         total_kv_size = num_layers * 2 * kv_per_layer
-        add_buffer("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]")
+        add_buffer("kv_cache", total_kv_size, f"[{num_layers}, 2, {num_kv_heads}, {context_len}, {head_dim}]", kv_cache_dtype)
 
     # RoPE tables: precomputed cos/sin [2, context_len, rotary_dim/2]
     rotary_dim = config.get("rotary_dim", head_dim)
@@ -6983,12 +7019,14 @@ def generate_ir_lower_2(
     context_len = config.get("context_length", config.get("max_seq_len", config.get("context_len", 0)))
     num_kv_heads = config.get("num_kv_heads", 0)
     head_dim = config.get("head_dim", 0)
+    kv_cache_dtype = str(config.get("decode_kv_cache_dtype", "fp32") or "fp32").strip().lower()
+    kv_elem_bytes = _dtype_size_bytes(kv_cache_dtype if kv_cache_dtype in {"fp16", "f16"} else "fp32")
 
     def kv_layer_offsets(layer: int) -> Optional[Tuple[int, int]]:
         kv_buf = activation_buffers.get("kv_cache")
         if not kv_buf or not context_len or not num_kv_heads or not head_dim:
             return None
-        kv_per_layer = num_kv_heads * context_len * head_dim * 4
+        kv_per_layer = num_kv_heads * context_len * head_dim * kv_elem_bytes
         base = kv_buf["offset"] + layer * 2 * kv_per_layer
         return base, base + kv_per_layer
 
@@ -8746,6 +8784,10 @@ def generate_ir_lower_3(lowered_ir: Dict, mode: str) -> Dict:
                     expr = f"(model->kv_cache + ({layer}*2)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
                 elif key in ("kv_cache_v_layer", "kv_v"):
                     expr = f"(model->kv_cache + ({layer}*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
+                elif key == "kv_cache_k_layer_f16":
+                    expr = f"(model->kv_cache_f16 + ({layer}*2)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
+                elif key == "kv_cache_v_layer_f16":
+                    expr = f"(model->kv_cache_f16 + ({layer}*2+1)*NUM_KV_HEADS*MAX_SEQ_LEN*HEAD_DIM)"
                 elif key == "rope_cos":
                     expr = "model->rope_cos"
                 elif key == "rope_sin":

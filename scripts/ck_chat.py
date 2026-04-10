@@ -412,28 +412,13 @@ class CKModel:
         self.chat_contract = None
         self._cached_chat_contract = None
         self._chat_contract_loaded = False
+        self.tokenizer_sidecar: dict[str, object] = {}
+        self.special_token_ids: set[int] = set()
+        self.visible_special_token_ids: set[int] = set()
+        self.special_token_text_by_id: dict[int, str] = {}
         self.default_system_prompt = "You are a helpful assistant."
         self.prefill_policy = "batched"
         self.thinking_mode = "auto"
-
-    def _iter_runtime_json_docs(self) -> List[dict]:
-        docs: List[dict] = []
-        candidates = [
-            self.model_dir / "config.json",
-            self.model_dir / "weights_manifest.json",
-            (self.model_dir.parent / "config.json") if self.model_dir.name == ".ck_build" else None,
-            (self.model_dir.parent / "weights_manifest.json") if self.model_dir.name == ".ck_build" else None,
-        ]
-        for path in candidates:
-            if path is None or not path.exists():
-                continue
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            if isinstance(data, dict):
-                docs.append(data)
-        return docs
 
     def _load_chat_contract(self) -> Optional[dict]:
         if self._chat_contract_loaded:
@@ -451,6 +436,14 @@ class CKModel:
                 explicit_contract = cfg.get("chat_contract")
                 if explicit_contract is not None:
                     break
+
+            contract = data.get("contract")
+            if isinstance(contract, dict):
+                explicit_contract = contract.get("chat_contract")
+                if explicit_contract is not None:
+                    break
+                if template_data is None:
+                    template_data = data
 
             template = data.get("template")
             if template_data is None and isinstance(template, dict):
@@ -698,6 +691,8 @@ class CKModel:
                     "force the Python/HF path."
                 )
 
+        self._load_visible_special_token_ids()
+
         # Detect EOS/stop tokens from active tokenizer + template mode.
         self._detect_eos_tokens()
 
@@ -785,8 +780,12 @@ class CKModel:
         candidates = [
             self.model_dir / "weights_manifest.json",
             self.model_dir / "config.json",
+            self.model_dir / "template_train.json",
+            self.model_dir / "train_init_config.json",
             model_root / "weights_manifest.json",
             model_root / "config.json",
+            model_root / "template_train.json",
+            model_root / "train_init_config.json",
         ]
         out: List[Path] = []
         seen: set[Path] = set()
@@ -811,6 +810,33 @@ class CKModel:
                 docs.append(data)
         return docs
 
+    def _runtime_sidecar_candidates(self, filename: str) -> List[Path]:
+        model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
+        candidates = [
+            self.model_dir / filename,
+            model_root / filename,
+        ]
+        out: List[Path] = []
+        seen: set[Path] = set()
+        for path in candidates:
+            if path in seen:
+                continue
+            seen.add(path)
+            out.append(path)
+        return out
+
+    def _load_tokenizer_sidecar(self) -> dict[str, Any]:
+        for path in self._runtime_sidecar_candidates("tokenizer_sidecar.json"):
+            if not path.exists():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                return data
+        return {}
+
     def _load_tokenizer_runtime_contract(self) -> dict:
         """Read tokenizer runtime contract saved next to the generated runtime."""
         for data in self._iter_runtime_json_docs():
@@ -826,6 +852,11 @@ class CKModel:
 
     def _tokenizer_json_candidates(self, model_root: Path) -> List[Path]:
         candidates = [self.model_dir / "tokenizer.json", model_root / "tokenizer.json"]
+        sidecar = self._load_tokenizer_sidecar()
+        raw_tokenizer_json = sidecar.get("tokenizer_json") if isinstance(sidecar, dict) else None
+        if isinstance(raw_tokenizer_json, str) and raw_tokenizer_json.strip():
+            sidecar_candidates = self._runtime_sidecar_candidates(raw_tokenizer_json.strip())
+            candidates.extend(sidecar_candidates)
         tok_contract = self._load_tokenizer_runtime_contract()
         contract_path = tok_contract.get("path") if isinstance(tok_contract, dict) else None
         if isinstance(contract_path, str) and contract_path.strip():
@@ -852,6 +883,66 @@ class CKModel:
                 if isinstance(nested, dict):
                     return nested
         return {}
+
+    def _load_visible_special_token_ids(self) -> None:
+        """Load tokenizer-sidecar visibility rules for user-visible decode.
+
+        IMPORTANT:
+        No model-family-specific special-token heuristics belong in ck_chat.py.
+        If a runtime wants visible control tokens in decoded output, that policy
+        must be staged through tokenizer/template sidecars in the run directory.
+        """
+        self.tokenizer_sidecar = self._load_tokenizer_sidecar()
+        self.special_token_ids = set()
+        self.visible_special_token_ids = set()
+        self.special_token_text_by_id = {}
+
+        visible_tokens = {
+            str(token).strip()
+            for token in list(self.tokenizer_sidecar.get("visible_special_tokens") or [])
+            if str(token).strip()
+        }
+
+        model_root = self.model_dir.parent if self.model_dir.name == ".ck_build" else self.model_dir
+        for tokenizer_json in self._tokenizer_json_candidates(model_root):
+            if not tokenizer_json.exists():
+                continue
+            for token_text, token_id in _iter_true_bpe_special_tokens(tokenizer_json):
+                tid = int(token_id)
+                self.special_token_ids.add(tid)
+                self.special_token_text_by_id[tid] = token_text
+                if token_text in visible_tokens:
+                    self.visible_special_token_ids.add(tid)
+            if self.special_token_text_by_id:
+                break
+
+        special = self._load_tokenizer_contract()
+        for key in ("bos_token_id", "eos_token_id", "unk_token_id", "pad_token_id"):
+            value = special.get(key)
+            if value is None:
+                continue
+            try:
+                self.special_token_ids.add(int(value))
+            except Exception:
+                pass
+
+        target = getattr(self.tokenizer, "_tokenizer", self.tokenizer)
+        tokenizer_special_ids = getattr(target, "special_ids", None)
+        if isinstance(tokenizer_special_ids, set):
+            self.special_token_ids.update(int(token_id) for token_id in tokenizer_special_ids)
+        tokenizer_special_map = getattr(target, "_special_token_text_by_id", None)
+        if isinstance(tokenizer_special_map, dict):
+            for token_id, token_text in tokenizer_special_map.items():
+                try:
+                    tid = int(token_id)
+                except Exception:
+                    continue
+                text = str(token_text or "")
+                if not text:
+                    continue
+                self.special_token_text_by_id.setdefault(tid, text)
+                if text in visible_tokens:
+                    self.visible_special_token_ids.add(tid)
 
     def _describe_c_tokenizer(self) -> str:
         """Human-readable description for the built-in generated tokenizer."""
@@ -1236,26 +1327,61 @@ class CKModel:
     def decode(self, token_ids: list, skip_special_tokens: bool = True) -> str:
         """Decode token IDs to text.
 
-        Default to the cleaned decode path for user-visible generation. Some of
-        the current fallback tokenizers still reconstruct raw special-token bytes
-        imperfectly, so forcing raw decode on the main chat path can make an
-        otherwise-coherent model look catastrophically broken. Callers that need
-        raw markers must pass ``skip_special_tokens=False`` explicitly.
+        User-visible control tokens are not hardcoded here. If a run wants some
+        special tokens to remain visible, they must be declared in the staged
+        tokenizer sidecar/template artifacts for that run.
         """
-        if self.use_c_tokenizer:
-            # Use C tokenizer for decoding
-            num_ids = len(token_ids)
-            ids_array = (ctypes.c_int32 * num_ids)(*token_ids)
-            # Allocate output buffer (generous size)
-            out_buf = ctypes.create_string_buffer(num_ids * 16)
-            out_len = self.lib.ck_model_decode_tokens(ids_array, num_ids, out_buf, len(out_buf))
-            return out_buf.value[:out_len].decode('utf-8', errors='replace')
-        else:
+        def _decode_chunk(chunk_ids: list[int]) -> str:
+            if not chunk_ids:
+                return ""
+            if self.use_c_tokenizer:
+                num_ids = len(chunk_ids)
+                ids_array = (ctypes.c_int32 * num_ids)(*chunk_ids)
+                out_buf = ctypes.create_string_buffer(num_ids * 16)
+                out_len = self.lib.ck_model_decode_tokens(ids_array, num_ids, out_buf, len(out_buf))
+                return out_buf.value[:out_len].decode("utf-8", errors="replace")
             decode_fn = getattr(self.tokenizer, "decode")
             try:
-                return decode_fn(token_ids, skip_special_tokens=skip_special_tokens)
+                return decode_fn(chunk_ids, skip_special_tokens=False)
             except TypeError:
-                return decode_fn(token_ids)
+                return decode_fn(chunk_ids)
+
+        def _special_token_text(token_id: int) -> str:
+            token_text = self.special_token_text_by_id.get(int(token_id))
+            if token_text:
+                return token_text
+            piece = self.token_piece(token_id)
+            if piece:
+                return piece
+            return _decode_chunk([int(token_id)])
+
+        if not token_ids:
+            return ""
+        if not self.special_token_ids:
+            return _decode_chunk([int(token_id) for token_id in token_ids])
+
+        parts: List[str] = []
+        chunk: List[int] = []
+
+        def _flush_chunk() -> None:
+            nonlocal chunk
+            if not chunk:
+                return
+            parts.append(_decode_chunk(chunk))
+            chunk = []
+
+        for raw_token_id in token_ids:
+            token_id = int(raw_token_id)
+            if token_id in self.special_token_ids:
+                _flush_chunk()
+                if skip_special_tokens and token_id not in self.visible_special_token_ids:
+                    continue
+                parts.append(_special_token_text(token_id))
+                continue
+            chunk.append(token_id)
+
+        _flush_chunk()
+        return "".join(parts)
 
     def token_piece(self, token_id: int) -> Optional[str]:
         """Return raw vocabulary piece for a token ID when Python tokenizer is active."""

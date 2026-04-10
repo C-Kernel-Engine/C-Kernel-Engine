@@ -154,8 +154,15 @@ void adamw_clip_update_multi_f32(float *const *grads,
                                  int step);
 
 void gradient_accumulate_f32(float *dst, const float *src, size_t numel);
+void gradient_accumulate_multi_f32(float *const *dsts,
+                                   const float *const *srcs,
+                                   const size_t *numels,
+                                   int tensor_count);
 void gradient_scale_f32(float *grad, size_t numel, float scale);
 float gradient_clip_norm_f32(float *grad, size_t numel, float max_norm);
+float gradient_global_norm_multi_f32(const float *const *grads,
+                                     const size_t *numels,
+                                     int tensor_count);
 
 	// Reference BF16 GEMM (A/B/bias in BF16, output BF16).
 void gemm_blocked_serial_bf16(const uint16_t *A,
@@ -1222,6 +1229,17 @@ void attention_forward_decode_head_major_gqa_flash_f16kv(const float *q_token,
                                                          int head_dim,
                                                          int aligned_head_dim);
 
+void attention_forward_decode_head_major_gqa_flash_f16cache(const float *q_token,
+                                                            const uint16_t *k_cache,
+                                                            const uint16_t *v_cache,
+                                                            float *out_token,
+                                                            int num_heads,
+                                                            int num_kv_heads,
+                                                            int kv_tokens,
+                                                            int cache_capacity,
+                                                            int head_dim,
+                                                            int aligned_head_dim);
+
 // Decode attention for a single token using a KV cache (REGULAR - NOT flash).
 //   q_token: [num_heads, aligned_head_dim]
 //   k_cache/v_cache: [num_kv_heads, cache_capacity, aligned_head_dim]
@@ -1660,6 +1678,16 @@ void kv_cache_store(float *__restrict kv_cache_k,
                     int num_kv_heads,
                     int head_dim,
                     int max_seq_len);
+
+void kv_cache_store_f16(uint16_t *__restrict kv_cache_k,
+                        uint16_t *__restrict kv_cache_v,
+                        const float *__restrict k,
+                        const float *__restrict v,
+                        int layer,
+                        int pos,
+                        int num_kv_heads,
+                        int head_dim,
+                        int max_seq_len);
 
 // Repack a head-major tensor from a packed `[head, tokens, aligned_head_dim]`
 // layout into a KV-cache-compatible layout `[head, cache_capacity, aligned_head_dim]`

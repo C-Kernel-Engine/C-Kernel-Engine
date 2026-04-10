@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "Sentencepiece Space Handling",
+    "subtitle": "Space handling is really a tokenizer rule diagram once boundary markers and emitted pieces are explicit."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Input Text",
+      "body": "Sentencepiece Space Handling begins with a text surface whose boundaries must stay explicit.",
+      "detail": [
+        "space marker",
+        "boundary"
+      ]
+    },
+    "stage_2": {
+      "title": "Candidate Split",
+      "body": "The system generates candidate pieces or structures before picking one stable path.",
+      "detail": [
+        "boundary",
+        "piece emit"
+      ]
+    },
+    "stage_3": {
+      "title": "Rule / Merge",
+      "body": "Rules or merge structures decide which candidate becomes the emitted token path.",
+      "detail": [
+        "merge rule",
+        "selection"
+      ]
+    },
+    "stage_4": {
+      "title": "Token Emission",
+      "body": "The final stage emits pieces or ids that downstream runtime code will trust exactly.",
+      "detail": [
+        "token ids",
+        "stable output"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "spaces -> markers -> token pieces",
+    "bullets": [
+      "space marker",
+      "boundary",
+      "piece emit"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Tokenizer Surface",
+      "body": "Expose the visible boundary markers, prefix paths, or candidate pieces.",
+      "detail": [
+        "surface tokens",
+        "markers"
+      ]
+    },
+    "right": {
+      "title": "Emission Result",
+      "body": "Connect the rule choice to the final emitted pieces or lookup path.",
+      "detail": [
+        "piece emit",
+        "lookup"
+      ]
+    }
+  },
+  "footer": {
+    "note": "Sentencepiece Space Handling belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}

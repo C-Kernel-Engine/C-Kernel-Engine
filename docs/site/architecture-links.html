@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Architecture Links  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Architecture Links | C-Kernel-Engine</title>
+    <meta name="description" content="Index of architecture, runbook, parity, and design pages for C-Kernel-Engine, including the current v8 multimodal inference documentation.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/architecture-links.html">
-    <meta property="og:title" content="Architecture Links  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <meta property="og:title" content="Architecture Links | C-Kernel-Engine">
+    <meta property="og:description" content="Index of architecture, runbook, parity, and design pages for C-Kernel-Engine, including the current v8 multimodal inference documentation.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/architecture-links.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -999,6 +999,26 @@
 
 <div class="runbook-grid">
     <div class="runbook-card">
+        <h3>v8 Qwen3-VL Runbook</h3>
+        <p>Scoped operator runbook for the validated <code>v8</code> multimodal inference path: Qwen3-VL decoder + matching mmproj.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">cks-v8-run</span>
+            <span class="runbook-tag">ck_run_v8.py</span>
+            <span class="runbook-tag">Qwen3-VL</span>
+        </div>
+        <a class="runbook-link" href="v8-runbook.html">Open v8 Runbook</a>
+    </div>
+    <div class="runbook-card">
+        <h3>v8 Vision Encoder Architecture</h3>
+        <p>Design page for how the <code>v8</code> vision encoder is derived from GGUF + template + lowering, then stitched into the decoder bridge.</p>
+        <div class="runbook-tags">
+            <span class="runbook-tag">qwen3_vl_vision.json</span>
+            <span class="runbook-tag">build_ir_v8.py</span>
+            <span class="runbook-tag">encoder → bridge → decoder</span>
+        </div>
+        <a class="runbook-link" href="v8-vision-encoder.html">Open Vision Encoder Page</a>
+    </div>
+    <div class="runbook-card">
         <h3>v7 Inference + Training Runbook</h3>
         <p>Copy/paste workflow for HF GGUF inference plus <code>true_bpe</code> training and train->infer handoff.</p>
         <div class="runbook-tags">
@@ -1048,6 +1068,10 @@
                 <span class="subtitle">One-command dataset -> tokenizer -> train orchestration</span></li>
             <li><a href="v7-backprop-ir.html#v7-runtime-stitch-graph">v7 Runtime Stitch Graph</a>
                 <span class="subtitle">Function-level forward/backward/accum/optimizer stitching view</span></li>
+            <li><a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>
+                <span class="subtitle">Current operator path for validated v8 multimodal inference</span></li>
+            <li><a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>
+                <span class="subtitle">How GGUF intake, template lowering, memory planning, and bridge stitching power the working vision path</span></li>
             <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
                 <span class="subtitle">Copy/paste commands for HF GGUF inference + true_bpe training</span></li>
             <li><a href="v7-svg-dataset-runbook.html">v7 SVG Dataset Runbook</a>
@@ -1112,6 +1136,10 @@
                 <span class="subtitle">RDMA, interpretability</span></li>
             <li><a href="profiling.html">Profiling Guide</a>
                 <span class="subtitle">Valgrind, perf, flamegraphs</span></li>
+            <li><a href="v8-runbook.html">v8 Qwen3-VL Runbook</a>
+                <span class="subtitle">Validated decoder/mmproj workflow for multimodal inference</span></li>
+            <li><a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>
+                <span class="subtitle">Bridge and encoder design notes for the current multimodal inference lane</span></li>
             <li><a href="v7-profiling.html">v7 Profiling Runbook</a>
                 <span class="subtitle">VTune + Advisor + perf/flamegraph on train kernels</span></li>
             <li><a href="v7-runbook.html">v7 Inference + Training Runbook</a>
@@ -1411,7 +1439,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-01</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-08</p>
             </div>
         </div>
     </footer>

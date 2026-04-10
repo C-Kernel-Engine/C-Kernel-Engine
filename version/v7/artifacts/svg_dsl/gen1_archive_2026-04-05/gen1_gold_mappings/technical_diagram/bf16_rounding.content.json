@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "Bf16 Rounding",
+    "subtitle": "Show how full precision values are rounded into BF16 while preserving the runtime story."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Source Values",
+      "body": "Bf16 Rounding starts from packed or full-precision source values that define the numeric contract.",
+      "detail": [
+        "mantissa keep",
+        "round bit"
+      ]
+    },
+    "stage_2": {
+      "title": "Packing Rule",
+      "body": "The central rule decides which bits survive and how dropped detail is accounted for in bf16 rounding.",
+      "detail": [
+        "round bit",
+        "error envelope"
+      ]
+    },
+    "stage_3": {
+      "title": "Block Layout",
+      "body": "Storage layout turns that rule into a concrete block or lane shape the runtime can consume.",
+      "detail": [
+        "mantissa keep",
+        "error envelope"
+      ]
+    },
+    "stage_4": {
+      "title": "Runtime Decode",
+      "body": "The final behavior depends on decode order, scale recovery, and the remaining error envelope.",
+      "detail": [
+        "decode path",
+        "runtime value"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "fp32 -> round_to_bf16(x) -> bf16 + residual_error",
+    "bullets": [
+      "mantissa keep",
+      "round bit",
+      "error envelope"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Structure View",
+      "body": "Show the concrete packed structure the runtime reads for bf16 rounding.",
+      "detail": [
+        "bit grouping",
+        "scale metadata"
+      ]
+    },
+    "right": {
+      "title": "Runtime Effect",
+      "body": "Explain the throughput, precision, or memory consequence of the chosen layout.",
+      "detail": [
+        "error tradeoff",
+        "runtime contract"
+      ]
+    }
+  },
+  "footer": {
+    "note": "Bf16 Rounding belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}

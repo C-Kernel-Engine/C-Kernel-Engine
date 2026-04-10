@@ -14,6 +14,12 @@
  * LEGACY EXCEPTION: This file contains OpenMP for backward compatibility.
  * New kernels should NOT use OpenMP internally.
  *
+ * OpenMP removal note:
+ * The bias-reduction loops in the fallback FP32 backward kernels were made
+ * serial so the training hot path does not bounce between the CK threadpool
+ * and libiomp barriers. These kernels now serve as compatibility fallbacks
+ * while threaded training backward is migrated into ck_parallel_train.c.
+ *
  * MLP: out = FC2(GELU(FC1(x)))
  */
 
@@ -145,7 +151,6 @@ void fc2_backward_kernel(const float *d_output,
                    aligned_out, aligned_in, T);
 
     // 3. d_b_fc2 = sum_over_T(d_output)
-#pragma omp parallel for schedule(static)
     for (int out_idx = 0; out_idx < aligned_out; ++out_idx) {
         float bias_grad = 0.0f;
         for (int t = 0; t < T; ++t) {
@@ -192,7 +197,6 @@ void fc1_backward_kernel(const float *d_output,
                    aligned_out, aligned_in, T);
 
     // 3. d_b_fc1 = sum_over_T(d_output)
-#pragma omp parallel for schedule(static)
     for (int out_idx = 0; out_idx < aligned_out; ++out_idx) {
         float bias_grad = 0.0f;
         for (int t = 0; t < T; ++t) {

@@ -25,6 +25,16 @@
 #include <stddef.h>
 #include <string.h>
 
+static inline void ck_local_fp32_to_fp16_row(const float *src, uint16_t *dst, int n)
+{
+    if (!src || !dst || n <= 0) {
+        return;
+    }
+    for (int i = 0; i < n; ++i) {
+        dst[i] = CK_FP32_TO_FP16(src[i]);
+    }
+}
+
 void kv_cache_repack_head_major_inplace(float *buf,
                                         int num_heads,
                                         int tokens,
@@ -116,6 +126,40 @@ void kv_cache_store(float *__restrict kv_cache_k,
                               max_seq_len,
                               head_dim,
                               head_dim);
+}
+
+void kv_cache_store_f16(uint16_t *__restrict kv_cache_k,
+                        uint16_t *__restrict kv_cache_v,
+                        const float *__restrict k,
+                        const float *__restrict v,
+                        int layer,
+                        int pos,
+                        int num_kv_heads,
+                        int head_dim,
+                        int max_seq_len)
+{
+    (void)layer;
+    if (!kv_cache_k || !kv_cache_v || !k || !v) {
+        return;
+    }
+    if (num_kv_heads <= 0 || pos < 0 || head_dim <= 0 || max_seq_len <= 0) {
+        return;
+    }
+    if (pos >= max_seq_len) {
+        return;
+    }
+
+    const size_t head_stride = (size_t)max_seq_len * (size_t)head_dim;
+    const size_t token_stride = (size_t)head_dim;
+
+    for (int h = 0; h < num_kv_heads; ++h) {
+        const float *k_src = k + (size_t)h * token_stride;
+        const float *v_src = v + (size_t)h * token_stride;
+        uint16_t *k_dst = kv_cache_k + (size_t)h * head_stride + (size_t)pos * token_stride;
+        uint16_t *v_dst = kv_cache_v + (size_t)h * head_stride + (size_t)pos * token_stride;
+        ck_local_fp32_to_fp16_row(k_src, k_dst, head_dim);
+        ck_local_fp32_to_fp16_row(v_src, v_dst, head_dim);
+    }
 }
 
 /**

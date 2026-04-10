@@ -1,0 +1,68 @@
+{
+  "header": {
+    "headline": "IR v66 Test Gates",
+    "subtitle": "A gate ladder is still a decision tree: classify the gate family, choose the correct branch, and only then rerun the full stack."
+  },
+  "entry": {
+    "label": "TEST GATE"
+  },
+  "nodes": {
+    "start": {
+      "title": "What gate class failed?",
+      "body": "Choose the lane that matches the first red test family."
+    },
+    "left": {
+      "title": "Fast Structural Gates",
+      "body": "Tokenizer, schema, and compiler-smoke checks failed first.",
+      "detail": [
+        "tokenizer",
+        "schema",
+        "smoke"
+      ]
+    },
+    "center": {
+      "title": "Model Behavior Gates",
+      "body": "Probe exactness, renderability, or held-out prompts failed.",
+      "detail": [
+        "probe",
+        "renderable",
+        "holdout"
+      ]
+    },
+    "right": {
+      "title": "Numerical Safety Gates",
+      "body": "Parity or finite-difference checks are the active blocker.",
+      "detail": [
+        "parity",
+        "fd-grad"
+      ]
+    }
+  },
+  "edges": {
+    "start_left": "structure",
+    "start_center": "behavior",
+    "start_right": "numerics",
+    "center_finish": "promote"
+  },
+  "outcomes": {
+    "left_outcome": {
+      "title": "Structure Branch",
+      "body": "Fix the contract, then re-smoke the family before training."
+    },
+    "center_outcome": {
+      "title": "Behavior Branch",
+      "body": "Use the probe autopsy to identify the failure class, not just the failing prompt."
+    },
+    "right_outcome": {
+      "title": "Numerics Branch",
+      "body": "Do not trust a training result until the numerical path is green again."
+    }
+  },
+  "finish": {
+    "title": "Promotion Gate",
+    "body": "Only promote the run after the selected branch and the umbrella gate are both green."
+  },
+  "footer": {
+    "note": "Decision trees are useful because they keep operational reasoning deterministic."
+  }
+}

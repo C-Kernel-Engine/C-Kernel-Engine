@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -86,6 +87,9 @@ typedef int (*write_embeddings_t)(const float *embeddings, int num_tokens, int s
 typedef int (*embed_tokens_at_t)(const int32_t *tokens, int num_tokens, int start_pos);
 typedef int (*forward_from_embeddings_t)(int embedded_tokens, int total_tokens, float *logits_out);
 typedef int (*forward_mixed_t)(const float *prefix_embeddings, int prefix_tokens, const int32_t *tokens, int num_tokens, float *logits_out);
+typedef int (*forward_mixed_ex_t)(const float *prefix_embeddings, int prefix_tokens, int prefix_embed_dim, const int32_t *tokens, int num_tokens, float *logits_out);
+typedef int (*forward_mixed_grid_ex_t)(const float *prefix_embeddings, int prefix_tokens, int prefix_embed_dim, int prefix_grid_x, int prefix_grid_y, int prefix_text_pos, const int32_t *tokens, int num_tokens, float *logits_out);
+typedef int (*forward_segments_grid_ex_t)(const int32_t *tokens_before, int tokens_before_count, const float *prefix_embeddings, int prefix_tokens, int prefix_embed_dim, int prefix_grid_x, int prefix_grid_y, int prefix_text_pos, const int32_t *tokens_after, int tokens_after_count, float *logits_out);
 typedef float *(*get_logits_t)(void);
 typedef int (*get_int_t)(void);
 typedef void (*free_t)(void);
@@ -100,6 +104,9 @@ typedef int (*has_tokenizer_t)(void);
 typedef int32_t (*lookup_token_t)(const char *text);
 typedef const char *(*id_to_token_t)(int32_t id);
 typedef const int32_t *(*get_token_buffer_t)(void);
+typedef int (*get_vocab_strings_size_t)(void);
+typedef const int32_t *(*get_vocab_offsets_t)(void);
+typedef const uint8_t *(*get_vocab_strings_t)(void);
 
 typedef struct {
     void *handle;
@@ -115,10 +122,14 @@ typedef struct {
     embed_tokens_at_t embed_tokens_at;
     forward_from_embeddings_t forward_from_embeddings;
     forward_mixed_t forward_mixed;
+    forward_mixed_ex_t forward_mixed_ex;
+    forward_mixed_grid_ex_t forward_mixed_grid_ex;
+    forward_segments_grid_ex_t forward_segments_grid_ex;
     get_logits_t get_logits;
     get_int_t get_logits_stride;
     get_int_t get_context;
     get_int_t get_vocab_size;
+    get_vocab_strings_size_t get_vocab_strings_size;
     get_int_t get_active_tokens;
     get_base_ptr_t get_base_ptr;
     get_named_activation_i_t get_named_activation_runtime_offset;
@@ -133,6 +144,8 @@ typedef struct {
     lookup_token_t lookup_token;
     id_to_token_t id_to_token;
     get_token_buffer_t get_token_buffer;
+    get_vocab_offsets_t get_vocab_offsets;
+    get_vocab_strings_t get_vocab_strings;
 } ModelAPI;
 
 /* ============================================================================
@@ -212,6 +225,7 @@ typedef struct {
     const char *weights_path;
     const char *manifest_path;
     const char *prefix_f32_path;
+    const char *bridge_report_path;
     const char *prompt_once;
     const char *prompt_tokens_csv;
     const char *system_prompt;
@@ -230,6 +244,23 @@ typedef struct {
     int eos_ids[CK_CLI_EOS_MAX];
     int eos_count;
 } CLIOptions;
+
+typedef struct {
+    char *prefix_dump_path;
+    int prefix_embed_dim;
+    int32_t *prompt_tokens_before_image;
+    int prompt_tokens_before_count;
+    int32_t *prompt_tokens_after_image;
+    int prompt_tokens_after_count;
+    int *stop_token_ids;
+    int stop_token_count;
+    int prefix_grid_x;
+    int prefix_grid_y;
+    int prefix_text_pos;
+    bool has_prefix_grid;
+    bool has_prefix_text_pos;
+    bool multimodal_prompt_segmented;
+} BridgeReportSpec;
 
 
 /* ============================================================================
@@ -471,6 +502,63 @@ static int json_find_key_value(const char *json, const jsmntok_t *toks, int obj_
     return -1;
 }
 
+static bool json_tok_is_null(const char *json, const jsmntok_t *tok) {
+    if (!json || !tok || tok->type != JSMN_PRIMITIVE) return false;
+    size_t n = (size_t)(tok->end - tok->start);
+    return n == 4 && strncmp(json + tok->start, "null", 4) == 0;
+}
+
+static bool json_tok_to_int(const char *json, const jsmntok_t *tok, int *out_value) {
+    if (!json || !tok || !out_value) return false;
+    if (tok->type != JSMN_PRIMITIVE) return false;
+    char *s = json_tok_strdup(json, tok);
+    if (!s) return false;
+    char *endp = NULL;
+    long v = strtol(s, &endp, 10);
+    bool ok = (endp && *endp == '\0' && v >= (long)INT_MIN && v <= (long)INT_MAX);
+    if (ok) *out_value = (int)v;
+    free(s);
+    return ok;
+}
+
+static bool json_tok_to_bool(const char *json, const jsmntok_t *tok, bool *out_value) {
+    if (!json || !tok || !out_value || tok->type != JSMN_PRIMITIVE) return false;
+    size_t n = (size_t)(tok->end - tok->start);
+    if (n == 4 && strncmp(json + tok->start, "true", 4) == 0) {
+        *out_value = true;
+        return true;
+    }
+    if (n == 5 && strncmp(json + tok->start, "false", 5) == 0) {
+        *out_value = false;
+        return true;
+    }
+    return false;
+}
+
+static bool json_parse_int_array(const char *json, const jsmntok_t *toks, int arr_idx, int32_t **out_vals, int *out_count) {
+    if (!out_vals || !out_count) return false;
+    *out_vals = NULL;
+    *out_count = 0;
+    if (!json || !toks || arr_idx < 0 || toks[arr_idx].type != JSMN_ARRAY) return false;
+    int count = toks[arr_idx].size;
+    if (count <= 0) return true;
+    int32_t *vals = (int32_t*)calloc((size_t)count, sizeof(int32_t));
+    if (!vals) return false;
+    int idx = arr_idx + 1;
+    for (int i = 0; i < count; i++) {
+        int v = 0;
+        if (!json_tok_to_int(json, &toks[idx], &v)) {
+            free(vals);
+            return false;
+        }
+        vals[i] = (int32_t)v;
+        idx = json_skip_token(toks, idx);
+    }
+    *out_vals = vals;
+    *out_count = count;
+    return true;
+}
+
 static bool read_file_text(const char *path, char **out_buf, size_t *out_len) {
     FILE *f = fopen(path, "rb");
     if (!f) return false;
@@ -526,6 +614,147 @@ static int parse_json_tokens(const char *json, size_t len, jsmntok_t **out_token
         *out_tokens = toks;
         return rc;
     }
+}
+
+static void free_bridge_report_spec(BridgeReportSpec *spec) {
+    if (!spec) return;
+    free(spec->prefix_dump_path);
+    free(spec->prompt_tokens_before_image);
+    free(spec->prompt_tokens_after_image);
+    free(spec->stop_token_ids);
+    memset(spec, 0, sizeof(*spec));
+}
+
+static int parse_bridge_report_spec(const char *report_path, BridgeReportSpec *out) {
+    if (!report_path || !out) return -1;
+    memset(out, 0, sizeof(*out));
+    char *json = NULL;
+    size_t len = 0;
+    if (!read_file_text(report_path, &json, &len)) return -2;
+    jsmntok_t *toks = NULL;
+    int tokc = parse_json_tokens(json, len, &toks);
+    if (tokc <= 0) {
+        free(json);
+        return -3;
+    }
+
+    int prefix_dump_idx = json_find_key_value(json, toks, 0, "prefix_dump_path");
+    int prefix_dim_idx = json_find_key_value(json, toks, 0, "prefix_embed_dim");
+    int before_idx = json_find_key_value(json, toks, 0, "prompt_tokens_before_image");
+    int after_idx = json_find_key_value(json, toks, 0, "prompt_tokens_after_image");
+    int stop_idx = json_find_key_value(json, toks, 0, "stop_token_ids");
+    int grid_x_idx = json_find_key_value(json, toks, 0, "prefix_grid_x");
+    int grid_y_idx = json_find_key_value(json, toks, 0, "prefix_grid_y");
+    int text_pos_idx = json_find_key_value(json, toks, 0, "prefix_text_pos");
+    int segmented_idx = json_find_key_value(json, toks, 0, "multimodal_prompt_segmented");
+
+    if (prefix_dump_idx < 0 || toks[prefix_dump_idx].type != JSMN_STRING) {
+        free(toks);
+        free(json);
+        return -4;
+    }
+    out->prefix_dump_path = json_tok_strdup(json, &toks[prefix_dump_idx]);
+    if (!out->prefix_dump_path || !out->prefix_dump_path[0]) {
+        free_bridge_report_spec(out);
+        free(toks);
+        free(json);
+        return -5;
+    }
+    if (prefix_dim_idx >= 0 && !json_tok_is_null(json, &toks[prefix_dim_idx])) {
+        int v = 0;
+        if (!json_tok_to_int(json, &toks[prefix_dim_idx], &v) || v <= 0) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -14;
+        }
+        out->prefix_embed_dim = v;
+    }
+
+    if (before_idx >= 0 && !json_parse_int_array(json, toks, before_idx, &out->prompt_tokens_before_image, &out->prompt_tokens_before_count)) {
+        free_bridge_report_spec(out);
+        free(toks);
+        free(json);
+        return -6;
+    }
+    if (after_idx >= 0 && !json_parse_int_array(json, toks, after_idx, &out->prompt_tokens_after_image, &out->prompt_tokens_after_count)) {
+        free_bridge_report_spec(out);
+        free(toks);
+        free(json);
+        return -7;
+    }
+    if (stop_idx >= 0) {
+        int32_t *stop_vals32 = NULL;
+        int stop_count = 0;
+        if (!json_parse_int_array(json, toks, stop_idx, &stop_vals32, &stop_count)) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -8;
+        }
+        if (stop_count > 0) {
+            out->stop_token_ids = (int*)calloc((size_t)stop_count, sizeof(int));
+            if (!out->stop_token_ids) {
+                free(stop_vals32);
+                free_bridge_report_spec(out);
+                free(toks);
+                free(json);
+                return -9;
+            }
+            for (int i = 0; i < stop_count; i++) out->stop_token_ids[i] = (int)stop_vals32[i];
+            out->stop_token_count = stop_count;
+        }
+        free(stop_vals32);
+    }
+
+    if (grid_x_idx >= 0 && !json_tok_is_null(json, &toks[grid_x_idx])) {
+        int v = 0;
+        if (!json_tok_to_int(json, &toks[grid_x_idx], &v)) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -10;
+        }
+        out->prefix_grid_x = v;
+    }
+    if (grid_y_idx >= 0 && !json_tok_is_null(json, &toks[grid_y_idx])) {
+        int v = 0;
+        if (!json_tok_to_int(json, &toks[grid_y_idx], &v)) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -11;
+        }
+        out->prefix_grid_y = v;
+    }
+    out->has_prefix_grid = (out->prefix_grid_x > 0 && out->prefix_grid_y > 0);
+
+    if (text_pos_idx >= 0 && !json_tok_is_null(json, &toks[text_pos_idx])) {
+        int v = 0;
+        if (!json_tok_to_int(json, &toks[text_pos_idx], &v)) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -12;
+        }
+        out->prefix_text_pos = v;
+        out->has_prefix_text_pos = true;
+    }
+
+    if (segmented_idx >= 0) {
+        bool segmented = false;
+        if (!json_tok_to_bool(json, &toks[segmented_idx], &segmented)) {
+            free_bridge_report_spec(out);
+            free(toks);
+            free(json);
+            return -13;
+        }
+        out->multimodal_prompt_segmented = segmented;
+    }
+
+    free(toks);
+    free(json);
+    return 0;
 }
 
 static int parse_runtime_init_order(const char *summary_path, RuntimeInitOrder *out) {
@@ -1318,6 +1547,37 @@ static void output_token(char *buf, size_t *len, const char *token) {
     }
 }
 
+static const char *fallback_vocab_id_to_token(ModelAPI *api, int32_t id) {
+    if (!api || !api->get_vocab_size || !api->get_vocab_offsets || !api->get_vocab_strings) {
+        return NULL;
+    }
+
+    int vocab_size = api->get_vocab_size();
+    if (id < 0 || id >= vocab_size) {
+        return NULL;
+    }
+
+    const int32_t *offsets = api->get_vocab_offsets();
+    const uint8_t *strings = api->get_vocab_strings();
+    if (!offsets || !strings) {
+        return NULL;
+    }
+
+    int32_t offset = offsets[id];
+    if (offset < 0) {
+        return NULL;
+    }
+
+    if (api->get_vocab_strings_size) {
+        int strings_size = api->get_vocab_strings_size();
+        if (strings_size <= 0 || offset >= strings_size) {
+            return NULL;
+        }
+    }
+
+    return (const char *)(strings + offset);
+}
+
 /* ============================================================================
  * Model Loading
  * ============================================================================ */
@@ -1356,13 +1616,19 @@ static bool load_model_api(const char *lib_path, ModelAPI *api) {
     resolve_symbol(api->handle, "ck_model_embed_tokens_at", (void **)&api->embed_tokens_at, false);
     resolve_symbol(api->handle, "ck_model_forward_from_embeddings", (void **)&api->forward_from_embeddings, false);
     resolve_symbol(api->handle, "ck_model_forward_mixed", (void **)&api->forward_mixed, false);
+    resolve_symbol(api->handle, "ck_model_forward_mixed_ex", (void **)&api->forward_mixed_ex, false);
+    resolve_symbol(api->handle, "ck_model_forward_mixed_grid_ex", (void **)&api->forward_mixed_grid_ex, false);
+    resolve_symbol(api->handle, "ck_model_forward_segments_grid_ex", (void **)&api->forward_segments_grid_ex, false);
     resolve_symbol(api->handle, "ck_model_get_logits", (void **)&api->get_logits, false);
     resolve_symbol(api->handle, "ck_model_get_logits_stride", (void **)&api->get_logits_stride, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_enable", (void **)&api->kv_enable, false);
     resolve_symbol(api->handle, "ck_model_kv_cache_reset", (void **)&api->kv_reset, false);
     resolve_symbol(api->handle, "ck_model_get_context_window", (void **)&api->get_context, false);
     resolve_symbol(api->handle, "ck_model_get_vocab_size", (void **)&api->get_vocab_size, false);
+    resolve_symbol(api->handle, "ck_model_get_vocab_strings_size", (void **)&api->get_vocab_strings_size, false);
     resolve_symbol(api->handle, "ck_model_get_active_tokens", (void **)&api->get_active_tokens, false);
+    resolve_symbol(api->handle, "ck_model_get_vocab_offsets", (void **)&api->get_vocab_offsets, false);
+    resolve_symbol(api->handle, "ck_model_get_vocab_strings", (void **)&api->get_vocab_strings, false);
     resolve_symbol(api->handle, "ck_model_get_base_ptr", (void **)&api->get_base_ptr, false);
     resolve_symbol(api->handle, "ck_model_get_named_activation_runtime_offset", (void **)&api->get_named_activation_runtime_offset, false);
     resolve_symbol(api->handle, "ck_model_get_named_activation_nbytes", (void **)&api->get_named_activation_nbytes, false);
@@ -1656,6 +1922,49 @@ static int infer_embedded_input_dim(const ModelAPI *api) {
     return (int)elems;
 }
 
+static bool load_prefix_embeddings_from_file(
+    const char *prefix_f32_path,
+    int embed_dim,
+    float **out_prefix,
+    int *out_prefix_tokens
+) {
+    if (!prefix_f32_path || !out_prefix || !out_prefix_tokens || embed_dim <= 0) return false;
+    *out_prefix = NULL;
+    *out_prefix_tokens = 0;
+
+    uint8_t *blob = NULL;
+    size_t blob_len = 0;
+    if (!read_file_blob(prefix_f32_path, &blob, &blob_len)) {
+        fprintf(stderr, "Error: failed to read prefix embeddings: %s\n", prefix_f32_path);
+        return false;
+    }
+    if ((blob_len % sizeof(float)) != 0) {
+        fprintf(stderr, "Error: prefix embedding file is not float32-aligned: %s\n", prefix_f32_path);
+        free(blob);
+        return false;
+    }
+
+    size_t total_floats = blob_len / sizeof(float);
+    if ((total_floats % (size_t)embed_dim) != 0) {
+        fprintf(stderr,
+                "Error: prefix embedding float count %zu is not divisible by embed_dim %d\n",
+                total_floats, embed_dim);
+        free(blob);
+        return false;
+    }
+
+    size_t prefix_tokens = total_floats / (size_t)embed_dim;
+    if (prefix_tokens == 0 || prefix_tokens > (size_t)INT32_MAX) {
+        fprintf(stderr, "Error: invalid prefix token count inferred from %s\n", prefix_f32_path);
+        free(blob);
+        return false;
+    }
+
+    *out_prefix = (float*)blob;
+    *out_prefix_tokens = (int)prefix_tokens;
+    return true;
+}
+
 static bool load_prefix_embeddings(
     const CLIOptions *opt,
     const ModelAPI *api,
@@ -1696,121 +2005,15 @@ static bool load_prefix_embeddings(
         return true;
     }
 
-    uint8_t *blob = NULL;
-    size_t blob_len = 0;
-    if (!read_file_blob(opt->prefix_f32_path, &blob, &blob_len)) {
-        fprintf(stderr, "Error: failed to read prefix embeddings: %s\n", opt->prefix_f32_path);
-        return false;
-    }
-    if ((blob_len % sizeof(float)) != 0) {
-        fprintf(stderr, "Error: prefix embedding file is not float32-aligned: %s\n", opt->prefix_f32_path);
-        free(blob);
-        return false;
-    }
-
-    size_t total_floats = blob_len / sizeof(float);
-    if ((total_floats % (size_t)embed_dim) != 0) {
-        fprintf(stderr,
-                "Error: prefix embedding float count %zu is not divisible by embed_dim %d\n",
-                total_floats, embed_dim);
-        free(blob);
-        return false;
-    }
-
-    size_t prefix_tokens = total_floats / (size_t)embed_dim;
-    if (prefix_tokens == 0 || prefix_tokens > (size_t)INT32_MAX) {
-        fprintf(stderr, "Error: invalid prefix token count inferred from %s\n", opt->prefix_f32_path);
-        free(blob);
-        return false;
-    }
-
-    *out_prefix = (float*)blob;
-    *out_prefix_tokens = (int)prefix_tokens;
-    return true;
+    return load_prefix_embeddings_from_file(opt->prefix_f32_path, embed_dim, out_prefix, out_prefix_tokens);
 }
 
 /* ============================================================================
  * Prompt Execution
  * ============================================================================ */
 
-static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, int user_tokens) {
-    if (!api || !opt || !ids || n <= 0) {
-        free(ids);
-        return -1;
-    }
-    if (g_exit_requested) {
-        free(ids);
-        return -1;
-    }
-
-    int ctx = opt->context_override;
-    if (ctx <= 0 && api->get_context) ctx = api->get_context();
-    if (ctx <= 0) ctx = 4096;
-    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
-
-    int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
-    if (n > ctx - max_tokens) {
-        n = ctx - max_tokens;
-        if (opt->verbose) {
-            printf("[DEBUG] Truncated prompt to %d tokens\n", n);
-        }
-    }
-
-    g_prefill_time_ms = 0.0;
-    g_decode_time_ms = 0.0;
-    g_decode_count = 0;
-    g_prompt_tokens = n;
-    g_user_tokens = user_tokens;
-
-    if (api->kv_reset) api->kv_reset();
-
-    float *prefix_embeddings = NULL;
-    int prefix_tokens = 0;
-    int prefix_embed_dim = 0;
-    if (!load_prefix_embeddings(opt, api, &prefix_embeddings, &prefix_tokens, &prefix_embed_dim)) {
-        free(ids);
-        return -1;
-    }
-    if (prefix_tokens > 0 && !api->forward_mixed) {
-        fprintf(stderr, "Error: model does not export ck_model_forward_mixed but multimodal prefix was requested\n");
-        free(prefix_embeddings);
-        free(ids);
-        return -1;
-    }
-
-    struct timespec t0, t1;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
-
-    if (prefix_tokens > 0) {
-        if (opt->verbose) {
-            fprintf(stderr,
-                    "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=%d embed_dim=%d prompt_tokens=%d\n",
-                    prefix_tokens, prefix_embed_dim, n);
-        }
-        if (api->forward_mixed(prefix_embeddings, prefix_tokens, ids, n, NULL) != 0) {
-            fprintf(stderr, "[Model] forward_mixed failed\n");
-            free(prefix_embeddings);
-            free(ids);
-            return -1;
-        }
-    } else {
-        if (api->embed(ids, n) != 0) {
-            fprintf(stderr, "[Model] embed failed\n");
-            free(ids);
-            return -1;
-        }
-
-        if (api->forward(NULL) != 0) {
-            fprintf(stderr, "[Model] forward failed\n");
-            free(ids);
-            return -1;
-        }
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    g_prefill_time_ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
-                        (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
-    free(prefix_embeddings);
+static int run_generation_loop(ModelAPI *api, CLIOptions *opt) {
+    if (!api || !opt) return -1;
 
     /* Get vocab size for sampling */
     int vocab_size = api->get_vocab_size ? api->get_vocab_size() : 0;
@@ -1851,6 +2054,8 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
 
     g_generation_active = 1;
 
+    struct timespec t0, t1;
+    int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
     for (int generated = 0; generated < max_tokens && !g_exit_requested && g_generation_active; generated++) {
         if (next_token < 0) break;
 
@@ -1864,6 +2069,9 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
                 token_str[len] = '\0';
                 word = token_str;
             }
+        }
+        if (!word) {
+            word = fallback_vocab_id_to_token(api, next_token);
         }
 
         if (opt->verbose) {
@@ -1963,9 +2171,255 @@ static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, in
         #undef C_RST
     }
     fflush(stdout);
+    return 0;
+}
 
+static int run_token_ids(ModelAPI *api, CLIOptions *opt, int32_t *ids, int n, int user_tokens) {
+    if (!api || !opt || !ids || n <= 0) {
+        free(ids);
+        return -1;
+    }
+    if (g_exit_requested) {
+        free(ids);
+        return -1;
+    }
+
+    int ctx = opt->context_override;
+    if (ctx <= 0 && api->get_context) ctx = api->get_context();
+    if (ctx <= 0) ctx = 4096;
+    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
+
+    int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
+    if (n > ctx - max_tokens) {
+        n = ctx - max_tokens;
+        if (opt->verbose) {
+            printf("[DEBUG] Truncated prompt to %d tokens\n", n);
+        }
+    }
+
+    g_prefill_time_ms = 0.0;
+    g_decode_time_ms = 0.0;
+    g_decode_count = 0;
+    g_prompt_tokens = n;
+    g_user_tokens = user_tokens;
+
+    if (api->kv_reset) api->kv_reset();
+
+    float *prefix_embeddings = NULL;
+    int prefix_tokens = 0;
+    int prefix_embed_dim = 0;
+    if (!load_prefix_embeddings(opt, api, &prefix_embeddings, &prefix_tokens, &prefix_embed_dim)) {
+        free(ids);
+        return -1;
+    }
+    if (prefix_tokens > 0 && !api->forward_mixed) {
+        fprintf(stderr, "Error: model does not export ck_model_forward_mixed but multimodal prefix was requested\n");
+        free(prefix_embeddings);
+        free(ids);
+        return -1;
+    }
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    if (prefix_tokens > 0) {
+        if (opt->verbose) {
+            fprintf(stderr,
+                    "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=%d embed_dim=%d prompt_tokens=%d\n",
+                    prefix_tokens, prefix_embed_dim, n);
+        }
+        if (api->forward_mixed(prefix_embeddings, prefix_tokens, ids, n, NULL) != 0) {
+            fprintf(stderr, "[Model] forward_mixed failed\n");
+            free(prefix_embeddings);
+            free(ids);
+            return -1;
+        }
+    } else {
+        if (api->embed(ids, n) != 0) {
+            fprintf(stderr, "[Model] embed failed\n");
+            free(ids);
+            return -1;
+        }
+
+        if (api->forward(NULL) != 0) {
+            fprintf(stderr, "[Model] forward failed\n");
+            free(ids);
+            return -1;
+        }
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    g_prefill_time_ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
+                        (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
+    free(prefix_embeddings);
+    run_generation_loop(api, opt);
     free(ids);
     return 0;
+}
+
+static int run_bridge_report(ModelAPI *api, CLIOptions *opt, const char *bridge_report_path) {
+    if (!api || !opt || !bridge_report_path) return -1;
+    if (g_exit_requested) return -1;
+
+    BridgeReportSpec spec;
+    int parse_rc = parse_bridge_report_spec(bridge_report_path, &spec);
+    if (parse_rc != 0) {
+        fprintf(stderr, "Error: failed to parse --bridge-report %s (rc=%d)\n", bridge_report_path, parse_rc);
+        return -1;
+    }
+
+    int ctx = opt->context_override;
+    if (ctx <= 0 && api->get_context) ctx = api->get_context();
+    if (ctx <= 0) ctx = 4096;
+    if (ctx > CK_CLI_MAX_CONTEXT) ctx = CK_CLI_MAX_CONTEXT;
+
+    int max_tokens = opt->max_tokens > 0 ? opt->max_tokens : CK_CLI_DEFAULT_MAX_TOKENS;
+    int before_count = spec.prompt_tokens_before_count;
+    int after_count = spec.prompt_tokens_after_count;
+    if (before_count + after_count > ctx - max_tokens) {
+        int allowed_after = ctx - max_tokens - before_count;
+        if (allowed_after < 0) {
+            fprintf(stderr, "Error: bridge prompt prefix exceeds available context budget\n");
+            free_bridge_report_spec(&spec);
+            return -1;
+        }
+        if (after_count > allowed_after) {
+            if (opt->verbose) {
+                fprintf(stderr, "[DEBUG] Truncated bridge prompt_after tokens to %d\n", allowed_after);
+            }
+            after_count = allowed_after;
+        }
+    }
+
+    g_prefill_time_ms = 0.0;
+    g_decode_time_ms = 0.0;
+    g_decode_count = 0;
+    g_prompt_tokens = before_count + after_count;
+    g_user_tokens = after_count;
+
+    if (api->kv_reset) api->kv_reset();
+
+    float *prefix_embeddings = NULL;
+    int prefix_tokens = 0;
+    int prefix_embed_dim = spec.prefix_embed_dim;
+    if (prefix_embed_dim <= 0) prefix_embed_dim = infer_embedded_input_dim(api);
+    if (prefix_embed_dim <= 0) {
+        fprintf(stderr, "Error: unable to infer bridge-report prefix embed_dim\n");
+        free_bridge_report_spec(&spec);
+        return -1;
+    }
+    if (!load_prefix_embeddings_from_file(spec.prefix_dump_path, prefix_embed_dim, &prefix_embeddings, &prefix_tokens)) {
+        free_bridge_report_spec(&spec);
+        return -1;
+    }
+    if (prefix_tokens <= 0) {
+        fprintf(stderr, "Error: bridge report prefix file produced no prefix rows\n");
+        free(prefix_embeddings);
+        free_bridge_report_spec(&spec);
+        return -1;
+    }
+
+    if (spec.stop_token_count > 0) {
+        opt->eos_count = spec.stop_token_count > CK_CLI_EOS_MAX ? CK_CLI_EOS_MAX : spec.stop_token_count;
+        for (int i = 0; i < opt->eos_count; i++) opt->eos_ids[i] = spec.stop_token_ids[i];
+    }
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    int forward_rc = -1;
+    if (before_count > 0) {
+        if (spec.has_prefix_grid && api->forward_segments_grid_ex) {
+            int prefix_text_pos = spec.has_prefix_text_pos ? spec.prefix_text_pos : (before_count + prefix_tokens);
+            if (opt->verbose) {
+                fprintf(stderr,
+                        "[DEBUG] Running ck_model_forward_segments_grid_ex with before=%d prefix_tokens=%d embed_dim=%d grid=%dx%d text_pos=%d after=%d\n",
+                        before_count, prefix_tokens, prefix_embed_dim,
+                        spec.prefix_grid_x, spec.prefix_grid_y, prefix_text_pos, after_count);
+            }
+            forward_rc = api->forward_segments_grid_ex(
+                spec.prompt_tokens_before_image,
+                before_count,
+                prefix_embeddings,
+                prefix_tokens,
+                prefix_embed_dim,
+                spec.prefix_grid_x,
+                spec.prefix_grid_y,
+                prefix_text_pos,
+                spec.prompt_tokens_after_image,
+                after_count,
+                NULL
+            );
+        } else {
+            fprintf(stderr, "Error: bridge report requires segmented multimodal replay but model lacks ck_model_forward_segments_grid_ex\n");
+            free(prefix_embeddings);
+            free_bridge_report_spec(&spec);
+            return -1;
+        }
+    } else if (spec.has_prefix_grid && api->forward_mixed_grid_ex) {
+        int prefix_text_pos = spec.has_prefix_text_pos ? spec.prefix_text_pos : prefix_tokens;
+        if (opt->verbose) {
+            fprintf(stderr,
+                    "[DEBUG] Running ck_model_forward_mixed_grid_ex with prefix_tokens=%d embed_dim=%d grid=%dx%d text_pos=%d prompt_tokens=%d\n",
+                    prefix_tokens, prefix_embed_dim, spec.prefix_grid_x, spec.prefix_grid_y, prefix_text_pos, after_count);
+        }
+        forward_rc = api->forward_mixed_grid_ex(
+            prefix_embeddings,
+            prefix_tokens,
+            prefix_embed_dim,
+            spec.prefix_grid_x,
+            spec.prefix_grid_y,
+            prefix_text_pos,
+            spec.prompt_tokens_after_image,
+            after_count,
+            NULL
+        );
+    } else if (api->forward_mixed_ex) {
+        if (opt->verbose) {
+            fprintf(stderr,
+                    "[DEBUG] Running ck_model_forward_mixed_ex with prefix_tokens=%d embed_dim=%d prompt_tokens=%d\n",
+                    prefix_tokens, prefix_embed_dim, after_count);
+        }
+        forward_rc = api->forward_mixed_ex(
+            prefix_embeddings,
+            prefix_tokens,
+            prefix_embed_dim,
+            spec.prompt_tokens_after_image,
+            after_count,
+            NULL
+        );
+    } else if (api->forward_mixed) {
+        if (opt->verbose) {
+            fprintf(stderr,
+                    "[DEBUG] Running ck_model_forward_mixed with prefix_tokens=%d embed_dim=%d prompt_tokens=%d\n",
+                    prefix_tokens, prefix_embed_dim, after_count);
+        }
+        forward_rc = api->forward_mixed(
+            prefix_embeddings,
+            prefix_tokens,
+            spec.prompt_tokens_after_image,
+            after_count,
+            NULL
+        );
+    } else {
+        fprintf(stderr, "Error: model does not export a multimodal forward entrypoint\n");
+        free(prefix_embeddings);
+        free_bridge_report_spec(&spec);
+        return -1;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    g_prefill_time_ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
+                        (t1.tv_nsec - t0.tv_nsec) / 1000000.0;
+    free(prefix_embeddings);
+    free_bridge_report_spec(&spec);
+
+    if (forward_rc != 0) {
+        fprintf(stderr, "[Model] bridge forward failed\n");
+        return -1;
+    }
+
+    return run_generation_loop(api, opt);
 }
 
 static int run_prompt(ModelAPI *api, CLIOptions *opt, const char *input) {
@@ -3966,6 +4420,7 @@ static void print_help(const char *prog) {
     fprintf(stderr, "  --weights PATH          Path to weights .bump file\n");
     fprintf(stderr, "  --manifest PATH         Path to weights_manifest.map for v8 init\n");
     fprintf(stderr, "  --prefix-f32 PATH       Float32 prefix embeddings file for ck_model_forward_mixed\n");
+    fprintf(stderr, "  --bridge-report PATH    Replay multimodal bridge_report.json through native C CLI\n");
     fprintf(stderr, "  --synthetic-prefix-tokens N  Use N zero prefix rows with ck_model_forward_mixed\n");
     fprintf(stderr, "  --prompt, -p TEXT       Run single prompt (non-interactive)\n");
     fprintf(stderr, "  --prompt-tokens IDS     Comma-separated prompt token IDs for tokenizer-free runtimes\n");
@@ -4032,6 +4487,8 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
             opt->manifest_path = argv[++i];
         } else if (!strcmp(arg, "--prefix-f32") && i + 1 < argc) {
             opt->prefix_f32_path = argv[++i];
+        } else if (!strcmp(arg, "--bridge-report") && i + 1 < argc) {
+            opt->bridge_report_path = argv[++i];
         } else if (!strcmp(arg, "--synthetic-prefix-tokens") && i + 1 < argc) {
             opt->synthetic_prefix_tokens = atoi(argv[++i]);
         } else if ((!strcmp(arg, "--prompt") || !strcmp(arg, "-p")) && i + 1 < argc) {
@@ -4096,6 +4553,10 @@ static bool parse_args(int argc, char **argv, CLIOptions *opt) {
     /* Auto-discover model if --model specified or model name given as positional arg */
     if (opt->prompt_once && opt->prompt_tokens_csv) {
         fprintf(stderr, "Error: use either --prompt or --prompt-tokens, not both\n");
+        return false;
+    }
+    if (opt->bridge_report_path && (opt->prompt_once || opt->prompt_tokens_csv)) {
+        fprintf(stderr, "Error: use either --bridge-report or --prompt/--prompt-tokens, not both\n");
         return false;
     }
 
@@ -4277,7 +4738,7 @@ int main(int argc, char **argv) {
 
     const bool has_tokenizer = api.has_tokenizer && api.has_tokenizer() &&
                                api.encode_text && api.decode_tokens;
-    if (!has_tokenizer && !opt.prompt_tokens_csv) {
+    if (!has_tokenizer && !opt.prompt_tokens_csv && !opt.bridge_report_path) {
         fprintf(stderr, "[Tokenizer] Model does not have built-in tokenizer\n");
         fprintf(stderr, "            Use --prompt-tokens for tokenizer-free generated runtimes\n");
         return 1;
@@ -4338,7 +4799,10 @@ int main(int argc, char **argv) {
 
     setvbuf(stdout, NULL, _IOFBF, 1 << 20);
 
-    if (opt.prompt_tokens_csv) {
+    int run_rc = 0;
+    if (opt.bridge_report_path) {
+        run_rc = run_bridge_report(&api, &opt, opt.bridge_report_path);
+    } else if (opt.prompt_tokens_csv) {
         int32_t *ids = NULL;
         int id_count = 0;
         if (!parse_token_id_list(opt.prompt_tokens_csv, &ids, &id_count)) {
@@ -4347,9 +4811,9 @@ int main(int argc, char **argv) {
             if (api.handle) dlclose(api.handle);
             return 1;
         }
-        run_token_ids(&api, &opt, ids, id_count, id_count);
+        run_rc = run_token_ids(&api, &opt, ids, id_count, id_count);
     } else if (opt.prompt_once) {
-        run_prompt(&api, &opt, opt.prompt_once);
+        run_rc = run_prompt(&api, &opt, opt.prompt_once);
     } else {
         /* REPL */
 #ifdef HAVE_READLINE
@@ -4417,5 +4881,5 @@ int main(int argc, char **argv) {
     if (api.handle) dlclose(api.handle);
 
     printf("\nGoodbye!\n");
-    return 0;
+    return run_rc == 0 ? 0 : 1;
 }

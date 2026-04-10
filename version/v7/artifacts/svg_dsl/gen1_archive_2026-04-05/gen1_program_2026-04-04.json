@@ -1,0 +1,120 @@
+{
+  "schema": "ck.gen1_program.v1",
+  "generated_on": "2026-04-04",
+  "program": "gen1",
+  "goal": "Move from narrow diagnostic specs to a broad-contract scene-DSL line that tests compositional generalization over a much larger asset-backed distribution.",
+  "baseline": {
+    "site_asset_count": 97,
+    "current_gold_covered_assets": 13,
+    "current_gold_missing_assets": 84,
+    "bootstrap_run": "/home/antshiv/.cache/ck-engine-v7/models/train/spec_broader_1_scene_dsl_l3_d192_h384_ctx512_r1",
+    "bootstrap_lineage": "spec_broader_1",
+    "bootstrap_generated_scenes": 396,
+    "bootstrap_seed_cases": 11,
+    "bootstrap_pretrain_rows": 1011,
+    "bootstrap_midtrain_rows": 4718,
+    "bootstrap_exact_rate": 0.023809523809523808,
+    "bootstrap_renderable_rate": 0.5476190476190477
+  },
+  "principles": [
+    "Broaden coverage aggressively, but only with coherent gold DSL/compiler supervision.",
+    "Freeze tokenizer, DSL, compiler, canonicalizer, and eval contract for each gen1 training phase.",
+    "Use held-out recombinations as the primary generalization target rather than only held-out prompt variants.",
+    "Treat narrow spec/rung work as diagnosis; treat gen1 as the broad-contract scaling experiment."
+  ],
+  "phase_plan": [
+    {
+      "phase": "bootstrap_baseline",
+      "status": "completed",
+      "purpose": "Prove the broader training path and establish a real baseline before coverage expansion.",
+      "run": "/home/antshiv/.cache/ck-engine-v7/models/train/spec_broader_1_scene_dsl_l3_d192_h384_ctx512_r1",
+      "dataset": {
+        "seed_cases": 11,
+        "generated_scenes": 396,
+        "pretrain_train_rows": 1011,
+        "midtrain_train_rows": 4718,
+        "dev_rows": 30,
+        "test_rows": 29
+      },
+      "probe": {
+        "count": 42,
+        "exact_rate": 0.023809523809523808,
+        "renderable_rate": 0.5476190476190477,
+        "materialized_exact_rate": 0.023809523809523808,
+        "svg_exact_rate": 0.023809523809523808,
+        "budget_truncation_rate": 0.0
+      }
+    },
+    {
+      "phase": "coverage_sprint",
+      "status": "next",
+      "purpose": "Expand gold DSL/compiler coverage rapidly across the first-wave families before the first true gen1-scale training run.",
+      "target_gold_asset_count": 36,
+      "family_count": 6,
+      "new_asset_count": 23,
+      "families": [
+        "comparison_span_chart",
+        "table_matrix",
+        "architecture_map",
+        "poster_stack",
+        "dashboard_cards",
+        "timeline_flow"
+      ]
+    },
+    {
+      "phase": "gen1_full_mix",
+      "status": "planned",
+      "purpose": "Train one broad-contract model on the full mix instead of patching narrow failure slices.",
+      "targets": {
+        "gold_asset_count_min": 40,
+        "gold_asset_count_max": 50,
+        "generated_scene_count_min": 5000,
+        "generated_scene_count_max": 10000,
+        "holdout_policy": "novel_recombinations",
+        "model_architecture": {
+          "layers": 3,
+          "embed_dim": 192,
+          "hidden_dim": 384,
+          "context_len": 512
+        },
+        "capacity_canary": {
+          "layers": 6,
+          "embed_dim": 384,
+          "hidden_dim": 768,
+          "context_len": 512
+        }
+      }
+    }
+  ],
+  "eval_contract": {
+    "primary_metrics": [
+      "compiler_valid_rate",
+      "exact_rate",
+      "renderable_rate",
+      "recombination_exact_rate"
+    ],
+    "failure_taxonomy": [
+      "family",
+      "form",
+      "style",
+      "topology",
+      "syntax"
+    ],
+    "required_holdouts": [
+      "layout x topic novel recombinations",
+      "family x theme novel recombinations",
+      "form x density novel recombinations"
+    ]
+  },
+  "gates": [
+    "Do not start gen1_full_mix until the wider tokenizer/DSL/compiler contract is frozen.",
+    "Do not start gen1_full_mix until the first-wave families have gold DSL seeds and compiler smoke passing.",
+    "Do not compare capacity until the data contract is fixed and the same broad dataset is used for both models."
+  ],
+  "next_steps": [
+    "Promote the finished spec_broader_1 run to the documented gen1 bootstrap baseline.",
+    "Expand gold DSL/compiler coverage quickly across the first-wave family plan.",
+    "Generate recombination-heavy holdouts, not only prompt paraphrase holdouts.",
+    "Launch the first true gen1 full-mix run only after the broader contract is frozen."
+  ]
+}

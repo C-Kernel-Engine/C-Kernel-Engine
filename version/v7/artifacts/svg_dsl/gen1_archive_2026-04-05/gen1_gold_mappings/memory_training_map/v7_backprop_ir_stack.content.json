@@ -1,0 +1,104 @@
+{
+  "header": {
+    "headline": "V7 Backprop IR Stack",
+    "subtitle": "Broader memory/training map seed on the promoted precursor family."
+  },
+  "offsets": [
+    "0x000000",
+    "0x100000",
+    "0x1C0000",
+    "0x280000",
+    "0x940000",
+    "0xAC0000",
+    "0x1CC0000"
+  ],
+  "segments": {
+    "embeddings": {
+      "title": "Inputs",
+      "size": "16 MB",
+      "caption": "V7 Backprop IR Stack begins with a fixed header region.",
+      "tone": "header"
+    },
+    "layer_0": {
+      "title": "Stage 0",
+      "size": "known region",
+      "caption": "The broader map still uses deterministic segment boundaries.",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "layer_1": {
+      "title": "Stage 1",
+      "size": "same shape",
+      "caption": "Promoted precursor families should preserve one regular middle tower.",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "mid_layers": {
+      "title": "Middle Span",
+      "caption": "Repeated layers or phases live inside one bracketed region."
+    },
+    "layer_23": {
+      "title": "Late Stage",
+      "size": "final block",
+      "caption": "The final segment mirrors the same deterministic layout rule.",
+      "parts": [
+        "Q",
+        "K",
+        "V",
+        "O",
+        "MLP"
+      ]
+    },
+    "lm_head": {
+      "title": "Output",
+      "size": "32 MB",
+      "caption": "One explicit head region remains visible in the map.",
+      "tone": "header"
+    },
+    "runtime": {
+      "title": "Runtime",
+      "caption": "Buffers, cache, and gradients stay in one trailing band.",
+      "parts": [
+        "KV Cache",
+        "Activations",
+        "Wave 3"
+      ]
+    }
+  },
+  "cards": {
+    "benefits": {
+      "title": "Benefits",
+      "items": [
+        "Deterministic offsets",
+        "Compiler-visible regions",
+        "Asset-backed map family",
+        "Reusable for training"
+      ]
+    },
+    "layout_json": {
+      "title": "layout.json",
+      "lines": [
+        "\"asset\": \"v7-backprop-ir-stack\"",
+        "\"layout\": \"memory_training_map\"",
+        "\"segments\": [\"embeddings\", \"runtime\"]"
+      ]
+    },
+    "direct_access": {
+      "title": "Direct Access",
+      "lines": [
+        "// Read the promoted family",
+        "rdma_read(0x1C0000)"
+      ]
+    }
+  }
+}

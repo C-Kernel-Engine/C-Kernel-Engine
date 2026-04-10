@@ -116,6 +116,22 @@ void ck_threadpool_destroy(ck_threadpool_t *pool);
 void ck_threadpool_dispatch(ck_threadpool_t *pool, ck_work_fn_t fn, void *args);
 
 /**
+ * Dispatch work to a subset of the pool and wait for completion.
+ *
+ * Threads with ith >= active_threads remain idle for this dispatch.
+ * The work function sees nth == active_threads.
+ *
+ * @param pool            Thread pool
+ * @param active_threads  Number of active threads including main thread
+ * @param fn              Work function
+ * @param args            Argument passed to fn
+ */
+void ck_threadpool_dispatch_n(ck_threadpool_t *pool,
+                              int active_threads,
+                              ck_work_fn_t fn,
+                              void *args);
+
+/**
  * Barrier synchronization within a dispatched work function.
  *
  * ALL threads must call this at the same point. Threads spin-wait

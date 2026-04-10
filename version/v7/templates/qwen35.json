@@ -63,7 +63,12 @@
       "rope_type": "rope",
       "qk_norm": "hybrid_full_attention_only",
       "kv_layout": "layer_major_kv_cache",
-      "attn_variant": "hybrid_recurrent_attention"
+      "attn_variant": "hybrid_recurrent_attention",
+      "train_runtime_contract": {
+        "saved_tensor_kernel_overrides": {
+          "attn_weights": "attention_forward_causal_head_major_gqa_exact"
+        }
+      }
     },
     "block_contract": {
       "norm_type": "rmsnorm",

@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Model Anatomy",
+    "headline": "Transformer Overview",
+    "subtitle": "The block diagram matters less as a picture than as a repeated contract: route, mix, project, normalize, repeat."
+  },
+  "principles": {
+    "left": {
+      "title": "Data path",
+      "body": "Tokens enter, attention mixes context, MLP reshapes representation, and residuals keep the path stable.",
+      "bullets": [
+        "Embed tokens",
+        "Mix with attention",
+        "Transform with MLP"
+      ]
+    },
+    "right": {
+      "title": "Scaling path",
+      "body": "As layers repeat, systems questions shift from one block to memory, bandwidth, and compiler-visible structure.",
+      "bullets": [
+        "Repetition creates depth",
+        "Serving exposes memory cost",
+        "Tooling needs explicit layout"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Block",
+      "title": "Attention core",
+      "summary": "Attention is the routing mechanism: what matters now, and what can be ignored.",
+      "bullets": [
+        "Context mixing",
+        "Head specialization",
+        "Sequence-aware routing"
+      ],
+      "accent": "blue",
+      "note": "Routing is a structured act."
+    },
+    {
+      "tag": "Block",
+      "title": "MLP reshape",
+      "summary": "Feed-forward layers turn mixed context into a richer feature basis for the next step.",
+      "bullets": [
+        "Expand then project",
+        "Local nonlinear transform",
+        "Shared across tokens"
+      ],
+      "accent": "green",
+      "note": "Not all intelligence is in attention."
+    },
+    {
+      "tag": "Systems",
+      "title": "Residual stability",
+      "summary": "Residual paths and normalization make repetition trainable and serving more predictable.",
+      "bullets": [
+        "Signal preservation",
+        "Stable gradients",
+        "Repeatable block contract"
+      ],
+      "accent": "amber",
+      "note": "Good structure enables deep reuse."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "The transformer is a repeated program, not just a diagram.",
+      "That makes it a natural fit for deterministic DSL training.",
+      "Learn the contract once, then compose it."
+    ],
+    "footer": "transformer_overview"
+  }
+}

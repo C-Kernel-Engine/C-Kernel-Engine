@@ -1,0 +1,70 @@
+{
+  "header": {
+    "headline": "Q5 0 Bit Layout",
+    "subtitle": "Bit-layout explainers should connect the stored representation to the recovered numeric path."
+  },
+  "nodes": {
+    "stage_1": {
+      "title": "Source Values",
+      "body": "Q5 0 Bit Layout starts from packed or full-precision source values that define the numeric contract.",
+      "detail": [
+        "bit lanes",
+        "decode order"
+      ]
+    },
+    "stage_2": {
+      "title": "Packing Rule",
+      "body": "The central rule decides which bits survive and how dropped detail is accounted for in q5 0 bit layout.",
+      "detail": [
+        "decode order",
+        "scale"
+      ]
+    },
+    "stage_3": {
+      "title": "Block Layout",
+      "body": "Storage layout turns that rule into a concrete block or lane shape the runtime can consume.",
+      "detail": [
+        "bit lanes",
+        "scale"
+      ]
+    },
+    "stage_4": {
+      "title": "Runtime Decode",
+      "body": "The final behavior depends on decode order, scale recovery, and the remaining error envelope.",
+      "detail": [
+        "decode path",
+        "runtime value"
+      ]
+    }
+  },
+  "formula": {
+    "title": "Technical Rule",
+    "equation": "q5_0 bits -> decode -> float value",
+    "bullets": [
+      "bit lanes",
+      "decode order",
+      "scale"
+    ]
+  },
+  "artifacts": {
+    "left": {
+      "title": "Structure View",
+      "body": "Show the concrete packed structure the runtime reads for q5 0 bit layout.",
+      "detail": [
+        "bit grouping",
+        "scale metadata"
+      ]
+    },
+    "right": {
+      "title": "Runtime Effect",
+      "body": "Explain the throughput, precision, or memory consequence of the chosen layout.",
+      "detail": [
+        "error tradeoff",
+        "runtime contract"
+      ]
+    }
+  },
+  "footer": {
+    "note": "Q5 0 Bit Layout belongs in the broader contract because the model needs dense technical layouts, not only charts and posters."
+  }
+}

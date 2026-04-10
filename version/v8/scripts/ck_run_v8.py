@@ -18,9 +18,11 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,14 +35,74 @@ BUILD_DIR = PROJECT_ROOT / "build"
 KERNEL_MAPS_DIR = V8_ROOT / "kernel_maps"
 KERNEL_REGISTRY_PATH = KERNEL_MAPS_DIR / "KERNEL_REGISTRY.json"
 V8_REQUIREMENTS_PATH = PROJECT_ROOT / "requirements-v8.txt"
+V8_VISUALIZER_PATH = V8_ROOT / "tools" / "open_ir_visualizer_v8.py"
+REPO_VENV_PY = PROJECT_ROOT / ".venv" / "bin" / "python"
+DEFAULT_CACHE_DIR = Path.home() / ".cache" / "ck-engine-v8" / "models"
+AUTO_MMPROJ_SPECS = (
+    {
+        "match_any": (
+            "qwen/qwen3-vl-8b-instruct-gguf",
+            "qwen3-vl-8b-instruct-gguf",
+            "qwen3-vl-8b-instruct",
+            "qwen3vl-8b-instruct",
+        ),
+        "mmproj": "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+    },
+)
+
+
+def _can_write_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".ck_write_probe"
+        probe.write_text("", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _fallback_cache_dir() -> Path:
+    return Path(tempfile.gettempdir()) / "ck-engine-v8" / "models"
 
 
 def _get_cache_dir() -> Path:
     env = os.environ.get("CK_CACHE_DIR")
-    return Path(env).expanduser() if env else (Path.home() / ".cache" / "ck-engine-v8" / "models")
+    if env:
+        return Path(env).expanduser()
+    if _can_write_dir(DEFAULT_CACHE_DIR):
+        return DEFAULT_CACHE_DIR
+    return _fallback_cache_dir()
+
+
+def _cache_roots() -> list[Path]:
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for root in (CACHE_DIR, DEFAULT_CACHE_DIR, LEGACY_CACHE_DIR):
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        roots.append(root)
+    return roots
+
+
+def _hf_hub_cache_dir(cache_dir: Path) -> Path:
+    return cache_dir / ".hf-hub"
+
+
+def _infer_auto_mmproj_spec(model_input: str) -> str | None:
+    normalized = str(model_input or "").strip().lower().replace("\\", "/")
+    if not normalized:
+        return None
+    for row in AUTO_MMPROJ_SPECS:
+        if any(token in normalized for token in row["match_any"]):
+            return str(row["mmproj"])
+    return None
 
 
 CACHE_DIR = _get_cache_dir()
+LEGACY_CACHE_DIR = Path.home() / ".cache" / "ck-engine-v7" / "models"
 
 
 C_RESET = "\033[0m"
@@ -64,6 +126,87 @@ def log_step(step: int, msg: str) -> None:
 
 def log_error(msg: str) -> None:
     print(f"{C_RED}Error:{C_RESET} {msg}", file=sys.stderr)
+
+
+def _detect_default_ck_threads() -> int:
+    """Best-effort physical core count; prefer physical cores on HT systems."""
+    try:
+        logical = len(os.sched_getaffinity(0))
+    except Exception:
+        logical = os.cpu_count() or 1
+    logical = max(1, int(logical or 1))
+
+    physical = 0
+    threads_per_core = 0
+
+    try:
+        pairs = set()
+        sockets = set()
+        phys_id = None
+        core_id = None
+        cpu_cores_hint = 0
+        siblings_hint = 0
+        with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    if phys_id is not None and core_id is not None:
+                        pairs.add((phys_id, core_id))
+                    phys_id = None
+                    core_id = None
+                    continue
+                if line.startswith("physical id"):
+                    phys_id = int(line.split(":", 1)[1].strip())
+                    sockets.add(phys_id)
+                elif line.startswith("core id"):
+                    core_id = int(line.split(":", 1)[1].strip())
+                elif line.startswith("cpu cores"):
+                    cpu_cores_hint = max(cpu_cores_hint, int(line.split(":", 1)[1].strip()))
+                elif line.startswith("siblings"):
+                    siblings_hint = max(siblings_hint, int(line.split(":", 1)[1].strip()))
+        if phys_id is not None and core_id is not None:
+            pairs.add((phys_id, core_id))
+
+        physical = len(pairs)
+        if siblings_hint > 0 and cpu_cores_hint > 0 and siblings_hint >= cpu_cores_hint:
+            threads_per_core = max(1, siblings_hint // cpu_cores_hint)
+
+        if physical <= 1 and cpu_cores_hint > 0:
+            if sockets:
+                physical = cpu_cores_hint * max(1, len(sockets))
+            elif threads_per_core > 1:
+                physical = max(1, logical // threads_per_core)
+    except Exception:
+        physical = 0
+
+    if physical <= 1:
+        try:
+            out = subprocess.check_output(["lscpu"], text=True, stderr=subprocess.DEVNULL)
+            kv: dict[str, str] = {}
+            for raw in out.splitlines():
+                if ":" not in raw:
+                    continue
+                k, v = raw.split(":", 1)
+                kv[k.strip().lower()] = v.strip()
+
+            sockets = int(kv.get("socket(s)", "0") or 0)
+            cores_per_socket = int(kv.get("core(s) per socket", "0") or 0)
+            tpc = int(kv.get("thread(s) per core", "0") or 0)
+            if tpc > 0 and threads_per_core <= 0:
+                threads_per_core = tpc
+
+            if sockets > 0 and cores_per_socket > 0:
+                physical = max(1, sockets * cores_per_socket)
+            elif tpc > 1:
+                physical = max(1, logical // tpc)
+        except Exception:
+            pass
+
+    if physical > 1:
+        return min(int(physical), int(logical))
+    if threads_per_core > 1:
+        return max(1, int(logical) // int(threads_per_core))
+    return int(logical)
 
 
 def _parse_requirement_packages() -> list[str]:
@@ -94,12 +237,35 @@ def _missing_python_packages() -> list[str]:
     return missing
 
 
+def _reexec_into_repo_venv_if_possible(missing: list[str]) -> bool:
+    if os.environ.get("CK_V8_REEXECED") == "1":
+        return False
+    if not REPO_VENV_PY.exists():
+        return False
+    current_python = Path(sys.executable).expanduser()
+    if not current_python.is_absolute():
+        current_python = (Path.cwd() / current_python).resolve()
+    target_python = REPO_VENV_PY.expanduser()
+    if not target_python.is_absolute():
+        target_python = (Path.cwd() / target_python).resolve()
+    try:
+        if current_python == target_python:
+            return False
+    except OSError:
+        return False
+    env = os.environ.copy()
+    env["CK_V8_REEXECED"] = "1"
+    os.execve(str(REPO_VENV_PY), [str(REPO_VENV_PY), __file__, *sys.argv[1:]], env)
+    return True
+
+
 def _ensure_v8_python_requirements(command: Optional[str]) -> None:
     if command not in {None, "run"}:
         return
     missing = _missing_python_packages()
     if not missing:
         return
+    _reexec_into_repo_venv_if_possible(missing)
     joined = ", ".join(missing)
     raise SystemExit(
         "Missing Python packages for v8 inference: "
@@ -234,11 +400,18 @@ def step_regenerate_kernel_registry(force: bool = False) -> Path:
 
 def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
     log_step(1, f"Downloading {model_id}")
+    if not force:
+        repo_dir = model_id.replace("/", "--")
+        for root in _cache_roots():
+            candidate_dir = root / repo_dir
+            if candidate_dir.exists() and any(candidate_dir.glob("*.gguf")):
+                if root == cache_dir:
+                    log(f"  Using cached model at {candidate_dir}", C_DIM)
+                else:
+                    log(f"  Reusing cached model at {candidate_dir}", C_DIM)
+                return candidate_dir
     model_dir = cache_dir / model_id.replace("/", "--")
     model_dir.mkdir(parents=True, exist_ok=True)
-    if any(model_dir.glob("*.gguf")) and not force:
-        log(f"  Using cached model at {model_dir}", C_DIM)
-        return model_dir
     try:
         from huggingface_hub import snapshot_download
     except ImportError as exc:
@@ -246,6 +419,7 @@ def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
     snapshot_download(
         repo_id=model_id,
         local_dir=str(model_dir),
+        cache_dir=str(_hf_hub_cache_dir(cache_dir)),
         ignore_patterns=["*.bin", "*.msgpack", "*.h5", "*.ot"],
     )
     return model_dir
@@ -253,12 +427,20 @@ def step_download(model_id: str, cache_dir: Path, force: bool = False) -> Path:
 
 def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool = False) -> Path:
     log_step(1, f"Downloading {filename} from {repo_id}")
+    if not force:
+        repo_dir = repo_id.replace("/", "--")
+        filename_only = Path(filename).name
+        for root in _cache_roots():
+            candidate = root / repo_dir / filename_only
+            if candidate.exists():
+                if root == cache_dir:
+                    log(f"  Using cached GGUF at {candidate}", C_DIM)
+                else:
+                    log(f"  Reusing cached GGUF at {candidate}", C_DIM)
+                return candidate
     model_dir = cache_dir / repo_id.replace("/", "--")
     model_dir.mkdir(parents=True, exist_ok=True)
     gguf_path = model_dir / Path(filename).name
-    if gguf_path.exists() and not force:
-        log(f"  Using cached GGUF at {gguf_path}", C_DIM)
-        return gguf_path
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
@@ -268,6 +450,7 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
             repo_id=repo_id,
             filename=filename,
             local_dir=str(model_dir),
+            cache_dir=str(_hf_hub_cache_dir(cache_dir)),
         )
     )
     if downloaded.resolve() != gguf_path.resolve():
@@ -283,22 +466,46 @@ def _strip_gguf_suffix(model_id: str) -> str:
     return model_id
 
 
+def _find_cached_tokenizer_json(repo_id: str) -> Path | None:
+    repo_dir = repo_id.replace("/", "--")
+    for root in _cache_roots():
+        candidate = root / repo_dir / "tokenizer.json"
+        if candidate.exists():
+            return candidate
+        nested = root / repo_dir / ".ck_build" / "tokenizer.json"
+        if nested.exists():
+            return nested
+    return None
+
+
 def ensure_tokenizer_files(model_id: str, work_dir: Path) -> None:
     tokenizer_path = work_dir / "tokenizer.json"
     if tokenizer_path.exists():
-        return
-    try:
-        from huggingface_hub import hf_hub_download
-    except ImportError:
         return
     candidates = []
     base_id = _strip_gguf_suffix(model_id)
     if base_id != model_id:
         candidates.append(base_id)
     candidates.append(model_id)
+
+    for repo_id in candidates:
+        cached = _find_cached_tokenizer_json(repo_id)
+        if cached is not None:
+            tokenizer_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(cached, tokenizer_path)
+            return
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        return
     for repo_id in candidates:
         try:
-            hf_hub_download(repo_id=repo_id, filename="tokenizer.json", local_dir=str(work_dir))
+            hf_hub_download(
+                repo_id=repo_id,
+                filename="tokenizer.json",
+                local_dir=str(work_dir),
+                cache_dir=str(_hf_hub_cache_dir(CACHE_DIR)),
+            )
             if tokenizer_path.exists():
                 return
         except Exception:
@@ -391,8 +598,10 @@ def step_convert_gguf(
         "--manifest-out",
         str(manifest_path),
     ]
-    if context_len is not None:
-        cmd.extend(["--context", str(int(context_len))])
+    # Preserve model-native context / RoPE metadata during conversion.
+    # The active runtime window is applied later in build_ir_v8 via --context-len,
+    # matching the v7 text path and avoiding qwen35 long-context regressions.
+    _ = context_len
     run_cmd(cmd, cwd=PROJECT_ROOT)
     return weights_path, config_path, manifest_path
 
@@ -410,6 +619,8 @@ def step_build_ir(
     step_regenerate_kernel_registry(force=force)
 
     outputs = {
+        "init_ir": output_dir / "init.json",
+        "init_call": output_dir / "init_call.json",
         "prefill_ir": output_dir / "ir1_prefill.json",
         "prefill_layout": output_dir / "layout_prefill.json",
         "prefill_lowered": output_dir / "lowered_prefill.json",
@@ -421,11 +632,7 @@ def step_build_ir(
         "manifest_map": output_dir / "weights_manifest.map",
     }
 
-    decode_ready = all(
-        path.exists()
-        for key, path in outputs.items()
-        if key != "prefill_ir"
-    ) and outputs["prefill_ir"].exists()
+    decode_ready = all(path.exists() for path in outputs.values())
     if decode_ready and not force:
         log(f"  Using cached IR artifacts in {output_dir}", C_DIM)
         return outputs
@@ -449,6 +656,7 @@ def step_build_ir(
         ]
         if mode == "decode":
             cmd.extend(["--manifest-map-output", str(outputs["manifest_map"])])
+            cmd.extend(["--init-output", str(outputs["init_ir"])])
         if context_len is not None:
             cmd.extend(["--context-len", str(int(context_len))])
         if logits_layout:
@@ -479,6 +687,8 @@ def step_codegen(output_dir: Path, ir_paths: dict[str, Path], *, force: bool = F
         str(ir_paths["decode_call"]),
         "--prefill",
         str(ir_paths["prefill_call"]),
+        "--prefill-layout",
+        str(ir_paths["prefill_layout"]),
         "--layout",
         str(ir_paths["decode_layout"]),
         "--output",
@@ -501,12 +711,29 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
     if lib_path.exists() and not force and lib_path.stat().st_mtime >= model_c_path.stat().st_mtime:
         _sync_runtime_lib(kernel_lib, output_dir / "libckernel_engine.so", "libckernel_engine.so")
         _sync_runtime_lib(tokenizer_lib, output_dir / "libckernel_tokenizer.so", "libckernel_tokenizer.so")
+        symlink_path = output_dir / "ck-kernel-inference.so"
+        try:
+            if symlink_path.exists() or symlink_path.is_symlink():
+                symlink_path.unlink()
+            symlink_path.symlink_to("libmodel.so")
+        except Exception:
+            pass
         return lib_path
 
     include_dir = PROJECT_ROOT / "include"
     v8_src = V8_ROOT / "src"
+    compiler = "gcc"
+    requested_compiler = (os.environ.get("CK_V8_COMPILER", "") or os.environ.get("CK_V7_COMPILER", "")).strip()
+    if requested_compiler:
+        if not shutil.which(requested_compiler):
+            log_error(f"Requested CK_V8_COMPILER not found in PATH: {requested_compiler}")
+            sys.exit(1)
+        compiler = requested_compiler
+    elif shutil.which("icx"):
+        compiler = "icx"
+    omp_flag = "-qopenmp" if compiler == "icx" else "-fopenmp"
     cmd = [
-        "gcc",
+        compiler,
         "-shared",
         "-fPIC",
         "-mcmodel=large",
@@ -514,7 +741,7 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
         "-march=native",
         "-std=c11",
         "-fvisibility=default",
-        "-fopenmp",
+        omp_flag,
         f"-I{include_dir}",
         f"-I{v8_src}",
         "-o",
@@ -532,10 +759,53 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
         "-Wl,-rpath,$ORIGIN",
         f"-Wl,-rpath,{BUILD_DIR}",
     ]
+    extra_cflags = (os.environ.get("CK_V8_EXTRA_CFLAGS", "") or os.environ.get("CK_V7_EXTRA_CFLAGS", "")).strip()
+    extra_ldflags = (os.environ.get("CK_V8_EXTRA_LDFLAGS", "") or os.environ.get("CK_V7_EXTRA_LDFLAGS", "")).strip()
+    if extra_cflags:
+        try:
+            cmd.extend(shlex.split(extra_cflags))
+        except ValueError:
+            log_error("Invalid CK_V8_EXTRA_CFLAGS value")
+            sys.exit(1)
+    if extra_ldflags:
+        try:
+            cmd.extend(shlex.split(extra_ldflags))
+        except ValueError:
+            log_error("Invalid CK_V8_EXTRA_LDFLAGS value")
+            sys.exit(1)
     run_cmd(cmd, cwd=PROJECT_ROOT)
     _sync_runtime_lib(kernel_lib, output_dir / "libckernel_engine.so", "libckernel_engine.so")
     _sync_runtime_lib(tokenizer_lib, output_dir / "libckernel_tokenizer.so", "libckernel_tokenizer.so")
+    symlink_path = output_dir / "ck-kernel-inference.so"
+    try:
+        if symlink_path.exists() or symlink_path.is_symlink():
+            symlink_path.unlink()
+        symlink_path.symlink_to("libmodel.so")
+    except Exception:
+        pass
     return lib_path
+
+
+def _generate_visualizer_html(work_dir: Path) -> Path:
+    """Generate ir_report.html for a v8 run directory without running extra probes."""
+    if not V8_VISUALIZER_PATH.exists():
+        raise RuntimeError(f"Visualizer script not found: {V8_VISUALIZER_PATH}")
+    cmd = [
+        sys.executable,
+        str(V8_VISUALIZER_PATH),
+        "--generate",
+        "--run",
+        str(work_dir),
+        "--html-only",
+        "--strict-run-artifacts",
+    ]
+    run_cmd(cmd, cwd=PROJECT_ROOT)
+    report_path = work_dir / "ir_report.html"
+    if report_path.exists():
+        log(f"  Visualizer: {report_path}", C_GREEN)
+    else:
+        log(f"  Warning: visualizer generation completed but report missing at {report_path}", C_ORANGE)
+    return report_path
 
 
 def step_run_chat(work_dir: Path, args: argparse.Namespace, *, gguf_path: Path | None) -> None:
@@ -550,7 +820,7 @@ def step_run_chat(work_dir: Path, args: argparse.Namespace, *, gguf_path: Path |
     if env.get("LD_LIBRARY_PATH"):
         ld_items.append(env["LD_LIBRARY_PATH"])
     env["LD_LIBRARY_PATH"] = ":".join(ld_items)
-    env.setdefault("CK_NUM_THREADS", str(max(1, os.cpu_count() or 1)))
+    env.setdefault("CK_NUM_THREADS", str(_detect_default_ck_threads()))
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("OMP_DYNAMIC", "FALSE")
 
@@ -649,8 +919,17 @@ def run_pipeline(args: argparse.Namespace) -> int:
     if args.mmproj is not None or args.image_path is not None or args.synthetic_prefix_tokens > 0:
         decoder_gguf, decoder_repo_id = _resolve_gguf_input(model_input, force_download=args.force_download)
         encoder_gguf = None
-        if args.mmproj is not None:
-            encoder_gguf, _ = _resolve_gguf_input(args.mmproj, force_download=args.force_download)
+        mmproj_spec = str(args.mmproj or "").strip() or _infer_auto_mmproj_spec(model_input)
+        auto_mmproj = not bool(args.mmproj) and bool(mmproj_spec)
+        if mmproj_spec:
+            if auto_mmproj:
+                log(f"  Auto-selected mmproj: {mmproj_spec}", C_DIM)
+            encoder_gguf, _ = _resolve_gguf_input(mmproj_spec, force_download=args.force_download)
+        elif args.image_path is not None:
+            raise RuntimeError(
+                "vision run requested with --image-path but no mmproj was provided and no known default companion "
+                f"was found for {model_input}. Pass --mmproj /path/to/mmproj.gguf or --mmproj hf://repo/file.gguf."
+            )
         if decoder_repo_id:
             ensure_tokenizer_files(decoder_repo_id, work_dir)
         bridge_dir = work_dir / "multimodal_bridge"
@@ -665,11 +944,25 @@ def run_pipeline(args: argparse.Namespace) -> int:
             args.prompt or "Describe the image.",
             "--image-mode",
             args.image_mode,
-            "--top-k",
+            "--report-top-k",
             str(int(args.vision_top_k)),
         ]
         if args.max_tokens is not None:
             cmd.extend(["--max-tokens", str(int(args.max_tokens))])
+        if args.temperature is not None:
+            cmd.extend(["--temperature", str(float(args.temperature))])
+        if args.top_k is not None:
+            cmd.extend(["--sample-top-k", str(int(args.top_k))])
+        if args.top_p is not None:
+            cmd.extend(["--top-p", str(float(args.top_p))])
+        if args.min_p is not None:
+            cmd.extend(["--min-p", str(float(args.min_p))])
+        if args.repeat_penalty is not None:
+            cmd.extend(["--repeat-penalty", str(float(args.repeat_penalty))])
+        if args.repeat_last_n is not None:
+            cmd.extend(["--repeat-last-n", str(int(args.repeat_last_n))])
+        for override in list(getattr(args, "vision_activation_pref", []) or []):
+            cmd.extend(["--vision-activation-pref", str(override)])
         if args.no_chat_template:
             cmd.append("--no-chat-template")
         else:
@@ -728,6 +1021,10 @@ def run_pipeline(args: argparse.Namespace) -> int:
     model_c_path = step_codegen(work_dir, ir_paths, force=args.force_compile)
     lib_path = step_compile(model_c_path, work_dir, force=args.force_compile)
 
+    if getattr(args, "generate_visualizer", False):
+        log(f"\n{C_ORANGE}[viz]{C_RESET} Generating IR visualizer HTML", C_DIM)
+        _generate_visualizer_html(work_dir)
+
     if args.generate_only:
         log(f"\n{C_GREEN}Generated:{C_RESET}")
         log(f"  Weights: {weights_path}")
@@ -753,8 +1050,9 @@ Examples:
   version/v8/scripts/cks-v8-run run hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \\
     --context-len 1034 --force-convert --force-compile
 
-  version/v8/scripts/cks-v8-run run /path/to/decoder.gguf \\
-    --mmproj /path/to/mmproj.gguf --image-path ./image.png --prompt "Describe the image."
+  version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \\
+    --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \\
+    --image-path version/v8/test_assets/v8_vision_doc_card_72.png --prompt "Explain this image."
 """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -772,7 +1070,7 @@ Examples:
     run_parser.add_argument("--repeat-penalty", type=float, default=1.0)
     run_parser.add_argument("--repeat-last-n", type=int, default=64)
     run_parser.add_argument("--prompt", default=None, help="Single prompt (non-interactive if set)")
-    run_parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3"], default="auto")
+    run_parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3", "llama"], default="auto")
     run_parser.add_argument("--no-chat-template", action="store_true")
     run_parser.add_argument("--allow-raw-prompt", action="store_true")
     run_parser.add_argument("--thinking-mode", choices=["auto", "visible", "suppressed"], default="auto")
@@ -781,13 +1079,24 @@ Examples:
     run_parser.add_argument("--force-download", action="store_true")
     run_parser.add_argument("--force-convert", action="store_true")
     run_parser.add_argument("--force-compile", action="store_true")
+    run_parser.add_argument("--generate-visualizer", action="store_true")
     run_parser.add_argument("--generate-only", action="store_true")
 
-    run_parser.add_argument("--mmproj", default=None, help="Optional encoder/mmproj GGUF for vision runs")
+    run_parser.add_argument(
+        "--mmproj",
+        default=None,
+        help="Optional encoder/mmproj GGUF for vision runs; accepts local paths or hf://repo/file.gguf",
+    )
     run_parser.add_argument("--image-path", default=None, help="Optional real image path for multimodal runs")
     run_parser.add_argument("--image-mode", choices=["checker", "gradient", "gray"], default="checker")
     run_parser.add_argument("--synthetic-prefix-tokens", type=int, default=0)
     run_parser.add_argument("--vision-top-k", type=int, default=8)
+    run_parser.add_argument(
+        "--vision-activation-pref",
+        action="append",
+        default=[],
+        help="Optional vision encoder activation override(s) in op=dtype form, e.g. out_proj=q8",
+    )
 
     subparsers.add_parser("list", help="List cached models")
 

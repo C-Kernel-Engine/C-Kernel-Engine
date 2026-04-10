@@ -42,7 +42,7 @@ These files describe compute graphs.
 
 ## Bring-up Notes
 
-- Use `llama_nanbeige_contract.md` as the working checklist for Llama-family
+- Use `llama_nanbeige_contract.md` as the working checklist for Nanbeige/Llama-family
   model onboarding when output quality is gibberish despite successful compile.
 - It captures tokenizer/chat-stop semantics and strict gate ordering needed
   before interactive generation is considered valid.

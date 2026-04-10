@@ -11,7 +11,10 @@ from typing import Any, Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TEMPLATE_DIR = REPO_ROOT / "version" / "v7" / "templates"
+TEMPLATE_DIRS = (
+    REPO_ROOT / "version" / "v7" / "templates",
+    REPO_ROOT / "version" / "v8" / "templates",
+)
 
 PRESET_ALIASES = {
     "qwen": "qwen2",
@@ -20,11 +23,14 @@ PRESET_ALIASES = {
     "qwen35": "qwen35",
     "gemma": "gemma3",
     "gemma3": "gemma3",
+    "gemma4": "gemma4",
 }
 
 KNOWN_TEMPLATE_MARKERS = (
     "<start_of_turn>",
     "<end_of_turn>",
+    "<|turn>",
+    "<turn|>",
     "<|im_start|>",
     "<|im_end|>",
     "<think>",
@@ -42,6 +48,7 @@ def extract_static_default_system_prompt(chat_template: str) -> Optional[str]:
     patterns = (
         r"<\|im_start\|>system\n(?P<prompt>.+?)<\|im_end\|>\n",
         r"<start_of_turn>system\n(?P<prompt>.+?)<end_of_turn>\n",
+        r"<\|turn>system\n(?P<prompt>.+?)<turn\|>\n",
     )
     reject_substrings = (
         "{{",
@@ -85,12 +92,14 @@ def looks_like_instruction_chat_model(
     return (
         "<|im_start|>" in template
         or "<start_of_turn>" in template
+        or "<|turn>" in template
         or "instruct" in finetune_lc
         or "chat" in finetune_lc
         or finetune_lc == "it"
         or "instruct" in model_name_lc
         or model_name_lc.endswith("-it")
         or model_type_lc.startswith("gemma")
+        or model_type_lc.startswith("gemma4")
         or model_type_lc.startswith("qwen")
     )
 
@@ -151,19 +160,21 @@ def load_template_chat_contract(name: str) -> Optional[dict[str, Any]]:
     alias = PRESET_ALIASES.get(requested)
     if not alias:
         return None
-    path = TEMPLATE_DIR / f"{alias}.json"
-    if not path.exists():
-        return None
-    try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-    contract = doc.get("contract", {}).get("chat_contract")
-    normalized = normalize_chat_contract(contract)
-    if normalized is None:
-        return None
-    normalized["name"] = requested or str(normalized.get("name") or alias)
-    return normalized
+    for template_dir in TEMPLATE_DIRS:
+        path = template_dir / f"{alias}.json"
+        if not path.exists():
+            continue
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        contract = doc.get("contract", {}).get("chat_contract")
+        normalized = normalize_chat_contract(contract)
+        if normalized is None:
+            continue
+        normalized["name"] = requested or str(normalized.get("name") or alias)
+        return normalized
+    return None
 
 
 def hydrate_chat_contract(contract: Any) -> Optional[dict[str, Any]]:
@@ -237,6 +248,8 @@ def _infer_explicit_contract_name(
 
     if "<start_of_turn>" in template and "<end_of_turn>" in template:
         return "gemma"
+    if "<|turn>" in template and "<turn|>" in template:
+        return "gemma4"
     if "<|im_start|>" in template and "<|im_end|>" in template:
         if model_type_lc == "qwen35" or template_name_lc == "qwen35":
             return "qwen35"

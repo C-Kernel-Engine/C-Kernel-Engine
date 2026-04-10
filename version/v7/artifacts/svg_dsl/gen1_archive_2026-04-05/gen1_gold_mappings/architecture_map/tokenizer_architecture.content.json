@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "Tokenizer Architecture",
+    "subtitle": "Tokenizer systems are architecture maps once the questions become vocabulary flow, staging, and runtime lookup."
+  },
+  "nodes": {
+    "corpus": {
+      "title": "Corpus Inputs",
+      "body": "Text corpora define the surface the tokenizer needs to absorb and compress.",
+      "detail": [
+        "corpus",
+        "domains"
+      ]
+    },
+    "train": {
+      "title": "Tokenizer Train",
+      "body": "Training turns corpus pressure into stable vocabulary and merges.",
+      "detail": [
+        "bpe",
+        "merges"
+      ]
+    },
+    "stage": {
+      "title": "Run Staging",
+      "body": "The trained tokenizer is staged into the run so generation stays consistent.",
+      "detail": [
+        "json",
+        "bin"
+      ]
+    },
+    "runtime": {
+      "title": "Runtime Lookup",
+      "body": "Encoding and decoding depend on that staged contract at training and eval time.",
+      "detail": [
+        "encode",
+        "decode"
+      ]
+    },
+    "outcome": {
+      "title": "Stable Surface",
+      "body": "The architecture is successful when training, probing, and inference share the same token contract."
+    }
+  },
+  "edges": {
+    "edge_1": "fit",
+    "edge_2": "stage",
+    "edge_3": "reuse",
+    "edge_4": "stable ids"
+  },
+  "footer": {
+    "note": "Tokenizer architecture matters because every other deterministic contract sits on top of it."
+  }
+}

@@ -6,6 +6,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +142,58 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertEqual(contract.get("kernel_id"), "attention_forward_causal_head_major_gqa_flash_strided")
         self.assertEqual(contract.get("saved_tensor_kernel_key"), "attn_weights")
         self.assertEqual(contract.get("contract_source"), "template.contract.attention_contract.train_runtime_contract")
+
+    def test_embedded_manifest_template_missing_train_runtime_contract_uses_compatibility_warning(self) -> None:
+        manifest = copy.deepcopy(self.manifest)
+        attention_contract = (((manifest.get("template") or {}).get("contract") or {}).get("attention_contract") or {})
+        attention_contract.pop("train_runtime_contract", None)
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="legacy",
+        )
+        attn_ops = [op for op in ir1.get("ops", []) if str(op.get("op")) == "attn"]
+        self.assertEqual(len(attn_ops), 1)
+        contract = attn_ops[0].get("runtime_contract") or {}
+        self.assertEqual(contract.get("kernel_id"), "attention_forward_causal_head_major_gqa_exact")
+        warnings = ir1.get("warnings", [])
+        self.assertTrue(
+            any("Embedded manifest template" in str(item) and "train_runtime_contract" in str(item) for item in warnings)
+        )
+
+    def test_repo_template_requires_explicit_train_runtime_contract(self) -> None:
+        template = copy.deepcopy(self.manifest.get("template") or {})
+        attention_contract = (((template.get("contract") or {}).get("attention_contract") or {}))
+        attention_contract.pop("train_runtime_contract", None)
+        base_manifest = {
+            "config": copy.deepcopy(self.manifest.get("config") or {}),
+            "entries": copy.deepcopy(self.manifest.get("entries") or []),
+        }
+        original_load_json = build_ir_train_v7._load_json
+
+        def fake_load_json(path: Path) -> dict:
+            if Path(path).name == "qwen3.json":
+                return copy.deepcopy(template)
+            return original_load_json(path)
+
+        with mock.patch.object(build_ir_train_v7, "_load_json", side_effect=fake_load_json):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Repo template `qwen3` must define contract.attention_contract.train_runtime_contract",
+            ):
+                build_ir_train_v7.build_ir1_train(
+                    manifest=base_manifest,
+                    registry=self.registry,
+                    bindings_doc=self.bindings,
+                    grad_rules=self.grad_rules,
+                    max_layers=1,
+                    strict=False,
+                    bridge_lowering="legacy",
+                )
 
     def test_gemma_sliding_attention_contract_uses_template_runtime_policy(self) -> None:
         manifest = _test_manifest("gemma3")
@@ -538,6 +591,68 @@ class TrainBridgeLoweringTests(unittest.TestCase):
         self.assertGreaterEqual(int(summary.get("checkpoint_rematerialize_ops", 0) or 0), 1)
         self.assertIn("checkpoint_rematerialize_saved_tensor", c_src)
         self.assertIn("explicit checkpoint rematerialization via shared attention_forward bridge", c_src)
+
+    def test_codegen_uses_shared_global_grad_norm_helper(self) -> None:
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=self.manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="explicit",
+        )
+        ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
+            ir1=ir1,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            strict=False,
+            allow_partial=True,
+            checkpoint_policy="none",
+        )
+        layout = generate_train_layout_v7.build_layout(ir2, self.manifest, 64, strict=False)
+        c_src, _summary = codegen_train_runtime_v7.generate_c(
+            ir2,
+            self.registry,
+            manifest=self.manifest,
+            layout=layout,
+            exec_plan=None,
+        )
+        self.assertIn("gradient_global_norm_multi_f32(grads, numels,", c_src)
+        self.assertNotIn("double gv = (double)", c_src)
+
+    def test_codegen_batches_grad_accumulate_only_in_non_trace_backward(self) -> None:
+        ir1 = build_ir_train_v7.build_ir1_train(
+            manifest=self.manifest,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            max_layers=1,
+            strict=False,
+            bridge_lowering="explicit",
+        )
+        ir2 = lower_ir2_backward_v7.synthesize_ir2_backward(
+            ir1=ir1,
+            registry=self.registry,
+            bindings_doc=self.bindings,
+            grad_rules=self.grad_rules,
+            strict=False,
+            allow_partial=True,
+            checkpoint_policy="none",
+        )
+        layout = generate_train_layout_v7.build_layout(ir2, self.manifest, 64, strict=False)
+        c_src, summary = codegen_train_runtime_v7.generate_c(
+            ir2,
+            self.registry,
+            manifest=self.manifest,
+            layout=layout,
+            exec_plan=None,
+        )
+        self.assertGreater(int(summary.get("batched_grad_accumulate_calls", 0) or 0), 0)
+        normal = c_src.split("int ck_train_backward_step(void) {", 1)[1].split("int ck_train_backward_step_trace(", 1)[0]
+        self.assertIn("gradient_accumulate_multi_f32(", normal)
+        self.assertGreater(normal.count("gradient_accumulate_multi_f32("), 0)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,307 @@
+{
+  "families": [
+    {
+      "id": "gemma",
+      "label": "Gemma 3 270M IT",
+      "enabled": true,
+      "model": "hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "coherence_gate": false,
+      "response_contract": {
+        "stop_text_markers": [
+          "<end_of_turn>"
+        ],
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "rope_layout": "split",
+          "chat_contract.name": "gemma"
+        },
+        "manifest": {
+          "config.rope_layout": "split",
+          "config.chat_contract.name": "gemma"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen2",
+      "label": "Qwen2 0.5B Instruct",
+      "enabled": true,
+      "model": "hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital",
+        "code_bundle"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen2"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen3",
+      "label": "Qwen3 0.6B",
+      "enabled": true,
+      "model": "hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--thinking-mode",
+        "suppressed",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital",
+        "code_bundle"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen3"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen35",
+      "label": "Qwen3.5 0.8B",
+      "enabled": true,
+      "model": "hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello",
+        "france_capital"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "chat_contract.name": "qwen35"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen3vl",
+      "label": "Qwen3-VL 8B Instruct",
+      "enabled": true,
+      "model": "hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--image-path",
+        "version/v8/test_assets/v8_vision_doc_card_72.png",
+        "--thinking-mode",
+        "suppressed",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "vision_doc_card"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "[v8-bridge] done report=",
+          "Wrote bridge report to "
+        ],
+        "config": {
+          "rope_layout": "multi_section_1d"
+        },
+        "manifest": {
+          "config.model": "qwen3vl",
+          "config.chat_contract.name": "qwen",
+          "config.rope_layout": "multi_section_1d"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "mrope_qk_text",
+            "min_matches": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "nanbeige",
+      "label": "Nanbeige 4.1 3B",
+      "enabled": true,
+      "model": "hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf",
+      "context_len": 1024,
+      "runtime_args": [
+        "--chat-template",
+        "auto",
+        "--temperature",
+        "0",
+        "--repeat-penalty",
+        "1.1"
+      ],
+      "coherence_gate": false,
+      "response_contract": {
+        "stop_text_markers": [
+          "<|im_end|>"
+        ],
+        "strip_think_blocks": true,
+        "strip_trailing_metrics": true,
+        "trim_whitespace": true
+      },
+      "smoke_prompts": [
+        "hello"
+      ],
+      "runtime_expect": {
+        "stdout_contains_any_of": [
+          "Using built-in C tokenizer",
+          "Loaded HuggingFace tokenizer"
+        ],
+        "stdout_not_contains": [
+          "Switched to Python tokenizer",
+          "Forcing Python tokenizer",
+          "Loaded GGUF tokenizer"
+        ],
+        "config": {
+          "rope_layout": "pairwise",
+          "chat_contract.name": "llama_chatml"
+        },
+        "manifest": {
+          "config.rope_layout": "pairwise",
+          "config.chat_contract.name": "llama_chatml"
+        },
+        "lowered_ops": [
+          {
+            "op": "rope_qk",
+            "function_prefix": "rope_forward_qk_pairwise_with_rotary_dim",
+            "min_matches": 1
+          }
+        ]
+      }
+    }
+  ]
+}

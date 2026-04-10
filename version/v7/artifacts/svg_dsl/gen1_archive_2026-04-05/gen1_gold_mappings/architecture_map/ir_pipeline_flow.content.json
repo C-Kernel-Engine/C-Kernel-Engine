@@ -1,0 +1,53 @@
+{
+  "header": {
+    "headline": "IR Pipeline Flow",
+    "subtitle": "Bring the legacy IR flow asset into the broader architecture-map family so the full mix sees it directly."
+  },
+  "nodes": {
+    "ingest": {
+      "title": "Graph Capture",
+      "body": "Capture the upstream IR contract before lowering loses the visible structure.",
+      "detail": [
+        "graph input",
+        "contract ids"
+      ]
+    },
+    "shape": {
+      "title": "Shape / Refine",
+      "body": "Normalize and annotate the graph into a shape the lowerer can preserve.",
+      "detail": [
+        "normalize",
+        "metadata"
+      ]
+    },
+    "lower": {
+      "title": "Lowering Path",
+      "body": "Convert the refined IR into runtime-facing artifacts while keeping provenance visible.",
+      "detail": [
+        "lower",
+        "artifact map"
+      ]
+    },
+    "runtime": {
+      "title": "Runtime Output",
+      "body": "Emit the concrete runtime handoff that later tools and probes inspect.",
+      "detail": [
+        "runtime files",
+        "probe path"
+      ]
+    },
+    "outcome": {
+      "title": "Visible Pipeline",
+      "body": "The map is useful when every stage boundary stays legible after lowering."
+    }
+  },
+  "edges": {
+    "edge_1": "capture",
+    "edge_2": "refine",
+    "edge_3": "lower",
+    "edge_4": "emit"
+  },
+  "footer": {
+    "note": "Legacy architecture assets should be explicit seeds in the full gen1 mix, not only inherited history."
+  }
+}

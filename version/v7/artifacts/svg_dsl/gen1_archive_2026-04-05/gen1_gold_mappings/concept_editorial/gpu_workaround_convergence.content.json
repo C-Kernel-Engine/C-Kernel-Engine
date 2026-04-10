@@ -1,0 +1,74 @@
+{
+  "header": {
+    "kicker": "Systems Tradeoffs",
+    "headline": "GPU Workaround Convergence",
+    "subtitle": "Many GPU workarounds eventually converge on the same truth: memory layout and movement dominate the user-visible outcome."
+  },
+  "principles": {
+    "left": {
+      "title": "Workaround stack",
+      "body": "Sharding, offload, and fragmentation controls can buy time, but they add orchestration cost and fragility.",
+      "bullets": [
+        "Shard more aggressively",
+        "Offload to host",
+        "Accept more coordination"
+      ]
+    },
+    "right": {
+      "title": "Convergence point",
+      "body": "Eventually the program wants a simpler memory story, not one more orchestration layer around the same limit.",
+      "bullets": [
+        "Bandwidth stays finite",
+        "Cache churn stays visible",
+        "Complexity compounds"
+      ]
+    }
+  },
+  "panels": [
+    {
+      "tag": "Pattern",
+      "title": "Patch stack",
+      "summary": "Short-term GPU fixes often accrete as a stack of shims around the original bottleneck.",
+      "bullets": [
+        "Offload",
+        "Shard",
+        "Repack"
+      ],
+      "accent": "amber",
+      "note": "Patches can hide the real shape."
+    },
+    {
+      "tag": "Signal",
+      "title": "Memory remains first",
+      "summary": "When every workaround fights placement and movement, that is the message, not an implementation detail.",
+      "bullets": [
+        "Placement matters",
+        "Transport matters",
+        "Cost shows up in latency"
+      ],
+      "accent": "green",
+      "note": "The system keeps telling the same story."
+    },
+    {
+      "tag": "Decision",
+      "title": "Choose the cleaner path",
+      "summary": "Prefer the design that simplifies the memory narrative instead of extending workaround depth forever.",
+      "bullets": [
+        "Fewer moving parts",
+        "Cleaner debugging",
+        "Better long-term leverage"
+      ],
+      "accent": "blue",
+      "note": "Complexity should buy something durable."
+    }
+  ],
+  "callout": {
+    "title": "Key takeaway",
+    "points": [
+      "Repeated workarounds are evidence, not progress by themselves.",
+      "Convergence usually points at the real systems constraint.",
+      "Teach the model to surface the principle, not just the patch list."
+    ],
+    "footer": "gpu_workaround_convergence"
+  }
+}
