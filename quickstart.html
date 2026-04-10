@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Getting Started  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>Getting Started | C-Kernel-Engine</title>
+    <meta name="description" content="Quickstart guide for building and running C-Kernel-Engine, including the current v7 runtime path plus the v8 text-inference and Qwen3-VL multimodal bring-up surfaces.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/quickstart.html">
-    <meta property="og:title" content="Getting Started  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <meta property="og:title" content="Getting Started | C-Kernel-Engine">
+    <meta property="og:description" content="Quickstart guide for building and running C-Kernel-Engine, including the current v7 runtime path plus the v8 text-inference and Qwen3-VL multimodal bring-up surfaces.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/quickstart.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -968,6 +968,7 @@
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#building">Building</a></li>
         <li><a href="#v7-runtime-quick">v7 Quick Runtime</a></li>
+        <li><a href="#v8-runtime-quick">v8 Inference Quick Runtime</a></li>
         <li><a href="#v7-artifact-capture">v7 Artifact Capture</a></li>
         <li><a href="#v7-profile-dashboard">v7 Profiling Dashboard</a></li>
         <li><a href="#make-targets">Make Targets Reference</a></li>
@@ -1072,6 +1073,34 @@ make CFLAGS="-O0 -g -fPIC -fopenmp -Wall"</pre>
 make v7-demo-runtime \
   V7_MODEL=hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf</pre>
     <p style="margin-bottom: 0;">This is the shortest supported path to a working v7 runtime. It creates the repo-local virtualenv, installs Python dependencies, downloads/converts/compiles the model, and enters the local chat loop.</p>
+</div>
+
+<h2 id="v8-runtime-quick">v8 Inference Quick Runtime (Linux)</h2>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Text Bring-Up</h3>
+    <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --generate-visualizer</pre>
+    <p style="margin-bottom: 0;">This is the short text-family <code>v8</code> path. The same runner surface now covers the promoted <code>qwen2</code>, <code>qwen3</code>, <code>qwen3.5</code>, <code>gemma3</code>, and <code>NanBeige</code> command shapes, with family-specific chat-template notes in the full runbook.</p>
+</div>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Scoped Multimodal Bring-Up</h3>
+    <pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj ./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
+  --image-path version/v8/test_assets/v8_vision_doc_card_72.png \
+  --prompt "Explain this image." \
+  --context-len 1024 \
+  --force-convert --force-compile \
+  --thinking-mode suppressed</pre>
+    <p style="margin-bottom: 0.35rem;">Update <code>--mmproj</code> to the actual local path of your matching Qwen3-VL mmproj file.</p>
+    <p style="margin-bottom: 0.35rem;">This is the current <code>v8</code> multimodal bring-up lane for the validated Qwen3-VL decoder/mmproj pair.</p>
+    <p style="margin-bottom: 0.35rem;"><strong>Full operator notes:</strong> see <a href="v8-runbook.html">v8 Inference Runbook</a>. Other multimodal families are not implied by this quick path.</p>
+    <p style="margin-bottom: 0;"><strong>Under the hood:</strong> see <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a> for how the encoder, bridge, and decoder are stitched together.</p>
 </div>
 
 <h2 id="v7-artifact-capture">v7 Full Artifact Capture (Non-privileged)</h2>
@@ -1648,7 +1677,7 @@ firefox build/flamegraph.svg</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-01</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-10</p>
             </div>
         </div>
     </footer>

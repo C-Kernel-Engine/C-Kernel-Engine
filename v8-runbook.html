@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>v8 Qwen3-VL Runbook  | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <title>v8 Inference Runbook | C-Kernel-Engine</title>
+    <meta name="description" content="Operator runbook for the current C-Kernel-Engine v8 inference lane, covering promoted text-family bring-up and the validated Qwen3-VL multimodal path.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/v8-runbook.html">
-    <meta property="og:title" content="v8 Qwen3-VL Runbook  | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine documentation for a CPU-native AI runtime, kernels, code generation, training, and inference on Linux systems.">
+    <meta property="og:title" content="v8 Inference Runbook | C-Kernel-Engine">
+    <meta property="og:description" content="Operator runbook for the current C-Kernel-Engine v8 inference lane, covering promoted text-family bring-up and the validated Qwen3-VL multimodal path.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/v8-runbook.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -980,6 +980,30 @@
 .v8-cmd pre {
     margin-top: 0.45rem;
 }
+.cmd-block {
+    position: relative;
+    margin: 0.65rem 0 1rem;
+}
+.cmd-block pre {
+    margin: 0;
+}
+.copy-btn {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    z-index: 2;
+    border: 1px solid var(--grey);
+    background: rgba(7,173,248,0.08);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.18rem 0.7rem;
+    font-size: 0.74rem;
+    cursor: pointer;
+}
+.mini-note {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
 .v8-path-table code {
     font-size: 0.8rem;
 }
@@ -994,11 +1018,12 @@
 }
 </style>
 
-<h1>v8 Qwen3-VL Runbook</h1>
+<h1>v8 Inference Runbook</h1>
 
 <p>
-    This is the operator runbook for the currently validated <code>v8</code> multimodal path:
-    <strong>Qwen3-VL-8B-Instruct</strong> on the decoder side plus the matching
+    This is the operator runbook for the current <code>v8</code> inference lane:
+    promoted text-family bring-up through the <code>v8</code> runner surface plus the validated
+    <strong>Qwen3-VL-8B-Instruct</strong> multimodal path with the matching
     <code>mmproj-Qwen3VL-8B-Instruct</code> encoder projection file.
 </p>
 
@@ -1008,7 +1033,7 @@
     </div>
     <div>
         <strong>Validated Scope</strong><br>
-        For the tested Qwen3-VL pair, <code>v8</code> now runs encoder -&gt; bridge -&gt; decoder end to end and produces coherent image captions instead of stop-marker or prompt-shell garbage.
+        <code>v8</code> now has a credible inference surface for promoted text-family bring-up and the tested Qwen3-VL pair runs encoder -&gt; bridge -&gt; decoder end to end with coherent captions instead of stop-marker or prompt-shell garbage.
     </div>
 </div>
 
@@ -1016,7 +1041,7 @@
     <div class="v8-runbook-card">
         <h2>What This Runbook Covers</h2>
         <p>
-            One model family at a time. This page is intentionally about the Qwen3-VL bring-up that is working today.
+            Two things only: the promoted text-family <code>v8</code> bring-up commands and the one multimodal family that is validated today.
             It does not claim that unrelated multimodal families are ready in <code>v8</code>.
         </p>
         <div class="v8-chip-row">
@@ -1044,6 +1069,18 @@
     </div>
 </div>
 
+<div class="card card-blue">
+    <h3 style="margin-top: 0;">How The Vision Side Works</h3>
+    <p style="margin-bottom: 0.35rem;">
+        If you want the architecture view instead of the operator commands, read
+        <a href="v8-vision-encoder.html">v8 Vision Encoder Architecture</a>.
+        That page explains how the encoder graph is derived from GGUF + template + lowering and how the bridge hands the prefix into the decoder.
+    </p>
+    <p style="margin-bottom: 0;">
+        For parity-specific investigation, see <a href="vision-encoder-parity.html">Vision Encoder Parity</a>.
+    </p>
+</div>
+
 <h2>Prerequisites</h2>
 
 <div class="card">
@@ -1061,18 +1098,79 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
 </div>
 
-<h2>Optional Text Smoke</h2>
+<h2>Canonical Text Bring-Up</h2>
 
-<div class="card">
-    <p>Before touching vision, you can verify that the <code>v8</code> runner surface is alive with a plain text model:</p>
-    <div class="v8-cmd">
-        <pre>version/v8/scripts/cks-v8-run run \
+<div class="card card-blue">
+    <p style="margin-bottom: 0.6rem;">Use this path when you want inference-only runs without training a local model.</p>
+    <p class="mini-note">These raw CLI examples use the shell wrapper so a first-time user can be prompted to create <code>.venv</code> and install <code>requirements-v8.txt</code> if the repo-local environment is missing.</p>
+
+    <h3 style="margin-top: 0;">Gemma 3 270M</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert --chat-template=auto \
+  --generate-visualizer</pre>
+    </div>
+
+    <h3>Qwen2 0.5B Instruct</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://Qwen/Qwen2-0.5B-Instruct-GGUF/qwen2-0_5b-instruct-q4_k_m.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --generate-visualizer</pre>
+    </div>
+
+    <h3>Qwen3 0.6B</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf \
   --context-len 1024 \
   --force-convert --force-compile \
-  --thinking-mode suppressed</pre>
+  --generate-visualizer</pre>
     </div>
-    <p class="v8-note">This is not the Qwen3-VL validation path. It is only a quick runner smoke test.</p>
+
+    <h3>Qwen3.5 0.8B</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>python3 version/v8/scripts/ck_run_v8.py run \
+  hf://unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --force-convert --force-compile \
+  --context-len 1034</pre>
+    </div>
+    <p class="mini-note">The canonical <code>v8</code> bring-up path is the <code>hf://...</code> URI. That materializes the run under <code>${CK_CACHE_DIR:-$HOME/.cache/ck-engine-v8/models}/unsloth--Qwen3.5-0.8B-GGUF</code>. Local GGUF paths are still supported when you intentionally want an offline or copied artifact.</p>
+
+    <div class="alert alert-warning" style="margin-top: 1rem;">
+        <div class="alert-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L22 20H2L12 3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+            <strong>NaanBeige / Llama-family template symptom</strong><br>
+            If the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, the prompt is being fed with the wrong chat wrapper or stop markers. For NaanBeige, keep the default <code>--chat-template auto</code>, prefer <code>--python-tokenizer</code> on first bring-up, and do not force <code>--chat-template none</code> unless you are testing raw logits on purpose.
+        </div>
+    </div>
+
+    <h3>NaanBeige 4.1 3B</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
+  hf://mradermacher/Nanbeige4.1-3B-GGUF/Nanbeige4.1-3B.Q4_K_M.gguf \
+  --context-len 1024 --force-compile --force-convert \
+  --chat-template auto \
+  --generate-visualizer</pre>
+    </div>
+    <p class="mini-note">Current scope: these are the validated <code>v8</code> text-family operator surfaces. The multimodal Qwen3-VL path is separate and remains the only promoted vision family today.</p>
+</div>
+
+<div class="card">
+    <h3 style="margin-top: 0;">Text-Family Notes</h3>
+    <ul>
+        <li><strong>Gemma 3:</strong> use <code>--chat-template auto</code> for normal instruction/chat runs. <code>--chat-template none</code> is raw continuation mode now and needs <code>--allow-raw-prompt</code> if you intentionally want it.</li>
+        <li><strong>Qwen2 / Qwen3 / Qwen3.5:</strong> the <code>v8</code> runner now reproduces the same public command shapes as <code>v7</code> and clean short prompt smokes succeed on the promoted examples.</li>
+        <li><strong>NaanBeige / llama-family symptom:</strong> if the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, keep <code>--chat-template auto</code>, do not force <code>none</code>, and treat it as a prompt-wrapper/chat-contract symptom rather than the expected reply.</li>
+    </ul>
 </div>
 
 <h2>Canonical Qwen3-VL Vision Run</h2>
@@ -1080,8 +1178,9 @@ python -m pip install -r requirements-v8.txt</pre>
 <div class="card card-accent">
     <h3 style="margin-top: 0;">Real Image Bring-Up</h3>
     <p>Replace the <code>--mmproj</code> value below if your local mmproj file lives somewhere else.</p>
-    <div class="v8-cmd">
-        <pre>version/v8/scripts/cks-v8-run run \
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
   --mmproj ./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
   --image-path version/v8/test_assets/v8_vision_doc_card_72.png \
@@ -1093,13 +1192,17 @@ python -m pip install -r requirements-v8.txt</pre>
     <p style="margin-bottom: 0;">
         The first run converts the GGUF, lowers/codegens the runtimes, compiles them, runs the encoder bridge, then generates from the decoder.
     </p>
+    <p class="v8-note" style="margin-top: 0.55rem; margin-bottom: 0;">
+        For a cleaner caption sanity check, add <code>--max-tokens 48</code> so the current bridge generation loop does not ramble into a long repetition tail.
+    </p>
 </div>
 
 <div class="card">
     <h3 style="margin-top: 0;">Synthetic Prefix Probe</h3>
     <p>For a seam-only smoke test without a real image file, keep the decoder pair but switch to a synthetic prefix:</p>
-    <div class="v8-cmd">
-        <pre>version/v8/scripts/cks-v8-run run \
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>version/v8/scripts/cks-v8-run run \
   hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
   --mmproj ./mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf \
   --image-mode checker \
@@ -1142,8 +1245,9 @@ python -m pip install -r requirements-v8.txt</pre>
             </tr>
         </tbody>
     </table>
-    <div class="v8-cmd">
-        <pre>./build/ck-cli-v8 --list</pre>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>./build/ck-cli-v8 --list</pre>
     </div>
 </div>
 
@@ -1169,6 +1273,33 @@ python -m pip install -r requirements-v8.txt</pre>
         The tested Qwen3-VL artifact pair works in <code>v8</code> for end-to-end multimodal inference bring-up. That does not automatically extend to unrelated model families or future multimodal templates that need kernels the engine does not have yet.
     </div>
 </div>
+
+<script>
+(function () {
+    var buttons = document.querySelectorAll('.copy-btn');
+    buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var pre = btn.parentElement.querySelector('pre');
+            if (!pre) return;
+            var text = pre.innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                var old = btn.textContent;
+                btn.textContent = 'Copied ✓';
+                btn.style.color = '#47b475';
+                btn.style.borderColor = '#47b475';
+                setTimeout(function () {
+                    btn.textContent = old;
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 1400);
+            }).catch(function () {
+                btn.textContent = '✗ Failed';
+                setTimeout(function () { btn.textContent = 'Copy'; }, 1400);
+            });
+        });
+    });
+})();
+</script>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1397,7 +1528,7 @@ python -m pip install -r requirements-v8.txt</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-10</p>
             </div>
         </div>
     </footer>

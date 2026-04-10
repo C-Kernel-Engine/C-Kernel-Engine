@@ -1460,11 +1460,17 @@ AFTER TRAINING:
     <strong>Applied to spec19:</strong> the line is now stable enough that rung-to-rung miss-shift is meaningful. The work is no longer guessing or resetting; it is coverage engineering. That means <code>spec19</code> stays in <em>rung mode</em>, not new-spec mode, until the remaining miss classes stop shrinking.
 </div>
 
+<div class="verdict-box">
+    <strong>Post-<code>gen1</code> update (2026-04-05):</strong> the first broad coherent scene-DSL line fit the widened contract much faster than the earlier narrow spec loop. On the same small 3L/192d model, <code>gen1_full r2</code> reached 100% exact/renderable on the current in-manifold probe after training on one frozen broad corpus instead of many miss-driven repair rungs. The right interpretation is not “spec02-spec19 was wasted.” The right interpretation is: the spec era discovered the contract, and the first broader scaling pass finally tested it properly. This is strong evidence for the local scaling thesis — broader clean compiler-backed data helped more than another narrow curriculum patch — but it is <strong>not yet proof of compositional generalization</strong>. That still depends on the stricter recombination holdout line.
+</div>
+
 <h2 id="working-thesis">The Working Thesis for Next Training</h2>
 
 <div class="verdict-box">
     <strong>Post-review consensus (2026-04-02):</strong> The analysis above is directionally right. The compiler-as-data-factory point is the strongest part. The &ldquo;fix once, train long&rdquo; point is also right, but only after the dataset becomes much larger and cleaner. The routing/planning split is a serious practical option, not just a fallback.
 </div>
+
+<p>That consensus now has one concrete supporting result: the first broad coherent <code>gen1_full</code> run validated the &ldquo;scale clean data before adding more cleverness&rdquo; direction on the current model size. The next honest question is no longer whether broader clean data helps at all. The next honest question is whether that same broad contract survives recombination holdouts, or whether the model was still only memorizing a larger manifold.</p>
 
 <p>If we continue to the next training run, this is the working thesis:</p>
 
@@ -1831,7 +1837,7 @@ AFTER TRAINING:
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-08</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-10</p>
             </div>
         </div>
     </footer>
