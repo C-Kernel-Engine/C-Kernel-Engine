@@ -262,8 +262,6 @@ def _direct_hf_download_gguf(repo_id: str, filename: str, dst: Path) -> bool:
             return True
 
     return False
-
-
 def _compiler_supports_openmp(compiler: str, omp_flag: str) -> bool:
     probe = tempfile.NamedTemporaryFile("w", suffix=".c", delete=False)
     try:
