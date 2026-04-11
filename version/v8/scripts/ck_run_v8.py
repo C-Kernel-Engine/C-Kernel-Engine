@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 from typing import Any, Optional
 
@@ -90,6 +91,10 @@ def _cache_roots() -> list[Path]:
 
 def _hf_hub_cache_dir(cache_dir: Path) -> Path:
     return cache_dir / ".hf-hub"
+
+
+def _is_arm_machine(machine: str) -> bool:
+    return machine in {"aarch64", "arm64", "armv7l", "armv8l"}
 
 
 def _infer_auto_mmproj_spec(model_input: str) -> str | None:
@@ -221,9 +226,42 @@ def _is_x86_machine(machine: str) -> bool:
 def _arch_defines(machine: str) -> list[str]:
     if _is_x86_machine(machine):
         return ["-DCK_TARGET_X86=1"]
-    if machine in {"aarch64", "arm64", "armv7l", "armv8l"}:
+    if _is_arm_machine(machine):
         return ["-DCK_TARGET_ARM=1"]
     return []
+
+
+def _hf_resolve_url(repo_id: str, filename: str) -> str:
+    quoted = urllib.parse.quote(str(filename).lstrip("/"), safe="/")
+    return f"https://huggingface.co/{repo_id}/resolve/main/{quoted}?download=true"
+
+
+def _direct_hf_download_gguf(repo_id: str, filename: str, dst: Path) -> bool:
+    url = _hf_resolve_url(repo_id, filename)
+    tmp_dst = dst.with_suffix(dst.suffix + ".part")
+    token = os.environ.get("HF_TOKEN", "").strip()
+
+    wget = shutil.which("wget")
+    if wget:
+        cmd = [wget, "-c", url, "-O", str(tmp_dst)]
+        if token:
+            cmd[1:1] = ["--header", f"Authorization: Bearer {token}"]
+        proc = subprocess.run(cmd, check=False)
+        if proc.returncode == 0 and tmp_dst.exists():
+            tmp_dst.replace(dst)
+            return True
+
+    curl = shutil.which("curl")
+    if curl:
+        cmd = [curl, "-L", "--continue-at", "-", url, "-o", str(tmp_dst)]
+        if token:
+            cmd[1:1] = ["-H", f"Authorization: Bearer {token}"]
+        proc = subprocess.run(cmd, check=False)
+        if proc.returncode == 0 and tmp_dst.exists():
+            tmp_dst.replace(dst)
+            return True
+
+    return False
 
 
 def _compiler_supports_openmp(compiler: str, omp_flag: str) -> bool:
@@ -485,6 +523,16 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
     model_dir = cache_dir / repo_id.replace("/", "--")
     model_dir.mkdir(parents=True, exist_ok=True)
     gguf_path = model_dir / Path(filename).name
+    machine = _host_machine()
+
+    # On low-memory ARM boards, prefer external downloaders because the Python
+    # HF path has been observed to get OOM-killed on multi-GB GGUF fetches.
+    if _is_arm_machine(machine):
+        if gguf_path.exists() and force:
+            gguf_path.unlink()
+        if _direct_hf_download_gguf(repo_id, filename, gguf_path):
+            return gguf_path
+
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
@@ -516,9 +564,14 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
             token = os.environ.get("HF_TOKEN")
             if token:
                 download_kwargs["token"] = token
-    downloaded = Path(
-        hf_hub_download(**download_kwargs)
-    )
+    try:
+        downloaded = Path(
+            hf_hub_download(**download_kwargs)
+        )
+    except Exception:
+        if _direct_hf_download_gguf(repo_id, filename, gguf_path):
+            return gguf_path
+        raise
     if downloaded.resolve() != gguf_path.resolve():
         shutil.move(str(downloaded), str(gguf_path))
     return gguf_path
