@@ -1,6 +1,5 @@
 var gemm__kernels__q8__0_8c =
 [
-    [ "ck_nearest_int_q8_0", "gemm__kernels__q8__0_8c.html#a5159297f36ea1f0911125aa2f7774884", null ],
     [ "dot_q8_0", "gemm__kernels__q8__0_8c.html#af900f8a5b4172fadbb2342b63276e7c3", null ],
     [ "gemm_nt_q8_0", "gemm__kernels__q8__0_8c.html#a85197b983d949018f42bd43e3751478b", null ],
     [ "gemm_q8_0", "gemm__kernels__q8__0_8c.html#a8085f1506d8fadd2070f5b71fedb5554", null ],
