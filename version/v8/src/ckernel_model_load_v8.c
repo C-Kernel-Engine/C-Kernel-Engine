@@ -123,6 +123,93 @@ static int dtype_from_str(const char *s) {
  * The manifest specifies where each tensor lives in the weights file and where
  * it should be placed in the runtime memory region.
  */
+static ck_manifest_map_t *ck_parse_manifest_map(void *base,
+                                                const char *manifest_path)
+{
+    if (!base || !manifest_path) {
+        fprintf(stderr, "ck_parse_manifest_map: invalid arguments\n");
+        return NULL;
+    }
+
+    FILE *mf = fopen(manifest_path, "r");
+    if (!mf) {
+        fprintf(stderr, "ck_parse_manifest_map: failed to open %s: %s\n",
+                manifest_path, strerror(errno));
+        return NULL;
+    }
+
+    ck_manifest_map_t *manifest = calloc(1, sizeof(*manifest));
+    if (!manifest) {
+        fprintf(stderr, "ck_parse_manifest_map: manifest alloc failed\n");
+        fclose(mf);
+        return NULL;
+    }
+    manifest->mapped_base = (uint8_t *)base;
+
+    char line[MANIFEST_LINE_MAX];
+    size_t cap = 0;
+    size_t count = 0;
+    ck_weight_info_t *entries = NULL;
+
+    while (fgets(line, sizeof(line), mf)) {
+        if (line[0] == '#' || line[0] == '\n') {
+            continue;
+        }
+
+        line[strcspn(line, "\r\n")] = '\0';
+
+        char *name = strtok(line, "|");
+        char *dtype = strtok(NULL, "|");
+        char *file_off = strtok(NULL, "|");
+        char *size_str = strtok(NULL, "|");
+        char *rt_off = strtok(NULL, "|");
+
+        if (!name || !dtype || !file_off || !size_str || !rt_off) {
+            fprintf(stderr, "ck_parse_manifest_map: malformed manifest line\n");
+            fprintf(stderr, "  Expected: name|dtype|file_offset|size|runtime_offset\n");
+            fprintf(stderr, "  Got: %s\n", line);
+            fclose(mf);
+            free(manifest);
+            return NULL;
+        }
+
+        if (count == cap) {
+            size_t next = cap ? cap * 2 : 256;
+            ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
+            if (!grow) {
+                fprintf(stderr, "ck_parse_manifest_map: realloc failed\n");
+                fclose(mf);
+                for (size_t i = 0; i < count; ++i) {
+                    free((void *)entries[i].name);
+                }
+                free(entries);
+                free(manifest);
+                return NULL;
+            }
+            entries = grow;
+            cap = next;
+        }
+
+        entries[count].name = strdup(name);
+        entries[count].dtype = dtype_from_str(dtype);
+        entries[count].file_offset = parse_u64(file_off);
+        entries[count].size = parse_u64(size_str);
+        entries[count].runtime_offset = parse_u64(rt_off);
+        count++;
+    }
+
+    fclose(mf);
+    manifest->entries = entries;
+    manifest->count = (int)count;
+    return manifest;
+}
+
+ck_manifest_map_t *ck_open_weights_manifest_v7(void *base,
+                                               const char *manifest_path)
+{
+    return ck_parse_manifest_map(base, manifest_path);
+}
+
 ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
                                 const char *weights_path,
                                 const char *manifest_path)
@@ -153,115 +240,38 @@ ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
         return NULL;
     }
 
-    /* STEP 3: Open the manifest file (pipe-delimited mapping) */
-    FILE *mf = fopen(manifest_path, "r");
-    if (!mf) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: failed to open %s: %s\n",
-                manifest_path, strerror(errno));
-        fclose(wf);
-        return NULL;
-    }
-
-    ck_manifest_map_t *manifest = calloc(1, sizeof(*manifest));
+    ck_manifest_map_t *manifest = ck_parse_manifest_map(base, manifest_path);
     if (!manifest) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: manifest alloc failed\n");
-        fclose(mf);
         fclose(wf);
         return NULL;
     }
-    manifest->mapped_base = (uint8_t *)base;
 
     /* STEP 4: Allocate chunk buffer for streaming copies
      * Using 1MB chunks avoids allocating massive single buffers
      * and works well with OS read-ahead caching */
-    char line[MANIFEST_LINE_MAX];
     unsigned char *buf = malloc(COPY_CHUNK);
     if (!buf) {
         fprintf(stderr, "ck_load_weights_manifest_v7: malloc failed\n");
         free(manifest);
-        fclose(mf);
         fclose(wf);
         return NULL;
     }
-
-    size_t cap = 0;
-    size_t count = 0;
-    ck_weight_info_t *entries = NULL;
-
-    /* STEP 5: Process each line in the manifest
-     * Format: name|dtype|file_offset|size|runtime_offset */
-    while (fgets(line, sizeof(line), mf)) {
-        /* Skip comments (#) and empty lines */
-        if (line[0] == '#' || line[0] == '\n') {
-            continue;
-        }
-
-        /* Remove trailing newlines/carriage returns */
-        line[strcspn(line, "\r\n")] = '\0';
-
-        /* Parse manifest fields (pipe-delimited) */
-        char *name = strtok(line, "|");
-        char *dtype = strtok(NULL, "|");
-        char *file_off = strtok(NULL, "|");
-        char *size_str = strtok(NULL, "|");
-        char *rt_off = strtok(NULL, "|");
-
-        /* Validate all 5 fields are present */
-        if (!name || !dtype || !file_off || !size_str || !rt_off) {
-            fprintf(stderr, "ck_load_weights_manifest_v7: malformed manifest line\n");
-            fprintf(stderr, "  Expected: name|dtype|file_offset|size|runtime_offset\n");
-            fprintf(stderr, "  Got: %s\n", line);
-            free(buf);
-            fclose(mf);
-            fclose(wf);
-            return NULL;
-        }
-
-        /* Parse numeric fields as unsigned 64-bit integers */
-        unsigned long long file_offset = parse_u64(file_off);
-        unsigned long long size = parse_u64(size_str);
-        unsigned long long runtime_offset = parse_u64(rt_off);
-
-        if (count == cap) {
-            size_t next = cap ? cap * 2 : 256;
-            ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
-            if (!grow) {
-                fprintf(stderr, "ck_load_weights_manifest_v7: realloc failed\n");
-                free(buf);
-                fclose(mf);
-                fclose(wf);
-                for (size_t i = 0; i < count; ++i) {
-                    free((void *)entries[i].name);
-                }
-                free(entries);
-                free(manifest);
-                return NULL;
-            }
-            entries = grow;
-            cap = next;
-        }
-
-        entries[count].name = strdup(name);
-        entries[count].dtype = dtype_from_str(dtype);
-        entries[count].file_offset = file_offset;
-        entries[count].size = size;
-        entries[count].runtime_offset = runtime_offset;
-        count++;
-
+    for (int i = 0; i < manifest->count; ++i) {
+        ck_weight_info_t *entry = &manifest->entries[i];
         /* STEP 6: Seek to tensor location in weights file */
-        if (fseek(wf, (long)file_offset, SEEK_SET) != 0) {
+        if (fseek(wf, (long)entry->file_offset, SEEK_SET) != 0) {
             fprintf(stderr, "ck_load_weights_manifest_v7: fseek failed to offset %llu\n",
-                    (unsigned long long)file_offset);
+                    (unsigned long long)entry->file_offset);
             free(buf);
-            fclose(mf);
             fclose(wf);
+            ck_unload_manifest_map(manifest);
             return NULL;
         }
 
         /* STEP 7: Copy tensor data from file to memory
          * Uses chunked copying for large tensors (>1MB) */
-        unsigned char *dst = (unsigned char *)base + runtime_offset;
-        unsigned long long remaining = size;
+        unsigned char *dst = (unsigned char *)base + entry->runtime_offset;
+        unsigned long long remaining = entry->size;
 
         while (remaining > 0) {
             /* Determine chunk size (cap at COPY_CHUNK = 1MB) */
@@ -271,16 +281,11 @@ ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
             size_t n = fread(buf, 1, take, wf);
             if (n != take) {
                 fprintf(stderr, "ck_load_weights_manifest_v7: short read at offset %llu\n",
-                        (unsigned long long)file_offset);
+                        (unsigned long long)entry->file_offset);
                 fprintf(stderr, "  Expected %zu bytes, got %zu (EOF or disk error)\n", take, n);
                 free(buf);
-                fclose(mf);
                 fclose(wf);
-                for (size_t i = 0; i < count; ++i) {
-                    free((void *)entries[i].name);
-                }
-                free(entries);
-                free(manifest);
+                ck_unload_manifest_map(manifest);
                 return NULL;
             }
 
@@ -289,18 +294,11 @@ ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
             dst += take;
             remaining -= take;
         }
-
-        /* Debug output (optional - useful for tracing) */
-        /* fprintf(stderr, "Loaded %s (%llu bytes) -> offset %llu\n",
-                name, size, runtime_offset); */
     }
 
     /* STEP 8: Cleanup and return success */
     free(buf);
-    fclose(mf);
     fclose(wf);
-    manifest->entries = entries;
-    manifest->count = (int)count;
     return manifest;
 }
 
