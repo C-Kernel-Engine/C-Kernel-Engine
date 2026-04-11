@@ -1669,11 +1669,22 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int count);
 static int do_init(void) {{
     if (g_model) return 0;
     g_model = calloc(1, sizeof(CKModel));
-    if (!g_model) return -1;
+    if (!g_model) {{
+        fprintf(stderr, "ck_model_init: failed to allocate CKModel struct (%zu bytes)\\n", sizeof(CKModel));
+        return -1;
+    }}
 
     g_model->bump_size = BUMP_TOTAL_SIZE;
     g_model->bump = aligned_alloc(64, g_model->bump_size);
-    if (!g_model->bump) {{ free(g_model); g_model = NULL; return -1; }}
+    if (!g_model->bump) {{
+        fprintf(stderr,
+                "ck_model_init: failed to allocate bump arena (%zu bytes, %.2f MiB)\\n",
+                g_model->bump_size,
+                (double)g_model->bump_size / (1024.0 * 1024.0));
+        free(g_model);
+        g_model = NULL;
+        return -1;
+    }}
     memset(g_model->bump, 0, g_model->bump_size);
 
     g_model->bump_weights = g_model->bump + BUMP_WEIGHTS_OFFSET;
