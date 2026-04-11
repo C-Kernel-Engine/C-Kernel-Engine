@@ -4753,7 +4753,6 @@ v7-profile-training-spec19-qwen3-advisor: v7-profile-training-spec19-qwen3-parit
 		--train-json-out "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/advisor/v7_train_spec19_qwen3_advisor.json" \
 		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
-
 v7-backprop-plumbing:
 	@set -e; \
 	manifest="$$V7_TRAIN_MANIFEST"; \
