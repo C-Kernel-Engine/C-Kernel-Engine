@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import inspect
 import json
 import os
 import shlex
@@ -488,13 +489,35 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
         raise RuntimeError("huggingface_hub not installed") from exc
+    # Embedded ARM boards are more stable with the plain HTTP path than the
+    # optional transfer/Xet backends.
+    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+    os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    download_kwargs: dict[str, Any] = {
+        "repo_id": repo_id,
+        "filename": filename,
+        "local_dir": str(model_dir),
+        "cache_dir": str(_hf_hub_cache_dir(cache_dir)),
+    }
+    try:
+        sig = inspect.signature(hf_hub_download)
+    except (TypeError, ValueError):
+        sig = None
+    if sig is not None:
+        params = sig.parameters
+        if "force_download" in params:
+            download_kwargs["force_download"] = force
+        if "resume_download" in params:
+            download_kwargs["resume_download"] = True
+        if "local_dir_use_symlinks" in params:
+            download_kwargs["local_dir_use_symlinks"] = False
+        if "token" in params:
+            token = os.environ.get("HF_TOKEN")
+            if token:
+                download_kwargs["token"] = token
     downloaded = Path(
-        hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            local_dir=str(model_dir),
-            cache_dir=str(_hf_hub_cache_dir(cache_dir)),
-        )
+        hf_hub_download(**download_kwargs)
     )
     if downloaded.resolve() != gguf_path.resolve():
         shutil.move(str(downloaded), str(gguf_path))
