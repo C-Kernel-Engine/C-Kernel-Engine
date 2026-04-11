@@ -39,6 +39,9 @@
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__) || defined(__SSSE3__)
 #include <immintrin.h>
 #endif
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 /* Forward declarations for SIMD implementations */
 void gemv_q6_k_q8_k_avx512(float *y, const void *W, const void *x_q8, int M, int K);
@@ -115,6 +118,81 @@ static float dot_q6_k_q8_k_ref(const block_q6_K *w,
 
     return sumf;
 }
+
+#if defined(__ARM_NEON) || defined(__aarch64__)
+static float dot_q6_k_q8_k_neon(const block_q6_K *w,
+                                const block_q8_K *x,
+                                int K)
+{
+    const int nb = K / QK_K;
+    float sumf = 0.0f;
+
+    for (int i = 0; i < nb; ++i) {
+        const float d = GGML_FP16_TO_FP32(w[i].d) * x[i].d;
+
+        const uint8_t *ql = w[i].ql;
+        const uint8_t *qh = w[i].qh;
+        const int8_t *sc = w[i].scales;
+        const int8_t *q8 = x[i].qs;
+
+        int8_t wvals[QK_K];
+        int8_t svals[QK_K];
+
+        for (int n = 0; n < QK_K; n += 128) {
+            for (int l = 0; l < 32; ++l) {
+                const int is = l / 16;
+
+                const int8_t q1 = (int8_t)((ql[l + 0] & 0xF) | (((qh[l] >> 0) & 3) << 4)) - 32;
+                const int8_t q2 = (int8_t)((ql[l + 32] & 0xF) | (((qh[l] >> 2) & 3) << 4)) - 32;
+                const int8_t q3 = (int8_t)((ql[l + 0] >> 4) | (((qh[l] >> 4) & 3) << 4)) - 32;
+                const int8_t q4 = (int8_t)((ql[l + 32] >> 4) | (((qh[l] >> 6) & 3) << 4)) - 32;
+
+                const int base = n;
+                wvals[base + l + 0] = q1;
+                wvals[base + l + 32] = q2;
+                wvals[base + l + 64] = q3;
+                wvals[base + l + 96] = q4;
+
+                svals[base + l + 0] = sc[is + 0];
+                svals[base + l + 32] = sc[is + 2];
+                svals[base + l + 64] = sc[is + 4];
+                svals[base + l + 96] = sc[is + 6];
+            }
+
+            ql += 64;
+            qh += 32;
+            sc += 8;
+        }
+
+        int32x4_t acc = vdupq_n_s32(0);
+        for (int j = 0; j < QK_K; j += 16) {
+            const int8x16_t wv = vld1q_s8(&wvals[j]);
+            const int8x16_t sv = vld1q_s8(&svals[j]);
+            const int8x16_t xv = vld1q_s8(&q8[j]);
+
+            const int16x8_t ws0 = vmull_s8(vget_low_s8(wv), vget_low_s8(sv));
+            const int16x8_t ws1 = vmull_s8(vget_high_s8(wv), vget_high_s8(sv));
+            const int16x8_t x0 = vmovl_s8(vget_low_s8(xv));
+            const int16x8_t x1 = vmovl_s8(vget_high_s8(xv));
+
+            int32x4_t p0 = vmull_s16(vget_low_s16(ws0), vget_low_s16(x0));
+            p0 = vmlal_s16(p0, vget_high_s16(ws0), vget_high_s16(x0));
+
+            int32x4_t p1 = vmull_s16(vget_low_s16(ws1), vget_low_s16(x1));
+            p1 = vmlal_s16(p1, vget_high_s16(ws1), vget_high_s16(x1));
+
+            acc = vaddq_s32(acc, p0);
+            acc = vaddq_s32(acc, p1);
+        }
+
+        int32_t lanes[4];
+        vst1q_s32(lanes, acc);
+        sumf += d * (float)(lanes[0] + lanes[1] + lanes[2] + lanes[3]);
+    }
+
+    return sumf;
+}
+#endif
 
 void gemv_q6_k_q8_k_ref(float *y,
                          const void *W,
@@ -965,6 +1043,8 @@ void vec_dot_q6_k_q8_k(int n, float *s, const void *vx, const void *vy)
     *s = dot_q6_k_q8_k_avx512(x, y, n);
 #elif defined(__AVX2__)
     *s = dot_q6_k_q8_k_avx2(x, y, n);
+#elif defined(__ARM_NEON) || defined(__aarch64__)
+    *s = dot_q6_k_q8_k_neon(x, y, n);
 #elif defined(__AVX__) && !defined(__AVX2__)
     *s = dot_q6_k_q8_k_avx(x, y, n);
 #elif defined(__SSSE3__)
@@ -987,6 +1067,17 @@ void gemv_q6_k_q8_k(float *y,
     gemv_q6_k_q8_k_avx512(y, W, x_q8, M, K);
 #elif defined(__AVX2__)
     gemv_q6_k_q8_k_avx2(y, W, x_q8, M, K);
+#elif defined(__ARM_NEON) || defined(__aarch64__)
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0) {
+        return;
+    }
+    const block_q6_K *blocks = (const block_q6_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+    for (int row = 0; row < M; ++row) {
+        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
+    }
 #elif defined(__AVX__)
     gemv_q6_k_q8_k_avx(y, W, x_q8, M, K);
 #elif defined(__SSSE3__)
@@ -1033,7 +1124,11 @@ void gemv_q6_k_q8_k_parallel(float *y,
 
     for (int row = r0; row < r1; ++row) {
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+#if defined(__ARM_NEON) || defined(__aarch64__)
+        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
+#else
         y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
+#endif
     }
 }
 
@@ -1089,10 +1184,14 @@ void gemv_q6_k_q8_k_parallel_simd(float *y,
 #endif
     }
 #else
-    /* Fallback to reference */
+    /* Fallback to reference / ARM NEON */
     for (int row = r0; row < r1; ++row) {
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+#if defined(__ARM_NEON) || defined(__aarch64__)
+        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
+#else
         y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
+#endif
     }
 #endif
 }
