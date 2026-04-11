@@ -2624,6 +2624,7 @@ help:
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make test             Run core kernel tests"
 	@echo "  make regression-fast  Run promoted v8 family smoke/coherence regression suite"
+	@echo "  make regression-fast-arm  Run ARM-focused v8 fast regression suite (context <= 100)"
 	@echo "  make v8-regression-fast  Run explicit v8 fast regression suite"
 	@echo "  make v7-regression-fast  Run legacy v7 fast regression suite"
 	@echo "  make regression-full  Run family regression suite with stitch/parity triage"
@@ -3420,7 +3421,7 @@ report-md:
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
-.PHONY: regression-fast v7-regression-fast v8-regression-fast regression-full regression-family
+.PHONY: regression-fast regression-fast-arm v7-regression-fast v8-regression-fast regression-full regression-family
 .PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
 .PHONY: v7-regression-training-fast v7-regression-training-full regression-training-fast regression-training-full training-fast training-full
 .PHONY: v7-benchmark-training-fp32-prepare v7-benchmark-training-fp32 benchmark-training-fp32
@@ -4083,6 +4084,12 @@ v8-regression-fast:
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
 regression-fast: v8-regression-fast
+
+V8_ARM_REGRESSION_MANIFEST ?= version/v8/regression/families_arm.json
+
+regression-fast-arm:
+	@echo "Running ARM-focused v8 regression fast suite..."
+	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild --families-manifest "$(V8_ARM_REGRESSION_MANIFEST)" $(REGRESSION_ARGS)
 
 regression-full:
 	@echo "Running v7 regression full suite..."
