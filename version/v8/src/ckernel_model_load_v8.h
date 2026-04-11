@@ -72,6 +72,15 @@ ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
                                                const char *manifest_path);
 
 /*
+ * ck_open_weights_manifest_v7() - Parse manifest metadata without copying
+ * weights into RAM. Useful when the weights region is already file-backed.
+ *
+ * Returns: Manifest map handle or NULL on error
+ */
+ck_manifest_map_t *ck_open_weights_manifest_v7(void *base,
+                                               const char *manifest_path);
+
+/*
  * ck_unload_manifest_map() - Unload manifest map and close files
  */
 void ck_unload_manifest_map(ck_manifest_map_t *manifest);

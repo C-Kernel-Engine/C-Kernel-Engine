@@ -93,6 +93,111 @@ static int dtype_from_str(const char *s) {
     return 0;
 }
 
+static ck_manifest_map_t *ck_parse_manifest_map(void *base,
+                                                const char *manifest_path)
+{
+    FILE *mf = NULL;
+    ck_manifest_map_t *manifest = NULL;
+    ck_weight_info_t *entries = NULL;
+    char line[MANIFEST_LINE_MAX];
+    size_t cap = 0;
+    size_t count = 0;
+
+    if (!base || !manifest_path) {
+        fprintf(stderr, "ck_parse_manifest_map: invalid arguments\n");
+        return NULL;
+    }
+
+    mf = fopen(manifest_path, "r");
+    if (!mf) {
+        fprintf(stderr, "ck_parse_manifest_map: failed to open %s: %s\n",
+                manifest_path, strerror(errno));
+        return NULL;
+    }
+
+    manifest = calloc(1, sizeof(*manifest));
+    if (!manifest) {
+        fprintf(stderr, "ck_parse_manifest_map: manifest alloc failed\n");
+        fclose(mf);
+        return NULL;
+    }
+    manifest->mapped_base = (uint8_t *)base;
+    manifest->weights_materialized = 0;
+
+    while (fgets(line, sizeof(line), mf)) {
+        char *name = NULL;
+        char *dtype = NULL;
+        char *file_off = NULL;
+        char *size_str = NULL;
+        char *rt_off = NULL;
+
+        if (line[0] == '#' || line[0] == '\n') {
+            continue;
+        }
+        line[strcspn(line, "\r\n")] = '\0';
+
+        name = strtok(line, "|");
+        dtype = strtok(NULL, "|");
+        file_off = strtok(NULL, "|");
+        size_str = strtok(NULL, "|");
+        rt_off = strtok(NULL, "|");
+
+        if (!name || !dtype || !file_off || !size_str || !rt_off) {
+            fprintf(stderr, "ck_parse_manifest_map: malformed manifest line\n");
+            fprintf(stderr, "  Expected: name|dtype|file_offset|size|runtime_offset\n");
+            fprintf(stderr, "  Got: %s\n", line);
+            fclose(mf);
+            free(manifest);
+            return NULL;
+        }
+
+        if (count == cap) {
+            size_t next = cap ? cap * 2 : 256;
+            ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
+            if (!grow) {
+                fprintf(stderr, "ck_parse_manifest_map: realloc failed\n");
+                fclose(mf);
+                for (size_t i = 0; i < count; ++i) {
+                    free((void *)entries[i].name);
+                }
+                free(entries);
+                free(manifest);
+                return NULL;
+            }
+            entries = grow;
+            cap = next;
+        }
+
+        entries[count].name = strdup(name);
+        if (!entries[count].name) {
+            fprintf(stderr, "ck_parse_manifest_map: strdup failed\n");
+            fclose(mf);
+            for (size_t i = 0; i < count; ++i) {
+                free((void *)entries[i].name);
+            }
+            free(entries);
+            free(manifest);
+            return NULL;
+        }
+        entries[count].dtype = dtype_from_str(dtype);
+        entries[count].file_offset = parse_u64(file_off);
+        entries[count].size = parse_u64(size_str);
+        entries[count].runtime_offset = parse_u64(rt_off);
+        count++;
+    }
+
+    fclose(mf);
+    manifest->entries = entries;
+    manifest->count = (int)count;
+    return manifest;
+}
+
+ck_manifest_map_t *ck_open_weights_manifest_v7(void *base,
+                                               const char *manifest_path)
+{
+    return ck_parse_manifest_map(base, manifest_path);
+}
+
 static int validate_weights_magic(FILE *wf, const char *weights_path)
 {
     char magic[8] = {0};
@@ -113,13 +218,8 @@ ck_manifest_map_t *ck_open_weights_manifest_v8(void *base,
                                                int materialize_weights)
 {
     FILE *wf = NULL;
-    FILE *mf = NULL;
     ck_manifest_map_t *manifest = NULL;
-    ck_weight_info_t *entries = NULL;
     unsigned char *buf = NULL;
-    char line[MANIFEST_LINE_MAX];
-    size_t cap = 0;
-    size_t count = 0;
 
     if (!base || !weights_path || !manifest_path) {
         fprintf(stderr, "ck_open_weights_manifest_v8: invalid arguments\n");
@@ -137,141 +237,71 @@ ck_manifest_map_t *ck_open_weights_manifest_v8(void *base,
         return NULL;
     }
 
-    mf = fopen(manifest_path, "r");
-    if (!mf) {
-        fprintf(stderr, "ck_open_weights_manifest_v8: failed to open %s: %s\n",
-                manifest_path, strerror(errno));
-        fclose(wf);
-        return NULL;
-    }
-
-    manifest = calloc(1, sizeof(*manifest));
+    manifest = ck_parse_manifest_map(base, manifest_path);
     if (!manifest) {
-        fprintf(stderr, "ck_open_weights_manifest_v8: manifest alloc failed\n");
-        fclose(mf);
         fclose(wf);
         return NULL;
     }
-    manifest->mapped_base = (uint8_t *)base;
     manifest->weights_materialized = materialize_weights ? 1 : 0;
 
-    if (materialize_weights) {
-        buf = malloc(COPY_CHUNK);
-        if (!buf) {
-            fprintf(stderr, "ck_open_weights_manifest_v8: malloc failed\n");
-            free(manifest);
-            fclose(mf);
-            fclose(wf);
-            return NULL;
-        }
-    }
-
-    while (fgets(line, sizeof(line), mf)) {
-        char *name = NULL;
-        char *dtype = NULL;
-        char *file_off = NULL;
-        char *size_str = NULL;
-        char *rt_off = NULL;
-        unsigned long long file_offset = 0;
-        unsigned long long size = 0;
-        unsigned long long runtime_offset = 0;
-
-        if (line[0] == '#' || line[0] == '\n') {
-            continue;
-        }
-        line[strcspn(line, "\r\n")] = '\0';
-
-        name = strtok(line, "|");
-        dtype = strtok(NULL, "|");
-        file_off = strtok(NULL, "|");
-        size_str = strtok(NULL, "|");
-        rt_off = strtok(NULL, "|");
-
-        if (!name || !dtype || !file_off || !size_str || !rt_off) {
-            fprintf(stderr, "ck_open_weights_manifest_v8: malformed manifest line\n");
-            goto fail;
-        }
-
-        file_offset = parse_u64(file_off);
-        size = parse_u64(size_str);
-        runtime_offset = parse_u64(rt_off);
-
-        if (count == cap) {
-            size_t next = cap ? cap * 2 : 256;
-            ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
-            if (!grow) {
-                fprintf(stderr, "ck_open_weights_manifest_v8: realloc failed\n");
-                goto fail;
-            }
-            entries = grow;
-            cap = next;
-        }
-
-        entries[count].name = strdup(name);
-        if (!entries[count].name) {
-            fprintf(stderr, "ck_open_weights_manifest_v8: strdup failed\n");
-            goto fail;
-        }
-        entries[count].dtype = dtype_from_str(dtype);
-        entries[count].file_offset = file_offset;
-        entries[count].size = size;
-        entries[count].runtime_offset = runtime_offset;
-        count++;
-
-        if (!materialize_weights) {
-            if (file_offset != runtime_offset) {
+    if (!materialize_weights) {
+        for (int i = 0; i < manifest->count; ++i) {
+            ck_weight_info_t *entry = &manifest->entries[i];
+            if (entry->file_offset != entry->runtime_offset) {
                 fprintf(stderr,
                         "ck_open_weights_manifest_v8: mixed-backed mode requires file_offset == runtime_offset for %s\n",
-                        name);
-                goto fail;
+                        entry->name ? entry->name : "(unknown)");
+                fclose(wf);
+                ck_unload_manifest_map(manifest);
+                return NULL;
             }
-            continue;
         }
+        fclose(wf);
+        return manifest;
+    }
 
-        if (fseek(wf, (long)file_offset, SEEK_SET) != 0) {
+    buf = malloc(COPY_CHUNK);
+    if (!buf) {
+        fprintf(stderr, "ck_open_weights_manifest_v8: malloc failed\n");
+        fclose(wf);
+        ck_unload_manifest_map(manifest);
+        return NULL;
+    }
+
+    for (int i = 0; i < manifest->count; ++i) {
+        ck_weight_info_t *entry = &manifest->entries[i];
+        unsigned char *dst = (unsigned char *)base + entry->runtime_offset;
+        unsigned long long remaining = entry->size;
+
+        if (fseek(wf, (long)entry->file_offset, SEEK_SET) != 0) {
             fprintf(stderr, "ck_open_weights_manifest_v8: fseek failed to offset %llu\n",
-                    (unsigned long long)file_offset);
-            goto fail;
+                    (unsigned long long)entry->file_offset);
+            free(buf);
+            fclose(wf);
+            ck_unload_manifest_map(manifest);
+            return NULL;
         }
 
-        {
-            unsigned char *dst = (unsigned char *)base + runtime_offset;
-            unsigned long long remaining = size;
-            while (remaining > 0) {
-                size_t take = remaining > COPY_CHUNK ? COPY_CHUNK : (size_t)remaining;
-                size_t n = fread(buf, 1, take, wf);
-                if (n != take) {
-                    fprintf(stderr, "ck_open_weights_manifest_v8: short read at offset %llu\n",
-                            (unsigned long long)file_offset);
-                    goto fail;
-                }
-                memcpy(dst, buf, take);
-                dst += take;
-                remaining -= take;
+        while (remaining > 0) {
+            size_t take = remaining > COPY_CHUNK ? COPY_CHUNK : (size_t)remaining;
+            size_t n = fread(buf, 1, take, wf);
+            if (n != take) {
+                fprintf(stderr, "ck_open_weights_manifest_v8: short read at offset %llu\n",
+                        (unsigned long long)entry->file_offset);
+                free(buf);
+                fclose(wf);
+                ck_unload_manifest_map(manifest);
+                return NULL;
             }
+            memcpy(dst, buf, take);
+            dst += take;
+            remaining -= take;
         }
     }
 
     free(buf);
-    fclose(mf);
     fclose(wf);
-    manifest->entries = entries;
-    manifest->count = (int)count;
     return manifest;
-
-fail:
-    free(buf);
-    if (mf) fclose(mf);
-    if (wf) fclose(wf);
-    if (entries) {
-        size_t i = 0;
-        for (i = 0; i < count; ++i) {
-            free((void *)entries[i].name);
-        }
-        free(entries);
-    }
-    free(manifest);
-    return NULL;
 }
 
 ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
