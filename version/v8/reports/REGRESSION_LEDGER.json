@@ -1,0 +1,215 @@
+{
+  "schema": "ck.v7.regression_ledger.v1",
+  "updated_at": "2026-02-21T00:00:00Z",
+  "source": "version/v7/reports/REGRESSION_LEDGER.md",
+  "entries": [
+    {
+      "id": "V7-2026-02-18-ATTN-SFB",
+      "title": "Attention save-for-backward contract broken by flash forward path",
+      "status": "fixed",
+      "kind": "functional_bug",
+      "detected_by": {
+        "gate_targets": [
+          "make v7-backprop-stitch-runtime",
+          "make v7-train-runtime-parity-stress"
+        ],
+        "first_signal": "Step-1 slot parity mismatch in v_proj activations."
+      },
+      "root_cause": "Generated runtime called flash attention forward while backward consumed saved attn_weights tensors. Flash forward does not materialize softmax weights.",
+      "fix": {
+        "summary": "Codegen now emits exact attention forward when save_for_backward.attn_weights is required, and keeps flash only when weights are not needed by backward.",
+        "files": [
+          "version/v7/scripts/codegen_train_runtime_v7.py"
+        ]
+      },
+      "proof": {
+        "artifacts": [
+          "version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_before.json",
+          "version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/backprop_grad_slots_step1_after.json",
+          "version/v7/.cache/reports/attention_save_for_backward_fix_2026-02-18/train_1tok_after_fix.json"
+        ],
+        "metrics": [
+          "grad.act.act.L1.v_proj.0.y max diff 2.2376e-01 -> 6.5193e-08",
+          "grad.act.act.L0.v_proj.0.y max diff 2.4468e-01 -> 1.0431e-07"
+        ]
+      },
+      "guardrails": {
+        "tests": [
+          "make v7-backprop-stitch-runtime",
+          "make v7-train-runtime-parity-realistic",
+          "make v7-train-runtime-parity-stress"
+        ],
+        "artifacts": [
+          "version/v7/.cache/reports/backprop_stitch_runtime_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_realistic_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_latest.json"
+        ]
+      }
+    },
+    {
+      "id": "V7-2026-02-18-GRAD-ACT-ACCUM",
+      "title": "Grad-activation buffers persisted across micro-steps when grad_accum > 1",
+      "status": "fixed",
+      "kind": "functional_bug",
+      "detected_by": {
+        "gate_targets": [
+          "make v7-backprop-stitch-runtime-accum",
+          "make v7-train-runtime-parity-stress"
+        ],
+        "first_signal": "Runtime parity failed for grad_accum=2/4/8 on stress flow."
+      },
+      "root_cause": "Generated ck_train_step only cleared grads at accumulation-window start. grad_activations must reset every micro-step, not once per window.",
+      "fix": {
+        "summary": "Codegen now emits separate ck_zero_grad_weights and ck_zero_grad_activations calls. Mid-window clears activations only.",
+        "files": [
+          "version/v7/scripts/codegen_train_runtime_v7.py",
+          "version/v7/scripts/check_backprop_stitch_runtime_v7.py"
+        ]
+      },
+      "proof": {
+        "artifacts": [
+          "version/v7/.cache/reports/train_runtime_parity_stress_e1_ga2_after_gradactfix.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_e1_ga4_after_gradactfix.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_e1_ga8_after_gradactfix.json"
+        ],
+        "metrics": [
+          "Before fix: first fail steps around 72/184/408 for ga=2/4/8",
+          "After fix: fail_count=0 for ga=2/4/8 stress checks"
+        ]
+      },
+      "guardrails": {
+        "tests": [
+          "make v7-backprop-stitch-runtime-accum",
+          "make v7-train-runtime-parity-long-horizon"
+        ],
+        "artifacts": [
+          "version/v7/.cache/reports/backprop_stitch_runtime_accum_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_realistic_latest.json"
+        ]
+      }
+    },
+    {
+      "id": "V7-2026-02-17-RUN-DIMS",
+      "title": "Train/parity path ignored run-dir manifest dims and used tiny defaults",
+      "status": "fixed",
+      "kind": "plumbing_bug",
+      "detected_by": {
+        "gate_targets": [
+          "make v7-train-runtime-parity-stress",
+          "make v7-train-runtime-parity-realistic"
+        ],
+        "first_signal": "Apples-to-oranges parity drift from dimension mismatch against run-dir manifest."
+      },
+      "root_cause": "ck_run_v7.py train used tiny defaults (vocab/d_model/hidden/layers) unless manually overridden, even with --run pointing to an initialized manifest.",
+      "fix": {
+        "summary": "Resolve effective train dimensions from run_dir/weights_manifest.json and propagate to both CK runtime and oracle paths. Emit train_dims in output JSON.",
+        "files": [
+          "version/v7/scripts/ck_run_v7.py"
+        ]
+      },
+      "proof": {
+        "artifacts": [
+          "version/v7/reports/PARITY_DRIFT_STATUS_2026-02-17.md",
+          "version/v7/.cache/reports/parity_drift_2026-02-17/v7_l24_every8_1024_after_dimfix_venv.json"
+        ],
+        "metrics": [
+          "Post-fix runs report effective dimensions from manifest via train_dims metadata"
+        ]
+      },
+      "guardrails": {
+        "tests": [
+          "make v7-train-runtime-parity-long-horizon"
+        ],
+        "artifacts": [
+          "version/v7/.cache/reports/train_runtime_parity_stress_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_realistic_latest.json"
+        ]
+      }
+    },
+    {
+      "id": "V7-2026-02-17-CE-SEMANTICS",
+      "title": "Cross-entropy semantic and numeric mismatch created long-horizon drift",
+      "status": "fixed",
+      "kind": "numerical_bug",
+      "detected_by": {
+        "gate_targets": [
+          "make v7-train-parity-drift-smoke",
+          "make v7-train-parity-long-horizon-realistic"
+        ],
+        "first_signal": "Stress parity failed around step ~64/~117 in older full-C harness runs."
+      },
+      "root_cause": "Loss reduction/ignore-index semantics and numeric path were not fully aligned with PyTorch reference behavior.",
+      "fix": {
+        "summary": "Adopt stable log-sum-exp loss path and PyTorch-aligned index-target mean semantics. Preserve strict CE reference variant for diagnostics.",
+        "files": [
+          "src/kernels/loss_kernels.c",
+          "version/v7/scripts/train_parity_epochs_v7.py"
+        ]
+      },
+      "proof": {
+        "artifacts": [
+          "docs/site/_pages/v7-cross-entropy-parity.html",
+          "version/v7/.cache/reports/train_parity_drift_smoke_latest.json",
+          "version/v7/.cache/reports/train_parity_realistic_long_horizon_latest.json"
+        ],
+        "metrics": [
+          "Updated 850-step parity evidence now passes for c, c_ptref, and torch loss backends"
+        ]
+      },
+      "guardrails": {
+        "tests": [
+          "python unittest/test_cross_entropy.py",
+          "make v7-train-parity-drift-smoke",
+          "make v7-train-parity-long-horizon-realistic"
+        ],
+        "artifacts": [
+          "version/v7/.cache/reports/train_parity_drift_smoke_latest.json",
+          "version/v7/.cache/reports/train_parity_realistic_long_horizon_latest.json"
+        ]
+      }
+    },
+    {
+      "id": "V7-2026-02-18-OPT-STATE-REPLAY",
+      "title": "Optimizer-state divergence could hide behind weight-only replay checks",
+      "status": "guardrail_added",
+      "kind": "coverage_hardening",
+      "detected_by": {
+        "gate_targets": [
+          "make v7-train-runtime-parity-stress",
+          "make v7-replay-accum"
+        ],
+        "first_signal": "Need to distinguish weight parity from optimizer-state parity in runtime replay triage."
+      },
+      "root_cause": "Replay checks lacked explicit optimizer-state snapshot export/import/compare in earlier flows.",
+      "fix": {
+        "summary": "Add runtime optimizer-state snapshot APIs and replay comparison fields, plus persisted optimizer-state snapshot artifacts.",
+        "files": [
+          "version/v7/scripts/ck_run_v7.py",
+          "version/v7/scripts/codegen_train_runtime_v7.py"
+        ]
+      },
+      "proof": {
+        "artifacts": [
+          "version/v7/.cache/reports/replay_accum_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_latest.json"
+        ],
+        "metrics": [
+          "Runtime parity output includes optimizer_state diff/error fields",
+          "Snapshots persisted under run_dir/oracle_ck_optimizer_state/"
+        ]
+      },
+      "guardrails": {
+        "tests": [
+          "make v7-replay-accum",
+          "make v7-train-runtime-parity-long-horizon"
+        ],
+        "artifacts": [
+          "version/v7/.cache/reports/replay_accum_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_stress_latest.json",
+          "version/v7/.cache/reports/train_runtime_parity_realistic_latest.json"
+        ]
+      }
+    }
+  ]
+}

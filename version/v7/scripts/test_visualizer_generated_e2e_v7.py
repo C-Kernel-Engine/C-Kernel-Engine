@@ -38,11 +38,34 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-HEALTH_SCRIPT = ROOT / "version" / "v7" / "scripts" / "test_visualizer_health_v7.py"
-OPEN_IR_VIZ = ROOT / "version" / "v7" / "tools" / "open_ir_visualizer.py"
-PREPARE_VIEWER = ROOT / "version" / "v7" / "tools" / "prepare_run_viewer.py"
-OPEN_IR_HUB = ROOT / "version" / "v7" / "tools" / "open_ir_hub.py"
-DEFAULT_MODELS_ROOT = Path.home() / ".cache" / "ck-engine-v7" / "models"
+VIS_VERSION = os.environ.get("CK_VIS_VERSION", "v7")
+
+
+def _env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value).expanduser() if value else default
+
+
+HEALTH_SCRIPT = _env_path(
+    "CK_VIS_HEALTH_SCRIPT",
+    ROOT / "version" / VIS_VERSION / "scripts" / f"test_visualizer_health_{VIS_VERSION}.py",
+)
+OPEN_IR_VIZ = _env_path(
+    "CK_VIS_OPEN_IR_VIZ",
+    ROOT / "version" / VIS_VERSION / "tools" / ("open_ir_visualizer.py" if VIS_VERSION == "v7" else f"open_ir_visualizer_{VIS_VERSION}.py"),
+)
+PREPARE_VIEWER = _env_path(
+    "CK_VIS_PREPARE_VIEWER",
+    ROOT / "version" / VIS_VERSION / "tools" / ("prepare_run_viewer.py" if VIS_VERSION == "v7" else f"prepare_run_viewer_{VIS_VERSION}.py"),
+)
+OPEN_IR_HUB = _env_path(
+    "CK_VIS_OPEN_IR_HUB",
+    ROOT / "version" / VIS_VERSION / "tools" / ("open_ir_hub.py" if VIS_VERSION == "v7" else f"open_ir_hub_{VIS_VERSION}.py"),
+)
+DEFAULT_MODELS_ROOT = _env_path(
+    "CK_VIS_MODELS_ROOT",
+    Path.home() / ".cache" / f"ck-engine-{VIS_VERSION}" / "models",
+)
 DEFAULT_TRAIN_ROOT = DEFAULT_MODELS_ROOT / "train"
 
 PYTHON = sys.executable
@@ -625,7 +648,7 @@ def check_cross_artifact_consistency(run_dir: Path, models_root: Path) -> StageR
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Level 3 — Generated-file E2E for all visualizers",
+        description=f"Level 3 — Generated-file E2E for all {VIS_VERSION} visualizers",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -658,6 +681,7 @@ Examples:
         if args.json_out:
             report = {
                 "level": 3,
+                "version": VIS_VERSION,
                 "description": "Generated-file E2E visualizer validation",
                 "skipped": True,
                 "reason": "no training runs found",
@@ -679,6 +703,7 @@ Examples:
         if args.json_out:
             report = {
                 "level": 3,
+                "version": VIS_VERSION,
                 "skipped": True,
                 "reason": f"run directory not found: {run_dir}",
                 "total_checks": 0, "passed": 0, "failed": 0,
@@ -690,6 +715,7 @@ Examples:
 
     print(f"{_BOLD}{'═' * 60}{_NC}")
     print(f"  Level 3 Generated-File E2E")
+    print(f"  Version: {_CYAN}{VIS_VERSION}{_NC}")
     print(f"  Run: {_CYAN}{run_dir.name}{_NC}")
     print(f"  Models root: {args.models_root}")
     print(f"  Mode: {'validate-only' if args.validate_only else 'generate + validate'}")
@@ -772,6 +798,7 @@ Examples:
     if args.json_out:
         report = {
             "level": 3,
+            "version": VIS_VERSION,
             "description": "Generated-file E2E visualizer validation",
             "run_dir": str(run_dir),
             "models_root": str(args.models_root),

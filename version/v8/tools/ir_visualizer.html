@@ -7,9 +7,9 @@
   │                                                                          │
   │  ⚠️  DO NOT DELETE OR REGRESS EXISTING TABS OR FUNCTIONS  ⚠️              │
   │                                                                          │
-  │  TABS (11 tabs):                                                         │
-  │   Memory · Kernel Flow · Stats · Training · Quantization · Dataflow ·    │
-  │   Interpretability · Profile · Data Pipeline · Parity · Overview         │
+  │  TABS (12 tabs):                                                         │
+  │   Memory · Kernel Flow · Stats · Multimodal · Training · Quantization ·  │
+  │   Dataflow · Interpretability · Profile · Data Pipeline · Parity         │
   │                                                                          │
   │  HOW TO EDIT:                                                            │
   │   • Each tab has a render function (e.g. renderMemory, renderTraining)   │
@@ -23,17 +23,17 @@
   │   2. Add <div id="yourTab" class="content-section"> panel               │
   │   3. Write renderYourTab() function                                      │
   │   4. Add to renderTabIfDirty() switch/case                              │
-  │   5. Update version/v7/tests/contracts/ir_visualizer_contract.json:      │
+  │   5. Update version/v8/tests/contracts/ir_visualizer_contract.json:      │
   │      — Add tab entry with id, label, render_function                     │
   │      — Add render function to required_functions list                    │
-  │   6. Run: make v7-visualizer-health  (must pass)                         │
+  │   6. Run: make v8-visualizer-health  (must pass)                         │
   │                                                                          │
   │  HOW TO ADD A NEW UTILITY FUNCTION:                                      │
   │   1. Add the function in the appropriate script block                    │
   │   2. If it's a pure function (no DOM), also add it to:                   │
-  │      version/v7/tests/fixtures/ir_pure_functions.js                      │
+  │      version/v8/tests/fixtures/ir_pure_functions.js                      │
   │   3. Add test vectors to ir_visualizer_contract.json                     │
-  │   4. Run: make v7-visualizer-health  (must pass)                         │
+  │   4. Run: make v8-visualizer-health  (must pass)                         │
   │                                                                          │
   │  WHAT NOT TO BREAK:                                                      │
   │   • setElText / setElHtml — safe DOM helpers used everywhere             │
@@ -43,10 +43,10 @@
   │   • showTab — tab navigation (all 11 tabs must remain accessible)        │
   │                                                                          │
   │  TESTING:                                                                │
-  │   make v7-visualizer-health          # L1 static + L2 JS units (3s)      │
-  │   make v7-visualizer-generated-e2e   # L3 generate + validate (10s)      │
-  │   Contracts: version/v7/tests/contracts/ir_visualizer_contract.json      │
-  │   Fixtures:  version/v7/tests/fixtures/ir_pure_functions.js              │
+  │   make v8-visualizer-health          # L1 static + L2 JS units (3s)      │
+  │   make v8-visualizer-generated-e2e   # L3 generate + validate (10s)      │
+  │   Contracts: version/v8/tests/contracts/ir_visualizer_contract.json      │
+  │   Fixtures:  version/v8/tests/fixtures/ir_pure_functions.js              │
   │   Pre-push:  .githooks/pre-push step [0.5/6] runs health checks         │
   │                                                                          │
   └──────────────────────────────────────────────────────────────────────────┘
@@ -2379,6 +2379,7 @@
         <div class="tab" data-tab="quantization" data-mode="inference" onclick="showTab('quantization')">Weight Dtype Audit</div>
         <div class="tab" data-tab="parity" data-mode="inference" onclick="showTab('parity')">Parity Debug</div>
         <div class="tab" data-tab="dataflow" data-mode="inference" onclick="showTab('dataflow')">Dataflow Graph</div>
+        <div class="tab" data-tab="multimodal" data-mode="inference" onclick="showTab('multimodal')">Multimodal Bridge</div>
         <div class="tab" data-tab="tests" data-mode="inference" onclick="showTab('tests')">Tests</div>
         <div class="tab" data-tab="stats" data-mode="inference" onclick="showTab('stats')">Statistics</div>
         <div class="tab" data-tab="training" data-mode="training" onclick="showTab('training')">Backprop IR</div>
@@ -2523,9 +2524,9 @@
                     </div>
                     <div class="infographic-card">
                         <h3>Operator Runbook</h3>
-                        <pre class="summary-runbook" id="summaryRunbook">make v7-gate
-make v7-validate-parity-matrix-required
-make v7-test-quick</pre>
+                        <pre class="summary-runbook" id="summaryRunbook">make regression-fast
+version/v8/scripts/cks-v8-run run "$RUN" --generate-visualizer
+python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$RUN" --html-only --strict-run-artifacts</pre>
                     </div>
                 </div>
 
@@ -2859,7 +2860,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
 
             <div class="parity-section">
                 <h3><span class="badge badge-green">Compare</span> Tensor Comparison</h3>
-                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Compare tensor dumps between two v7 runs (or optional external baseline).</p>
+                <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">Compare tensor dumps between two CK runs (or an optional external baseline).</p>
                 <div class="tensor-compare">
                     <div class="tensor-panel">
                         <h4>C-Kernel-Engine</h4>
@@ -2985,10 +2986,10 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
         </div>
 
         <div id="tests" class="panel">
-            <h2 style="margin-bottom: 1rem;">v7 Test Suite</h2>
+            <h2 style="margin-bottom: 1rem;">V8 Test Suite</h2>
             <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-                Run tests to validate your model. This tab is v7-focused and organized by operator intent.
-                For full documentation, see <code>version/v7/test/TEST_README.py</code>.
+                Run tests to validate your model. This tab is organized by operator intent around the current v8-facing entry points.
+                For full documentation, see <code>version/v8/test/TEST_README.py</code>.
             </p>
 
             <div class="tests-hero">
@@ -3006,7 +3007,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                             <span class="tests-pill"><strong>S4</strong>Gate Confidence</span>
                         </div>
                     </div>
-                    <svg class="tests-lifecycle-figure" viewBox="0 0 520 220" preserveAspectRatio="xMidYMid meet" aria-label="v7 test lifecycle">
+                    <svg class="tests-lifecycle-figure" viewBox="0 0 520 220" preserveAspectRatio="xMidYMid meet" aria-label="v8 test lifecycle">
                         <defs>
                             <linearGradient id="testArcA" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" stop-color="#ffb400"/>
@@ -3033,7 +3034,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                             <path d="M301,174 A72,72 0 0 1 191,174" stroke="url(#testArcC)" stroke-width="24" fill="none" stroke-linecap="round"/>
                             <path d="M191,174 A72,72 0 0 1 191,46" stroke="url(#testArcD)" stroke-width="24" fill="none" stroke-linecap="round"/>
                             <circle cx="260" cy="110" r="46" fill="#1f1f1f" stroke="#555" stroke-width="1"/>
-                            <text x="260" y="104" text-anchor="middle" fill="#f5f5f5" font-size="22" font-weight="700">v7</text>
+                            <text x="260" y="104" text-anchor="middle" fill="#f5f5f5" font-size="22" font-weight="700">v8</text>
                             <text x="260" y="124" text-anchor="middle" fill="#b0b0b0" font-size="12">test loop</text>
                         </g>
 
@@ -3060,7 +3061,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                             <span class="tests-outcome-dot orange"></span>
                             <h4>Health Signal</h4>
                         </div>
-                        <p><code>test_numerical_parity.py</code> confirms logits finiteness and output-token sanity for your loaded v7 artifact.</p>
+                        <p><code>test_numerical_parity.py</code> confirms logits finiteness and output-token sanity for your loaded run artifact.</p>
                     </div>
                     <div class="tests-outcome-card">
                         <div class="tests-outcome-head">
@@ -3084,7 +3085,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                         <p><code>ck_test_runner.py --quick/--all</code> provides an operator gate to decide whether the model is ready for integration work.</p>
                     </div>
                 </div>
-                <svg class="tests-flow-map" viewBox="0 0 1024 220" preserveAspectRatio="xMidYMid meet" aria-label="v7 test execution map">
+                <svg class="tests-flow-map" viewBox="0 0 1024 220" preserveAspectRatio="xMidYMid meet" aria-label="v8 test execution map">
                     <defs>
                         <marker id="testArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                             <path d="M0,0 L8,4 L0,8 z" fill="#a8a8a8"></path>
@@ -3124,7 +3125,7 @@ swish(z) = z · σ(z),   σ(z)=1/(1+e^{-z})</div>
                     Commands below auto-populate from loaded report metadata. Copy this block first if you want shell variables.
                 </p>
                 <pre id="testModelPathContext"># Load an embedded ir_report.html to auto-fill model path.
-cd version/v7/test
+cd version/v8/test
 export CK_MODEL_DIR="$MODEL_DIR"
 export CK_BUILD_DIR="$CK_BUILD_DIR"</pre>
             </div>
@@ -3135,8 +3136,8 @@ export CK_BUILD_DIR="$CK_BUILD_DIR"</pre>
                 <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
                     Minimal test: embedding, weight offsets, memory layout.
                 </p>
-                <pre style="background: var(--code-bg); padding: 1rem; border-radius: 6px; margin: 0.5rem 0;">
-cd version/v7/test
+<pre style="background: var(--code-bg); padding: 1rem; border-radius: 6px; margin: 0.5rem 0;">
+cd version/v8/test
 python3 ck_test_runner.py --quick</pre>
             </div>
 
@@ -3144,7 +3145,7 @@ python3 ck_test_runner.py --quick</pre>
             <div class="parity-section">
                 <h3><span class="badge badge-green">Runtime</span> Runtime Validation Tests</h3>
                 <p style="color: var(--text-muted); margin: 0.5rem 0 1rem;">
-                    Validate v7 output health and localize the first failing runtime stage.
+                    Validate runtime output health and localize the first failing runtime stage.
                 </p>
                 <table>
                     <thead>
@@ -3158,18 +3159,18 @@ python3 ck_test_runner.py --quick</pre>
                         </tr>
                         <tr>
                             <td><code>test_numerical_parity.py</code></td>
-                            <td>v7 logits health check (NaN/Inf/output sanity)</td>
+                            <td>Runtime logits health check (NaN/Inf/output sanity)</td>
                             <td><code id="cmdTestNumericalParity">python3 test_numerical_parity.py --model "$MODEL_DIR" --threads 1 --context-len 1024</code></td>
                         </tr>
                         <tr>
                             <td><code>trace_divergence.py</code></td>
-                            <td>Find first failing v7 stop-op / execution stage</td>
+                            <td>Find first failing stop-op / execution stage</td>
                             <td><code id="cmdTraceDivergence">python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --context-len 1024</code></td>
                         </tr>
                         <tr>
-                            <td><code>v7_comprehensive_debug.py</code></td>
+                            <td><code>comprehensive_debug.py</code></td>
                             <td>Step-by-step debugging with stop points</td>
-                            <td><code id="cmdComprehensiveDebug">python3 v7_comprehensive_debug.py --model-dir "$MODEL_DIR" --token 25 --stop-at 5 --threads 1 --context-len 1024</code></td>
+                            <td><code id="cmdComprehensiveDebug">python3 comprehensive_debug.py --model-dir "$MODEL_DIR" --token 25 --stop-at 5 --threads 1 --context-len 1024</code></td>
                         </tr>
                     </tbody>
                 </table>
@@ -3187,9 +3188,9 @@ python3 ck_test_runner.py --quick</pre>
                     </thead>
                     <tbody>
                         <tr>
-                            <td><code>test_weight_offset_consistency.py</code></td>
-                            <td>Verify weight offsets match actual BUMP data</td>
-                            <td><code id="cmdWeightOffset">python3 test_weight_offset_consistency.py --model-dir "$MODEL_DIR"</code></td>
+                            <td><code>ck_test_runner.py --memory</code></td>
+                            <td>Run the current memory validation bundle from one entry point</td>
+                            <td><code id="cmdWeightOffset">python3 ck_test_runner.py --memory</code></td>
                         </tr>
                         <tr>
                             <td><code>test_memory_planner.py</code></td>
@@ -3251,7 +3252,7 @@ python3 ck_test_runner.py --quick</pre>
                     </div>
                 </div>
                 <p style="color: var(--text-muted); margin-top: 1rem;">
-                    Run all tests: <code>cd version/v7/test && python3 ck_test_runner.py --all</code>
+                    Run all tests: <code>cd version/v8/test && python3 ck_test_runner.py --all</code>
                 </p>
             </div>
 
@@ -3263,10 +3264,10 @@ python3 ck_test_runner.py --quick</pre>
                         <h4 style="color: var(--orange); margin-bottom: 0.5rem;">New Runtime Issue</h4>
                         <pre style="font-size: 0.8rem;">
 # 1. Find first failure
-python3 test_layer_by_layer.py --model "$MODEL_DIR" --token 25
+python3 ck_test_runner.py --parity --token 25
 
 # 2. Debug at that layer
-python3 v7_comprehensive_debug.py --model-dir "$MODEL_DIR" --token 25 --stop-at LAYER --threads 1 --context-len 1024
+python3 comprehensive_debug.py --model-dir "$MODEL_DIR" --token 25 --stop-at LAYER --threads 1 --context-len 1024
 
 # 3. Trace divergence
 python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --context-len 1024</pre>
@@ -3274,38 +3275,38 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                     <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
                         <h4 style="color: var(--orange); margin-bottom: 0.5rem;">NaN Detected</h4>
                         <pre style="font-size: 0.8rem;">
-# 1. Find layer with NaN
-python3 trace_nan_layer.py --model "$MODEL_DIR" --token 25
+# 1. Confirm runtime parity / finiteness
+python3 test_numerical_parity.py --model "$MODEL_DIR" --threads 1 --context-len 1024
 
-# 2. Find exact op with NaN
-python3 trace_nan_step.py --model "$MODEL_DIR" --token 25
+# 2. Localize the failure band
+python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --context-len 1024
 
-# 3. Check weight integrity
-python3 test_weight_offset_consistency.py --model-dir "$MODEL_DIR"</pre>
+# 3. Check memory path integrity
+python3 ck_test_runner.py --memory</pre>
                     </div>
                     <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
                         <h4 style="color: var(--orange); margin-bottom: 0.5rem;">Memory Corruption</h4>
                         <pre style="font-size: 0.8rem;">
-# 1. Quick memory check
-python3 test_memory_planner.py --layout="$CK_BUILD_DIR/layout_decode.json"
+# 1. Run the bundled memory gate
+python3 ck_test_runner.py --memory
 
 # 2. Deep validation
 python3 advanced_memory_validator.py --model-dir "$MODEL_DIR"
 
-# 3. BUMP sync check
-python3 test_bump_layout_sync.py --model-dir "$MODEL_DIR"</pre>
+# 3. KV cache validation
+python3 test_kv_cache.py --model-dir "$MODEL_DIR"</pre>
                     </div>
                     <div style="background: var(--dark-card); padding: 1rem; border-radius: 6px;">
                         <h4 style="color: var(--orange); margin-bottom: 0.5rem;">Converter Bug</h4>
                         <pre style="font-size: 0.8rem;">
-# 1. Check weight offsets
-python3 test_weight_offset_consistency.py --model-dir "$MODEL_DIR"
+# 1. Verify runtime parity
+python3 test_numerical_parity.py --model "$MODEL_DIR" --threads 1 --context-len 1024
 
-# 2. Verify dtype consistency
-python3 test_dtype_consistency.py --model-dir "$MODEL_DIR"
+# 2. Re-check memory planning
+python3 test_memory_planner.py --layout="$CK_BUILD_DIR/layout_decode.json"
 
-# 3. GEMV specific test
-python3 test_gemv_q8_0_q8_0.py</pre>
+# 3. Localize the first failing stage
+python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --context-len 1024</pre>
                     </div>
                 </div>
             </div>
@@ -3328,7 +3329,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             <div class="parity-section">
                 <h3><span class="badge badge-blue">Roadmap</span> Optional Local Runner Service</h3>
                 <p style="color: var(--text-muted); margin: 0.5rem 0 0.9rem;">
-                    Browsers cannot execute shell commands directly from <code>ir_report.html</code>. To run tests from this UI, add a small local service that executes whitelisted v7 commands and streams logs.
+                    Browsers cannot execute shell commands directly from <code>ir_report.html</code>. To run tests from this UI, add a small local service that executes whitelisted v8 commands and streams logs.
                 </p>
                 <table>
                     <thead><tr><th>API</th><th>Purpose</th><th>Output</th></tr></thead>
@@ -3350,6 +3351,14 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <thead><tr><th>Kernel</th><th>Count</th><th>Layers</th></tr></thead>
                 <tbody></tbody>
             </table>
+        </div>
+
+        <div id="multimodal" class="panel">
+            <h2>Multimodal Bridge</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                Inspect the encoder to decoder handoff, real-image ingest metadata, and the bridge artifacts that make a vision run distinct from a decoder-only report.
+            </p>
+            <div id="multimodalRoot" style="color: var(--text-muted);">No multimodal bridge artifacts loaded.</div>
         </div>
 
         <div id="training" class="panel">
@@ -3631,7 +3640,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 <p style="color:var(--text-muted); font-size:0.78rem; margin-bottom:0.75rem;">
                     The BPE demo above uses a <strong style="color:var(--orange);">hard-coded example merge table</strong> for visualization.
                     Your actual model uses a HuggingFace-compatible <code>tokenizer.json</code> loaded by <code>ck_tokenizer.c</code>,
-                    which may be <strong>bytelevel BPE</strong>, <strong>SentencePiece</strong> (BPE/Unigram), or <strong>ascii_bpe</strong> (v7 trainer, default 1024 vocab).
+                    which may be <strong>bytelevel BPE</strong>, <strong>SentencePiece</strong> (BPE/Unigram), or <strong>ascii_bpe</strong> (small-vocab trainer, default 1024 vocab).
                 </p>
                 <div id="tokenizerLineageInfo" style="font-size:0.75rem;"></div>
             </div>
@@ -4133,7 +4142,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const context = document.getElementById('testModelPathContext');
             if (context) {
                 context.textContent = [
-                    'cd version/v7/test',
+                    'cd version/v8/test',
                     `export MODEL_DIR=${modelDir}`,
                     `export CK_BUILD_DIR=${ckBuildDir}`,
                 ].join('\n');
@@ -4147,8 +4156,8 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             setCmd('cmdTestLayerByLayer', `python3 test_layer_by_layer.py --model "${modelDir}" --token 25`);
             setCmd('cmdTestNumericalParity', `python3 test_numerical_parity.py --model "${modelDir}" --threads 1 --context-len 1024`);
             setCmd('cmdTraceDivergence', `python3 trace_divergence.py --model "${modelDir}" --token 25 --threads 1 --context-len 1024`);
-            setCmd('cmdComprehensiveDebug', `python3 v7_comprehensive_debug.py --model-dir "${modelDir}" --token 25 --stop-at 5 --threads 1 --context-len 1024`);
-            setCmd('cmdWeightOffset', `python3 test_weight_offset_consistency.py --model-dir "${modelDir}"`);
+            setCmd('cmdComprehensiveDebug', `python3 comprehensive_debug.py --model-dir "${modelDir}" --token 25 --stop-at 5 --threads 1 --context-len 1024`);
+            setCmd('cmdWeightOffset', 'python3 ck_test_runner.py --memory');
             setCmd('cmdMemoryPlanner', `python3 test_memory_planner.py --layout="${ckBuildDir}/${layoutFile}"`);
             setCmd('cmdAdvancedMemory', `python3 advanced_memory_validator.py --model-dir "${modelDir}"`);
             setCmd('cmdKvCache', `python3 test_kv_cache.py --model-dir "${modelDir}"`);
@@ -4356,6 +4365,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const isTrainingScope = reportMode === 'training';
             const filesView = typeof currentFiles === 'function' ? currentFiles() : ((window.EMBEDDED_IR_DATA && window.EMBEDDED_IR_DATA.files) || {});
             const dataLab = (trainPipelineData && typeof trainPipelineData.data_lab === 'object') ? trainPipelineData.data_lab : {};
+            const bridgeView = (filesView && typeof filesView.multimodal_bridge_report === 'object') ? filesView.multimodal_bridge_report : null;
 
             const inferenceRequired = [
                 { key: 'ir1', label: `ir1_${currentMode}.json`, ready: Boolean(modeSnapshot.ir1) },
@@ -4376,6 +4386,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 { key: 'advisor_summary', label: 'advisor_summary.json', ready: Boolean(advisorSummaryData) },
                 { key: 'memory_signoff', label: 'memory_signoff.json', ready: Boolean(memorySignoffData) },
                 { key: 'perf_gate_report', label: 'perf_gate_report.json', ready: Boolean(perfGateData) },
+                { key: 'multimodal_bridge_report', label: 'multimodal_bridge/bridge_report.json', ready: Boolean(bridgeView) },
                 { key: 'kernel_registry', label: 'KERNEL_REGISTRY.json', ready: Boolean(kernelRegistryData) },
             ];
             if (hasTrainRuntimeContext || Boolean(asanSummaryData)) {
@@ -4401,7 +4412,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 { key: 'replay_accum', label: 'replay_accum_latest.json', ready: Boolean(filesView && filesView.replay_accum) },
                 { key: 'layout_train_audit', label: 'layout_train_audit.json', ready: Boolean(filesView && filesView.layout_train_audit) },
                 { key: 'memory_diagnostic', label: 'memory_diagnostic_latest.json', ready: Boolean(filesView && filesView.memory_diagnostic) },
-                { key: 'generated_train_runtime_summary', label: 'generated_train_runtime_summary_v7.json', ready: Boolean(filesView && filesView.generated_train_runtime_summary) },
+                { key: 'generated_train_runtime_summary', label: 'generated_train_runtime_summary.json', ready: Boolean(filesView && filesView.generated_train_runtime_summary) },
                 { key: 'dataset_qc', label: 'dataset_qc.json', ready: Boolean((filesView && filesView.dataset_qc) || dataLab.dataset_qc) },
                 { key: 'tokenizer_roundtrip', label: 'tokenizer_roundtrip.json', ready: Boolean((filesView && filesView.tokenizer_roundtrip) || dataLab.tokenizer_roundtrip) },
                 { key: 'post_train_eval', label: 'post_train_eval.json', ready: Boolean((filesView && filesView.post_train_eval) || dataLab.post_train_eval) },
@@ -4461,7 +4472,10 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 else el.classList.add('status-chip-muted');
             };
 
-            if (summaryModeChip) summaryModeChip.textContent = isTrainingScope ? 'mode: training' : `mode: ${currentMode}`;
+            if (summaryModeChip) {
+                const multimodalMode = bridgeView ? 'encoder+decoder' : currentMode;
+                summaryModeChip.textContent = isTrainingScope ? 'mode: training' : `mode: ${multimodalMode}`;
+            }
             if (summaryStatusChip) {
                 setChipState(summaryStatusChip, `status: ${statusText}`, statusText === 'ready' ? 'good' : 'warn');
             }
@@ -4722,26 +4736,30 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             if (summaryRunbook) {
                 const runbook = isTrainingScope
                     ? [
-                        `make v7-gate-train`,
-                        `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir "$RUN" --json-out "$RUN/training_parity_regimen_latest.json" --md-out "$RUN/training_parity_regimen_latest.md"`,
+                        `make v8-gate-train`,
+                        `python3 version/v8/scripts/run_training_parity_regimen_v8.py --run-dir "$RUN" --json-out "$RUN/training_parity_regimen_latest.json" --md-out "$RUN/training_parity_regimen_latest.md"`,
                         `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$RUN" --html-only`,
                         `# verify lineage: resume_from_run_id / resume_from_checkpoint_id should match the intended source checkpoint`,
                         `tail -n 8 "$RUN/run_ledger.jsonl"`,
                     ]
                     : [
-                        `make v7-gate`,
-                        `make v7-validate-parity-matrix-required`,
-                        `make v7-test-quick`,
+                        `make regression-fast`,
+                        `version/v8/scripts/cks-v8-run run "$RUN" --generate-visualizer`,
+                        `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$RUN" --html-only --strict-run-artifacts`,
                     ];
+                if (!isTrainingScope && bridgeView) {
+                    runbook.push('# multimodal bridge replay');
+                    runbook.push(`python3 version/v8/scripts/decoder_first_token_parity_v8.py --bridge-report "$RUN/multimodal_bridge/bridge_report.json"`);
+                }
                 if (missingRequired.length > 0) {
                     runbook.push('# missing artifacts detected');
-                    runbook.push(isTrainingScope ? 'version/v7/scripts/cks-v7-run train-suite --run "$RUN"' : 'make v7-validate-contracts');
-                    if (!isTrainingScope) runbook.push('make v7-validate-matrix-smoke');
+                    runbook.push(isTrainingScope ? 'version/v8/scripts/cks-v8-run train-suite --run "$RUN"' : 'make v8-validate-contracts');
+                    if (!isTrainingScope) runbook.push('python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$RUN" --html-only --strict-run-artifacts');
                 }
                 if (missingKernels.length > 0) {
                     runbook.push('# missing kernel mappings');
-                    runbook.push('make v7-kernel-map-gate');
-                    runbook.push('make v7-validate-contracts');
+                    runbook.push('make v8-kernel-map-gate');
+                    runbook.push('make v8-validate-contracts');
                 }
                 summaryRunbook.textContent = runbook.join('\n');
             }
@@ -4930,7 +4948,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
             const schema = String(payload.schema || '');
             const tool = String(payload.tool || '');
             if (schema === 'ck.profile.summary.v1' && tool) {
-                return `${source} is a ${tool} marker stub, not decode timing data. If ${embeddedMeta?.path || '<model-dir>'}/model_v7.c has zero CK_PROFILE sections, rebuild with "make profile-v7-decode ... V7_PREP_WITH_PYTHON=1 V7_FORCE_COMPILE=1".`;
+                return `${source} is a ${tool} marker stub, not decode timing data. If the generated model C file has zero CK_PROFILE sections, rebuild with "make profile-v8-decode ... V8_PREP_WITH_PYTHON=1 V8_FORCE_COMPILE=1".`;
             }
             if (schema === 'ck.profile.summary.v1') {
                 return `${source} is a marker stub without per-kernel timing entries.`;
@@ -5219,7 +5237,7 @@ python3 test_gemv_q8_0_q8_0.py</pre>
 
         function markAllTabsDirty() {
             _dirtyTabs = {
-                memory: true, kernels: true, stats: true, training: true,
+                memory: true, kernels: true, stats: true, multimodal: true, training: true,
                 quantization: true, dataflow: true, interpretability: true,
                 profile: true, tests: true, parity: true, 'data-pipeline': true,
                 'train-dashboard': true, 'train-grad-flow': true,
@@ -5249,6 +5267,9 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                     break;
                 case 'stats':
                     renderStats();
+                    break;
+                case 'multimodal':
+                    renderMultimodal();
                     break;
                 case 'training':
                     renderTraining();
@@ -7156,6 +7177,205 @@ python3 test_gemv_q8_0_q8_0.py</pre>
                 });
         }
 
+        function getMultimodalBridgePayload() {
+            const files = getEmbeddedFiles();
+            const payload = files && files.multimodal_bridge_report;
+            return (payload && typeof payload === 'object') ? payload : null;
+        }
+
+        function multimodalOpCount(payload) {
+            if (!payload || typeof payload !== 'object') return null;
+            const ops = Array.isArray(payload.operations)
+                ? payload.operations
+                : (Array.isArray(payload.ops) ? payload.ops : []);
+            return ops.length > 0 ? ops.length : null;
+        }
+
+        function multimodalLayoutTotalBytes(payload) {
+            if (!payload || typeof payload !== 'object') return null;
+            const memory = (payload.memory && typeof payload.memory === 'object') ? payload.memory : {};
+            const arena = (memory.arena && typeof memory.arena === 'object') ? memory.arena : {};
+            const candidates = [
+                arena.total_size,
+                memory.total_size,
+                payload.total_bytes,
+            ];
+            for (const raw of candidates) {
+                const value = Number(raw);
+                if (Number.isFinite(value) && value > 0) return value;
+            }
+            return null;
+        }
+
+        function renderMultimodal() {
+            const root = document.getElementById('multimodalRoot');
+            if (!root) return;
+
+            const files = getEmbeddedFiles();
+            const bridge = getMultimodalBridgePayload();
+            if (!bridge) {
+                const modeHint = (embeddedMeta && embeddedMeta.multimodal_mode) || 'decoder_only';
+                root.innerHTML = `
+                    <div class="parity-section">
+                        <h3><span class="badge badge-blue">Decoder Only</span> No Bridge Report Loaded</h3>
+                        <p style="color:var(--text-muted);margin:0.6rem 0 0;">
+                            This report has no <code>multimodal_bridge/bridge_report.json</code>. The run is being visualized as a ${escapeHtml(String(modeHint))} runtime, so Memory, Kernel Flow, Dataflow, and Profile still reflect the loaded decoder artifacts.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            const encoderReport = (bridge.encoder_report && typeof bridge.encoder_report === 'object') ? bridge.encoder_report : {};
+            const encoderIr1 = (files.bridge_encoder_ir1 && typeof files.bridge_encoder_ir1 === 'object') ? files.bridge_encoder_ir1 : {};
+            const encoderLayout = (files.bridge_encoder_layout && typeof files.bridge_encoder_layout === 'object') ? files.bridge_encoder_layout : {};
+            const encoderCall = (files.bridge_encoder_call && typeof files.bridge_encoder_call === 'object') ? files.bridge_encoder_call : {};
+            const encoderLowered = (files.bridge_encoder_lowered && typeof files.bridge_encoder_lowered === 'object') ? files.bridge_encoder_lowered : {};
+            const decoderPrefill = (files.lowered_prefill_call && typeof files.lowered_prefill_call === 'object')
+                ? files.lowered_prefill_call
+                : ((files.lowered_prefill && typeof files.lowered_prefill === 'object') ? files.lowered_prefill : {});
+            const decoderIr1 = (files.ir1_prefill && typeof files.ir1_prefill === 'object') ? files.ir1_prefill : {};
+            const decoderLayout = (files.layout_prefill && typeof files.layout_prefill === 'object') ? files.layout_prefill : {};
+
+            const bridgeMode = String(bridge.bridge_mode || (bridge.encoder_runtime ? 'encoder_decoder' : 'decoder_only'));
+            const prompt = String(bridge.prompt || '');
+            const generatedText = String(bridge.generated_text || bridge.generated_text_raw || '');
+            const beforeCount = Array.isArray(bridge.prompt_tokens_before_image) ? bridge.prompt_tokens_before_image.length : 0;
+            const afterCount = Array.isArray(bridge.prompt_tokens_after_image) ? bridge.prompt_tokens_after_image.length : 0;
+            const imageResolved = String(encoderReport.image_path_resolved || encoderReport.image_path || '');
+            const imageDataUri = String(encoderReport.image_data_uri || '');
+            const sourceSize = Array.isArray(encoderReport.source_image_size) ? encoderReport.source_image_size : [];
+            const sourceSizeLabel = sourceSize.length === 2 ? `${sourceSize[0]} × ${sourceSize[1]}` : '-';
+            const preprocessSize = Number(encoderReport.image_width) > 0 && Number(encoderReport.image_height) > 0
+                ? `${encoderReport.image_width} × ${encoderReport.image_height}`
+                : (Number(encoderReport.image_size) > 0 ? `${encoderReport.image_size} square` : '-');
+            const encoderTotalBytes = multimodalLayoutTotalBytes(encoderLayout);
+            const decoderTotalBytes = multimodalLayoutTotalBytes(decoderLayout);
+            const artifactRows = [
+                { label: 'bridge_report.json', ready: true, note: 'Prompt contract + encoder/decoder handoff.' },
+                { label: 'encoder/ir1.json', ready: Boolean(multimodalOpCount(encoderIr1)), note: 'Vision encoder IR1 graph.' },
+                { label: 'encoder/layout.json', ready: Number.isFinite(Number(encoderTotalBytes)), note: 'Encoder memory layout.' },
+                { label: 'encoder/call.json', ready: Boolean(multimodalOpCount(encoderCall)), note: 'Encoder lowered call/runtime view.' },
+                { label: 'encoder/lowered.json', ready: Boolean(multimodalOpCount(encoderLowered)), note: 'Encoder lowered op list.' },
+                { label: 'decoder/ir1_prefill.json', ready: Boolean(multimodalOpCount(decoderIr1)), note: 'Bridge-aware decoder prefill IR.' },
+                { label: 'decoder/layout_prefill.json', ready: Number.isFinite(Number(decoderTotalBytes)), note: 'Decoder prefill memory layout.' },
+                { label: 'decoder/lowered_prefill*.json', ready: Boolean(multimodalOpCount(decoderPrefill)), note: 'Bridge-aware decoder lowered call IR.' },
+            ];
+            const notes = Array.isArray(bridge.notes) ? bridge.notes : [];
+
+            root.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(bridgeMode === 'encoder_decoder' ? 'enc+dec' : 'decode')}</div><div class="stat-label">Bridge Mode</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.prefix_source || '-'))}</div><div class="stat-label">Prefix Source</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.prefix_tokens ?? '-'))}</div><div class="stat-label">Prefix Tokens</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(String(beforeCount))} / ${escapeHtml(String(afterCount))}</div><div class="stat-label">Text Tokens Before / After Image</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.decoder_input_embed_dim ?? '-'))}</div><div class="stat-label">Decoder Input Dim</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(String(encoderReport.embed_dim ?? '-'))}</div><div class="stat-label">Encoder Output Dim</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(sourceSizeLabel)}</div><div class="stat-label">Source Image</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(preprocessSize)}</div><div class="stat-label">Preprocess Size</div></div>
+                </div>
+
+                <div class="parity-section">
+                    <h3><span class="badge badge-orange">Bridge Contract</span> Prompt, Prefix, and Runtime Handoff</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.9rem;">
+                        <div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:1rem;">
+                            <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.45rem;">Prompt</div>
+                            <pre style="white-space:pre-wrap;background:var(--code-bg);padding:0.8rem;border-radius:6px;margin:0;">${escapeHtml(prompt || '-')}</pre>
+                        </div>
+                        <div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:1rem;">
+                            <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.45rem;">Generated Text</div>
+                            <pre style="white-space:pre-wrap;background:var(--code-bg);padding:0.8rem;border-radius:6px;margin:0;">${escapeHtml(generatedText || '-')}</pre>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem;margin-top:0.9rem;">
+                        <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.total_prefill_tokens ?? '-'))}</div><div class="stat-label">Total Prefill Tokens</div></div>
+                        <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.generated_token_count ?? '-'))}</div><div class="stat-label">Generated Tokens</div></div>
+                        <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.generation_stop_reason || '-'))}</div><div class="stat-label">Stop Reason</div></div>
+                        <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.multimodal_prompt_segmented ? 'segmented' : 'flat'))}</div><div class="stat-label">Prompt Segmentation</div></div>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0.9rem;">
+                    <div class="parity-section">
+                        <h3><span class="badge badge-blue">Image</span> Real-Image Ingest Metadata</h3>
+                        ${imageDataUri ? `<img src="${imageDataUri}" alt="Bridge input image" style="width:100%;max-width:320px;border-radius:8px;border:1px solid var(--grey);margin-bottom:0.8rem;display:block;">` : ''}
+                        <table>
+                            <tbody>
+                                <tr><th>Image Source</th><td>${escapeHtml(String(encoderReport.image_source || '-'))}</td></tr>
+                                <tr><th>Path</th><td>${imageResolved ? `<a href="file://${encodeURI(imageResolved)}">${escapeHtml(imageResolved)}</a>` : '-'}</td></tr>
+                                <tr><th>Preprocess</th><td>${escapeHtml(String(encoderReport.preprocess || '-'))}</td></tr>
+                                <tr><th>Source Size</th><td>${escapeHtml(sourceSizeLabel)}</td></tr>
+                                <tr><th>Bridge Grid</th><td>${escapeHtml(String(encoderReport.prefix_grid_x ?? '-'))} × ${escapeHtml(String(encoderReport.prefix_grid_y ?? '-'))}</td></tr>
+                                <tr><th>Text Position</th><td>${escapeHtml(String(encoderReport.prefix_text_pos ?? '-'))}</td></tr>
+                                <tr><th>Bridge Activation</th><td>${escapeHtml(String(encoderReport.bridge_activation || '-'))}</td></tr>
+                                <tr><th>Bridge Reason</th><td>${escapeHtml(String(encoderReport.bridge_reason || '-'))}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="parity-section">
+                        <h3><span class="badge badge-green">Artifacts</span> Encoder and Decoder Coverage</h3>
+                        <table>
+                            <thead><tr><th>Artifact</th><th>Status</th><th>Note</th></tr></thead>
+                            <tbody>
+                                ${artifactRows.map((row) => `
+                                    <tr>
+                                        <td><code>${escapeHtml(row.label)}</code></td>
+                                        <td>${row.ready ? '<span class="badge badge-green">loaded</span>' : '<span class="badge badge-orange">missing</span>'}</td>
+                                        <td>${escapeHtml(row.note)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.9rem;">
+                    <div class="parity-section">
+                        <h3><span class="badge badge-blue">Encoder</span> Vision Runtime Summary</h3>
+                        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:0.8rem;">
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(multimodalOpCount(encoderIr1) ?? '-'))}</div><div class="stat-label">IR1 Ops</div></div>
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(multimodalOpCount(encoderCall) ?? multimodalOpCount(encoderLowered) ?? '-'))}</div><div class="stat-label">Lowered Ops</div></div>
+                            <div class="stat-card"><div class="stat-value">${encoderTotalBytes ? escapeHtml(formatBytes(encoderTotalBytes)) : '-'}</div><div class="stat-label">Arena Size</div></div>
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(encoderReport.embed_dim ?? '-'))}</div><div class="stat-label">Output Dim</div></div>
+                        </div>
+                        <table>
+                            <tbody>
+                                <tr><th>Runtime Root</th><td>${bridge.encoder_runtime && bridge.encoder_runtime.workdir ? escapeHtml(String(bridge.encoder_runtime.workdir)) : '-'}</td></tr>
+                                <tr><th>mmproj GGUF</th><td>${bridge.encoder_runtime && bridge.encoder_runtime.gguf ? escapeHtml(String(bridge.encoder_runtime.gguf)) : '-'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="parity-section">
+                        <h3><span class="badge badge-orange">Decoder</span> Bridge-Aware Prefill Summary</h3>
+                        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:0.8rem;">
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(multimodalOpCount(decoderIr1) ?? '-'))}</div><div class="stat-label">IR1 Ops</div></div>
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(multimodalOpCount(decoderPrefill) ?? '-'))}</div><div class="stat-label">Lowered Ops</div></div>
+                            <div class="stat-card"><div class="stat-value">${decoderTotalBytes ? escapeHtml(formatBytes(decoderTotalBytes)) : '-'}</div><div class="stat-label">Arena Size</div></div>
+                            <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.decoder_context_len ?? '-'))}</div><div class="stat-label">Context Len</div></div>
+                        </div>
+                        <table>
+                            <tbody>
+                                <tr><th>Runtime Root</th><td>${bridge.decoder_runtime && bridge.decoder_runtime.workdir ? escapeHtml(String(bridge.decoder_runtime.workdir)) : '-'}</td></tr>
+                                <tr><th>Decoder GGUF</th><td>${bridge.decoder_runtime && bridge.decoder_runtime.gguf ? escapeHtml(String(bridge.decoder_runtime.gguf)) : '-'}</td></tr>
+                                <tr><th>SO Path</th><td>${bridge.decoder_runtime && bridge.decoder_runtime.so_path ? escapeHtml(String(bridge.decoder_runtime.so_path)) : '-'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                ${notes.length > 0 ? `
+                    <div class="parity-section">
+                        <h3><span class="badge badge-green">Notes</span> Bridge Runtime Notes</h3>
+                        <ul style="margin-left:1.1rem;color:var(--text-secondary);">
+                            ${notes.map((note) => `<li style="margin:0.35rem 0;">${escapeHtml(String(note))}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+        }
+
 
 function getTrainingBackwardList() {
     if (Array.isArray(ir2TrainData?.backward)) return ir2TrainData.backward;
@@ -7481,8 +7701,8 @@ function gradAccumulateExplanation(op, compact = false) {
     const role = String(op?.role || '').toLowerCase();
     if (role === 'activation') {
         return compact
-            ? 'backprop dL/dx flow; explicit in v7 IR (optimizable later).'
-            : 'Activation grad_accumulate is backprop gradient flow (dL/dx), including residual/skip fan-in. Single-writer cases may be optimizable; v7 keeps this explicit today.';
+            ? 'backprop dL/dx flow; explicit in the current IR (optimizable later).'
+            : 'Activation grad_accumulate is backprop gradient flow (dL/dx), including residual/skip fan-in. Single-writer cases may be optimizable; the current IR keeps this explicit today.';
     }
     if (role === 'weight') {
         return compact
@@ -8267,7 +8487,7 @@ function renderTraining() {
             <div class="parity-section" style="margin-top:0.8rem;">
                 <h3><span class="badge badge-orange">Ledger</span> Regression Knowledge Base</h3>
                 <div style="color:var(--text-muted);">
-                    No regression ledger loaded. Expected <code>regression_ledger.json</code> or <code>version/v7/reports/REGRESSION_LEDGER.json</code>.
+                    No regression ledger loaded. Expected <code>regression_ledger.json</code> or <code>version/v8/reports/REGRESSION_LEDGER.json</code>.
                 </div>
             </div>
         `;
@@ -8681,7 +8901,7 @@ function renderTraining() {
             }
 
             const ops = data.operations || data.ops || [];
-            let code = `// Debug dump code - add to model_v7.c\n\n`;
+            let code = `// Debug dump code - add to the generated model C file\n\n`;
             code += `#include <stdio.h>\n`;
             code += `static void dump_tensor(const char* name, const float* data, int size, int layer) {\n`;
             code += `    char filename[256];\n`;
@@ -10044,10 +10264,10 @@ function renderTraining() {
                         console.log('Auto-loaded: ir2 train');
                     } else if (name.includes('contract_report')) {
                         trainContractData = info.data;
-                        console.log('Auto-loaded: v7 contract report');
+                        console.log('Auto-loaded: v8 contract report');
                     } else if (name.includes('parity_1token')) {
                         trainParity1TokenData = info.data;
-                        console.log('Auto-loaded: v7 parity 1token');
+                        console.log('Auto-loaded: v8 parity 1token');
                     } else if (name.includes('qk_norm_backward_parity')) {
                         trainQkNormParityData = info.data;
                         console.log('Auto-loaded: qk norm backward parity');
@@ -11619,8 +11839,8 @@ function renderProfileHowTo() {
     const runModel = reportModelDir;
     const chatTemplate = hint.chatTemplate;
     const chatRunArg = chatTemplate !== 'auto' ? ` --chat-template ${chatTemplate}` : '';
-    const makeChatArg = chatTemplate !== 'auto' ? ` V7_CHAT_TEMPLATE=${chatTemplate}` : '';
-    const makeCliArg = chatTemplate === 'none' ? ' V7_CLI_ARGS=--no-chat-template' : '';
+    const makeChatArg = chatTemplate !== 'auto' ? ` V8_CHAT_TEMPLATE=${chatTemplate}` : '';
+    const makeCliArg = chatTemplate === 'none' ? ' V8_CLI_ARGS=--no-chat-template' : '';
     const advisorTokenPath = `${reportRunDir}/.ck_profile_tokens_viz.txt`;
 
     const depChips = [
@@ -11745,7 +11965,7 @@ function renderProfileHowTo() {
     const depsCmdLines = Array.isArray(profileToolStatus.install_hints) && profileToolStatus.install_hints.length
         ? profileToolStatus.install_hints
         : [
-            'make v7-doctor',
+            'make v8-doctor',
             '# Install perf, valgrind, and FlameGraph for this host, then retry.',
         ];
     const depsCmd = depsCmdLines.join('\n');
@@ -11757,81 +11977,80 @@ function renderProfileHowTo() {
 
     const profileDecodeCmd = [
         explicitModelDirCmd,
-        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const profilePrefillCmd = [
         explicitModelDirCmd,
-        `make profile-v7-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-prefill V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const profileTimingSweepCmd = [
         explicitModelDirCmd,
-        `make profile-v7-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-prefill V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const perfStatCmd = [
         explicitModelDirCmd,
-        `make profile-v7-perf-stat V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-perf-stat V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const flamegraphCmd = [
         explicitModelDirCmd,
-        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const flamegraphPrefillCmd = [
         explicitModelDirCmd,
-        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-prefill V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const flamegraphBothCmd = [
         explicitModelDirCmd,
-        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-prefill V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const flamegraphRecoverCmd = [
         explicitModelDirCmd,
         '# If perf is blocked, enable perf sampling permissions first:',
         'sudo sysctl -w kernel.perf_event_paranoid=1 kernel.kptr_restrict=0',
-        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-flamegraph-prefill V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-prefill V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
     const cachegrindCmd = [
         explicitModelDirCmd,
-        `make profile-v7-cachegrind V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-cachegrind V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const perfGateEvalCmd = [
         explicitModelDirCmd,
-        'make v7-perf-gate-evaluate V7_MODEL="$REPORT_MODEL_DIR"',
+        'make v8-perf-gate-evaluate V8_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
     const fullPerfCmd = [
         explicitModelDirCmd,
-        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-perf-stat V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-flamegraph-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        `make profile-v7-cachegrind V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
-        'make v7-perf-gate-evaluate V7_MODEL="$REPORT_MODEL_DIR"',
+        `make profile-v8-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-perf-stat V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-flamegraph-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-cachegrind V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        'make v8-perf-gate-evaluate V8_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
     const quickArtifactCmd = [
         explicitModelDirCmd,
-        'make v7-init',
-        'make v7-capture-artifacts V7_MODEL="$REPORT_MODEL_DIR"',
+        'make v8-init',
+        'make v8-capture-artifacts V8_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
     const quickProfileDashboardCmd = [
         explicitModelDirCmd,
-        'make v7-init',
-        'make v7-profile-dashboard V7_MODEL="$REPORT_MODEL_DIR"',
+        'make v8-init',
+        'make v8-profile-dashboard V8_MODEL="$REPORT_MODEL_DIR"',
     ].join('\n');
 
     const profileDecodeForceCompileCmd = [
         explicitModelDirCmd,
-        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=1 V7_FORCE_COMPILE=1${makeChatArg}${makeCliArg}`,
+        `make profile-v8-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=1 V8_FORCE_COMPILE=1${makeChatArg}${makeCliArg}`,
     ].join('\n');
     const profileCompileCheckCmd = [
         explicitModelDirCmd,
-        'PROFILE_C_PATH="$REPORT_MODEL_DIR/model_v7.c"',
-        'if [ -f "$REPORT_MODEL_DIR/.ck_build/model_v7.c" ]; then PROFILE_C_PATH="$REPORT_MODEL_DIR/.ck_build/model_v7.c"; fi',
-        'echo "profile_c_path=$PROFILE_C_PATH"',
-        'rg -n "CK_PROFILE" "$PROFILE_C_PATH" || true',
-        '# If output is empty, generated model_v7.c has zero CK_PROFILE sections and decode CSV cannot be emitted.',
-        `make profile-v7-decode V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=1 V7_FORCE_COMPILE=1${makeChatArg}${makeCliArg}`,
+        'PROFILE_C_PATH="$(find "$REPORT_MODEL_DIR" -maxdepth 2 -type f -name "model*.c" | head -n 1)"',
+        'echo "profile_c_path=${PROFILE_C_PATH:-<missing>}"',
+        'if [ -n "$PROFILE_C_PATH" ]; then rg -n "CK_PROFILE" "$PROFILE_C_PATH" || true; fi',
+        '# If output is empty, the generated model C file has zero CK_PROFILE sections and decode CSV cannot be emitted.',
+        `make profile-v8-decode V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=1 V8_FORCE_COMPILE=1${makeChatArg}${makeCliArg}`,
         'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
     const oneShotCmd = [
@@ -11848,20 +12067,20 @@ function renderProfileHowTo() {
 
     const vtuneCmd = [
         explicitModelDirCmd,
-        `make profile-v7-vtune V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0 V7_WITH_VTUNE=1 V7_VTUNE_DEEP=1${makeChatArg}${makeCliArg}`,
+        `make profile-v8-vtune V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0 V8_WITH_VTUNE=1 V8_VTUNE_DEEP=1${makeChatArg}${makeCliArg}`,
         'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
 
     const advisorCmd = [
         explicitModelDirCmd,
-        `make profile-v7-advisor V7_MODEL="$REPORT_MODEL_DIR" V7_PERF_RUNTIME=cli V7_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
+        `make profile-v8-advisor V8_MODEL="$REPORT_MODEL_DIR" V8_PERF_RUNTIME=cli V8_PREP_WITH_PYTHON=0${makeChatArg}${makeCliArg}`,
         'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
 
     const cachegrindNativeCmd = [
         explicitModelDirCmd,
-        `make profile-v7-cachegrind V7_MODEL="$REPORT_MODEL_DIR"${makeChatArg}${makeCliArg}`,
-        'python3 version/v7/scripts/cachegrind_artifacts_v7.py --model-dir "$REPORT_MODEL_DIR" --out-dir "$REPORT_MODEL_DIR" --cachegrind-out build/cachegrind_v7.out --annotate build/cachegrind_v7_annotated.txt',
+        `make profile-v8-cachegrind V8_MODEL="$REPORT_MODEL_DIR"${makeChatArg}${makeCliArg}`,
+        'python3 version/v8/scripts/cachegrind_artifacts_v8.py --model-dir "$REPORT_MODEL_DIR" --out-dir "$REPORT_MODEL_DIR" --cachegrind-out build/cachegrind_v8.out --annotate build/cachegrind_v8_annotated.txt',
         'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run "$REPORT_MODEL_DIR" --html-only --output "$REPORT_MODEL_DIR/ir_report.html"',
     ].join('\n');
 
@@ -11884,8 +12103,8 @@ function renderProfileHowTo() {
         "p.write_text(' '.join(str(i % 1024) for i in range(8192)))",
         "print(p)",
         "PY",
-        "  make --no-print-directory ck-cli-v7",
-        `  CK_NUM_THREADS=8 ./build/ck-cli-v7 profile --run ${quoteShell(reportRunDir)} --tool asan --train-token-file ${quoteShell(advisorTokenPath)} --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 --threads 8`,
+        "  make --no-print-directory ck-cli-v8",
+        `  CK_NUM_THREADS=8 ./build/ck-cli-v8 profile --run ${quoteShell(reportRunDir)} --tool asan --train-token-file ${quoteShell(advisorTokenPath)} --train-epochs 1 --train-seq-len 8 --train-total-tokens 2048 --train-grad-accum 8 --threads 8`,
         `  python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${quoteShell(reportRunDir)} --html-only --output ${quoteShell(reportHtmlPath)}`,
         'fi',
     ].join('\n');
@@ -11894,7 +12113,7 @@ function renderProfileHowTo() {
 
     const artifactHelp = {
         'profile_summary.json': {
-            why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown). If model_v7.c has zero CK_PROFILE sections, regenerate decode or prefill with CK_PROFILE enabled first.',
+            why: 'Core per-kernel timing JSON for Profile charts (decode/prefill op and layer breakdown). If the generated model C file has zero CK_PROFILE sections, regenerate decode or prefill with CK_PROFILE enabled first.',
             cmd: profileCompileCheckCmd,
         },
         'perf_stat_summary.json': {
@@ -12076,7 +12295,7 @@ function renderProfileHowTo() {
                         ${renderHowToBlock(
                             'Runtime + Report + Hub',
                             quickArtifactCmd,
-                            'Creates the local v7 environment if needed, refreshes this run directory, regenerates ir_report.html, and updates the parent Run Hub.'
+                            'Creates the local v8 environment if needed, refreshes this run directory, regenerates ir_report.html, and updates the parent Run Hub.'
                         )}
                         ${renderHowToBlock(
                             'Full Profiling Dashboard',
@@ -12144,10 +12363,10 @@ function renderProfileHowTo() {
                         <strong>Cachegrind</strong> for precise cache-miss attribution. The one-liner below runs the decode-focused full stack.
                     </p>
                     <p class="profile-phase-desc" style="margin-top:-0.25rem;">
-                        <strong>Scope:</strong> <code>profile-v7-prefill</code> gives prefill timing coverage. Current
-                        <code>profile-v7-perf-stat</code>, <code>profile-v7-vtune</code>, and <code>profile-v7-advisor</code>
+                        <strong>Scope:</strong> <code>profile-v8-prefill</code> gives prefill timing coverage. Current
+                        <code>profile-v8-perf-stat</code>, <code>profile-v8-vtune</code>, and <code>profile-v8-advisor</code>
                         targets are decode-path captures, while flamegraph has explicit
-                        <code>profile-v7-flamegraph-decode</code> and <code>profile-v7-flamegraph-prefill</code> modes.
+                        <code>profile-v8-flamegraph-decode</code> and <code>profile-v8-flamegraph-prefill</code> modes.
                     </p>
                     <div class="profile-howto-grid">
                         ${renderHowToBlock(
@@ -12250,12 +12469,12 @@ function renderProfileHowTo() {
                         ${renderHowToBlock(
                             'One-Shot Full Report',
                             quickProfileDashboardCmd,
-                            'Preferred one-command operator path. Creates the v7 environment if needed, runs profiling targets, and refreshes the report and Run Hub for this run directory.'
+                            'Preferred one-command operator path. Creates the v8 environment if needed, runs profiling targets, and refreshes the report and Run Hub for this run directory.'
                         )}
                         ${renderHowToBlock(
                             'Force Rebuild (if profile_decode.csv missing)',
                             profileCompileCheckCmd,
-                            'Checks whether model_v7.c has CK_PROFILE instrumentation. If not, forces a recompile with profiling enabled and regenerates the decode CSV + report.'
+                            'Checks whether the generated model C file has CK_PROFILE instrumentation. If not, forces a recompile with profiling enabled and regenerates the decode CSV + report.'
                         )}
                         ${renderHowToBlock(
                             'Override Source Model (optional)',
@@ -12265,7 +12484,7 @@ function renderProfileHowTo() {
                         ${renderHowToBlock(
                             'Force Compile + Decode (fresh)',
                             profileDecodeForceCompileCmd,
-                            'Forces a full recompile of model_v7.c with CK_PROFILE enabled, then immediately runs a profiled decode pass. Use when the existing binary is stale.'
+                            'Forces a full recompile of the generated model C file with CK_PROFILE enabled, then immediately runs a profiled decode pass. Use when the existing binary is stale.'
                         )}
                     </div>
                 </div>
@@ -13040,7 +13259,7 @@ function renderProfileHowTo() {
             // ── What to do next (Engineering Compass) ──
             const nextSteps = [];
             if (constraint === 'memory-bound') {
-                nextSteps.push({ icon: '🔬', text: 'Run <code>make profile-v7-cachegrind</code> to see per-function cache miss attribution' });
+                nextSteps.push({ icon: '🔬', text: 'Run <code>make profile-v8-cachegrind</code> to see per-function cache miss attribution' });
                 nextSteps.push({ icon: '📐', text: 'Check weight quantization: Q4_K and Q5_K reduce bytes/weight by 4-8x vs FP32' });
                 nextSteps.push({ icon: '🧊', text: 'Review cache blocking in GEMV kernels — are you fitting a row tile in L1/L2?' });
                 nextSteps.push({ icon: '⚡', text: 'Add <code>__builtin_prefetch</code> hints for next-block weight loads' });
@@ -13051,14 +13270,14 @@ function renderProfileHowTo() {
                 nextSteps.push({ icon: '💎', text: 'Consider AMX (BF16/INT8 matrix engine) on Sapphire Rapids and newer' });
             } else if (constraint === 'balanced') {
                 nextSteps.push({ icon: '🎯', text: 'Profile individual kernels with VTune to classify each as memory- or compute-bound' });
-                nextSteps.push({ icon: '📊', text: 'Run <code>make profile-v7-advisor</code> then open the interactive roofline HTML' });
+                nextSteps.push({ icon: '📊', text: 'Run <code>make profile-v8-advisor</code> then open the interactive roofline HTML' });
                 nextSteps.push({ icon: '🔄', text: 'Alternate strategy: reduce memory BW for some kernels, increase SIMD width for others' });
             }
             if (!hasAdvisor) {
-                nextSteps.push({ icon: '📈', text: 'Run <code>make profile-v7-advisor</code> to get per-loop roofline classification' });
+                nextSteps.push({ icon: '📈', text: 'Run <code>make profile-v8-advisor</code> to get per-loop roofline classification' });
             }
             if (!hasCachegrind) {
-                nextSteps.push({ icon: '🔬', text: 'Run <code>make profile-v7-cachegrind</code> for D1/LL miss attribution per function' });
+                nextSteps.push({ icon: '🔬', text: 'Run <code>make profile-v8-cachegrind</code> for D1/LL miss attribution per function' });
             }
 
             const nextStepsHtml = nextSteps.map(s => `
@@ -13138,7 +13357,7 @@ function renderProfileHowTo() {
             'Total Time (selected mode window)': {
                 what: 'Wall-clock time for all profiled operations within the current mode (prefill or decode) window.',
                 how: 'Sum of individual CK_PROFILE section durations recorded in profile_summary.json. Measured via clock_gettime(CLOCK_MONOTONIC) per op.',
-                who: 'Captured by the C kernel engine runtime (model_v7.c) when compiled with CK_PROFILE=1.',
+                who: 'Captured by the C kernel engine runtime (generated model C file) when compiled with CK_PROFILE=1.',
                 why: 'The total budget you have per forward pass. Lowering this is the primary optimization target.'
             },
             'ms/token (selected window)': {
@@ -13156,20 +13375,20 @@ function renderProfileHowTo() {
             'Unique Operations': {
                 what: 'Count of distinct kernel/operation names seen in the profile (e.g. q_proj, attention, rmsnorm).',
                 how: 'Object.keys(by_op) from profile_summary.json — each unique op name counted once.',
-                who: 'Profile summary generated by profile_artifacts_v7.py from raw CK_PROFILE output.',
+                who: 'Profile summary generated by the profile artifact generator from raw CK_PROFILE output.',
                 why: 'Shows the model\'s computational complexity. Fewer unique ops = simpler to optimize.'
             },
             'Top Hotspots': {
                 what: 'The 3 most time-consuming operations ranked by total wall time.',
                 how: 'by_op entries sorted descending by microseconds. Shows op name + total time in ms.',
-                who: 'Aggregated by profile_artifacts_v7.py across all layers for the selected mode.',
+                who: 'Aggregated by the profile artifact generator across all layers for the selected mode.',
                 why: 'Focus optimization on these first — Amdahl\'s law says the biggest slice yields the biggest speedup.'
             },
             // ── CPU Counters (perf stat) ──
             'Execution Intensity (IPC)': {
                 what: 'Instructions Per Cycle — how many CPU instructions complete per clock cycle on average.',
                 how: 'IPC = instructions_retired / cpu_cycles. Captured by Linux perf stat using hardware PMU counters.',
-                who: 'Collected by "perf stat" during inference. Parsed by perf_stat_artifacts_v7.py into perf_stat_summary.json.',
+                who: 'Collected by "perf stat" during inference. Parsed by the perf-stat artifact generator into perf_stat_summary.json.',
                 why: 'IPC < 1.0 indicates stalls (memory-bound). IPC > 2.0 indicates efficient compute. Modern x86 cores can do ~4-6 IPC peak.'
             },
             'Cache Miss Rate': {
@@ -13187,7 +13406,7 @@ function renderProfileHowTo() {
             'dTLB Miss Rate': {
                 what: 'Combined data-TLB miss rate for load + store accesses.',
                 how: '(dTLB-load-misses + dTLB-store-misses) / (dTLB-loads + dTLB-stores).',
-                who: 'Collected by perf stat dTLB events and normalized by perf_artifacts_v7.py.',
+                who: 'Collected by perf stat dTLB events and normalized by the perf artifact generator.',
                 why: 'High values indicate address-translation pressure and poor locality across pages.'
             },
             'iTLB Misses / kInst': {
@@ -13218,21 +13437,21 @@ function renderProfileHowTo() {
             'Perf Budget Gate': {
                 what: 'Automated pass/fail check comparing measured performance against per-model-family thresholds.',
                 how: 'Each check compares a metric (decode_tok_s, IPC, cache_miss_rate, branch_miss_rate) against a threshold using >=, <=, etc.',
-                who: 'Defined in perf_gate_budgets.json per model family. Evaluated by perf_gate_v7.py.',
+                who: 'Defined in perf_gate_budgets.json per model family. Evaluated by the perf gate evaluator.',
                 why: 'CI/CD guardrail — prevents performance regressions from being merged. FAIL means the build is slower than the budget.'
             },
             // ── Memory ──
             'Memory Sign-off': {
                 what: 'Validates that the model\'s actual memory usage matches the calculated memory map (no leaks, no overflows).',
                 how: 'Compares measured RSS/heap against tensor-by-tensor memory map totals. Checks allocation count and peak usage.',
-                who: 'Generated by memory_signoff_v7.py. Reads memory_map.json + runtime RSS/malloc stats.',
+                who: 'Generated by memory_signoff_v8.py. Reads memory_map.json + runtime RSS/malloc stats.',
                 why: 'Ensures the memory model is accurate — critical for deployment on constrained devices.'
             },
             // ── Cachegrind ──
             'Cachegrind D1 Miss Rate': {
                 what: 'L1 data cache miss rate as measured by Valgrind\'s cachegrind cache simulator.',
                 how: 'D1 misses / D references. Cachegrind simulates a simplified cache hierarchy (I1/D1/LL) instruction-by-instruction.',
-                who: 'Runs the binary under "valgrind --tool=cachegrind". Parsed by cachegrind_artifacts_v7.py.',
+                who: 'Runs the binary under "valgrind --tool=cachegrind". Parsed by cachegrind_artifacts_v8.py.',
                 why: 'More precise than perf stat cache counters. Gives per-function attribution. Higher = worse data locality.'
             },
             'Cachegrind LL Miss Rate': {
@@ -13294,7 +13513,7 @@ function renderProfileHowTo() {
             'ASan Verification': {
                 what: 'AddressSanitizer memory safety check — detects buffer overflows, use-after-free, leaks.',
                 how: 'Runs inference under ASan (compile with -fsanitize=address). Checks for heap/stack/global overflows.',
-                who: 'Generated by asan_artifacts_v7.py. Binary must be compiled with ASAN=1.',
+                who: 'Generated by the ASan artifact generator. Binary must be compiled with ASAN=1.',
                 why: 'Memory bugs cause silent corruption in inference. PASS means no safety violations detected.'
             },
         };
@@ -13960,7 +14179,7 @@ function renderProfileHowTo() {
                 }
                 activeFlame = flameByMode[activeFlameMode] || flamegraphManifestData;
             } else if (selectedProfileMode === 'prefill') {
-                flameModeWarning = 'Prefill flamegraph is not available in this manifest. Re-run profile-v7-flamegraph-prefill and regenerate ir_report.html.';
+                flameModeWarning = 'Prefill flamegraph is not available in this manifest. Re-run profile-v8-flamegraph-prefill and regenerate ir_report.html.';
             }
 
             const flameSvgInline = activeFlame?.svg_inline;
@@ -13993,7 +14212,7 @@ function renderProfileHowTo() {
                     ? `<iframe title="Flamegraph Viewer" style="width:100%;height:420px;border:0;background:#0a0a0a;" srcdoc="${escapeHtml(flameSvgInline)}"></iframe>`
                     : `<object type="image/svg+xml" data="${escapeHtml(flameSvgPath)}" style="width:100%;height:420px;"></object>`;
                 if (flamegraphError) {
-                    const retryTarget = flameModeLabel === 'prefill' ? 'profile-v7-flamegraph-prefill' : 'profile-v7-flamegraph-decode';
+                    const retryTarget = flameModeLabel === 'prefill' ? 'profile-v8-flamegraph-prefill' : 'profile-v8-flamegraph-decode';
                     frame = `
                         <div style="border:1px solid #7a5f1a;border-radius:8px;padding:0.7rem;background:rgba(243,156,18,0.10);color:#f6d48f;font-size:0.84rem;line-height:1.45;">
                             Flamegraph generation failed: <code>flamegraph.pl</code> did not receive valid folded stack input.
@@ -14003,7 +14222,7 @@ function renderProfileHowTo() {
                                 ${flamePerfDataPath ? `, <code>${escapeHtml(String(flamePerfDataPath))}</code>` : ''}
                             </div>
                             <div style="margin-top:0.35rem;color:var(--text-muted);">
-                                Re-run: <code>make ${escapeHtml(retryTarget)} V7_MODEL="&lt;model_dir&gt;" V7_PERF_RUNTIME=cli</code>
+                                Re-run: <code>make ${escapeHtml(retryTarget)} V8_MODEL="&lt;model_dir&gt;" V8_PERF_RUNTIME=cli</code>
                             </div>
                         </div>
                     `;
@@ -14314,7 +14533,7 @@ function renderProfileHowTo() {
             if (!filteredData) {
                 const issue = profileDataIssue ? `<br/><span style="color:#f6d48f;">${escapeHtml(profileDataIssue)}</span>` : '';
                 const src = profileDataSource ? `<br/><span style="color:var(--text-muted);font-size:0.82rem;">source: ${escapeHtml(profileDataSource)}</span>` : '';
-                document.getElementById('profileStats').innerHTML = `<p style="color:var(--text-muted);">No renderable profile timing data loaded. Use the Load Profile button or run <code>make profile-v7-decode ...</code>. If <code>model_v7.c</code> has zero <code>CK_PROFILE</code> sections, rerun with <code>V7_PREP_WITH_PYTHON=1 V7_FORCE_COMPILE=1</code>.${issue}${src}</p>`;
+                document.getElementById('profileStats').innerHTML = `<p style="color:var(--text-muted);">No renderable profile timing data loaded. Use the Load Profile button or run <code>make profile-v8-decode ...</code>. If the generated model C file has zero <code>CK_PROFILE</code> sections, rerun with <code>V8_PREP_WITH_PYTHON=1 V8_FORCE_COMPILE=1</code>.${issue}${src}</p>`;
                 document.getElementById('profileOpChart').innerHTML = '';
                 document.getElementById('profileHeatmap').innerHTML = '';
                 document.getElementById('profileRawTable').innerHTML = '';
@@ -14687,7 +14906,7 @@ function renderProfileHowTo() {
             mistral: { minVocab: 128000, maxVocab: 135000, name: 'Mistral/Llama3',  type: 'bytelevel_bpe', byteBase: 256, mergeCountTypical: '~128K', preTokenizer: 'ByteLevel (SentencePiece)', special: ['<s>','</s>','[INST]'] },
             llama2:  { minVocab: 31000,  maxVocab: 33000,  name: 'Llama2/CodeLlama', type: 'bytelevel_bpe', byteBase: 256, mergeCountTypical: '~32K', preTokenizer: 'SentencePiece BPE', special: ['<s>','</s>','<unk>'] },
             gpt2:    { minVocab: 50000,  maxVocab: 52000,  name: 'GPT-2',           type: 'bytelevel_bpe', byteBase: 256, mergeCountTypical: '~50K', preTokenizer: 'ByteLevel', special: ['<|endoftext|>'] },
-            v7ascii: { minVocab: 0,      maxVocab: 10000,  name: 'v7 ASCII BPE',    type: 'ascii_bpe',     byteBase: 128, mergeCountTypical: '~900', preTokenizer: 'Character-level (ASCII 0-127)', special: ['<pad>','<eos>'] },
+            ascii_bpe_small: { minVocab: 0,      maxVocab: 10000,  name: 'ASCII BPE',    type: 'ascii_bpe',     byteBase: 128, mergeCountTypical: '~900', preTokenizer: 'Character-level (ASCII 0-127)', special: ['<pad>','<eos>'] },
         };
 
         function detectTokenizerType() {
@@ -14733,7 +14952,7 @@ function renderProfileHowTo() {
 
             // Explicit mode wins
             if (explicitMode === 'ascii_bpe') {
-                return { ...TOKENIZER_FAMILIES.v7ascii, vocabSize, tokPath, detected: true, matchKey: 'v7ascii' };
+                return { ...TOKENIZER_FAMILIES.ascii_bpe_small, vocabSize, tokPath, detected: true, matchKey: 'ascii_bpe_small' };
             }
             if (
                 explicitMode === 'sentencepiece' ||
@@ -14749,7 +14968,7 @@ function renderProfileHowTo() {
             if (explicitMode === 'bytelevel_bpe' || explicitMode === 'byte_level') {
                 // Try to match by vocab size for name resolution
                 for (const [k, fam] of Object.entries(TOKENIZER_FAMILIES)) {
-                    if (k === 'v7ascii') continue;
+                    if (k === 'ascii_bpe_small') continue;
                     if (vocabSize >= fam.minVocab && vocabSize <= fam.maxVocab) {
                         return { ...fam, vocabSize, tokPath, detected: true, matchKey: k };
                     }
@@ -14792,7 +15011,7 @@ function renderProfileHowTo() {
                              preTokenizer: 'ByteLevel (inferred)', special: [],
                              vocabSize, tokPath, detected: true, matchKey: 'bytelevel_generic' };
                 }
-                return { ...TOKENIZER_FAMILIES.v7ascii, vocabSize, tokPath, detected: true, matchKey: 'v7ascii' };
+                return { ...TOKENIZER_FAMILIES.ascii_bpe_small, vocabSize, tokPath, detected: true, matchKey: 'ascii_bpe_small' };
             }
 
             // No model loaded
@@ -15846,7 +16065,7 @@ function renderProfileHowTo() {
                         <p style="margin:0 0 0.5rem;">Run the extraction script on your model to get token embedding vectors:</p>
                         <pre style="background:var(--code-bg); padding:0.6rem; border-radius:6px; font-size:0.68rem; overflow-x:auto; margin:0;">
 # Quick extraction (first 200 tokens)
-python3 version/v7/scripts/dump_embeddings_v7.py \\
+python3 version/v8/scripts/dump_embeddings_v8.py \\
   --model-dir build/your_model/ \\
   --max-tokens 200 \\
   --output embedding_dump.json
@@ -16516,7 +16735,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'parity_1token — RMSNorm Forward/Backward', dataKey: 'trainParity1TokenData', subTest: 'RMSNorm Forward/Backward Parity', type: 'inference+training' },
                 ],
                 commands: [
-                    'make v7-parity-1tok',
+                    'make v8-parity-1tok',
                     'cd unittest && python3 test_parity.py -k rmsnorm',
                 ],
             },
@@ -16528,7 +16747,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'parity_1token — SwiGLU Forward/Backward', dataKey: 'trainParity1TokenData', subTest: 'SwiGLU Forward/Backward Parity', type: 'inference+training' },
                 ],
                 commands: [
-                    'make v7-parity-1tok',
+                    'make v8-parity-1tok',
                     'cd unittest && python3 test_parity.py -k swiglu',
                 ],
             },
@@ -16540,7 +16759,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'parity_1token — Cross-Entropy Loss/Grad', dataKey: 'trainParity1TokenData', subTest: 'Cross-Entropy Loss/Gradient Parity', type: 'training' },
                 ],
                 commands: [
-                    'make v7-parity-1tok',
+                    'make v8-parity-1tok',
                     'cd unittest && python3 test_parity.py -k cross_entropy',
                 ],
             },
@@ -16553,8 +16772,8 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'QK Norm ISA Parity', dataKey: 'trainQkNormParityIsaData', subTest: null, type: 'training' },
                 ],
                 commands: [
-                    'make v7-qk-norm-backward-parity',
-                    'cd version/v7/test && python3 trace_divergence.py --stop-at attention_0',
+                    'make v8-qk-norm-backward-parity',
+                    'python3 version/v8/test/trace_divergence.py --model <run_dir> --token 25 --threads 1 --context-len 1024',
                 ],
             },
             {
@@ -16578,7 +16797,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                 ],
                 commands: [
                     'make test-kernel-parity-full',
-                    'make v7-kernel-parity-train',
+                    'make v8-kernel-parity-train',
                     'cd unittest && python3 test_q5_0_parity.py && python3 test_q6k_q8k_parity.py',
                 ],
             },
@@ -16609,7 +16828,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'Autopsy first-divergence report', dataKey: 'inferenceLlamaAutopsyData', subTest: null, type: 'inference' },
                 ],
                 commands: [
-                    'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"',
+                    'version/v8/scripts/cks-v8-run run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"',
                     'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html',
                     'make llamacpp-parity-full',
                 ],
@@ -16627,7 +16846,7 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     'make test-tokenizer',
                     'make test-tokenizer-llama',
                     'make test-tokenizer-spm',
-                    'make test-v7-bpe-train-parity',
+                    'make test-v8-bpe-train-parity',
                 ],
             },
             {
@@ -16640,10 +16859,10 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                     { name: 'Train Parity (3 epochs, SGD)', dataKey: 'trainParityEpoch3SgdData', subTest: null, type: 'training' },
                 ],
                 commands: [
-                    'make v7-train-parity-3',
-                    'make v7-train-parity-5',
-                    'make v7-train-parity-drift-smoke',
-                    'make v7-train-parity-long-horizon',
+                    'make v8-train-parity-3',
+                    'make v8-train-parity-5',
+                    'make v8-train-parity-drift-smoke',
+                    'make v8-train-parity-long-horizon',
                 ],
             },
         ];
@@ -16854,12 +17073,12 @@ json.dump({'tokens':tokens,'dim':emb.shape[1],'source':'pytorch'}, open('embeddi
                 ? `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
                 : 'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
             const runParityCmd = runCtx.runDir
-                ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
-                : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+                ? `version/v8/scripts/cks-v8-run parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+                : 'version/v8/scripts/cks-v8-run parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
             const runSweepCmd = runCtx.runDir
-                ? `python3 version/v7/scripts/ck_run_v7.py train-suite --run ${runDir} --backend ck --epochs-list 1,3,5 --profile-train none`
-                : 'python3 version/v7/scripts/ck_run_v7.py train-suite --run <run_dir> --backend ck --epochs-list 1,3,5 --profile-train none';
-            const globalParityCmd = 'make v7-parity-1tok && make v7-qk-norm-backward-parity && make v7-train-parity-3';
+                ? `version/v8/scripts/cks-v8-run train-suite --run ${runDir} --backend ck --epochs-list 1,3,5 --profile-train none`
+                : 'version/v8/scripts/cks-v8-run train-suite --run <run_dir> --backend ck --epochs-list 1,3,5 --profile-train none';
+            const globalParityCmd = 'make v8-parity-1tok && make v8-qk-norm-backward-parity && make v8-train-parity-3';
             const globalRefreshCmd = runCtx.runDir
                 ? `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runDir} --html-only --no-strict-run-artifacts --output ${runDir}/ir_report.html`
                 : 'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run <run_dir> --html-only --no-strict-run-artifacts --output <run_dir>/ir_report.html';
@@ -16870,8 +17089,8 @@ GGUF_LOCAL="$(find "$REPORT_MODEL_DIR" -maxdepth 1 -type f -name '*.gguf' | head
 if [ -z "$GGUF_LOCAL" ]; then
   GGUF_LOCAL=${modelPathQ || '"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"'};
 fi
-python3 version/v7/scripts/ck_run_v7.py run "$GGUF_LOCAL" --run "$REPORT_MODEL_DIR" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"`
-                : 'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
+version/v8/scripts/cks-v8-run run "$GGUF_LOCAL" --run "$REPORT_MODEL_DIR" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"`
+                : 'version/v8/scripts/cks-v8-run run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
             const inferenceKernelParityCmd = 'make llamacpp-parity-full';
             const hasInferenceParityData = Boolean(
                 inferenceLlamaParityData ||
@@ -17026,8 +17245,8 @@ ${globalRefreshCmd}</pre>
                 ? `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
                 : 'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
             const inferenceParityCmd = runCtx.runDir
-                ? `REPORT_MODEL_DIR=${runDir}; GGUF_LOCAL=\"$(find \"$REPORT_MODEL_DIR\" -maxdepth 1 -type f -name \"*.gguf\" | head -n 1)\"; if [ -z \"$GGUF_LOCAL\" ]; then GGUF_LOCAL=${modelPathQ || '"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"'}; fi; python3 version/v7/scripts/ck_run_v7.py run \"$GGUF_LOCAL\" --run \"$REPORT_MODEL_DIR\" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt \"Hello\"`
-                : 'python3 version/v7/scripts/ck_run_v7.py run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
+                ? `REPORT_MODEL_DIR=${runDir}; GGUF_LOCAL=\"$(find \"$REPORT_MODEL_DIR\" -maxdepth 1 -type f -name \"*.gguf\" | head -n 1)\"; if [ -z \"$GGUF_LOCAL\" ]; then GGUF_LOCAL=${modelPathQ || '"hf://Qwen/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf"'}; fi; version/v8/scripts/cks-v8-run run \"$GGUF_LOCAL\" --run \"$REPORT_MODEL_DIR\" --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt \"Hello\"`
+                : 'version/v8/scripts/cks-v8-run run <hf_or_local_gguf> --run <run_dir> --context-len 1024 --max-tokens 8 --force-compile --detailed-llamacpp-parity --prompt "Hello"';
             const inferenceKernelParityCmd = 'make llamacpp-parity-full';
 
             let html = `
@@ -17074,16 +17293,16 @@ ${globalRefreshCmd}</pre>
     </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
-    <!-- CK_V7_MODULE_BUNDLE_START -->
+    <!-- CK_V8_MODULE_BUNDLE_START -->
 <script type="module">
 /* GENERATED FILE: do not edit by hand.
- * Source modules in version/v7/tools/src/
+ * Source modules in the bundled training extension source tree.
  * Built by build_ir_visualizer_bundle.sh
  */
 (() => {
 
 /* ===== utils.js ===== */
-// Shared helpers for v7 IR visualizer training extensions.
+// Shared helpers for the bundled training extensions.
 
 function getEmbeddedFiles() {
     const embedded = window.EMBEDDED_IR_DATA;
@@ -18033,8 +18252,8 @@ function renderTrainingDashboard(files) {
         ? `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runCtx.runDir} --html-only`
         : 'python3 version/v8/tools/open_ir_visualizer_v8.py --generate <model> --html-only';
     const suiteCmd = runCtx.runDir
-        ? `version/v7/scripts/cks-v7-run train-suite --run ${runCtx.runDir} --profile-train perf --profile-epoch 3`
-        : 'version/v7/scripts/cks-v7-run train-suite --run ./version/v7/runs/exp1 --profile-train perf --profile-epoch 3';
+        ? `version/v8/scripts/cks-v8-run train-suite --run ${runCtx.runDir} --profile-train perf --profile-epoch 3`
+        : 'version/v8/scripts/cks-v8-run train-suite --run ./version/v8/runs/exp1 --profile-train perf --profile-epoch 3';
 
     if (lossSteps.length === 0) {
         root.innerHTML = `
@@ -18174,7 +18393,7 @@ function renderTrainingDashboard(files) {
     const sweepEl = document.getElementById('trainSweepTable');
     if (!sweepEl) return;
     if (!Array.isArray(sweepRows) || sweepRows.length === 0) {
-        sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>ck_run_v7.py train-suite</code>.</div>';
+        sweepEl.innerHTML = '<div style="color:var(--text-muted);">No training_epoch_sweep_latest.json loaded yet. Run <code>version/v8/scripts/cks-v8-run train-suite</code>.</div>';
         renderTrainingDataPipelineSection(document.getElementById('trainDataPipelineSection'), pipeline, dataLab, postEval, lossSteps);
         return;
     }
@@ -18351,8 +18570,8 @@ function renderParityPanel(files) {
         const runCtx = getRunContext();
         const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
         const parityCmd = runCtx.runDir
-            ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
-            : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+            ? `version/v8/scripts/cks-v8-run parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+            : 'version/v8/scripts/cks-v8-run parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
         root.innerHTML = `
             <div class="parity-section">
                 <h3><span class="badge badge-blue">CK-Only Mode</span> No PyTorch Reference Available</h3>
@@ -18371,8 +18590,8 @@ function renderParityPanel(files) {
         const runCtx = getRunContext();
         const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
         const parityCmd = runCtx.runDir
-            ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
-            : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+            ? `version/v8/scripts/cks-v8-run parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+            : 'version/v8/scripts/cks-v8-run parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
         const reportCmd = runCtx.runDir
             ? `python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runDir} --html-only --strict-run-artifacts --output ${runDir}/ir_report.html`
             : 'python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run <run_dir> --html-only --strict-run-artifacts --output <run_dir>/ir_report.html';
@@ -18485,20 +18704,20 @@ function buildDataPrepDiagnosisSection(files, pipeline) {
         : null;
     const datasetType = String((matrix && matrix.dataset_type) || 'unknown').trim().toLowerCase() || 'unknown';
     const provenanceAuditCmd = runDir
-        ? `python3 version/v7/scripts/audit_train_token_provenance_v7.py --run ${quoteShell(runDir)} --preview-lines 2`
-        : 'python3 version/v7/scripts/audit_train_token_provenance_v7.py --run <run_dir> --preview-lines 2';
+        ? `python3 version/v8/scripts/audit_train_token_provenance_v8.py --run ${quoteShell(runDir)} --preview-lines 2`
+        : 'python3 version/v8/scripts/audit_train_token_provenance_v8.py --run <run_dir> --preview-lines 2';
     const evalCmd = runDir
-        ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runDir)} --all-stages --n-samples 5`
-        : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
+        ? `python3 version/v8/scripts/eval_stage_v8.py --run ${quoteShell(runDir)} --all-stages --n-samples 5`
+        : 'python3 version/v8/scripts/eval_stage_v8.py --run <run_dir> --all-stages --n-samples 5';
     const probeReportPath = runDir ? `${runDir}/probe_report.html` : '<run_dir>/probe_report.html';
     const probeReportCmd = runDir
-        ? `python3 version/v7/scripts/build_probe_report_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(probeReportPath)}`
-        : 'python3 version/v7/scripts/build_probe_report_v7.py --run <run_dir> --output <run_dir>/probe_report.html';
+        ? `python3 version/v8/scripts/build_probe_report_v8.py --run ${quoteShell(runDir)} --output ${quoteShell(probeReportPath)}`
+        : 'python3 version/v8/scripts/build_probe_report_v8.py --run <run_dir> --output <run_dir>/probe_report.html';
     const probeReportHref = runDir ? encodeURI(`file://${probeReportPath}`) : '';
     const reportCardPath = runDir ? `${runDir}/svg_training_report_card.html` : '<run_dir>/svg_training_report_card.html';
     const reportCardCmd = runDir
-        ? `python3 version/v7/scripts/build_svg_training_report_card_v7.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
-        : 'python3 version/v7/scripts/build_svg_training_report_card_v7.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
+        ? `python3 version/v8/scripts/build_svg_training_report_card_v8.py --run ${quoteShell(runDir)} --output ${quoteShell(reportCardPath)}`
+        : 'python3 version/v8/scripts/build_svg_training_report_card_v8.py --run <run_dir> --output <run_dir>/svg_training_report_card.html';
     const reportHref = runDir ? encodeURI(`file://${reportCardPath}`) : '';
     const diagnosisCards = [];
     diagnosisCards.push({
@@ -18661,11 +18880,11 @@ function buildDataLabParitySection(files) {
     const runCtx = getRunContext();
     const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
     const parityCmd = runCtx.runDir
-        ? `python3 version/v7/scripts/ck_run_v7.py parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
-        : 'python3 version/v7/scripts/ck_run_v7.py parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
+        ? `version/v8/scripts/cks-v8-run parity --run ${runDir} --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final`
+        : 'version/v8/scripts/cks-v8-run parity --run <run_dir> --backend ck --parity-on --train-epochs 1 --train-seq-len 8 --train-total-tokens 512 --train-grad-accum 8 --no-train-save-final';
     const regimenCmd = runCtx.runDir
-        ? `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
-        : 'python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
+        ? `python3 version/v8/scripts/run_training_parity_regimen_v8.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
+        : 'python3 version/v8/scripts/run_training_parity_regimen_v8.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
     const rows = parseParityRows(files.training_parity);
     const trainE2E = files.train_e2e && typeof files.train_e2e === 'object' ? files.train_e2e : {};
     const e2e = trainE2EState(trainE2E);
@@ -18761,7 +18980,7 @@ function buildDataLabParitySection(files) {
             <div style="margin-top:0.5rem;font-size:0.73rem;color:#9ca3af;line-height:1.55;">${htmlEscape(parityWhy)}</div>
             ${regimenStages.length === 0 ? `
                 <div style="margin-top:0.6rem;background:rgba(59,130,246,0.08);border:1px solid rgba(96,165,250,0.35);border-radius:6px;padding:0.55rem 0.75rem;font-size:0.73rem;color:#cbd5e1;line-height:1.6;">
-                    A/B/C/D/E/F parity is missing for this run. <code>eval_stage_v7.py</code> does not create the parity regimen report. Run:
+                    A/B/C/D/E/F parity is missing for this run. <code>eval_stage_v8.py</code> does not create the parity regimen report. Run:
                     <pre style="font-size:0.74rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(regimenCmd)}</pre>
                 </div>
             ` : ''}
@@ -18777,8 +18996,8 @@ function buildDataLabReadinessSection(files) {
     const runCtx = getRunContext();
     const runDir = runCtx.runDir ? quoteShell(runCtx.runDir) : '<run_dir>';
     const regimenCmd = runCtx.runDir
-        ? `python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
-        : 'python3 version/v7/scripts/run_training_parity_regimen_v7.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
+        ? `python3 version/v8/scripts/run_training_parity_regimen_v8.py --run-dir ${runDir} --json-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.json`)} --md-out ${quoteShell(`${runCtx.runDir}/training_parity_regimen_latest.md`)}`
+        : 'python3 version/v8/scripts/run_training_parity_regimen_v8.py --run-dir <run_dir> --json-out <run_dir>/training_parity_regimen_latest.json --md-out <run_dir>/training_parity_regimen_latest.md';
     const regimen = files.training_parity_regimen && typeof files.training_parity_regimen === 'object'
         ? files.training_parity_regimen
         : {};
@@ -18911,7 +19130,7 @@ function buildDataLabReadinessSection(files) {
             </div>
             ${regimenStages.length === 0 ? `
                 <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(96,165,250,0.35);border-radius:6px;padding:0.55rem 0.75rem;margin-bottom:0.75rem;font-size:0.73rem;color:#cbd5e1;line-height:1.6;">
-                    A/B/C/D/E/F readiness does <strong>not</strong> come from <code>eval_stage_v7.py</code>. Generate <code>training_parity_regimen_latest.json</code> for this run, then regenerate <code>ir_report.html</code>.
+                    A/B/C/D/E/F readiness does <strong>not</strong> come from <code>eval_stage_v8.py</code>. Generate <code>training_parity_regimen_latest.json</code> for this run, then regenerate <code>ir_report.html</code>.
                     <pre style="font-size:0.74rem;white-space:pre-wrap;margin-top:0.45rem;">${htmlEscape(regimenCmd)}</pre>
                 </div>
             ` : ''}
@@ -18934,8 +19153,8 @@ function buildDataLabEvalSummarySection(files, pipeline) {
     if (!matrix || !Array.isArray(matrix.entries) || matrix.entries.length === 0) {
         const runCtx = getRunContext();
         const evalCmd = runCtx.runDir
-            ? `python3 version/v7/scripts/eval_stage_v7.py --run ${quoteShell(runCtx.runDir)} --all-stages --n-samples 5`
-            : 'python3 version/v7/scripts/eval_stage_v7.py --run <run_dir> --all-stages --n-samples 5';
+            ? `python3 version/v8/scripts/eval_stage_v8.py --run ${quoteShell(runCtx.runDir)} --all-stages --n-samples 5`
+            : 'python3 version/v8/scripts/eval_stage_v8.py --run <run_dir> --all-stages --n-samples 5';
         return `
             <div class="parity-section" style="margin-top:0.8rem;">
                 <h3><span class="badge badge-green">Eval Matrix</span> Missing stage_eval_matrix.json</h3>
@@ -21187,7 +21406,7 @@ function renderGradientFlow(files) {
                 <div style="color:var(--text-muted);margin-bottom:0.45rem;">
                     Missing artifact: <code>analysis_checkpoint_step_*.json</code>. These files drive Gradient Flow, Weights &amp; Activations, and Attention Inspector tabs.
                 </div>
-                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">version/v8/scripts/cks-v8-run train --run ${runRef} --analysis-checkpoints log
 python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runRef} --html-only</pre>
             </div>
         `;
@@ -21353,7 +21572,7 @@ function renderWeightActivation(files) {
                 <div style="color:var(--text-muted);margin-bottom:0.45rem;">
                     Missing artifact: <code>analysis_checkpoint_step_*.json</code>. This tab requires sampled weights/activations/gradients saved during training.
                 </div>
-                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">version/v8/scripts/cks-v8-run train --run ${runRef} --analysis-checkpoints log
 python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runRef} --html-only</pre>
             </div>
         `;
@@ -21643,7 +21862,7 @@ function renderAttentionInspector(files) {
                 <div style="color:var(--text-muted);margin-bottom:0.45rem;">
                     Missing artifact: <code>analysis_checkpoint_step_*.json</code> with attention blocks per step/head.
                 </div>
-                <pre style="font-size:0.76rem;white-space:pre-wrap;">python3 version/v7/scripts/ck_run_v7.py train --run ${runRef} --analysis-checkpoints log
+                <pre style="font-size:0.76rem;white-space:pre-wrap;">version/v8/scripts/cks-v8-run train --run ${runRef} --analysis-checkpoints log
 python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runRef} --html-only</pre>
             </div>
         `;
@@ -22134,7 +22353,7 @@ function renderTrainingMemoryDiag(files) {
     const embedded = window.EMBEDDED_IR_DATA || {};
     const runDir = embedded && embedded.meta && typeof embedded.meta.run_dir === "string" && embedded.meta.run_dir.trim()
         ? embedded.meta.run_dir.trim()
-        : "/tmp/v7_exp1";
+        : "/tmp/v8_exp1";
 
     const hasAny = Object.keys(memoryDiag).length > 0 || Object.keys(runtimeSummary).length > 0 || Object.keys(layoutAudit).length > 0;
     if (!hasAny) {
@@ -22142,7 +22361,7 @@ function renderTrainingMemoryDiag(files) {
             <div class="parity-section">
                 <h3><span class="badge badge-orange">No Memory Diagnostics</span> Missing training memory artifacts</h3>
                 <p style="color:var(--text-muted);">Run strict CK training once to emit canary diagnostics and runtime memory summary.</p>
-                <pre style="font-size:0.8rem;white-space:pre-wrap;">version/v7/scripts/cks-v7-run train --run ${runDir} --backend ck --train-strict --prompt "hello" --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 4</pre>
+                <pre style="font-size:0.8rem;white-space:pre-wrap;">version/v8/scripts/cks-v8-run train --run ${runDir} --backend ck --train-strict --prompt "hello" --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 4</pre>
             </div>`;
         return;
     }
@@ -22203,7 +22422,7 @@ function renderTrainingMemoryDiag(files) {
 
         <div class="parity-section" style="margin-top:0.8rem;">
             <h3><span class="badge badge-green">Runbook</span> Re-run Strict Memory Checks</h3>
-            <pre style="font-size:0.8rem;white-space:pre-wrap;">version/v7/scripts/cks-v7-run train --run ${runDir} --backend ck --train-strict --prompt "hello" --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 4</pre>
+            <pre style="font-size:0.8rem;white-space:pre-wrap;">version/v8/scripts/cks-v8-run train --run ${runDir} --backend ck --train-strict --prompt "hello" --train-epochs 1 --train-seq-len 8 --train-total-tokens 64 --train-grad-accum 4</pre>
             <pre style="font-size:0.8rem;white-space:pre-wrap;">python3 version/v8/tools/open_ir_visualizer_v8.py --generate --run ${runDir} --html-only</pre>
         </div>
     `;
@@ -22307,9 +22526,9 @@ function detectTrainingModeAvailable() {
 }
 
 function injectStyles() {
-    if (document.getElementById('ck-v7-train-style')) return;
+    if (document.getElementById('ck-v8-train-style')) return;
     const style = document.createElement('style');
-    style.id = 'ck-v7-train-style';
+    style.id = 'ck-v8-train-style';
     style.textContent = `
         :root {
             --train-fwd: #3b82f6;
@@ -22614,14 +22833,14 @@ function trainingTabIds() {
 
 /* ===== memory_explorer.js ===== */
 /**
- * Memory Explorer — v7 BUMP allocator grid visualization
+ * Memory Explorer — BUMP allocator grid visualization
  *
  * Renders the BUMP allocator's arena as a grid of colored squares
  * (1 square = 1 cache line = 64 bytes by default).
  *
- * Handles both v7 data formats:
+ * Handles both supported data formats:
  *
- * 1) Training (layout-train-v7):
+ * 1) Training (layout-train*):
  *    regions[]:  { name, offset, bytes, count }
  *    tensors[]:  { id, dtype, numel, bytes, kind, persistent, requires_grad,
  *                  region, shape, producer, bump_offset, bump_size, offset, end }
@@ -22652,7 +22871,7 @@ const ME_ZOOM_LEVELS = [
     { label: 'Overview (64KB)',   bytesPerCell: 65536, cellPx: 6  },
 ];
 
-/* Region colour palette — matches v7 region names */
+/* Region colour palette — matches the runtime region names */
 const ME_REGION_COLORS = {
     params:            { bg: '#2a5599', border: '#4a90d9' },
     grads:             { bg: '#993333', border: '#e74c3c' },
@@ -22666,7 +22885,7 @@ const ME_REGION_COLORS = {
     kv_cache:          { bg: '#5a2a7a', border: '#9b59b6' },
     logits:            { bg: '#365d8a', border: '#76a5e8' },
     io:                { bg: '#6b5f2a', border: '#c8b46b' },
-    /* v7 inference layout uses role names rather than region names */
+    /* Inference layout uses role names rather than region names */
     weight:            { bg: '#2a5599', border: '#4a90d9' },
     activation:        { bg: '#1a7a3a', border: '#2ecc71' },
     gap:               { bg: '#111',    border: '#222'    },
@@ -22718,7 +22937,7 @@ function meExtractData(ld) {
     let totalBytes = 0;
     let inferenceMode = false;
 
-    /* v7 layout-train format (primary) */
+    /* layout-train format (primary) */
     if (ld.format && ld.format.startsWith('layout-train')) {
         if (Array.isArray(ld.regions)) {
             for (const r of ld.regions) {
@@ -22765,7 +22984,7 @@ function meExtractData(ld) {
         }
     }
 
-    /* v7 inference format: memory.weights.entries + memory.activations.buffers */
+    /* Inference format: memory.weights.entries + memory.activations.buffers */
     if (tensors.length === 0) {
         inferenceMode = true;
         var memory = ld.memory || ld;
@@ -22779,7 +22998,7 @@ function meExtractData(ld) {
             tensors.push(meParseFlatEntry(e, 'activations', wEntries.length + idx, 'activations'));
         });
 
-        /* v7 tensors[] flat array (e.g. from ir1 or lowered IR) */
+        /* Flat tensors[] array (e.g. from ir1 or lowered IR) */
         if (tensors.length === 0 && Array.isArray(ld.tensors)) {
             ld.tensors.forEach(function(t, idx) {
                 if (!t) return;
@@ -23164,7 +23383,7 @@ function meBuildProfilerHints(alignment, seqLocality) {
 
     addHint(
         'perf stat',
-        'make profile-v7-perf-stat',
+        'make profile-v8-perf-stat',
         'Collect baseline IPC/cache/branch metrics before deep profiling.',
         'recommended'
     );
@@ -23172,14 +23391,14 @@ function meBuildProfilerHints(alignment, seqLocality) {
     if (alignment && alignment.misaligned > 0) {
         addHint(
             'VTune',
-            'make profile-v7-vtune',
+            'make profile-v8-vtune',
             'Investigate ' + alignment.misaligned + ' misaligned tensor' + (alignment.misaligned === 1 ? '' : 's') + ' with hotspot + memory analysis.',
             'high'
         );
     } else {
         addHint(
             'VTune',
-            'make profile-v7-vtune',
+            'make profile-v8-vtune',
             'Validate whether runtime is compute-bound or memory-bound in top kernels.',
             'recommended'
         );
@@ -23188,14 +23407,14 @@ function meBuildProfilerHints(alignment, seqLocality) {
     if (seqLocality && seqLocality.mapped > 0 && (seqLocality.opRegressions > 0 || seqLocality.stageSwitches > 24)) {
         addHint(
             'FlameGraph',
-            'make profile-v7-flamegraph',
+            'make profile-v8-flamegraph',
             'Operation order churn detected; confirm dispatch overhead and hotspot spread.',
             'high'
         );
     } else {
         addHint(
             'FlameGraph',
-            'make profile-v7-flamegraph',
+            'make profile-v8-flamegraph',
             'Capture a visual call-stack baseline for operator time distribution.',
             'recommended'
         );
@@ -23204,7 +23423,7 @@ function meBuildProfilerHints(alignment, seqLocality) {
     if (meState.dataMode === 'training' || (alignment && alignment.misaligned > 32)) {
         addHint(
             'Advisor',
-            'make profile-v7-advisor',
+            'make profile-v8-advisor',
             'Check vectorization and memory roofline headroom for training kernels.',
             'recommended'
         );
@@ -23212,7 +23431,7 @@ function meBuildProfilerHints(alignment, seqLocality) {
 
     addHint(
         'Perf Gate',
-        'make v7-perf-gate',
+        'make v8-perf-gate',
         'Re-run full perf gate after fixes to verify no regression.',
         'info'
     );
@@ -23325,7 +23544,7 @@ function renderMemoryExplorer(containerId) {
         container.innerHTML =
             '<div style="text-align:center; padding:3rem; color:var(--text-muted,#888);">' +
                 '<p style="font-size:1.3em; margin-bottom:0.5rem;">No memory layout data loaded</p>' +
-                '<p>Load a <code>layout_train.json</code> (v7 format) to explore the BUMP allocator arena.</p>' +
+                '<p>Load a <code>layout_train.json</code> or current memory layout export to explore the BUMP allocator arena.</p>' +
             '</div>';
         return;
     }
@@ -24319,7 +24538,7 @@ if (document.readyState === 'loading') {
 
 })();
 </script>
-    <!-- CK_V7_MODULE_BUNDLE_END -->
+    <!-- CK_V8_MODULE_BUNDLE_END -->
 
     <!-- ═══════════════════════════════════════════════════════════════
          CK SVG Viewer Overlay — fullscreen pan/zoom for profile charts

@@ -24,7 +24,13 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-CONTRACTS_DIR = ROOT / "version" / "v7" / "tests" / "contracts"
+VIS_VERSION = os.environ.get("CK_VIS_VERSION", "v7")
+CONTRACTS_DIR = Path(
+    os.environ.get(
+        "CK_VIS_CONTRACTS_DIR",
+        str(ROOT / "version" / VIS_VERSION / "tests" / "contracts"),
+    )
+).expanduser()
 IR_CONTRACT = CONTRACTS_DIR / "ir_visualizer_contract.json"
 DS_CONTRACT = CONTRACTS_DIR / "dataset_viewer_contract.json"
 
@@ -192,7 +198,9 @@ console.log(JSON.stringify(Object.keys(fns)));
 # ── Main ─────────────────────────────────────────────────────────────
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Contract-driven JS unit tests for visualizer pure functions")
+    ap = argparse.ArgumentParser(
+        description=f"Contract-driven JS unit tests for visualizer pure functions ({VIS_VERSION})"
+    )
     ap.add_argument("--json-out", type=str, help="Write JSON report to file")
     ap.add_argument("--quiet", action="store_true", help="Only print failures and summary")
     args = ap.parse_args()
@@ -289,7 +297,8 @@ def main() -> int:
         outpath = Path(args.json_out)
         outpath.parent.mkdir(parents=True, exist_ok=True)
         report = {
-            "tool": "test_visualizer_js_units_v7",
+            "tool": f"test_visualizer_js_units_{VIS_VERSION}",
+            "version": VIS_VERSION,
             "total": total,
             "passed": passed,
             "failed": failed,

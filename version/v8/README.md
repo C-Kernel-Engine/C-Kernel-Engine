@@ -1,25 +1,24 @@
 # Version 8
 
-`version/v8` is the next clean inference lane for vision bring-up.
+`version/v8` is the active inference lane for text and multimodal bring-up.
 
 Current scope:
-- copy only the critical inference scaffold from `version/v7`
-- keep template evolution for vision isolated from `v7`
-- prove the copied builder still matches the stable `v7` behavior before new vision ops land
-- expose a native `v8` inference runner surface for text and multimodal bring-up
+- keep the inference runner, visualizer, run hub, and regression surface versioned as `v8`
+- isolate template and multimodal bridge evolution inside `version/v8`
+- preserve stable operator contracts while new vision ops land
+- expose a native `v8` operator surface for text and multimodal bring-up
 
-What is duplicated here right now:
+What is included here right now:
 - `scripts/ck_run_v8.py`
 - `scripts/cks-v8-run`
 - `scripts/build_ir_v8.py`
 - `scripts/memory_planner_v8.py`
+- `scripts/resolve_model_dir_v8.py`
 - `tools/open_ir_visualizer_v8.py`
+- `tools/open_ir_hub_v8.py`
 - `tools/ir_visualizer.html`
 - `templates/*`
-- `kernel_maps/*` (seeded from `v7` plus `v8` overlays)
-
-What is intentionally still reused from `v7`:
-- profiling and report generation fallbacks inside the visualizer launcher
+- `kernel_maps/*`
 
 Canonical text bring-up examples:
 - `version/v8/scripts/cks-v8-run run hf://unsloth/gemma-3-270m-it-GGUF/gemma-3-270m-it-Q5_K_M.gguf --context-len 1024 --force-compile --force-convert --chat-template=auto --generate-visualizer`
@@ -33,9 +32,9 @@ Notes:
 - `NaanBeige`: if the first reply echoes `<|im_start|>assistant` or starts with `<think>`, keep `--chat-template auto`, do not force `none`, and treat it as a prompt-wrapper/chat-contract symptom rather than a stable expected reply shape.
 
 Canonical vision bring-up example:
-- `version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf --image-path version/v8/test_assets/v8_vision_doc_card_72.png --prompt "Explain this image."`
+- `version/v8/scripts/cks-v8-run run hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf --mmproj hf://Qwen/Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf --image-path version/v8/test_assets/v8_vision_doc_card_72.ppm --prompt "Explain this image."`
 
 Notes:
 - For the validated Qwen3-VL 8B path, omitting `--mmproj` now auto-resolves the matching HF companion projector.
 
-That keeps `v8` small and honest: the version split now includes the inference runner, local kernel registry/maps, and multimodal bridge entrypoint, while broader profiling/report tooling can still be copied forward later as needed.
+That keeps `v8` small and honest: the version split now includes the inference runner, local kernel registry/maps, multimodal bridge entrypoint, and the `v8`-named operator tooling surface used by the visualizer, hub, and regression entrypoints.

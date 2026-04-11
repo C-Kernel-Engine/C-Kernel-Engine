@@ -51,7 +51,8 @@ for path in "${STAGED_FILES[@]}"; do
             should_run_regression=1
             break
             ;;
-        version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md)
+        version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md|\
+        version/v8/scripts/*|version/v8/templates/*|version/v8/regression/*|version/v8/test_assets/*|version/v8/src/*|version/v8/kernel_maps/*|version/v8/README.md)
             should_run_regression=1
             break
             ;;
@@ -93,15 +94,14 @@ build_staged_snapshot() {
     git -C "$ROOT_DIR" diff --cached --binary --submodule=diff | git -C "$SNAPSHOT_DIR" apply --index --whitespace=nowarn
 }
 
-seed_precommit_cache() {
-    local source_models="$HOME/.cache/ck-engine-v7/models"
-    mkdir -p "$CACHE_ROOT"
+seed_precommit_cache_from() {
+    local source_models="$1"
     if [ ! -d "$source_models" ]; then
         return
     fi
     local entry
+    local name
     for entry in "$source_models"/* "$source_models"/.*; do
-        local name
         name="$(basename "$entry")"
         case "$name" in
             .|..)
@@ -112,6 +112,13 @@ seed_precommit_cache() {
             ln -s "$entry" "$CACHE_ROOT/$name" 2>/dev/null || true
         fi
     done
+}
+
+seed_precommit_cache() {
+    mkdir -p "$CACHE_ROOT"
+    # Prefer native v8 cache entries first, then fall back to legacy v7 cache reuse.
+    seed_precommit_cache_from "$HOME/.cache/ck-engine-v8/models"
+    seed_precommit_cache_from "$HOME/.cache/ck-engine-v7/models"
 }
 
 echo -e "${YELLOW}Running make regression-fast for staged runtime/regression changes...${NC}"

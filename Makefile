@@ -3542,6 +3542,30 @@ V7_CAPTURE_PROMPT ?= Hello
 V7_CAPTURE_MAX_TOKENS ?= 1
 V7_REPORT_DIR ?= version/v7/.cache/reports
 V7_CLI_TEMPLATE_ARGS = $(if $(filter none,$(V7_CHAT_TEMPLATE)),--no-chat-template,$(if $(findstring --chat-template none,$(V7_RUN_ARGS)),--no-chat-template,))
+V8_MODEL ?= $(V7_MODEL)
+V8_CHAT_TEMPLATE ?= $(V7_CHAT_TEMPLATE)
+V8_WEIGHT_DTYPE ?= $(V7_WEIGHT_DTYPE)
+V8_WEIGHT_DTYPE_ARG := $(if $(strip $(V8_WEIGHT_DTYPE)),--weight-dtype $(V8_WEIGHT_DTYPE),)
+V8_RUN_ARGS ?= $(V8_WEIGHT_DTYPE_ARG) $(if $(filter auto,$(V8_CHAT_TEMPLATE)),,--chat-template $(V8_CHAT_TEMPLATE))
+V8_PERF_RUNTIME ?= $(V7_PERF_RUNTIME)
+V8_CLI_ARGS ?= $(V7_CLI_ARGS)
+V8_WITH_VTUNE ?= $(V7_WITH_VTUNE)
+V8_WITH_ADVISOR ?= $(V7_WITH_ADVISOR)
+V8_VTUNE_DEEP ?= $(V7_VTUNE_DEEP)
+V8_PREP_WITH_PYTHON ?= $(V7_PREP_WITH_PYTHON)
+V8_FORCE_COMPILE ?= $(V7_FORCE_COMPILE)
+V8_FORCE_COMPILE_ARG := $(if $(filter 1,$(V8_FORCE_COMPILE)),--force-compile,)
+V8_FORCE_CONVERT ?= $(V7_FORCE_CONVERT)
+V8_FORCE_CONVERT_ARG := $(if $(filter 1,$(V8_FORCE_CONVERT)),--force-convert,)
+V8_AUTO_OPEN ?= $(V7_AUTO_OPEN)
+V8_DEMO_CONTEXT ?= $(V7_DEMO_CONTEXT)
+V8_DEMO_PROMPT ?= $(V7_DEMO_PROMPT)
+V8_DEMO_MAX_TOKENS ?= $(V7_DEMO_MAX_TOKENS)
+V8_CAPTURE_CONTEXT ?= $(V7_CAPTURE_CONTEXT)
+V8_CAPTURE_PROMPT ?= $(V7_CAPTURE_PROMPT)
+V8_CAPTURE_MAX_TOKENS ?= $(V7_CAPTURE_MAX_TOKENS)
+V8_REPORT_DIR ?= version/v8/.cache/reports
+V8_CLI_TEMPLATE_ARGS = $(if $(filter none,$(V8_CHAT_TEMPLATE)),--no-chat-template,$(if $(findstring --chat-template none,$(V8_RUN_ARGS)),--no-chat-template,))
 V7_TRAIN_MANIFEST ?=
 V7_TRAIN_MAX_LAYERS ?= 2
 V7_TRAIN_ALLOW_PARTIAL ?= 0
@@ -3759,6 +3783,9 @@ V7_STABILIZATION_HISTORY ?= $(V7_REPORT_DIR)/training_stabilization_history.json
 	v7-train-data-pipeline v7-stabilization-nightly v7-ir-visualizer-e2e v7-runbook-e2e v7-kernel-map-contracts \
 	v7-ctop v7-ctop-demo
 
+.PHONY: v8-init v8-doctor v8-capture-artifacts v8-capture-artifacts-run v8-profile-dashboard v8-profile-dashboard-run \
+	v8-compile-train-runtime v8-regression-fast v8-regression-full v8-regression-family
+
 v7-help:
 	@echo "=== v7 Training Foundation (fp32 correctness-first) ==="
 	@echo ""
@@ -3967,6 +3994,84 @@ v7-profile-dashboard-run: v7-init
 	fi
 	@$(MAKE) --no-print-directory v7-profile-dashboard V7_MODEL="$(RUN)" V7_AUTO_OPEN=$(V7_AUTO_OPEN) V7_FORCE_COMPILE=$(V7_FORCE_COMPILE) V7_FORCE_CONVERT=$(V7_FORCE_CONVERT) V7_PERF_RUNTIME=$(V7_PERF_RUNTIME) V7_CHAT_TEMPLATE="$(V7_CHAT_TEMPLATE)" V7_WEIGHT_DTYPE="$(V7_WEIGHT_DTYPE)"
 
+v8-init:
+	@$(MAKE) --no-print-directory v7-init
+
+v8-doctor:
+	@$(MAKE) --no-print-directory v7-doctor
+
+v8-capture-artifacts: v8-init
+	@echo "Capturing v8 operator artifacts for $(V8_MODEL)"
+	@$(PYTHON) version/v8/scripts/ck_run_v8.py run "$(V8_MODEL)" \
+		$(V8_FORCE_COMPILE_ARG) $(V8_FORCE_CONVERT_ARG) \
+		--generate-only --generate-visualizer \
+		--context-len $(V8_CAPTURE_CONTEXT) \
+		--prompt "$(V8_CAPTURE_PROMPT)" --max-tokens $(V8_CAPTURE_MAX_TOKENS) \
+		$(V8_RUN_ARGS)
+	@cache_models="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}"; \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V8_SCRIPT) --model-input "$(V8_MODEL)" )"; \
+		report_path="$$model_dir/ir_report.html"; \
+		hub_html="$$cache_models/ir_hub.html"; \
+		hub_index="$$cache_models/runs_hub_index.json"; \
+		$(PYTHON) version/v8/tools/open_ir_visualizer_v8.py --generate --run "$$model_dir" --html-only --strict-run-artifacts --output "$$report_path"; \
+		$(PYTHON) version/v8/tools/open_ir_hub_v8.py --models-root "$$cache_models" --output "$$hub_html" --index-out "$$hub_index"; \
+		echo "[OK] run dir: $$model_dir"; \
+		echo "[OK] report: $$report_path"; \
+		echo "[OK] hub: $$hub_html"; \
+		if [ "$(V8_AUTO_OPEN)" = "1" ] && command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "$$report_path" >/dev/null 2>&1 || true; \
+			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
+		fi
+
+v8-capture-artifacts-run:
+	@if [ -z "$(RUN)" ]; then \
+		echo "Set RUN=/path/to/run"; \
+		exit 2; \
+	fi
+	@$(MAKE) --no-print-directory v8-capture-artifacts V8_MODEL="$(RUN)" V8_AUTO_OPEN=$(V8_AUTO_OPEN) V8_FORCE_COMPILE=$(V8_FORCE_COMPILE) V8_FORCE_CONVERT=$(V8_FORCE_CONVERT) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+
+v8-profile-dashboard: v8-init
+	@echo "Capturing v8 profiling dashboard for $(V8_MODEL)"
+	@$(MAKE) --no-print-directory v8-capture-artifacts V8_MODEL="$(V8_MODEL)" V8_AUTO_OPEN=0 V8_FORCE_COMPILE=$(V8_FORCE_COMPILE) V8_FORCE_CONVERT=$(V8_FORCE_CONVERT) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v8-prepare-runtime V8_MODEL="$(V8_MODEL)" V8_FORCE_COMPILE=$(V8_FORCE_COMPILE) V8_PERF_RUNTIME=$(V8_PERF_RUNTIME) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v8-decode V8_MODEL="$(V8_MODEL)" V8_FORCE_COMPILE=0 V8_PERF_RUNTIME=$(V8_PERF_RUNTIME) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v8-perf-stat V8_MODEL="$(V8_MODEL)" V8_FORCE_COMPILE=0 V8_PERF_RUNTIME=$(V8_PERF_RUNTIME) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+	@$(MAKE) --no-print-directory profile-v8-flamegraph-decode V8_MODEL="$(V8_MODEL)" V8_FORCE_COMPILE=0 V8_PERF_RUNTIME=$(V8_PERF_RUNTIME) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+	@if command -v valgrind >/dev/null 2>&1 && command -v cg_annotate >/dev/null 2>&1; then \
+		$(MAKE) --no-print-directory profile-v8-cachegrind V8_MODEL="$(V8_MODEL)" V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"; \
+	else \
+		echo "SKIP: cachegrind capture requires valgrind + cg_annotate"; \
+	fi
+	@$(MAKE) --no-print-directory v8-perf-gate-evaluate V8_MODEL="$(V8_MODEL)"
+	@cache_models="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}"; \
+		model_dir="$$( $(PYTHON) $(RESOLVE_MODEL_DIR_V8_SCRIPT) --model-input "$(V8_MODEL)" )"; \
+		report_path="$$model_dir/ir_report.html"; \
+		hub_html="$$cache_models/ir_hub.html"; \
+		hub_index="$$cache_models/runs_hub_index.json"; \
+		$(PYTHON) version/v8/tools/open_ir_visualizer_v8.py --generate --run "$$model_dir" --html-only --strict-run-artifacts --output "$$report_path"; \
+		$(PYTHON) version/v8/tools/open_ir_hub_v8.py --models-root "$$cache_models" --output "$$hub_html" --index-out "$$hub_index"; \
+		echo "[OK] profiled run dir: $$model_dir"; \
+		echo "[OK] profiled report: $$report_path"; \
+		echo "[OK] profiled hub: $$hub_html"; \
+		if [ "$(V8_AUTO_OPEN)" = "1" ] && command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "$$report_path" >/dev/null 2>&1 || true; \
+			xdg-open "$$hub_html" >/dev/null 2>&1 || true; \
+		fi
+
+v8-profile-dashboard-run:
+	@if [ -z "$(RUN)" ]; then \
+		echo "Set RUN=/path/to/run"; \
+		exit 2; \
+	fi
+	@$(MAKE) --no-print-directory v8-profile-dashboard V8_MODEL="$(RUN)" V8_AUTO_OPEN=$(V8_AUTO_OPEN) V8_FORCE_COMPILE=$(V8_FORCE_COMPILE) V8_FORCE_CONVERT=$(V8_FORCE_CONVERT) V8_PERF_RUNTIME=$(V8_PERF_RUNTIME) V8_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" V8_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)"
+
+v8-compile-train-runtime:
+	@if [ -z "$(RUN)" ]; then \
+		echo "Set RUN=/path/to/run"; \
+		exit 2; \
+	fi
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(PYTHON) version/v7/scripts/ck_run_v7.py init --run "$(RUN)" --generate-ir --generate-runtime
+
 v7-ctop:
 	@RUN_DIR="$(if $(RUN),$(RUN),$(V7_CKTOP_RUN))"; \
 	$(PYTHON) version/v7/tools/cktop_v7.py --run "$$RUN_DIR"
@@ -4010,19 +4115,62 @@ v8-regression-fast:
 	@echo "Running v8 regression fast suite..."
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
-regression-fast: v8-regression-fast
+v8-regression-full:
+	@echo "Running v8 regression full suite..."
+	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode full $(REGRESSION_ARGS)
 
-regression-full:
-	@echo "Running v7 regression full suite..."
-	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode full $(REGRESSION_ARGS)
-
-regression-family:
+v8-regression-family:
 	@if [ -z "$(FAMILY)" ]; then \
 		echo "Usage: make regression-family FAMILY=<family_id>"; \
 		exit 2; \
 	fi
-	@echo "Running v7 regression for family: $(FAMILY)"
-	@$(PYTHON) version/v7/scripts/run_regression_v7.py --mode full --family "$(FAMILY)" $(REGRESSION_ARGS)
+	@echo "Running v8 regression for family: $(FAMILY)"
+	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode full --family "$(FAMILY)" $(REGRESSION_ARGS)
+
+v8-validate-contracts:
+	@$(MAKE) --no-print-directory v7-validate-contracts
+
+v8-kernel-map-contracts:
+	@$(MAKE) --no-print-directory v7-kernel-map-contracts
+
+v8-kernel-map-gate:
+	@$(MAKE) --no-print-directory v8-kernel-map-contracts
+
+v8-parity-1tok:
+	@$(MAKE) --no-print-directory v7-parity-1tok
+
+v8-qk-norm-backward-parity:
+	@$(MAKE) --no-print-directory v7-qk-norm-backward-parity
+
+v8-kernel-parity-train:
+	@$(MAKE) --no-print-directory v7-kernel-parity-train
+
+v8-train-parity-3:
+	@$(MAKE) --no-print-directory v7-train-parity-3
+
+v8-train-parity-5:
+	@$(MAKE) --no-print-directory v7-train-parity-5
+
+v8-train-parity-drift-smoke:
+	@$(MAKE) --no-print-directory v7-train-parity-drift-smoke
+
+v8-train-parity-long-horizon:
+	@$(MAKE) --no-print-directory v7-train-parity-long-horizon
+
+test-v8-bpe-train-parity:
+	@$(MAKE) --no-print-directory test-v7-bpe-train-parity
+
+v8-gate-train:
+	@$(MAKE) --no-print-directory v7-gate-train
+
+v8-gate:
+	@$(MAKE) --no-print-directory v7-gate
+
+regression-fast: v8-regression-fast
+
+regression-full: v8-regression-full
+
+regression-family: v8-regression-family
 
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out $(V7_REPORT_DIR)/parity_1token_latest.json
@@ -4736,6 +4884,18 @@ v7-visualizer-generated-e2e:
 		$(if $(RUN),--run $(RUN),) \
 		--json-out $(V7_REPORT_DIR)/visualizer_generated_e2e_latest.json
 
+v8-visualizer-health:
+	@echo "Running visualizer health checks..."
+	@$(PYTHON) version/v8/scripts/test_visualizer_health_v8.py --source --json-out $(V8_REPORT_DIR)/visualizer_health_latest.json
+	@echo "Running visualizer JS unit tests..."
+	@$(PYTHON) version/v8/scripts/test_visualizer_js_units_v8.py --json-out $(V8_REPORT_DIR)/visualizer_js_units_latest.json
+
+v8-visualizer-generated-e2e:
+	@echo "Running Level 3 generated-file E2E..."
+	@$(PYTHON) version/v8/scripts/test_visualizer_generated_e2e_v8.py \
+		$(if $(RUN),--run $(RUN),) \
+		--json-out $(V8_REPORT_DIR)/visualizer_generated_e2e_latest.json
+
 # ── Dataset Pipeline Targets ─────────────────────────────────────────────────
 # Usage: make v7-dataset-all RUN=~/.cache/ck-engine-v7/models/train/<run_name>
 # Each target maps to a tab in the Dataset Viewer.  See the Pipeline Map
@@ -4969,6 +5129,7 @@ ADVISOR_ARTIFACTS_V7_SCRIPT := version/v7/scripts/advisor_artifacts_v7.py
 MEMORY_SIGNOFF_V7_SCRIPT := version/v7/scripts/memory_signoff_v7.py
 PERF_GATE_V7_SCRIPT := version/v7/scripts/perf_gate_v7.py
 RESOLVE_MODEL_DIR_V7_SCRIPT := version/v7/scripts/resolve_model_dir_v7.py
+RESOLVE_MODEL_DIR_V8_SCRIPT := version/v8/scripts/resolve_model_dir_v8.py
 PROFILE_V7_SUMMARY_SCRIPT := version/v7/scripts/generate_profile_summary_v7.py
 PROFILE_V7_PERF_DATA ?= build/ck_v7_perf.data
 PROFILE_V7_PERF_FOLDED ?= build/ck_v7_perf.folded
@@ -4987,6 +5148,46 @@ PROFILE_V7_VTUNE_UARCH_CSV ?= build/ck_v7_vtune_uarch_summary.csv
 PROFILE_V7_ADVISOR_TEXT ?= build/ck_v7_advisor_roofline.txt
 PROFILE_V7_ADVISOR_CSV ?= build/ck_v7_advisor_roofline.csv
 PROFILE_V7_ADVISOR_HTML ?= build/ck_v7_advisor_roofline.html
+V8_FLAMEGRAPH_MODE ?= decode
+PROFILE_V8_PERF_DATA ?= build/ck_v8_perf.data
+PROFILE_V8_PERF_FOLDED ?= build/ck_v8_perf.folded
+PROFILE_V8_FLAMEGRAPH_SVG ?= build/flamegraph_v8.svg
+PROFILE_V8_PERF_STAT_TXT ?= build/ck_v8_perf_stat.txt
+PROFILE_V8_VTUNE_TEXT ?= build/ck_v8_vtune_hotspots.txt
+PROFILE_V8_VTUNE_CSV ?= build/ck_v8_vtune_hotspots.csv
+PROFILE_V8_VTUNE_MEMORY_TEXT ?= build/ck_v8_vtune_memory_summary.txt
+PROFILE_V8_VTUNE_MEMORY_CSV ?= build/ck_v8_vtune_memory_summary.csv
+PROFILE_V8_VTUNE_UARCH_TEXT ?= build/ck_v8_vtune_uarch_summary.txt
+PROFILE_V8_VTUNE_UARCH_CSV ?= build/ck_v8_vtune_uarch_summary.csv
+PROFILE_V8_ADVISOR_TEXT ?= build/ck_v8_advisor_roofline.txt
+PROFILE_V8_ADVISOR_CSV ?= build/ck_v8_advisor_roofline.csv
+PROFILE_V8_ADVISOR_HTML ?= build/ck_v8_advisor_roofline.html
+PROFILE_V8_CACHEGRIND_OUT ?= build/cachegrind_v8.out
+PROFILE_V8_CACHEGRIND_ANNOTATE ?= build/cachegrind_v8_annotated.txt
+V8_PROFILE_V7_ARGS = \
+	V7_MODEL="$(V8_MODEL)" \
+	V7_PERF_RUNTIME="$(V8_PERF_RUNTIME)" \
+	V7_CHAT_TEMPLATE="$(V8_CHAT_TEMPLATE)" \
+	V7_WEIGHT_DTYPE="$(V8_WEIGHT_DTYPE)" \
+	V7_CLI_ARGS="$(V8_CLI_ARGS)" \
+	V7_WITH_VTUNE="$(V8_WITH_VTUNE)" \
+	V7_WITH_ADVISOR="$(V8_WITH_ADVISOR)" \
+	V7_VTUNE_DEEP="$(V8_VTUNE_DEEP)" \
+	V7_FORCE_COMPILE="$(V8_FORCE_COMPILE)" \
+	V7_PREP_WITH_PYTHON="$(V8_PREP_WITH_PYTHON)" \
+	PROFILE_V7_PERF_DATA="$(PROFILE_V8_PERF_DATA)" \
+	PROFILE_V7_PERF_FOLDED="$(PROFILE_V8_PERF_FOLDED)" \
+	PROFILE_V7_FLAMEGRAPH_SVG="$(PROFILE_V8_FLAMEGRAPH_SVG)" \
+	PROFILE_V7_PERF_STAT_TXT="$(PROFILE_V8_PERF_STAT_TXT)" \
+	PROFILE_V7_VTUNE_TEXT="$(PROFILE_V8_VTUNE_TEXT)" \
+	PROFILE_V7_VTUNE_CSV="$(PROFILE_V8_VTUNE_CSV)" \
+	PROFILE_V7_VTUNE_MEMORY_TEXT="$(PROFILE_V8_VTUNE_MEMORY_TEXT)" \
+	PROFILE_V7_VTUNE_MEMORY_CSV="$(PROFILE_V8_VTUNE_MEMORY_CSV)" \
+	PROFILE_V7_VTUNE_UARCH_TEXT="$(PROFILE_V8_VTUNE_UARCH_TEXT)" \
+	PROFILE_V7_VTUNE_UARCH_CSV="$(PROFILE_V8_VTUNE_UARCH_CSV)" \
+	PROFILE_V7_ADVISOR_TEXT="$(PROFILE_V8_ADVISOR_TEXT)" \
+	PROFILE_V7_ADVISOR_CSV="$(PROFILE_V8_ADVISOR_CSV)" \
+	PROFILE_V7_ADVISOR_HTML="$(PROFILE_V8_ADVISOR_HTML)"
 
 profile-v6-prepare-runtime:
 	@if [ "$(V66_PREP_WITH_PYTHON)" != "1" ]; then \
@@ -5835,6 +6036,73 @@ profile-v7-full:
 	@$(MAKE) --no-print-directory profile-v7-advisor
 	@echo "=== Open visualizer: version/v7/tools/ir_visualizer.html ==="
 	@echo "=== Load folder from model cache to see Profile tab ==="
+
+.PHONY: profile-v8-prepare-runtime profile-v8-decode profile-v8-prefill profile-v8-flamegraph \
+	profile-v8-flamegraph-decode profile-v8-flamegraph-prefill profile-v8-perf-stat profile-v8-cachegrind \
+	profile-v8-vtune profile-v8-advisor profile-v8-full v8-perf-gate v8-perf-gate-evaluate
+
+profile-v8-prepare-runtime:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-prepare-runtime $(V8_PROFILE_V7_ARGS)
+
+profile-v8-decode:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-decode $(V8_PROFILE_V7_ARGS)
+
+profile-v8-prefill:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-prefill $(V8_PROFILE_V7_ARGS)
+
+profile-v8-flamegraph:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-flamegraph $(V8_PROFILE_V7_ARGS) V7_FLAMEGRAPH_MODE="$(V8_FLAMEGRAPH_MODE)"
+
+profile-v8-flamegraph-decode:
+	@$(MAKE) --no-print-directory profile-v8-flamegraph V8_FLAMEGRAPH_MODE=decode
+
+profile-v8-flamegraph-prefill:
+	@$(MAKE) --no-print-directory profile-v8-flamegraph V8_FLAMEGRAPH_MODE=prefill
+
+profile-v8-perf-stat:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-perf-stat $(V8_PROFILE_V7_ARGS)
+
+profile-v8-cachegrind:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-cachegrind $(V8_PROFILE_V7_ARGS)
+	@if [ -f build/cachegrind_v7.out ]; then cp build/cachegrind_v7.out "$(PROFILE_V8_CACHEGRIND_OUT)"; fi
+	@if [ -f build/cachegrind_v7_annotated.txt ]; then cp build/cachegrind_v7_annotated.txt "$(PROFILE_V8_CACHEGRIND_ANNOTATE)"; fi
+
+profile-v8-vtune:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-vtune $(V8_PROFILE_V7_ARGS)
+
+profile-v8-advisor:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory profile-v7-advisor $(V8_PROFILE_V7_ARGS)
+
+profile-v8-full:
+	@$(MAKE) --no-print-directory profile-v8-prepare-runtime
+	@$(MAKE) --no-print-directory profile-v8-decode
+	@$(MAKE) --no-print-directory profile-v8-prefill
+	@$(MAKE) --no-print-directory profile-v8-perf-stat
+	@$(MAKE) --no-print-directory profile-v8-flamegraph-decode
+	@$(MAKE) --no-print-directory profile-v8-flamegraph-prefill
+	@$(MAKE) --no-print-directory profile-v8-vtune
+	@$(MAKE) --no-print-directory profile-v8-advisor
+	@echo "=== Open visualizer: version/v8/tools/ir_visualizer.html ==="
+	@echo "=== Load folder from model cache to see Profile tab ==="
+
+v8-perf-gate:
+	@if ! command -v perf >/dev/null 2>&1; then \
+		echo "SKIP: v8-perf-gate (perf not installed)"; \
+	elif [ ! -x ./FlameGraph/stackcollapse-perf.pl ] || [ ! -x ./FlameGraph/flamegraph.pl ]; then \
+		echo "SKIP: v8-perf-gate (FlameGraph tools missing)"; \
+	else \
+		$(MAKE) --no-print-directory profile-v8-prepare-runtime; \
+		$(MAKE) --no-print-directory profile-v8-decode; \
+		$(MAKE) --no-print-directory profile-v8-perf-stat; \
+		$(MAKE) --no-print-directory profile-v8-flamegraph-decode; \
+		$(MAKE) --no-print-directory profile-v8-flamegraph-prefill; \
+		$(MAKE) --no-print-directory profile-v8-vtune || true; \
+		$(MAKE) --no-print-directory profile-v8-advisor || true; \
+		$(MAKE) --no-print-directory v8-perf-gate-evaluate; \
+	fi
+
+v8-perf-gate-evaluate:
+	@CK_CACHE_DIR="$${CK_CACHE_DIR:-$$HOME/.cache/ck-engine-v8/models}" $(MAKE) --no-print-directory v7-perf-gate-evaluate V7_MODEL="$(V8_MODEL)"
 
 v6.6-memory-signoff:
 	@$(PYTHON) version/v6.6/scripts/ck_run_v6_6.py run "$(V66_MODEL)" --generate-only $(V66_FORCE_COMPILE_ARG) --context-len 128 --max-tokens 1 --prompt "Hello" $(V66_RUN_ARGS)
