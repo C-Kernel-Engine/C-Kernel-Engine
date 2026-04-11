@@ -93,215 +93,192 @@ static int dtype_from_str(const char *s) {
     return 0;
 }
 
-/*
- * ck_load_weights_manifest_v7()
- * ===============================
- * Loads model weights from a BUMPWGT4/BUMPWGT5 binary file using a manifest map.
- *
- * This is the primary entry point for loading weights in v7. It supports both:
- *   - BUMPWGT4: Legacy flat binary format (sequential tensors)
- *   - BUMPWGT5: New manifest-driven format (random access via offsets)
- *
- * IMPORTANT: This loader IGNORES any metadata header in the BUMPWGT5 file.
- * It relies entirely on the sidecar .manifest file for tensor mapping.
- * The weights file's magic bytes only serve as a format validation check.
- *
- * Parameters:
- *   base:          Pointer to pre-allocated memory region (mmap'd or malloc'd)
- *   weights_path:  Path to .bin weights file (starts with BUMPWGT4/BUMPWGT5 magic)
- *   manifest_path: Path to .manifest file (maps tensor names to offsets)
- *
- * Returns:
- *   Manifest map handle or NULL on error
- *
- * MEMORY LAYOUT:
- * ==============
- *   [base + runtime_offset_0] = Tensor 0 data
- *   [base + runtime_offset_1] = Tensor 1 data
- *   ...
- *
- * The manifest specifies where each tensor lives in the weights file and where
- * it should be placed in the runtime memory region.
- */
-ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
-                                const char *weights_path,
-                                const char *manifest_path)
+static int validate_weights_magic(FILE *wf, const char *weights_path)
 {
-    /* Validate input parameters */
-    if (!base || !weights_path || !manifest_path) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: invalid arguments\n");
-        return NULL;
-    }
-
-    /* STEP 1: Open the weights binary file */
-    FILE *wf = fopen(weights_path, "rb");
-    if (!wf) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: failed to open %s: %s\n",
-                weights_path, strerror(errno));
-        return NULL;
-    }
-
-    /* STEP 2: Verify magic bytes to detect BUMPWGT4 vs BUMPWGT5 */
-    /* BUMPWGT4 = legacy format, BUMPWGT5 = current manifest format */
     char magic[8] = {0};
     if (fread(magic, 1, 8, wf) != 8 ||
         (memcmp(magic, "BUMPWGT4", 8) != 0 && memcmp(magic, "BUMPWGT5", 8) != 0)) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: invalid BUMPWGT4/BUMPWGT5 magic\n");
+        fprintf(stderr, "ck_open_weights_manifest_v8: invalid BUMPWGT4/BUMPWGT5 magic in %s\n",
+                weights_path);
         fprintf(stderr, "  Expected: 'BUMPWGT4' or 'BUMPWGT5'\n");
         fprintf(stderr, "  Got: '%.8s' (file may be corrupted or wrong format)\n", magic);
+        return -1;
+    }
+    return 0;
+}
+
+ck_manifest_map_t *ck_open_weights_manifest_v8(void *base,
+                                               const char *weights_path,
+                                               const char *manifest_path,
+                                               int materialize_weights)
+{
+    FILE *wf = NULL;
+    FILE *mf = NULL;
+    ck_manifest_map_t *manifest = NULL;
+    ck_weight_info_t *entries = NULL;
+    unsigned char *buf = NULL;
+    char line[MANIFEST_LINE_MAX];
+    size_t cap = 0;
+    size_t count = 0;
+
+    if (!base || !weights_path || !manifest_path) {
+        fprintf(stderr, "ck_open_weights_manifest_v8: invalid arguments\n");
+        return NULL;
+    }
+
+    wf = fopen(weights_path, "rb");
+    if (!wf) {
+        fprintf(stderr, "ck_open_weights_manifest_v8: failed to open %s: %s\n",
+                weights_path, strerror(errno));
+        return NULL;
+    }
+    if (validate_weights_magic(wf, weights_path) != 0) {
         fclose(wf);
         return NULL;
     }
 
-    /* STEP 3: Open the manifest file (pipe-delimited mapping) */
-    FILE *mf = fopen(manifest_path, "r");
+    mf = fopen(manifest_path, "r");
     if (!mf) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: failed to open %s: %s\n",
+        fprintf(stderr, "ck_open_weights_manifest_v8: failed to open %s: %s\n",
                 manifest_path, strerror(errno));
         fclose(wf);
         return NULL;
     }
 
-    ck_manifest_map_t *manifest = calloc(1, sizeof(*manifest));
+    manifest = calloc(1, sizeof(*manifest));
     if (!manifest) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: manifest alloc failed\n");
+        fprintf(stderr, "ck_open_weights_manifest_v8: manifest alloc failed\n");
         fclose(mf);
         fclose(wf);
         return NULL;
     }
     manifest->mapped_base = (uint8_t *)base;
+    manifest->weights_materialized = materialize_weights ? 1 : 0;
 
-    /* STEP 4: Allocate chunk buffer for streaming copies
-     * Using 1MB chunks avoids allocating massive single buffers
-     * and works well with OS read-ahead caching */
-    char line[MANIFEST_LINE_MAX];
-    unsigned char *buf = malloc(COPY_CHUNK);
-    if (!buf) {
-        fprintf(stderr, "ck_load_weights_manifest_v7: malloc failed\n");
-        free(manifest);
-        fclose(mf);
-        fclose(wf);
-        return NULL;
-    }
-
-    size_t cap = 0;
-    size_t count = 0;
-    ck_weight_info_t *entries = NULL;
-
-    /* STEP 5: Process each line in the manifest
-     * Format: name|dtype|file_offset|size|runtime_offset */
-    while (fgets(line, sizeof(line), mf)) {
-        /* Skip comments (#) and empty lines */
-        if (line[0] == '#' || line[0] == '\n') {
-            continue;
-        }
-
-        /* Remove trailing newlines/carriage returns */
-        line[strcspn(line, "\r\n")] = '\0';
-
-        /* Parse manifest fields (pipe-delimited) */
-        char *name = strtok(line, "|");
-        char *dtype = strtok(NULL, "|");
-        char *file_off = strtok(NULL, "|");
-        char *size_str = strtok(NULL, "|");
-        char *rt_off = strtok(NULL, "|");
-
-        /* Validate all 5 fields are present */
-        if (!name || !dtype || !file_off || !size_str || !rt_off) {
-            fprintf(stderr, "ck_load_weights_manifest_v7: malformed manifest line\n");
-            fprintf(stderr, "  Expected: name|dtype|file_offset|size|runtime_offset\n");
-            fprintf(stderr, "  Got: %s\n", line);
-            free(buf);
+    if (materialize_weights) {
+        buf = malloc(COPY_CHUNK);
+        if (!buf) {
+            fprintf(stderr, "ck_open_weights_manifest_v8: malloc failed\n");
+            free(manifest);
             fclose(mf);
             fclose(wf);
             return NULL;
         }
+    }
 
-        /* Parse numeric fields as unsigned 64-bit integers */
-        unsigned long long file_offset = parse_u64(file_off);
-        unsigned long long size = parse_u64(size_str);
-        unsigned long long runtime_offset = parse_u64(rt_off);
+    while (fgets(line, sizeof(line), mf)) {
+        char *name = NULL;
+        char *dtype = NULL;
+        char *file_off = NULL;
+        char *size_str = NULL;
+        char *rt_off = NULL;
+        unsigned long long file_offset = 0;
+        unsigned long long size = 0;
+        unsigned long long runtime_offset = 0;
+
+        if (line[0] == '#' || line[0] == '\n') {
+            continue;
+        }
+        line[strcspn(line, "\r\n")] = '\0';
+
+        name = strtok(line, "|");
+        dtype = strtok(NULL, "|");
+        file_off = strtok(NULL, "|");
+        size_str = strtok(NULL, "|");
+        rt_off = strtok(NULL, "|");
+
+        if (!name || !dtype || !file_off || !size_str || !rt_off) {
+            fprintf(stderr, "ck_open_weights_manifest_v8: malformed manifest line\n");
+            goto fail;
+        }
+
+        file_offset = parse_u64(file_off);
+        size = parse_u64(size_str);
+        runtime_offset = parse_u64(rt_off);
 
         if (count == cap) {
             size_t next = cap ? cap * 2 : 256;
             ck_weight_info_t *grow = realloc(entries, next * sizeof(*entries));
             if (!grow) {
-                fprintf(stderr, "ck_load_weights_manifest_v7: realloc failed\n");
-                free(buf);
-                fclose(mf);
-                fclose(wf);
-                for (size_t i = 0; i < count; ++i) {
-                    free((void *)entries[i].name);
-                }
-                free(entries);
-                free(manifest);
-                return NULL;
+                fprintf(stderr, "ck_open_weights_manifest_v8: realloc failed\n");
+                goto fail;
             }
             entries = grow;
             cap = next;
         }
 
         entries[count].name = strdup(name);
+        if (!entries[count].name) {
+            fprintf(stderr, "ck_open_weights_manifest_v8: strdup failed\n");
+            goto fail;
+        }
         entries[count].dtype = dtype_from_str(dtype);
         entries[count].file_offset = file_offset;
         entries[count].size = size;
         entries[count].runtime_offset = runtime_offset;
         count++;
 
-        /* STEP 6: Seek to tensor location in weights file */
-        if (fseek(wf, (long)file_offset, SEEK_SET) != 0) {
-            fprintf(stderr, "ck_load_weights_manifest_v7: fseek failed to offset %llu\n",
-                    (unsigned long long)file_offset);
-            free(buf);
-            fclose(mf);
-            fclose(wf);
-            return NULL;
-        }
-
-        /* STEP 7: Copy tensor data from file to memory
-         * Uses chunked copying for large tensors (>1MB) */
-        unsigned char *dst = (unsigned char *)base + runtime_offset;
-        unsigned long long remaining = size;
-
-        while (remaining > 0) {
-            /* Determine chunk size (cap at COPY_CHUNK = 1MB) */
-            size_t take = remaining > COPY_CHUNK ? COPY_CHUNK : (size_t)remaining;
-
-            /* Read chunk from file */
-            size_t n = fread(buf, 1, take, wf);
-            if (n != take) {
-                fprintf(stderr, "ck_load_weights_manifest_v7: short read at offset %llu\n",
-                        (unsigned long long)file_offset);
-                fprintf(stderr, "  Expected %zu bytes, got %zu (EOF or disk error)\n", take, n);
-                free(buf);
-                fclose(mf);
-                fclose(wf);
-                for (size_t i = 0; i < count; ++i) {
-                    free((void *)entries[i].name);
-                }
-                free(entries);
-                free(manifest);
-                return NULL;
+        if (!materialize_weights) {
+            if (file_offset != runtime_offset) {
+                fprintf(stderr,
+                        "ck_open_weights_manifest_v8: mixed-backed mode requires file_offset == runtime_offset for %s\n",
+                        name);
+                goto fail;
             }
-
-            /* Copy chunk to destination */
-            memcpy(dst, buf, take);
-            dst += take;
-            remaining -= take;
+            continue;
         }
 
-        /* Debug output (optional - useful for tracing) */
-        /* fprintf(stderr, "Loaded %s (%llu bytes) -> offset %llu\n",
-                name, size, runtime_offset); */
+        if (fseek(wf, (long)file_offset, SEEK_SET) != 0) {
+            fprintf(stderr, "ck_open_weights_manifest_v8: fseek failed to offset %llu\n",
+                    (unsigned long long)file_offset);
+            goto fail;
+        }
+
+        {
+            unsigned char *dst = (unsigned char *)base + runtime_offset;
+            unsigned long long remaining = size;
+            while (remaining > 0) {
+                size_t take = remaining > COPY_CHUNK ? COPY_CHUNK : (size_t)remaining;
+                size_t n = fread(buf, 1, take, wf);
+                if (n != take) {
+                    fprintf(stderr, "ck_open_weights_manifest_v8: short read at offset %llu\n",
+                            (unsigned long long)file_offset);
+                    goto fail;
+                }
+                memcpy(dst, buf, take);
+                dst += take;
+                remaining -= take;
+            }
+        }
     }
 
-    /* STEP 8: Cleanup and return success */
     free(buf);
     fclose(mf);
     fclose(wf);
     manifest->entries = entries;
     manifest->count = (int)count;
     return manifest;
+
+fail:
+    free(buf);
+    if (mf) fclose(mf);
+    if (wf) fclose(wf);
+    if (entries) {
+        size_t i = 0;
+        for (i = 0; i < count; ++i) {
+            free((void *)entries[i].name);
+        }
+        free(entries);
+    }
+    free(manifest);
+    return NULL;
+}
+
+ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
+                                               const char *weights_path,
+                                               const char *manifest_path)
+{
+    return ck_open_weights_manifest_v8(base, weights_path, manifest_path, 1);
 }
 
 void ck_unload_manifest_map(ck_manifest_map_t *manifest) {

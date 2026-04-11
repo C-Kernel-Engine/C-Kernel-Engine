@@ -1628,6 +1628,7 @@ CK_EXPORT void ck_model_profile_dump(void) {
 typedef struct {{
     uint8_t *bump;           /* Single contiguous allocation */
     size_t bump_size;
+    ck_bump_alloc_t bump_alloc;
     uint8_t *bump_weights;   /* Weights section */
     float *activations;      /* Activations section */
     float *kv_cache;         /* KV cache section */
@@ -1666,15 +1667,20 @@ static ck_manifest_map_t *g_manifest = NULL;
 static void ck_decode(CKModel *model, int32_t token);
 static void ck_prefill(CKModel *model, const int32_t *tokens, int count);
 
-static int do_init(void) {{
+static int do_init(const char *weights_path) {{
     if (g_model) return 0;
     g_model = calloc(1, sizeof(CKModel));
     if (!g_model) return -1;
 
-    g_model->bump_size = BUMP_TOTAL_SIZE;
-    g_model->bump = aligned_alloc(64, g_model->bump_size);
-    if (!g_model->bump) {{ free(g_model); g_model = NULL; return -1; }}
-    memset(g_model->bump, 0, g_model->bump_size);
+    if (ck_bump_alloc_init(&g_model->bump_alloc, weights_path,
+                           BUMP_TOTAL_SIZE, BUMP_WEIGHTS_OFFSET, BUMP_ACT_OFFSET) != 0) {{
+        free(g_model);
+        g_model = NULL;
+        return -1;
+    }}
+    g_model->bump = g_model->bump_alloc.base;
+    g_model->bump_size = g_model->bump_alloc.total_size;
+    memset(g_model->bump + BUMP_ACT_OFFSET, 0, g_model->bump_size - BUMP_ACT_OFFSET);
 
     g_model->bump_weights = g_model->bump + BUMP_WEIGHTS_OFFSET;
     g_model->activations = (float*)(g_model->bump + BUMP_ACT_OFFSET);
@@ -1713,10 +1719,11 @@ static int build_manifest_path(const char *weights_path, char *out, size_t out_s
 }}
 
 static int do_load_manifest(const char *weights_path, const char *manifest_path) {{
+    int materialize_weights = ck_bump_alloc_needs_weight_materialization(&g_model->bump_alloc);
     #if MANIFEST_OFFSETS_ABSOLUTE
-    g_manifest = ck_load_weights_manifest_v7(g_model->bump, weights_path, manifest_path);
+    g_manifest = ck_open_weights_manifest_v8(g_model->bump, weights_path, manifest_path, materialize_weights);
     #else
-    g_manifest = ck_load_weights_manifest_v7(g_model->bump_weights, weights_path, manifest_path);
+    g_manifest = ck_open_weights_manifest_v8(g_model->bump_weights, weights_path, manifest_path, materialize_weights);
     #endif
     return g_manifest ? 0 : -1;
 }}
@@ -1742,7 +1749,7 @@ static void print_omp_info(void) {{
 /* Combined init + load (ck_chat.py expects this signature) */
 CK_EXPORT int ck_model_init(const char *weights_path) {{
     char manifest_path[4096];
-    if (do_init() != 0) return -1;
+    if (do_init(weights_path) != 0) return -1;
     if (build_manifest_path(weights_path, manifest_path, sizeof(manifest_path)) != 0) return -1;
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
@@ -1761,7 +1768,7 @@ CK_EXPORT int ck_model_init(const char *weights_path) {{
 
 /* Explicit manifest path (preferred) */
 CK_EXPORT int ck_model_init_with_manifest(const char *weights_path, const char *manifest_path) {{
-    if (do_init() != 0) return -1;
+    if (do_init(weights_path) != 0) return -1;
     if (do_load_manifest(weights_path, manifest_path) != 0) return -1;
     do_post_weights_init();  /* Initialize tokenizer AFTER weights are loaded */
     print_omp_info();
@@ -1793,7 +1800,7 @@ CK_EXPORT void ck_model_free(void) {{
         ck_unload_manifest_map(g_manifest);
         g_manifest = NULL;
     }}
-    if (g_model->bump) free(g_model->bump);
+    ck_bump_alloc_free(&g_model->bump_alloc);
     free(g_model);
     g_model = NULL;
 }}
@@ -2036,6 +2043,7 @@ def generate(
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include "ckernel_alloc.h"
 #include "ckernel_model_load_v8.h"
 #include "ckernel_engine.h"  /* Kernel declarations */
 {tokenizer_include}

@@ -40,6 +40,7 @@ typedef struct {
     int count;
     FILE *file;
     uint8_t *mapped_base;
+    int weights_materialized;
 } ck_manifest_map_t;
 
 /* ============================================================================
@@ -48,13 +49,27 @@ typedef struct {
 /* Note: Model struct (e.g., QWEN2_DECODEModel) is generated per-model by codegen */
 
 /*
- * ck_load_weights_manifest_v7() - Load weights using manifest map
+ * ck_open_weights_manifest_v8() - Open and parse a weights manifest
+ *
+ * When materialize_weights is non-zero, tensor data is copied into the runtime
+ * bump arena. When it is zero, the manifest is parsed but tensor bytes are
+ * assumed to already be addressable from the arena backing.
+ *
+ * Returns: Manifest map handle or NULL on error
+ */
+ck_manifest_map_t *ck_open_weights_manifest_v8(void *base,
+                                               const char *weights_path,
+                                               const char *manifest_path,
+                                               int materialize_weights);
+
+/*
+ * ck_load_weights_manifest_v7() - Backward-compatible eager materialization wrapper
  *
  * Returns: Manifest map handle or NULL on error
  */
 ck_manifest_map_t *ck_load_weights_manifest_v7(void *base,
-                                                 const char *weights_path,
-                                                 const char *manifest_path);
+                                               const char *weights_path,
+                                               const char *manifest_path);
 
 /*
  * ck_unload_manifest_map() - Unload manifest map and close files

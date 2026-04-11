@@ -791,6 +791,7 @@ def step_compile(model_c_path: Path, output_dir: Path, *, force: bool = False) -
         "-o",
         str(lib_path),
         str(model_c_path),
+        str(PROJECT_ROOT / "src" / "ckernel_alloc.c"),
         str(v8_src / "ckernel_model_load_v8.c"),
         str(v8_src / "ck_parallel_decode_v8.c"),
         str(v8_src / "ck_parallel_prefill_v8.c"),
