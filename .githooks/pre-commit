@@ -40,27 +40,32 @@ if [ ${#STAGED_FILES[@]} -eq 0 ]; then
     exit 0
 fi
 
-should_run_regression=0
+should_run_v7_regression=0
+should_run_v8_regression=0
 for path in "${STAGED_FILES[@]}"; do
     case "$path" in
         Makefile|.githooks/pre-commit|.githooks/pre-push|.github/workflows/nightly.yml)
-            should_run_regression=1
-            break
+            should_run_v7_regression=1
+            should_run_v8_regression=1
             ;;
         scripts/*|src/*|tests/*)
-            should_run_regression=1
-            break
+            should_run_v7_regression=1
+            should_run_v8_regression=1
             ;;
-        version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md|\
+        version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md)
+            should_run_v7_regression=1
+            ;;
         version/v8/scripts/*|version/v8/templates/*|version/v8/regression/*|version/v8/test_assets/*|version/v8/src/*|version/v8/kernel_maps/*|version/v8/README.md)
-            should_run_regression=1
-            break
+            should_run_v8_regression=1
             ;;
     esac
+    if [ "$should_run_v7_regression" = "1" ] && [ "$should_run_v8_regression" = "1" ]; then
+        break
+    fi
 done
 
-if [ "$should_run_regression" != "1" ]; then
-    echo -e "${GREEN}✓ Staged changes do not affect runtime/regression paths; skipping regression-fast${NC}"
+if [ "$should_run_v7_regression" != "1" ] && [ "$should_run_v8_regression" != "1" ]; then
+    echo -e "${GREEN}✓ Staged changes do not affect v7/v8 runtime or regression paths; skipping fast regression${NC}"
     exit 0
 fi
 
@@ -91,7 +96,11 @@ build_staged_snapshot() {
         rm -rf "$SNAPSHOT_DIR/llama.cpp"
         ln -s "$ROOT_DIR/llama.cpp" "$SNAPSHOT_DIR/llama.cpp"
     fi
-    git -C "$ROOT_DIR" diff --cached --binary --submodule=diff | git -C "$SNAPSHOT_DIR" apply --index --whitespace=nowarn
+    if git -C "$ROOT_DIR" rev-parse --verify HEAD >/dev/null 2>&1; then
+        git -C "$ROOT_DIR" diff --cached --binary --submodule=diff HEAD -- | git -C "$SNAPSHOT_DIR" apply --index --whitespace=nowarn
+    else
+        git -C "$ROOT_DIR" diff --cached --binary --submodule=diff | git -C "$SNAPSHOT_DIR" apply --index --whitespace=nowarn
+    fi
 }
 
 seed_precommit_cache_from() {
@@ -121,30 +130,50 @@ seed_precommit_cache() {
     seed_precommit_cache_from "$HOME/.cache/ck-engine-v7/models"
 }
 
-echo -e "${YELLOW}Running make regression-fast for staged runtime/regression changes...${NC}"
+echo -e "${YELLOW}Running staged fast regression suites...${NC}"
 echo -e "${YELLOW}  ↳ run root: ${RUN_ROOT}${NC}"
 echo -e "${YELLOW}  ↳ report root: ${REPORT_ROOT}${NC}"
 echo -e "${YELLOW}  ↳ cache root: ${CACHE_ROOT}${NC}"
 echo -e "${YELLOW}  ↳ staged snapshot: ${SNAPSHOT_PREFIX}.XXXXXX${NC}"
+if [ "$should_run_v7_regression" = "1" ]; then
+    echo -e "${YELLOW}  ↳ enabled: v7-regression-fast${NC}"
+fi
+if [ "$should_run_v8_regression" = "1" ]; then
+    echo -e "${YELLOW}  ↳ enabled: v8-regression-fast${NC}"
+fi
 
 build_staged_snapshot
 seed_precommit_cache
 
-echo -e "${YELLOW}Running v7-kernel-map-contracts in staged snapshot...${NC}"
-if ! make -C "$SNAPSHOT_DIR" v7-kernel-map-contracts > /tmp/ck_precommit_kernel_maps.log 2>&1; then
-    echo -e "${RED}✗ v7-kernel-map-contracts failed${NC}"
-    echo "  See /tmp/ck_precommit_kernel_maps.log for details"
-    tail -40 /tmp/ck_precommit_kernel_maps.log || true
-    exit 1
-fi
-echo -e "${GREEN}✓ v7-kernel-map-contracts passed${NC}"
-
-if CK_CACHE_DIR="${CACHE_ROOT}" make -C "$SNAPSHOT_DIR" regression-fast REGRESSION_ARGS="--run-root ${RUN_ROOT} --report-root ${REPORT_ROOT}" > /tmp/ck_precommit_regression.log 2>&1; then
-    echo -e "${GREEN}✓ regression-fast passed${NC}"
-    exit 0
+if [ "$should_run_v7_regression" = "1" ]; then
+    echo -e "${YELLOW}Running v7-kernel-map-contracts in staged snapshot...${NC}"
+    if ! make -C "$SNAPSHOT_DIR" v7-kernel-map-contracts > /tmp/ck_precommit_kernel_maps.log 2>&1; then
+        echo -e "${RED}✗ v7-kernel-map-contracts failed${NC}"
+        echo "  See /tmp/ck_precommit_kernel_maps.log for details"
+        tail -40 /tmp/ck_precommit_kernel_maps.log || true
+        exit 1
+    fi
+    echo -e "${GREEN}✓ v7-kernel-map-contracts passed${NC}"
 fi
 
-echo -e "${RED}✗ regression-fast failed${NC}"
-echo "  See /tmp/ck_precommit_regression.log for details"
-tail -40 /tmp/ck_precommit_regression.log || true
-exit 1
+if [ "$should_run_v7_regression" = "1" ]; then
+    if ! CK_CACHE_DIR="${CACHE_ROOT}" make -C "$SNAPSHOT_DIR" v7-regression-fast REGRESSION_ARGS="--run-root ${RUN_ROOT}/v7 --report-root ${REPORT_ROOT}/v7" > /tmp/ck_precommit_regression_v7.log 2>&1; then
+        echo -e "${RED}✗ v7-regression-fast failed${NC}"
+        echo "  See /tmp/ck_precommit_regression_v7.log for details"
+        tail -40 /tmp/ck_precommit_regression_v7.log || true
+        exit 1
+    fi
+    echo -e "${GREEN}✓ v7-regression-fast passed${NC}"
+fi
+
+if [ "$should_run_v8_regression" = "1" ]; then
+    if ! CK_CACHE_DIR="${CACHE_ROOT}" make -C "$SNAPSHOT_DIR" v8-regression-fast REGRESSION_ARGS="--run-root ${RUN_ROOT}/v8 --report-root ${REPORT_ROOT}/v8" > /tmp/ck_precommit_regression_v8.log 2>&1; then
+        echo -e "${RED}✗ v8-regression-fast failed${NC}"
+        echo "  See /tmp/ck_precommit_regression_v8.log for details"
+        tail -40 /tmp/ck_precommit_regression_v8.log || true
+        exit 1
+    fi
+    echo -e "${GREEN}✓ v8-regression-fast passed${NC}"
+fi
+
+exit 0

@@ -37,6 +37,9 @@
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
 #include <immintrin.h>
 #endif
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 /* Forward declarations for dequant functions (defined in dequant_kernels.c) */
 void dequant_q5_0_block(const block_q5_0 *block, float *output);
@@ -634,10 +637,9 @@ void gemv_q5_0_parallel_simd(float *y,
 
     if (r0 >= M) return;
 
+#if defined(__AVX__) || defined(__SSE4_1__)
     const block_q5_0 *blocks = (const block_q5_0 *)W;
     const int blocks_per_row = K / QK5_0;
-
-#if defined(__AVX__) || defined(__SSE4_1__)
     /* Prefetch first few rows */
     const int PREFETCH_ROWS = 4;
     for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
@@ -934,6 +936,63 @@ void vec_dot_q5_0_q8_0_ref(int n, float *s, const void *vx, const void *vy)
 
     *s = sumf;
 }
+
+#if defined(__ARM_NEON) || defined(__aarch64__)
+static inline int32_t ck_hsum_s32x4(int32x4_t v)
+{
+    int32_t lanes[4];
+    vst1q_s32(lanes, v);
+    return lanes[0] + lanes[1] + lanes[2] + lanes[3];
+}
+
+void vec_dot_q5_0_q8_0_neon(int n, float *s, const void *vx, const void *vy)
+{
+    const int qk = QK5_0;
+    const int nb = n / qk;
+
+    const block_q5_0 *x = (const block_q5_0 *)vx;
+    const block_q8_0 *y = (const block_q8_0 *)vy;
+
+    float sumf = 0.0f;
+
+    for (int ib = 0; ib < nb; ib++) {
+        uint32_t qh;
+        memcpy(&qh, x[ib].qh, sizeof(qh));
+
+        int8_t wvals[QK5_0];
+        for (int j = 0; j < qk / 2; j++) {
+            const uint8_t packed = x[ib].qs[j];
+            const uint8_t xh_0 = ((qh >> (j + 0)) & 1u) << 4;
+            const uint8_t xh_1 = ((qh >> (j + 16)) & 1u) << 4;
+
+            wvals[j] = (int8_t)(((packed & 0x0F) | xh_0) - 16);
+            wvals[j + qk / 2] = (int8_t)(((packed >> 4) | xh_1) - 16);
+        }
+
+        const int8x16_t w0 = vld1q_s8(&wvals[0]);
+        const int8x16_t w1 = vld1q_s8(&wvals[16]);
+        const int8x16_t x0 = vld1q_s8(&y[ib].qs[0]);
+        const int8x16_t x1 = vld1q_s8(&y[ib].qs[16]);
+
+        int32x4_t acc = vdupq_n_s32(0);
+
+        int16x8_t p0 = vmull_s8(vget_low_s8(w0), vget_low_s8(x0));
+        int16x8_t p1 = vmull_s8(vget_high_s8(w0), vget_high_s8(x0));
+        int16x8_t p2 = vmull_s8(vget_low_s8(w1), vget_low_s8(x1));
+        int16x8_t p3 = vmull_s8(vget_high_s8(w1), vget_high_s8(x1));
+
+        acc = vaddq_s32(acc, vpaddlq_s16(p0));
+        acc = vaddq_s32(acc, vpaddlq_s16(p1));
+        acc = vaddq_s32(acc, vpaddlq_s16(p2));
+        acc = vaddq_s32(acc, vpaddlq_s16(p3));
+
+        const float d = CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d);
+        sumf += d * (float)ck_hsum_s32x4(acc);
+    }
+
+    *s = sumf;
+}
+#endif
 
 #ifdef __AVX512F__
 /**
@@ -1546,6 +1605,8 @@ void vec_dot_q5_0_q8_0(int n, float *s, const void *vx, const void *vy)
     vec_dot_q5_0_q8_0_avx512(n, s, vx, vy);
 #elif defined(__AVX2__)
     vec_dot_q5_0_q8_0_avx2(n, s, vx, vy);
+#elif defined(__ARM_NEON) || defined(__aarch64__)
+    vec_dot_q5_0_q8_0_neon(n, s, vx, vy);
 #elif defined(__AVX__)
     /* AVX for 256-bit float ops (works on Ivy Bridge and newer) */
     vec_dot_q5_0_q8_0_avx(n, s, vx, vy);

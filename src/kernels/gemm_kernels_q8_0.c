@@ -35,6 +35,9 @@
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
 #include <immintrin.h>
 #endif
+#if defined(__ARM_NEON) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif
 
 void quantize_row_q8_k(const float *x, void *vy, int k);
 
@@ -985,6 +988,46 @@ void vec_dot_q8_0_q8_0_ref(int n, float *s, const void *vx, const void *vy)
     *s = sumf;
 }
 
+#if defined(__ARM_NEON) || defined(__aarch64__)
+void vec_dot_q8_0_q8_0_neon(int n, float *s, const void *vx, const void *vy)
+{
+    const int qk = QK8_0;
+    const int nb = n / qk;
+
+    const block_q8_0 *x = (const block_q8_0 *)vx;
+    const block_q8_0 *y = (const block_q8_0 *)vy;
+
+    float sumf = 0.0f;
+
+    for (int ib = 0; ib < nb; ib++) {
+        const int8x16_t x0 = vld1q_s8(&x[ib].qs[0]);
+        const int8x16_t x1 = vld1q_s8(&x[ib].qs[16]);
+        const int8x16_t y0 = vld1q_s8(&y[ib].qs[0]);
+        const int8x16_t y1 = vld1q_s8(&y[ib].qs[16]);
+
+        int32x4_t acc = vdupq_n_s32(0);
+
+        const int16x8_t p0 = vmull_s8(vget_low_s8(x0), vget_low_s8(y0));
+        const int16x8_t p1 = vmull_s8(vget_high_s8(x0), vget_high_s8(y0));
+        const int16x8_t p2 = vmull_s8(vget_low_s8(x1), vget_low_s8(y1));
+        const int16x8_t p3 = vmull_s8(vget_high_s8(x1), vget_high_s8(y1));
+
+        acc = vaddq_s32(acc, vpaddlq_s16(p0));
+        acc = vaddq_s32(acc, vpaddlq_s16(p1));
+        acc = vaddq_s32(acc, vpaddlq_s16(p2));
+        acc = vaddq_s32(acc, vpaddlq_s16(p3));
+
+        int32_t lanes[4];
+        vst1q_s32(lanes, acc);
+        const int sumi = lanes[0] + lanes[1] + lanes[2] + lanes[3];
+
+        sumf += (float)sumi * (CK_FP16_TO_FP32(x[ib].d) * CK_FP16_TO_FP32(y[ib].d));
+    }
+
+    *s = sumf;
+}
+#endif
+
 #if defined(__AVX2__) && !defined(__AVX512F__)
 void vec_dot_q8_0_q8_0_avx2(int n, float *s, const void *vx, const void *vy)
 {
@@ -1164,6 +1207,8 @@ void vec_dot_q8_0_q8_0(int n, float *s, const void *vx, const void *vy)
     vec_dot_q8_0_q8_0_avx512(n, s, vx, vy);
 #elif defined(__AVX2__)
     vec_dot_q8_0_q8_0_avx2(n, s, vx, vy);
+#elif defined(__ARM_NEON) || defined(__aarch64__)
+    vec_dot_q8_0_q8_0_neon(n, s, vx, vy);
 #elif defined(__AVX__)
     vec_dot_q8_0_q8_0_avx(n, s, vx, vy);
 #elif defined(__SSE4_1__)

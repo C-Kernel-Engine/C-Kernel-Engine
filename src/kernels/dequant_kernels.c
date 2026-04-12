@@ -21,7 +21,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
+#endif
 #include "ckernel_quant.h"
 
 /* ============================================================================

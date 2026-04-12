@@ -19,6 +19,10 @@
  * Used for multimodal projection layers (mmproj-*.gguf files).
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>

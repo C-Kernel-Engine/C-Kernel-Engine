@@ -3,6 +3,10 @@
  * @brief FP32 API adapters that enforce Q8_0 x Q8_0 activation contract
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "ckernel_engine.h"
 #include "ckernel_quant.h"
 #include "ggml_runtime_compat.h"

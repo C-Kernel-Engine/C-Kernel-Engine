@@ -605,6 +605,7 @@ static inline void ck_ggml_init_tensor_f32(struct ggml_tensor *t,
 }
 #endif
 
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #if defined(__FMA__)
 #define CK_MADD128(x, y, z) _mm_fmadd_ps(x, y, z)
 #define CK_NMADD128(x, y, z) _mm_fnmadd_ps(x, y, z)
@@ -619,7 +620,6 @@ static inline float ck_hsum128_ps(__m128 v) {
     return _mm_cvtss_f32(v);
 }
 
-#if defined(__AVX__) || defined(__AVX2__)
 static inline float ck_hsum256_ps(__m256 v) {
     const __m128 lo = _mm256_castps256_ps128(v);
     const __m128 hi = _mm256_extractf128_ps(v, 1);

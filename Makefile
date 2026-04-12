@@ -48,6 +48,17 @@ endif
 # You can override AVX/arch flags from the environment if needed, e.g.:
 #   make AVX_FLAGS="-mavx2"
 #   make AVX_FLAGS=""            # scalar build
+# Detect host architecture so we can avoid compiling x86-only kernels on ARM.
+UNAME_M := $(shell uname -m 2>/dev/null)
+IS_X86_ARCH := $(filter x86_64 amd64 i386 i486 i586 i686,$(UNAME_M))
+IS_ARM_ARCH := $(filter aarch64 arm64 armv7l armv8l,$(UNAME_M))
+ARCH_DEFINES :=
+ifneq ($(IS_X86_ARCH),)
+ARCH_DEFINES += -DCK_TARGET_X86=1
+endif
+ifneq ($(IS_ARM_ARCH),)
+ARCH_DEFINES += -DCK_TARGET_ARM=1
+endif
 # Get ALL flags lines (AVX-512/AMX might be on subsequent lines)
 CPU_FLAGS := $(shell grep '^flags' /proc/cpuinfo | tr '\n' ' ' 2>/dev/null)
 # Detect FMA support
@@ -118,8 +129,16 @@ else
 SSSE3_FLAGS :=
 endif
 
+WARNING_FLAGS := -Wall
+ifeq ($(CK_ENABLE_OPENMP),0)
+WARNING_FLAGS += -Wno-unknown-pragmas
+endif
+ifneq ($(IS_ARM_ARCH),)
+WARNING_FLAGS += -Wno-unused-function
+endif
+
 INCLUDES := -Iinclude
-CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
+CFLAGS  := -O3 -fPIC $(OPENMP_FLAG) $(WARNING_FLAGS) $(ARCH_DEFINES) $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
 CXX ?= g++
 BENCH_CC ?= gcc
 BENCH_CXX ?= $(CXX)
@@ -199,7 +218,11 @@ endif
 # Default message
 ifndef USE_MKL
 ifndef USE_ONEDNN
+ifneq ($(IS_ARM_ARCH),)
+    $(info Building with native ARM/generic kernels for GEMM)
+else
     $(info Building with native AVX kernels for GEMM)
+endif
 endif
 endif
 
@@ -318,6 +341,55 @@ SRCS    := src/backend_native.c \
 	           src/kernels/fused/attention_mlp_fused.c \
 	           src/ck_threadpool.c \
            src/ck_parallel_train.c
+
+X86_ONLY_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
+	           src/kernels/gemm_kernels_q4k_sse.c \
+	           src/kernels/gemm_kernels_q4k_avx.c \
+	           src/kernels/gemm_kernels_q6k_sse.c \
+	           src/kernels/gemm_kernels_q4k_q8k_avx2.c \
+	           src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	           src/kernels/gemm_kernels_amx.c \
+	           src/kernels/gemv_omp.c \
+	           src/kernels/quantize_row_q8_k_sse.c \
+	           src/kernels/quantize_row_q8_k_avx.c \
+	           src/kernels/quantize_row_q8_k_avx2.c \
+	           src/kernels/fused/rmsnorm_q8_k_fused.c
+
+ifeq ($(IS_ARM_ARCH),)
+else
+SRCS := $(filter-out $(X86_ONLY_SRCS),$(SRCS))
+AVX_FLAGS :=
+SSSE3_FLAGS :=
+endif
+
+QUANT_COMMON_SRCS := src/kernels/dequant_kernels.c \
+	src/kernels/gemm_kernels_q4_0.c \
+	src/kernels/gemm_kernels_q4_1.c \
+	src/kernels/gemm_kernels_q5_0.c \
+	src/kernels/gemm_kernels_q5_1.c \
+	src/kernels/gemm_kernels_q5_1_q8_1.c \
+	src/kernels/gemm_kernels_q4k.c \
+	src/kernels/gemm_kernels_q6k.c \
+	src/kernels/gemm_kernels_q4k_q8k.c \
+	src/kernels/gemm_kernels_q8_0.c \
+	src/kernels/gemm_kernels_q8_0_q8_0_contract.c \
+	src/kernels/gemm_kernels_f16.c \
+	src/ckernel_strict.c \
+	src/ck_threadpool.c
+
+QUANT_X86_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
+	src/kernels/gemm_kernels_q4k_sse.c \
+	src/kernels/gemm_kernels_q4k_q8k_avx2.c \
+	src/kernels/gemm_kernels_q4k_q8k_vnni.c \
+	src/kernels/quantize_row_q8_k_sse.c \
+	src/kernels/quantize_row_q8_k_avx.c \
+	src/kernels/quantize_row_q8_k_avx2.c
+
+QUANT_SRCS := $(QUANT_COMMON_SRCS)
+ifneq ($(IS_ARM_ARCH),)
+else
+QUANT_SRCS += $(QUANT_X86_SRCS)
+endif
 LIB          := $(BUILD_DIR)/libckernel_engine.so
 LIB_QUANT    := $(BUILD_DIR)/libckernel_quant.so
 LIB_GELU     := $(BUILD_DIR)/libckernel_gelu.so
@@ -966,8 +1038,8 @@ $(LIB_ATTENTION): $(BUILD_STAMP) src/kernels/attention_kernels.c src/kernels/att
 $(LIB_ROPE): $(BUILD_STAMP) src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_engine.h
 	$(CC) $(CFLAGS) -shared -o $@ src/kernels/rope_kernels.c src/kernels/rope_kernels_bf16.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
 
-$(LIB_QUANT): $(BUILD_STAMP) src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/ckernel_strict.c src/ck_threadpool.c include/ckernel_quant.h include/ckernel_dtype.h
-	$(CC) $(CFLAGS) -shared -o $@ src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4_0.c src/kernels/gemm_kernels_q4_1.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q4k.c src/kernels/gemm_kernels_q6k.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_kernels_f16.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/ckernel_strict.c src/ck_threadpool.c -lm -lpthread
+$(LIB_QUANT): $(BUILD_STAMP) $(QUANT_SRCS) include/ckernel_quant.h include/ckernel_dtype.h
+	$(CC) $(CFLAGS) -shared -o $@ $(QUANT_SRCS) -lm -lpthread
 
 # Convenience alias targets so existing commands still work.
 libckernel_gelu.so: $(LIB_GELU)
@@ -2552,6 +2624,7 @@ help:
 	@echo "  └─────────────────────────────────────────────────────────────────────┘"
 	@echo "  make test             Run core kernel tests"
 	@echo "  make regression-fast  Run promoted v8 family smoke/coherence regression suite"
+	@echo "  make regression-fast-arm  Run ARM-focused v8 fast regression suite (context <= 100)"
 	@echo "  make v8-regression-fast  Run explicit v8 fast regression suite"
 	@echo "  make v7-regression-fast  Run legacy v7 fast regression suite"
 	@echo "  make regression-full  Run family regression suite with stitch/parity triage"
@@ -3348,7 +3421,7 @@ report-md:
 .PHONY: v7-perf-gate v7-perf-gate-evaluate
 .PHONY: v7-inference-smoke
 .PHONY: v7-grad-fd v7-replay
-.PHONY: regression-fast v7-regression-fast v8-regression-fast regression-full regression-family
+.PHONY: regression-fast regression-fast-arm v7-regression-fast v8-regression-fast regression-full regression-family
 .PHONY: v7-regression-backprop-fast v7-regression-backprop-full regression-backprop-fast regression-backprop-full
 .PHONY: v7-regression-training-fast v7-regression-training-full regression-training-fast regression-training-full training-fast training-full
 .PHONY: v7-benchmark-training-fp32-prepare v7-benchmark-training-fp32 benchmark-training-fp32
@@ -4115,9 +4188,19 @@ v8-regression-fast:
 	@echo "Running v8 regression fast suite..."
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild $(REGRESSION_ARGS)
 
+regression-fast: v8-regression-fast
+
+V8_ARM_REGRESSION_MANIFEST ?= version/v8/regression/families_arm.json
+
+regression-fast-arm:
+	@echo "Running ARM-focused v8 regression fast suite..."
+	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode fast --force-rebuild --families-manifest "$(V8_ARM_REGRESSION_MANIFEST)" $(REGRESSION_ARGS)
+
 v8-regression-full:
 	@echo "Running v8 regression full suite..."
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode full $(REGRESSION_ARGS)
+
+regression-full: v8-regression-full
 
 v8-regression-family:
 	@if [ -z "$(FAMILY)" ]; then \
@@ -4127,11 +4210,18 @@ v8-regression-family:
 	@echo "Running v8 regression for family: $(FAMILY)"
 	@$(PYTHON) version/v8/scripts/run_regression_v8.py --mode full --family "$(FAMILY)" $(REGRESSION_ARGS)
 
+regression-family: v8-regression-family
+
 v8-validate-contracts:
-	@$(MAKE) --no-print-directory v7-validate-contracts
+	@$(MAKE) --no-print-directory v8-visualizer-health
+	@$(PYTHON) -m py_compile \
+		version/v8/scripts/ck_run_v8.py \
+		version/v8/scripts/eval_stage_v8.py \
+		version/v8/tools/open_ir_hub_v8.py \
+		version/v8/tools/open_ir_visualizer_v8.py
 
 v8-kernel-map-contracts:
-	@$(MAKE) --no-print-directory v7-kernel-map-contracts
+	@$(PYTHON) -m unittest tests.test_build_ir_v8_scaffold
 
 v8-kernel-map-gate:
 	@$(MAKE) --no-print-directory v8-kernel-map-contracts
@@ -4162,15 +4252,14 @@ test-v8-bpe-train-parity:
 
 v8-gate-train:
 	@$(MAKE) --no-print-directory v7-gate-train
+	@$(MAKE) --no-print-directory v8-validate-contracts
+	@$(MAKE) --no-print-directory v8-kernel-map-gate
 
 v8-gate:
 	@$(MAKE) --no-print-directory v7-gate
-
-regression-fast: v8-regression-fast
-
-regression-full: v8-regression-full
-
-regression-family: v8-regression-family
+	@$(MAKE) --no-print-directory v8-validate-contracts
+	@$(MAKE) --no-print-directory v8-kernel-map-gate
+	@$(MAKE) --no-print-directory v8-regression-fast
 
 v7-parity-1tok:
 	@$(PYTHON) version/v7/scripts/run_parity_1token_v7.py --json-out $(V7_REPORT_DIR)/parity_1token_latest.json
@@ -4822,7 +4911,6 @@ v7-profile-training-spec19-qwen3-advisor: v7-profile-training-spec19-qwen3-parit
 		--train-json-out "$(V7_TRAIN_SPEC19_QWEN3_REPORT_ROOT)/advisor/v7_train_spec19_qwen3_advisor.json" \
 		--train-bridge-lowering "$(V7_TRAIN_SPEC19_QWEN3_BRIDGE)" \
 		--train-checkpoint-policy "$(V7_TRAIN_SPEC19_QWEN3_CHECKPOINT)"
-
 v7-backprop-plumbing:
 	@set -e; \
 	manifest="$$V7_TRAIN_MANIFEST"; \
@@ -6154,7 +6242,7 @@ v7-memory-signoff:
 
 TEST_THREADPOOL := $(BUILD_DIR)/test_threadpool
 
-THREADPOOL_CFLAGS := -O3 -fPIC -Wall $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
+THREADPOOL_CFLAGS := -O3 -fPIC $(WARNING_FLAGS) $(ARCH_DEFINES) $(AVX_FLAGS) $(SSSE3_FLAGS) $(INCLUDES)
 
 $(TEST_THREADPOOL): tests/test_threadpool.c src/ck_threadpool.c src/ckernel_strict.c include/ck_threadpool.h
 	@mkdir -p $(BUILD_DIR)

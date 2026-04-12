@@ -80,32 +80,39 @@ for idx in "${!PUSH_TARGETS[@]}"; do
     fi
 done
 
-ck_should_run_regression_fast=0
+ck_should_run_v7_regression_fast=0
+ck_should_run_v8_regression_fast=0
 ck_should_run_v66_gate=0
 case "${CK_PREPUSH_REGRESSION_FAST:-auto}" in
     1|true|TRUE|yes|YES|always)
-        ck_should_run_regression_fast=1
+        ck_should_run_v7_regression_fast=1
+        ck_should_run_v8_regression_fast=1
         ;;
     0|false|FALSE|no|NO|never)
-        ck_should_run_regression_fast=0
+        ck_should_run_v7_regression_fast=0
+        ck_should_run_v8_regression_fast=0
         ;;
     *)
         for path in "${PUSH_CHANGED_FILES[@]}"; do
             case "$path" in
                 Makefile|.githooks/pre-commit|.githooks/pre-push|.github/workflows/nightly.yml)
-                    ck_should_run_regression_fast=1
-                    break
+                    ck_should_run_v7_regression_fast=1
+                    ck_should_run_v8_regression_fast=1
                     ;;
                 scripts/*|src/*|tests/*)
-                    ck_should_run_regression_fast=1
-                    break
+                    ck_should_run_v7_regression_fast=1
+                    ck_should_run_v8_regression_fast=1
                     ;;
-                version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md|\
+                version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md)
+                    ck_should_run_v7_regression_fast=1
+                    ;;
                 version/v8/scripts/*|version/v8/templates/*|version/v8/regression/*|version/v8/test_assets/*|version/v8/src/*|version/v8/kernel_maps/*|version/v8/README.md)
-                    ck_should_run_regression_fast=1
-                    break
+                    ck_should_run_v8_regression_fast=1
                     ;;
             esac
+            if [ "$ck_should_run_v7_regression_fast" = "1" ] && [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+                break
+            fi
         done
         ;;
 esac
@@ -137,10 +144,16 @@ case "${CK_PREPUSH_V66_GATE:-auto}" in
         ;;
 esac
 
-if [ "$ck_should_run_regression_fast" = "1" ]; then
-    echo -e "${YELLOW}  ↳ regression-fast enabled for pushed runtime/regression changes${NC}"
+if [ "$ck_should_run_v7_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}  ↳ v7-regression-fast enabled for pushed shared/v7 runtime changes${NC}"
 else
-    echo -e "${YELLOW}  ↳ regression-fast skipped (no pushed runtime/regression changes)${NC}"
+    echo -e "${YELLOW}  ↳ v7-regression-fast skipped${NC}"
+fi
+
+if [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}  ↳ v8-regression-fast enabled for pushed shared/v8 runtime changes${NC}"
+else
+    echo -e "${YELLOW}  ↳ v8-regression-fast skipped${NC}"
 fi
 
 if [ "$ck_should_run_v66_gate" = "1" ]; then
@@ -528,14 +541,25 @@ fi
 # =============================================================================
 # Test 5.5: fast regression (conditional on pushed runtime/regression files)
 # =============================================================================
-if [ "$ck_should_run_regression_fast" = "1" ]; then
+if [ "$ck_should_run_v7_regression_fast" = "1" ] || [ "$ck_should_run_v8_regression_fast" = "1" ]; then
     echo -e "${YELLOW}[5.5/6]${NC} Running fast regression..."
-    if make --no-print-directory regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs --report-root /tmp/ck-prepush-regression/reports" > /tmp/ck_regression_fast.log 2>&1; then
-        echo -e "${GREEN}  ✓ fast regression passed${NC}"
-    else
-        echo -e "${RED}  ✗ fast regression failed${NC}"
-        echo "    See /tmp/ck_regression_fast.log for details"
-        failed=1
+    if [ "$ck_should_run_v7_regression_fast" = "1" ]; then
+        if make --no-print-directory v7-regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs/v7 --report-root /tmp/ck-prepush-regression/reports/v7" > /tmp/ck_regression_fast_v7.log 2>&1; then
+            echo -e "${GREEN}  ✓ v7 fast regression passed${NC}"
+        else
+            echo -e "${RED}  ✗ v7 fast regression failed${NC}"
+            echo "    See /tmp/ck_regression_fast_v7.log for details"
+            failed=1
+        fi
+    fi
+    if [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+        if make --no-print-directory v8-regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs/v8 --report-root /tmp/ck-prepush-regression/reports/v8" > /tmp/ck_regression_fast_v8.log 2>&1; then
+            echo -e "${GREEN}  ✓ v8 fast regression passed${NC}"
+        else
+            echo -e "${RED}  ✗ v8 fast regression failed${NC}"
+            echo "    See /tmp/ck_regression_fast_v8.log for details"
+            failed=1
+        fi
     fi
 fi
 

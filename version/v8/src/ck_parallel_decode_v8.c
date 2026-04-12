@@ -32,6 +32,8 @@ extern void gemv_q8_0_q8_0_parallel_simd(float *y, const void *W, const void *x_
 /* Q4_K parallel SIMD — check if it exists, otherwise fall back */
 extern void gemv_q4_k_q8_k_parallel_simd(float *y, const void *W, const void *x_q8,
                                           int M, int K, int ith, int nth);
+extern void gemv_q4_k_q8_k_parallel(float *y, const void *W, const void *x_q8,
+                                     int M, int K, int ith, int nth);
 
 /* Serial fallbacks (for correctness reference) */
 extern void gemv_q5_0_q8_0(float *y, const void *W, const void *x_q8, int M, int K);
@@ -121,7 +123,11 @@ static void work_gemv_q6_k_q8_k(int ith, int nth, void *args)
 static void work_gemv_q4_k_q8_k(int ith, int nth, void *args)
 {
     const gemv_args_t *a = (const gemv_args_t *)args;
+#if defined(CK_TARGET_ARM)
+    gemv_q4_k_q8_k_parallel(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
+#else
     gemv_q4_k_q8_k_parallel_simd(a->y, a->W, a->x_q8, a->M, a->K, ith, nth);
+#endif
 }
 
 static void work_gemv_q8_0_q8_0(int ith, int nth, void *args)
