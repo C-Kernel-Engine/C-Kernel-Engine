@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSL Planner | C-Kernel-Engine</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CK-Engine DSL Planner Visualizer — Dark Theme with CK Branding
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+    --orange: #ffb400;
+    --orange-dark: #e5a200;
+    --orange-light: #ffc933;
+    --orange-glow: rgba(255, 180, 0, 0.12);
+    --orange-glow-strong: rgba(255, 180, 0, 0.25);
+    --dark: #2a2a2a;
+    --dark-lighter: #363636;
+    --dark-card: #323232;
+    --dark-deep: #1a1a1a;
+    --grey: #454545;
+    --green: #47b475;
+    --green-dim: rgba(71, 180, 117, 0.15);
+    --blue: #07adf8;
+    --blue-dim: rgba(7, 173, 248, 0.15);
+    --red: #e85d5d;
+    --red-dim: rgba(232, 93, 93, 0.15);
+    --yellow: #f5c842;
+    --yellow-dim: rgba(245, 200, 66, 0.15);
+    --purple: #b07cff;
+    --purple-dim: rgba(176, 124, 255, 0.15);
+    --bg-dark: #232323;
+    --bg-darker: #1b1b1b;
+    --text-primary: #f5f5f5;
+    --text-secondary: #b0b0b0;
+    --text-muted: #808080;
+    --border: #3a3a3a;
+    --border-light: #484848;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 48px rgba(0,0,0,0.6);
+    --transition: 0.2s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+    background: var(--bg-darker);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* ─── Header ─── */
+.header {
+    background: linear-gradient(135deg, var(--dark-deep) 0%, var(--dark) 50%, #2d2518 100%);
+    border-bottom: 3px solid var(--orange);
+    padding: 20px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+}
+
+.header-content {
+    max-width: 1800px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.logo {
+    width: 42px;
+    height: 42px;
+    background: var(--orange);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 18px;
+    color: var(--dark-deep);
+    letter-spacing: -1px;
+    box-shadow: 0 0 20px rgba(255, 180, 0, 0.3);
+}
+
+.header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+
+.header h1 span { color: var(--orange); }
+
+.header-meta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.meta-chip {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.meta-chip strong { color: var(--orange); }
+
+/* ─── Tab Navigation ─── */
+.tab-nav {
+    background: var(--dark);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.tab-btn {
+    padding: 14px 24px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.tab-btn:hover {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.03);
+}
+
+.tab-btn.active {
+    color: var(--orange);
+    border-bottom-color: var(--orange);
+    background: var(--orange-glow);
+}
+
+.tab-btn .tab-badge {
+    display: inline-block;
+    background: var(--orange);
+    color: var(--dark-deep);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+/* ─── Main Content ─── */
+.main {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 24px 32px;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ─── Dashboard Tab ─── */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    text-align: center;
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    border-color: var(--orange);
+    box-shadow: 0 0 20px var(--orange-glow);
+}
+
+.stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--orange);
+    line-height: 1.1;
+}
+
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-value.blue { color: var(--blue); }
+
+.stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+}
+
+.stat-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+/* Split breakdown table */
+.split-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+
+.split-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--orange);
+    background: var(--dark);
+}
+
+.split-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.split-table tr:hover td {
+    background: var(--orange-glow);
+}
+
+.split-name {
+    font-weight: 700;
+    color: var(--orange-light);
+    text-transform: capitalize;
+}
+
+.rate-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rate-bar-fill {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--orange);
+    transition: width 0.4s ease;
+}
+
+.rate-bar-track {
+    width: 100px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--grey);
+    overflow: hidden;
+}
+
+/* Error category chips */
+.error-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.error-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    min-width: 160px;
+}
+
+.error-chip-count {
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.error-chip-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+}
+
+.error-chip.family { border-left: 4px solid var(--red); }
+.error-chip.family .error-chip-count { color: var(--red); }
+.error-chip.form { border-left: 4px solid var(--yellow); }
+.error-chip.form .error-chip-count { color: var(--yellow); }
+.error-chip.style { border-left: 4px solid var(--purple); }
+.error-chip.style .error-chip-count { color: var(--purple); }
+.error-chip.syntax { border-left: 4px solid var(--blue); }
+.error-chip.syntax .error-chip-count { color: var(--blue); }
+.error-chip.exact { border-left: 4px solid var(--green); }
+.error-chip.exact .error-chip-count { color: var(--green); }
+
+/* ─── Section Headers ─── */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.section-header h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+}
+
+.section-header .section-icon {
+    color: var(--orange);
+    font-size: 18px;
+}
+
+/* ─── DSL Comparison Tab ─── */
+.row-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.row-filter-btn {
+    padding: 6px 16px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--dark-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.row-filter-btn:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+}
+
+.row-filter-btn.active {
+    background: var(--orange);
+    color: var(--dark-deep);
+    border-color: var(--orange);
+}
+
+.row-filter-btn .filter-count {
+    font-weight: 800;
+    margin-left: 4px;
+}
+
+.row-card {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.row-card:hover {
+    border-color: var(--border-light);
+}
+
+.row-card.exact {
+    border-left: 4px solid var(--green);
+}
+
+.row-card.miss {
+    border-left: 4px solid var(--red);
+}
+
+.row-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--dark);
+    cursor: pointer;
+    user-select: none;
+}
+
+.row-card-header:hover {
+    background: rgba(255, 180, 0, 0.05);
+}
+
+.row-id {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.row-split-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-left: 10px;
+}
+
+.row-split-badge.train { background: var(--blue-dim); color: var(--blue); }
+.row-split-badge.test { background: var(--green-dim); color: var(--green); }
+.row-split-badge.dev { background: var(--orange-glow-strong); color: var(--orange); }
+.row-split-badge.hidden_test { background: var(--purple-dim); color: var(--purple); }
+.row-split-badge.hidden_train { background: var(--yellow-dim); color: var(--yellow); }
+
+.row-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-dot.pass { background: var(--green); box-shadow: 0 0 8px rgba(71,180,117,0.5); }
+.status-dot.fail { background: var(--red); box-shadow: 0 0 8px rgba(232,93,93,0.5); }
+
+.row-failure-type {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.row-failure-type.family { background: var(--red-dim); color: var(--red); }
+.row-failure-type.form { background: var(--yellow-dim); color: var(--yellow); }
+.row-failure-type.style { background: var(--purple-dim); color: var(--purple); }
+.row-failure-type.syntax { background: var(--blue-dim); color: var(--blue); }
+.row-failure-type.exact { background: var(--green-dim); color: var(--green); }
+
+.row-expand-icon {
+    color: var(--text-muted);
+    font-size: 18px;
+    transition: transform 0.2s;
+}
+
+.row-card.expanded .row-expand-icon {
+    transform: rotate(90deg);
+}
+
+.row-card-body {
+    display: none;
+    padding: 0;
+}
+
+.row-card.expanded .row-card-body {
+    display: block;
+}
+
+/* Prompt display */
+.prompt-block {
+    padding: 16px 20px;
+    background: var(--dark-deep);
+    border-top: 1px solid var(--border);
+}
+
+.prompt-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.prompt-text {
+    font-size: 13px;
+    color: var(--orange-light);
+    word-break: break-all;
+    padding: 10px 14px;
+    background: var(--dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+/* DSL diff comparison */
+.dsl-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-top: 1px solid var(--border);
+}
+
+.dsl-pane {
+    padding: 16px 20px;
+}
+
+.dsl-pane:first-child {
+    border-right: 1px solid var(--border);
+}
+
+.dsl-pane-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dsl-pane-title .pane-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.dsl-pane-title .pane-dot.gold { background: var(--green); }
+.dsl-pane-title .pane-dot.model { background: var(--blue); }
+
+.dsl-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.8;
+}
+
+.dsl-token {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.dsl-token.match {
+    background: var(--green-dim);
+    color: var(--green);
+}
+
+.dsl-token.mismatch {
+    background: var(--red-dim);
+    color: var(--red);
+    font-weight: 700;
+    border: 1px solid rgba(232, 93, 93, 0.3);
+}
+
+.dsl-token.missing {
+    background: var(--dark);
+    color: var(--text-muted);
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.dsl-token.extra {
+    background: var(--yellow-dim);
+    color: var(--yellow);
+    border: 1px dashed rgba(245, 200, 66, 0.4);
+}
+
+.dsl-token.structure {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Field diff table */
+.field-diff {
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+}
+
+.field-diff-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.field-diff-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.field-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+}
+
+.field-item.match {
+    background: var(--green-dim);
+}
+
+.field-item.mismatch {
+    background: var(--red-dim);
+    border: 1px solid rgba(232, 93, 93, 0.2);
+}
+
+.field-key {
+    color: var(--text-muted);
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.field-val {
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+.field-val.expected { color: var(--green); }
+.field-val.actual { color: var(--red); }
+
+.field-arrow {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* ─── Gallery Tab ─── */
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.gallery-item {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.gallery-item:hover {
+    border-color: var(--orange);
+    box-shadow: 0 0 24px var(--orange-glow);
+}
+
+.gallery-item.exact { border-top: 3px solid var(--green); }
+.gallery-item.miss { border-top: 3px solid var(--red); }
+
+.gallery-item-header {
+    padding: 12px 16px;
+    background: var(--dark);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gallery-item-id {
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.svg-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+}
+
+.svg-pane {
+    background: var(--dark-card);
+    padding: 8px;
+}
+
+.svg-pane-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.svg-container {
+    background: #fff;
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.svg-container svg {
+    max-width: 100%;
+    max-height: 300px;
+    height: auto;
+}
+
+.svg-container .no-svg {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 40px;
+    text-align: center;
+}
+
+/* ─── Autopsy Tab ─── */
+.autopsy-summary {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.autopsy-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 16px;
+}
+
+.miss-card {
+    background: var(--dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    border-left: 4px solid var(--red);
+    transition: var(--transition);
+}
+
+.miss-card:hover {
+    border-color: var(--orange);
+    border-left-color: var(--red);
+}
+
+.miss-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.miss-card-id {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.miss-mismatch-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.mismatch-chip {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+}
+
+.mismatch-chip .mm-key {
+    color: var(--text-muted);
+}
+
+.mismatch-chip .mm-expected {
+    color: var(--green);
+}
+
+.mismatch-chip .mm-arrow {
+    color: var(--text-muted);
+    margin: 0 4px;
+}
+
+.mismatch-chip .mm-actual {
+    color: var(--red);
+}
+
+/* ─── Run Info ─── */
+.run-info {
+    background: var(--dark-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.run-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.run-info-item {
+    font-size: 12px;
+}
+
+.run-info-item .ri-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.run-info-item .ri-value {
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--dark-deep); }
+::-webkit-scrollbar-thumb { background: var(--grey); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--orange-dark); }
+
+/* ─── Animation ─── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.panel.active {
+    animation: fadeIn 0.25s ease;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+    .header-content { flex-direction: column; align-items: flex-start; }
+    .header-meta { flex-wrap: wrap; }
+    .dsl-compare { grid-template-columns: 1fr; }
+    .svg-compare { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ─── Empty state ─── */
+.empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.empty-state-text {
+    font-size: 14px;
+}
+
+/* ─── Donut Chart ─── */
+.donut-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    margin: 20px 0;
+}
+
+.donut-svg {
+    width: 160px;
+    height: 160px;
+}
+
+.donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.donut-legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+/* Search/filter */
+.search-box {
+    flex: 1;
+    max-width: 300px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--dark);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text-primary);
+    outline: none;
+    transition: var(--transition);
+}
+
+.search-box:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 12px var(--orange-glow);
+}
+
+.search-box::placeholder {
+    color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Header
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="header">
+    <div class="header-content">
+        <div class="header-left">
+            <div class="logo">CK</div>
+            <div>
+                <h1><span>DSL Planner</span> Visualizer</h1>
+            </div>
+        </div>
+        <div class="header-meta" id="headerMeta">
+            <span class="meta-chip">loading…</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Tab Navigation
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-nav" id="tabNav">
+    <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
+        ◆ Dashboard
+    </button>
+    <button class="tab-btn" data-tab="comparison" onclick="switchTab('comparison')">
+        ⇔ DSL Comparison
+    </button>
+    <button class="tab-btn" data-tab="gallery" onclick="switchTab('gallery')">
+        ◫ Output Gallery
+    </button>
+    <button class="tab-btn" data-tab="autopsy" onclick="switchTab('autopsy')">
+        ⚑ Autopsy <span class="tab-badge" id="autopsyBadge">0</span>
+    </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Main Content
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="main">
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="panel active"></div>
+
+    <!-- DSL Comparison -->
+    <div id="comparison" class="panel"></div>
+
+    <!-- Output Gallery -->
+    <div id="gallery" class="panel"></div>
+
+    <!-- Autopsy -->
+    <div id="autopsy" class="panel"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Scripts
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+    'use strict';
+
+    /* ── Data ── */
+    let DATA = window.__DSL_PLANNER_DATA__ || null;
+    let probeReport = null;
+    let probeAutopsy = null;
+
+    const rendered = { dashboard: false, comparison: false, gallery: false, autopsy: false };
+    let currentFilter = 'all';
+
+    /* ── Bootstrap ── */
+    function bootstrap() {
+        if (window.__DSL_PLANNER_DATA__) {
+            DATA = window.__DSL_PLANNER_DATA__;
+            probeReport = DATA.probe_report;
+            probeAutopsy = DATA.probe_autopsy;
+            renderHeader();
+            renderDashboard();
+        } else {
+            document.getElementById('dashboard').innerHTML =
+                '<div class="empty-state"><div class="empty-state-icon">⊘</div>' +
+                '<div class="empty-state-text">No data embedded. Generate with:<br>' +
+                '<code style="color:var(--orange)">python3 version/v8/tools/open_dsl_planner_v8.py --run &lt;run_dir&gt;</code></div></div>';
+        }
+    }
+
+    /* ── Tab switching ── */
+    window.switchTab = function(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+        document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === tabId));
+
+        if (!rendered[tabId] && probeReport) {
+            switch(tabId) {
+                case 'dashboard': renderDashboard(); break;
+                case 'comparison': renderComparison(); break;
+                case 'gallery': renderGallery(); break;
+                case 'autopsy': renderAutopsy(); break;
+            }
+            rendered[tabId] = true;
+        }
+    };
+
+    /* ── Header ── */
+    function renderHeader() {
+        const r = probeReport;
+        const el = document.getElementById('headerMeta');
+        const runName = r.run_name || 'unknown';
+        const parts = runName.match(/spec(\d+)/) || ['', '?'];
+        const generated = r.generated_at ? new Date(r.generated_at).toLocaleDateString() : '';
+        const total = r.totals.count;
+        const exact = Math.round(r.totals.exact_rate * total);
+
+        el.innerHTML = `
+            <span class="meta-chip"><strong>Spec${parts[1]}</strong> ${runName.split('_').slice(1, 4).join(' ')}</span>
+            <span class="meta-chip"><strong>${exact}/${total}</strong> exact</span>
+            <span class="meta-chip"><strong>${(r.totals.exact_rate * 100).toFixed(1)}%</strong> accuracy</span>
+            <span class="meta-chip">${generated}</span>
+        `;
+
+        document.title = `DSL Planner | ${runName} | C-Kernel-Engine`;
+        document.getElementById('autopsyBadge').textContent = probeAutopsy ? probeAutopsy.miss_cases : '?';
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Dashboard
+       ═══════════════════════════════════════════════════════════════════════ */
+    function renderDashboard() {
+        const r = probeReport;
+        const a = probeAutopsy;
+        const total = r.totals.count;
+        const exact = Math.round(r.totals.exact_rate * total);
+        const renderable = Math.round(r.totals.renderable_rate * total);
+        const misses = total - exact;
+
+        const failureCounts = a ? a.overall_failure_counts : {};
+
+        let html = '';
+
+        /* Stat cards */
+        html += '<div class="stat-grid">';
+        html += statCard(exact + '/' + total, 'Exact Match', (r.totals.exact_rate * 100).toFixed(1) + '%', exact === total ? 'green' : '');
+        html += statCard(renderable + '/' + total, 'Renderable', (r.totals.renderable_rate * 100).toFixed(1) + '%', 'blue');
+        html += statCard(misses, 'Misses', misses === 0 ? 'Clean run!' : misses + ' rows to diagnose', misses === 0 ? 'green' : 'red');
+        html += statCard(r.results.length, 'Total Rows', Object.keys(splitGroups(r.results)).length + ' splits', '');
+        html += '</div>';
+
+        /* Donut chart */
+        html += '<div class="section-header"><span class="section-icon">◉</span><h2>Error Distribution</h2></div>';
+        html += renderDonut(failureCounts, misses, exact);
+
+        /* Split breakdown */
+        html += '<div class="section-header"><span class="section-icon">▦</span><h2>Split Breakdown</h2></div>';
+        html += '<table class="split-table"><thead><tr>';
+        html += '<th>Split</th><th>Count</th><th>Exact Rate</th><th>Renderable</th><th></th>';
+        html += '</tr></thead><tbody>';
+
+        for (const s of r.split_summary) {
+            const pct = (s.exact_rate * 100).toFixed(0);
+            const rpct = (s.renderable_rate * 100).toFixed(0);
+            html += `<tr>
+                <td><span class="split-name">${esc(s.split)}</span></td>
+                <td>${s.count}</td>
+                <td><div class="rate-bar"><div class="rate-bar-track"><div class="rate-bar-fill" style="width:${pct}%"></div></div> ${pct}%</div></td>
+                <td><div class="rate-bar"><div class="rate-bar-track"><div class="rate-bar-fill" style="width:${rpct}%; background:var(--blue)"></div></div> ${rpct}%</div></td>
+                <td>${s.exact_rate === 1 ? '<span style="color:var(--green)">✓ clean</span>' : ''}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+
+        /* Error category chips */
+        if (Object.keys(failureCounts).length > 0) {
+            html += '<div class="section-header"><span class="section-icon">⚐</span><h2>Failure Categories</h2></div>';
+            html += '<div class="error-grid">';
+            for (const [cat, count] of Object.entries(failureCounts)) {
+                html += `<div class="error-chip ${cat}">
+                    <span class="error-chip-count">${count}</span>
+                    <span class="error-chip-label">${cat}</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+
+        /* Run info */
+        html += '<div class="section-header"><span class="section-icon">⚙</span><h2>Run Info</h2></div>';
+        html += '<div class="run-info"><div class="run-info-grid">';
+        html += runInfoItem('Run Name', r.run_name);
+        html += runInfoItem('Schema', r.schema);
+        html += runInfoItem('Dataset Type', r.dataset_type);
+        html += runInfoItem('Output Adapter', r.output_adapter);
+        html += runInfoItem('Generated', r.generated_at);
+        if (r.contract_source) html += runInfoItem('Contract', r.contract_source.split('/').pop());
+        html += '</div></div>';
+
+        document.getElementById('dashboard').innerHTML = html;
+        rendered.dashboard = true;
+    }
+
+    function statCard(value, label, sub, colorClass) {
+        return `<div class="stat-card">
+            <div class="stat-value ${colorClass}">${value}</div>
+            <div class="stat-label">${label}</div>
+            <div class="stat-sub">${sub}</div>
+        </div>`;
+    }
+
+    function runInfoItem(label, value) {
+        return `<div class="run-info-item"><div class="ri-label">${label}</div><div class="ri-value">${esc(value || '-')}</div></div>`;
+    }
+
+    function renderDonut(failureCounts, misses, exact) {
+        const colors = {
+            family: 'var(--red)',
+            form: 'var(--yellow)',
+            style: 'var(--purple)',
+            syntax: 'var(--blue)',
+            exact: 'var(--green)',
+        };
+
+        const segments = [];
+        if (exact > 0) segments.push({ label: 'Exact', count: exact, color: colors.exact });
+        for (const [k, v] of Object.entries(failureCounts)) {
+            if (v > 0 && k !== 'exact') segments.push({ label: k, count: v, color: colors[k] || 'var(--text-muted)' });
+        }
+
+        const total = segments.reduce((s, x) => s + x.count, 0);
+        if (total === 0) return '';
+
+        let html = '<div class="donut-container">';
+
+        // SVG donut
+        const r = 60, cx = 80, cy = 80, sw = 20;
+        const circ = 2 * Math.PI * r;
+        let offset = 0;
+        html += `<svg class="donut-svg" viewBox="0 0 160 160">`;
+        for (const seg of segments) {
+            const pct = seg.count / total;
+            const dashLen = pct * circ;
+            const gap = circ - dashLen;
+            html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+                stroke="${seg.color}" stroke-width="${sw}"
+                stroke-dasharray="${dashLen} ${gap}"
+                stroke-dashoffset="${-offset}"
+                transform="rotate(-90 ${cx} ${cy})" />`;
+            offset += dashLen;
+        }
+        // Center text
+        html += `<text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="var(--text-primary)" font-size="28" font-weight="800">${exact}</text>`;
+        html += `<text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text-muted)" font-size="11">/ ${total}</text>`;
+        html += '</svg>';
+
+        // Legend
+        html += '<div class="donut-legend">';
+        for (const seg of segments) {
+            html += `<div class="donut-legend-item">
+                <div class="donut-legend-dot" style="background:${seg.color}"></div>
+                <span style="color:var(--text-secondary)">${seg.label}</span>
+                <span style="color:var(--text-primary);font-weight:700;margin-left:auto">${seg.count}</span>
+            </div>`;
+        }
+        html += '</div></div>';
+        return html;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       DSL Comparison
+       ═══════════════════════════════════════════════════════════════════════ */
+    function renderComparison() {
+        const results = probeReport.results;
+        const groups = splitGroups(results);
+        const misses = probeAutopsy ? probeAutopsy.misses : [];
+        const missIds = new Set(misses.map(m => m.id));
+
+        let html = '';
+
+        // Filter nav
+        html += '<div class="row-nav">';
+        html += filterBtn('all', 'All', results.length);
+        html += filterBtn('miss', 'Misses', misses.length);
+        for (const [split, items] of Object.entries(groups)) {
+            html += filterBtn(split, split, items.length);
+        }
+        html += '<input class="search-box" type="text" placeholder="Search by id, prompt, label…" oninput="filterRows(this.value)" />';
+        html += '</div>';
+
+        // Row cards
+        html += '<div id="comparisonRows">';
+        for (const r of results) {
+            const isExact = r.exact_match;
+            const miss = misses.find(m => m.id === r.id);
+            const failureType = miss ? miss.primary_failure : (isExact ? 'exact' : 'unknown');
+
+            html += `<div class="row-card ${isExact ? 'exact' : 'miss'}" data-id="${esc(r.id)}" data-split="${esc(r.split)}" data-miss="${missIds.has(r.id) ? '1' : '0'}" data-searchable="${esc((r.id + ' ' + r.prompt + ' ' + (r.label || '')).toLowerCase())}">`;
+
+            // Header
+            html += `<div class="row-card-header" onclick="toggleRow(this)">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="status-dot ${isExact ? 'pass' : 'fail'}"></span>
+                    <span class="row-id">${esc(r.id)}</span>
+                    <span class="row-split-badge ${r.split}">${esc(r.split)}</span>
+                    ${!isExact ? `<span class="row-failure-type ${failureType}">${failureType}</span>` : ''}
+                </div>
+                <div class="row-status">
+                    <span style="font-size:11px;color:var(--text-muted)">${esc(r.label || '')}</span>
+                    <span class="row-expand-icon">▸</span>
+                </div>
+            </div>`;
+
+            // Body (collapsed by default)
+            html += '<div class="row-card-body">';
+
+            // Prompt
+            html += `<div class="prompt-block">
+                <div class="prompt-label">Prompt</div>
+                <div class="prompt-text">${esc(r.prompt)}</div>
+            </div>`;
+
+            // DSL comparison
+            html += '<div class="dsl-compare">';
+            html += renderDslPane('Expected (Gold)', 'gold', r.expected_output, r.parsed_output);
+            html += renderDslPane('Model Output', 'model', r.parsed_output, r.expected_output);
+            html += '</div>';
+
+            // Field diff
+            if (miss && miss.expected_fields && miss.actual_fields) {
+                html += renderFieldDiff(miss.expected_fields, miss.actual_fields, miss.mismatched_fields || []);
+            } else if (r.repair_diag && r.repair_diag.bundle) {
+                // For hits, show bundle fields from repair_diag
+                const expected = parseBundleFields(r.expected_output);
+                const actual = parseBundleFields(r.parsed_output);
+                if (Object.keys(expected).length > 0) {
+                    const mm = [];
+                    for (const k of Object.keys(expected)) {
+                        if (expected[k] !== actual[k]) mm.push(k);
+                    }
+                    html += renderFieldDiff(expected, actual, mm);
+                }
+            }
+
+            html += '</div>'; // row-card-body
+            html += '</div>'; // row-card
+        }
+        html += '</div>';
+
+        document.getElementById('comparison').innerHTML = html;
+        rendered.comparison = true;
+    }
+
+    function renderDslPane(title, dotClass, primary, reference) {
+        const pTokens = tokenizeDsl(primary || '');
+        const rTokens = tokenizeDsl(reference || '');
+        const rSet = new Set(rTokens.map(t => t.text));
+
+        let html = `<div class="dsl-pane">`;
+        html += `<div class="dsl-pane-title"><span class="pane-dot ${dotClass}"></span>${title}</div>`;
+        html += '<div class="dsl-tokens">';
+
+        for (const tok of pTokens) {
+            if (tok.type === 'structure') {
+                html += `<span class="dsl-token structure">${esc(tok.text)}</span>`;
+            } else if (tok.type === 'field') {
+                // Check if this field matches the reference
+                const matchRef = rTokens.find(t => t.text === tok.text);
+                const cls = matchRef ? 'match' : 'mismatch';
+                html += `<span class="dsl-token ${cls}">${esc(tok.text)}</span>`;
+            } else {
+                html += `<span class="dsl-token">${esc(tok.text)}</span>`;
+            }
+        }
+
+        html += '</div></div>';
+        return html;
+    }
+
+    function tokenizeDsl(dsl) {
+        if (!dsl) return [];
+        const tokens = [];
+        const regex = /\[(\/?[a-z_]+(?::[^\]]*)?)\]/g;
+        let last = 0;
+        let m;
+        while ((m = regex.exec(dsl)) !== null) {
+            if (m.index > last) {
+                const gap = dsl.slice(last, m.index).trim();
+                if (gap) tokens.push({ type: 'text', text: gap });
+            }
+            const inner = m[1];
+            if (inner === 'bundle' || inner === '/bundle') {
+                tokens.push({ type: 'structure', text: m[0] });
+            } else {
+                tokens.push({ type: 'field', text: m[0] });
+            }
+            last = m.index + m[0].length;
+        }
+        if (last < dsl.length) {
+            const tail = dsl.slice(last).trim();
+            if (tail) tokens.push({ type: 'text', text: tail });
+        }
+        return tokens;
+    }
+
+    function parseBundleFields(dsl) {
+        const fields = {};
+        if (!dsl) return fields;
+        const regex = /\[([a-z_]+):([^\]]*)\]/g;
+        let m;
+        while ((m = regex.exec(dsl)) !== null) {
+            if (m[1] !== 'bundle') fields[m[1]] = m[2];
+        }
+        return fields;
+    }
+
+    function renderFieldDiff(expected, actual, mismatched) {
+        const mmSet = new Set(mismatched);
+        const allKeys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])];
+
+        let html = '<div class="field-diff">';
+        html += '<div class="field-diff-title">Field-Level Diff</div>';
+        html += '<div class="field-diff-grid">';
+
+        for (const k of allKeys) {
+            const e = expected[k];
+            const a = actual[k];
+            const match = e === a;
+
+            if (match) {
+                html += `<div class="field-item match">
+                    <span class="field-key">${esc(k)}</span>
+                    <span class="field-val">${esc(e || '-')}</span>
+                </div>`;
+            } else {
+                html += `<div class="field-item mismatch">
+                    <span class="field-key">${esc(k)}</span>
+                    <span class="field-val expected">${esc(e || '∅')}</span>
+                    <span class="field-arrow">→</span>
+                    <span class="field-val actual">${esc(a || '∅')}</span>
+                </div>`;
+            }
+        }
+
+        html += '</div></div>';
+        return html;
+    }
+
+    function filterBtn(value, label, count) {
+        const active = value === 'all' ? ' active' : '';
+        return `<button class="row-filter-btn${active}" data-filter="${value}" onclick="applyFilter('${value}')">${label}<span class="filter-count">${count}</span></button>`;
+    }
+
+    window.applyFilter = function(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.row-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+        const cards = document.querySelectorAll('#comparisonRows .row-card');
+        cards.forEach(c => {
+            let show = true;
+            if (filter === 'miss') show = c.dataset.miss === '1';
+            else if (filter !== 'all') show = c.dataset.split === filter;
+            c.style.display = show ? '' : 'none';
+        });
+    };
+
+    window.filterRows = function(query) {
+        const q = query.toLowerCase();
+        const cards = document.querySelectorAll('#comparisonRows .row-card');
+        cards.forEach(c => {
+            if (!q) { c.style.display = ''; return; }
+            c.style.display = c.dataset.searchable.includes(q) ? '' : 'none';
+        });
+    };
+
+    window.toggleRow = function(headerEl) {
+        headerEl.parentElement.classList.toggle('expanded');
+    };
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Output Gallery
+       ═══════════════════════════════════════════════════════════════════════ */
+    function renderGallery() {
+        const results = probeReport.results;
+        const missIds = probeAutopsy ? new Set(probeAutopsy.misses.map(m => m.id)) : new Set();
+
+        let html = '';
+
+        // Filter
+        html += '<div class="row-nav">';
+        html += '<button class="row-filter-btn active" data-gfilter="all" onclick="galleryFilter(\'all\')">All<span class="filter-count">' + results.length + '</span></button>';
+        html += '<button class="row-filter-btn" data-gfilter="miss" onclick="galleryFilter(\'miss\')">Misses<span class="filter-count">' + (probeAutopsy ? probeAutopsy.miss_cases : 0) + '</span></button>';
+        html += '<button class="row-filter-btn" data-gfilter="renderable" onclick="galleryFilter(\'renderable\')">Renderable<span class="filter-count">' + results.filter(r => r.renderable).length + '</span></button>';
+        html += '</div>';
+
+        html += '<div class="gallery-grid" id="galleryGrid">';
+
+        for (const r of results) {
+            const isExact = r.exact_match;
+            const hasExpectedSvg = r.expected_svg || r.expected_rendered_output;
+            const hasModelSvg = r.rendered_svg || r.materialized_output;
+
+            html += `<div class="gallery-item ${isExact ? 'exact' : 'miss'}" data-gid="${esc(r.id)}" data-gmiss="${missIds.has(r.id) ? '1' : '0'}" data-grenderable="${r.renderable ? '1' : '0'}">`;
+
+            html += `<div class="gallery-item-header">
+                <span class="gallery-item-id">
+                    <span class="status-dot ${isExact ? 'pass' : 'fail'}" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>
+                    ${esc(r.id)}
+                    <span class="row-split-badge ${r.split}">${esc(r.split)}</span>
+                </span>
+            </div>`;
+
+            html += '<div class="svg-compare">';
+
+            // Expected SVG
+            html += '<div class="svg-pane">';
+            html += '<div class="svg-pane-label">Expected</div>';
+            html += '<div class="svg-container">';
+            if (hasExpectedSvg) {
+                html += sanitizeSvg(hasExpectedSvg);
+            } else {
+                html += '<div class="no-svg">No SVG</div>';
+            }
+            html += '</div></div>';
+
+            // Model SVG
+            html += '<div class="svg-pane">';
+            html += '<div class="svg-pane-label">Model</div>';
+            html += '<div class="svg-container">';
+            if (hasModelSvg) {
+                html += sanitizeSvg(hasModelSvg);
+            } else {
+                html += '<div class="no-svg">' + (r.renderable ? 'Renderable but no SVG data' : 'Not renderable') + '</div>';
+            }
+            html += '</div></div>';
+
+            html += '</div>'; // svg-compare
+            html += '</div>'; // gallery-item
+        }
+
+        html += '</div>';
+
+        document.getElementById('gallery').innerHTML = html;
+        rendered.gallery = true;
+    }
+
+    function sanitizeSvg(svg) {
+        if (!svg) return '';
+        // Remove any script tags for safety
+        let safe = svg.replace(/<script[\s\S]*?<\/script>/gi, '');
+        // Ensure viewBox is present for scaling
+        if (safe.includes('<svg') && !safe.includes('viewBox')) {
+            safe = safe.replace('<svg', '<svg viewBox="0 0 1280 980"');
+        }
+        return safe;
+    }
+
+    window.galleryFilter = function(filter) {
+        document.querySelectorAll('[data-gfilter]').forEach(b => b.classList.toggle('active', b.dataset.gfilter === filter));
+        document.querySelectorAll('#galleryGrid .gallery-item').forEach(item => {
+            let show = true;
+            if (filter === 'miss') show = item.dataset.gmiss === '1';
+            else if (filter === 'renderable') show = item.dataset.grenderable === '1';
+            item.style.display = show ? '' : 'none';
+        });
+    };
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Autopsy
+       ═══════════════════════════════════════════════════════════════════════ */
+    function renderAutopsy() {
+        if (!probeAutopsy) {
+            document.getElementById('autopsy').innerHTML =
+                '<div class="empty-state"><div class="empty-state-icon">⊘</div><div class="empty-state-text">No autopsy data available.</div></div>';
+            return;
+        }
+
+        const a = probeAutopsy;
+        let html = '';
+
+        // Summary
+        html += '<div class="autopsy-summary">';
+        html += `<div class="autopsy-title">Bundle Probe Autopsy — ${a.miss_cases} misses / ${a.total_cases} total</div>`;
+
+        // Split failure breakdown
+        if (a.split_failure_counts) {
+            html += '<div class="section-header"><span class="section-icon">▦</span><h2>Failures by Split</h2></div>';
+            html += '<table class="split-table"><thead><tr>';
+            html += '<th>Split</th>';
+            const categories = Object.keys(a.overall_failure_counts || {});
+            for (const cat of categories) {
+                html += `<th>${cat}</th>`;
+            }
+            html += '<th>Total</th></tr></thead><tbody>';
+
+            for (const [split, counts] of Object.entries(a.split_failure_counts)) {
+                const splitTotal = Object.values(counts).reduce((s, v) => s + v, 0);
+                if (splitTotal === 0) continue;
+                html += `<tr><td><span class="split-name">${esc(split)}</span></td>`;
+                for (const cat of categories) {
+                    const v = counts[cat] || 0;
+                    html += `<td style="color:${v > 0 ? 'var(--red)' : 'var(--text-muted)'}">${v}</td>`;
+                }
+                html += `<td style="font-weight:700">${splitTotal}</td></tr>`;
+            }
+            html += '</tbody></table>';
+        }
+
+        html += '</div>'; // autopsy-summary
+
+        // Individual misses
+        html += '<div class="section-header"><span class="section-icon">⚑</span><h2>Miss Detail</h2></div>';
+
+        for (const miss of a.misses) {
+            html += `<div class="miss-card">`;
+            html += `<div class="miss-card-header">
+                <div>
+                    <span class="miss-card-id">${esc(miss.id)}</span>
+                    <span class="row-split-badge ${miss.split}">${esc(miss.split)}</span>
+                    <span class="row-failure-type ${miss.primary_failure}">${miss.primary_failure}</span>
+                </div>
+                <div style="display:flex;gap:8px;font-size:11px;color:var(--text-muted)">
+                    ${miss.renderable ? '<span style="color:var(--green)">renderable</span>' : '<span style="color:var(--red)">not renderable</span>'}
+                    ${miss.missing_stop_marker ? '<span style="color:var(--yellow)">⚠ no stop</span>' : ''}
+                    ${miss.truncated_at_budget ? '<span style="color:var(--yellow)">⚠ truncated</span>' : ''}
+                    ${miss.hit_decode_ceiling ? '<span style="color:var(--yellow)">⚠ decode ceiling</span>' : ''}
+                </div>
+            </div>`;
+
+            html += `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">${esc(miss.label || '')}</div>`;
+            html += `<div style="font-size:11px;color:var(--orange-light);padding:6px 10px;background:var(--dark-deep);border-radius:4px;margin-bottom:8px">${esc(miss.prompt)}</div>`;
+
+            // Mismatch chips
+            if (miss.mismatched_fields && miss.mismatched_fields.length > 0 && miss.expected_fields && miss.actual_fields) {
+                html += '<div class="miss-mismatch-list">';
+                for (const field of miss.mismatched_fields) {
+                    html += `<span class="mismatch-chip">
+                        <span class="mm-key">${esc(field)}:</span>
+                        <span class="mm-expected">${esc(miss.expected_fields[field] || '∅')}</span>
+                        <span class="mm-arrow">→</span>
+                        <span class="mm-actual">${esc(miss.actual_fields[field] || '∅')}</span>
+                    </span>`;
+                }
+                html += '</div>';
+            }
+
+            html += '</div>'; // miss-card
+        }
+
+        document.getElementById('autopsy').innerHTML = html;
+        rendered.autopsy = true;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Utilities
+       ═══════════════════════════════════════════════════════════════════════ */
+    function esc(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = String(s);
+        return div.innerHTML;
+    }
+
+    function splitGroups(results) {
+        const g = {};
+        for (const r of results) {
+            if (!g[r.split]) g[r.split] = [];
+            g[r.split].push(r);
+        }
+        return g;
+    }
+
+    /* ── Boot ── */
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+    } else {
+        bootstrap();
+    }
+
+    // Also listen for dynamic data injection
+    window.addEventListener('ckDslPlannerDataLoaded', bootstrap);
+})();
+</script>
+</body>
+</html>

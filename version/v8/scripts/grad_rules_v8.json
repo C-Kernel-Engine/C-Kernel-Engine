@@ -1,0 +1,774 @@
+{
+  "version": 1,
+  "description": "v7 gradient rules for IR2 backward synthesis. 'ready' rules can lower today; 'todo' rules fail-fast unless partial mode is enabled.",
+  "rules": {
+    "dense_embedding_lookup_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "token_ids",
+        "weight"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "embedding_backward_f32",
+          "reads": [
+            "saved:token_ids",
+            "grad:out"
+          ],
+          "writes": [
+            {
+              "name": "d_token_embeddings",
+              "kind": "tmp_grad_weight",
+              "target_weight": "weight"
+            },
+            {
+              "name": "d_pos_embeddings",
+              "kind": "aux",
+              "tensor": "aux.d_pos_embeddings"
+            }
+          ]
+        }
+      ]
+    },
+    "rmsnorm_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "gamma",
+        "rstd_cache"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "rmsnorm_backward",
+          "reads": [
+            "grad:output",
+            "saved:input",
+            "saved_weight:gamma",
+            "saved:rstd_cache"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "gamma"
+            }
+          ]
+        }
+      ]
+    },
+    "matmul_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "W"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "gemm_backward_f32",
+          "reads": [
+            "grad:y",
+            "saved:input",
+            "saved_weight:W"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "W"
+            },
+            {
+              "name": "d_bias",
+              "kind": "tmp_grad_weight",
+              "target_weight": "bias",
+              "optional_target_weight": true
+            }
+          ]
+        }
+      ]
+    },
+    "matmul_no_bias_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input",
+        "W"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "gemm_backward_f32",
+          "reads": [
+            "grad:y",
+            "saved:input",
+            "saved_weight:W"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "W"
+            },
+            {
+              "name": "d_bias",
+              "kind": "aux",
+              "tensor": "aux.d_bias"
+            }
+          ]
+        }
+      ]
+    },
+    "qk_norm_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k",
+        "q_gamma",
+        "k_gamma"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "qk_norm_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:k",
+            "saved:q",
+            "saved:k",
+            "saved_weight:q_gamma",
+            "saved_weight:k_gamma"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_q_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "q_gamma"
+            },
+            {
+              "name": "d_k_gamma",
+              "kind": "tmp_grad_weight",
+              "target_weight": "k_gamma"
+            }
+          ]
+        }
+      ]
+    },
+    "rope_qk_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "rope_backward_qk_f32",
+          "reads": [
+            "grad:q",
+            "grad:k"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            }
+          ]
+        }
+      ]
+    },
+    "attention_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k",
+        "v"
+      ],
+      "extra_saved": [
+        "attn_weights"
+      ],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "attention_backward_causal_head_major_gqa",
+          "reads": [
+            "grad:out",
+            "saved:q",
+            "saved:k",
+            "saved:v",
+            "saved:attn_weights"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_v",
+              "kind": "grad_activation",
+              "target_input": "v"
+            },
+        {
+          "name": "d_scores",
+          "kind": "aux",
+          "tensor": "aux.d_scores",
+          "shape_from_saved": "attn_weights"
+        }
+      ]
+    }
+  ]
+    },
+    "split_q_gate_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "split_q_gate_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:gate"
+          ],
+          "writes": [
+            {
+              "name": "d_packed_qg",
+              "kind": "grad_activation",
+              "target_input": "packed_qg"
+            }
+          ]
+        }
+      ]
+    },
+    "attn_gate_sigmoid_mul_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "x",
+        "gate"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "attn_gate_sigmoid_mul_backward_f32",
+          "reads": [
+            "grad:out",
+            "saved:x",
+            "saved:gate"
+          ],
+          "writes": [
+            {
+              "name": "d_x",
+              "kind": "grad_activation",
+              "target_input": "x"
+            },
+            {
+              "name": "d_gate",
+              "kind": "grad_activation",
+              "target_input": "gate"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_split_qkv_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_split_qkv_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:k",
+            "grad:v"
+          ],
+          "writes": [
+            {
+              "name": "d_packed_qkv",
+              "kind": "grad_activation",
+              "target_input": "packed_qkv"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_dt_gate_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "alpha",
+        "dt_bias",
+        "A"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_dt_gate_backward_f32",
+          "reads": [
+            "grad:gate",
+            "saved:alpha",
+            "saved_weight:dt_bias",
+            "saved_weight:A"
+          ],
+          "writes": [
+            {
+              "name": "d_alpha",
+              "kind": "grad_activation",
+              "target_input": "alpha"
+            },
+            {
+              "name": "d_dt_bias",
+              "kind": "tmp_grad_weight",
+              "target_weight": "dt_bias"
+            },
+            {
+              "name": "d_A",
+              "kind": "tmp_grad_weight",
+              "target_weight": "A"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_conv_state_update_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "state_in",
+        "q",
+        "k",
+        "v"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_conv_state_update_backward_f32",
+          "reads": [
+            "grad:conv_x",
+            "saved:state_in",
+            "saved:q",
+            "saved:k",
+            "saved:v"
+          ],
+          "writes": [
+            {
+              "name": "d_state_in",
+              "kind": "grad_activation",
+              "target_input": "state_in"
+            },
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_v",
+              "kind": "grad_activation",
+              "target_input": "v"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_ssm_conv_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "conv_x",
+        "kernel"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "ssm_conv1d_backward",
+          "reads": [
+            "grad:out",
+            "saved:conv_x",
+            "saved_weight:kernel"
+          ],
+          "writes": [
+            {
+              "name": "d_conv_x",
+              "kind": "grad_activation",
+              "target_input": "conv_x"
+            },
+            {
+              "name": "d_kernel",
+              "kind": "tmp_grad_weight",
+              "target_weight": "kernel"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_silu_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "x"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_silu_backward_f32",
+          "reads": [
+            "grad:out",
+            "saved:x"
+          ],
+          "writes": [
+            {
+              "name": "d_x",
+              "kind": "grad_activation",
+              "target_input": "x"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_split_conv_qkv_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_split_conv_qkv_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:k",
+            "grad:v"
+          ],
+          "writes": [
+            {
+              "name": "d_packed_qkv",
+              "kind": "grad_activation",
+              "target_input": "packed_qkv"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_qk_l2_norm_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_qk_l2_norm_backward_f32",
+          "reads": [
+            "grad:q",
+            "grad:k",
+            "saved:q",
+            "saved:k"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_core_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "q",
+        "k",
+        "v",
+        "g",
+        "beta",
+        "state_in",
+        "state_out"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "gated_deltanet_autoregressive_backward_f32",
+          "reads": [
+            "grad:out",
+            "grad:state_out",
+            "saved:q",
+            "saved:k",
+            "saved:v",
+            "saved:g",
+            "saved:beta",
+            "saved:state_in",
+            "saved:state_out"
+          ],
+          "writes": [
+            {
+              "name": "d_q",
+              "kind": "grad_activation",
+              "target_input": "q"
+            },
+            {
+              "name": "d_k",
+              "kind": "grad_activation",
+              "target_input": "k"
+            },
+            {
+              "name": "d_v",
+              "kind": "grad_activation",
+              "target_input": "v"
+            },
+            {
+              "name": "d_g",
+              "kind": "grad_activation",
+              "target_input": "g"
+            },
+            {
+              "name": "d_beta",
+              "kind": "grad_activation",
+              "target_input": "beta"
+            },
+            {
+              "name": "d_state_in",
+              "kind": "grad_activation",
+              "target_input": "state_in"
+            }
+          ]
+        }
+      ]
+    },
+    "recurrent_norm_gate_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "x",
+        "gate",
+        "weight"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "recurrent_norm_gate_backward_f32",
+          "reads": [
+            "grad:out",
+            "saved:x",
+            "saved:gate",
+            "saved_weight:weight"
+          ],
+          "writes": [
+            {
+              "name": "d_x",
+              "kind": "grad_activation",
+              "target_input": "x"
+            },
+            {
+              "name": "d_gate",
+              "kind": "grad_activation",
+              "target_input": "gate"
+            },
+            {
+              "name": "d_weight",
+              "kind": "tmp_grad_weight",
+              "target_weight": "weight"
+            }
+          ]
+        }
+      ]
+    },
+    "residual_add_backward": {
+      "status": "ready",
+      "requires_saved": [],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "residual_add_backward_f32",
+          "reads": [
+            "grad:out"
+          ],
+          "writes": [
+            {
+              "name": "d_a",
+              "kind": "grad_activation",
+              "target_input": "a"
+            },
+            {
+              "name": "d_b",
+              "kind": "grad_activation",
+              "target_input": "b"
+            }
+          ]
+        }
+      ]
+    },
+    "swiglu_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "swiglu_backward_exact",
+          "reads": [
+            "grad:out",
+            "saved:input"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            }
+          ]
+        }
+      ]
+    },
+    "geglu_backward": {
+      "status": "ready",
+      "requires_saved": [
+        "input"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "geglu_backward_exact",
+          "reads": [
+            "grad:out",
+            "saved:input"
+          ],
+          "writes": [
+            {
+              "name": "d_input",
+              "kind": "grad_activation",
+              "target_input": "input"
+            }
+          ]
+        }
+      ]
+    },
+    "cross_entropy_loss": {
+      "status": "ready",
+      "requires_saved": [
+        "logits",
+        "targets"
+      ],
+      "extra_saved": [],
+      "backward_ops": [
+        {
+          "role": "core",
+          "kernel_id": "softmax_cross_entropy_loss",
+          "reads": [
+            "saved:logits",
+            "saved:targets"
+          ],
+          "writes": [
+            {
+              "name": "d_logits",
+              "kind": "grad_activation",
+              "target_input": "logits"
+            },
+            {
+              "name": "loss_out",
+              "kind": "aux",
+              "tensor": "aux.loss"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "template_op_to_rule": {
+    "bpe_tokenizer": null,
+    "wordpiece_tokenizer": null,
+    "weight_tying": null,
+    "lm_head": null,
+    "dense_embedding_lookup": "dense_embedding_lookup_backward",
+    "rmsnorm": "rmsnorm_backward",
+    "q_proj": "matmul_backward",
+    "q_gate_proj": "matmul_no_bias_backward",
+    "k_proj": "matmul_backward",
+    "v_proj": "matmul_backward",
+    "recurrent_qkv_proj": "matmul_no_bias_backward",
+    "recurrent_gate_proj": "matmul_no_bias_backward",
+    "recurrent_alpha_proj": "matmul_no_bias_backward",
+    "recurrent_beta_proj": "matmul_no_bias_backward",
+    "recurrent_split_qkv": "recurrent_split_qkv_backward",
+    "split_q_gate": "split_q_gate_backward",
+    "recurrent_dt_gate": "recurrent_dt_gate_backward",
+    "recurrent_conv_state_update": "recurrent_conv_state_update_backward",
+    "recurrent_ssm_conv": "recurrent_ssm_conv_backward",
+    "recurrent_silu": "recurrent_silu_backward",
+    "recurrent_split_conv_qkv": "recurrent_split_conv_qkv_backward",
+    "recurrent_qk_l2_norm": "recurrent_qk_l2_norm_backward",
+    "recurrent_core": "recurrent_core_backward",
+    "recurrent_norm_gate": "recurrent_norm_gate_backward",
+    "qk_norm": "qk_norm_backward",
+    "rope_qk": "rope_qk_backward",
+    "attn": "attention_backward",
+    "attn_sliding": "attention_backward",
+    "attn_gate_sigmoid_mul": "attn_gate_sigmoid_mul_backward",
+    "out_proj": "matmul_backward",
+    "recurrent_out_proj": "matmul_no_bias_backward",
+    "residual_add": "residual_add_backward",
+    "mlp_gate_up": "matmul_backward",
+    "silu_mul": "swiglu_backward",
+    "geglu": "geglu_backward",
+    "mlp_down": "matmul_backward",
+    "logits": "matmul_no_bias_backward"
+  }
+}

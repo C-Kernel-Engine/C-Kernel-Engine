@@ -578,11 +578,153 @@ def _coerce_float_triplet(values: Any, default: list[float]) -> list[float]:
     return [float(v) for v in default]
 
 
-def _qwen3vl_geometry_overrides(config: dict[str, Any], image_path: Path) -> dict[str, Any]:
+def _ppm_skip_ws_and_comments(data: bytes, idx: int) -> int:
+    n = len(data)
+    while idx < n:
+        byte = data[idx]
+        if byte in b" \t\r\n":
+            idx += 1
+            continue
+        if byte == ord("#"):
+            idx += 1
+            while idx < n and data[idx] not in b"\r\n":
+                idx += 1
+            continue
+        break
+    return idx
+
+
+def _ppm_next_token(data: bytes, idx: int) -> tuple[str, int]:
+    idx = _ppm_skip_ws_and_comments(data, idx)
+    start = idx
+    n = len(data)
+    while idx < n and data[idx] not in b" \t\r\n#":
+        idx += 1
+    if start == idx:
+        raise RuntimeError("invalid PPM header: unexpected end of token stream")
+    return data[start:idx].decode("ascii"), idx
+
+
+def _read_ppm_rgb8(path: Path) -> tuple[int, int, bytes]:
+    data = path.read_bytes()
+    magic, idx = _ppm_next_token(data, 0)
+    width_s, idx = _ppm_next_token(data, idx)
+    height_s, idx = _ppm_next_token(data, idx)
+    maxval_s, idx = _ppm_next_token(data, idx)
+    try:
+        width = int(width_s)
+        height = int(height_s)
+        maxval = int(maxval_s)
+    except ValueError as exc:
+        raise RuntimeError(f"invalid PPM header in {path}: {exc}") from exc
+    if width <= 0 or height <= 0:
+        raise RuntimeError(f"invalid PPM dimensions in {path}: {width}x{height}")
+    if maxval <= 0 or maxval > 255:
+        raise RuntimeError(f"unsupported PPM maxval in {path}: {maxval}")
+    sample_count = width * height * 3
+    if magic == "P6":
+        if idx >= len(data) or data[idx] not in b" \t\r\n":
+            raise RuntimeError(f"invalid PPM header terminator in {path}")
+        idx += 1
+        payload = data[idx:]
+        if len(payload) != sample_count:
+            raise RuntimeError(
+                f"invalid PPM payload size in {path}: expected {sample_count} bytes, got {len(payload)}"
+            )
+        return width, height, payload
+    if magic == "P3":
+        samples: list[int] = []
+        while len(samples) < sample_count:
+            token, idx = _ppm_next_token(data, idx)
+            try:
+                value = int(token)
+            except ValueError as exc:
+                raise RuntimeError(f"invalid PPM sample in {path}: {exc}") from exc
+            if value < 0 or value > maxval:
+                raise RuntimeError(f"PPM sample out of range in {path}: {value}")
+            samples.append(int(round((float(value) / float(maxval)) * 255.0)))
+        return width, height, bytes(samples)
+    raise RuntimeError(f"unsupported PPM magic in {path}: {magic}")
+
+
+def _image_source_size(path: Path) -> tuple[int, int]:
+    suffix = path.suffix.lower()
+    if suffix == ".ppm":
+        width, height, _ = _read_ppm_rgb8(path)
+        return width, height
     if Image is None:
-        raise RuntimeError("Pillow is required for Qwen3-VL real-image geometry overrides")
-    with Image.open(image_path) as src:
-        source_width, source_height = src.size
+        raise RuntimeError(f"Pillow is required for non-PPM image input: {path.name}")
+    with Image.open(path) as src:
+        width, height = src.size
+    return int(width), int(height)
+
+
+def _resize_rgb8_bilinear(
+    src_rgb: bytes,
+    src_width: int,
+    src_height: int,
+    dst_width: int,
+    dst_height: int,
+) -> list[tuple[int, int, int]]:
+    if src_width <= 0 or src_height <= 0 or dst_width <= 0 or dst_height <= 0:
+        raise RuntimeError(
+            f"invalid resize dimensions src={src_width}x{src_height} dst={dst_width}x{dst_height}"
+        )
+    if src_width == dst_width and src_height == dst_height:
+        return [
+            (
+                int(src_rgb[i]),
+                int(src_rgb[i + 1]),
+                int(src_rgb[i + 2]),
+            )
+            for i in range(0, len(src_rgb), 3)
+        ]
+
+    out: list[tuple[int, int, int]] = []
+    scale_x = float(src_width) / float(dst_width)
+    scale_y = float(src_height) / float(dst_height)
+    for y in range(dst_height):
+        src_y = ((float(y) + 0.5) * scale_y) - 0.5
+        y0 = max(0, min(src_height - 1, int(math.floor(src_y))))
+        y1 = max(0, min(src_height - 1, y0 + 1))
+        wy = max(0.0, min(1.0, src_y - float(y0)))
+        for x in range(dst_width):
+            src_x = ((float(x) + 0.5) * scale_x) - 0.5
+            x0 = max(0, min(src_width - 1, int(math.floor(src_x))))
+            x1 = max(0, min(src_width - 1, x0 + 1))
+            wx = max(0.0, min(1.0, src_x - float(x0)))
+
+            def _pix(px: int, py: int) -> tuple[float, float, float]:
+                base = (py * src_width + px) * 3
+                return (
+                    float(src_rgb[base]),
+                    float(src_rgb[base + 1]),
+                    float(src_rgb[base + 2]),
+                )
+
+            p00 = _pix(x0, y0)
+            p10 = _pix(x1, y0)
+            p01 = _pix(x0, y1)
+            p11 = _pix(x1, y1)
+
+            def _blend(c00: float, c10: float, c01: float, c11: float) -> int:
+                top = c00 * (1.0 - wx) + c10 * wx
+                bot = c01 * (1.0 - wx) + c11 * wx
+                value = top * (1.0 - wy) + bot * wy
+                return int(max(0, min(255, round(value))))
+
+            out.append(
+                (
+                    _blend(p00[0], p10[0], p01[0], p11[0]),
+                    _blend(p00[1], p10[1], p01[1], p11[1]),
+                    _blend(p00[2], p10[2], p01[2], p11[2]),
+                )
+            )
+    return out
+
+
+def _qwen3vl_geometry_overrides(config: dict[str, Any], image_path: Path) -> dict[str, Any]:
+    source_width, source_height = _image_source_size(image_path)
     patch_size = int(config.get("patch_size", 0) or 0)
     merge_size = int(config.get("spatial_merge_size", 2) or 2)
     align_size = patch_size * merge_size
@@ -731,22 +873,29 @@ def _load_image_file(
     image_mean: list[float] | None = None,
     image_std: list[float] | None = None,
 ) -> dict[str, Any]:
-    if Image is None:
-        raise RuntimeError("Pillow is required for --image-path support")
     if not image_path.exists():
         raise FileNotFoundError(f"image file not found: {image_path}")
     mean = _coerce_float_triplet(image_mean, [0.5, 0.5, 0.5])
     std = _coerce_float_triplet(image_std, [0.5, 0.5, 0.5])
 
-    with Image.open(image_path) as src:
-        source_width, source_height = src.size
-        rgb = src.convert("RGB")
-        if rgb.size != (width, height):
-            if hasattr(Image, "Resampling"):
-                rgb = rgb.resize((width, height), Image.Resampling.BILINEAR)
-            else:  # pragma: no cover - compatibility with older Pillow.
-                rgb = rgb.resize((width, height), Image.BILINEAR)
-        pixels = list(rgb.getdata())
+    suffix = image_path.suffix.lower()
+    if suffix == ".ppm":
+        source_width, source_height, src_rgb = _read_ppm_rgb8(image_path)
+        pixels = _resize_rgb8_bilinear(src_rgb, source_width, source_height, width, height)
+        preprocess_prefix = "ppm_rgb_bilinear_resize"
+    else:
+        if Image is None:
+            raise RuntimeError("Pillow is required for non-PPM --image-path support")
+        with Image.open(image_path) as src:
+            source_width, source_height = src.size
+            rgb = src.convert("RGB")
+            if rgb.size != (width, height):
+                if hasattr(Image, "Resampling"):
+                    rgb = rgb.resize((width, height), Image.Resampling.BILINEAR)
+                else:  # pragma: no cover - compatibility with older Pillow.
+                    rgb = rgb.resize((width, height), Image.BILINEAR)
+            pixels = list(rgb.getdata())
+        preprocess_prefix = "rgb_bilinear_resize"
 
     interleaved = [0.0] * (height * width * 3)
     planar = [0.0] * (height * width * 3)
@@ -767,7 +916,7 @@ def _load_image_file(
         "image_source": "file",
         "image_path": str(image_path.resolve()),
         "source_image_size": [source_width, source_height],
-        "preprocess": f"rgb_bilinear_resize_{width}x{height}_normalize_mean_std",
+        "preprocess": f"{preprocess_prefix}_{width}x{height}_normalize_mean_std",
     }
 
 

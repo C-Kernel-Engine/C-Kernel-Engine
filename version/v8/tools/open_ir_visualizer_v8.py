@@ -38,19 +38,16 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).parent              # .../version/v8/tools
 V8_ROOT = SCRIPT_DIR.parent                    # .../version/v8
 PROJECT_ROOT = V8_ROOT.parent.parent           # .../Workspace/C-Kernel-Engine
-V7_ROOT = PROJECT_ROOT / "version" / "v7"      # stable runtime/tooling fallback
 
 sys.path.insert(0, str(V8_ROOT / "scripts"))
-sys.path.insert(0, str(V7_ROOT / "scripts"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 CACHE_PATH = Path(os.environ.get("CK_CACHE_DIR", str(Path.home() / ".cache" / "ck-engine-v8" / "models"))).expanduser()
-CACHE_PATH_FALLBACK = Path.home() / ".cache" / "ck-engine-v7" / "models"
 VISUALIZER = SCRIPT_DIR / "ir_visualizer.html"
-CK_RUN_SCRIPT = V7_ROOT / "scripts" / "ck_run_v7.py"
-MEMORY_SIGNOFF_SCRIPT = V7_ROOT / "scripts" / "memory_signoff_v7.py"
-V7_REPORT_PATH = Path(os.environ.get("CK_V8_REPORT_DIR", str(CACHE_PATH / "reports"))).expanduser()
-V7_REPORT_PATH_LEGACY = V8_ROOT / "reports"
+CK_RUN_SCRIPT = V8_ROOT / "scripts" / "ck_run_v8.py"
+MEMORY_SIGNOFF_SCRIPT = V8_ROOT / "scripts" / "memory_signoff_v8.py"
+V8_REPORT_PATH = Path(os.environ.get("CK_V8_REPORT_DIR", str(CACHE_PATH / "reports"))).expanduser()
+V8_REPORT_PATH_LEGACY = V8_ROOT / "reports"
 
 
 def _read_os_release() -> dict[str, str]:
@@ -72,7 +69,7 @@ def _profile_install_hints() -> list[str]:
         return [
             "# Full profiling workflow is Linux-first.",
             "# For local smoke tests on macOS/WSL, use the runtime and artifact commands first.",
-            "make v7-doctor",
+            "make v8-doctor",
         ]
 
     os_release = _read_os_release()
@@ -121,7 +118,7 @@ def _profile_install_hints() -> list[str]:
             "sudo sysctl -w kernel.yama.ptrace_scope=0",
         ]
     return [
-        "make v7-doctor",
+        "make v8-doctor",
         "# Install perf, valgrind, and FlameGraph for your Linux distribution, then retry.",
         "# Intel hosts: install Intel oneAPI Base Toolkit for icx/vtune/advisor",
     ]
@@ -335,18 +332,6 @@ def resolve_model_target(model_arg: str) -> tuple[Path, Path]:
     if model_dir.exists():
         return model_dir, model_dir
 
-    ck_build_fallback = CACHE_PATH_FALLBACK / model_arg / "ck_build"
-    if ck_build_fallback.exists():
-        return ck_build_fallback, CACHE_PATH_FALLBACK / model_arg
-
-    dot_ck_build_fallback = CACHE_PATH_FALLBACK / model_arg / ".ck_build"
-    if dot_ck_build_fallback.exists():
-        return dot_ck_build_fallback, CACHE_PATH_FALLBACK / model_arg
-
-    model_dir_fallback = CACHE_PATH_FALLBACK / model_arg
-    if model_dir_fallback.exists():
-        return model_dir_fallback, model_dir_fallback
-
     raise ValueError(f"Model not found: {model_arg}")
 
 
@@ -366,7 +351,7 @@ def resolve_run_target(run_arg: Path) -> tuple[Path, Path]:
 
 
 def has_local_runnable_source(path: Path) -> bool:
-    """Whether path can be used as ck_run_v7 local input source."""
+    """Whether path can be used as ck_run_v8 local input source."""
     if not path.exists() or not path.is_dir():
         return False
     if any(path.glob("*.gguf")):
@@ -423,7 +408,7 @@ def resolve_local_runnable_input(path: Path) -> str:
 def infer_run_model_input(model_root: Path, weight_dtype: str | None = None) -> str | None:
     """
     Best-effort mapping from cache model folder names to hf:// model inputs.
-    Keeps launcher ergonomic for common v7 model aliases.
+    Keeps launcher ergonomic for common v8 model aliases.
     For training-oriented dtypes (float32/bf16), prefer source checkpoints.
     """
     name = model_root.name.lower()
@@ -517,7 +502,7 @@ def maybe_interactive_configure(args: argparse.Namespace, model_root: Path) -> N
 
 def detect_model_dir_from_input(model_input: str) -> Path | None:
     try:
-        from ck_run_v7 import CACHE_DIR, detect_input_type  # type: ignore
+        from ck_run_v8 import CACHE_DIR, detect_input_type  # type: ignore
     except Exception:
         return None
 
@@ -658,7 +643,10 @@ def has_train_runtime_artifacts(run_dir: Path) -> bool:
     has_lib = (run_dir / "libtrain.so").exists() or (run_dir / ".ck_build" / "libtrain.so").exists()
     has_weights = (run_dir / "weights.bump").exists()
     has_manifest = (run_dir / "weights_manifest.json").exists()
-    has_summary = (run_dir / "generated_train_runtime_summary_v7.json").exists()
+    has_summary = (
+        (run_dir / "generated_train_runtime_summary.json").exists()
+        or (run_dir / "generated_train_runtime_summary_v7.json").exists()
+    )
     return bool(has_lib and has_weights and has_manifest and has_summary)
 
 
@@ -746,6 +734,49 @@ def _encode_image_data_uri(path: Path) -> str | None:
         return None
     payload = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{payload}"
+
+
+def _resolve_multimodal_bridge_dirs(
+    run_dir: Path | None,
+    model_root: Path,
+) -> dict[str, Path | None]:
+    for base in (run_dir, model_root):
+        if base is None:
+            continue
+        bridge_root = base / "multimodal_bridge"
+        if not bridge_root.exists() or not bridge_root.is_dir():
+            continue
+        decoder_root = bridge_root / "decoder"
+        encoder_root = bridge_root / "encoder"
+        return {
+            "root": bridge_root,
+            "decoder": decoder_root if decoder_root.exists() and decoder_root.is_dir() else None,
+            "encoder": encoder_root if encoder_root.exists() and encoder_root.is_dir() else None,
+        }
+    return {"root": None, "decoder": None, "encoder": None}
+
+
+def _enrich_multimodal_bridge_payload(
+    payload: dict[str, Any],
+    *,
+    ck_build_path: Path,
+    model_root: Path,
+) -> dict[str, Any]:
+    out = dict(payload)
+    encoder_report = out.get("encoder_report")
+    if isinstance(encoder_report, dict):
+        encoder_copy = dict(encoder_report)
+        raw_image_path = str(encoder_copy.get("image_path") or "").strip()
+        if raw_image_path:
+            resolved = _resolve_asset_path(raw_image_path, ck_build_path, model_root)
+            if resolved is not None:
+                encoder_copy["image_path_resolved"] = str(resolved)
+                data_uri = _encode_image_data_uri(resolved)
+                if data_uri:
+                    encoder_copy["image_data_uri"] = data_uri
+        out["encoder_report"] = encoder_copy
+    out["bridge_mode"] = "encoder_decoder" if isinstance(out.get("encoder_runtime"), dict) else "decoder_only"
+    return out
 
 
 def _trim_memory_signoff_payload(payload: dict, max_items: int = 120) -> dict:
@@ -1311,7 +1342,7 @@ def _build_tokenizer_preview(
 def list_available_models():
     """List all models in cache."""
     models = []
-    for cache_root in [CACHE_PATH, CACHE_PATH_FALLBACK]:
+    for cache_root in [CACHE_PATH]:
         if not cache_root.exists():
             continue
         for model_dir in cache_root.iterdir():
@@ -1379,7 +1410,7 @@ def collect_training_logbook(
     strict_run_scope: bool = False,
 ) -> dict | None:
     """Load an operator-facing training logbook markdown file."""
-    repo_logbook = V7_ROOT / "reports" / "TRAINING_LOGBOOK.md"
+    repo_logbook = V8_ROOT / "reports" / "TRAINING_LOGBOOK.md"
     names = [
         "training_logbook.md",
         "TRAINING_LOGBOOK.md",
@@ -1725,8 +1756,8 @@ def _derive_dataset_catalog(pipeline: dict, run_dir: Path | None) -> list[dict]:
             probes.append(manifest_path.parent / name)
         probes.extend(
             [
-                V7_ROOT / "data" / "generated" / name,
-                V7_ROOT / "data" / name,
+                V8_ROOT / "data" / "generated" / name,
+                V8_ROOT / "data" / name,
             ]
         )
         for cand in probes:
@@ -1778,7 +1809,7 @@ def _derive_dataset_catalog(pipeline: dict, run_dir: Path | None) -> list[dict]:
         ds_dir = Path(ds_dir_raw).expanduser()
         if ds_dir.exists():
             manifest_candidates.extend(sorted(ds_dir.glob("*manifest.json")))
-    repo_data_dir = V7_ROOT / "data"
+    repo_data_dir = V8_ROOT / "data"
     if repo_data_dir.exists():
         manifest_candidates.extend(sorted(repo_data_dir.glob("svg*_manifest.json")))
     if run_dir is not None:
@@ -2963,11 +2994,21 @@ def load_model_data(
         model_root = ck_build_path.parent if ck_build_path.name in {"ck_build", ".ck_build"} else ck_build_path
     train_runtime_available = has_train_runtime_artifacts(run_dir if run_dir is not None else model_root)
     inference_runtime_available = has_inference_runtime_artifacts(run_dir if run_dir is not None else model_root)
+    bridge_dirs = _resolve_multimodal_bridge_dirs(run_dir, model_root)
+    bridge_root = bridge_dirs.get("root")
+    bridge_decoder_root = bridge_dirs.get("decoder")
+    bridge_encoder_root = bridge_dirs.get("encoder")
 
     search_roots: list[Path] = []
+    if bridge_decoder_root is not None:
+        search_roots.append(bridge_decoder_root)
     if run_dir is not None:
         search_roots.extend([run_dir, run_dir / "ck_build", run_dir / ".ck_build"])
     search_roots.extend([ck_build_path, model_root, model_root / ".ck_build"])
+    if bridge_root is not None:
+        search_roots.append(bridge_root)
+    if bridge_encoder_root is not None:
+        search_roots.append(bridge_encoder_root)
 
     deduped_roots: list[Path] = []
     seen_roots: set[str] = set()
@@ -3075,6 +3116,11 @@ def load_model_data(
         "perf_gate_report",
         "regression_ledger",
         "embedding_dump",
+        "multimodal_bridge_report",
+        "bridge_encoder_ir1",
+        "bridge_encoder_layout",
+        "bridge_encoder_call",
+        "bridge_encoder_lowered",
     ]
 
     def model_candidates(name: str) -> list[Path]:
@@ -3089,92 +3135,97 @@ def load_model_data(
         "lowered_prefill": model_candidates("lowered_prefill.json"),
         "lowered_decode_call": model_candidates("lowered_decode_call.json") + model_candidates("lowered_decode.json"),
         "lowered_prefill_call": model_candidates("lowered_prefill_call.json") + model_candidates("lowered_prefill.json"),
-        "ir1_train": model_candidates("ir1_train_forward.json") + model_candidates("ir1_train.json") + [V7_REPORT_PATH / "ir1_train_forward_latest.json", V7_REPORT_PATH_LEGACY / "ir1_train_forward_latest.json"],
-        "ir2_train": model_candidates("ir2_train_backward.json") + model_candidates("ir2_train.json") + [V7_REPORT_PATH / "ir2_train_backward_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_backward_latest.json"],
-        "ir_train_invariants": model_candidates("ir_train_invariants.json") + [V7_REPORT_PATH / "ir_train_invariants_latest.json", V7_REPORT_PATH_LEGACY / "ir_train_invariants_latest.json"],
-        "ir2_train_summary": model_candidates("ir2_train_summary.json") + [V7_REPORT_PATH / "ir2_train_summary_latest.json", V7_REPORT_PATH_LEGACY / "ir2_train_summary_latest.json"],
-        "layout_train": model_candidates("layout_train.json") + model_candidates("layout_train_latest.json") + [V7_REPORT_PATH / "layout_train_latest.json", V7_REPORT_PATH_LEGACY / "layout_train_latest.json"],
-        "layout_train_audit": model_candidates("layout_train_audit.json") + model_candidates("layout_train_audit_latest.json") + [V7_REPORT_PATH / "layout_train_audit_latest.json", V7_REPORT_PATH_LEGACY / "layout_train_audit_latest.json"],
-        "train_exec_plan": model_candidates("train_exec_plan.json") + model_candidates("train_exec_plan_latest.json") + [V7_REPORT_PATH / "train_exec_plan_latest.json", V7_REPORT_PATH_LEGACY / "train_exec_plan_latest.json"],
-        "memory_diagnostic": model_candidates("memory_diagnostic_latest.json") + model_candidates("memory_diagnostic.json") + [V7_REPORT_PATH / "memory_diagnostic_latest.json", V7_REPORT_PATH_LEGACY / "memory_diagnostic_latest.json"],
-        "memory_verification": model_candidates("memory_verification_latest.json") + model_candidates("memory_verification.json") + [V7_REPORT_PATH / "memory_verification_latest.json", V7_REPORT_PATH_LEGACY / "memory_verification_latest.json"],
-        "generated_train_runtime_summary": model_candidates("generated_train_runtime_summary_v7.json") + model_candidates("generated_train_runtime_summary.json") + [V7_REPORT_PATH / "generated_train_runtime_summary_v7.json", V7_REPORT_PATH_LEGACY / "generated_train_runtime_summary_v7.json"],
-        "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V7_REPORT_PATH / "training_loss_curve_latest.json", V7_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
-        "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V7_REPORT_PATH / "training_grad_norms_latest.json", V7_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
-        "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V7_REPORT_PATH / "training_parity_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_latest.json"],
-        "training_parity_regimen": model_candidates("training_parity_regimen_latest.json") + model_candidates("training_parity_regimen.json") + [V7_REPORT_PATH / "training_parity_regimen_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_regimen_latest.json"],
-        "training_parity_xray": model_candidates("regimen_backend_xray.json") + model_candidates("training_parity_xray.json") + [V7_REPORT_PATH / "training_parity_xray_latest.json", V7_REPORT_PATH_LEGACY / "training_parity_xray_latest.json"],
+        "ir1_train": model_candidates("ir1_train_forward.json") + model_candidates("ir1_train.json") + [V8_REPORT_PATH / "ir1_train_forward_latest.json", V8_REPORT_PATH_LEGACY / "ir1_train_forward_latest.json"],
+        "ir2_train": model_candidates("ir2_train_backward.json") + model_candidates("ir2_train.json") + [V8_REPORT_PATH / "ir2_train_backward_latest.json", V8_REPORT_PATH_LEGACY / "ir2_train_backward_latest.json"],
+        "ir_train_invariants": model_candidates("ir_train_invariants.json") + [V8_REPORT_PATH / "ir_train_invariants_latest.json", V8_REPORT_PATH_LEGACY / "ir_train_invariants_latest.json"],
+        "ir2_train_summary": model_candidates("ir2_train_summary.json") + [V8_REPORT_PATH / "ir2_train_summary_latest.json", V8_REPORT_PATH_LEGACY / "ir2_train_summary_latest.json"],
+        "layout_train": model_candidates("layout_train.json") + model_candidates("layout_train_latest.json") + [V8_REPORT_PATH / "layout_train_latest.json", V8_REPORT_PATH_LEGACY / "layout_train_latest.json"],
+        "layout_train_audit": model_candidates("layout_train_audit.json") + model_candidates("layout_train_audit_latest.json") + [V8_REPORT_PATH / "layout_train_audit_latest.json", V8_REPORT_PATH_LEGACY / "layout_train_audit_latest.json"],
+        "train_exec_plan": model_candidates("train_exec_plan.json") + model_candidates("train_exec_plan_latest.json") + [V8_REPORT_PATH / "train_exec_plan_latest.json", V8_REPORT_PATH_LEGACY / "train_exec_plan_latest.json"],
+        "memory_diagnostic": model_candidates("memory_diagnostic_latest.json") + model_candidates("memory_diagnostic.json") + [V8_REPORT_PATH / "memory_diagnostic_latest.json", V8_REPORT_PATH_LEGACY / "memory_diagnostic_latest.json"],
+        "memory_verification": model_candidates("memory_verification_latest.json") + model_candidates("memory_verification.json") + [V8_REPORT_PATH / "memory_verification_latest.json", V8_REPORT_PATH_LEGACY / "memory_verification_latest.json"],
+        "generated_train_runtime_summary": model_candidates("generated_train_runtime_summary_v7.json") + model_candidates("generated_train_runtime_summary.json") + [V8_REPORT_PATH / "generated_train_runtime_summary_v7.json", V8_REPORT_PATH_LEGACY / "generated_train_runtime_summary_v7.json"],
+        "training_loss_curve": model_candidates("training_loss_curve.json") + model_candidates("training_loss_curve_latest.json") + [V8_REPORT_PATH / "training_loss_curve_latest.json", V8_REPORT_PATH_LEGACY / "training_loss_curve_latest.json"],
+        "training_grad_norms": model_candidates("training_grad_norms.json") + model_candidates("training_grad_norms_latest.json") + [V8_REPORT_PATH / "training_grad_norms_latest.json", V8_REPORT_PATH_LEGACY / "training_grad_norms_latest.json"],
+        "training_parity": model_candidates("training_parity.json") + model_candidates("training_parity_latest.json") + [V8_REPORT_PATH / "training_parity_latest.json", V8_REPORT_PATH_LEGACY / "training_parity_latest.json"],
+        "training_parity_regimen": model_candidates("training_parity_regimen_latest.json") + model_candidates("training_parity_regimen.json") + [V8_REPORT_PATH / "training_parity_regimen_latest.json", V8_REPORT_PATH_LEGACY / "training_parity_regimen_latest.json"],
+        "training_parity_xray": model_candidates("regimen_backend_xray.json") + model_candidates("training_parity_xray.json") + [V8_REPORT_PATH / "training_parity_xray_latest.json", V8_REPORT_PATH_LEGACY / "training_parity_xray_latest.json"],
         "training_canary_summary": model_candidates("training_canary_summary.json"),
-        "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V7_REPORT_PATH / "training_step_profile_latest.json", V7_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
-        "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V7_REPORT_PATH / "training_checkpoint_policy_latest.json", V7_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
-        "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V7_REPORT_PATH / "training_pipeline_latest.json", V7_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
-        "training_plan": model_candidates("training_plan.json") + [V7_REPORT_PATH / "training_plan.json", V7_REPORT_PATH_LEGACY / "training_plan.json"],
+        "training_step_profile": model_candidates("training_step_profile.json") + model_candidates("training_step_profile_latest.json") + [V8_REPORT_PATH / "training_step_profile_latest.json", V8_REPORT_PATH_LEGACY / "training_step_profile_latest.json"],
+        "training_checkpoint_policy": model_candidates("training_checkpoint_policy.json") + model_candidates("training_checkpoint_policy_latest.json") + [V8_REPORT_PATH / "training_checkpoint_policy_latest.json", V8_REPORT_PATH_LEGACY / "training_checkpoint_policy_latest.json"],
+        "training_pipeline": model_candidates("training_pipeline_latest.json") + model_candidates("training_pipeline.json") + [V8_REPORT_PATH / "training_pipeline_latest.json", V8_REPORT_PATH_LEGACY / "training_pipeline_latest.json"],
+        "training_plan": model_candidates("training_plan.json") + [V8_REPORT_PATH / "training_plan.json", V8_REPORT_PATH_LEGACY / "training_plan.json"],
         "run_ledger": model_candidates("run_ledger.jsonl"),
-        "corpus_sampling_log": model_candidates("corpus_sampling_log_latest.json") + model_candidates("corpus_sampling_log.json") + [V7_REPORT_PATH / "corpus_sampling_log_latest.json", V7_REPORT_PATH_LEGACY / "corpus_sampling_log_latest.json"],
+        "corpus_sampling_log": model_candidates("corpus_sampling_log_latest.json") + model_candidates("corpus_sampling_log.json") + [V8_REPORT_PATH / "corpus_sampling_log_latest.json", V8_REPORT_PATH_LEGACY / "corpus_sampling_log_latest.json"],
         "dataset_qc": model_candidates("dataset_qc.json"),
         "dataset_profile": model_candidates("dataset_profile.json"),
         "tokenizer_roundtrip": model_candidates("tokenizer_roundtrip.json"),
         "post_train_eval": model_candidates("post_train_eval.json"),
         "stage_eval_matrix": model_candidates("stage_eval_matrix.json"),
-        "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V7_REPORT_PATH / "training_epoch_sweep_latest.json", V7_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
-        "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V7_REPORT_PATH / "train_e2e_latest.json", V7_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
+        "training_epoch_sweep": model_candidates("training_epoch_sweep.json") + model_candidates("training_epoch_sweep_latest.json") + [V8_REPORT_PATH / "training_epoch_sweep_latest.json", V8_REPORT_PATH_LEGACY / "training_epoch_sweep_latest.json"],
+        "train_e2e": model_candidates("train_e2e.json") + model_candidates("train_e2e_latest.json") + [V8_REPORT_PATH / "train_e2e_latest.json", V8_REPORT_PATH_LEGACY / "train_e2e_latest.json"],
         "run_index": model_candidates("run_index.json"),
         "run_config": model_candidates("config.json"),
         "sanity_overfit": model_candidates("sanity_overfit.json"),
         "parity_report": model_candidates("parity_report.json"),
         "profile_latest": model_candidates("profile_latest.json"),
-        "contract_report": model_candidates("contract_report_latest.json") + [V7_REPORT_PATH / "contract_report_latest.json", V7_REPORT_PATH_LEGACY / "contract_report_latest.json"],
-        "parity_1token": model_candidates("parity_1token_latest.json") + [V7_REPORT_PATH / "parity_1token_latest.json", V7_REPORT_PATH_LEGACY / "parity_1token_latest.json"],
-        "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V7_REPORT_PATH / "qk_norm_backward_parity_latest.json", V7_REPORT_PATH_LEGACY / "qk_norm_backward_parity_latest.json"],
+        "contract_report": model_candidates("contract_report_latest.json") + [V8_REPORT_PATH / "contract_report_latest.json", V8_REPORT_PATH_LEGACY / "contract_report_latest.json"],
+        "parity_1token": model_candidates("parity_1token_latest.json") + [V8_REPORT_PATH / "parity_1token_latest.json", V8_REPORT_PATH_LEGACY / "parity_1token_latest.json"],
+        "qk_norm_backward_parity": model_candidates("qk_norm_backward_parity_latest.json") + [V8_REPORT_PATH / "qk_norm_backward_parity_latest.json", V8_REPORT_PATH_LEGACY / "qk_norm_backward_parity_latest.json"],
         "inference_llama_parity": (
             model_candidates("detailed_parity_analysis_latest.json")
             + model_candidates("detailed_parity_analysis.json")
             + model_candidates("llamacpp_parity_latest.json")
             + model_candidates("llamacpp_parity.json")
-            + [V7_REPORT_PATH / "detailed_parity_analysis_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_latest.json"]
+            + [V8_REPORT_PATH / "detailed_parity_analysis_latest.json", V8_REPORT_PATH_LEGACY / "detailed_parity_analysis_latest.json"]
         ),
         "inference_llama_parity_prefill": (
             model_candidates("detailed_parity_analysis_prefill_latest.json")
             + model_candidates("detailed_parity_analysis_prefill.json")
-            + [V7_REPORT_PATH / "detailed_parity_analysis_prefill_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_prefill_latest.json"]
+            + [V8_REPORT_PATH / "detailed_parity_analysis_prefill_latest.json", V8_REPORT_PATH_LEGACY / "detailed_parity_analysis_prefill_latest.json"]
         ),
         "inference_llama_parity_decode": (
             model_candidates("detailed_parity_analysis_decode_latest.json")
             + model_candidates("detailed_parity_analysis_decode.json")
-            + [V7_REPORT_PATH / "detailed_parity_analysis_decode_latest.json", V7_REPORT_PATH_LEGACY / "detailed_parity_analysis_decode_latest.json"]
+            + [V8_REPORT_PATH / "detailed_parity_analysis_decode_latest.json", V8_REPORT_PATH_LEGACY / "detailed_parity_analysis_decode_latest.json"]
         ),
         "inference_llama_autopsy": (
             model_candidates("parity_autopsy_latest.json")
             + model_candidates("autopsy_report_latest.json")
             + model_candidates("autopsy_report.json")
-            + [V7_REPORT_PATH / "parity_autopsy_latest.json", V7_REPORT_PATH_LEGACY / "parity_autopsy_latest.json"]
+            + [V8_REPORT_PATH / "parity_autopsy_latest.json", V8_REPORT_PATH_LEGACY / "parity_autopsy_latest.json"]
         ),
         "inference_llama_dump_index": model_candidates("llama_parity_dumps/index.json"),
-        "fd_gradients": model_candidates("fd_gradients_latest.json") + [V7_REPORT_PATH / "fd_gradients_latest.json", V7_REPORT_PATH_LEGACY / "fd_gradients_latest.json"],
-        "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_3_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_3_latest.json"],
-        "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V7_REPORT_PATH / "train_parity_epochs_5_latest.json", V7_REPORT_PATH_LEGACY / "train_parity_epochs_5_latest.json"],
-        "train_runtime_parity_realistic": model_candidates("train_runtime_parity_realistic_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_realistic_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_realistic_latest.json"],
-        "train_runtime_parity_stress": model_candidates("train_runtime_parity_stress_latest.json") + [V7_REPORT_PATH / "train_runtime_parity_stress_latest.json", V7_REPORT_PATH_LEGACY / "train_runtime_parity_stress_latest.json"],
-        "replay_determinism": model_candidates("replay_determinism_latest.json") + [V7_REPORT_PATH / "replay_determinism_latest.json", V7_REPORT_PATH_LEGACY / "replay_determinism_latest.json"],
-        "backprop_stitch_runtime": model_candidates("backprop_stitch_runtime_latest.json") + model_candidates("backprop_stitch_runtime.json") + [V7_REPORT_PATH / "backprop_stitch_runtime_latest.json", V7_REPORT_PATH_LEGACY / "backprop_stitch_runtime_latest.json"],
-        "grad_rules": [V7_ROOT / "scripts" / "grad_rules_v7.json"],
+        "fd_gradients": model_candidates("fd_gradients_latest.json") + [V8_REPORT_PATH / "fd_gradients_latest.json", V8_REPORT_PATH_LEGACY / "fd_gradients_latest.json"],
+        "train_parity_epochs_3": model_candidates("train_parity_epochs_3_latest.json") + [V8_REPORT_PATH / "train_parity_epochs_3_latest.json", V8_REPORT_PATH_LEGACY / "train_parity_epochs_3_latest.json"],
+        "train_parity_epochs_5": model_candidates("train_parity_epochs_5_latest.json") + [V8_REPORT_PATH / "train_parity_epochs_5_latest.json", V8_REPORT_PATH_LEGACY / "train_parity_epochs_5_latest.json"],
+        "train_runtime_parity_realistic": model_candidates("train_runtime_parity_realistic_latest.json") + [V8_REPORT_PATH / "train_runtime_parity_realistic_latest.json", V8_REPORT_PATH_LEGACY / "train_runtime_parity_realistic_latest.json"],
+        "train_runtime_parity_stress": model_candidates("train_runtime_parity_stress_latest.json") + [V8_REPORT_PATH / "train_runtime_parity_stress_latest.json", V8_REPORT_PATH_LEGACY / "train_runtime_parity_stress_latest.json"],
+        "replay_determinism": model_candidates("replay_determinism_latest.json") + [V8_REPORT_PATH / "replay_determinism_latest.json", V8_REPORT_PATH_LEGACY / "replay_determinism_latest.json"],
+        "backprop_stitch_runtime": model_candidates("backprop_stitch_runtime_latest.json") + model_candidates("backprop_stitch_runtime.json") + [V8_REPORT_PATH / "backprop_stitch_runtime_latest.json", V8_REPORT_PATH_LEGACY / "backprop_stitch_runtime_latest.json"],
+        "grad_rules": [V8_ROOT / "scripts" / "grad_rules_v8.json"],
         "manifest": model_candidates("weights_manifest.json"),
         "profile_summary": model_candidates("profile_summary.json"),
-        "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V7_REPORT_PATH / "perf_stat_summary.json", V7_REPORT_PATH_LEGACY / "perf_stat_summary.json"],
-        "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V7_REPORT_PATH / "flamegraph_manifest.json", V7_REPORT_PATH_LEGACY / "flamegraph_manifest.json"],
-        "cachegrind_summary": model_candidates("cachegrind_summary.json") + [V7_REPORT_PATH / "cachegrind_summary.json", V7_REPORT_PATH_LEGACY / "cachegrind_summary.json"],
-        "asan_summary": model_candidates("asan_summary.json") + [V7_REPORT_PATH / "asan_summary.json", V7_REPORT_PATH_LEGACY / "asan_summary.json"],
-        "vtune_summary": model_candidates("vtune_summary.json") + [V7_REPORT_PATH / "vtune_summary.json", V7_REPORT_PATH_LEGACY / "vtune_summary.json"],
-        "advisor_summary": model_candidates("advisor_summary.json") + [V7_REPORT_PATH / "advisor_summary.json", V7_REPORT_PATH_LEGACY / "advisor_summary.json"],
-        "memory_signoff": model_candidates("memory_signoff.json") + [V7_REPORT_PATH / "memory_signoff.json", V7_REPORT_PATH_LEGACY / "memory_signoff.json"],
-        "perf_gate_report": model_candidates("perf_gate_report.json") + [V7_REPORT_PATH / "perf_gate_report.json", V7_REPORT_PATH_LEGACY / "perf_gate_report.json"],
+        "perf_stat_summary": model_candidates("perf_stat_summary.json") + [V8_REPORT_PATH / "perf_stat_summary.json", V8_REPORT_PATH_LEGACY / "perf_stat_summary.json"],
+        "flamegraph_manifest": model_candidates("flamegraph_manifest.json") + [V8_REPORT_PATH / "flamegraph_manifest.json", V8_REPORT_PATH_LEGACY / "flamegraph_manifest.json"],
+        "cachegrind_summary": model_candidates("cachegrind_summary.json") + [V8_REPORT_PATH / "cachegrind_summary.json", V8_REPORT_PATH_LEGACY / "cachegrind_summary.json"],
+        "asan_summary": model_candidates("asan_summary.json") + [V8_REPORT_PATH / "asan_summary.json", V8_REPORT_PATH_LEGACY / "asan_summary.json"],
+        "vtune_summary": model_candidates("vtune_summary.json") + [V8_REPORT_PATH / "vtune_summary.json", V8_REPORT_PATH_LEGACY / "vtune_summary.json"],
+        "advisor_summary": model_candidates("advisor_summary.json") + [V8_REPORT_PATH / "advisor_summary.json", V8_REPORT_PATH_LEGACY / "advisor_summary.json"],
+        "memory_signoff": model_candidates("memory_signoff.json") + [V8_REPORT_PATH / "memory_signoff.json", V8_REPORT_PATH_LEGACY / "memory_signoff.json"],
+        "perf_gate_report": model_candidates("perf_gate_report.json") + [V8_REPORT_PATH / "perf_gate_report.json", V8_REPORT_PATH_LEGACY / "perf_gate_report.json"],
         "embedding_dump": model_candidates("embedding_dump.json") + model_candidates("embedding_dump_latest.json"),
         "regression_ledger": (
             model_candidates("regression_ledger.json")
-            + [V7_REPORT_PATH / "regression_ledger_latest.json", V7_REPORT_PATH_LEGACY / "regression_ledger_latest.json"]
-            + [V7_ROOT / "reports" / "REGRESSION_LEDGER.json"]
+            + [V8_REPORT_PATH / "regression_ledger_latest.json", V8_REPORT_PATH_LEGACY / "regression_ledger_latest.json"]
+            + [V8_ROOT / "reports" / "REGRESSION_LEDGER.json"]
         ),
-        "kernel_registry": [V7_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
+        "kernel_registry": [V8_ROOT / "kernel_maps" / "KERNEL_REGISTRY.json"],
+        "multimodal_bridge_report": [bridge_root / "bridge_report.json"] if bridge_root is not None else [],
+        "bridge_encoder_ir1": [bridge_encoder_root / "ir1.json"] if bridge_encoder_root is not None else [],
+        "bridge_encoder_layout": [bridge_encoder_root / "layout.json"] if bridge_encoder_root is not None else [],
+        "bridge_encoder_call": [bridge_encoder_root / "call.json"] if bridge_encoder_root is not None else [],
+        "bridge_encoder_lowered": [bridge_encoder_root / "lowered.json"] if bridge_encoder_root is not None else [],
     }
 
     if strict_run_scope:
@@ -3270,7 +3321,7 @@ def load_model_data(
 
     analysis_roots = list(search_roots)
     if not strict_run_scope:
-        analysis_roots.extend([V7_REPORT_PATH, V7_REPORT_PATH_LEGACY])
+        analysis_roots.extend([V8_REPORT_PATH, V8_REPORT_PATH_LEGACY])
     analysis_payload = collect_analysis_checkpoints(analysis_roots)
     if analysis_payload is not None:
         data["files"]["analysis_checkpoints"] = analysis_payload
@@ -3799,17 +3850,26 @@ def load_model_data(
             prefill_svg_path = (
                 flame.get("prefill_svg_path")
                 if isinstance(flame.get("prefill_svg_path"), str)
-                else _replace_suffix(decode_svg, "flamegraph_v7.svg", "flamegraph_v7_prefill.svg")
+                else (
+                    _replace_suffix(decode_svg, "flamegraph_v8.svg", "flamegraph_v8_prefill.svg")
+                    or _replace_suffix(decode_svg, "flamegraph_v7.svg", "flamegraph_v7_prefill.svg")
+                )
             )
             prefill_perf_path = (
                 flame.get("prefill_perf_data_path")
                 if isinstance(flame.get("prefill_perf_data_path"), str)
-                else _replace_suffix(decode_perf, "ck_v7_perf.data", "ck_v7_perf_prefill.data")
+                else (
+                    _replace_suffix(decode_perf, "ck_v8_perf.data", "ck_v8_perf_prefill.data")
+                    or _replace_suffix(decode_perf, "ck_v7_perf.data", "ck_v7_perf_prefill.data")
+                )
             )
             prefill_folded_path = (
                 flame.get("prefill_folded_path")
                 if isinstance(flame.get("prefill_folded_path"), str)
-                else _replace_suffix(decode_folded, "ck_v7_perf.folded", "ck_v7_perf_prefill.folded")
+                else (
+                    _replace_suffix(decode_folded, "ck_v8_perf.folded", "ck_v8_perf_prefill.folded")
+                    or _replace_suffix(decode_folded, "ck_v7_perf.folded", "ck_v7_perf_prefill.folded")
+                )
             )
             prefill_top_symbols = flame.get("prefill_top_symbols")
 
@@ -4011,6 +4071,22 @@ def load_model_data(
         data["meta"]["profile_roots"] = [str(p) for p in profile_alias_roots]
     if strict_run_scope:
         data["meta"]["artifact_roots"] = [str(p) for p in search_roots]
+    if bridge_root is not None:
+        data["meta"]["multimodal_bridge_root"] = str(bridge_root)
+    if bridge_decoder_root is not None:
+        data["meta"]["multimodal_decoder_root"] = str(bridge_decoder_root)
+    if bridge_encoder_root is not None:
+        data["meta"]["multimodal_encoder_root"] = str(bridge_encoder_root)
+
+    bridge_payload = data["files"].get("multimodal_bridge_report")
+    if isinstance(bridge_payload, dict):
+        enriched_bridge = _enrich_multimodal_bridge_payload(
+            bridge_payload,
+            ck_build_path=ck_build_path,
+            model_root=model_root,
+        )
+        data["files"]["multimodal_bridge_report"] = enriched_bridge
+        data["meta"]["multimodal_mode"] = str(enriched_bridge.get("bridge_mode") or "encoder_decoder")
 
     print(f"  Loaded {len(loaded)} files")
     return data
@@ -4164,7 +4240,7 @@ def serve_live(run_dir: Path, html_path: Path, port: int = 7700, interval_ms: in
                 resolved = _resolve_path_loose(req_path)
                 allowed_roots = [
                     _resolve_path_loose(run_dir),
-                    _resolve_path_loose(V7_ROOT),
+                    _resolve_path_loose(V8_ROOT),
                     _resolve_path_loose(PROJECT_ROOT),
                 ]
                 if not _path_under_any_root(resolved, allowed_roots):
@@ -4254,7 +4330,7 @@ Examples:
     parser.add_argument(
         "--run",
         type=Path,
-        help="Run directory produced by cks-v7-run (single source of training/profile artifacts)"
+        help="Run directory produced by cks-v8-run (single source of training/profile artifacts)"
     )
     parser.add_argument(
         "--run-model",
@@ -4270,7 +4346,7 @@ Examples:
         "--with-profile", "--profile",
         dest="with_profile",
         action="store_true",
-        help="Run ck_run_v7.py --profile before generating report"
+        help="Run the stable runtime prep path with profiling before generating the report"
     )
     parser.add_argument(
         "--with-probes", "--probes",
@@ -4318,7 +4394,7 @@ Examples:
         "--weight-dtype",
         choices=["float32", "bf16", "q4_0", "q4_1", "q4_k", "q4_k_m", "q5_0", "q5_1", "q6_k", "q8_0"],
         default=None,
-        help="Weight dtype override forwarded to ck_run_v7.py for profile/probe prep (e.g., float32 for training-focused builds)"
+        help="Weight dtype override forwarded to the prep runner for profile/probe preparation (e.g., float32 for training-focused builds)"
     )
     parser.add_argument(
         "--vtune",
@@ -4438,7 +4514,7 @@ Examples:
             run_model_input = args.run_model
             run_model_compiled_only = False
             if not run_model_input:
-                # Prefer source/HF inputs so probe flow can always prep via ck_run_v7.py first.
+                # Prefer source/HF inputs so probe flow can always prep via ck_run_v8.py first.
                 if has_local_runnable_source(model_root):
                     run_model_input = resolve_local_runnable_input(model_root)
                     if run_model_input != str(model_root):
@@ -4510,18 +4586,18 @@ Examples:
                 chat_args = ["--chat-template", effective_chat_template]
 
             make_overrides = [
-                f"V7_MODEL={run_model_input}",
-                f"V7_PERF_RUNTIME={args.perf_runtime}",
-                f"V7_WITH_VTUNE={1 if args.vtune else 0}",
-                f"V7_FORCE_COMPILE={1 if args.force_compile else 0}",
-                f"V7_PREP_WITH_PYTHON={0 if run_model_compiled_only else 1}",
+                f"V8_MODEL={run_model_input}",
+                f"V8_PERF_RUNTIME={args.perf_runtime}",
+                f"V8_WITH_VTUNE={1 if args.vtune else 0}",
+                f"V8_FORCE_COMPILE={1 if args.force_compile else 0}",
+                f"V8_PREP_WITH_PYTHON={0 if run_model_compiled_only else 1}",
             ]
             if args.weight_dtype:
-                make_overrides.append(f"V7_WEIGHT_DTYPE={args.weight_dtype}")
+                make_overrides.append(f"V8_WEIGHT_DTYPE={args.weight_dtype}")
             if effective_chat_template and effective_chat_template != "auto":
-                make_overrides.append(f"V7_CHAT_TEMPLATE={effective_chat_template}")
+                make_overrides.append(f"V8_CHAT_TEMPLATE={effective_chat_template}")
             if effective_chat_template == "none":
-                make_overrides.append("V7_CLI_ARGS=--no-chat-template")
+                make_overrides.append("V8_CLI_ARGS=--no-chat-template")
 
             profile_cmd = [
                 sys.executable,
@@ -4544,16 +4620,16 @@ Examples:
 
             if args.with_profile:
                 if args.perf_runtime == "cli":
-                    print("Preparing runtime via ck_run_v7.py...")
+                    print("Preparing runtime via ck_run_v8.py...")
                     try_run_cmd(
                         "runtime prep",
-                        ["make", "--no-print-directory", "profile-v7-prepare-runtime", *make_overrides],
+                        ["make", "--no-print-directory", "profile-v8-prepare-runtime", *make_overrides],
                         PROJECT_ROOT,
                     )
                     print("Running CLI profile capture...")
                     try_run_cmd(
                         "cli profile capture",
-                        ["make", "--no-print-directory", "profile-v7-decode", *make_overrides],
+                        ["make", "--no-print-directory", "profile-v8-decode", *make_overrides],
                         PROJECT_ROOT,
                     )
                 else:
@@ -4567,7 +4643,7 @@ Examples:
                 need_probe_prep = args.force_compile or not (has_layout and has_lowered)
                 if need_probe_prep and run_model_compiled_only:
                     print(
-                        "Skipping probe prep via ck_run_v7.py: runtime-only input has no source checkpoint "
+                        "Skipping probe prep via ck_run_v8.py: runtime-only input has no source checkpoint "
                         "(use --run-model hf://... or local .gguf/.safetensors to enable prep)."
                     )
                 elif need_probe_prep:
@@ -4598,16 +4674,16 @@ Examples:
                 if not args.with_profile:
                     # Ensure profile_summary.json exists for report profile charts.
                     if args.perf_runtime == "cli":
-                        print("Preparing runtime via ck_run_v7.py (required for probes)...")
+                        print("Preparing runtime via ck_run_v8.py (required for probes)...")
                         try_run_cmd(
                             "runtime prep (required for probes)",
-                            ["make", "--no-print-directory", "profile-v7-prepare-runtime", *make_overrides],
+                            ["make", "--no-print-directory", "profile-v8-prepare-runtime", *make_overrides],
                             PROJECT_ROOT,
                         )
                         print("Running CLI profile capture (required for probes)...")
                         try_run_cmd(
                             "cli profile capture (required for probes)",
-                            ["make", "--no-print-directory", "profile-v7-decode", *make_overrides],
+                            ["make", "--no-print-directory", "profile-v8-decode", *make_overrides],
                             PROJECT_ROOT,
                         )
                     else:
@@ -4642,7 +4718,7 @@ Examples:
                 else:
                     try_run_cmd(
                         "perf probe gate",
-                        ["make", "--no-print-directory", "v7-perf-gate", *make_overrides],
+                        ["make", "--no-print-directory", "v8-perf-gate", *make_overrides],
                         PROJECT_ROOT,
                     )
 
@@ -4650,10 +4726,10 @@ Examples:
                 expect_cachegrind = False
                 expect_asan = False
                 if run_dir is not None and has_train_runtime_artifacts(run_dir):
-                    ck_cli = PROJECT_ROOT / "build" / "ck-cli-v7"
+                    ck_cli = PROJECT_ROOT / "build" / "ck-cli-v8"
                     thread_hint = os.environ.get("CK_NUM_THREADS", "8")
                     token_file = ensure_train_token_file(run_dir)
-                    try_run_cmd("build ck-cli-v7 (native profile probes)", ["make", "--no-print-directory", "ck-cli-v7"], PROJECT_ROOT)
+                    try_run_cmd("build ck-cli-v8 (native profile probes)", ["make", "--no-print-directory", "ck-cli-v8"], PROJECT_ROOT)
 
                     native_probe_prefix = [
                         str(ck_cli),
@@ -4676,7 +4752,7 @@ Examples:
 
                     if args.vtune:
                         if vtune_available:
-                            print("Running native train VTune probe (ck-cli-v7 profile)...")
+                            print("Running native train VTune probe (ck-cli-v8 profile)...")
                             try_run_cmd(
                                 "native train VTune probe",
                                 [*native_probe_prefix, "--tool", "vtune"],
@@ -4689,7 +4765,7 @@ Examples:
                     if args.cachegrind:
                         if valgrind_available:
                             expect_cachegrind = True
-                            print("Running native train cachegrind probe (ck-cli-v7 profile)...")
+                            print("Running native train cachegrind probe (ck-cli-v8 profile)...")
                             try_run_cmd(
                                 "native train cachegrind probe",
                                 [*native_probe_prefix, "--tool", "cachegrind"],
@@ -4701,7 +4777,7 @@ Examples:
 
                     if args.asan:
                         expect_asan = True
-                        print("Running native train ASan verification probe (ck-cli-v7 profile)...")
+                        print("Running native train ASan verification probe (ck-cli-v8 profile)...")
                         try_run_cmd(
                             "native train ASan probe",
                             [*native_probe_prefix, "--tool", "asan"],
@@ -4712,7 +4788,7 @@ Examples:
                     if args.advisor:
                         if advisor_available:
                             expect_advisor = True
-                            print("Running native train Advisor probe (ck-cli-v7 profile)...")
+                            print("Running native train Advisor probe (ck-cli-v8 profile)...")
                             try_run_cmd(
                                 "native train Advisor probe",
                                 [*native_probe_prefix, "--tool", "advisor"],

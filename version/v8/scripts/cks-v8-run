@@ -155,12 +155,28 @@ if [ "${1:-}" = "run" ] && [ "$#" -eq 1 ]; then
   exit 2
 fi
 
+if [ -z "${CK_CACHE_DIR:-}" ]; then
+  default_cache_dir="$HOME/.cache/ck-engine-v8/models"
+  if mkdir -p "$default_cache_dir" >/dev/null 2>&1 && [ -w "$default_cache_dir" ]; then
+    export CK_CACHE_DIR="$default_cache_dir"
+  else
+    export CK_CACHE_DIR="$PROJECT_ROOT/version/v8/.cache/models"
+  fi
+fi
+
+PY_BIN="python3"
 if [ -n "$SELECTED_PY" ]; then
-  exec "$SELECTED_PY" "$SCRIPT_DIR/ck_run_v8.py" "$@"
+  PY_BIN="$SELECTED_PY"
+elif [ -x "$VENV_PY" ]; then
+  PY_BIN="$VENV_PY"
 fi
 
-if [ -x "$VENV_PY" ]; then
-  exec "$VENV_PY" "$SCRIPT_DIR/ck_run_v8.py" "$@"
-fi
-
-exec python3 "$SCRIPT_DIR/ck_run_v8.py" "$@"
+case "${1:-}" in
+  ""|help|run|list|clean)
+    exec "$PY_BIN" "$SCRIPT_DIR/ck_run_v8.py" "$@"
+    ;;
+  *)
+    export CK_V7_REPORT_DIR="${CK_V7_REPORT_DIR:-$PROJECT_ROOT/version/v8/.cache/reports}"
+    exec "$PY_BIN" "$PROJECT_ROOT/version/v7/scripts/ck_run_v7.py" "$@"
+    ;;
+esac

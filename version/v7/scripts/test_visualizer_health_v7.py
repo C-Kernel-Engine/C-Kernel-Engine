@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -39,6 +40,34 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _env_path(name: str, default: Path) -> Path:
+    value = os.environ.get(name)
+    return Path(value).expanduser() if value else default
+
+
+VIS_VERSION = os.environ.get("CK_VIS_VERSION", "v7")
+CONTRACTS_DIR = _env_path(
+    "CK_VIS_CONTRACTS_DIR",
+    ROOT / "version" / VIS_VERSION / "tests" / "contracts",
+)
+IR_VIZ_SOURCE_PATH = _env_path(
+    "CK_VIS_IR_VIZ_SOURCE",
+    ROOT / "version" / VIS_VERSION / "tools" / "ir_visualizer.html",
+)
+DV_SOURCE_PATH = _env_path(
+    "CK_VIS_DV_SOURCE",
+    ROOT / "version" / VIS_VERSION / "scripts" / "dataset" / f"build_svg_dataset_visualizer_{VIS_VERSION}.py",
+)
+HUB_SOURCE_PATH = _env_path(
+    "CK_VIS_HUB_SOURCE",
+    ROOT / "version" / VIS_VERSION / "tools" / ("open_ir_hub.py" if VIS_VERSION == "v7" else f"open_ir_hub_{VIS_VERSION}.py"),
+)
+DEFAULT_MODELS_ROOT = _env_path(
+    "CK_VIS_MODELS_ROOT",
+    Path.home() / ".cache" / f"ck-engine-{VIS_VERSION}" / "models",
+)
 
 # ── Colour output ────────────────────────────────────────────────────────────
 
@@ -184,8 +213,6 @@ def check_js_syntax(js: str) -> tuple[bool, str]:
 
 
 # ── Contract definitions ─────────────────────────────────────────────────────
-
-CONTRACTS_DIR = ROOT / "version" / "v7" / "tests" / "contracts"
 
 
 def _load_contract(name: str) -> dict:
@@ -407,7 +434,7 @@ def test_ir_hub(html: str) -> SuiteResult:
 
 def test_ir_viz_source() -> SuiteResult:
     """Test the ir_visualizer.html source template."""
-    path = ROOT / "version" / "v7" / "tools" / "ir_visualizer.html"
+    path = IR_VIZ_SOURCE_PATH
     if not path.exists():
         r = SuiteResult(suite="ir_visualizer_source")
         r.checks.append(Check("file_exists", False, str(path)))
@@ -421,7 +448,7 @@ def test_ir_viz_source() -> SuiteResult:
 
 def test_dv_source() -> SuiteResult:
     """Test the dataset viewer generator source (embedded JS)."""
-    path = ROOT / "version" / "v7" / "scripts" / "dataset" / "build_svg_dataset_visualizer_v7.py"
+    path = DV_SOURCE_PATH
     if not path.exists():
         r = SuiteResult(suite="dataset_viewer_source")
         r.checks.append(Check("file_exists", False, str(path)))
@@ -511,7 +538,7 @@ def test_dv_source() -> SuiteResult:
 
 def test_ir_hub_source() -> SuiteResult:
     """Test open_ir_hub.py generates valid hub HTML structure."""
-    path = ROOT / "version" / "v7" / "tools" / "open_ir_hub.py"
+    path = HUB_SOURCE_PATH
     if not path.exists():
         r = SuiteResult(suite="ir_hub_source")
         r.checks.append(Check("file_exists", False, str(path)))
@@ -554,7 +581,7 @@ def print_suite(suite: SuiteResult) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="HTML visualizer health gate (zero-dependency)")
+    ap = argparse.ArgumentParser(description=f"HTML visualizer health gate ({VIS_VERSION})")
     ap.add_argument("--source", action="store_true", help="Test source templates")
     ap.add_argument("--ir-report", type=Path, help="Test a generated ir_report.html")
     ap.add_argument("--dataset-viewer", type=Path, help="Test a generated dataset_viewer.html")
@@ -596,7 +623,7 @@ def main() -> int:
 
     # ── Auto-discover generated files ────────────────────────────────────
     if args.all:
-        cache = Path.home() / ".cache" / "ck-engine-v7" / "models"
+        cache = DEFAULT_MODELS_ROOT
         if cache.exists():
             hub = cache / "ir_hub.html"
             if hub.exists():
@@ -656,6 +683,7 @@ def main() -> int:
     # ── JSON output ──────────────────────────────────────────────────────
     if args.json_out:
         report = {
+            "version": VIS_VERSION,
             "total_checks": total_checks,
             "passed": total_passed,
             "failed": total_failed,

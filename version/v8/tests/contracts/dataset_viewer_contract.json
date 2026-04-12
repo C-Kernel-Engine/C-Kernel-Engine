@@ -1,0 +1,397 @@
+{
+  "$schema": "visualizer_contract_v1",
+  "_testing_guide": "Single source of truth for dataset viewer tests. L1 reads tabs/functions. L2 reads test_vectors. To add a tab: add to tabs[] + required_functions[]. To add a unit-tested function: add to test_vectors{} + update fixtures/ds_pure_functions.js. Run: make v8-visualizer-health",
+  "name": "dataset_viewer",
+  "description": "CK-Engine v8 Dataset Viewer — SVG training data inspector",
+  "source": "version/v8/scripts/dataset/build_svg_dataset_visualizer_v8.py",
+  "tabs": [
+    {
+      "id": "overview",
+      "label": "Overview",
+      "render_fn": "renderOverview",
+      "panel_id": "panel-overview",
+      "description": "Dataset summary, stage flow, stat cards"
+    },
+    {
+      "id": "preflight",
+      "label": "Preflight",
+      "render_fn": "renderPreflight",
+      "panel_id": "panel-preflight",
+      "description": "PyTorch parity gate, training readiness A/B/C/D/E/F"
+    },
+    {
+      "id": "gallery",
+      "label": "Gallery",
+      "render_fn": "renderGallery",
+      "panel_id": "panel-gallery",
+      "description": "SVG preview grid with classification badges"
+    },
+    {
+      "id": "text",
+      "label": "Text",
+      "render_fn": "renderTextSamples",
+      "panel_id": "panel-text",
+      "description": "Raw text sample viewer"
+    },
+    {
+      "id": "tokenizer",
+      "label": "Tokenizer",
+      "render_fn": "renderTokenizer",
+      "panel_id": "panel-tokenizer",
+      "description": "Tokenizer roundtrip, BPE merge stats"
+    },
+    {
+      "id": "vocabulary",
+      "label": "Vocabulary",
+      "render_fn": "renderVocabulary",
+      "panel_id": "panel-vocabulary",
+      "description": "Vocabulary table, frequency distribution"
+    },
+    {
+      "id": "classification",
+      "label": "Classification",
+      "render_fn": "renderClassification",
+      "panel_id": "panel-classification",
+      "description": "Scene classification distribution"
+    },
+    {
+      "id": "browse",
+      "label": "Browse",
+      "render_fn": "renderBrowse",
+      "panel_id": "panel-browse",
+      "description": "Row-level dataset browser with tokenizer roundtrip"
+    },
+    {
+      "id": "candidates",
+      "label": "Candidates",
+      "render_fn": "renderCandidates",
+      "panel_id": "panel-candidates",
+      "description": "Candidate evaluation and selection"
+    },
+    {
+      "id": "quality",
+      "label": "Quality",
+      "render_fn": "renderQuality",
+      "panel_id": "panel-quality",
+      "description": "Output quality evaluation and metrics"
+    },
+    {
+      "id": "embeddings",
+      "label": "Embeddings",
+      "render_fn": "renderEmbeddings",
+      "panel_id": "panel-embeddings",
+      "description": "Embedding heatmap, cosine similarity matrix"
+    },
+    {
+      "id": "attention",
+      "label": "Attention",
+      "render_fn": "renderAttention",
+      "panel_id": "panel-attention",
+      "description": "Multi-head attention heatmaps, entropy, layer comparison"
+    },
+    {
+      "id": "training",
+      "label": "Training",
+      "render_fn": "renderTraining",
+      "panel_id": "panel-training",
+      "description": "Training dynamics: loss curves (CK vs PT), parity drift, gradient norms, LR schedule, step timing"
+    }
+  ],
+  "required_functions": {
+    "core": [
+      "renderAll",
+      "openModal",
+      "closeModal",
+      "esc",
+      "escAttr",
+      "statCardHtml",
+      "filteredEntries",
+      "renderHeader",
+      "emptyTabHtml",
+      "provenanceBanner"
+    ],
+    "per_tab": [
+      "renderOverview",
+      "renderPreflight",
+      "renderGallery",
+      "renderTextSamples",
+      "renderTokenizer",
+      "renderVocabulary",
+      "renderClassification",
+      "renderBrowse",
+      "renderCandidates",
+      "renderQuality",
+      "renderEmbeddings",
+      "renderAttention",
+      "renderTraining"
+    ],
+    "embeddings": [
+      "embColor",
+      "embNormalise",
+      "cosineSim",
+      "drawEmbHeatmap",
+      "loadEmbData",
+      "embSortedIndices",
+      "drawEmbColorbar",
+      "renderSimPanel",
+      "generateEmbDemo"
+    ],
+    "attention": [
+      "attnColor",
+      "drawAttnMatrix",
+      "drawAttnThumb",
+      "attnEntropy",
+      "avgMatrices",
+      "attnGetMatrix",
+      "loadAttnData",
+      "renderAttnMain",
+      "renderAttnSeqList",
+      "renderAttnTokenChips",
+      "openAttnDetail",
+      "openAttnDetailMatrix",
+      "generateAttnDemo"
+    ],
+    "training": [
+      "drawCanvasChart",
+      "fmtAxisVal",
+      "renderTraining"
+    ]
+  },
+  "pure_function_tests": {
+    "fixture_file": "version/v8/tests/fixtures/ds_pure_functions.js",
+    "functions": [
+      {
+        "name": "attnColor",
+        "tests": [
+          {
+            "name": "zero_orange",
+            "call": "attnColor(0, 'orange')",
+            "expect": [0, 0, 0]
+          },
+          {
+            "name": "one_orange",
+            "call": "attnColor(1, 'orange')",
+            "expect": [255, 180, 0]
+          },
+          {
+            "name": "clamp_neg",
+            "call": "attnColor(-1, 'orange')",
+            "expect": [0, 0, 0]
+          },
+          {
+            "name": "clamp_over",
+            "call": "attnColor(2, 'orange')",
+            "expect": [255, 180, 0]
+          },
+          {
+            "name": "heatmap_0",
+            "call": "attnColor(0, 'heatmap')",
+            "expect": [7, 100, 248]
+          },
+          {
+            "name": "heatmap_1",
+            "call": "attnColor(1, 'heatmap')",
+            "expect": [255, 160, 0]
+          },
+          {
+            "name": "heatmap_mid",
+            "call": "attnColor(0.5, 'heatmap')",
+            "expect": [240, 240, 240]
+          },
+          {
+            "name": "blue",
+            "call": "attnColor(1, 'blue')",
+            "expect": [7, 173, 248]
+          },
+          {
+            "name": "green",
+            "call": "attnColor(1, 'green')",
+            "expect": [71, 180, 117]
+          }
+        ]
+      },
+      {
+        "name": "embColor",
+        "tests": [
+          {
+            "name": "zero",
+            "call": "embColor(0)",
+            "expect": [7, 173, 248]
+          },
+          {
+            "name": "one",
+            "call": "embColor(1)",
+            "expect": [255, 180, 0]
+          },
+          {
+            "name": "half",
+            "call": "embColor(0.5)",
+            "expect": [195, 200, 208]
+          }
+        ]
+      },
+      {
+        "name": "cosineSim",
+        "tests": [
+          {
+            "name": "identical",
+            "call": "cosineSim([1,0,0],[1,0,0])",
+            "expect_approx": 1.0
+          },
+          {
+            "name": "orthogonal",
+            "call": "cosineSim([1,0],[0,1])",
+            "expect_approx": 0.0
+          },
+          {
+            "name": "opposite",
+            "call": "cosineSim([1,0],[-1,0])",
+            "expect_approx": -1.0
+          },
+          {
+            "name": "scaled",
+            "call": "cosineSim([2,0],[4,0])",
+            "expect_approx": 1.0
+          }
+        ]
+      },
+      {
+        "name": "attnEntropy",
+        "tests": [
+          {
+            "name": "uniform_2",
+            "call": "attnEntropy([0.5, 0.5])",
+            "expect_approx": 1.0
+          },
+          {
+            "name": "uniform_4",
+            "call": "attnEntropy([0.25,0.25,0.25,0.25])",
+            "expect_approx": 2.0
+          },
+          {
+            "name": "peaked",
+            "call": "attnEntropy([1, 0, 0])",
+            "expect_approx": 0.0
+          },
+          {
+            "name": "with_zeros",
+            "call": "attnEntropy([0.5, 0.5, 0, 0])",
+            "expect_approx": 1.0
+          }
+        ]
+      },
+      {
+        "name": "avgMatrices",
+        "tests": [
+          {
+            "name": "single",
+            "call": "avgMatrices([[[1,2],[3,4]]])",
+            "expect": [[1, 2], [3, 4]]
+          },
+          {
+            "name": "two",
+            "call": "avgMatrices([[[0,0],[0,0]],[[2,4],[6,8]]])",
+            "expect": [[1, 2], [3, 4]]
+          },
+          {
+            "name": "null",
+            "call": "avgMatrices(null)",
+            "expect": [[]]
+          }
+        ]
+      },
+      {
+        "name": "embNormalise",
+        "tests": [
+          {
+            "name": "global_range",
+            "call": "embNormalise([[0, 10], [5, 5]], 'global')",
+            "expect_fn": "r => Math.abs(r.vmin) < 1e-6 && Math.abs(r.vmax - 10) < 1e-6 && Math.abs(r.norm[0][0]) < 1e-6 && Math.abs(r.norm[0][1] - 1) < 1e-6"
+          },
+          {
+            "name": "null_safe",
+            "call": "embNormalise(null, 'global')",
+            "expect_fn": "r => r.norm.length === 0 && r.vmin === 0 && r.vmax === 0"
+          },
+          {
+            "name": "col_note",
+            "call": "embNormalise([[1,2],[3,4]], 'col')",
+            "expect_fn": "r => r.norm.length === 2 && r.note.includes('col')"
+          },
+          {
+            "name": "row_note",
+            "call": "embNormalise([[1,2],[3,4]], 'row')",
+            "expect_fn": "r => r.norm.length === 2 && r.note.includes('row')"
+          }
+        ]
+      },
+      {
+        "name": "fmtAxisVal",
+        "tests": [
+          {
+            "name": "zero",
+            "call": "fmtAxisVal(0)",
+            "expect": "0"
+          },
+          {
+            "name": "integer",
+            "call": "fmtAxisVal(42)",
+            "expect": "42"
+          },
+          {
+            "name": "thousands",
+            "call": "fmtAxisVal(1500)",
+            "expect": "1.5K"
+          },
+          {
+            "name": "millions",
+            "call": "fmtAxisVal(2500000)",
+            "expect": "2.5M"
+          },
+          {
+            "name": "small_float",
+            "call": "fmtAxisVal(0.00045)",
+            "expect": "4.5e-4"
+          },
+          {
+            "name": "pi",
+            "call": "fmtAxisVal(3.14159)",
+            "expect": "3.14"
+          },
+          {
+            "name": "negative_thousands",
+            "call": "fmtAxisVal(-3200)",
+            "expect": "-3.2K"
+          }
+        ]
+      }
+    ]
+  },
+  "embedded_data": {
+    "CK_TRAINING": {
+      "description": "Training telemetry: loss curve, grad norms, step profile (downsampled to ~500 pts)",
+      "nullable": true,
+      "when_present": {
+        "required_keys": [
+          "available",
+          "loss_curve",
+          "total_steps",
+          "summary"
+        ],
+        "summary_keys": [
+          "start_loss",
+          "final_loss",
+          "final_loss_pt",
+          "total_steps",
+          "final_lr"
+        ]
+      }
+    },
+    "CK_PIPELINE_MAP": {
+      "description": "Script → artifact → tab mapping with live status (present/synthesized/missing/na)",
+      "nullable": false,
+      "is_array": true,
+      "entry_keys": ["tab", "artifact", "script", "status", "detail", "command"]
+    }
+  }
+}

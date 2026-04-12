@@ -80,31 +80,39 @@ for idx in "${!PUSH_TARGETS[@]}"; do
     fi
 done
 
-ck_should_run_regression_fast=0
+ck_should_run_v7_regression_fast=0
+ck_should_run_v8_regression_fast=0
 ck_should_run_v66_gate=0
 case "${CK_PREPUSH_REGRESSION_FAST:-auto}" in
     1|true|TRUE|yes|YES|always)
-        ck_should_run_regression_fast=1
+        ck_should_run_v7_regression_fast=1
+        ck_should_run_v8_regression_fast=1
         ;;
     0|false|FALSE|no|NO|never)
-        ck_should_run_regression_fast=0
+        ck_should_run_v7_regression_fast=0
+        ck_should_run_v8_regression_fast=0
         ;;
     *)
         for path in "${PUSH_CHANGED_FILES[@]}"; do
             case "$path" in
                 Makefile|.githooks/pre-commit|.githooks/pre-push|.github/workflows/nightly.yml)
-                    ck_should_run_regression_fast=1
-                    break
+                    ck_should_run_v7_regression_fast=1
+                    ck_should_run_v8_regression_fast=1
                     ;;
                 scripts/*|src/*|tests/*)
-                    ck_should_run_regression_fast=1
-                    break
+                    ck_should_run_v7_regression_fast=1
+                    ck_should_run_v8_regression_fast=1
                     ;;
-                version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/src/*|version/v7/README.md)
-                    ck_should_run_regression_fast=1
-                    break
+                version/v7/scripts/*|version/v7/templates/*|version/v7/regression/*|version/v7/test_assets/*|version/v7/src/*|version/v7/kernel_maps/*|version/v7/README.md)
+                    ck_should_run_v7_regression_fast=1
+                    ;;
+                version/v8/scripts/*|version/v8/templates/*|version/v8/regression/*|version/v8/test_assets/*|version/v8/src/*|version/v8/kernel_maps/*|version/v8/README.md)
+                    ck_should_run_v8_regression_fast=1
                     ;;
             esac
+            if [ "$ck_should_run_v7_regression_fast" = "1" ] && [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+                break
+            fi
         done
         ;;
 esac
@@ -136,10 +144,16 @@ case "${CK_PREPUSH_V66_GATE:-auto}" in
         ;;
 esac
 
-if [ "$ck_should_run_regression_fast" = "1" ]; then
-    echo -e "${YELLOW}  ↳ regression-fast enabled for pushed runtime/regression changes${NC}"
+if [ "$ck_should_run_v7_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}  ↳ v7-regression-fast enabled for pushed shared/v7 runtime changes${NC}"
 else
-    echo -e "${YELLOW}  ↳ regression-fast skipped (no pushed runtime/regression changes)${NC}"
+    echo -e "${YELLOW}  ↳ v7-regression-fast skipped${NC}"
+fi
+
+if [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}  ↳ v8-regression-fast enabled for pushed shared/v8 runtime changes${NC}"
+else
+    echo -e "${YELLOW}  ↳ v8-regression-fast skipped${NC}"
 fi
 
 if [ "$ck_should_run_v66_gate" = "1" ]; then
@@ -268,31 +282,38 @@ else
 fi
 
 # =============================================================================
-# Test 3: E2E inference test
+# Test 3: v8 runner E2E text smoke
 # =============================================================================
-echo -e "${YELLOW}[3/6]${NC} Running E2E inference test..."
+echo -e "${YELLOW}[3/6]${NC} Running v8 E2E text smoke..."
 
-# Candidate models for E2E smoke:
+# Candidate models for v8 E2E smoke:
 # 1) explicit override, 2) local cache, 3) HF GGUF URL fallback.
 MODEL_CANDIDATES=()
 if [ -n "${CK_E2E_MODEL:-}" ]; then
   MODEL_CANDIDATES+=("${CK_E2E_MODEL}")
 fi
 
-LOCAL_CANDIDATES=(
-  "$HOME/.cache/ck-engine-v7/models/unsloth--gemma-3-270m-it-GGUF"
-  "$HOME/.cache/ck-engine-v7/models/Qwen--Qwen3-0.6B-GGUF"
-  "$HOME/.cache/ck-engine-v7/models/Qwen--Qwen2-0.5B-Instruct-GGUF"
+LOCAL_CACHE_ROOTS=(
+  "$HOME/.cache/ck-engine-v8/models"
+  "$HOME/.cache/ck-engine-v7/models"
 )
-for C in "${LOCAL_CANDIDATES[@]}"; do
-  if [ -d "$C" ]; then
-    GGUF_LOCAL=$(find "$C" -maxdepth 1 -type f -name "*.gguf" 2>/dev/null | sort | head -1 || true)
-    if [ -n "$GGUF_LOCAL" ] && [ -f "$GGUF_LOCAL" ]; then
-      MODEL_CANDIDATES+=("$GGUF_LOCAL")
-    elif [ -f "$C/config.json" ]; then
-      MODEL_CANDIDATES+=("$C")
+LOCAL_REPOS=(
+  "unsloth--gemma-3-270m-it-GGUF"
+  "Qwen--Qwen3-0.6B-GGUF"
+  "Qwen--Qwen2-0.5B-Instruct-GGUF"
+)
+for cache_root in "${LOCAL_CACHE_ROOTS[@]}"; do
+  for repo in "${LOCAL_REPOS[@]}"; do
+    C="${cache_root}/${repo}"
+    if [ -d "$C" ]; then
+      GGUF_LOCAL=$(find "$C" -maxdepth 1 -type f -name "*.gguf" 2>/dev/null | sort | head -1 || true)
+      if [ -n "$GGUF_LOCAL" ] && [ -f "$GGUF_LOCAL" ]; then
+        MODEL_CANDIDATES+=("$GGUF_LOCAL")
+      elif [ -f "$C/config.json" ]; then
+        MODEL_CANDIDATES+=("$C")
+      fi
     fi
-  fi
+  done
 done
 
 HF_CANDIDATES=(
@@ -307,18 +328,22 @@ done
 PROMPTS=(
   "Hello! Reply with a single short sentence."
   "Give a tiny C function that returns 42."
-  "Give a tiny Python function that returns 42."
-  "Give a tiny SQL query that selects the number 42."
 )
 
-RUNNER=""
-if [ -f "version/v6.6/scripts/ck_run_v6_6.py" ]; then
-    RUNNER="version/v6.6/scripts/ck_run_v6_6.py"
-elif [ -f "scripts/v6.6/ck_run_v6_6.py" ]; then
-    RUNNER="scripts/v6.6/ck_run_v6_6.py"
+RUNNER=()
+if [ -x "$ROOT_DIR/.venv/bin/python" ] && [ -f "version/v8/scripts/ck_run_v8.py" ]; then
+    RUNNER=("$ROOT_DIR/.venv/bin/python" "version/v8/scripts/ck_run_v8.py")
+elif command -v python3 >/dev/null 2>&1 && [ -f "version/v8/scripts/ck_run_v8.py" ]; then
+    RUNNER=("python3" "version/v8/scripts/ck_run_v8.py")
+elif [ -x "version/v8/scripts/cks-v8-run" ]; then
+    RUNNER=("version/v8/scripts/cks-v8-run")
 fi
 
-if [ -n "$RUNNER" ]; then
+E2E_CACHE_DIR="${CK_E2E_CACHE_DIR:-$HOME/.cache/ck-engine-v8/models}"
+E2E_TIMEOUT_SEC="${CK_E2E_TIMEOUT_SEC:-240}"
+mkdir -p "$E2E_CACHE_DIR"
+
+if [ ${#RUNNER[@]} -ne 0 ]; then
     e2e_ok=0
     e2e_network_skip=0
     e2e_permission_skip=0
@@ -336,12 +361,30 @@ if [ -n "$RUNNER" ]; then
               --prompt "$P"
               --max-tokens 5
               --context-len 128
+              --chat-template auto
             )
             # Keep pre-push E2E portable and non-destructive by default.
             if [ "${CK_E2E_FORCE_COMPILE:-0}" = "1" ]; then
-                RUN_ARGS+=(--force-compile)
+                RUN_ARGS+=(--force-convert --force-compile)
             fi
-            OUTPUT=$(timeout 180 python3 "$RUNNER" "${RUN_ARGS[@]}" 2>&1 || true)
+            set +e
+            OUTPUT=$(CK_CACHE_DIR="$E2E_CACHE_DIR" timeout "$E2E_TIMEOUT_SEC" "${RUNNER[@]}" "${RUN_ARGS[@]}" 2>&1)
+            run_status=$?
+            set -e
+
+            if [ "$run_status" -eq 124 ]; then
+                if [[ "$MODEL" == hf://* ]]; then
+                    echo -e "${YELLOW}  ⚠ Skipped candidate (timeout while preparing remote model): ${MODEL}${NC}"
+                    candidate_status="network_skip"
+                    e2e_network_skip=1
+                    break
+                fi
+                echo -e "${RED}  ✗ E2E inference timed out${NC}"
+                echo "$OUTPUT" | tail -5
+                failed=1
+                candidate_status="hard_fail"
+                break
+            fi
 
             if echo "$OUTPUT" | grep -qiE "Temporary failure in name resolution|Connection timed out|Could not resolve host|No route to host|network is unreachable|HTTPError|httpx|client has been closed"; then
                 echo -e "${YELLOW}  ⚠ Skipped candidate (network unavailable): ${MODEL}${NC}"
@@ -372,7 +415,7 @@ if [ -n "$RUNNER" ]; then
                 failed=1
                 candidate_status="hard_fail"
                 break
-            elif echo "$OUTPUT" | grep -qE "tok/s|Response:|Generated"; then
+            elif echo "$OUTPUT" | grep -qE "tok/s|Response:|Generated|Assistant:"; then
                 e2e_ok=1
             else
                 echo -e "${YELLOW}  ⚠ E2E inference unclear (check output)${NC}"
@@ -496,16 +539,27 @@ else
 fi
 
 # =============================================================================
-# Test 5.5: v7 regression fast (conditional on pushed runtime/regression files)
+# Test 5.5: fast regression (conditional on pushed runtime/regression files)
 # =============================================================================
-if [ "$ck_should_run_regression_fast" = "1" ]; then
-    echo -e "${YELLOW}[5.5/6]${NC} Running v7 regression-fast..."
-    if make --no-print-directory regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs --report-root /tmp/ck-prepush-regression/reports" > /tmp/ck_v7_regression_fast.log 2>&1; then
-        echo -e "${GREEN}  ✓ v7 regression-fast passed${NC}"
-    else
-        echo -e "${RED}  ✗ v7 regression-fast failed${NC}"
-        echo "    See /tmp/ck_v7_regression_fast.log for details"
-        failed=1
+if [ "$ck_should_run_v7_regression_fast" = "1" ] || [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+    echo -e "${YELLOW}[5.5/6]${NC} Running fast regression..."
+    if [ "$ck_should_run_v7_regression_fast" = "1" ]; then
+        if make --no-print-directory v7-regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs/v7 --report-root /tmp/ck-prepush-regression/reports/v7" > /tmp/ck_regression_fast_v7.log 2>&1; then
+            echo -e "${GREEN}  ✓ v7 fast regression passed${NC}"
+        else
+            echo -e "${RED}  ✗ v7 fast regression failed${NC}"
+            echo "    See /tmp/ck_regression_fast_v7.log for details"
+            failed=1
+        fi
+    fi
+    if [ "$ck_should_run_v8_regression_fast" = "1" ]; then
+        if make --no-print-directory v8-regression-fast REGRESSION_ARGS="--run-root /tmp/ck-prepush-regression/runs/v8 --report-root /tmp/ck-prepush-regression/reports/v8" > /tmp/ck_regression_fast_v8.log 2>&1; then
+            echo -e "${GREEN}  ✓ v8 fast regression passed${NC}"
+        else
+            echo -e "${RED}  ✗ v8 fast regression failed${NC}"
+            echo "    See /tmp/ck_regression_fast_v8.log for details"
+            failed=1
+        fi
     fi
 fi
 

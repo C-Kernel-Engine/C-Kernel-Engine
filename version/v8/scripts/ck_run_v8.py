@@ -287,8 +287,6 @@ def _compiler_supports_openmp(compiler: str, omp_flag: str) -> bool:
             os.unlink(probe.name)
         except OSError:
             pass
-
-
 def _parse_requirement_packages() -> list[str]:
     packages: list[str] = []
     if not V8_REQUIREMENTS_PATH.exists():
@@ -530,7 +528,6 @@ def step_download_gguf(repo_id: str, filename: str, cache_dir: Path, force: bool
             gguf_path.unlink()
         if _direct_hf_download_gguf(repo_id, filename, gguf_path):
             return gguf_path
-
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
