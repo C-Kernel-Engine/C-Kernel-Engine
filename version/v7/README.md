@@ -38,6 +38,41 @@ make v7-gate-train
 make v7-gate
 ```
 
+## Python Authoring Layer
+
+An experimental Python authoring layer now lives under `ckernel_engine.v7`.
+It is intentionally thin: Python owns model/template/data/tokenizer planning,
+then hands off to the existing `v7` pipeline for manifest creation, IR lowering,
+generated C runtime codegen, and train execution.
+
+Example:
+
+```bash
+python3 version/v7/examples/python_authoring_tiny_lm_v7.py --run-name py-ui-demo
+```
+
+Notebook examples:
+
+```bash
+notebooks/v7_python_authoring_quickstart.ipynb
+notebooks/v7_python_authoring_artifact_walkthrough.ipynb
+```
+
+The package entrypoint is:
+
+```python
+from ckernel_engine.v7 import TrainingProject
+```
+
+Current scope:
+- wraps the existing tiny `v7` run-dir/bootstrap surface
+- supports builtin or embedded template documents
+- records a `python_authoring_plan.json` beside the run artifacts
+
+Not yet in scope:
+- arbitrary Python-defined autograd graphs lowered directly to v7 IR
+- a full public module/op registry for custom backprop definitions
+
 ## v7 Visualizer Dev (No Node)
 
 Training-view extensions for the v7 visualizer live in native ES modules:
