@@ -58,6 +58,12 @@ notebooks/v7_python_authoring_quickstart.ipynb
 notebooks/v7_python_authoring_artifact_walkthrough.ipynb
 ```
 
+Launch the quickstart notebook from inside the repo checkout so it can detect `ckernel_engine/` and `version/v7/`.
+
+```bash
+jupyter lab notebooks/v7_python_authoring_quickstart.ipynb
+```
+
 The package entrypoint is:
 
 ```python
@@ -68,6 +74,8 @@ Current scope:
 - wraps the existing tiny `v7` run-dir/bootstrap surface
 - supports builtin or embedded template documents
 - records a `python_authoring_plan.json` beside the run artifacts
+- can refresh `ir_report.html`, export viewer-side artifacts, and regenerate the shared `ir_hub.html`
+- `dataset_viewer.html` and `attention.json` stay conditional on dataset/tokenizer/probe artifacts being present for the run
 
 Not yet in scope:
 - arbitrary Python-defined autograd graphs lowered directly to v7 IR

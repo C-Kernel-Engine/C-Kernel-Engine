@@ -845,6 +845,7 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange,#ffb400);margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Foundation</div>
     <ul>
         <li><a href="#demo-lane">Demo Lane</a></li>
+        <li><a href="#python-authoring-notebooks">Python Authoring Notebooks</a></li>
         <li><a href="#run-hub-quick-launch">IR Hub Quick Launch</a></li>
         <li><a href="#why-svg">Why SVG for v7</a></li>
     </ul>
@@ -928,6 +929,35 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     <p style="margin:0.35rem 0 0 0;"><strong>Long-range CK-native roadmap:</strong> for how <code>v7</code> training foundations roll into <code>v8-v17</code> capabilities, use <a href="training-curriculum.html">training-curriculum.html</a>.</p>
     <p style="margin:0.35rem 0 0 0;"><strong>Parity gate checklist:</strong> run <a href="v7-parity-checklist.html">v7-parity-checklist.html</a> for the current GO criteria (<code>dataset_qc</code>, <code>tokenizer_roundtrip exact_match</code>, <code>D1/E1/F1</code>, canary <code>row1/row2</code>).</p>
     <p style="margin:0.35rem 0 0 0;"><strong>Caveat:</strong> <code>A1/A2</code> remain a separate kernel-harness bug track and do not block runbook execution readiness under the current operator gate.</p>
+</div>
+
+<h2 id="python-authoring-notebooks">Python Authoring Notebooks</h2>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top:0;">Quickstart Notebook</h3>
+        <p style="margin-bottom:0.35rem;">Launch from the repo root so the notebook can auto-detect <code>ckernel_engine/</code> and <code>version/v7/</code>.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>jupyter lab notebooks/v7_python_authoring_quickstart.ipynb</pre>
+        </div>
+        <p class="mini-note">Walks through <code>materialize -&gt; train -&gt; prepare_viewers()</code> and renders a run artifact dashboard with direct links into the rest of the v7 surface.</p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top:0;">Artifact Walkthrough Notebook</h3>
+        <p style="margin-bottom:0.35rem;">Use after the quickstart or the CLI example to inspect the run-dir handoff boundary and generated artifacts.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>jupyter lab notebooks/v7_python_authoring_artifact_walkthrough.ipynb</pre>
+        </div>
+        <p class="mini-note">Focuses on <code>python_authoring_plan.json</code>, <code>weights_manifest.json</code>, <code>ir1/ir2</code>, layout, reports, and viewer outputs.</p>
+    </div>
+</div>
+
+<div class="card" style="margin-top:0.75rem;">
+    <p style="margin:0 0 0.35rem 0;"><strong>What the notebook lane gives you:</strong> a Python front door into the existing v7 runtime and artifact surface, not a separate execution stack.</p>
+    <p style="margin:0 0 0.35rem 0;"><strong>Typical tiny-run outputs:</strong> <code>python_authoring_plan.json</code>, <code>ir_report.html</code>, <code>embeddings.json</code>, <code>train_e2e_latest.json</code>, and the shared <code>ir_hub.html</code>.</p>
+    <p style="margin:0;"><strong>Conditional artifacts:</strong> <code>dataset_viewer.html</code> requires dataset manifests or a staged dataset workspace, and <code>attention.json</code> requires tokenizer plus probe artifacts.</p>
 </div>
 
 <h2 id="run-hub-quick-launch">IR Hub Quick Launch</h2>
