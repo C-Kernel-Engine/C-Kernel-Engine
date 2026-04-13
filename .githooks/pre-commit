@@ -14,6 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+HOME_DIR="${HOME:-$ROOT_DIR}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -69,10 +70,119 @@ if [ "$should_run_v7_regression" != "1" ] && [ "$should_run_v8_regression" != "1
     exit 0
 fi
 
-RUN_ROOT="${CK_PRECOMMIT_RUN_ROOT:-/tmp/ck-precommit-regression/runs}"
-REPORT_ROOT="${CK_PRECOMMIT_REPORT_ROOT:-/tmp/ck-precommit-regression/reports}"
-CACHE_ROOT="${CK_PRECOMMIT_CACHE_ROOT:-/tmp/ck-precommit-regression/cache/models}"
-SNAPSHOT_PREFIX="${CK_PRECOMMIT_SNAPSHOT_PREFIX:-/tmp/ck-precommit-snapshot}"
+nearest_existing_path() {
+    local probe="$1"
+    while [ ! -e "$probe" ]; do
+        local parent
+        parent="$(dirname "$probe")"
+        if [ "$parent" = "$probe" ]; then
+            break
+        fi
+        probe="$parent"
+    done
+    printf '%s\n' "$probe"
+}
+
+path_is_tmpfs() {
+    local raw_path="$1"
+    local probe
+    local fs_type
+    case "$raw_path" in
+        /dev/shm|/dev/shm/*)
+            return 0
+            ;;
+    esac
+    probe="$(nearest_existing_path "$raw_path")"
+    fs_type="$(stat -f -c %T "$probe" 2>/dev/null || true)"
+    [ "$fs_type" = "tmpfs" ]
+}
+
+default_precommit_base() {
+    local tmp_candidate="${TMPDIR:-}"
+    if [ -n "$tmp_candidate" ] && ! path_is_tmpfs "$tmp_candidate"; then
+        printf '%s\n' "$tmp_candidate/ck-precommit"
+        return 0
+    fi
+    if ! path_is_tmpfs "/tmp"; then
+        printf '%s\n' "/tmp/ck-precommit"
+        return 0
+    fi
+    printf '%s\n' "$HOME_DIR/.cache/ck-engine/precommit"
+}
+
+resolve_precommit_path() {
+    local env_name="$1"
+    local fallback="$2"
+    local label="$3"
+    local requested="${!env_name:-}"
+    local chosen="$fallback"
+    if [ -n "$requested" ]; then
+        chosen="$requested"
+        if path_is_tmpfs "$requested" && [ -z "${CK_PRECOMMIT_ALLOW_TMPFS:-}" ]; then
+            echo -e "${YELLOW}⚠️  ${label} requested tmpfs storage via ${env_name}=${requested}${NC}" >&2
+            echo -e "${YELLOW}   Falling back to disk-backed path: ${fallback}${NC}" >&2
+            echo -e "${YELLOW}   Set CK_PRECOMMIT_ALLOW_TMPFS=1 to keep tmpfs for this run.${NC}" >&2
+            chosen="$fallback"
+        fi
+    fi
+    printf '%s\n' "$chosen"
+}
+
+prune_old_dirs() {
+    local root="$1"
+    local label="$2"
+    local retention_days="${CK_PRECOMMIT_RETENTION_DAYS:-3}"
+    local stale_dirs=()
+    local stale_dir
+    if [ ! -d "$root" ]; then
+        return 0
+    fi
+    if ! [[ "$retention_days" =~ ^[0-9]+$ ]]; then
+        echo -e "${YELLOW}⚠️  Ignoring invalid CK_PRECOMMIT_RETENTION_DAYS=${retention_days}${NC}"
+        return 0
+    fi
+    if [ "$retention_days" -eq 0 ]; then
+        return 0
+    fi
+    while IFS= read -r -d '' stale_dir; do
+        stale_dirs+=("$stale_dir")
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +"$retention_days" -print0 2>/dev/null)
+    if [ ${#stale_dirs[@]} -eq 0 ]; then
+        return 0
+    fi
+    echo -e "${YELLOW}  ↳ pruning ${#stale_dirs[@]} stale ${label} entries older than ${retention_days}d${NC}"
+    rm -rf "${stale_dirs[@]}"
+}
+
+prune_old_snapshots() {
+    local snapshot_parent_dir
+    local snapshot_name
+    local retention_days="${CK_PRECOMMIT_RETENTION_DAYS:-3}"
+    local stale_dirs=()
+    local stale_dir
+    if ! [[ "$retention_days" =~ ^[0-9]+$ ]] || [ "$retention_days" -eq 0 ]; then
+        return 0
+    fi
+    snapshot_parent_dir="$(dirname "$SNAPSHOT_PREFIX")"
+    snapshot_name="$(basename "$SNAPSHOT_PREFIX")"
+    if [ ! -d "$snapshot_parent_dir" ]; then
+        return 0
+    fi
+    while IFS= read -r -d '' stale_dir; do
+        stale_dirs+=("$stale_dir")
+    done < <(find "$snapshot_parent_dir" -mindepth 1 -maxdepth 1 -type d -name "${snapshot_name}.*" -mtime +"$retention_days" -print0 2>/dev/null)
+    if [ ${#stale_dirs[@]} -eq 0 ]; then
+        return 0
+    fi
+    echo -e "${YELLOW}  ↳ pruning ${#stale_dirs[@]} stale snapshot entries older than ${retention_days}d${NC}"
+    rm -rf "${stale_dirs[@]}"
+}
+
+DEFAULT_PRECOMMIT_BASE="$(default_precommit_base)"
+RUN_ROOT="$(resolve_precommit_path CK_PRECOMMIT_RUN_ROOT "${DEFAULT_PRECOMMIT_BASE}/regression/runs" "run root")"
+REPORT_ROOT="$(resolve_precommit_path CK_PRECOMMIT_REPORT_ROOT "${DEFAULT_PRECOMMIT_BASE}/regression/reports" "report root")"
+CACHE_ROOT="$(resolve_precommit_path CK_PRECOMMIT_CACHE_ROOT "${DEFAULT_PRECOMMIT_BASE}/regression/cache/models" "cache root")"
+SNAPSHOT_PREFIX="$(resolve_precommit_path CK_PRECOMMIT_SNAPSHOT_PREFIX "${DEFAULT_PRECOMMIT_BASE}/snapshot/ck-precommit-snapshot" "snapshot root")"
 SNAPSHOT_PARENT=""
 SNAPSHOT_DIR=""
 
@@ -129,6 +239,11 @@ seed_precommit_cache() {
     seed_precommit_cache_from "$HOME/.cache/ck-engine-v8/models"
     seed_precommit_cache_from "$HOME/.cache/ck-engine-v7/models"
 }
+
+mkdir -p "$RUN_ROOT" "$REPORT_ROOT" "$CACHE_ROOT" "$(dirname "$SNAPSHOT_PREFIX")"
+prune_old_dirs "$RUN_ROOT" "run-root"
+prune_old_dirs "$REPORT_ROOT" "report-root"
+prune_old_snapshots
 
 echo -e "${YELLOW}Running staged fast regression suites...${NC}"
 echo -e "${YELLOW}  ↳ run root: ${RUN_ROOT}${NC}"
