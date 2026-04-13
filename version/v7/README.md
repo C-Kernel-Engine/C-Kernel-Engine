@@ -56,6 +56,7 @@ Notebook examples:
 ```bash
 notebooks/v7_python_authoring_quickstart.ipynb
 notebooks/v7_python_authoring_artifact_walkthrough.ipynb
+notebooks/v7_dsl_dataset_preparation.ipynb
 ```
 
 Launch the quickstart notebook from inside the repo checkout so it can detect `ckernel_engine/` and `version/v7/`.

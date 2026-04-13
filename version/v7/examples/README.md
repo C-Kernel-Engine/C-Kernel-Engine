@@ -9,6 +9,8 @@ What works now:
   Notebook walkthrough for materialize + train + viewer generation, including a run artifact dashboard that links out to the rest of the v7 artifact surface.
 - [v7_python_authoring_artifact_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/v7_python_authoring_artifact_walkthrough.ipynb)
   Notebook for inspecting the run-dir artifacts, generated-runtime handoff, and viewer outputs.
+- [v7_dsl_dataset_preparation.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/v7_dsl_dataset_preparation.ipynb)
+  Notebook scaffold for split-aware SVG/DSL dataset prep: workspace inspection, artifact materialization, run-local staging, `dataset_viewer.html`, and training handoff commands.
 
 Starting the notebooks:
 - From the repo root, run `jupyter lab notebooks/v7_python_authoring_quickstart.ipynb`.
@@ -28,6 +30,16 @@ Example ladder to build next:
   Current working path.
 - `data_and_tokenizer_planning`
   Notebook/API for dataset staging, token streams, tokenizer lineage, and run metadata.
+
+Recommended notebook suite:
+- `v7_python_authoring_quickstart`
+  Start a tiny run and point users to the IR visualizer, IR hub, and dataset viewer when available.
+- `v7_python_authoring_artifact_walkthrough`
+  Inspect `python_authoring_plan.json`, manifests, IR, layout, codegen outputs, and reports.
+- `v7_dsl_dataset_preparation`
+  Scaffold SVG/DSL dataset staging, manifest inspection, run-local dataset snapshots, and `dataset_viewer.html`.
+- `v7_training_operator_workbench`
+  Planned notebook for parity, sanity, full train, artifact refresh, and train command surfacing.
 
 Current boundary:
 - Python is the UI and planning layer.

@@ -1893,10 +1893,38 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     </div>
 </div>
 
+<div class="card card-green" style="margin-top:0.75rem;">
+    <h3 style="margin-top:0;">DSL Dataset Preparation Notebook</h3>
+    <p style="margin-bottom:0.35rem;">Use this when the user needs to understand the split-aware SVG/DSL workspace itself, not just a tiny training run.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>jupyter lab notebooks/v7_dsl_dataset_preparation.ipynb</pre>
+    </div>
+    <p class="mini-note">Scaffolds the real dataset workflow: inspect <code>version/v7/data/spec04</code>, materialize workspace artifacts, stage the workspace into <code>$RUN/dataset/</code>, regenerate <code>dataset_viewer.html</code>, refresh <code>ir_hub.html</code>, and surface the Python + CLI training handoff commands.</p>
+</div>
+
 <div class="card" style="margin-top:0.75rem;">
     <p style="margin:0 0 0.35rem 0;"><strong>What the notebook lane gives you:</strong> a Python front door into the existing v7 runtime and artifact surface, not a separate execution stack.</p>
     <p style="margin:0 0 0.35rem 0;"><strong>Typical tiny-run outputs:</strong> <code>python_authoring_plan.json</code>, <code>ir_report.html</code>, <code>embeddings.json</code>, <code>train_e2e_latest.json</code>, and the shared <code>ir_hub.html</code>.</p>
     <p style="margin:0;"><strong>Conditional artifacts:</strong> <code>dataset_viewer.html</code> requires dataset manifests or a staged dataset workspace, and <code>attention.json</code> requires tokenizer plus probe artifacts.</p>
+</div>
+
+<div class="card" style="margin-top:0.75rem;">
+    <h3 style="margin-top:0;">Recommended Notebook Suite</h3>
+    <p style="margin:0 0 0.45rem 0;">The current notebook set now covers thin Python authoring plus DSL dataset prep. The broader notebook surface should still settle into three user-facing lanes:</p>
+    <ul style="margin-top:0.35rem;">
+        <li><strong>Getting Started + Viewer Tour</strong>: start a tiny run, open the IR visualizer, jump to the IR hub, and understand when the dataset viewer is available.</li>
+        <li><strong>DSL Dataset Prep + Inspection</strong>: stage SVG/DSL data, inspect manifests, regenerate <code>dataset_viewer.html</code>, and explain how staged datasets flow into runs.</li>
+        <li><strong>Training With C-Kernel-Engine</strong>: materialize, sanity-check, parity-check, and train from Python while still surfacing the underlying <code>ck_run_v7.py</code> commands and run-dir artifacts.</li>
+    </ul>
+    <p style="margin:0.55rem 0 0.35rem 0;"><strong>Suggested notebook names:</strong></p>
+    <ul style="margin-top:0.2rem;">
+        <li><code>notebooks/v7_python_authoring_quickstart.ipynb</code>: current entrypoint, keep focused on the smallest successful run plus viewer links.</li>
+        <li><code>notebooks/v7_python_authoring_artifact_walkthrough.ipynb</code>: current run-dir inspection notebook, keep focused on manifests, IR, codegen, and reports.</li>
+        <li><code>notebooks/v7_dsl_dataset_preparation.ipynb</code>: current dataset workspace notebook for manifests, staging, run-local snapshots, and <code>dataset_viewer.html</code>.</li>
+        <li><code>notebooks/v7_training_operator_workbench.ipynb</code>: planned training notebook for parity, sanity, full train, and artifact refresh.</li>
+    </ul>
+    <p class="mini-note" style="margin-top:0.45rem;">The right design is notebook as guided front door, with <code>ir_hub.html</code> and run-local HTML artifacts remaining the durable operator surface.</p>
 </div>
 
 <h2 id="run-hub-quick-launch">IR Hub Quick Launch</h2>
