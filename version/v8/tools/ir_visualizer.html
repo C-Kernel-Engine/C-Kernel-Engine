@@ -3814,6 +3814,48 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             return n.includes('prefill') ? 'prefill' : 'decode';
         }
 
+        function getFullNetworkGraph() {
+            const files = getEmbeddedFiles();
+            const payload = files && files.full_network_graph;
+            return (payload && typeof payload === 'object') ? payload : null;
+        }
+
+        function updateModeSelectLabels(hasFullNetworkGraph) {
+            const select = document.getElementById('modeSelect');
+            if (!select) return;
+            const decodeOption = select.querySelector('option[value="decode"]');
+            const prefillOption = select.querySelector('option[value="prefill"]');
+            if (decodeOption) decodeOption.textContent = 'Decode Mode';
+            if (prefillOption) {
+                prefillOption.textContent = hasFullNetworkGraph
+                    ? 'Prefill / Full Network'
+                    : 'Prefill Mode';
+            }
+        }
+
+        function getUnifiedLayerMeta(op) {
+            if (!op || typeof op !== 'object') return null;
+            const key = String(op.unified_layer_key || '').trim();
+            if (!key) return null;
+            return {
+                key,
+                label: String(op.unified_layer_label || key).trim(),
+                stage: String(op.network_stage || '').trim(),
+                stageLabel: String(op.network_stage_label || '').trim(),
+            };
+        }
+
+        function formatOpExecutionLabel(op, fallbackPrefix = 'Layer') {
+            const unified = getUnifiedLayerMeta(op);
+            if (unified && unified.label) return unified.label;
+            const section = String(op?.section || '').toLowerCase();
+            if (section === 'header') return 'Header';
+            if (section === 'footer') return 'Footer';
+            const layer = Number(op?.layer);
+            if (Number.isFinite(layer) && layer >= 0) return `${fallbackPrefix} ${layer}`;
+            return fallbackPrefix;
+        }
+
         function setModeData(mode, key, data) {
             const normalized = normalizeMode(mode);
             if (!modeData[normalized] || !Object.prototype.hasOwnProperty.call(modeData[normalized], key)) {
@@ -5312,16 +5354,30 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
 
             embeddedMeta = embedded.meta || null;
             const files = embedded.files;
+            const fullNetworkGraph = (files.full_network_graph && typeof files.full_network_graph === 'object')
+                ? files.full_network_graph
+                : null;
+            const fullNetworkLayout = (fullNetworkGraph && typeof fullNetworkGraph.layout === 'object')
+                ? fullNetworkGraph.layout
+                : null;
+            const fullNetworkCall = (fullNetworkGraph && typeof fullNetworkGraph.call === 'object')
+                ? fullNetworkGraph.call
+                : null;
+            const fullNetworkIr1 = (fullNetworkGraph && typeof fullNetworkGraph.ir1 === 'object')
+                ? fullNetworkGraph.ir1
+                : null;
+
+            updateModeSelectLabels(Boolean(fullNetworkGraph));
 
             setModeData('decode', 'ir1', files.ir1_decode || null);
             setModeData('decode', 'layout', files.layout_decode || null);
             setModeData('decode', 'call', files.lowered_decode_call || null);
             setModeData('decode', 'lowered', files.lowered_decode || files.lowered_decode_call || null);
 
-            setModeData('prefill', 'ir1', files.ir1_prefill || null);
-            setModeData('prefill', 'layout', files.layout_prefill || null);
-            setModeData('prefill', 'call', files.lowered_prefill_call || null);
-            setModeData('prefill', 'lowered', files.lowered_prefill || files.lowered_prefill_call || null);
+            setModeData('prefill', 'ir1', fullNetworkIr1 || files.ir1_prefill || null);
+            setModeData('prefill', 'layout', fullNetworkLayout || files.layout_prefill || null);
+            setModeData('prefill', 'call', fullNetworkCall || files.lowered_prefill_call || null);
+            setModeData('prefill', 'lowered', fullNetworkCall || files.lowered_prefill || files.lowered_prefill_call || null);
 
             manifestData = files.manifest || manifestData;
             if (files.profile_summary) {
@@ -5390,6 +5446,10 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 setModeData('prefill', 'layout', files.layout_train || null);
                 setModeData('prefill', 'call', files.train_exec_plan || null);
                 setModeData('prefill', 'lowered', files.train_exec_plan || files.ir1_train || null);
+            }
+
+            if (fullNetworkGraph) {
+                window.__ckFullNetworkGraph = fullNetworkGraph;
             }
 
             window.__ckAnalysisCheckpoints = files.analysis_checkpoints || null;
@@ -6696,7 +6756,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             setElText('weightsRegionSize', formatBytes(totalWeightSize));
             setElText('activationsRegionSize', formatBytes(totalActivationSize));
 
-            const kvCache = activationBuffers.find(b => b.name === 'kv_cache');
+            const kvCache = activationBuffers.find(b => String(b.name || '').toLowerCase().includes('kv_cache'));
             const kvSize = kvCache ? parseInt(kvCache.size) : 0;
             setElText('totalKVCache', formatBytes(kvSize));
             setElText('totalMemory', formatBytes(totalWeightSize + totalActivationSize));
@@ -6757,7 +6817,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
 
                 const block = document.createElement('div');
                 block.className = `memory-block ${type}`;
-                if (entry.name === 'kv_cache') block.className += ' kv-cache';
+                if (String(entry.name || '').toLowerCase().includes('kv_cache')) block.className += ' kv-cache';
                 if (entry.name && entry.name.includes('scratch')) block.className += ' scratch';
 
                 // Get or infer shape
@@ -7033,16 +7093,20 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 container.appendChild(layerDiv);
             }
 
-            const layers = {};
+            const groups = [];
             ops.forEach(op => {
-                const layer = op.layer !== undefined ? op.layer : -1;
-                const section = op.section || 'body';
-                const key = section === 'header' ? 'Header' : section === 'footer' ? 'Footer' : `Layer ${layer}`;
-                if (!layers[key]) layers[key] = [];
-                layers[key].push(op);
+                const meta = getUnifiedLayerMeta(op);
+                const key = meta ? meta.key : `${String(op.section || 'body')}::${String(op.layer ?? -1)}`;
+                const label = meta ? meta.label : formatOpExecutionLabel(op);
+                const prev = groups.length > 0 ? groups[groups.length - 1] : null;
+                if (prev && prev.key === key) {
+                    prev.ops.push(op);
+                } else {
+                    groups.push({ key, label, ops: [op] });
+                }
             });
 
-            Object.entries(layers).forEach(([layerName, layerOps]) => {
+            groups.forEach(({ label: layerName, ops: layerOps }) => {
                 const layerDiv = document.createElement('div');
                 layerDiv.className = 'layer-container';
 
@@ -7227,6 +7291,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             }
 
             const encoderReport = (bridge.encoder_report && typeof bridge.encoder_report === 'object') ? bridge.encoder_report : {};
+            const fullNetworkGraph = (files.full_network_graph && typeof files.full_network_graph === 'object') ? files.full_network_graph : {};
             const encoderIr1 = (files.bridge_encoder_ir1 && typeof files.bridge_encoder_ir1 === 'object') ? files.bridge_encoder_ir1 : {};
             const encoderLayout = (files.bridge_encoder_layout && typeof files.bridge_encoder_layout === 'object') ? files.bridge_encoder_layout : {};
             const encoderCall = (files.bridge_encoder_call && typeof files.bridge_encoder_call === 'object') ? files.bridge_encoder_call : {};
@@ -7236,6 +7301,12 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
                 : ((files.lowered_prefill && typeof files.lowered_prefill === 'object') ? files.lowered_prefill : {});
             const decoderIr1 = (files.ir1_prefill && typeof files.ir1_prefill === 'object') ? files.ir1_prefill : {};
             const decoderLayout = (files.layout_prefill && typeof files.layout_prefill === 'object') ? files.layout_prefill : {};
+            const fullGraphReady = Boolean(
+                fullNetworkGraph &&
+                typeof fullNetworkGraph.layout === 'object' &&
+                typeof fullNetworkGraph.call === 'object' &&
+                typeof fullNetworkGraph.ir1 === 'object'
+            );
 
             const bridgeMode = String(bridge.bridge_mode || (bridge.encoder_runtime ? 'encoder_decoder' : 'decoder_only'));
             const prompt = String(bridge.prompt || '');
@@ -7253,6 +7324,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             const decoderTotalBytes = multimodalLayoutTotalBytes(decoderLayout);
             const artifactRows = [
                 { label: 'bridge_report.json', ready: true, note: 'Prompt contract + encoder/decoder handoff.' },
+                { label: 'full_network_graph.json', ready: fullGraphReady, note: 'Unified encoder + bridge + decoder graph for main tabs.' },
                 { label: 'encoder/ir1.json', ready: Boolean(multimodalOpCount(encoderIr1)), note: 'Vision encoder IR1 graph.' },
                 { label: 'encoder/layout.json', ready: Number.isFinite(Number(encoderTotalBytes)), note: 'Encoder memory layout.' },
                 { label: 'encoder/call.json', ready: Boolean(multimodalOpCount(encoderCall)), note: 'Encoder lowered call/runtime view.' },
@@ -7266,6 +7338,7 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
             root.innerHTML = `
                 <div class="stats-grid">
                     <div class="stat-card"><div class="stat-value">${escapeHtml(bridgeMode === 'encoder_decoder' ? 'enc+dec' : 'decode')}</div><div class="stat-label">Bridge Mode</div></div>
+                    <div class="stat-card"><div class="stat-value">${escapeHtml(fullGraphReady ? 'full graph' : 'decoder')}</div><div class="stat-label">Main Tabs Source</div></div>
                     <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.prefix_source || '-'))}</div><div class="stat-label">Prefix Source</div></div>
                     <div class="stat-card"><div class="stat-value">${escapeHtml(String(bridge.prefix_tokens ?? '-'))}</div><div class="stat-label">Prefix Tokens</div></div>
                     <div class="stat-card"><div class="stat-value">${escapeHtml(String(beforeCount))} / ${escapeHtml(String(afterCount))}</div><div class="stat-label">Text Tokens Before / After Image</div></div>
@@ -7277,6 +7350,11 @@ python3 trace_divergence.py --model "$MODEL_DIR" --token 25 --threads 1 --contex
 
                 <div class="parity-section">
                     <h3><span class="badge badge-orange">Bridge Contract</span> Prompt, Prefix, and Runtime Handoff</h3>
+                    <div class="subnote" style="margin-bottom:0.8rem;">
+                        ${fullGraphReady
+                            ? 'Prefill mode now drives Memory, Kernel Flow, and Dataflow from the unified full_network_graph.json artifact.'
+                            : 'Main tabs are still reading the decoder-side prefill artifacts for this run.'}
+                    </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.9rem;">
                         <div style="background:var(--dark-card);border:1px solid var(--grey);border-radius:8px;padding:1rem;">
                             <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.45rem;">Prompt</div>
@@ -10541,6 +10619,41 @@ function renderTraining() {
             return getForwardDataflowOps();
         }
 
+        function getDataflowLayerEntry(op, phase) {
+            const unified = getUnifiedLayerMeta(op);
+            if (unified) {
+                return { value: unified.key, label: unified.label };
+            }
+            const section = String(op?.section || '').toLowerCase();
+            const layer = Number(op?.layer);
+            if (section === 'footer' && phase !== 'backward' && phase !== 'runtime') {
+                return { value: 'footer', label: 'Footer' };
+            }
+            if (Number.isFinite(layer) && layer === -1) {
+                if (phase === 'runtime') return { value: '-1', label: 'Global (-1)' };
+                if (phase === 'backward') return { value: '-1', label: 'Global (-1)' };
+                return { value: '-1', label: 'Header' };
+            }
+            if (Number.isFinite(layer) && layer >= 0) {
+                return { value: String(layer), label: `Layer ${layer}` };
+            }
+            return { value: 'all', label: 'All' };
+        }
+
+        function buildDataflowLayerOptions(ops, phase) {
+            const ordered = [{ value: 'all', label: 'All' }];
+            const seen = new Set(['all']);
+            (Array.isArray(ops) ? ops : []).forEach((op) => {
+                const entry = getDataflowLayerEntry(op, phase);
+                if (!entry || !entry.value) return;
+                const value = String(entry.value);
+                if (seen.has(value)) return;
+                seen.add(value);
+                ordered.push({ value, label: String(entry.label || value) });
+            });
+            return ordered;
+        }
+
         function buildTensorProducerIndex(phase) {
             const map = new Map();
             const scopeOps = getDataflowProducerScopeOps(phase);
@@ -10615,24 +10728,10 @@ function renderTraining() {
             if (!Array.isArray(ops) || ops.length === 0) return [];
             const layerStr = String(layer);
             if (layerStr === 'all') return ops.slice();
-            if (layerStr === 'footer') {
-                return ops.filter(op => String(op?.section || '').toLowerCase() === 'footer');
-            }
-            const layerNum = parseInt(layerStr, 10);
-            if (!Number.isFinite(layerNum)) return ops.slice();
-            if (layerNum === -1) {
-                if (phase === 'runtime') {
-                    return ops.filter(op => Number(op?.layer) === -1);
-                }
-                if (phase === 'backward') {
-                    return ops.filter(op => Number(op?.layer) === -1);
-                }
-                return ops.filter(op => {
-                    const section = String(op?.section || '').toLowerCase();
-                    return section === 'header' || (Number(op?.layer) === -1 && section !== 'footer');
-                });
-            }
-            return ops.filter(op => Number(op?.layer) === layerNum);
+            return ops.filter(op => {
+                const entry = getDataflowLayerEntry(op, phase);
+                return entry && String(entry.value) === layerStr;
+            });
         }
 
         function opTouchesDataflowSlot(op, slotName) {
@@ -10706,24 +10805,10 @@ function renderTraining() {
             // Populate layer selector
             const layerSelect = document.getElementById('dfLayerSelect');
             const prevLayer = String(layerSelect?.value || 'all');
-            const layers = new Set(ops.map(op => Number(op?.layer)).filter(l => Number.isFinite(l) && l >= 0));
-            let options = '<option value="all">All</option>';
-            if (phase === 'runtime') {
-                if (ops.some(op => Number(op?.layer) === -1)) {
-                    options += '<option value="-1">Global (-1)</option>';
-                }
-            } else if (phase !== 'backward') {
-                options += '<option value="-1">Header</option>';
-            } else if (ops.some(op => Number(op?.layer) === -1)) {
-                options += '<option value="-1">Global (-1)</option>';
-            }
-            [...layers].sort((a, b) => a - b).forEach(layer => {
-                options += `<option value="${layer}">Layer ${layer}</option>`;
-            });
-            if (phase !== 'backward' && phase !== 'runtime') {
-                options += '<option value="footer">Footer</option>';
-            }
-            layerSelect.innerHTML = options;
+            const layerOptions = buildDataflowLayerOptions(ops, phase);
+            layerSelect.innerHTML = layerOptions
+                .map(({ value, label }) => `<option value="${escapeHtml(String(value))}">${escapeHtml(String(label))}</option>`)
+                .join('');
             const validValues = new Set(Array.from(layerSelect.options).map(o => String(o.value)));
             if (validValues.has(prevLayer)) {
                 layerSelect.value = prevLayer;
@@ -10910,13 +10995,14 @@ function renderTraining() {
                 const borderColor = getKernelColor(kernelType);
                 const phaseText = String(op.phase || (phase === 'backward' ? 'backward' : 'forward'));
                 const accumNoteCompact = gradAccumulateExplanation(op, true);
+                const executionLabel = formatOpExecutionLabel(op);
 
                 row.innerHTML = `
                     <td style="font-family: monospace; color: var(--blue);">${op.op_id}</td>
                     <td><span class="status-chip ${phaseText === 'backward' ? 'status-chip-warn' : 'status-chip-good'}">${phaseText}</span></td>
                     <td style="border-left: 3px solid ${borderColor}; padding-left: 0.75rem;">
                         <div style="font-weight: 600; color: var(--white);">${op.op || '-'}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">L${op.layer} inst:${op.instance || 0}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(executionLabel)} · inst:${op.instance || 0}</div>
                         ${accumNoteCompact ? `<div style="font-size: 0.72rem; color: #ffc66d; margin-top: 0.22rem;">${escapeHtml(accumNoteCompact)}</div>` : ''}
                     </td>
                     <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--blue);">${kernelFn}</td>
@@ -10957,14 +11043,9 @@ function renderTraining() {
                         }
                     }
                     const layerSelect = document.getElementById('dfLayerSelect');
-                    const section = String(op?.section || '').toLowerCase();
-                    let targetLayer = 'all';
                     const newPhase = currentDataflowPhase();
-                    if (section === 'footer' && newPhase !== 'backward' && newPhase !== 'runtime') {
-                        targetLayer = 'footer';
-                    } else if (Number.isFinite(Number(op?.layer))) {
-                        targetLayer = String(Number(op.layer));
-                    }
+                    const targetEntry = getDataflowLayerEntry(op, newPhase);
+                    const targetLayer = targetEntry ? String(targetEntry.value) : 'all';
                     layerSelect.value = targetLayer;
                     renderDataflowLayer(targetLayer);
                     setTimeout(() => scrollToOp(opId), 100);
@@ -11031,9 +11112,10 @@ function renderTraining() {
                 }
 
                 const isCorrect = residualFromOp !== null;
+                const executionLabel = formatOpExecutionLabel(add);
 
                 row.innerHTML = `
-                    <td style="font-weight: bold;">Layer ${add.layer}</td>
+                    <td style="font-weight: bold;">${escapeHtml(executionLabel)}</td>
                     <td>${add.instance || 0}</td>
                     <td style="cursor: pointer; color: var(--blue);" onclick="scrollToOp(${residualFromOp || -1})">
                         ${residualSource}

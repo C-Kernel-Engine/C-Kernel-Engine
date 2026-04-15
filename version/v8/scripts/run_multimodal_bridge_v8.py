@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import ctypes
 import hashlib
 import heapq
@@ -118,6 +119,636 @@ def _json_write(path: Path, payload: dict[str, Any]) -> None:
         except Exception:
             pass
     path.write_text(encoded, encoding="utf-8")
+
+
+def _json_load(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _payload_ops(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    ops = payload.get("ops")
+    if isinstance(ops, list):
+        return [op for op in ops if isinstance(op, dict)]
+    ops = payload.get("operations")
+    if isinstance(ops, list):
+        return [op for op in ops if isinstance(op, dict)]
+    return []
+
+
+def _int_or(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _stage_layer_identity(stage_key: str, stage_label: str, section: str, layer: int) -> tuple[str, str]:
+    sec = str(section or "body").strip().lower() or "body"
+    if sec == "header":
+        return (f"{stage_key}:header", f"{stage_label} / Header")
+    if sec == "footer":
+        return (f"{stage_key}:footer", f"{stage_label} / Footer")
+    if sec == "bridge":
+        return (f"{stage_key}:bridge", f"{stage_label} / Prefix Stitch")
+    if layer >= 0:
+        return (f"{stage_key}:layer:{layer}", f"{stage_label} / Layer {layer}")
+    return (f"{stage_key}:misc", f"{stage_label} / Misc")
+
+
+def _decorate_unified_op(op: dict[str, Any], *, stage_key: str, stage_label: str) -> None:
+    section = str(op.get("section", "body") or "body")
+    stage_layer = _int_or(op.get("layer"), -1)
+    layer_key, layer_label = _stage_layer_identity(stage_key, stage_label, section, stage_layer)
+    op["network_stage"] = stage_key
+    op["network_stage_label"] = stage_label
+    op["stage_layer"] = stage_layer
+    op["unified_layer_key"] = layer_key
+    op["unified_layer_label"] = layer_label
+
+
+def _append_ir_segment(
+    merged_ops: list[dict[str, Any]],
+    raw_ops: list[dict[str, Any]],
+    *,
+    stage_key: str,
+    stage_label: str,
+    forced_from_ops: dict[int, int] | None = None,
+) -> tuple[list[dict[str, Any]], dict[int, int]]:
+    local_ops: list[dict[str, Any]] = []
+    op_id_map: dict[int, int] = {}
+    base = len(merged_ops)
+    for local_idx, raw in enumerate(raw_ops):
+        op = copy.deepcopy(raw)
+        old_id = _int_or(op.get("op_id"), local_idx)
+        new_id = base + local_idx
+        op_id_map[old_id] = new_id
+        op["source_op_id"] = old_id
+        op["op_id"] = new_id
+        _decorate_unified_op(op, stage_key=stage_key, stage_label=stage_label)
+        local_ops.append(op)
+
+    forced = dict(forced_from_ops or {})
+    for op in local_ops:
+        dataflow = op.get("dataflow")
+        if not isinstance(dataflow, dict):
+            continue
+        inputs = dataflow.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for info in inputs.values():
+            if not isinstance(info, dict) or "from_op" not in info:
+                continue
+            old_from = _int_or(info.get("from_op"), -1)
+            if old_from in forced:
+                info["from_op"] = int(forced[old_from])
+            elif old_from in op_id_map:
+                info["from_op"] = int(op_id_map[old_from])
+
+    merged_ops.extend(local_ops)
+    return local_ops, op_id_map
+
+
+def _append_call_segment(
+    merged_ops: list[dict[str, Any]],
+    raw_ops: list[dict[str, Any]],
+    *,
+    stage_key: str,
+    stage_label: str,
+) -> list[dict[str, Any]]:
+    local_ops: list[dict[str, Any]] = []
+    base = len(merged_ops)
+    for local_idx, raw in enumerate(raw_ops):
+        op = copy.deepcopy(raw)
+        old_idx = _int_or(op.get("idx"), local_idx)
+        op["source_idx"] = old_idx
+        op["idx"] = base + local_idx
+        _decorate_unified_op(op, stage_key=stage_key, stage_label=stage_label)
+        local_ops.append(op)
+    merged_ops.extend(local_ops)
+    return local_ops
+
+
+def _count_nonnegative_layers(ops: list[dict[str, Any]]) -> int:
+    layers = {
+        _int_or(op.get("layer"), -1)
+        for op in ops
+        if _int_or(op.get("layer"), -1) >= 0
+    }
+    return len(layers)
+
+
+def _find_output_ref(
+    ops: list[dict[str, Any]],
+    *,
+    preferred_names: list[str] | None = None,
+) -> dict[str, Any] | None:
+    preferred = {str(name).strip().lower() for name in list(preferred_names or []) if str(name).strip()}
+    fallback: dict[str, Any] | None = None
+    for op in reversed(ops):
+        outputs = ((op.get("dataflow") or {}).get("outputs") or {})
+        if not isinstance(outputs, dict):
+            continue
+        for output_name, output_info in outputs.items():
+            if not isinstance(output_info, dict):
+                continue
+            entry = {
+                "op_id": _int_or(op.get("op_id"), -1),
+                "output_name": str(output_name),
+                "slot": str(output_info.get("slot") or output_name),
+                "tensor": str(output_info.get("tensor") or output_info.get("slot") or output_name),
+                "dtype": str(output_info.get("dtype") or "fp32"),
+            }
+            if fallback is None:
+                fallback = entry
+            candidates = {
+                str(output_name).strip().lower(),
+                str(output_info.get("slot") or "").strip().lower(),
+                str(output_info.get("tensor") or "").strip().lower(),
+            }
+            if preferred and any(candidate in preferred for candidate in candidates if candidate):
+                return entry
+    return fallback
+
+
+def _build_unified_bridge_ir_op(
+    bridge_op_id: int,
+    *,
+    bridge_report: dict[str, Any],
+    encoder_output: dict[str, Any] | None,
+    decoder_header_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    prefix_source = str(bridge_report.get("prefix_source") or "none")
+    output_slot = str((decoder_header_output or {}).get("slot") or "main_stream")
+    bridge_op = {
+        "op_id": int(bridge_op_id),
+        "kernel": "encoder_decoder_bridge",
+        "op": "multimodal_bridge",
+        "template_op_id": "multimodal_bridge",
+        "section": "bridge",
+        "layer": -1,
+        "instance": 0,
+        "params": {
+            "prefix_source": prefix_source,
+            "prefix_tokens": _int_or(bridge_report.get("prefix_tokens"), 0),
+            "prefix_embed_dim": _int_or(bridge_report.get("prefix_embed_dim"), 0),
+            "decoder_embed_dim": _int_or(bridge_report.get("decoder_embed_dim"), 0),
+            "decoder_input_embed_dim": _int_or(bridge_report.get("decoder_input_embed_dim"), 0),
+            "prompt_tokens_before_image": len(list(bridge_report.get("prompt_tokens_before_image") or [])),
+            "prompt_tokens_after_image": len(list(bridge_report.get("prompt_tokens_after_image") or [])),
+        },
+        "dataflow": {
+            "inputs": {},
+            "outputs": {
+                "out": {
+                    "dtype": "fp32",
+                    "slot": output_slot,
+                    "tensor": "bridge.mixed_embeddings",
+                }
+            },
+        },
+        "weights": {},
+    }
+    inputs = bridge_op["dataflow"]["inputs"]
+    if isinstance(decoder_header_output, dict) and _int_or(decoder_header_output.get("op_id"), -1) >= 0:
+        inputs["text_embeddings"] = {
+            "from_op": _int_or(decoder_header_output.get("op_id"), -1),
+            "from_output": str(decoder_header_output.get("output_name") or "out"),
+            "dtype": str(decoder_header_output.get("dtype") or "fp32"),
+            "tensor": str(decoder_header_output.get("tensor") or "decoder.prefill.text_embeddings"),
+            "slot": str(decoder_header_output.get("slot") or "main_stream"),
+        }
+    else:
+        inputs["text_embeddings"] = {
+            "from": "external:text_embeddings",
+            "dtype": "fp32",
+            "tensor": "external:text_embeddings",
+            "slot": "external:text_embeddings",
+        }
+    if isinstance(encoder_output, dict) and _int_or(encoder_output.get("op_id"), -1) >= 0:
+        inputs["vision_prefix"] = {
+            "from_op": _int_or(encoder_output.get("op_id"), -1),
+            "from_output": str(encoder_output.get("output_name") or "out"),
+            "dtype": str(encoder_output.get("dtype") or "fp32"),
+            "tensor": str(encoder_output.get("tensor") or "encoder.vision_output"),
+            "slot": str(encoder_output.get("slot") or "vision_output"),
+        }
+    else:
+        inputs["vision_prefix"] = {
+            "from": f"external:{prefix_source or 'prefix'}",
+            "dtype": "fp32",
+            "tensor": f"external:{prefix_source or 'prefix'}",
+            "slot": f"external:{prefix_source or 'prefix'}",
+        }
+    _decorate_unified_op(bridge_op, stage_key="bridge", stage_label="Bridge")
+    return bridge_op
+
+
+def _build_unified_bridge_call_op(
+    bridge_idx: int,
+    *,
+    bridge_report: dict[str, Any],
+    encoder_bridge_name: str,
+    decoder_output_buffer: str,
+) -> dict[str, Any]:
+    op = {
+        "idx": int(bridge_idx),
+        "function": "encoder_decoder_bridge",
+        "op": "multimodal_bridge",
+        "layer": -1,
+        "section": "bridge",
+        "args": [
+            {
+                "name": "vision_prefix",
+                "source": "bridge:encoder_prefix",
+                "expr": encoder_bridge_name or "external:prefix_embeddings",
+                "buffer_ref": encoder_bridge_name or "external_prefix",
+            },
+            {
+                "name": "text_embeddings",
+                "source": "bridge:text_embeddings",
+                "expr": decoder_output_buffer or "decoder_prefill::embedded_input",
+                "buffer_ref": decoder_output_buffer or "embedded_input",
+            },
+            {
+                "name": "output",
+                "source": "output:mixed",
+                "expr": decoder_output_buffer or "decoder_prefill::embedded_input",
+                "buffer_ref": decoder_output_buffer or "embedded_input",
+            },
+            {
+                "name": "prefix_tokens",
+                "source": "dim:prefix_tokens",
+                "expr": str(_int_or(bridge_report.get("prefix_tokens"), 0)),
+            },
+            {
+                "name": "prefix_embed_dim",
+                "source": "dim:prefix_embed_dim",
+                "expr": str(_int_or(bridge_report.get("prefix_embed_dim"), 0)),
+            },
+            {
+                "name": "decoder_input_embed_dim",
+                "source": "dim:decoder_input_embed_dim",
+                "expr": str(_int_or(bridge_report.get("decoder_input_embed_dim"), 0)),
+            },
+        ],
+        "warnings": [],
+        "errors": [],
+    }
+    _decorate_unified_op(op, stage_key="bridge", stage_label="Bridge")
+    return op
+
+
+def _prefixed_name(stage_key: str, name: Any) -> str:
+    raw = str(name or "").strip()
+    return f"{stage_key}::{raw}" if raw else stage_key
+
+
+def _merge_layout_segment_records(
+    entries: list[dict[str, Any]],
+    *,
+    stage_key: str,
+    stage_label: str,
+    offset_shift: int,
+    record_kind: str,
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    for raw in entries:
+        if not isinstance(raw, dict):
+            continue
+        item = copy.deepcopy(raw)
+        item["network_stage"] = stage_key
+        item["network_stage_label"] = stage_label
+        item["name"] = _prefixed_name(stage_key, item.get("name"))
+        if isinstance(item.get("define"), str) and str(item["define"]).strip():
+            item["define"] = f"{stage_key.upper()}__{str(item['define']).strip()}"
+        item["offset"] = _int_or(item.get("offset"), 0) + int(offset_shift)
+        if "abs_offset" in item:
+            item["abs_offset"] = _int_or(item.get("abs_offset"), _int_or(item.get("offset"), 0)) + int(offset_shift)
+        elif record_kind == "activations":
+            item["abs_offset"] = int(item["offset"])
+        if record_kind == "activations":
+            usage = str(item.get("usage") or "").strip()
+            item["usage"] = f"{stage_label} / {usage}" if usage else stage_label
+        merged.append(item)
+    return merged
+
+
+def _build_full_network_layout(
+    encoder_layout: dict[str, Any] | None,
+    decoder_layout: dict[str, Any] | None,
+    *,
+    bridge_report: dict[str, Any],
+) -> dict[str, Any]:
+    merged_weight_entries: list[dict[str, Any]] = []
+    merged_activation_buffers: list[dict[str, Any]] = []
+    weight_offset = 0
+    activation_offset = 0
+    segments: list[dict[str, Any]] = []
+
+    def add_segment(stage_key: str, stage_label: str, payload: dict[str, Any] | None) -> None:
+        nonlocal weight_offset, activation_offset
+        if not isinstance(payload, dict):
+            return
+        memory = payload.get("memory")
+        if not isinstance(memory, dict):
+            return
+        weights = memory.get("weights") if isinstance(memory.get("weights"), dict) else {}
+        activations = memory.get("activations") if isinstance(memory.get("activations"), dict) else {}
+        weight_entries = _merge_layout_segment_records(
+            list(weights.get("entries") or []),
+            stage_key=stage_key,
+            stage_label=stage_label,
+            offset_shift=weight_offset,
+            record_kind="weights",
+        )
+        activation_buffers = _merge_layout_segment_records(
+            list(activations.get("buffers") or []),
+            stage_key=stage_key,
+            stage_label=stage_label,
+            offset_shift=activation_offset,
+            record_kind="activations",
+        )
+        weight_size = _int_or(weights.get("size"), 0)
+        activation_size = _int_or(activations.get("size"), 0)
+        merged_weight_entries.extend(weight_entries)
+        merged_activation_buffers.extend(activation_buffers)
+        segments.append(
+            {
+                "stage": stage_key,
+                "label": stage_label,
+                "weight_offset": int(weight_offset),
+                "weight_size": int(weight_size),
+                "activation_offset": int(activation_offset),
+                "activation_size": int(activation_size),
+                "weight_entries": len(weight_entries),
+                "activation_buffers": len(activation_buffers),
+            }
+        )
+        weight_offset += weight_size
+        activation_offset += activation_size
+
+    add_segment("encoder", "Encoder", encoder_layout)
+    add_segment("decoder_prefill", "Decoder Prefill", decoder_layout)
+
+    decoder_cfg = dict((decoder_layout or {}).get("config", {}) or {})
+    encoder_cfg = dict((encoder_layout or {}).get("config", {}) or {})
+    prefix_tokens = _int_or(bridge_report.get("prefix_tokens"), 0)
+    prefix_embed_dim = _int_or(bridge_report.get("prefix_embed_dim"), 0)
+    bridge_external_bytes = max(0, prefix_tokens * prefix_embed_dim * ctypes.sizeof(ctypes.c_float))
+    config = {
+        "model": "multimodal_full_network",
+        "arch": "bridge_full_network",
+        "mode": "prefill",
+        "embed_dim": _int_or(bridge_report.get("decoder_embed_dim"), _int_or(decoder_cfg.get("embed_dim"), 0)),
+        "input_embed_dim": _int_or(
+            bridge_report.get("decoder_input_embed_dim"),
+            _int_or(decoder_cfg.get("input_embed_dim"), 0),
+        ),
+        "num_layers": _int_or(decoder_cfg.get("num_layers"), 0),
+        "num_heads": _int_or(decoder_cfg.get("num_heads"), 0),
+        "num_kv_heads": _int_or(decoder_cfg.get("num_kv_heads"), 0),
+        "head_dim": _int_or(decoder_cfg.get("head_dim"), 0),
+        "intermediate_size": _int_or(decoder_cfg.get("intermediate_size"), 0),
+        "context_length": _int_or(bridge_report.get("decoder_context_len"), _int_or(decoder_cfg.get("context_length"), 0)),
+        "vocab_size": _int_or(decoder_cfg.get("vocab_size"), 0),
+        "vision_embed_dim": _int_or((bridge_report.get("encoder_report") or {}).get("embed_dim"), _int_or(encoder_cfg.get("embed_dim"), 0)),
+        "vision_prefix_tokens": prefix_tokens,
+        "vision_prefix_embed_dim": prefix_embed_dim,
+        "vision_grid_x": _int_or(bridge_report.get("prefix_grid_x"), 0),
+        "vision_grid_y": _int_or(bridge_report.get("prefix_grid_y"), 0),
+        "bridge_external_prefix_bytes": bridge_external_bytes,
+        "encoder_layers": _int_or(encoder_cfg.get("num_layers"), _int_or(encoder_cfg.get("num_hidden_layers"), 0)),
+        "decoder_prefill_layers": _int_or(decoder_cfg.get("num_layers"), 0),
+    }
+    return {
+        "format": "ck.layout.multimodal_full_network.v1",
+        "version": 1,
+        "mode": "prefill",
+        "config": config,
+        "memory": {
+            "weights": {
+                "size": int(weight_offset),
+                "bump_size": int(weight_offset),
+                "base_offset": 0,
+                "entries": merged_weight_entries,
+            },
+            "activations": {
+                "size": int(activation_offset),
+                "buffers": merged_activation_buffers,
+            },
+            "arena": {
+                "mode": "segmented",
+                "weights_base": 0,
+                "activations_base": int(weight_offset),
+                "total_size": int(weight_offset + activation_offset),
+            },
+            "segments": segments,
+            "bridge": {
+                "prefix_source": str(bridge_report.get("prefix_source") or "none"),
+                "prefix_tokens": prefix_tokens,
+                "prefix_embed_dim": prefix_embed_dim,
+                "external_prefix_bytes": bridge_external_bytes,
+            },
+        },
+    }
+
+
+def _build_full_network_graph(
+    *,
+    workdir: Path,
+    bridge_report: dict[str, Any],
+    encoder_dir: Path,
+    decoder_dir: Path,
+) -> dict[str, Any]:
+    encoder_ir1 = _json_load(encoder_dir / "ir1.json")
+    encoder_call = _json_load(encoder_dir / "call.json")
+    encoder_layout = _json_load(encoder_dir / "layout.json")
+    decoder_ir1 = _json_load(decoder_dir / "ir1_prefill.json")
+    decoder_call = _json_load(decoder_dir / "call_prefill.json")
+    decoder_layout = _json_load(decoder_dir / "layout_prefill.json")
+
+    encoder_ir_ops = _payload_ops(encoder_ir1)
+    decoder_ir_ops = _payload_ops(decoder_ir1)
+    encoder_call_ops = _payload_ops(encoder_call)
+    decoder_call_ops = _payload_ops(decoder_call)
+    decoder_header_ir = [op for op in decoder_ir_ops if str(op.get("section") or "").lower() == "header"]
+    decoder_tail_ir = [op for op in decoder_ir_ops if str(op.get("section") or "").lower() != "header"]
+    decoder_header_call = [op for op in decoder_call_ops if str(op.get("section") or "").lower() == "header"]
+    decoder_tail_call = [op for op in decoder_call_ops if str(op.get("section") or "").lower() != "header"]
+
+    merged_ir_ops: list[dict[str, Any]] = []
+    merged_call_ops: list[dict[str, Any]] = []
+
+    encoder_ir_segment, _ = _append_ir_segment(
+        merged_ir_ops,
+        encoder_ir_ops,
+        stage_key="encoder",
+        stage_label="Encoder",
+    )
+    decoder_header_segment, decoder_header_map = _append_ir_segment(
+        merged_ir_ops,
+        decoder_header_ir,
+        stage_key="decoder_prefill",
+        stage_label="Decoder Prefill",
+    )
+    encoder_bridge_name = str(((bridge_report.get("encoder_report") or {}).get("bridge_activation")) or "vision_output")
+    encoder_output = _find_output_ref(
+        encoder_ir_segment,
+        preferred_names=[
+            encoder_bridge_name,
+            "vision_output",
+            "vision_bridge_output",
+            "embedded_input",
+        ],
+    )
+    decoder_header_output = _find_output_ref(decoder_header_segment)
+    decoder_header_terminal_old_id = None
+    if decoder_header_ir:
+        decoder_header_terminal_old_id = max(_int_or(op.get("op_id"), -1) for op in decoder_header_ir)
+
+    bridge_op_id = len(merged_ir_ops)
+    bridge_ir_op = _build_unified_bridge_ir_op(
+        bridge_op_id,
+        bridge_report=bridge_report,
+        encoder_output=encoder_output,
+        decoder_header_output=decoder_header_output,
+    )
+    merged_ir_ops.append(bridge_ir_op)
+
+    forced_from_ops = (
+        {int(decoder_header_terminal_old_id): int(bridge_op_id)}
+        if decoder_header_terminal_old_id is not None and decoder_header_terminal_old_id >= 0
+        else {}
+    )
+    _append_ir_segment(
+        merged_ir_ops,
+        decoder_tail_ir,
+        stage_key="decoder_prefill",
+        stage_label="Decoder Prefill",
+        forced_from_ops=forced_from_ops,
+    )
+
+    _append_call_segment(
+        merged_call_ops,
+        encoder_call_ops,
+        stage_key="encoder",
+        stage_label="Encoder",
+    )
+    decoder_header_call_segment = _append_call_segment(
+        merged_call_ops,
+        decoder_header_call,
+        stage_key="decoder_prefill",
+        stage_label="Decoder Prefill",
+    )
+    decoder_output_buffer = "decoder_prefill::embedded_input"
+    for op in reversed(decoder_header_call_segment):
+        args = op.get("args")
+        if not isinstance(args, list):
+            continue
+        preferred_buffer = None
+        for arg in args:
+            if not isinstance(arg, dict):
+                continue
+            buffer_ref = str(arg.get("buffer_ref") or "").strip()
+            if not buffer_ref:
+                continue
+            source = str(arg.get("source") or "").lower()
+            name = str(arg.get("name") or "").lower()
+            if source.startswith("output:") or name in {"output", "out", "c", "dst"}:
+                preferred_buffer = buffer_ref
+                break
+            if preferred_buffer is None:
+                preferred_buffer = buffer_ref
+        if preferred_buffer:
+            decoder_output_buffer = f"decoder_prefill::{preferred_buffer}"
+            break
+    merged_call_ops.append(
+        _build_unified_bridge_call_op(
+            len(merged_call_ops),
+            bridge_report=bridge_report,
+            encoder_bridge_name=f"encoder::{encoder_bridge_name}",
+            decoder_output_buffer=decoder_output_buffer,
+        )
+    )
+    _append_call_segment(
+        merged_call_ops,
+        decoder_tail_call,
+        stage_key="decoder_prefill",
+        stage_label="Decoder Prefill",
+    )
+
+    merged_layout = _build_full_network_layout(
+        encoder_layout,
+        decoder_layout,
+        bridge_report=bridge_report,
+    )
+    merged_ir1 = {
+        "format": "ck.ir1.multimodal_full_network.v1",
+        "version": _int_or((decoder_ir1 or {}).get("version"), _int_or((encoder_ir1 or {}).get("version"), 1)),
+        "mode": "prefill",
+        "ops": merged_ir_ops,
+        "segments": [
+            {
+                "stage": "encoder",
+                "label": "Encoder",
+                "ops": len(encoder_ir_segment),
+                "body_layers": _count_nonnegative_layers(encoder_ir_segment),
+            },
+            {
+                "stage": "bridge",
+                "label": "Bridge",
+                "ops": 1,
+                "body_layers": 0,
+            },
+            {
+                "stage": "decoder_prefill",
+                "label": "Decoder Prefill",
+                "ops": len(decoder_header_segment) + len(decoder_tail_ir),
+                "body_layers": _count_nonnegative_layers(decoder_tail_ir),
+            },
+        ],
+        "bridge": {
+            "prefix_source": str(bridge_report.get("prefix_source") or "none"),
+            "prefix_tokens": _int_or(bridge_report.get("prefix_tokens"), 0),
+            "prefix_embed_dim": _int_or(bridge_report.get("prefix_embed_dim"), 0),
+        },
+    }
+    merged_call = {
+        "format": "ck.call.multimodal_full_network.v1",
+        "version": 1,
+        "mode": "prefill",
+        "config": dict(merged_layout.get("config", {}) or {}),
+        "memory": dict((merged_layout.get("memory") or {})),
+        "operations": merged_call_ops,
+        "errors": [],
+    }
+    return {
+        "format": "ck.full_network_graph.v1",
+        "version": 1,
+        "mode": "prefill",
+        "bridge_mode": "encoder_decoder" if encoder_ir_ops else "decoder_only",
+        "config": dict(merged_layout.get("config", {}) or {}),
+        "layout": merged_layout,
+        "call": merged_call,
+        "ir1": merged_ir1,
+        "sources": {
+            "bridge_report": str(workdir / "bridge_report.json"),
+            "encoder_ir1": str(encoder_dir / "ir1.json"),
+            "encoder_call": str(encoder_dir / "call.json"),
+            "encoder_layout": str(encoder_dir / "layout.json"),
+            "decoder_ir1_prefill": str(decoder_dir / "ir1_prefill.json"),
+            "decoder_call_prefill": str(decoder_dir / "call_prefill.json"),
+            "decoder_layout_prefill": str(decoder_dir / "layout_prefill.json"),
+        },
+    }
 
 
 def _json_read(path: Path) -> dict[str, Any] | None:
@@ -2134,9 +2765,25 @@ def main(argv: list[str] | None = None) -> int:
     }
     report_path = workdir / "bridge_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    full_network_graph = _build_full_network_graph(
+        workdir=workdir,
+        bridge_report=report,
+        encoder_dir=encoder_dir,
+        decoder_dir=decoder_dir,
+    )
+    full_network_path = workdir / "full_network_graph.json"
+    _json_write(full_network_path, full_network_graph)
     _log_progress(f"done report={report_path}")
     if args.print_json_report:
-        print(json.dumps(report, indent=2))
+        print(
+            json.dumps(
+                {
+                    **report,
+                    "full_network_graph": str(full_network_path),
+                },
+                indent=2,
+            )
+        )
     else:
         generated_text = str(report.get("generated_text") or "").strip()
         streamed_output = bool(decoder_report.get("streamed_output"))
@@ -2149,6 +2796,7 @@ def main(argv: list[str] | None = None) -> int:
                         "status": report["status"],
                         "top_logits": report["top_logits"],
                         "report_path": str(report_path),
+                        "full_network_graph": str(full_network_path),
                     },
                     indent=2,
                 )
