@@ -1,5 +1,6 @@
 """Experimental Python authoring layer for the v7 training pipeline."""
 
+from ..python_authoring.config import CompileConfig, TargetConfig
 from ..python_authoring.export_v7 import CompiledProject, compile
 from .authoring import (
     DataSource,
@@ -17,10 +18,12 @@ from .authoring import (
 
 __all__ = [
     "CompiledProject",
+    "CompileConfig",
     "DataSource",
     "ExecutionResult",
     "MaterializeOptions",
     "TemplateSpec",
+    "TargetConfig",
     "TinyModelSpec",
     "TokenizerPlan",
     "TrainConfig",

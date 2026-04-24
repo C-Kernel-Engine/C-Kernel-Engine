@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+from .config import CompileConfig, default_pass_trace
 from .graph import AuthoringGraph, build_authoring_graph
 from .nn import Embedding, Linear, Module, RMSNorm, TransformerBlock
 from ..v7.authoring import (
@@ -118,13 +119,22 @@ def _extract_tiny_lm_contract(model: Module) -> dict[str, Any]:
     }
 
 
-def _build_template_spec(*, family: str, graph: AuthoringGraph, contract: dict[str, Any]) -> TemplateSpec:
+def _build_template_spec(
+    *,
+    family: str,
+    graph: AuthoringGraph,
+    contract: dict[str, Any],
+    compile_config: CompileConfig,
+    pass_trace: list[dict[str, object]],
+) -> TemplateSpec:
     document = copy.deepcopy(_load_base_template_document(family))
     document['python_authoring'] = {
         'schema': 'ck.python_authoring.graph.v1',
         'entrypoint': 'ck.v7.compile',
         'family': family,
         'graph': graph.to_dict(),
+        'compile_config': compile_config.to_metadata(),
+        'pass_trace': pass_trace,
         'supported_contract': 'v7_tiny_transformer_lm',
         'model_contract': {
             'layers': contract['layers'],
@@ -149,6 +159,8 @@ class CompiledProject:
     project: TrainingProject
     graph: AuthoringGraph
     family: str
+    compile_config: CompileConfig
+    pass_trace: tuple[dict[str, object], ...]
 
     @property
     def run_dir(self) -> Path:
@@ -167,16 +179,46 @@ class CompiledProject:
         return self.run_dir / 'python_authoring_graph.md'
 
     @property
+    def compile_config_path(self) -> Path:
+        return self.run_dir / 'python_authoring_compile_config.json'
+
+    @property
+    def pass_trace_path(self) -> Path:
+        return self.run_dir / 'python_authoring_pass_trace.json'
+
+    @property
     def project_plan_path(self) -> Path:
         return self.project.project_plan_path
 
-    def _write_graph_artifacts(self) -> None:
+    def _write_authoring_artifacts(self) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.graph_path.write_text(self.graph.to_json(indent=2), encoding='utf-8')
         self.graph_markdown_path.write_text(self.graph.to_markdown(), encoding='utf-8')
+        self.compile_config_path.write_text(
+            json.dumps(
+                {
+                    'schema': 'ck.python_authoring.compile_config.v1',
+                    'family': self.family,
+                    'compile_config': self.compile_config.to_metadata(),
+                },
+                indent=2,
+            ),
+            encoding='utf-8',
+        )
+        self.pass_trace_path.write_text(
+            json.dumps(
+                {
+                    'schema': 'ck.python_authoring.pass_trace.v1',
+                    'family': self.family,
+                    'passes': list(self.pass_trace),
+                },
+                indent=2,
+            ),
+            encoding='utf-8',
+        )
 
     def materialize(self, options: Optional[MaterializeOptions] = None) -> ExecutionResult:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         return self.project.materialize(options)
 
     def train(
@@ -186,7 +228,7 @@ class CompiledProject:
         *,
         auto_materialize: bool = True,
     ) -> ExecutionResult:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         source = DataSource.inline_text(data) if isinstance(data, str) else data
         return self.project.train(source, config, auto_materialize=auto_materialize)
 
@@ -198,7 +240,7 @@ class CompiledProject:
         min_loss_drop: float = 0.0,
         auto_materialize: bool = True,
     ) -> ExecutionResult:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         source = DataSource.inline_text(data) if isinstance(data, str) else data
         return self.project.sanity(source, config, min_loss_drop=min_loss_drop, auto_materialize=auto_materialize)
 
@@ -211,7 +253,7 @@ class CompiledProject:
         with_replay: bool = True,
         auto_materialize: bool = True,
     ) -> ExecutionResult:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         source = DataSource.inline_text(data) if isinstance(data, str) else data
         return self.project.parity(source, config, with_fd=with_fd, with_replay=with_replay, auto_materialize=auto_materialize)
 
@@ -224,7 +266,7 @@ class CompiledProject:
         hub_output: Optional[Path] = None,
         hub_index_out: Optional[Path] = None,
     ) -> ViewerArtifacts:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         return self.project.prepare_viewers(
             force=force,
             models_root=models_root,
@@ -234,11 +276,11 @@ class CompiledProject:
         )
 
     def generate_ir_report(self, **kwargs: Any):
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         return self.project.generate_ir_report(**kwargs)
 
     def refresh_ir_hub(self, **kwargs: Any):
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         return self.project.refresh_ir_hub(**kwargs)
 
     def show_graph(self, *, format: str = 'markdown') -> str | dict[str, Any]:
@@ -256,8 +298,14 @@ class CompiledProject:
         return result.paths.get('ir_report')
 
     def notebook_artifact_dashboard_html(self, *, title: str = 'v7 Run Artifact Dashboard') -> str:
-        self._write_graph_artifacts()
+        self._write_authoring_artifacts()
         return self.project.notebook_artifact_dashboard_html(title=title)
+
+    def show_compile_config(self) -> dict[str, object]:
+        return self.compile_config.to_metadata()
+
+    def show_pass_trace(self) -> list[dict[str, object]]:
+        return list(self.pass_trace)
 
 
 def compile(
@@ -267,7 +315,8 @@ def compile(
     family: str = 'qwen3',
     run_dir: Optional[str | Path] = None,
     init: str = 'normal_0p02',
-    kernel_policy: str = 'fp32_reference_first',
+    kernel_policy: Optional[str] = None,
+    config: Optional[CompileConfig] = None,
     seed: int = 42,
     adamw_beta1: float = 0.9,
     adamw_beta2: float = 0.999,
@@ -280,11 +329,23 @@ def compile(
     repo_root: Optional[str | Path] = None,
 ) -> CompiledProject:
     family_name = _ensure_supported_family(family)
+    compile_config = config or CompileConfig(
+        kernel_policy=kernel_policy or CompileConfig().kernel_policy,
+    )
+    if kernel_policy is not None and config is not None and kernel_policy != config.kernel_policy:
+        raise ValueError('kernel_policy conflicts with config.kernel_policy')
     graph = build_authoring_graph(model, name=model.name)
     contract = _extract_tiny_lm_contract(model)
     if family_name in {'qwen3', 'qwen35'} and str(contract['activation']) != 'swiglu':
         raise ValueError(f"family {family_name!r} currently expects ck.nn.TransformerBlock(..., activation='swiglu')")
-    template = _build_template_spec(family=family_name, graph=graph, contract=contract)
+    pass_trace = default_pass_trace(compile_config)
+    template = _build_template_spec(
+        family=family_name,
+        graph=graph,
+        contract=contract,
+        compile_config=compile_config,
+        pass_trace=pass_trace,
+    )
     tiny_model = TinyModelSpec(
         init=init,
         layers=contract['layers'],
@@ -295,7 +356,7 @@ def compile(
         num_kv_heads=contract['kv_heads'],
         context_len=contract['context_len'],
         rope_theta=float(contract['rope_theta']),
-        kernel_policy=kernel_policy,
+        kernel_policy=compile_config.kernel_policy,
         adamw_beta1=adamw_beta1,
         adamw_beta2=adamw_beta2,
         adamw_eps=adamw_eps,
@@ -312,4 +373,10 @@ def compile(
         python_exec=python_exec,
         command_runner=command_runner,
     )
-    return CompiledProject(project=project, graph=graph, family=family_name)
+    return CompiledProject(
+        project=project,
+        graph=graph,
+        family=family_name,
+        compile_config=compile_config,
+        pass_trace=tuple(pass_trace),
+    )

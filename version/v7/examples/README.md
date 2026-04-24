@@ -6,7 +6,7 @@ What works now:
 - [python_authoring_tiny_lm_v7.py](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/examples/python_authoring_tiny_lm_v7.py)
   Python authors the project spec, then hands off to `ck_run_v7.py init/train`, refreshes `ir_report.html`, and regenerates `ir_hub.html`. Run-local `dataset_viewer.html` and `attention.json` stay conditional on dataset/tokenizer artifacts.
 - [python_module_api_tiny_lm_v7.py](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/examples/python_module_api_tiny_lm_v7.py)
-  Builds a tiny `ck.nn` transformer graph, compiles it through `ck.v7.compile(...)`, and then uses the same existing v7 materialize/train/viewer flow.
+  Builds a tiny `ck.models.qwen3_tiny(...)` transformer graph, compiles it through `ck.v7.compile(...)`, records compile/pass sidecars, and then uses the same existing v7 materialize/train/viewer flow.
 - [01_v7_experiment_story_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb)
   Presenter-oriented walkthrough of the spec02 -> spec19 training arc, with direct links into the numbered notebook lane and live demo commands.
 - [02_v7_python_authoring_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb)
@@ -51,7 +51,7 @@ Recommended notebook suite:
 - `04_v7_python_authoring_artifact_walkthrough`
   Inspect `python_authoring_plan.json`, manifests, IR, layout, codegen outputs, and reports.
 - `05_v7_python_module_api_quickstart`
-  Build a tiny `ck.nn` graph, compile it through the v7 adapter, and inspect the exported graph artifacts beside the normal run outputs.
+  Build a tiny `ck.models.qwen3_tiny(...)` graph, compile it through the v7 adapter, and inspect the exported graph/config/pass artifacts beside the normal run outputs.
 - `v7_training_operator_workbench`
   Planned notebook for parity, sanity, full train, artifact refresh, and train command surfacing.
 

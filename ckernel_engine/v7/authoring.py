@@ -126,6 +126,16 @@ def _artifact_dashboard_rows(run_dir: Path, models_root: Path) -> list[dict[str,
             "note": "Human-readable summary of the same ck.nn module graph.",
         },
         {
+            "label": "Compile Config",
+            "path": _existing_path(run_dir / "python_authoring_compile_config.json"),
+            "note": "Python-side compile target and pass intent for the v7 adapter.",
+        },
+        {
+            "label": "Pass Trace",
+            "path": _existing_path(run_dir / "python_authoring_pass_trace.json"),
+            "note": "Recorded authoring/lowering pass intent before v7 owns execution.",
+        },
+        {
             "label": "Weights Manifest",
             "path": _existing_path(run_dir / "weights_manifest.json"),
             "note": "Manifest-first training state and template contract.",
@@ -1070,6 +1080,16 @@ class TrainingProject:
                 "python_authoring_graph_markdown": _stringify_path(
                     (Path(self.run_dir) / "python_authoring_graph.md")
                     if (Path(self.run_dir) / "python_authoring_graph.md").exists()
+                    else None
+                ),
+                "python_authoring_compile_config": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_compile_config.json")
+                    if (Path(self.run_dir) / "python_authoring_compile_config.json").exists()
+                    else None
+                ),
+                "python_authoring_pass_trace": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_pass_trace.json")
+                    if (Path(self.run_dir) / "python_authoring_pass_trace.json").exists()
                     else None
                 ),
                 "weights_manifest": str(manifest_path),

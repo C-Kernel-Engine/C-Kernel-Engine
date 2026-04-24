@@ -17,7 +17,7 @@ Recommended reading order:
 4. `04_v7_python_authoring_artifact_walkthrough.ipynb`
    Deep inspection of the run-dir artifacts, IR/codegen boundary, and viewer outputs.
 5. `05_v7_python_module_api_quickstart.ipynb`
-   Thin `ck.nn` module graph -> `ck.v7.compile(...)` adapter -> materialize/train/viewer flow on the same existing v7 pipeline.
+   Thin `ck.models.qwen3_tiny(...)` graph -> `ck.v7.compile(...)` adapter -> materialize/train/viewer flow on the same existing v7 pipeline, with graph/config/pass-trace sidecars.
 
 Launch examples from the repo root:
 

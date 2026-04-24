@@ -16,12 +16,15 @@ import ckernel_engine as ck  # noqa: E402
 
 
 def build_demo_model() -> ck.nn.Sequential:
-    return ck.nn.Sequential(
-        ck.nn.Embedding(vocab=256, dim=128, init='xavier_uniform', name='tokens'),
-        ck.nn.TransformerBlock(dim=128, hidden=256, heads=8, kv_heads=4, context_len=128, init='xavier_uniform', name='block0'),
-        ck.nn.TransformerBlock(dim=128, hidden=256, heads=8, kv_heads=4, context_len=128, init='xavier_uniform', name='block1'),
-        ck.nn.RMSNorm(128, name='final_norm'),
-        ck.nn.Linear(128, 256, bias=False, init='xavier_uniform', name='lm_head'),
+    return ck.models.qwen3_tiny(
+        vocab=256,
+        dim=128,
+        layers=2,
+        hidden=256,
+        heads=8,
+        kv_heads=4,
+        context_len=128,
+        init='xavier_uniform',
         name='tiny_qwen3_module_api',
     )
 
@@ -38,10 +41,19 @@ def main() -> int:
         run_name=str(args.run_name),
         family='qwen3',
         init='xavier_uniform',
+        config=ck.CompileConfig(
+            target=ck.TargetConfig(name='cpu', isa='auto'),
+            vectorize=True,
+            pack_weights=True,
+            unroll=1,
+            dump_pass_trace=True,
+            kernel_policy='fp32_reference_first',
+        ),
         tokenizer_notes='Example keeps tokenizer ownership in the existing v7 runtime.',
     )
 
     print(run.show_graph())
+    print(run.show_compile_config())
     materialize_result = run.materialize()
     train_result = run.train(
         str(args.text),
@@ -61,6 +73,8 @@ def main() -> int:
 
     print(f'run_dir={materialize_result.run_dir}')
     print(f'graph={run.graph_path}')
+    print(f'compile_config={run.compile_config_path}')
+    print(f'pass_trace={run.pass_trace_path}')
     print(f'report={train_result.report_path}')
     print(f'plan={run.project_plan_path}')
     print(f'ir_report={viewer_artifacts.ir_report}')

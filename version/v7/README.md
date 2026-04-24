@@ -81,13 +81,23 @@ Or from the top-level package:
 ```python
 import ckernel_engine as ck
 
-model = ck.nn.Sequential(...)
-run = ck.v7.compile(model, run_name="py-module-demo")
+model = ck.models.qwen3_tiny(layers=2, dim=128, hidden=256, heads=8, kv_heads=4)
+run = ck.v7.compile(
+    model,
+    run_name="py-module-demo",
+    config=ck.CompileConfig(
+        target=ck.TargetConfig(name="cpu", isa="auto"),
+        vectorize=True,
+        pack_weights=True,
+        dump_pass_trace=True,
+    ),
+)
 ```
 
 Current scope:
 - wraps the existing tiny `v7` run-dir/bootstrap surface
 - accepts a thin `ck.nn` module graph and compiles it into the same current tiny qwen-style v7 LM bootstrap contract
+- provides `ck.models.qwen3_tiny(...)` and records `CompileConfig` / pass-trace sidecars for notebook inspection
 - supports builtin or embedded template documents
 - records a `python_authoring_plan.json` beside the run artifacts
 - can refresh `ir_report.html`, export viewer-side artifacts, and regenerate the shared `ir_hub.html`

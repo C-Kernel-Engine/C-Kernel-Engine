@@ -26,12 +26,15 @@ class _FakeRunner:
 
 
 def _build_model() -> ck.nn.Sequential:
-    return ck.nn.Sequential(
-        ck.nn.Embedding(vocab=256, dim=128, init='xavier_uniform', name='tokens'),
-        ck.nn.TransformerBlock(dim=128, hidden=256, heads=8, kv_heads=4, context_len=128, init='xavier_uniform', name='block0'),
-        ck.nn.TransformerBlock(dim=128, hidden=256, heads=8, kv_heads=4, context_len=128, init='xavier_uniform', name='block1'),
-        ck.nn.RMSNorm(128, name='final_norm'),
-        ck.nn.Linear(128, 256, bias=False, init='xavier_uniform', name='lm_head'),
+    return ck.models.qwen3_tiny(
+        vocab=256,
+        dim=128,
+        layers=2,
+        hidden=256,
+        heads=8,
+        kv_heads=4,
+        context_len=128,
+        init='xavier_uniform',
         name='tiny_qwen3_module_api',
     )
 
@@ -46,6 +49,13 @@ class PythonModuleApiTest(unittest.TestCase):
                 run_dir=Path(tmp) / 'run',
                 family='qwen3',
                 init='xavier_uniform',
+                config=ck.CompileConfig(
+                    target=ck.TargetConfig(name='cpu', isa='auto'),
+                    vectorize=True,
+                    pack_weights=True,
+                    unroll=2,
+                    kernel_policy='fp32_reference_first',
+                ),
                 command_runner=fake_runner,
             )
 
@@ -54,6 +64,8 @@ class PythonModuleApiTest(unittest.TestCase):
             self.assertEqual(compiled.project.model.embed_dim, 128)
             self.assertEqual(compiled.project.model.hidden_dim, 256)
             self.assertIn('# tiny_qwen3_module_api', compiled.show_graph())
+            self.assertEqual(compiled.show_compile_config()['unroll'], 2)
+            self.assertTrue(compiled.show_pass_trace())
             graph_payload = compiled.show_graph(format='json')
             self.assertEqual(graph_payload['schema'], 'ck.python_authoring.graph.v1')
             self.assertGreater(graph_payload['node_count'], 0)
@@ -83,8 +95,12 @@ class PythonModuleApiTest(unittest.TestCase):
 
             graph_path = run_dir / 'python_authoring_graph.json'
             graph_markdown_path = run_dir / 'python_authoring_graph.md'
+            compile_config_path = run_dir / 'python_authoring_compile_config.json'
+            pass_trace_path = run_dir / 'python_authoring_pass_trace.json'
             self.assertTrue(graph_path.exists())
             self.assertTrue(graph_markdown_path.exists())
+            self.assertTrue(compile_config_path.exists())
+            self.assertTrue(pass_trace_path.exists())
             graph_payload = json.loads(graph_path.read_text(encoding='utf-8'))
             self.assertEqual(graph_payload['schema'], 'ck.python_authoring.graph.v1')
             self.assertEqual(graph_payload['name'], 'tiny_qwen3_module_api')
@@ -93,11 +109,31 @@ class PythonModuleApiTest(unittest.TestCase):
             self.assertIn('python_authoring', template_payload)
             self.assertEqual(template_payload['python_authoring']['family'], 'qwen3')
             self.assertEqual(template_payload['python_authoring']['graph']['schema'], 'ck.python_authoring.graph.v1')
+            self.assertEqual(template_payload['python_authoring']['compile_config']['target']['name'], 'cpu')
+            self.assertTrue(template_payload['python_authoring']['pass_trace'])
+
+            compile_payload = json.loads(compile_config_path.read_text(encoding='utf-8'))
+            self.assertEqual(compile_payload['schema'], 'ck.python_authoring.compile_config.v1')
+            self.assertEqual(compile_payload['compile_config']['kernel_policy'], 'fp32_reference_first')
+            pass_payload = json.loads(pass_trace_path.read_text(encoding='utf-8'))
+            self.assertEqual(pass_payload['schema'], 'ck.python_authoring.pass_trace.v1')
+            self.assertTrue(pass_payload['passes'])
 
             plan_payload = json.loads((run_dir / 'python_authoring_plan.json').read_text(encoding='utf-8'))
             self.assertEqual(plan_payload['artifacts']['python_authoring_graph'], str(graph_path))
             self.assertEqual(plan_payload['artifacts']['python_authoring_graph_markdown'], str(graph_markdown_path))
+            self.assertEqual(plan_payload['artifacts']['python_authoring_compile_config'], str(compile_config_path))
+            self.assertEqual(plan_payload['artifacts']['python_authoring_pass_trace'], str(pass_trace_path))
             self.assertEqual(plan_payload['history'][0]['action'], 'materialize')
+
+    def test_compile_rejects_conflicting_kernel_policy(self) -> None:
+        with self.assertRaises(ValueError):
+            ck.v7.compile(
+                _build_model(),
+                run_name='conflicting-kernel-policy',
+                kernel_policy='fp32_reference_first',
+                config=ck.CompileConfig(kernel_policy='other_policy'),
+            )
 
     def test_compile_rejects_unsupported_family_shape_mismatch(self) -> None:
         with self.assertRaises(ValueError):
