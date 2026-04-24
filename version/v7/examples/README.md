@@ -5,17 +5,27 @@ These examples sit on top of the current `v7` training pipeline.
 What works now:
 - [python_authoring_tiny_lm_v7.py](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/examples/python_authoring_tiny_lm_v7.py)
   Python authors the project spec, then hands off to `ck_run_v7.py init/train`, refreshes `ir_report.html`, and regenerates `ir_hub.html`. Run-local `dataset_viewer.html` and `attention.json` stay conditional on dataset/tokenizer artifacts.
-- [v7_python_authoring_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/v7_python_authoring_quickstart.ipynb)
+- [python_module_api_tiny_lm_v7.py](/home/antshiv/Workspace/C-Kernel-Engine/version/v7/examples/python_module_api_tiny_lm_v7.py)
+  Builds a tiny `ck.nn` transformer graph, compiles it through `ck.v7.compile(...)`, and then uses the same existing v7 materialize/train/viewer flow.
+- [01_v7_experiment_story_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb)
+  Presenter-oriented walkthrough of the spec02 -> spec19 training arc, with direct links into the numbered notebook lane and live demo commands.
+- [02_v7_python_authoring_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb)
   Notebook walkthrough for materialize + train + viewer generation, including a run artifact dashboard that links out to the rest of the v7 artifact surface.
-- [v7_python_authoring_artifact_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/v7_python_authoring_artifact_walkthrough.ipynb)
-  Notebook for inspecting the run-dir artifacts, generated-runtime handoff, and viewer outputs.
-- [v7_dsl_dataset_preparation.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/v7_dsl_dataset_preparation.ipynb)
+- [03_v7_dsl_dataset_preparation.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb)
   Notebook scaffold for split-aware SVG/DSL dataset prep: workspace inspection, artifact materialization, run-local staging, `dataset_viewer.html`, and training handoff commands.
+- [04_v7_python_authoring_artifact_walkthrough.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb)
+  Notebook for inspecting the run-dir artifacts, generated-runtime handoff, and viewer outputs.
+- [05_v7_python_module_api_quickstart.ipynb](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb)
+  Notebook walkthrough for the thin `ck.nn` graph -> `ck.v7.compile(...)` adapter and the same existing v7 viewer surface.
+- [v7_training/README.md](/home/antshiv/Workspace/C-Kernel-Engine/notebooks/python_authoring/v7_training/README.md)
+  Folder index for the ordered `01 -> 05` notebook flow.
 
 Starting the notebooks:
-- From the repo root, run `jupyter lab notebooks/v7_python_authoring_quickstart.ipynb`.
-- If you prefer the classic UI, run `jupyter notebook notebooks/`.
+- From the repo root, run `.venv/bin/jupyter lab notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb`.
+- To open the whole ordered folder in JupyterLab, run `.venv/bin/jupyter lab notebooks/python_authoring/v7_training/`.
+- If you prefer the classic UI, run `.venv/bin/jupyter notebook notebooks/python_authoring/v7_training/`.
 - Open them from inside the repo checkout so repo-root detection works.
+- `notebooks/v7_training/` remains available as a compatibility alias for older launch commands.
 
 Example ladder to build next:
 - `linear_regression`
@@ -32,12 +42,16 @@ Example ladder to build next:
   Notebook/API for dataset staging, token streams, tokenizer lineage, and run metadata.
 
 Recommended notebook suite:
-- `v7_python_authoring_quickstart`
+- `01_v7_experiment_story_walkthrough`
+  Start with the story: summarize the experiment ladder, what changed across the specs, and what to demo live.
+- `02_v7_python_authoring_quickstart`
   Start a tiny run and point users to the IR visualizer, IR hub, and dataset viewer when available.
-- `v7_python_authoring_artifact_walkthrough`
-  Inspect `python_authoring_plan.json`, manifests, IR, layout, codegen outputs, and reports.
-- `v7_dsl_dataset_preparation`
+- `03_v7_dsl_dataset_preparation`
   Scaffold SVG/DSL dataset staging, manifest inspection, run-local dataset snapshots, and `dataset_viewer.html`.
+- `04_v7_python_authoring_artifact_walkthrough`
+  Inspect `python_authoring_plan.json`, manifests, IR, layout, codegen outputs, and reports.
+- `05_v7_python_module_api_quickstart`
+  Build a tiny `ck.nn` graph, compile it through the v7 adapter, and inspect the exported graph artifacts beside the normal run outputs.
 - `v7_training_operator_workbench`
   Planned notebook for parity, sanity, full train, artifact refresh, and train command surfacing.
 

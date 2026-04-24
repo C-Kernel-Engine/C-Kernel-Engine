@@ -116,6 +116,16 @@ def _artifact_dashboard_rows(run_dir: Path, models_root: Path) -> list[dict[str,
             "note": "Python-side project spec and command history.",
         },
         {
+            "label": "Python Graph",
+            "path": _existing_path(run_dir / "python_authoring_graph.json"),
+            "note": "Symbolic module graph exported before the existing v7 materialize/train handoff.",
+        },
+        {
+            "label": "Python Graph Notes",
+            "path": _existing_path(run_dir / "python_authoring_graph.md"),
+            "note": "Human-readable summary of the same ck.nn module graph.",
+        },
+        {
             "label": "Weights Manifest",
             "path": _existing_path(run_dir / "weights_manifest.json"),
             "note": "Manifest-first training state and template contract.",
@@ -1052,6 +1062,16 @@ class TrainingProject:
             "tokenizer": self.tokenizer.to_metadata(),
             "artifacts": {
                 "project_plan": str(self.project_plan_path),
+                "python_authoring_graph": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_graph.json")
+                    if (Path(self.run_dir) / "python_authoring_graph.json").exists()
+                    else None
+                ),
+                "python_authoring_graph_markdown": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_graph.md")
+                    if (Path(self.run_dir) / "python_authoring_graph.md").exists()
+                    else None
+                ),
                 "weights_manifest": str(manifest_path),
                 "weights": str(Path(self.run_dir) / "weights.bump"),
                 "config": str(Path(self.run_dir) / "config.json"),

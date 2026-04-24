@@ -1,5 +1,6 @@
 """Experimental Python authoring layer for the v7 training pipeline."""
 
+from ..python_authoring.export_v7 import CompiledProject, compile
 from .authoring import (
     DataSource,
     ExecutionResult,
@@ -15,6 +16,7 @@ from .authoring import (
 )
 
 __all__ = [
+    "CompiledProject",
     "DataSource",
     "ExecutionResult",
     "MaterializeOptions",
@@ -25,5 +27,6 @@ __all__ = [
     "TrainingProject",
     "ViewerArtifacts",
     "ViewerCommandResult",
+    "compile",
     "notebook_artifact_dashboard_html",
 ]
