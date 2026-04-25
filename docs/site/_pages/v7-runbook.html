@@ -845,7 +845,7 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--orange,#ffb400);margin:0.6rem 0 0.3rem;padding-left:0.25rem;">Foundation</div>
     <ul>
         <li><a href="#demo-lane">Demo Lane</a></li>
-        <li><a href="#python-authoring-notebooks">Python Authoring Notebooks</a></li>
+        <li><a href="#notebooks">Notebooks</a></li>
         <li><a href="#run-hub-quick-launch">IR Hub Quick Launch</a></li>
         <li><a href="#why-svg">Why SVG for v7</a></li>
     </ul>
@@ -931,37 +931,67 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     <p style="margin:0.35rem 0 0 0;"><strong>Caveat:</strong> <code>A1/A2</code> remain a separate kernel-harness bug track and do not block runbook execution readiness under the current operator gate.</p>
 </div>
 
-<h2 id="python-authoring-notebooks">Python Authoring Notebooks</h2>
+<h2 id="notebooks">Notebooks</h2>
+
+<div class="card" style="margin-bottom:0.75rem;">
+    <p style="margin:0 0 0.35rem 0;"><strong>Ordered notebook lane:</strong> open the v7 notebooks from <code>notebooks/v7_training/</code> so they appear in a clean <code>01 -> 05</code> sequence during demos and onboarding.</p>
+    <p style="margin:0 0 0.35rem 0;"><strong>Recommended start:</strong> begin with the story notebook, then run the quickstart, then go deeper with dataset prep, artifact inspection, and the thin <code>ck.nn</code> module API notebook.</p>
+    <div class="cmd-block" style="margin-top:0.6rem;">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/</pre>
+    </div>
+    <p class="mini-note" style="margin:0.45rem 0 0 0;">Need the full walkthrough? Open <a href="v7-python-authoring.html">the v7 Python Authoring Guide</a> for notebook order, exact Python syntax, and the handoff boundary into <code>ck_run_v7.py</code>.</p>
+</div>
 
 <div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top:0;">01. Experiment Story Walkthrough</h3>
+        <p style="margin-bottom:0.35rem;">Start here for the presenter-friendly overview of the spec02 -&gt; spec19 arc and the current v7 training surface.</p>
+        <div class="cmd-block">
+            <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/01_v7_experiment_story_walkthrough.ipynb</pre>
+        </div>
+        <p class="mini-note">Summarizes the experiment ladder, major inflection points, source-note excerpts, and the exact live-demo handoff into the rest of the notebook lane.</p>
+    </div>
     <div class="card card-accent">
-        <h3 style="margin-top:0;">Quickstart Notebook</h3>
+        <h3 style="margin-top:0;">02. Quickstart Notebook</h3>
         <p style="margin-bottom:0.35rem;">Launch from the repo root so the notebook can auto-detect <code>ckernel_engine/</code> and <code>version/v7/</code>.</p>
         <div class="cmd-block">
             <button class="copy-btn" type="button">Copy</button>
-<pre>jupyter lab notebooks/v7_python_authoring_quickstart.ipynb</pre>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/02_v7_python_authoring_quickstart.ipynb</pre>
         </div>
         <p class="mini-note">Walks through <code>materialize -&gt; train -&gt; prepare_viewers()</code> and renders a run artifact dashboard with direct links into the rest of the v7 surface.</p>
-    </div>
-    <div class="card card-blue">
-        <h3 style="margin-top:0;">Artifact Walkthrough Notebook</h3>
-        <p style="margin-bottom:0.35rem;">Use after the quickstart or the CLI example to inspect the run-dir handoff boundary and generated artifacts.</p>
-        <div class="cmd-block">
-            <button class="copy-btn" type="button">Copy</button>
-<pre>jupyter lab notebooks/v7_python_authoring_artifact_walkthrough.ipynb</pre>
-        </div>
-        <p class="mini-note">Focuses on <code>python_authoring_plan.json</code>, <code>weights_manifest.json</code>, <code>ir1/ir2</code>, layout, reports, and viewer outputs.</p>
     </div>
 </div>
 
 <div class="card card-green" style="margin-top:0.75rem;">
-    <h3 style="margin-top:0;">DSL Dataset Preparation Notebook</h3>
+    <h3 style="margin-top:0;">03. DSL Dataset Preparation Notebook</h3>
     <p style="margin-bottom:0.35rem;">Use this when the user needs to understand the split-aware SVG/DSL workspace itself, not just a tiny training run.</p>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
-<pre>jupyter lab notebooks/v7_dsl_dataset_preparation.ipynb</pre>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/03_v7_dsl_dataset_preparation.ipynb</pre>
     </div>
     <p class="mini-note">Scaffolds the real dataset workflow: inspect <code>version/v7/data/spec04</code>, materialize workspace artifacts, stage the workspace into <code>$RUN/dataset/</code>, regenerate <code>dataset_viewer.html</code>, refresh <code>ir_hub.html</code>, and surface the Python + CLI training handoff commands.</p>
+</div>
+
+<div class="card card-blue" style="margin-top:0.75rem;">
+    <h3 style="margin-top:0;">04. Artifact Walkthrough Notebook</h3>
+    <p style="margin-bottom:0.35rem;">Use after the quickstart or the CLI example to inspect the run-dir handoff boundary and generated artifacts.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb</pre>
+    </div>
+    <p class="mini-note">Focuses on <code>python_authoring_plan.json</code>, <code>weights_manifest.json</code>, <code>ir1/ir2</code>, layout, reports, and viewer outputs.</p>
+</div>
+
+<div class="card card-accent" style="margin-top:0.75rem;">
+    <h3 style="margin-top:0;">05. Module API Quickstart Notebook</h3>
+    <p style="margin-bottom:0.35rem;">Use this when you want the thin <code>ck.nn</code> graph adapter and the authoring-side graph/config/pass-trace artifacts.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/jupyter lab notebooks/v7_training/05_v7_python_module_api_quickstart.ipynb</pre>
+    </div>
+    <p class="mini-note">Builds a tiny <code>ck.models.qwen3_tiny(...)</code> graph, compiles it through <code>ck.v7.compile(...)</code>, and then uses the same current <code>v7</code> materialize/train/viewer flow.</p>
 </div>
 
 <div class="card" style="margin-top:0.75rem;">
@@ -980,9 +1010,11 @@ python3 version/v7/tools/open_ir_hub.py --open</pre>
     </ul>
     <p style="margin:0.55rem 0 0.35rem 0;"><strong>Suggested notebook names:</strong></p>
     <ul style="margin-top:0.2rem;">
-        <li><code>notebooks/v7_python_authoring_quickstart.ipynb</code>: current entrypoint, keep focused on the smallest successful run plus viewer links.</li>
-        <li><code>notebooks/v7_python_authoring_artifact_walkthrough.ipynb</code>: current run-dir inspection notebook, keep focused on manifests, IR, codegen, and reports.</li>
-        <li><code>notebooks/v7_dsl_dataset_preparation.ipynb</code>: current dataset workspace notebook for manifests, staging, run-local snapshots, and <code>dataset_viewer.html</code>.</li>
+        <li><code>notebooks/v7_training/01_v7_experiment_story_walkthrough.ipynb</code>: presenter-first summary of the experiment arc and current platform story.</li>
+        <li><code>notebooks/v7_training/02_v7_python_authoring_quickstart.ipynb</code>: current entrypoint, keep focused on the smallest successful run plus viewer links.</li>
+        <li><code>notebooks/v7_training/03_v7_dsl_dataset_preparation.ipynb</code>: current dataset workspace notebook for manifests, staging, run-local snapshots, and <code>dataset_viewer.html</code>.</li>
+        <li><code>notebooks/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb</code>: current run-dir inspection notebook, keep focused on manifests, IR, codegen, and reports.</li>
+        <li><code>notebooks/v7_training/05_v7_python_module_api_quickstart.ipynb</code>: thin <code>ck.nn</code> graph authoring path plus compile/config/pass-trace sidecars.</li>
         <li><code>notebooks/v7_training_operator_workbench.ipynb</code>: planned training notebook for parity, sanity, full train, and artifact refresh.</li>
     </ul>
     <p class="mini-note" style="margin-top:0.45rem;">The right design is notebook as guided front door, with <code>ir_hub.html</code> and run-local HTML artifacts remaining the durable operator surface.</p>

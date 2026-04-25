@@ -126,6 +126,19 @@ class PythonModuleApiTest(unittest.TestCase):
             self.assertEqual(plan_payload['artifacts']['python_authoring_pass_trace'], str(pass_trace_path))
             self.assertEqual(plan_payload['history'][0]['action'], 'materialize')
 
+    def test_compile_defaults_command_runner_when_none(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            compiled = ck.v7.compile(
+                _build_model(),
+                run_name='py-module-api-default-runner',
+                run_dir=Path(tmp) / 'run',
+                family='qwen3',
+                init='xavier_uniform',
+                command_runner=None,
+            )
+
+            self.assertTrue(callable(compiled.project.command_runner))
+
     def test_compile_rejects_conflicting_kernel_policy(self) -> None:
         with self.assertRaises(ValueError):
             ck.v7.compile(

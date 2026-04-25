@@ -678,13 +678,15 @@ class TrainingProject:
     run_dir: Optional[Path] = None
     repo_root: Path = field(default_factory=lambda: REPO_ROOT)
     python_exec: Optional[str] = None
-    command_runner: CommandRunner = field(default=_default_command_runner, repr=False)
+    command_runner: Optional[CommandRunner] = field(default=_default_command_runner, repr=False)
     _history: list[dict[str, Any]] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.repo_root = Path(self.repo_root).expanduser().resolve(strict=False)
         if self.python_exec is None:
             self.python_exec = _default_python_exec()
+        if self.command_runner is None:
+            self.command_runner = _default_command_runner
         if self.run_dir is None:
             self.run_dir = (DEFAULT_TRAIN_ROOT / self.run_name).expanduser().resolve(strict=False)
         else:
