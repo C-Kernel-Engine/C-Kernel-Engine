@@ -49,21 +49,26 @@ Example:
 
 ```bash
 python3 version/v7/examples/python_authoring_tiny_lm_v7.py --run-name py-ui-demo
+python3 version/v7/examples/python_module_api_tiny_lm_v7.py --run-name py-module-demo
 ```
 
 Notebook examples:
 
 ```bash
-notebooks/v7_python_authoring_quickstart.ipynb
-notebooks/v7_python_authoring_artifact_walkthrough.ipynb
-notebooks/v7_dsl_dataset_preparation.ipynb
+notebooks/python_authoring/v7_training/01_v7_experiment_story_walkthrough.ipynb
+notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
+notebooks/python_authoring/v7_training/03_v7_dsl_dataset_preparation.ipynb
+notebooks/python_authoring/v7_training/04_v7_python_authoring_artifact_walkthrough.ipynb
+notebooks/python_authoring/v7_training/05_v7_python_module_api_quickstart.ipynb
 ```
 
 Launch the quickstart notebook from inside the repo checkout so it can detect `ckernel_engine/` and `version/v7/`.
 
 ```bash
-jupyter lab notebooks/v7_python_authoring_quickstart.ipynb
+.venv/bin/jupyter lab notebooks/python_authoring/v7_training/02_v7_python_authoring_quickstart.ipynb
 ```
+
+Compatibility alias: `notebooks/v7_training/` still points at the same lane so older demo commands keep working during the reorganization.
 
 The package entrypoint is:
 
@@ -71,8 +76,28 @@ The package entrypoint is:
 from ckernel_engine.v7 import TrainingProject
 ```
 
+Or from the top-level package:
+
+```python
+import ckernel_engine as ck
+
+model = ck.models.qwen3_tiny(layers=2, dim=128, hidden=256, heads=8, kv_heads=4)
+run = ck.v7.compile(
+    model,
+    run_name="py-module-demo",
+    config=ck.CompileConfig(
+        target=ck.TargetConfig(name="cpu", isa="auto"),
+        vectorize=True,
+        pack_weights=True,
+        dump_pass_trace=True,
+    ),
+)
+```
+
 Current scope:
 - wraps the existing tiny `v7` run-dir/bootstrap surface
+- accepts a thin `ck.nn` module graph and compiles it into the same current tiny qwen-style v7 LM bootstrap contract
+- provides `ck.models.qwen3_tiny(...)` and records `CompileConfig` / pass-trace sidecars for notebook inspection
 - supports builtin or embedded template documents
 - records a `python_authoring_plan.json` beside the run artifacts
 - can refresh `ir_report.html`, export viewer-side artifacts, and regenerate the shared `ir_hub.html`
@@ -80,6 +105,7 @@ Current scope:
 
 Not yet in scope:
 - arbitrary Python-defined autograd graphs lowered directly to v7 IR
+- pure eager tensor execution or a PyTorch-compatible autograd/runtime surface
 - a full public module/op registry for custom backprop definitions
 
 ## v7 Visualizer Dev (No Node)

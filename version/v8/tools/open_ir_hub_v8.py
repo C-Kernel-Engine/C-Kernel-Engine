@@ -1250,6 +1250,7 @@ def _build_run_coverage(
                     "Multimodal Bridge",
                     [
                         ("bridge_report", _has_run_artifact(run_dir, "multimodal_bridge/bridge_report.json")),
+                        ("full_network_graph", _has_run_artifact(run_dir, "multimodal_bridge/full_network_graph.json")),
                         ("encoder_ir1", _has_run_artifact(run_dir, "multimodal_bridge/encoder/ir1.json")),
                         ("encoder_layout", _has_run_artifact(run_dir, "multimodal_bridge/encoder/layout.json")),
                         ("decoder_ir1_prefill", _has_run_artifact(run_dir, "multimodal_bridge/decoder/ir1_prefill.json")),

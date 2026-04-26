@@ -3203,7 +3203,7 @@ def _build_training_pipeline_payload(summary: dict, run_dir: Optional[Path]) -> 
         existing_doc = _load_json_dict(run_dir / "training_pipeline_latest.json")
         existing_pipeline = (
             existing_doc.get("pipeline")
-            if isinstance(existing_doc.get("pipeline"), dict)
+            if isinstance(existing_doc, dict) and isinstance(existing_doc.get("pipeline"), dict)
             else {}
         )
         existing_rows = (

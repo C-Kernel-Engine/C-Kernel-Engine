@@ -116,6 +116,26 @@ def _artifact_dashboard_rows(run_dir: Path, models_root: Path) -> list[dict[str,
             "note": "Python-side project spec and command history.",
         },
         {
+            "label": "Python Graph",
+            "path": _existing_path(run_dir / "python_authoring_graph.json"),
+            "note": "Symbolic module graph exported before the existing v7 materialize/train handoff.",
+        },
+        {
+            "label": "Python Graph Notes",
+            "path": _existing_path(run_dir / "python_authoring_graph.md"),
+            "note": "Human-readable summary of the same ck.nn module graph.",
+        },
+        {
+            "label": "Compile Config",
+            "path": _existing_path(run_dir / "python_authoring_compile_config.json"),
+            "note": "Python-side compile target and pass intent for the v7 adapter.",
+        },
+        {
+            "label": "Pass Trace",
+            "path": _existing_path(run_dir / "python_authoring_pass_trace.json"),
+            "note": "Recorded authoring/lowering pass intent before v7 owns execution.",
+        },
+        {
             "label": "Weights Manifest",
             "path": _existing_path(run_dir / "weights_manifest.json"),
             "note": "Manifest-first training state and template contract.",
@@ -658,13 +678,15 @@ class TrainingProject:
     run_dir: Optional[Path] = None
     repo_root: Path = field(default_factory=lambda: REPO_ROOT)
     python_exec: Optional[str] = None
-    command_runner: CommandRunner = field(default=_default_command_runner, repr=False)
+    command_runner: Optional[CommandRunner] = field(default=_default_command_runner, repr=False)
     _history: list[dict[str, Any]] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.repo_root = Path(self.repo_root).expanduser().resolve(strict=False)
         if self.python_exec is None:
             self.python_exec = _default_python_exec()
+        if self.command_runner is None:
+            self.command_runner = _default_command_runner
         if self.run_dir is None:
             self.run_dir = (DEFAULT_TRAIN_ROOT / self.run_name).expanduser().resolve(strict=False)
         else:
@@ -1052,6 +1074,26 @@ class TrainingProject:
             "tokenizer": self.tokenizer.to_metadata(),
             "artifacts": {
                 "project_plan": str(self.project_plan_path),
+                "python_authoring_graph": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_graph.json")
+                    if (Path(self.run_dir) / "python_authoring_graph.json").exists()
+                    else None
+                ),
+                "python_authoring_graph_markdown": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_graph.md")
+                    if (Path(self.run_dir) / "python_authoring_graph.md").exists()
+                    else None
+                ),
+                "python_authoring_compile_config": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_compile_config.json")
+                    if (Path(self.run_dir) / "python_authoring_compile_config.json").exists()
+                    else None
+                ),
+                "python_authoring_pass_trace": _stringify_path(
+                    (Path(self.run_dir) / "python_authoring_pass_trace.json")
+                    if (Path(self.run_dir) / "python_authoring_pass_trace.json").exists()
+                    else None
+                ),
                 "weights_manifest": str(manifest_path),
                 "weights": str(Path(self.run_dir) / "weights.bump"),
                 "config": str(Path(self.run_dir) / "config.json"),
