@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Pack row-structured training data into fixed-length token windows.
 
@@ -13,8 +15,6 @@ Outputs:
 - Integer token stream file (one token id per line)
 - JSON report with packing stats and recommended total_tokens
 """
-
-from __future__ import annotations
 
 import argparse
 import ctypes

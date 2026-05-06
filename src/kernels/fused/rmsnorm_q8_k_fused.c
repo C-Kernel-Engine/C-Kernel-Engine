@@ -15,7 +15,6 @@
  * quantization, keeping normalized values in registers/L1.
  */
 
-#pragma GCC target("avx,sse4.1")
 #include <immintrin.h>
 #include <math.h>
 #include <stdint.h>
@@ -23,6 +22,7 @@
 
 #include "ckernel_quant.h"
 
+#if defined(__AVX__)
 // AVX1 horizontal sum helper
 static inline float hsum256_ps_fused(__m256 v) {
     __m128 hi = _mm256_extractf128_ps(v, 1);
@@ -140,3 +140,65 @@ void rmsnorm_q8_k_fused(const float *input,
         }
     }
 }
+#else
+void rmsnorm_q8_k_fused(const float *input,
+                        const float *gamma,
+                        void *vy,
+                        int tokens,
+                        int d_model,
+                        int aligned_embed_dim,
+                        float eps)
+{
+    const int T = tokens;
+    const int D = d_model;
+    block_q8_K *y = (block_q8_K *)vy;
+
+    for (int t = 0; t < T; ++t) {
+        const float *x = input + (size_t)t * (size_t)aligned_embed_dim;
+
+        float sum_sq = 0.0f;
+        for (int d = 0; d < D; ++d) {
+            sum_sq += x[d] * x[d];
+        }
+        const float rstd = 1.0f / sqrtf(sum_sq / (float)D + eps);
+
+        for (int b = 0; b < D / QK_K; ++b) {
+            const float *xb = x + b * QK_K;
+            const float *gb = gamma + b * QK_K;
+            block_q8_K *out_block = &y[t * (D / QK_K) + b];
+
+            float norm_buf[QK_K];
+            float max_val = 0.0f;
+            for (int d = 0; d < QK_K; ++d) {
+                const float normalized = xb[d] * rstd * gb[d];
+                norm_buf[d] = normalized;
+                const float abs_val = fabsf(normalized);
+                if (abs_val > max_val) {
+                    max_val = abs_val;
+                }
+            }
+
+            if (max_val == 0.0f) {
+                out_block->d = 0.0f;
+                memset(out_block->qs, 0, QK_K);
+                memset(out_block->bsums, 0, sizeof(out_block->bsums));
+                continue;
+            }
+
+            const float iscale = -127.0f / max_val;
+            out_block->d = 1.0f / iscale;
+            for (int j = 0; j < QK_K; j += 16) {
+                int bsum = 0;
+                for (int k = 0; k < 16; ++k) {
+                    int q = (int)lrintf(norm_buf[j + k] * iscale);
+                    if (q < -128) q = -128;
+                    if (q > 127) q = 127;
+                    out_block->qs[j + k] = (int8_t)q;
+                    bsum += q;
+                }
+                out_block->bsums[j / 16] = (int16_t)bsum;
+            }
+        }
+    }
+}
+#endif

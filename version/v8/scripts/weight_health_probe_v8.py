@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 weight_health_probe_v8.py
 
@@ -29,8 +31,6 @@ Usage
 
 Output: ``<run_dir>/weight_health_latest.json``
 """
-
-from __future__ import annotations
 
 import argparse
 import json

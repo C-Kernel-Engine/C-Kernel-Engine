@@ -899,6 +899,7 @@ static int emit_kernel_manifest(const CKIRGraph *forward, const char *runtime_pa
     emit_unique_source(f, "src/kernels/quantize_row_q8_k_sse.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/quantize_row_q8_k_avx.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/quantize_row_q8_k_avx2.c", seen, &seen_count, seen_cap);
+    emit_unique_source(f, "src/kernels/quantize_row_q8_k_avx512.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/rope_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/loss_kernels.c", seen, &seen_count, seen_cap);
     emit_unique_source(f, "src/kernels/kv_cache_kernels.c", seen, &seen_count, seen_cap);

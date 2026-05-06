@@ -26,12 +26,15 @@
 #include "../../llama.cpp/ggml/include/ggml.h"
 #endif
 #include <dlfcn.h>
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || defined(__SSE2__)
 #include <immintrin.h>
 #endif
 
@@ -605,7 +608,7 @@ static inline void ck_ggml_init_tensor_f32(struct ggml_tensor *t,
 }
 #endif
 
-#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
+#if defined(__SSE2__)
 #if defined(__FMA__)
 #define CK_MADD128(x, y, z) _mm_fmadd_ps(x, y, z)
 #define CK_NMADD128(x, y, z) _mm_fnmadd_ps(x, y, z)
@@ -619,7 +622,9 @@ static inline float ck_hsum128_ps(__m128 v) {
     v = _mm_add_ss(v, _mm_movehdup_ps(v));
     return _mm_cvtss_f32(v);
 }
+#endif
 
+#if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 static inline float ck_hsum256_ps(__m256 v) {
     const __m128 lo = _mm256_castps256_ps128(v);
     const __m128 hi = _mm256_extractf128_ps(v, 1);

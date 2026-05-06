@@ -14,6 +14,9 @@
 #include "../../llama.cpp/ggml/include/ggml-backend.h"
 #include "../../llama.cpp/ggml/include/ggml-alloc.h"
 #include <dlfcn.h>
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *)0)
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

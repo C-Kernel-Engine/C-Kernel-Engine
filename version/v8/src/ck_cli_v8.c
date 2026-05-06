@@ -158,6 +158,7 @@ typedef enum {
     CHAT_TEMPLATE_LLAMA,
     CHAT_TEMPLATE_CHATML,
     CHAT_TEMPLATE_MISTRAL,
+    CHAT_TEMPLATE_GEMMA,
 } ChatTemplateType;
 
 typedef struct {
@@ -212,6 +213,15 @@ static const ChatTemplate g_templates[] = {
         .user_suffix = " [/INST]",
         .assistant_prefix = "",
         .assistant_suffix = "</s> ",
+    },
+    [CHAT_TEMPLATE_GEMMA] = {
+        .type = CHAT_TEMPLATE_GEMMA,
+        .system_prefix = "",
+        .system_suffix = "\n\n",
+        .user_prefix = "<start_of_turn>user\n",
+        .user_suffix = "<end_of_turn>\n",
+        .assistant_prefix = "<start_of_turn>model\n",
+        .assistant_suffix = "<end_of_turn>\n",
     },
 };
 
@@ -1664,14 +1674,20 @@ static ChatTemplateType detect_chat_template(const char *model_name) {
     if (strstr(lower, "qwen")) return CHAT_TEMPLATE_QWEN;
     if (strstr(lower, "llama")) return CHAT_TEMPLATE_LLAMA;
     if (strstr(lower, "mistral")) return CHAT_TEMPLATE_MISTRAL;
+    if (strstr(lower, "gemma")) return CHAT_TEMPLATE_GEMMA;
 
     return CHAT_TEMPLATE_CHATML;  /* Default */
 }
 
 static char *apply_chat_template(const ChatTemplate *tmpl, const char *system, const char *user) {
     size_t needed = 0;
+    const bool gemma_system_as_user_prefix = tmpl && tmpl->type == CHAT_TEMPLATE_GEMMA && system && *system;
     if (system && *system) {
-        needed += strlen(tmpl->system_prefix) + strlen(system) + strlen(tmpl->system_suffix);
+        if (gemma_system_as_user_prefix) {
+            needed += strlen(system) + strlen(tmpl->system_suffix);
+        } else {
+            needed += strlen(tmpl->system_prefix) + strlen(system) + strlen(tmpl->system_suffix);
+        }
     }
     needed += strlen(tmpl->user_prefix) + strlen(user) + strlen(tmpl->user_suffix);
     needed += strlen(tmpl->assistant_prefix);
@@ -1682,11 +1698,17 @@ static char *apply_chat_template(const ChatTemplate *tmpl, const char *system, c
 
     result[0] = '\0';
     if (system && *system) {
-        strcat(result, tmpl->system_prefix);
+        if (!gemma_system_as_user_prefix) {
+            strcat(result, tmpl->system_prefix);
+            strcat(result, system);
+            strcat(result, tmpl->system_suffix);
+        }
+    }
+    strcat(result, tmpl->user_prefix);
+    if (gemma_system_as_user_prefix) {
         strcat(result, system);
         strcat(result, tmpl->system_suffix);
     }
-    strcat(result, tmpl->user_prefix);
     strcat(result, user);
     strcat(result, tmpl->user_suffix);
     strcat(result, tmpl->assistant_prefix);
@@ -1753,6 +1775,10 @@ static void eos_pattern_init(ChatTemplateType tmpl) {
         case CHAT_TEMPLATE_MISTRAL:
             g_eos_state.target_pattern = "</s>";
             g_eos_state.partial_prefix = "</";
+            break;
+        case CHAT_TEMPLATE_GEMMA:
+            g_eos_state.target_pattern = "end_of_turn";
+            g_eos_state.partial_prefix = "end";
             break;
         default:
             break;
@@ -4774,7 +4800,8 @@ int main(int argc, char **argv) {
            opt.no_chat_template ? "none" :
            opt.chat_template == CHAT_TEMPLATE_QWEN ? "qwen" :
            opt.chat_template == CHAT_TEMPLATE_LLAMA ? "llama" :
-           opt.chat_template == CHAT_TEMPLATE_MISTRAL ? "mistral" : "chatml");
+           opt.chat_template == CHAT_TEMPLATE_MISTRAL ? "mistral" :
+           opt.chat_template == CHAT_TEMPLATE_GEMMA ? "gemma" : "chatml");
 
     /* Print CPU capability info */
     ck_capability_t cap = ck_get_capabilities();

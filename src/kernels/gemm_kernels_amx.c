@@ -231,7 +231,16 @@ bool amx_available(void) {
     bool has_amx_tile = (edx >> 24) & 1;
     bool has_amx_int8 = (edx >> 25) & 1;
 
-    return has_amx_tile && has_amx_int8;
+    unsigned int xcr0_lo = 0, xcr0_hi = 0;
+    __asm__ __volatile__(
+        ".byte 0x0f, 0x01, 0xd0"
+        : "=a"(xcr0_lo), "=d"(xcr0_hi)
+        : "c"(0)
+    );
+    uint64_t xcr0 = ((uint64_t)xcr0_hi << 32) | xcr0_lo;
+    bool os_tile_state_enabled = (xcr0 & 0x60000) == 0x60000;
+
+    return has_amx_tile && has_amx_int8 && os_tile_state_enabled;
 }
 
 #else /* No AMX support */

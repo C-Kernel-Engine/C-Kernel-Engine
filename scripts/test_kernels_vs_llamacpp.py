@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 test_kernels_vs_llamacpp.py - Kernel-level parity tests
 

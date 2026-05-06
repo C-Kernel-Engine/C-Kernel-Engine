@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Inference-only v8 pipeline runner.
 
@@ -11,8 +13,6 @@ and adds a v8-native multimodal route:
 
   decoder GGUF + mmproj GGUF + image -> run_multimodal_bridge_v8.py
 """
-
-from __future__ import annotations
 
 import argparse
 import importlib.util

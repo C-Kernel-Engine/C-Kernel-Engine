@@ -31,6 +31,13 @@ endif
 ifneq ($(findstring icx,$(CC)),)
     CXX ?= icpx
 endif
+
+# Return a compiler flag only when the selected compiler accepts it. This keeps
+# host CPU feature detection from adding flags that older GCC/Clang/icx releases
+# or non-x86 toolchains do not understand.
+cc-option = $(shell printf 'int main(void){return 0;}\n' | $(CC) $(1) -x c - -c -o /tmp/ck_cc_flag_test.o >/dev/null 2>&1 && rm -f /tmp/ck_cc_flag_test.o && echo $(1) || true)
+cc-options = $(strip $(foreach flag,$(1),$(call cc-option,$(flag))))
+
 # OpenMP is opt-in for runtime stability (v6.6 uses threadpool parallelism).
 # Enable explicitly when needed:
 #   make CK_ENABLE_OPENMP=1
@@ -59,11 +66,11 @@ endif
 ifneq ($(IS_ARM_ARCH),)
 ARCH_DEFINES += -DCK_TARGET_ARM=1
 endif
-# Get ALL flags lines (AVX-512/AMX might be on subsequent lines)
-CPU_FLAGS := $(shell grep '^flags' /proc/cpuinfo | tr '\n' ' ' 2>/dev/null)
+# Get ALL flags lines (AVX-512/AMX might be on subsequent lines).
+CPU_FLAGS := $(if $(IS_X86_ARCH),$(shell grep '^flags' /proc/cpuinfo | tr '\n' ' ' 2>/dev/null),)
 # Detect FMA support
 ifneq (,$(findstring fma,$(CPU_FLAGS)))
-FMA_FLAGS := -mfma
+FMA_FLAGS := $(call cc-option,-mfma)
 else
 FMA_FLAGS :=
 endif
@@ -77,42 +84,107 @@ DEFAULT_AVX_FLAGS_INTEL :=
 AVX512_SUPPORT := $(findstring avx512f,$(CPU_FLAGS))
 AVX2_SUPPORT := $(findstring avx2,$(CPU_FLAGS))
 AVX_SUPPORT := $(findstring avx,$(CPU_FLAGS))
+SSE41_SUPPORT := $(findstring sse4_1,$(CPU_FLAGS))
 AMX_SUPPORT := $(findstring amx_tile,$(CPU_FLAGS))
+AMX_INT8_SUPPORT := $(findstring amx_int8,$(CPU_FLAGS))
+AMX_BF16_SUPPORT := $(findstring amx_bf16,$(CPU_FLAGS))
+AVX512_BASE_FLAGS_GCC := -mavx512f -mavx512bw -mavx512dq -mavx512vl
+AVX512_BASE_FLAGS_GCC_SUPPORTED := $(call cc-options,$(AVX512_BASE_FLAGS_GCC))
+AVX2_BASE_FLAGS_GCC_SUPPORTED := $(call cc-option,-mavx2)
+AVX_BASE_FLAGS_GCC_SUPPORTED := $(call cc-option,-mavx)
+AVX512_BASE_FLAGS_INTEL := -xcore-avx512 -mavx512f -mavx512bw -mavx512dq -mavx512vl
+AVX512_BASE_FLAGS_INTEL_SUPPORTED := $(call cc-options,$(AVX512_BASE_FLAGS_INTEL))
+AVX2_BASE_FLAGS_INTEL_SUPPORTED := $(call cc-option,-xAVX2)
+AVX_BASE_FLAGS_INTEL_SUPPORTED := $(call cc-option,-xAVX)
+SSE41_BASE_FLAGS_SUPPORTED := $(call cc-options,-msse4.1 -mssse3)
 
 # GCC flags (used when CC=gcc/clang)
 ifneq (,$(AVX512_SUPPORT))
+ifeq ($(AVX512_BASE_FLAGS_GCC_SUPPORTED),$(AVX512_BASE_FLAGS_GCC))
 # Full AVX-512 requires F, BW, DQ for all kernels (including _mm512_extractf32x8_ps)
-DEFAULT_AVX_FLAGS_GCC := -mavx512f -mavx512bw -mavx512dq $(FMA_FLAGS)
+DEFAULT_AVX_FLAGS_GCC := $(AVX512_BASE_FLAGS_GCC_SUPPORTED) $(FMA_FLAGS)
 ifneq (,$(findstring avx512vnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS_GCC += -mavx512vnni
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mavx512vnni)
 endif
 ifneq (,$(findstring avx512_vnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS_GCC += -mavx512vnni
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mavx512vnni)
+endif
+ifneq (,$(findstring avx512_bf16,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mavx512bf16)
+endif
+ifneq (,$(AMX_SUPPORT))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mamx-tile)
+endif
+ifneq (,$(AMX_INT8_SUPPORT))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mamx-int8)
+endif
+ifneq (,$(AMX_BF16_SUPPORT))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mamx-bf16)
 endif
 else ifneq (,$(AVX2_SUPPORT))
-DEFAULT_AVX_FLAGS_GCC := -mavx2 $(FMA_FLAGS)
-ifneq (,$(findstring avx_vnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS_GCC += -mavxvnni
+DEFAULT_AVX_FLAGS_GCC := $(AVX2_BASE_FLAGS_GCC_SUPPORTED) $(FMA_FLAGS)
 endif
-ifneq (,$(findstring avxvnni,$(CPU_FLAGS)))
-DEFAULT_AVX_FLAGS_GCC += -mavxvnni
+else ifneq (,$(AVX2_SUPPORT))
+ifneq (,$(AVX2_BASE_FLAGS_GCC_SUPPORTED))
+DEFAULT_AVX_FLAGS_GCC := $(AVX2_BASE_FLAGS_GCC_SUPPORTED) $(FMA_FLAGS)
 endif
 else ifneq (,$(AVX_SUPPORT))
-DEFAULT_AVX_FLAGS_GCC := -mavx $(FMA_FLAGS)
+ifneq (,$(AVX_BASE_FLAGS_GCC_SUPPORTED))
+DEFAULT_AVX_FLAGS_GCC := $(AVX_BASE_FLAGS_GCC_SUPPORTED) $(FMA_FLAGS)
+endif
+else ifneq (,$(SSE41_SUPPORT))
+ifeq ($(SSE41_BASE_FLAGS_SUPPORTED),-msse4.1 -mssse3)
+DEFAULT_AVX_FLAGS_GCC := $(SSE41_BASE_FLAGS_SUPPORTED)
+endif
+endif
+ifneq (,$(findstring avx_vnni,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mavxvnni)
+endif
+ifneq (,$(findstring avxvnni,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_GCC += $(call cc-option,-mavxvnni)
 endif
 
 # Intel icx flags - use -xHost to auto-detect CPU, or -xAVX2 for Ivy Bridge
 # -xHost auto-detects but generates code for the BUILD machine's CPU
 # Since we might build on a different machine, use explicit targeting
 ifneq (,$(AVX512_SUPPORT))
-# Haswell/Broadwell or newer - use AVX-512
-DEFAULT_AVX_FLAGS_INTEL := -xcore-avx512
+ifeq ($(AVX512_BASE_FLAGS_INTEL_SUPPORTED),$(AVX512_BASE_FLAGS_INTEL))
+# AVX-512 baseline plus Xeon extensions when present. Explicit -m flags keep
+# feature macros visible to per-kernel dispatch code under icx.
+DEFAULT_AVX_FLAGS_INTEL := $(AVX512_BASE_FLAGS_INTEL_SUPPORTED)
+ifneq (,$(findstring avx512vnni,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mavx512vnni)
+endif
+ifneq (,$(findstring avx512_vnni,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mavx512vnni)
+endif
+ifneq (,$(findstring avx512_bf16,$(CPU_FLAGS)))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mavx512bf16)
+endif
+ifneq (,$(AMX_SUPPORT))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mamx-tile)
+endif
+ifneq (,$(AMX_INT8_SUPPORT))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mamx-int8)
+endif
+ifneq (,$(AMX_BF16_SUPPORT))
+DEFAULT_AVX_FLAGS_INTEL += $(call cc-option,-mamx-bf16)
+endif
+else ifneq (,$(AVX2_SUPPORT))
+DEFAULT_AVX_FLAGS_INTEL := $(AVX2_BASE_FLAGS_INTEL_SUPPORTED)
+endif
 else ifneq (,$(AVX2_SUPPORT))
 # Ivy Bridge/Skylake or newer - use AVX2
-DEFAULT_AVX_FLAGS_INTEL := -xAVX2
+DEFAULT_AVX_FLAGS_INTEL := $(AVX2_BASE_FLAGS_INTEL_SUPPORTED)
+else ifneq (,$(AVX_SUPPORT))
+DEFAULT_AVX_FLAGS_INTEL := $(AVX_BASE_FLAGS_INTEL_SUPPORTED)
+else ifneq (,$(SSE41_SUPPORT))
+ifeq ($(SSE41_BASE_FLAGS_SUPPORTED),-msse4.1 -mssse3)
+DEFAULT_AVX_FLAGS_INTEL := $(SSE41_BASE_FLAGS_SUPPORTED)
+endif
 else
 # Older CPUs
-DEFAULT_AVX_FLAGS_INTEL := -xAVX
+DEFAULT_AVX_FLAGS_INTEL :=
 endif
 
 # Use appropriate flags based on compiler
@@ -124,7 +196,7 @@ endif
 
 # Detect SSSE3 support (needed for _mm_maddubs_epi16 etc.)
 ifneq (,$(findstring ssse3,$(CPU_FLAGS)))
-SSSE3_FLAGS := -mssse3
+SSSE3_FLAGS := $(call cc-option,-mssse3)
 else
 SSSE3_FLAGS :=
 endif
@@ -330,6 +402,7 @@ SRCS    := src/backend_native.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/quantize_row_q8_k_avx.c \
 	           src/kernels/quantize_row_q8_k_avx2.c \
+	           src/kernels/quantize_row_q8_k_avx512.c \
 	           src/kernels/fused/rmsnorm_q8_k_fused.c \
 	           src/kernels/gemm_kernels_f16.c \
 	           src/kernels/optimizer_kernels.c \
@@ -353,6 +426,7 @@ X86_ONLY_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
 	           src/kernels/quantize_row_q8_k_sse.c \
 	           src/kernels/quantize_row_q8_k_avx.c \
 	           src/kernels/quantize_row_q8_k_avx2.c \
+	           src/kernels/quantize_row_q8_k_avx512.c \
 	           src/kernels/fused/rmsnorm_q8_k_fused.c
 
 ifeq ($(IS_ARM_ARCH),)
@@ -383,7 +457,8 @@ QUANT_X86_SRCS := src/kernels/gemm_kernels_q5_0_sse_v2.c \
 	src/kernels/gemm_kernels_q4k_q8k_vnni.c \
 	src/kernels/quantize_row_q8_k_sse.c \
 	src/kernels/quantize_row_q8_k_avx.c \
-	src/kernels/quantize_row_q8_k_avx2.c
+	src/kernels/quantize_row_q8_k_avx2.c \
+	src/kernels/quantize_row_q8_k_avx512.c
 
 QUANT_SRCS := $(QUANT_COMMON_SRCS)
 ifneq ($(IS_ARM_ARCH),)
@@ -1310,7 +1385,7 @@ test-kernel-parity:
 
 test-kernel-parity-full:
 	@echo "[Layer 1] Full Kernel Parity Tests..."
-	@$(PYTHON) scripts/test_kernels_vs_llamacpp.py 2>&1 || echo "Run 'make parity-libs' first"
+	@$(PYTHON) scripts/test_kernels_vs_llamacpp.py 2>&1 || { echo "Run 'make parity-libs' first"; exit 1; }
 
 # Layer 2: Bump conversion validation
 test-bump-conversion:
@@ -1917,6 +1992,8 @@ llamacpp-parity:
 	@echo "Running llama.cpp parity smoketest..."
 	@./scripts/run_parity_smoketest.sh --quick
 
+test-llamacpp-parity: llamacpp-parity
+
 # Full parity test (assumes already built) — kernel parity only
 # IMPORTANT: keep this target restricted to kernel-level parity/ISA coverage.
 # Do not add model-family, template, or end-to-end compatibility checks here.
@@ -1948,6 +2025,8 @@ llamacpp-parity-full:
 	@echo ""
 	@echo "Running head-major Q5 CK vs llama.cpp benchmark..."
 	@$(MAKE) --no-print-directory test-head-major-q5-vs-llama
+
+test-llamacpp-parity-full: llamacpp-parity-full
 
 # End-to-end llama.cpp compatibility suite
 # This lane is where model-family and stitched graph checks belong.
@@ -2001,7 +2080,7 @@ llamacpp-parity-perf-large:
 llamacpp-parity-avx512:
 	@echo "Running AVX-512 parity tests..."
 	@if grep -q avx512f /proc/cpuinfo 2>/dev/null; then \
-		python3 scripts/test_avx512_parity.py --cross --full; \
+		$(PYTHON) $(PYTHONFLAGS) scripts/test_avx512_parity.py --cross --full; \
 	else \
 		echo "SKIP: AVX-512 not available on this machine"; \
 	fi
@@ -2715,6 +2794,7 @@ PARITY_SRCS := src/ck_parity_api.c \
                src/kernels/quantize_row_q8_k_sse.c \
                src/kernels/quantize_row_q8_k_avx.c \
                src/kernels/quantize_row_q8_k_avx2.c \
+               src/kernels/quantize_row_q8_k_avx512.c \
                src/kernels/rmsnorm_kernels.c \
                src/kernels/rope_kernels.c \
                src/kernels/swiglu_kernels.c \

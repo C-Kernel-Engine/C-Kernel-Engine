@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Tokenizer-free first-token logits parity probe.
 
@@ -8,8 +10,6 @@ Runs the same explicit token IDs through:
 
 Writes a compact JSON report with top-k overlap and full-logits diff stats.
 """
-
-from __future__ import annotations
 
 import argparse
 import ctypes

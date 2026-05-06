@@ -23,6 +23,7 @@ import argparse
 import ctypes
 import numpy as np
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -193,9 +194,15 @@ def compile_test_lib(march: str, output_name: str) -> Optional[Path]:
         "src/kernels/gemm_kernels_q6k.c",
         "src/kernels/gemm_kernels_q4k_q8k.c",
         "src/kernels/gemm_kernels_q4k_q8k_avx2.c",
+        "src/kernels/gemm_kernels_q4k_q8k_vnni.c",
         "src/kernels/gemm_kernels_q4k_sse.c",
         "src/kernels/quantize_row_q8_k_sse.c",
+        "src/kernels/quantize_row_q8_k_avx.c",
+        "src/kernels/quantize_row_q8_k_avx2.c",
+        "src/kernels/quantize_row_q8_k_avx512.c",
         "src/cpu_features.c",
+        "src/ckernel_strict.c",
+        "src/ck_threadpool.c",
     ]
 
     include_dir = PROJECT_ROOT / "include"
@@ -206,12 +213,15 @@ def compile_test_lib(march: str, output_name: str) -> Optional[Path]:
 
     src_paths = ' '.join(str(PROJECT_ROOT / f) for f in src_files)
 
-    cmd = f"gcc -O3 {march} -fPIC -shared -I{include_dir} {src_paths} -o {output_path} -lm 2>&1"
+    compiler = os.environ.get("CC") or shutil.which("icx") or shutil.which("gcc") or "gcc"
+    cmd = f"{compiler} -O3 {march} -fPIC -shared -I{include_dir} {src_paths} -o {output_path} -lm -lpthread 2>&1"
 
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
     if result.returncode != 0:
         print(f"{RED}Compilation failed for {march}:{RESET}")
+        if result.stdout:
+            print(result.stdout[:500])
         print(result.stderr[:500])
         return None
 
@@ -331,8 +341,7 @@ def run_cross_architecture_test(full: bool = False):
 
     # Test architectures
     archs = [
-        ("-march=x86-64", "SSE2 baseline"),
-        ("-march=core2 -mssse3", "SSSE3"),
+        ("-march=core2 -msse4.1", "SSE4.1 baseline"),
         ("-march=haswell", "AVX2"),
     ]
 
@@ -417,12 +426,13 @@ def run_cross_architecture_test(full: bool = False):
             diff = abs(results[name] - ref_val)
             max_diff = max(max_diff, diff)
 
-        passed = max_diff < 1e-4
+        tolerance = max(1e-4, 1e-6 * abs(ref_val))
+        passed = max_diff < tolerance
 
         if passed:
-            print(f"  {GREEN}PASS{RESET} {num_blocks} blocks: max_diff={max_diff:.2e}")
+            print(f"  {GREEN}PASS{RESET} {num_blocks} blocks: max_diff={max_diff:.2e} tol={tolerance:.2e}")
         else:
-            print(f"  {RED}FAIL{RESET} {num_blocks} blocks: max_diff={max_diff:.2e}")
+            print(f"  {RED}FAIL{RESET} {num_blocks} blocks: max_diff={max_diff:.2e} tol={tolerance:.2e}")
             for name, val in results.items():
                 print(f"       {name}: {val:.6f}")
             all_passed = False

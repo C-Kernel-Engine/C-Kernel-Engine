@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Model-family regression runner for v8 inference bring-up.
 
@@ -15,8 +17,6 @@ For now this focuses on the promoted inference surface:
 Parity/debug escalation remains in the dedicated v8 tooling until the text lane
 is stable enough to promote as the default regression path.
 """
-
-from __future__ import annotations
 
 import argparse
 import json

@@ -1,8 +1,8 @@
 /**
- * test_gemm_avx_bench.c - Benchmark: gemm_nt_q8_0_q8_0 AVX vs scalar reference
+ * test_gemm_avx_bench.c - Benchmark: gemm_nt_q8_0_q8_0 SIMD vs scalar reference
  *
- * Measures speedup of the SSE4.1-based _avx kernel over the scalar _ref
- * for the Q8_0 x Q8_0 GEMM used in prefill (V projection, embeddings).
+ * Measures speedup of the selected SIMD dispatch kernel over the scalar _ref
+ * for the Q8_0 x Q8_0 GEMM used in projection paths.
  *
  * On AVX-only CPUs (Sandy/Ivy Bridge), the dispatch chain previously fell
  * through to _ref. This benchmark quantifies the improvement.
@@ -12,9 +12,9 @@
  * few 1e-3 on the largest Q8_0 prefill shapes.
  *
  * Tests:
- *   1. Parity: _avx output matches _ref within tolerance
- *   2. Benchmark: _ref vs _avx timing across model-realistic shapes
- *   3. Dispatch: confirms gemm_nt_q8_0_q8_0() now calls _avx (not _ref)
+ *   1. Parity: dispatch output matches _ref within tolerance
+ *   2. Benchmark: _ref vs dispatch timing across model-realistic shapes
+ *   3. Dispatch: reports the selected compiled backend
  *
  * Build:
  *   make test-gemm-avx-bench
@@ -50,16 +50,7 @@ static double get_time_ms(void) {
 extern void gemm_nt_q8_0_q8_0_ref(
     const void *A, const void *B, float *C, int M, int N, int K);
 
-// NOTE: AVX variant was removed in favor of AVX2. Keep a fallback for non-AVX2 builds.
-#if defined(__AVX2__)
-extern void gemm_nt_q8_0_q8_0_avx2(
-    const void *A, const void *B, float *C, int M, int N, int K);
-#else
-extern void gemm_nt_q8_0_q8_0(
-    const void *A, const void *B, const float *bias, float *C, int M, int N, int K);
-#endif
-
-/* Public dispatcher (with bias) — should now call _avx on AVX-only CPUs */
+/* Public dispatcher with optional bias. */
 extern void gemm_nt_q8_0_q8_0(
     const void *A, const void *B, const float *bias, float *C, int M, int N, int K);
 
@@ -138,7 +129,7 @@ int main(int argc, char **argv) {
     int total_fail = 0;
 
     printf("================================================================================\n");
-    printf("  GEMM Q8_0 x Q8_0 Benchmark: AVX (SSE4.1) vs Scalar Reference\n");
+    printf("  GEMM Q8_0 x Q8_0 Benchmark: SIMD Dispatch vs Scalar Reference\n");
     printf("================================================================================\n");
     const char *backend = gemm_batch_int8_impl_name();
     printf("  Backend:  %s\n", backend);
@@ -151,7 +142,7 @@ int main(int argc, char **argv) {
     printf("================================================================================\n\n");
 
     printf("%-16s %5s %5s %5s  %10s %10s  %7s  %s\n",
-           "Config", "M", "N", "K", "ref(ms)", "avx(ms)", "Speedup", "Parity");
+           "Config", "M", "N", "K", "ref(ms)", "simd(ms)", "Speedup", "Parity");
     printf("--------------------------------------------------------------------------------\n");
 
     for (int c = 0; cfgs[c].name; c++) {
@@ -181,12 +172,7 @@ int main(int argc, char **argv) {
 
         /* Warmup both paths */
         for (int w = 0; w < warmup; w++) {
-            gemm_nt_q8_0_q8_0_ref(A, B, C_ref, M, N, K);
-#if defined(__AVX2__)
-            gemm_nt_q8_0_q8_0_avx2(A, B, C_avx, M, N, K);
-#else
             gemm_nt_q8_0_q8_0(A, B, NULL, C_avx, M, N, K);
-#endif
         }
 
         /* Benchmark: scalar ref */
@@ -195,14 +181,10 @@ int main(int argc, char **argv) {
             gemm_nt_q8_0_q8_0_ref(A, B, C_ref, M, N, K);
         double ref_ms = (get_time_ms() - t0) / iters;
 
-        /* Benchmark: AVX */
+        /* Benchmark: selected SIMD dispatch */
         t0 = get_time_ms();
         for (int i = 0; i < iters; i++)
-#if defined(__AVX2__)
-            gemm_nt_q8_0_q8_0_avx2(A, B, C_avx, M, N, K);
-#else
             gemm_nt_q8_0_q8_0(A, B, NULL, C_avx, M, N, K);
-#endif
         double avx_ms = (get_time_ms() - t0) / iters;
 
         /* Parity check (use last iteration's output) */
@@ -224,7 +206,7 @@ int main(int argc, char **argv) {
         free(C_avx);
     }
 
-    /* Dispatch verification: confirm the public dispatcher routes to _avx */
+    /* Dispatch verification: compare public dispatcher against scalar ref. */
     printf("\n");
     printf("================================================================================\n");
     printf("  Dispatch Verification\n");
@@ -240,29 +222,25 @@ int main(int argc, char **argv) {
         block_q8_0 *A = malloc(a_count * sizeof(block_q8_0));
         block_q8_0 *B = malloc(b_count * sizeof(block_q8_0));
         float *C_dispatch = malloc((size_t)M * N * sizeof(float));
-        float *C_avx_out  = malloc((size_t)M * N * sizeof(float));
+        float *C_ref_out  = malloc((size_t)M * N * sizeof(float));
 
         fill_random_q8_0(A, a_count, 99);
         fill_random_q8_0(B, b_count, 77);
 
         gemm_nt_q8_0_q8_0(A, B, NULL, C_dispatch, M, N, K);
-#if defined(__AVX2__)
-        gemm_nt_q8_0_q8_0_avx2(A, B, C_avx_out, M, N, K);
-#else
-        gemm_nt_q8_0_q8_0(A, B, NULL, C_avx_out, M, N, K);
-#endif
+        gemm_nt_q8_0_q8_0_ref(A, B, C_ref_out, M, N, K);
 
         float max_diff = 0.0f;
-        int mismatches = compare_outputs(C_dispatch, C_avx_out, M * N, 0.0f, &max_diff);
+        int mismatches = compare_outputs(C_dispatch, C_ref_out, M * N, abs_tol, &max_diff);
         if (mismatches == 0) {
-            printf("  Dispatcher output matches _avx: PASS (bit-exact)\n");
+            printf("  Dispatcher output matches scalar ref: PASS (max=%.6f)\n", max_diff);
         } else {
-            printf("  Dispatcher output matches _avx: FAIL (%d diffs, max=%.6f)\n",
+            printf("  Dispatcher output matches scalar ref: FAIL (%d diffs, max=%.6f)\n",
                    mismatches, max_diff);
-            /* Not a hard failure — on AVX2+ machines the dispatcher calls a different variant */
+            total_fail++;
         }
 
-        free(A); free(B); free(C_dispatch); free(C_avx_out);
+        free(A); free(B); free(C_dispatch); free(C_ref_out);
     }
 
     printf("================================================================================\n");

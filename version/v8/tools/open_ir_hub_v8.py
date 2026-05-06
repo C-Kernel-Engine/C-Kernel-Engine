@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 open_ir_hub_v8.py
 
@@ -78,8 +80,6 @@ Usage:
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
-
-from __future__ import annotations
 
 import argparse
 import json

@@ -50,6 +50,7 @@ BLOCK_Q5_0_SIZE = 22  # 2 (FP16 d) + 4 (qh) + 16 (qs)
 TOLERANCES = {
     "scalar": 1e-6,
     "avx": 1e-5,
+    "avx2": 5e-4,
     "avx512": 1e-5,
     "amx": 1e-4,  # AMX may have different accumulation order
 }
@@ -331,6 +332,7 @@ def run_gemm_q8_0_q8_0_test(
         libck.gemm_nt_q8_0_q8_0(
             (ctypes.c_char * len(A_q8)).from_buffer(A_q8),
             (ctypes.c_char * len(B_q8)).from_buffer(B_q8),
+            None,
             C_ck.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             ctypes.c_int(M),
             ctypes.c_int(N),
@@ -415,6 +417,7 @@ def run_gemm_q5_0_q8_0_test(
         libck.gemm_nt_q5_0_q8_0(
             (ctypes.c_char * len(A_q8)).from_buffer(A_q8),
             (ctypes.c_char * len(B_q5)).from_buffer(B_q5),
+            None,
             C_ck.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             ctypes.c_int(M),
             ctypes.c_int(N),
@@ -486,6 +489,9 @@ def main():
     if cpu.avx512f:
         simd = "AVX-512"
         tol = TOLERANCES["avx512"]
+    elif cpu.avx2:
+        simd = "AVX2"
+        tol = TOLERANCES["avx2"]
     elif cpu.avx:
         simd = "AVX"
         tol = TOLERANCES["avx"]
@@ -512,13 +518,15 @@ def main():
     # Set up function signatures
     try:
         libck.gemm_nt_q8_0_q8_0.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
+            ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
             ctypes.c_int, ctypes.c_int, ctypes.c_int
         ]
         libck.gemm_nt_q8_0_q8_0.restype = None
 
         libck.gemm_nt_q5_0_q8_0.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
+            ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
             ctypes.c_int, ctypes.c_int, ctypes.c_int
         ]
         libck.gemm_nt_q5_0_q8_0.restype = None

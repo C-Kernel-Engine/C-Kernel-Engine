@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 DSL Planner Visualizer Generator for C-Kernel-Engine v8
 

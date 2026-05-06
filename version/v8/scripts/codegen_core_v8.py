@@ -1,4 +1,4 @@
-#!nusr/bin/env python3
+#!/usr/bin/env python3
 from __future__ import annotations
 """
 codegen_core_v8.py - Generate C code from lowered IR.

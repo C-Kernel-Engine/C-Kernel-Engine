@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Export the token embedding matrix from a C-Kernel-Engine v8 run directory.
 

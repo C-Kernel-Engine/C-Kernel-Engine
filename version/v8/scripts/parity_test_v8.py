@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 parity_test_v8.py - Layer-by-layer parity comparison between llama.cpp and CKE
 

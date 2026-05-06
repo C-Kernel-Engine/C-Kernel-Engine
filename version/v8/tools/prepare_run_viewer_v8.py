@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 prepare_run_viewer_v8.py
 
@@ -16,7 +18,6 @@ Usage:
     python3 version/v8/tools/prepare_run_viewer_v8.py <run_dir> --force
     python3 version/v8/tools/prepare_run_viewer_v8.py --all             # every train run
 """
-from __future__ import annotations
 
 import argparse
 import json

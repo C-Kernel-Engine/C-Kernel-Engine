@@ -26,6 +26,14 @@ typedef struct {
     int has_avx;
     int has_avx2;
     int has_avx512f;
+    int has_avx512bw;
+    int has_avx512dq;
+    int has_avx512vl;
+    int has_avx512_vnni;
+    int has_avx512_bf16;
+    int has_amx_tile;
+    int has_amx_int8;
+    int has_amx_bf16;
     int has_fma;
 } CPUInfo;
 

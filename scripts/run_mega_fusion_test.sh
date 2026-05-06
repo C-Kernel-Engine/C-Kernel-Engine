@@ -25,6 +25,11 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$ROOT_DIR/llama.cpp"
 PATCHES_DIR="$ROOT_DIR/patches"
 BUILD_DIR="$ROOT_DIR/build"
+if [[ -z "${PYTHON_BIN:-}" && -x "$ROOT_DIR/.venv/bin/python" ]]; then
+    PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+else
+    PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
 
 # Default options
 QUICK_MODE=false
@@ -193,10 +198,10 @@ export LD_LIBRARY_PATH="$LLAMA_DIR/build/bin:$BUILD_DIR:$LD_LIBRARY_PATH"
 # Run the attention parity test with numerical accuracy AND performance
 set +e
 if [ "$QUICK_MODE" = true ]; then
-    python3 unittest/fusion/test_mega_fusion_parity.py --quick --perf 2>&1
+    "$PYTHON_BIN" unittest/fusion/test_mega_fusion_parity.py --quick --perf 2>&1
     RET=$?
 else
-    python3 unittest/fusion/test_mega_fusion_parity.py --verbose --perf 2>&1
+    "$PYTHON_BIN" unittest/fusion/test_mega_fusion_parity.py --verbose --perf 2>&1
     RET=$?
 fi
 set -e
@@ -215,10 +220,10 @@ log_step "[5/6] Running OutProj+MLP fusion parity tests (CK vs llama.cpp)..."
 if [ -f "unittest/fusion/test_mega_fusion_outproj_mlp_parity.py" ]; then
     set +e
     if [ "$QUICK_MODE" = true ]; then
-        python3 unittest/fusion/test_mega_fusion_outproj_mlp_parity.py --quick 2>&1
+        "$PYTHON_BIN" unittest/fusion/test_mega_fusion_outproj_mlp_parity.py --quick 2>&1
         RET=$?
     else
-        python3 unittest/fusion/test_mega_fusion_outproj_mlp_parity.py 2>&1
+        "$PYTHON_BIN" unittest/fusion/test_mega_fusion_outproj_mlp_parity.py 2>&1
         RET=$?
     fi
     set -e
@@ -240,7 +245,7 @@ log_step "[6/6] Running mega-fusion prefill benchmark..."
 
 if [ -f "scripts/bench_mega_fused_attention_prefill.py" ]; then
     set +e
-    python3 scripts/bench_mega_fused_attention_prefill.py 2>&1
+    "$PYTHON_BIN" scripts/bench_mega_fused_attention_prefill.py 2>&1
     RET=$?
     set -e
 

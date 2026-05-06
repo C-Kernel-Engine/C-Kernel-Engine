@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Tokenizer quality gate — flag degenerate vocab before training starts.
 
 Detects:
@@ -15,8 +17,6 @@ Outputs:
   <run_dir>/tokenizer_quality_gate.json   (when --run)
   stdout summary with PASS / WARN / FAIL verdict
 """
-
-from __future__ import annotations
 
 import argparse
 import json

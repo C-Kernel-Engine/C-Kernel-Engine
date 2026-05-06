@@ -560,7 +560,7 @@ void gemv_q5_0(float *y,
 #elif defined(__AVX__)
     gemv_q5_0_avx(y, W, x, M, K);
 #elif defined(__SSE4_1__)
-    gemv_q5_0_sse_v2(y, W, x, M, K);
+    gemv_q5_0_ref(y, W, x, M, K);
 #else
     gemv_q5_0_ref(y, W, x, M, K);
 #endif
@@ -665,7 +665,7 @@ void gemv_q5_0_parallel_simd(float *y,
 #elif defined(__AVX__)
         gemv_q5_0_avx(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
 #else
-        gemv_q5_0_sse_v2(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
+        gemv_q5_0_ref(&y[row], (const char *)blocks + row * blocks_per_row * sizeof(block_q5_0), x, 1, K);
 #endif
     }
 #else

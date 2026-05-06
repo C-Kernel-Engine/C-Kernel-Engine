@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Build a self-contained interactive SVG dataset viewer from split-aware workspaces.
 
 Uses the Antsand/IR-Visualizer brand system. All data is embedded as JSON so the
@@ -85,7 +87,6 @@ viewer works offline with full search, sort, gallery, quality checks, and proven
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
-from __future__ import annotations
 
 import argparse
 import base64

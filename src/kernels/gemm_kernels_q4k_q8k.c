@@ -20,6 +20,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "ck_threadpool.h"
 #include "ckernel_quant.h"
 
 void gemv_q4_k_q8_k_avx2(float *y,
@@ -105,9 +106,12 @@ void quantize_row_q8_k_ref(const float *x, void *vy, int k) {
 void quantize_row_q8_k_sse(const float *x, void *vy, int k);
 void quantize_row_q8_k_avx(const float *x, void *vy, int k);
 void quantize_row_q8_k_avx2(const float *x, void *vy, int k);
+void quantize_row_q8_k_avx512(const float *x, void *vy, int k);
 
 void quantize_row_q8_k(const float *x, void *vy, int k) {
-#if defined(__AVX2__)
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+    quantize_row_q8_k_avx512(x, vy, k);
+#elif defined(__AVX2__)
     quantize_row_q8_k_avx2(x, vy, k);
 #elif defined(__AVX__)
     quantize_row_q8_k_avx(x, vy, k);
@@ -280,6 +284,45 @@ void gemm_q4_k_q8_k_ref(float *Y,
     }
 }
 
+typedef struct {
+    float *Y;
+    const void *W;
+    const block_q8_K *X;
+    int M_out;
+    int N_batch;
+    int K;
+    int blocks_per_vec;
+    int blocks_per_row;
+} gemm_q4_k_q8_k_work_t;
+
+static void gemm_q4_k_q8_k_thread_fn(int ith, int nth, void *args)
+{
+    gemm_q4_k_q8_k_work_t *a = (gemm_q4_k_q8_k_work_t *)args;
+    if (!a || ith < 0 || nth <= 0 || ith >= nth) {
+        return;
+    }
+
+    const int dr = (a->M_out + nth - 1) / nth;
+    const int r0 = dr * ith;
+    const int r1 = (r0 + dr < a->M_out) ? (r0 + dr) : a->M_out;
+    if (r0 >= a->M_out) {
+        return;
+    }
+
+    const block_q4_K *blocks = (const block_q4_K *)a->W;
+    const block_q4_K *w_start = blocks + (size_t)r0 * (size_t)a->blocks_per_row;
+    const int rows = r1 - r0;
+
+    for (int n = 0; n < a->N_batch; ++n) {
+        const block_q8_K *x_row = a->X + (size_t)n * (size_t)a->blocks_per_vec;
+        gemv_q4_k_q8_k(a->Y + (size_t)n * (size_t)a->M_out + (size_t)r0,
+                       w_start,
+                       x_row,
+                       rows,
+                       a->K);
+    }
+}
+
 void gemm_q4_k_q8_k(float *Y,
                     const void *W,
                     const void *X_q8,
@@ -291,6 +334,31 @@ void gemm_q4_k_q8_k(float *Y,
 
     const block_q8_K *X = (const block_q8_K *)X_q8;
     const int blocks_per_vec = K / QK_K;
+    const int blocks_per_row = K / QK_K;
+    const size_t work_items = (size_t)M * (size_t)N;
+
+    if (work_items >= 4096u && M >= 512 && N > 1) {
+        ck_threadpool_t *pool = ck_threadpool_global();
+        const int pool_threads = pool ? ck_threadpool_n_threads(pool) : 1;
+        int active_threads = pool_threads;
+        if (active_threads > M) {
+            active_threads = M;
+        }
+        if (active_threads > 1) {
+            gemm_q4_k_q8_k_work_t work = {
+                .Y = Y,
+                .W = W,
+                .X = X,
+                .M_out = M,
+                .N_batch = N,
+                .K = K,
+                .blocks_per_vec = blocks_per_vec,
+                .blocks_per_row = blocks_per_row,
+            };
+            ck_threadpool_dispatch_n(pool, active_threads, gemm_q4_k_q8_k_thread_fn, &work);
+            return;
+        }
+    }
 
     for (int n = 0; n < N; ++n) {
         const block_q8_K *x_row = X + (size_t)n * (size_t)blocks_per_vec;

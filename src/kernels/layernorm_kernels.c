@@ -16,7 +16,7 @@
 
 #include "ckernel_engine.h"
 
-#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__)
+#if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE2__)
 #include <immintrin.h>
 #endif
 #include <math.h>

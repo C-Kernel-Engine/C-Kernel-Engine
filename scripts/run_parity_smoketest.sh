@@ -17,7 +17,11 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$ROOT_DIR/llama.cpp"
 PATCHES_DIR="$ROOT_DIR/patches"
 BUILD_DIR="$ROOT_DIR/build"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -z "${PYTHON_BIN:-}" && -x "$ROOT_DIR/.venv/bin/python" ]]; then
+    PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+else
+    PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
 
 # Default options
 QUICK_MODE=false
@@ -388,8 +392,21 @@ fi
 # Keep the patched kernel parity helper in sync even when --skip-build is used.
 if [ -d "$LLAMA_DIR" ] && [ -f "$PATCHES_DIR/test-kernel-parity.cpp" ]; then
     mkdir -p "$LLAMA_DIR/tests"
-    if [ ! -f "$LLAMA_DIR/tests/test-kernel-parity.cpp" ] || \
-       ! cmp -s "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp"; then
+    parity_source_changed=false
+    if [ ! -f "$LLAMA_DIR/tests/test-kernel-parity.cpp" ]; then
+        parity_source_changed=true
+    elif command -v cmp >/dev/null 2>&1; then
+        cmp -s "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp" || parity_source_changed=true
+    elif ! "$PYTHON_BIN" - "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp" <<'PY'
+import filecmp
+import sys
+
+sys.exit(0 if filecmp.cmp(sys.argv[1], sys.argv[2], shallow=False) else 1)
+PY
+    then
+        parity_source_changed=true
+    fi
+    if [ "$parity_source_changed" = true ]; then
         log_step "Syncing patched kernel parity source into llama.cpp/tests..."
         cp "$PATCHES_DIR/test-kernel-parity.cpp" "$LLAMA_DIR/tests/test-kernel-parity.cpp"
     fi

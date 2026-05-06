@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Run a numpy forward pass on a C-Kernel-Engine v8 Qwen3-like model and export
 per-layer, per-head attention matrices to attention.json for the dataset viewer.

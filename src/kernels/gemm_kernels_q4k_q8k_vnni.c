@@ -44,51 +44,48 @@ static inline int32_t hsum256_epi32(__m256i v) {
     return _mm_cvtsi128_si32(sum);
 }
 
-static inline void load_q8_even_odd_16(const int8_t *q8,
-                                       __m128i *even8,
-                                       __m128i *odd8) {
-    const __m128i q8_lo = _mm_loadu_si128((const __m128i *)q8);
-    const __m128i q8_hi = _mm_loadu_si128((const __m128i *)(q8 + 16));
-    const __m128i even_mask = _mm_setr_epi8(
-        0, 2, 4, 6, 8, 10, 12, 14,
-        (char)0x80, (char)0x80, (char)0x80, (char)0x80,
-        (char)0x80, (char)0x80, (char)0x80, (char)0x80);
-    const __m128i odd_mask = _mm_setr_epi8(
-        1, 3, 5, 7, 9, 11, 13, 15,
-        (char)0x80, (char)0x80, (char)0x80, (char)0x80,
-        (char)0x80, (char)0x80, (char)0x80, (char)0x80);
-
-    const __m128i q8_lo_even = _mm_shuffle_epi8(q8_lo, even_mask);
-    const __m128i q8_hi_even = _mm_shuffle_epi8(q8_hi, even_mask);
-    *even8 = _mm_unpacklo_epi64(q8_lo_even, q8_hi_even);
-
-    const __m128i q8_lo_odd = _mm_shuffle_epi8(q8_lo, odd_mask);
-    const __m128i q8_hi_odd = _mm_shuffle_epi8(q8_hi, odd_mask);
-    *odd8 = _mm_unpacklo_epi64(q8_lo_odd, q8_hi_odd);
-}
-
-static inline int32_t dot_q4_q8_32_vnni(const uint8_t *q4,
-                                        const int8_t *q8) {
-    const __m128i q4_packed = _mm_loadu_si128((const __m128i *)q4);
-    const __m256i q4_16 = _mm256_cvtepu8_epi16(q4_packed);
-    const __m256i mask4 = _mm256_set1_epi16(0x0F);
-
-    const __m256i q4_lo16 = _mm256_and_si256(q4_16, mask4);
-    const __m256i q4_hi16 = _mm256_and_si256(_mm256_srli_epi16(q4_16, 4), mask4);
-
-    const __m128i q4_lo8 = _mm_packus_epi16(_mm256_castsi256_si128(q4_lo16),
-                                            _mm256_extracti128_si256(q4_lo16, 1));
-    const __m128i q4_hi8 = _mm_packus_epi16(_mm256_castsi256_si128(q4_hi16),
-                                            _mm256_extracti128_si256(q4_hi16, 1));
-    const __m256i q4_bytes = _mm256_set_m128i(q4_hi8, q4_lo8);
-
-    __m128i q8_even8;
-    __m128i q8_odd8;
-    load_q8_even_odd_16(q8, &q8_even8, &q8_odd8);
-    const __m256i q8_bytes = _mm256_set_m128i(q8_odd8, q8_even8);
+static inline int32_t dot_q4_k_q8_k_32_vnni(const uint8_t *q4_packed_32,
+                                            const int8_t *q8_32,
+                                            int high_nibble) {
+    const __m256i packed = _mm256_loadu_si256((const __m256i *)q4_packed_32);
+    const __m256i mask4 = _mm256_set1_epi8(0x0F);
+    const __m256i q4_bytes = high_nibble
+        ? _mm256_and_si256(_mm256_srli_epi16(packed, 4), mask4)
+        : _mm256_and_si256(packed, mask4);
+    const __m256i q8_bytes = _mm256_loadu_si256((const __m256i *)q8_32);
     __m256i acc = _mm256_setzero_si256();
     acc = _mm256_dpbusd_epi32(acc, q4_bytes, q8_bytes);
     return hsum256_epi32(acc);
+}
+
+static inline float dot_q4_k_q8_k_vnni_block(const block_q4_K *w,
+                                             const block_q8_K *x) {
+    uint8_t sc[8], m_val[8];
+    unpack_q4_k_scales(w->scales, sc, m_val);
+
+    const float d = CK_FP16_TO_FP32(w->d) * x->d;
+    const float dmin = CK_FP16_TO_FP32(w->dmin) * x->d;
+    float sumf = 0.0f;
+
+    for (int j = 0, is = 0, q_offset = 0; j < QK_K; j += 64, is += 2, q_offset += 32) {
+        const uint8_t *qs = &w->qs[q_offset];
+        const int8_t *q8_lo = &x->qs[j];
+        const int8_t *q8_hi = &x->qs[j + 32];
+
+        const int32_t sum_lo = dot_q4_k_q8_k_32_vnni(qs, q8_lo, 0);
+        const int32_t sum_hi = dot_q4_k_q8_k_32_vnni(qs, q8_hi, 1);
+        const int32_t bsum_lo = (int32_t)x->bsums[j / 16] +
+                                (int32_t)x->bsums[j / 16 + 1];
+        const int32_t bsum_hi = (int32_t)x->bsums[(j + 32) / 16] +
+                                (int32_t)x->bsums[(j + 32) / 16 + 1];
+
+        sumf += d * (float)sc[is] * (float)sum_lo;
+        sumf -= dmin * (float)m_val[is] * (float)bsum_lo;
+        sumf += d * (float)sc[is + 1] * (float)sum_hi;
+        sumf -= dmin * (float)m_val[is + 1] * (float)bsum_hi;
+    }
+
+    return sumf;
 }
 #endif
 
@@ -97,9 +94,24 @@ void gemv_q4_k_q8_k_vnni(float *y,
                          const void *x_q8,
                          int M, int K)
 {
-    /* TODO: Implement VNNI version with correct Q4_K memory layout.
-     * For now, fall back to reference implementation which has been
-     * fixed to use the correct layout.
-     */
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+    if (!y || !W || !x_q8 || M <= 0 || K <= 0 || (K % QK_K) != 0) {
+        return;
+    }
+
+    const block_q4_K *blocks = (const block_q4_K *)W;
+    const block_q8_K *x = (const block_q8_K *)x_q8;
+    const int blocks_per_row = K / QK_K;
+
+    for (int row = 0; row < M; ++row) {
+        const block_q4_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
+        float sumf = 0.0f;
+        for (int b = 0; b < blocks_per_row; ++b) {
+            sumf += dot_q4_k_q8_k_vnni_block(&w_row[b], &x[b]);
+        }
+        y[row] = sumf;
+    }
+#else
     gemv_q4_k_q8_k_ref(y, W, x_q8, M, K);
+#endif
 }

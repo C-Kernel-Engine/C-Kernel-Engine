@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 IR Visualizer Launcher for C-Kernel-Engine v8
 
@@ -427,11 +429,6 @@ def infer_run_model_input(model_root: Path, weight_dtype: str | None = None) -> 
 
 
 def infer_chat_template(run_model_input: str, model_root: Path) -> str:
-    probe = f"{run_model_input} {model_root.name}".lower()
-    # Gemma GGUF chat templates are often not compatible with our runtime path;
-    # prefer raw prompt mode unless the operator overrides explicitly.
-    if "gemma" in probe:
-        return "none"
     return "auto"
 
 

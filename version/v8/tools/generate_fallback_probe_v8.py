@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Generate a minimal probe_report.json from tokenizer vocab.
 
@@ -17,7 +19,6 @@ Usage:
 
 If probe_report.json already exists, skips unless --force is given.
 """
-from __future__ import annotations
 
 import argparse
 import json

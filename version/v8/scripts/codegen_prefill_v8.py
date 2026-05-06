@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 codegen_prefill_v8.py - Generate C code for PREFILL mode from lowered IR.
 

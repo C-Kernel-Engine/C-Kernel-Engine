@@ -46,6 +46,18 @@ static void cpuid(int leaf, int subleaf, uint32_t* eax, uint32_t* ebx, uint32_t*
 #endif
 }
 
+static uint64_t xgetbv0(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    uint32_t eax = 0, edx = 0;
+    __asm__ __volatile__(".byte 0x0f, 0x01, 0xd0" : "=a"(eax), "=d"(edx) : "c"(0));
+    return ((uint64_t)edx << 32) | eax;
+#elif defined(_MSC_VER)
+    return _xgetbv(0);
+#else
+    return 0;
+#endif
+}
+
 static void detect_x86_features(CPUInfo* info) {
     uint32_t eax, ebx, ecx, edx;
 
@@ -55,14 +67,34 @@ static void detect_x86_features(CPUInfo* info) {
 
     if (max_leaf >= 1) {
         cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-        info->has_avx = (ecx >> 28) & 1;
+        int has_osxsave = (ecx >> 27) & 1;
+        uint64_t xcr0 = has_osxsave ? xgetbv0() : 0;
+        int os_avx = ((xcr0 & 0x6) == 0x6);
+        int os_avx512 = ((xcr0 & 0xE6) == 0xE6);
+        int os_amx = ((xcr0 & 0x60000) == 0x60000);
+
+        info->has_avx = ((ecx >> 28) & 1) && os_avx;
         info->has_fma = (ecx >> 12) & 1;
+
+        if (max_leaf >= 7) {
+            cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+            info->has_avx2 = ((ebx >> 5) & 1) && os_avx;
+            info->has_avx512f = ((ebx >> 16) & 1) && os_avx512;
+            info->has_avx512dq = ((ebx >> 17) & 1) && os_avx512;
+            info->has_avx512bw = ((ebx >> 30) & 1) && os_avx512;
+            info->has_avx512vl = ((ebx >> 31) & 1) && os_avx512;
+            info->has_avx512_vnni = ((ecx >> 11) & 1) && os_avx512;
+            info->has_amx_bf16 = ((edx >> 22) & 1) && os_amx;
+            info->has_amx_tile = ((edx >> 24) & 1) && os_amx;
+            info->has_amx_int8 = ((edx >> 25) & 1) && os_amx;
+        }
     }
 
     if (max_leaf >= 7) {
-        cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-        info->has_avx2 = (ebx >> 5) & 1;
-        info->has_avx512f = (ebx >> 16) & 1;
+        cpuid(7, 1, &eax, &ebx, &ecx, &edx);
+        if (info->has_avx512f) {
+            info->has_avx512_bf16 = (eax >> 5) & 1;
+        }
     }
 }
 
@@ -391,6 +423,16 @@ void print_cpu_info(void) {
     printf("AVX:            %s\n", g_cpu_info.has_avx ? "yes" : "no");
     printf("AVX2:           %s\n", g_cpu_info.has_avx2 ? "yes" : "no");
     printf("AVX-512F:       %s\n", g_cpu_info.has_avx512f ? "yes" : "no");
+    printf("AVX-512BW/DQ/VL:%s/%s/%s\n",
+           g_cpu_info.has_avx512bw ? "yes" : "no",
+           g_cpu_info.has_avx512dq ? "yes" : "no",
+           g_cpu_info.has_avx512vl ? "yes" : "no");
+    printf("AVX-512 VNNI:   %s\n", g_cpu_info.has_avx512_vnni ? "yes" : "no");
+    printf("AVX-512 BF16:   %s\n", g_cpu_info.has_avx512_bf16 ? "yes" : "no");
+    printf("AMX tile/int8/bf16: %s/%s/%s\n",
+           g_cpu_info.has_amx_tile ? "yes" : "no",
+           g_cpu_info.has_amx_int8 ? "yes" : "no",
+           g_cpu_info.has_amx_bf16 ? "yes" : "no");
     printf("FMA:            %s\n", g_cpu_info.has_fma ? "yes" : "no");
     printf("\n=== GEMM Blocking Parameters ===\n");
     printf("MR (microkernel rows): %d\n", g_gemm_params.MR);

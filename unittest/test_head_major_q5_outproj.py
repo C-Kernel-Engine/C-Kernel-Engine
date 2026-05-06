@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Direct parity and benchmark coverage for ck_gemm_nt_head_major_q5_0.
 

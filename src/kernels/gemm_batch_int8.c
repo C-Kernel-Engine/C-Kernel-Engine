@@ -64,6 +64,29 @@
 #define AMX_TILE_N 16
 #define AMX_TILE_K 64
 
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
+static inline int32_t hsum256_epi32_q8_batch(__m256i v)
+{
+    __m128i lo = _mm256_castsi256_si128(v);
+    __m128i hi = _mm256_extracti128_si256(v, 1);
+    __m128i sum = _mm_add_epi32(lo, hi);
+    sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 8));
+    sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 4));
+    return _mm_cvtsi128_si32(sum);
+}
+
+static inline int32_t dot_q8_0_q8_0_32_vnni_i32(const int8_t *a, const int8_t *b)
+{
+    const __m256i va = _mm256_loadu_si256((const __m256i *)a);
+    const __m256i vb = _mm256_loadu_si256((const __m256i *)b);
+    const __m256i va_u = _mm256_xor_si256(va, _mm256_set1_epi8((char)0x80));
+    const __m256i dot_u_s = _mm256_dpbusd_epi32(_mm256_setzero_si256(), va_u, vb);
+    const __m256i sum_b = _mm256_dpbusd_epi32(_mm256_setzero_si256(), _mm256_set1_epi8(1), vb);
+    const __m256i correction = _mm256_slli_epi32(sum_b, 7);
+    return hsum256_epi32_q8_batch(_mm256_sub_epi32(dot_u_s, correction));
+}
+#endif
+
 /* ============================================================================
  * SECTION 1: GEMM Q8_0 x Q8_0 -> FP32
  *
@@ -303,7 +326,7 @@ void gemm_nt_q8_0_q8_0_avx512(
     }
 }
 
-#if defined(__AVX512VNNI__)
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
 /**
  * @brief AVX-512 VNNI implementation: gemm_nt_q8_0_q8_0
  *
@@ -333,28 +356,15 @@ void gemm_nt_q8_0_q8_0_vnni(
             for (int ib = 0; ib < nb; ib++) {
                 const float d_a = CK_FP16_TO_FP32(a_row[ib].d);
                 const float d_b = CK_FP16_TO_FP32(b_row[ib].d);
-                const float d = d_a * d_b;
-
-                /* Load 32 int8 values */
-                __m256i va = _mm256_loadu_si256((const __m256i *)a_row[ib].qs);
-                __m256i vb = _mm256_loadu_si256((const __m256i *)b_row[ib].qs);
-
-                /* For signed*signed, use extend to 16-bit approach
-                 * (dpbusd is unsigned*signed, dpbssd requires AVX512_VNNI_INT8) */
-                __m512i va_16 = _mm512_cvtepi8_epi16(va);
-                __m512i vb_16 = _mm512_cvtepi8_epi16(vb);
-                __m512i prod = _mm512_mullo_epi16(va_16, vb_16);
-                __m512i sum_32 = _mm512_madd_epi16(prod, _mm512_set1_epi16(1));
-                int32_t sumi = _mm512_reduce_add_epi32(sum_32);
-
-                sum += d * (float)sumi;
+                const int32_t sumi = dot_q8_0_q8_0_32_vnni_i32(a_row[ib].qs, b_row[ib].qs);
+                sum += (d_a * d_b) * (float)sumi;
             }
 
             C[(size_t)m * N + n] = sum;
         }
     }
 }
-#endif /* __AVX512VNNI__ */
+#endif /* __AVX512VNNI__ && __AVX512VL__ */
 #endif /* __AVX512F__ */
 
 /**
@@ -552,10 +562,11 @@ void gemm_nt_q5_0_q8_0_amx(
  */
 const char* gemm_batch_int8_impl_name(void)
 {
-#if HAS_AMX
-    return "AMX";
-#elif defined(__AVX512VNNI__)
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
     return "AVX-512 VNNI";
+#elif HAS_AMX
+    /* The AMX entry points in this file currently fall back to AVX-512/ref. */
+    return "AMX fallback";
 #elif defined(__AVX512F__)
     return "AVX-512";
 #elif defined(__AVX2__)
@@ -587,7 +598,7 @@ void gemm_nt_q8_0_q8_0(
     int M, int N, int K)
 {
     /* First compute GEMM */
-#if defined(__AVX512VNNI__)
+#if defined(__AVX512VNNI__) && defined(__AVX512VL__)
     gemm_nt_q8_0_q8_0_vnni(A, B, C, M, N, K);
 #elif defined(__AVX512F__)
     gemm_nt_q8_0_q8_0_avx512(A, B, C, M, N, K);

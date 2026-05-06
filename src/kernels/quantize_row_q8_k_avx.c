@@ -15,9 +15,14 @@
 #include "ckernel_quant.h"
 
 void quantize_row_q8_k_sse(const float *x, void *vy, int k);
+void quantize_row_q8_k_ref(const float *x, void *vy, int k);
 
 void quantize_row_q8_k_avx(const float *x, void *vy, int k) {
     /* Reuse the parity-clean SIMD implementation until a wider AVX variant is
      * worth maintaining separately. */
+#if defined(__SSE4_1__)
     quantize_row_q8_k_sse(x, vy, k);
+#else
+    quantize_row_q8_k_ref(x, vy, k);
+#endif
 }

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 convert_gguf_to_bump_v8.py
 ============================
@@ -84,8 +86,6 @@ Notes:
     to size out_proj and related ops correctly.
   - BUMPWGT5: Metadata placed at EOF preserves all v4 offsets
 """
-
-from __future__ import annotations
 
 import argparse
 import copy
