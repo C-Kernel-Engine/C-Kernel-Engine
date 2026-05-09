@@ -61,6 +61,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "qk_norm_kernels.c", "qk__norm__kernels_8c.html", "qk__norm__kernels_8c" ],
     [ "quantize_row_q8_k_avx.c", "quantize__row__q8__k__avx_8c.html", "quantize__row__q8__k__avx_8c" ],
     [ "quantize_row_q8_k_avx2.c", "quantize__row__q8__k__avx2_8c.html", "quantize__row__q8__k__avx2_8c" ],
+    [ "quantize_row_q8_k_avx512.c", "quantize__row__q8__k__avx512_8c.html", "quantize__row__q8__k__avx512_8c" ],
     [ "quantize_row_q8_k_sse.c", "quantize__row__q8__k__sse_8c.html", "quantize__row__q8__k__sse_8c" ],
     [ "recurrent_gate_kernels.c", "recurrent__gate__kernels_8c.html", "recurrent__gate__kernels_8c" ],
     [ "recurrent_norm_kernels.c", "recurrent__norm__kernels_8c.html", "recurrent__norm__kernels_8c" ],
