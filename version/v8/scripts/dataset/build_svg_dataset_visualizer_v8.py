@@ -87,7 +87,6 @@ viewer works offline with full search, sort, gallery, quality checks, and proven
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
-
 import argparse
 import base64
 import json

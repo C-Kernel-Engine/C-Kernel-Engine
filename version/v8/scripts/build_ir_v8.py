@@ -228,11 +228,12 @@ def _inject_runtime_config_defaults(config: Dict[str, Any], arch: str) -> Dict[s
         config["activation_preference_by_op"] = prefs
 
     if arch_lc == "qwen35":
+        config.setdefault("prefer_q8_0_contract", True)
         _merge_activation_defaults(
             {
                 "recurrent_gate_proj": "fp32",
-                "recurrent_alpha_proj": "fp32",
-                "recurrent_beta_proj": "fp32",
+                "recurrent_alpha_proj": "q8_0",
+                "recurrent_beta_proj": "q8_0",
             }
         )
     elif arch_lc == "qwen3_vl_vision":
@@ -1699,6 +1700,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
         q_size = seq_len * recurrent_q * 4
         k_size = seq_len * recurrent_k * 4
         v_size = seq_len * recurrent_v * 4
+        conv_input_width = max(1, recurrent_conv_history + seq_len)
+        conv_input_size = max(1, recurrent_conv_channels) * conv_input_width * 4
+        conv_qkv_size = seq_len * max(1, recurrent_conv_channels) * 4
         conv_state_stride = max(1, recurrent_conv_history) * max(1, recurrent_conv_channels) * 4
         ssm_state_stride = max(1, recurrent_state_heads) * max(1, recurrent_state_rows) * max(1, recurrent_state_cols) * 4
         conv_state_size = num_layers * conv_state_stride
@@ -1711,6 +1715,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
         add("recurrent_q", q_size, f"[{seq_len}, {recurrent_q}]")
         add("recurrent_k", k_size, f"[{seq_len}, {recurrent_k}]")
         add("recurrent_v", v_size, f"[{seq_len}, {recurrent_v}]")
+        add("recurrent_conv_input", conv_input_size, f"[{recurrent_conv_channels}, {recurrent_conv_history + seq_len}]")
+        add("recurrent_conv_qkv_raw", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
+        add("recurrent_conv_qkv", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
         add("recurrent_conv_state", conv_state_size, f"[{num_layers}, {recurrent_conv_history}, {recurrent_conv_channels}]")
         add("recurrent_ssm_state", ssm_state_size, f"[{num_layers}, {recurrent_state_heads}, {recurrent_state_rows}, {recurrent_state_cols}]")
 
@@ -3574,12 +3581,12 @@ def get_quantize_kernel_for_activation(activation_dtype: str) -> Optional[str]:
 # These formats have incompatible memory layouts that cannot be safely fed to other kernels
 UNSAFE_QUANT_FALLBACKS = {
     "q4_k",  # Super-block format (8 values per block) - now has native gemm_nt_q4_k, gemv_q4_k
+    "q5_k",  # Super-block format; incompatible with Q5_0 simple-block kernels
     "q6_k",  # Super-block format (16 values per block) - now has native gemm_nt_q6_k, gemv_q6_k
 }
 
 # Quantization formats that have safe fallbacks (same block structure)
 SAFE_QUANT_FALLBACKS = {
-    "q5_k": "q5_0",  # Q5_K super-block -> Q5_0 simple blocks (lossy but functional)
     "q5_1": "q5_0",  # Both use 32-value blocks, Q5_1 has min value
     "q4_1": "q4_0",  # Both use 32-value blocks, Q4_1 has min value
 }
@@ -6553,6 +6560,9 @@ def generate_memory_layout(
         rq_size = seq_len * recurrent_q * 4
         rk_size = seq_len * recurrent_k * 4
         rv_size = seq_len * recurrent_v * 4
+        conv_input_width = max(1, recurrent_conv_history + seq_len)
+        conv_input_size = max(1, recurrent_conv_channels) * conv_input_width * 4
+        conv_qkv_size = seq_len * max(1, recurrent_conv_channels) * 4
         conv_state_stride = max(1, recurrent_conv_history) * max(1, recurrent_conv_channels) * 4
         ssm_state_stride = max(1, recurrent_state_heads) * max(1, recurrent_state_rows) * max(1, recurrent_state_cols) * 4
         conv_state_size = num_layers * conv_state_stride
@@ -6565,6 +6575,9 @@ def generate_memory_layout(
         add_buffer("recurrent_q", rq_size, f"[{seq_len}, {recurrent_q}]")
         add_buffer("recurrent_k", rk_size, f"[{seq_len}, {recurrent_k}]")
         add_buffer("recurrent_v", rv_size, f"[{seq_len}, {recurrent_v}]")
+        add_buffer("recurrent_conv_input", conv_input_size, f"[{recurrent_conv_channels}, {recurrent_conv_history + seq_len}]")
+        add_buffer("recurrent_conv_qkv_raw", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
+        add_buffer("recurrent_conv_qkv", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
         add_buffer("recurrent_conv_state", conv_state_size, f"[{num_layers}, {recurrent_conv_history}, {recurrent_conv_channels}]")
         add_buffer("recurrent_ssm_state", ssm_state_size, f"[{num_layers}, {recurrent_state_heads}, {recurrent_state_rows}, {recurrent_state_cols}]")
 

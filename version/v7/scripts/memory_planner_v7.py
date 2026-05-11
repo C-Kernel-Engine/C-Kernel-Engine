@@ -192,9 +192,9 @@ SLOT_TO_BUFFER_DEFAULT = {
     # MLP scratch
     "mlp_scratch": "A_MLP_SCRATCH",
     "recurrent_qkv_packed": "A_RECURRENT_PACKED",
-    "recurrent_conv_input": "A_RECURRENT_PACKED",
-    "recurrent_conv_qkv_raw": "A_RECURRENT_PACKED",
-    "recurrent_conv_qkv": "A_RECURRENT_PACKED",
+    "recurrent_conv_input": "A_RECURRENT_CONV_INPUT",
+    "recurrent_conv_qkv_raw": "A_RECURRENT_CONV_QKV_RAW",
+    "recurrent_conv_qkv": "A_RECURRENT_CONV_QKV",
     "recurrent_attn_out": "A_RECURRENT_PACKED",
     "recurrent_normed": "A_RECURRENT_NORMED",
     "recurrent_z": "A_RECURRENT_Z",

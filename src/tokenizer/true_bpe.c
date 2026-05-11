@@ -667,7 +667,7 @@ CKSpacePrefixStyle ck_true_bpe_detect_space_style(CKTrueBPE *bpe) {
     int gpt2_count = 0;  /* Ġ (0xC4 0xA0) */
     int spm_count = 0;   /* ▁ (0xE2 0x96 0x81) */
 
-    for (size_t i = 0; i < bpe->vocab_size && i < 10000; i++) {
+    for (size_t i = 0; i < bpe->vocab_size; i++) {
         const char *token = bpe->id_to_token[i];
         if (!token) continue;
 
@@ -1529,8 +1529,16 @@ int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, ch
 
         if (style == CK_SPACE_PREFIX_ASCII) {
             int token_len_ascii = (int)strlen(token);
-            for (int j = 0; j < token_len_ascii && len < max_len - 1; j++) {
-                text[len++] = token[j];
+            for (int j = 0; j < token_len_ascii && len < max_len - 1; ) {
+                if (j + 2 < token_len_ascii &&
+                    (unsigned char)token[j] == 0xE2 &&
+                    (unsigned char)token[j + 1] == 0x96 &&
+                    (unsigned char)token[j + 2] == 0x81) {
+                    text[len++] = ' ';
+                    j += 3;
+                    continue;
+                }
+                text[len++] = token[j++];
             }
             continue;
         }
@@ -1554,13 +1562,17 @@ int ck_true_bpe_decode(const CKTrueBPE *bpe, const int32_t *ids, int num_ids, ch
             int cp = 0;
             int used = 0;
             if (decode_utf8_scalar((const unsigned char *)token + pos, token_len - pos, &cp, &used) == 0) {
-                int decoded = gpt2_codepoint_to_byte(cp);
-                if (decoded >= 0) {
-                    text[len++] = (char)decoded;
+                if (cp == 0x2581) {
+                    text[len++] = ' ';
                 } else {
-                    /* Not part of byte-level mapping: preserve original UTF-8 bytes. */
-                    for (int j = 0; j < used && pos + j < token_len && len < max_len - 1; j++) {
-                        text[len++] = token[pos + j];
+                    int decoded = gpt2_codepoint_to_byte(cp);
+                    if (decoded >= 0) {
+                        text[len++] = (char)decoded;
+                    } else {
+                        /* Not part of byte-level mapping: preserve original UTF-8 bytes. */
+                        for (int j = 0; j < used && pos + j < token_len && len < max_len - 1; j++) {
+                            text[len++] = token[pos + j];
+                        }
                     }
                 }
                 pos += used;

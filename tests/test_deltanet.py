@@ -75,6 +75,11 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.c_float,                  # norm_eps
             ]
             bwd.restype = None
+
+            lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+            lib.ck_set_strict_parity.restype = None
+            lib.gated_deltanet_impl_name.argtypes = []
+            lib.gated_deltanet_impl_name.restype = ctypes.c_char_p
             return lib
     return None
 
@@ -208,6 +213,14 @@ class TestDeltaNetParity(unittest.TestCase):
 
     def test_wider_case(self) -> None:
         self._run_case(num_heads=3, state_dim=24, seed=19)
+
+    def test_strict_parity_dispatches_ref(self) -> None:
+        LIB.ck_set_strict_parity(1)
+        try:
+            self.assertEqual(LIB.gated_deltanet_impl_name().decode("ascii"), "REF")
+            self._run_case(num_heads=2, state_dim=8, seed=23)
+        finally:
+            LIB.ck_set_strict_parity(0)
 
 
 if __name__ == "__main__":

@@ -18,7 +18,6 @@ Usage:
     python3 version/v8/tools/prepare_run_viewer_v8.py <run_dir> --force
     python3 version/v8/tools/prepare_run_viewer_v8.py --all             # every train run
 """
-
 import argparse
 import json
 import subprocess

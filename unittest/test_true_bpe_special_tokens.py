@@ -63,8 +63,13 @@ lib.ck_true_bpe_encode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_in
 lib.ck_true_bpe_decode.restype = ctypes.c_int
 lib.ck_true_bpe_decode.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
 
+lib.ck_true_bpe_detect_space_style.restype = ctypes.c_int
+lib.ck_true_bpe_detect_space_style.argtypes = [ctypes.c_void_p]
+
 lib.ck_true_bpe_vocab_size.restype = ctypes.c_size_t
 lib.ck_true_bpe_vocab_size.argtypes = [ctypes.c_void_p]
+
+CK_SPACE_PREFIX_SPM = 2
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -93,6 +98,43 @@ def load_vocab_from_hf(bpe, hf_tokenizer):
     vocab = hf_tokenizer.get_vocab()
     for token, id_val in vocab.items():
         lib.ck_true_bpe_add_token(bpe, token.encode('utf-8'), id_val, 0.0)
+
+
+def test_late_spm_space_prefix_detection():
+    """Detect SentencePiece markers even when they appear past early vocab IDs."""
+    print("\nTest: Late SentencePiece Space Prefix Detection")
+    print("-" * 60)
+
+    bpe = lib.ck_true_bpe_create()
+    if not bpe:
+        print("FAIL: Could not create tokenizer")
+        return False
+
+    try:
+        for idx in range(10050):
+            token = f"tok_{idx}".encode("utf-8")
+            if lib.ck_true_bpe_add_token(bpe, token, idx, 0.0) != 0:
+                print(f"FAIL: Could not add filler token {idx}")
+                return False
+
+        if lib.ck_true_bpe_add_token(bpe, "▁late".encode("utf-8"), 10050, 0.0) != 0:
+            print("FAIL: Could not add late SPM token")
+            return False
+
+        style = int(lib.ck_true_bpe_detect_space_style(bpe))
+        if style != CK_SPACE_PREFIX_SPM:
+            print(f"FAIL: Expected SPM style ({CK_SPACE_PREFIX_SPM}), got {style}")
+            return False
+
+        decoded = decode_c(bpe, [10050])
+        if decoded != " late":
+            print(f"FAIL: Expected decoded text ' late', got {decoded!r}")
+            return False
+
+        print("PASS: Late SPM marker is detected and decoded as space")
+        return True
+    finally:
+        lib.ck_true_bpe_free(bpe)
 
     # Load merges if available (BPE tokenizers)
     if hasattr(hf_tokenizer, 'backend_tokenizer'):
@@ -390,6 +432,7 @@ def main():
     # Run tests
     results.append(("Special Token Encoding", test_special_token_encoding()))
     results.append(("GPT-2 Byte Decoding", test_gpt2_byte_decoding()))
+    results.append(("Late SPM Space Prefix Detection", test_late_spm_space_prefix_detection()))
     results.append(("Chat Template Encoding", test_chat_template_encoding()))
 
     # Summary

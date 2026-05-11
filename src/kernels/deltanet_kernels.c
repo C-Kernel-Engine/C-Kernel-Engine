@@ -38,6 +38,7 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -530,6 +531,11 @@ void gated_deltanet_autoregressive_forward_avx2(const float *q,
 #endif
 
 #if defined(__AVX512F__)
+static inline __m512 ck_deltanet_madd512(__m512 a, __m512 b, __m512 c)
+{
+    return _mm512_add_ps(_mm512_mul_ps(a, b), c);
+}
+
 static void ck_deltanet_scale_rows_avx512(const float *src, float *dst, int dim, float scale)
 {
     const __m512 scale_v = _mm512_set1_ps(scale);
@@ -601,7 +607,7 @@ void gated_deltanet_autoregressive_forward_avx512(const float *q,
                 __m512 prev_v = _mm512_loadu_ps(state_prev + row_off + (size_t)col);
                 __m512 cur_v = _mm512_mul_ps(prev_v, gate_v);
                 __m512 kv_v = _mm512_loadu_ps(kv_mem + col);
-                kv_v = _mm512_fmadd_ps(cur_v, k_hat_v, kv_v);
+                kv_v = ck_deltanet_madd512(cur_v, k_hat_v, kv_v);
                 _mm512_storeu_ps(state_cur + row_off + (size_t)col, cur_v);
                 _mm512_storeu_ps(kv_mem + col, kv_v);
             }
@@ -632,8 +638,8 @@ void gated_deltanet_autoregressive_forward_avx512(const float *q,
                 __m512 cur_v = _mm512_loadu_ps(state_cur + row_off + (size_t)col);
                 __m512 delta_v = _mm512_loadu_ps(delta + col);
                 __m512 out_v = _mm512_loadu_ps(out_head + col);
-                __m512 updated_v = _mm512_fmadd_ps(k_hat_v, delta_v, cur_v);
-                out_v = _mm512_fmadd_ps(updated_v, q_hat_v, out_v);
+                __m512 updated_v = ck_deltanet_madd512(k_hat_v, delta_v, cur_v);
+                out_v = ck_deltanet_madd512(updated_v, q_hat_v, out_v);
                 _mm512_storeu_ps(state_cur + row_off + (size_t)col, updated_v);
                 _mm512_storeu_ps(out_head + col, out_v);
             }
@@ -647,9 +653,15 @@ void gated_deltanet_autoregressive_forward_avx512(const float *q,
 }
 #endif
 
+static int ck_deltanet_force_ref(void)
+{
+    const char *env = getenv("CK_DELTANET_FORCE_REF");
+    return env && atoi(env) != 0;
+}
+
 const char *gated_deltanet_impl_name(void)
 {
-    if (ck_strict_parity_enabled()) {
+    if (ck_strict_parity_enabled() || ck_deltanet_force_ref()) {
         return "REF";
     }
 #if defined(__AVX512F__)
@@ -686,6 +698,11 @@ void gated_deltanet_autoregressive_forward(const float *q,
      * q and k arrive pre-normalized by recurrent_qk_l2_norm, so the
      * ISA-specialized kernels can follow the same contract as the scalar ref.
      */
+    if (ck_strict_parity_enabled() || ck_deltanet_force_ref()) {
+        gated_deltanet_autoregressive_forward_ref(
+            q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);
+        return;
+    }
 #if defined(__AVX512F__)
     gated_deltanet_autoregressive_forward_avx512(
         q, k, v, g, beta, state_in, state_out, out, num_heads, state_dim, norm_eps);

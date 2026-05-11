@@ -1038,20 +1038,11 @@ void vec_dot_q6_k_q8_k(int n, float *s, const void *vx, const void *vy)
     const block_q6_K *x = (const block_q6_K *)vx;
     const block_q8_K *y = (const block_q8_K *)vy;
 
-    /* Dispatch based on available SIMD */
-#if defined(__AVX512F__) && defined(__AVX512BW__)
-    *s = dot_q6_k_q8_k_avx512(x, y, n);
-#elif defined(__AVX2__)
-    *s = dot_q6_k_q8_k_avx2(x, y, n);
-#elif defined(__ARM_NEON) || defined(__aarch64__)
-    *s = dot_q6_k_q8_k_neon(x, y, n);
-#elif defined(__AVX__) && !defined(__AVX2__)
-    *s = dot_q6_k_q8_k_avx(x, y, n);
-#elif defined(__SSSE3__)
-    *s = dot_q6_k_q8_k_sse(x, y, n);
-#else
+    /* Keep the public dispatch on the llama-compatible reduction order.
+     * The SIMD variants are still exported for direct tests/benchmarks, but
+     * their horizontal reduction order can move borderline logits in Qwen3.5
+     * long-decode parity. */
     *s = dot_q6_k_q8_k_ref(x, y, n);
-#endif
 }
 
 /**
@@ -1062,29 +1053,7 @@ void gemv_q6_k_q8_k(float *y,
                      const void *x_q8,
                      int M, int K)
 {
-    /* AVX-512 uses same algorithm as AVX2 (matches llama.cpp) */
-#if defined(__AVX512F__) && defined(__AVX512BW__)
-    gemv_q6_k_q8_k_avx512(y, W, x_q8, M, K);
-#elif defined(__AVX2__)
-    gemv_q6_k_q8_k_avx2(y, W, x_q8, M, K);
-#elif defined(__ARM_NEON) || defined(__aarch64__)
-    if (!y || !W || !x_q8 || M <= 0 || K <= 0) {
-        return;
-    }
-    const block_q6_K *blocks = (const block_q6_K *)W;
-    const block_q8_K *x = (const block_q8_K *)x_q8;
-    const int blocks_per_row = K / QK_K;
-    for (int row = 0; row < M; ++row) {
-        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
-    }
-#elif defined(__AVX__)
-    gemv_q6_k_q8_k_avx(y, W, x_q8, M, K);
-#elif defined(__SSSE3__)
-    gemv_q6_k_q8_k_sse(y, W, x_q8, M, K);
-#else
     gemv_q6_k_q8_k_ref(y, W, x_q8, M, K);
-#endif
 }
 
 /* ============================================================================
@@ -1124,11 +1093,7 @@ void gemv_q6_k_q8_k_parallel(float *y,
 
     for (int row = r0; row < r1; ++row) {
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-#if defined(__ARM_NEON) || defined(__aarch64__)
-        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
-#else
         y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
-#endif
     }
 }
 
@@ -1157,43 +1122,10 @@ void gemv_q6_k_q8_k_parallel_simd(float *y,
     const block_q8_K *x = (const block_q8_K *)x_q8;
     const int blocks_per_row = K / QK_K;
 
-#if defined(__AVX__) || defined(__SSSE3__)
-    /* Prefetch first few rows */
-    const int PREFETCH_ROWS = 4;
-    for (int p = 0; p < PREFETCH_ROWS && r0 + p < r1; ++p) {
-        const char *row_ptr = (const char *)(blocks + (r0 + p) * blocks_per_row);
-        _mm_prefetch(row_ptr, _MM_HINT_T0);
-        _mm_prefetch(row_ptr + 64, _MM_HINT_T0);
-    }
-
-    for (int row = r0; row < r1; ++row) {
-        /* Prefetch rows ahead */
-        if (row + PREFETCH_ROWS < r1) {
-            const char *prefetch_ptr = (const char *)(blocks + (row + PREFETCH_ROWS) * blocks_per_row);
-            _mm_prefetch(prefetch_ptr, _MM_HINT_T0);
-            _mm_prefetch(prefetch_ptr + 64, _MM_HINT_T0);
-        }
-
-        const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-#if defined(__AVX2__)
-        y[row] = dot_q6_k_q8_k_avx2(w_row, x, K);
-#elif defined(__AVX__)
-        y[row] = dot_q6_k_q8_k_avx(w_row, x, K);
-#else
-        y[row] = dot_q6_k_q8_k_sse(w_row, x, K);
-#endif
-    }
-#else
-    /* Fallback to reference / ARM NEON */
     for (int row = r0; row < r1; ++row) {
         const block_q6_K *w_row = blocks + (size_t)row * (size_t)blocks_per_row;
-#if defined(__ARM_NEON) || defined(__aarch64__)
-        y[row] = dot_q6_k_q8_k_neon(w_row, x, K);
-#else
         y[row] = dot_q6_k_q8_k_ref(w_row, x, K);
-#endif
     }
-#endif
 }
 
 /**

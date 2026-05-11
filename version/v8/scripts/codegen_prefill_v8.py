@@ -553,8 +553,10 @@ def emit_prefill_function(ops: List[Dict], config: Dict, profile: bool = False, 
     """Emit the prefill function with all ops unrolled."""
     lines = []
     scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
+    outproj_policy = str(config.get("out_proj_input_policy") or "").strip().lower()
+    debug_outproj_default = 1 if outproj_policy in {"fp32", "fp32_input", "force_fp32"} else 0
     embed_scale_emitted = False
-    lines.append("""
+    prologue = """
 /* ============================================================================
  * PREFILL - Batched processing from IR Lower (prefill mode)
  * ============================================================================ */
@@ -572,7 +574,12 @@ static void ck_prefill(CKModel *model, const int32_t *tokens, int num_tokens) {
 
     /* Copy input tokens to activation buffer (follow same pattern as decode) */
     memcpy((void*)(model->bump + A_TOKEN_IDS), tokens, (size_t)num_tokens * sizeof(int32_t));
-""")
+"""
+    prologue = prologue.replace(
+        "int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;",
+        f"int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : {debug_outproj_default};",
+    )
+    lines.append(prologue)
 
     if profile:
         lines.append("    CK_PROFILE_VARS();")
@@ -906,6 +913,8 @@ def emit_prefill_from_embedded_function(
     """Emit a prefill entrypoint that assumes embedded_input is already populated."""
     lines = []
     scale_embeddings_sqrt_dim = bool(config.get("scale_embeddings_sqrt_dim", False))
+    outproj_policy = str(config.get("out_proj_input_policy") or "").strip().lower()
+    debug_outproj_default = 1 if outproj_policy in {"fp32", "fp32_input", "force_fp32"} else 0
     embed_scale_emitted = False
     is_qwen3vl = _is_qwen3vl_multimodal_config(config)
     num_deepstack_layers = int(config.get("num_deepstack_layers", 0) or 0) if is_qwen3vl else 0
@@ -913,8 +922,7 @@ def emit_prefill_from_embedded_function(
     if helper_block:
         lines.append(helper_block)
 
-    lines.append(
-        """
+    prologue = """
 /* ============================================================================
  * PREFILL FROM EMBEDDED INPUT - Multimodal/orchestrated prefill path
  * ============================================================================
@@ -938,7 +946,11 @@ static void ck_prefill_from_embedded(CKModel *model, int num_tokens) {
     int debug_mlp_down_fp32 = debug_mlp_down_env ? (atoi(debug_mlp_down_env) != 0) : 0;
     const float *ck_debug_mlp_down_fp32_input = NULL;
 """
+    prologue = prologue.replace(
+        "int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : 0;",
+        f"int debug_outproj_fp32 = debug_outproj_env ? (atoi(debug_outproj_env) != 0) : {debug_outproj_default};",
     )
+    lines.append(prologue)
     if is_qwen3vl:
         lines.append(
             """    const char *bridge_fp32_env = getenv("CK_V8_QWEN3VL_PREFILL_FP32");

@@ -14,6 +14,7 @@ Writes a compact JSON report with top-k overlap and full-logits diff stats.
 import argparse
 import ctypes
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -251,6 +252,10 @@ def load_ck_logits(model_dir: Path, tokens: list[int]) -> dict[str, Any]:
     if has_free:
         lib.ck_model_free.argtypes = []
         lib.ck_model_free.restype = None
+    has_strict = hasattr(lib, "ck_set_strict_parity")
+    if has_strict:
+        lib.ck_set_strict_parity.argtypes = [ctypes.c_int]
+        lib.ck_set_strict_parity.restype = None
 
     init_candidates = [model_dir / "weights.bump", model_dir]
     if model_dir.name in {".ck_build", "ck_build"}:
@@ -277,6 +282,9 @@ def load_ck_logits(model_dir: Path, tokens: list[int]) -> dict[str, Any]:
             f"ck_model_init failed for all init dirs ({', '.join(init_errors)}) lib_dir={model_dir}"
         )
     try:
+        if has_strict:
+            strict_env = os.environ.get("CK_STRICT_PARITY")
+            lib.ck_set_strict_parity(1 if strict_env and int(strict_env) != 0 else 0)
         runtime_contract = load_runtime_contract(model_dir)
         prefill_policy = str(runtime_contract.get("prefill_policy") or "batched").strip().lower()
         vocab = int(lib.ck_model_get_vocab_size())
@@ -353,6 +361,16 @@ def compare_logits(
     ck_top_list = [int(x) for x in ck_top.tolist()]
     ll_top_list = [int(x) for x in ll_top.tolist()]
     overlap = set(ck_top_list) & set(ll_top_list)
+    inspected_ids = sorted(set(ck_top_list) | set(ll_top_list))
+    inspected_logits = [
+        {
+            "id": int(idx),
+            "ck": float(a[idx]),
+            "llama": float(b[idx]),
+            "diff": float(a[idx] - b[idx]),
+        }
+        for idx in inspected_ids
+    ]
 
     return {
         "n_compared": n,
@@ -368,6 +386,7 @@ def compare_logits(
         "topk": k,
         "ck_topk_ids": ck_top_list,
         "llama_topk_ids": ll_top_list,
+        "topk_logits": inspected_logits,
     }
 
 

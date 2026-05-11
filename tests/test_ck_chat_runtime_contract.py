@@ -55,6 +55,28 @@ class TestCKChatRuntimeContract(unittest.TestCase):
             contract = model._load_runtime_contract()
             self.assertEqual(contract.get("prefill_policy"), "sequential_decode")
 
+    def test_runtime_contract_loads_sampler_defaults_from_config(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ck_chat_sampler_") as td:
+            run_dir = Path(td)
+            (run_dir / "config.json").write_text(
+                json.dumps(
+                    {
+                        "sampler_defaults": {
+                            "repeat_penalty": 1.12,
+                            "repeat_last_n": 96,
+                            "no_repeat_ngram_size": 4,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = ck_chat.CKModel(str(run_dir))
+            contract = model._load_runtime_contract()
+
+        self.assertEqual(contract["sampler_defaults"]["repeat_penalty"], 1.12)
+        self.assertEqual(contract["sampler_defaults"]["repeat_last_n"], 96)
+        self.assertEqual(contract["sampler_defaults"]["no_repeat_ngram_size"], 4)
+
     def test_runtime_contract_keeps_dense_attention_on_batched_prefill(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ck_chat_dense_") as td:
             run_dir = Path(td)

@@ -2337,22 +2337,22 @@ test-gemm-avx-bench-quick: $(GEMM_AVX_BENCH_BIN)
 $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN): $(LIB) tests/test_head_major_q5_llama_bench.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(BENCH_CXX) -O3 -march=native \
-		-Iinclude -Illama.cpp/ggml/include -Illama.cpp/ggml/src \
+		-Iinclude -I$(LLAMA_CPP_DIR)/ggml/include -I$(LLAMA_CPP_DIR)/ggml/src \
 		tests/test_head_major_q5_llama_bench.cpp \
 		-L$(BUILD_DIR) -lckernel_engine \
-		-Lllama.cpp/build/bin -lggml-cpu -lggml-base -lggml \
+		-L$(LLAMA_CPP_DIR)/build/bin -lggml-cpu -lggml-base -lggml \
 		-lm -lpthread -ldl \
 		-Wl,-rpath,$(BUILD_DIR) \
-		-Wl,-rpath,$(CURDIR)/llama.cpp/build/bin \
+		-Wl,-rpath,$(LLAMA_CPP_ABS)/build/bin \
 		-o $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
 
 test-head-major-q5-vs-llama: $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
 	@echo "Running head-major Q5 CK vs llama.cpp benchmark (full)..."
-	LD_LIBRARY_PATH=$(BUILD_DIR):llama.cpp/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
+	LD_LIBRARY_PATH=$(BUILD_DIR):$(LLAMA_CPP_DIR)/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
 
 test-head-major-q5-vs-llama-quick: $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN)
 	@echo "Running head-major Q5 CK vs llama.cpp benchmark (quick)..."
-	LD_LIBRARY_PATH=$(BUILD_DIR):llama.cpp/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN) --quick
+	LD_LIBRARY_PATH=$(BUILD_DIR):$(LLAMA_CPP_DIR)/build/bin:$$LD_LIBRARY_PATH $(HEAD_MAJOR_Q5_LLAMA_BENCH_BIN) --quick
 
 .PHONY: test-head-major-q5-vs-llama test-head-major-q5-vs-llama-quick
 
@@ -2400,7 +2400,7 @@ $(DELTANET_LLAMA_BENCH_BIN): $(LIB) $(LLAMA_KERNEL_TEST) tests/test_deltanet_vs_
 		-L$(LLAMA_CPP_DIR) -lggml_kernel_test \
 		-lm -lpthread \
 		-Wl,-rpath,$(PWD)/$(BUILD_DIR) \
-		-Wl,-rpath,$(PWD)/$(LLAMA_CPP_DIR) \
+		-Wl,-rpath,$(LLAMA_CPP_ABS) \
 		-o $(DELTANET_LLAMA_BENCH_BIN)
 
 test-deltanet-vs-llamacpp-bench: $(DELTANET_LLAMA_BENCH_BIN)
@@ -2836,7 +2836,8 @@ libck_parity_llama.so: $(LIB_PARITY_LLAMA)
 
 # Build llama.cpp kernel test library
 # Requires llama.cpp to be cloned in llama.cpp/ subdirectory
-LLAMA_CPP_DIR := llama.cpp
+LLAMA_CPP_DIR ?= llama.cpp
+LLAMA_CPP_ABS = $(abspath $(LLAMA_CPP_DIR))
 LLAMA_KERNEL_TEST := $(LLAMA_CPP_DIR)/libggml_kernel_test.so
 
 $(LLAMA_KERNEL_TEST):
@@ -2859,7 +2860,7 @@ $(LLAMA_KERNEL_TEST):
 		tests/test-kernel-parity.cpp \
 		-I ggml/include -I ggml/src \
 		-L $$GGML_LIB_DIR -lggml -lggml-cpu -lggml-base -lm -lpthread \
-		-Wl,-rpath,$(PWD)/$(LLAMA_CPP_DIR)/$$GGML_LIB_DIR
+		-Wl,-rpath,$(LLAMA_CPP_ABS)/$$GGML_LIB_DIR
 
 llama_kernel_test: $(LLAMA_KERNEL_TEST)
 	@echo "Built llama.cpp kernel test library: $(LLAMA_KERNEL_TEST)"

@@ -17,6 +17,7 @@
 #include "ckernel_engine.h"
 #include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -142,7 +143,11 @@ void swiglu_forward(const float *input,
                     int tokens,
                     int dim)
 {
-    if (ck_strict_parity_enabled()) {
+    const char *fast_env = getenv("CK_SWIGLU_FAST");
+    const char *exact_env = getenv("CK_SWIGLU_EXACT");
+    if (ck_strict_parity_enabled() ||
+        !(fast_env && atoi(fast_env) != 0) ||
+        (exact_env && atoi(exact_env) != 0)) {
         swiglu_forward_exact(input, output, tokens, dim);
         return;
     }

@@ -27,12 +27,28 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 #include "ckernel_quant.h"
 
 /* Include SIMD headers based on available extensions */
 #if defined(__AVX512F__) || defined(__AVX2__) || defined(__AVX__) || defined(__SSE4_1__)
 #include <immintrin.h>
 #endif
+
+#define CK_Q4K_STACK_Q8_BLOCKS 128
+
+void quantize_row_q8_k(const float *x, void *vy, int k);
+void gemv_q4_k_q8_k(float *y, const void *W, const void *x_q8, int M, int K);
+
+static int ck_q4k_debug_q8_contract(void)
+{
+    static int cached = -1;
+    if (cached < 0) {
+        const char *env = getenv("CK_DEBUG_Q4K_Q8_CONTRACT");
+        cached = (env && env[0] && env[0] != '0') ? 1 : 0;
+    }
+    return cached;
+}
 
 /* ============================================================================
  * GEMV: y = W @ x  (W is Q4_K, x and y are FP32)
@@ -287,6 +303,15 @@ void gemv_q4_k(float *y,
                const float *x,
                int M, int K)
 {
+    if (ck_q4k_debug_q8_contract() && K > 0 && (K % QK_K) == 0) {
+        const int nb = K / QK_K;
+        if (nb <= CK_Q4K_STACK_Q8_BLOCKS) {
+            block_q8_K x_q8[CK_Q4K_STACK_Q8_BLOCKS];
+            quantize_row_q8_k(x, x_q8, K);
+            gemv_q4_k_q8_k(y, W, x_q8, M, K);
+            return;
+        }
+    }
 #ifdef __AVX512F__
     gemv_q4_k_avx512(y, W, x, M, K);
 #elif defined(__AVX__)

@@ -293,7 +293,7 @@ CKSpacePrefixStyle ck_tokenizer_detect_space_prefix_style(CKTokenizer *tok) {
     int gpt2_count = 0;
     int spm_count = 0;
 
-    for (size_t i = 0; i < tok->vocab_size && i < 10000; i++) {  /* Sample first 10k tokens */
+    for (size_t i = 0; i < tok->vocab_size; i++) {
         const char *token = tok->id_to_token[i];
         if (!token) continue;
 
@@ -526,7 +526,17 @@ int ck_tokenizer_decode(const CKTokenizer *tok, const int32_t *ids, int num_ids,
             }
         }
 
-        for (int j = 0; j < token_len && len < max_len - 1; j++) text[len++] = token[j];
+        for (int j = 0; j < token_len && len < max_len - 1; ) {
+            if (j + 2 < token_len &&
+                (unsigned char)token[j] == 0xE2 &&
+                (unsigned char)token[j + 1] == 0x96 &&
+                (unsigned char)token[j + 2] == 0x81) {
+                text[len++] = ' ';
+                j += 3;
+                continue;
+            }
+            text[len++] = token[j++];
+        }
     }
     text[len] = '\0';
     return len;

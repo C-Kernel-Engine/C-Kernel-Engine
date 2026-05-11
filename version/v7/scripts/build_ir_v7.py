@@ -1426,6 +1426,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
         q_size = seq_len * recurrent_q * 4
         k_size = seq_len * recurrent_k * 4
         v_size = seq_len * recurrent_v * 4
+        conv_input_width = max(1, recurrent_conv_history + seq_len)
+        conv_input_size = max(1, recurrent_conv_channels) * conv_input_width * 4
+        conv_qkv_size = seq_len * max(1, recurrent_conv_channels) * 4
         conv_state_stride = max(1, recurrent_conv_history) * max(1, recurrent_conv_channels) * 4
         ssm_state_stride = max(1, recurrent_state_heads) * max(1, recurrent_state_rows) * max(1, recurrent_state_cols) * 4
         conv_state_size = num_layers * conv_state_stride
@@ -1438,6 +1441,9 @@ def build_activation_specs(config: Dict[str, Any], mode: str, context_len: int, 
         add("recurrent_q", q_size, f"[{seq_len}, {recurrent_q}]")
         add("recurrent_k", k_size, f"[{seq_len}, {recurrent_k}]")
         add("recurrent_v", v_size, f"[{seq_len}, {recurrent_v}]")
+        add("recurrent_conv_input", conv_input_size, f"[{recurrent_conv_channels}, {recurrent_conv_history + seq_len}]")
+        add("recurrent_conv_qkv_raw", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
+        add("recurrent_conv_qkv", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
         add("recurrent_conv_state", conv_state_size, f"[{num_layers}, {recurrent_conv_history}, {recurrent_conv_channels}]")
         add("recurrent_ssm_state", ssm_state_size, f"[{num_layers}, {recurrent_state_heads}, {recurrent_state_rows}, {recurrent_state_cols}]")
 
@@ -4934,6 +4940,9 @@ def generate_memory_layout(
         rq_size = seq_len * recurrent_q * 4
         rk_size = seq_len * recurrent_k * 4
         rv_size = seq_len * recurrent_v * 4
+        conv_input_width = max(1, recurrent_conv_history + seq_len)
+        conv_input_size = max(1, recurrent_conv_channels) * conv_input_width * 4
+        conv_qkv_size = seq_len * max(1, recurrent_conv_channels) * 4
         conv_state_stride = max(1, recurrent_conv_history) * max(1, recurrent_conv_channels) * 4
         ssm_state_stride = max(1, recurrent_state_heads) * max(1, recurrent_state_rows) * max(1, recurrent_state_cols) * 4
         conv_state_size = num_layers * conv_state_stride
@@ -4946,6 +4955,9 @@ def generate_memory_layout(
         add_buffer("recurrent_q", rq_size, f"[{seq_len}, {recurrent_q}]")
         add_buffer("recurrent_k", rk_size, f"[{seq_len}, {recurrent_k}]")
         add_buffer("recurrent_v", rv_size, f"[{seq_len}, {recurrent_v}]")
+        add_buffer("recurrent_conv_input", conv_input_size, f"[{recurrent_conv_channels}, {recurrent_conv_history + seq_len}]")
+        add_buffer("recurrent_conv_qkv_raw", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
+        add_buffer("recurrent_conv_qkv", conv_qkv_size, f"[{seq_len}, {recurrent_conv_channels}]")
         add_buffer("recurrent_conv_state", conv_state_size, f"[{num_layers}, {recurrent_conv_history}, {recurrent_conv_channels}]")
         add_buffer("recurrent_ssm_state", ssm_state_size, f"[{num_layers}, {recurrent_state_heads}, {recurrent_state_rows}, {recurrent_state_cols}]")
 

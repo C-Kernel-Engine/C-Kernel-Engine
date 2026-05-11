@@ -17,6 +17,7 @@
 #include "ckernel_engine.h"
 #include <math.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
@@ -136,7 +137,8 @@ void rmsnorm_forward(const float *input,
     int D = d_model;
     int aligned = aligned_embed_dim;
 
-    if (ck_strict_parity_enabled()) {
+    const char *exact_env = getenv("CK_RMSNORM_EXACT");
+    if (ck_strict_parity_enabled() || (exact_env && atoi(exact_env) != 0)) {
         rmsnorm_forward_strict_scalar(input, gamma, output, rstd_cache, T, D, aligned, eps);
         return;
     }

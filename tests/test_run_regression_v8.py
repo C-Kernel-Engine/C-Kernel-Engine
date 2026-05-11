@@ -71,6 +71,8 @@ class RegressionHarnessV8Tests(unittest.TestCase):
         self.assertEqual(by_id["qwen3vl"].runtime_expect.get("manifest", {}).get("config.model"), "qwen3vl")
         self.assertEqual(by_id["nanbeige"].runtime_expect.get("config", {}).get("chat_contract.name"), "llama_chatml")
         self.assertEqual(by_id["gemma"].runtime_expect.get("config", {}).get("rope_layout"), "split")
+        qwen35_lowered = by_id["qwen35"].runtime_expect.get("lowered_ops", [])
+        self.assertEqual(qwen35_lowered[0].get("function_prefix"), "mrope_qk_text")
 
     def test_resolve_gguf_path_accepts_direct_cache_root_layout(self) -> None:
         cache_root = Path("/tmp/test_run_regression_v8_cache")

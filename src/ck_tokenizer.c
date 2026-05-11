@@ -759,7 +759,10 @@ int ck_tokenizer_decode(const CKTokenizer *tok,
             continue;
         }
 
-        /* Handle GPT-style space prefix (Ġ = 0xC4 0xA0 in UTF-8) */
+        /* Handle tokenizer space prefixes:
+         *   GPT/byte-level BPE: Ġ (0xC4 0xA0)
+         *   SentencePiece BPE: ▁ (0xE2 0x96 0x81)
+         */
         const char *src = token;
         if ((unsigned char)token[0] == 0xC4 && (unsigned char)token[1] == 0xA0) {
             if (len < max_len - 1) {
@@ -767,11 +770,31 @@ int ck_tokenizer_decode(const CKTokenizer *tok,
             }
             src = token + 2;
             token_len -= 2;
+        } else if ((unsigned char)token[0] == 0xE2 &&
+                   (unsigned char)token[1] == 0x96 &&
+                   (unsigned char)token[2] == 0x81) {
+            if (len < max_len - 1) {
+                text[len++] = ' ';
+            }
+            src = token + 3;
+            token_len -= 3;
         }
 
-        /* Copy token */
-        for (int j = 0; j < token_len && len < max_len - 1; j++) {
-            text[len++] = src[j];
+        /* Copy token, normalizing any embedded SentencePiece markers too.
+         * Some Gemma tokenizer pieces contain repeated ▁ markers after
+         * indentation or punctuation; those are word-boundary spaces, not
+         * literal output characters.
+         */
+        for (int j = 0; j < token_len && len < max_len - 1; ) {
+            if (j + 2 < token_len &&
+                (unsigned char)src[j] == 0xE2 &&
+                (unsigned char)src[j + 1] == 0x96 &&
+                (unsigned char)src[j + 2] == 0x81) {
+                text[len++] = ' ';
+                j += 3;
+                continue;
+            }
+            text[len++] = src[j++];
         }
     }
 

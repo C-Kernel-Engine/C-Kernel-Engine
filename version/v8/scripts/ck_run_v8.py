@@ -966,6 +966,8 @@ def step_run_chat(work_dir: Path, args: argparse.Namespace, *, gguf_path: Path |
         cmd.extend(["--repeat-penalty", str(float(args.repeat_penalty))])
     if args.repeat_last_n is not None:
         cmd.extend(["--repeat-last-n", str(int(args.repeat_last_n))])
+    if args.no_repeat_ngram_size is not None:
+        cmd.extend(["--no-repeat-ngram-size", str(int(args.no_repeat_ngram_size))])
     if args.prompt:
         cmd.extend(["--prompt", args.prompt])
     if args.no_chat_template:
@@ -1081,6 +1083,8 @@ def run_pipeline(args: argparse.Namespace) -> int:
             cmd.extend(["--repeat-penalty", str(float(args.repeat_penalty))])
         if args.repeat_last_n is not None:
             cmd.extend(["--repeat-last-n", str(int(args.repeat_last_n))])
+        if args.no_repeat_ngram_size is not None:
+            cmd.extend(["--no-repeat-ngram-size", str(int(args.no_repeat_ngram_size))])
         for override in list(getattr(args, "vision_activation_pref", []) or []):
             cmd.extend(["--vision-activation-pref", str(override)])
         if args.no_chat_template:
@@ -1187,8 +1191,9 @@ Examples:
     run_parser.add_argument("--top-k", type=int, default=40)
     run_parser.add_argument("--top-p", type=float, default=1.0)
     run_parser.add_argument("--min-p", type=float, default=0.0)
-    run_parser.add_argument("--repeat-penalty", type=float, default=1.0)
-    run_parser.add_argument("--repeat-last-n", type=int, default=64)
+    run_parser.add_argument("--repeat-penalty", type=float, default=None)
+    run_parser.add_argument("--repeat-last-n", type=int, default=None)
+    run_parser.add_argument("--no-repeat-ngram-size", type=int, default=None)
     run_parser.add_argument("--prompt", default=None, help="Single prompt (non-interactive if set)")
     run_parser.add_argument("--chat-template", choices=["auto", "none", "qwen", "qwen2", "qwen3", "qwen35", "qwen3vl", "gemma", "gemma3", "llama"], default="auto")
     run_parser.add_argument("--no-chat-template", action="store_true")

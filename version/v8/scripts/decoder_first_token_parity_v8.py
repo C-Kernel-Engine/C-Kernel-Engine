@@ -801,6 +801,7 @@ def _capture_ck_dump(
     tokens_before: list[int] | None = None,
     prefix_grid: tuple[int, int] | None = None,
     prefix_text_pos: int | None = None,
+    ck_strict_parity: bool = True,
 ) -> dict[str, Any]:
     if dump_dir.exists():
         shutil.rmtree(dump_dir)
@@ -818,7 +819,7 @@ def _capture_ck_dump(
             prefix_embed_dim=prefix_row_dim,
             prefix_grid=prefix_grid,
             prefix_text_pos=prefix_text_pos,
-            strict_parity=True,
+            strict_parity=ck_strict_parity,
         )
     finally:
         if old_dump is None:
@@ -846,6 +847,7 @@ def _capture_dump_compare(
     dump_rtol: float,
     prefix_grid: tuple[int, int] | None = None,
     prefix_text_pos: int | None = None,
+    ck_strict_parity: bool = True,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if prefix_tokens > 0:
         if str(dump_pass) != "decode":
@@ -856,7 +858,7 @@ def _capture_dump_compare(
                 token_ids,
                 tokens_before=tokens_before,
                 prefix_embed_dim=prefix_row_dim,
-                strict_parity=True,
+                strict_parity=ck_strict_parity,
             )
             return ck, {
                 "status": "skipped",
@@ -895,6 +897,7 @@ def _capture_dump_compare(
         tokens_before=tokens_before,
         prefix_grid=prefix_grid,
         prefix_text_pos=prefix_text_pos,
+        ck_strict_parity=ck_strict_parity,
     )
 
     ck_dump_path = ck_dump_dir / "dump.bin"
@@ -984,6 +987,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dump-pass", choices=("all", "prefill", "decode"), default="decode")
     ap.add_argument("--dump-atol", type=float, default=1.0e-4)
     ap.add_argument("--dump-rtol", type=float, default=1.0e-3)
+    ap.add_argument("--ck-strict-parity", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--json-out", type=Path, default=None, help="Optional explicit JSON report path")
     args = ap.parse_args(argv)
 
@@ -1110,6 +1114,7 @@ def main(argv: list[str] | None = None) -> int:
             dump_rtol=float(args.dump_rtol),
             prefix_grid=resolved_prefix_grid,
             prefix_text_pos=resolved_prefix_text_pos,
+            ck_strict_parity=bool(args.ck_strict_parity),
         )
     else:
         ck = bridge_runner_v8._run_decoder(
@@ -1121,7 +1126,7 @@ def main(argv: list[str] | None = None) -> int:
             prefix_embed_dim=prefix_row_dim,
             prefix_grid=resolved_prefix_grid,
             prefix_text_pos=resolved_prefix_text_pos,
-            strict_parity=True,
+            strict_parity=bool(args.ck_strict_parity),
         )
 
     ck_logits = np.array(ck["logits"], dtype=np.float32, copy=False)

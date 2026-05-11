@@ -283,11 +283,12 @@ def _inject_runtime_config_defaults(config: dict, arch: str) -> dict:
         config["activation_preference_by_op"] = prefs
 
     if arch_lc == "qwen35":
+        config.setdefault("prefer_q8_0_contract", True)
         _merge_activation_defaults(
             {
                 "recurrent_gate_proj": "fp32",
-                "recurrent_alpha_proj": "fp32",
-                "recurrent_beta_proj": "fp32",
+                "recurrent_alpha_proj": "q8_0",
+                "recurrent_beta_proj": "q8_0",
             }
         )
     elif arch_lc == "qwen3_vl_vision":
@@ -991,6 +992,21 @@ def describe_layer_contract(tensors: Dict[str, "TensorInfo"], layer: int, arch: 
     return None
 
 
+def extract_mrope_sections_for_arch(meta: Dict[str, object], arch: str) -> Optional[list]:
+    """Return GGUF RoPE dimension sections for architectures that use text MRoPE."""
+    arch_lc = str(arch or "").strip().lower()
+    key = "qwen3vl.rope.dimension_sections"
+    if arch_lc == "qwen35":
+        key = "qwen35.rope.dimension_sections"
+    value = meta.get(key)
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    try:
+        return [int(v) for v in value]
+    except Exception:
+        return None
+
+
 # GGML tensor types (subset).
 GGML_TYPE_F32 = 0
 GGML_TYPE_F16 = 1
@@ -1214,13 +1230,13 @@ def copy_qk_head_packed(
     aligned_head_dim: int,
     aligned_embed_dim: int,
 ) -> None:
-    # Supported quantized types: K-quants (Q4_K, Q6_K) and simple quants (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
+    # Supported quantized types: K-quants (Q4_K, Q5_K, Q6_K) and simple quants (Q4_0, Q4_1, Q5_0, Q5_1, Q8_0)
     supported_types = (
-        GGML_TYPE_Q4_K, GGML_TYPE_Q6_K, GGML_TYPE_F32,
+        GGML_TYPE_Q4_K, GGML_TYPE_Q5_K, GGML_TYPE_Q6_K, GGML_TYPE_F32,
         GGML_TYPE_Q4_0, GGML_TYPE_Q4_1, GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0
     )
     if info.ggml_type not in supported_types:
-        raise GGUFError(f"{info.name}: expected Q4_K/Q6_K/Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/F32, got {ggml_type_name(info.ggml_type)}")
+        raise GGUFError(f"{info.name}: expected Q4_K/Q5_K/Q6_K/Q4_0/Q4_1/Q5_0/Q5_1/Q8_0/F32, got {ggml_type_name(info.ggml_type)}")
     if len(info.dims) != 2:
         raise GGUFError(f"{info.name}: expected 2D, got dims={info.dims}")
 
@@ -1229,7 +1245,7 @@ def copy_qk_head_packed(
     if in_dim > aligned_embed_dim:
         raise GGUFError(f"{info.name}: expected in_dim<=aligned_embed_dim (got {in_dim} > {aligned_embed_dim})")
     # K-quants require 256-element alignment, simple quants require 32-element alignment
-    if info.ggml_type in (GGML_TYPE_Q4_K, GGML_TYPE_Q6_K) and (aligned_embed_dim % 256) != 0:
+    if info.ggml_type in (GGML_TYPE_Q4_K, GGML_TYPE_Q5_K, GGML_TYPE_Q6_K) and (aligned_embed_dim % 256) != 0:
         raise GGUFError(f"{info.name}: aligned_embed_dim must be multiple of 256 for K-quant (got {aligned_embed_dim})")
     if info.ggml_type in (GGML_TYPE_Q4_0, GGML_TYPE_Q4_1, GGML_TYPE_Q5_0, GGML_TYPE_Q5_1, GGML_TYPE_Q8_0) and (aligned_embed_dim % 32) != 0:
         raise GGUFError(f"{info.name}: aligned_embed_dim must be multiple of 32 for simple quant (got {aligned_embed_dim})")
@@ -3075,14 +3091,8 @@ def main() -> None:
             "even_odd": "pairwise",
         }
         rope_layout = rope_layout_aliases.get(rope_layout, rope_layout)
-        mrope_sections_meta = meta.get("qwen3vl.rope.dimension_sections")
-        mrope_sections = None
-        if isinstance(mrope_sections_meta, (list, tuple)) and len(mrope_sections_meta) == 4:
-            try:
-                mrope_sections = [int(v) for v in mrope_sections_meta]
-            except Exception:
-                mrope_sections = None
-        if arch == "qwen3vl" and mrope_sections:
+        mrope_sections = extract_mrope_sections_for_arch(meta, arch)
+        if arch in ("qwen3vl", "qwen35") and mrope_sections:
             rope_layout = "multi_section_1d"
         rope_original_context_length = int(rope_original_context_length_meta or context_len)
         rope_beta_fast = float(rope_beta_fast_meta) if rope_beta_fast_meta is not None else 0.0
@@ -3208,7 +3218,7 @@ def main() -> None:
 
         token_dtype = weight_dtype(tok, "token_emb")
         output_dtype = weight_dtype(out_weight, "output.weight") if out_weight is not None else token_dtype
-        needs_k_quant = token_dtype in (CK_DT_Q4_K, CK_DT_Q6_K) or output_dtype in (CK_DT_Q4_K, CK_DT_Q6_K)
+        needs_k_quant = token_dtype in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K) or output_dtype in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K)
 
         if arch == "qwen35":
             def _qwen35_shape(info: TensorInfo) -> list[int]:
@@ -3378,6 +3388,13 @@ def main() -> None:
                 "max_seq_len": int(context_len),
                 "context_length": int(context_len),
                 "rope_theta": float(rope_theta),
+                "rotary_dim": int(rotary_dim),
+                "rope_scaling_type": rope_scaling_type,
+                "rope_scaling_factor": float(rope_scaling_factor),
+                "rope_original_context_length": int(rope_original_context_length),
+                "rope_beta_fast": float(rope_beta_fast),
+                "rope_beta_slow": float(rope_beta_slow),
+                "rope_attn_factor": float(rope_attn_factor),
                 "rms_eps": float(rms_eps) if rms_eps else 1e-5,
                 "rms_norm_eps": float(rms_eps) if rms_eps else 1e-5,
                 "tie_word_embeddings": bool(tie_word_embeddings),
@@ -3386,7 +3403,28 @@ def main() -> None:
                 "dtype": "fp32",
                 "layer_kinds": layer_kinds,
                 "hybrid_block_pattern": layer_kinds[:],
+                # Qwen3.5 contains recurrent stateful layers. Batched prefill
+                # for those layers is not equivalent to autoregressive decode
+                # until the recurrent prefill state update has dedicated parity.
+                "prefill_policy": "sequential_decode",
+                "sampler_defaults": {
+                    "repeat_penalty": 1.12,
+                    "repeat_last_n": 96,
+                    "no_repeat_ngram_size": 4,
+                },
+                # Qwen3.5 long-decode parity is sensitive to the extra
+                # activation Q8_K rounding before full-attention Q/Gate/K/V
+                # projections. Codegen supports an opt-in
+                # attn_proj_fp32_layers policy for targeted debugging, but the
+                # converter leaves the production path on the quantized kernels
+                # until the replacement policy is proven across multi-token
+                # parity, not just one borderline prefix.
             }
+            if rope_layout:
+                qwen35_config["rope_layout"] = rope_layout
+            if mrope_sections:
+                qwen35_config["mrope_sections"] = [int(v) for v in mrope_sections]
+                qwen35_config["mrope_n_dims"] = int(sum(int(v) for v in mrope_sections))
             if full_attention_interval is not None:
                 qwen35_config["full_attention_interval"] = int(full_attention_interval)
             if attn_q_gate_proj_dim is not None:
@@ -3804,7 +3842,7 @@ def main() -> None:
                 )
 
             needs_k_quant = needs_k_quant or any(
-                dt in (CK_DT_Q4_K, CK_DT_Q6_K)
+                dt in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K)
                 for dt in (wq_dt, wk_dt, wv_dt, wo_dt, gate_dt, up_dt, down_dt)
             )
 
@@ -3865,7 +3903,7 @@ def main() -> None:
         dtype_table_bytes = bytes(dtype_table)
 
         # Check alignment requirements per-tensor:
-        # - K-quants (Q4_K, Q6_K) require row dimension (ne0) divisible by 256
+        # - K-quants (Q4_K, Q5_K, Q6_K) require row dimension (ne0) divisible by 256
         # - Simple quants (Q5_0, Q8_0) require row dimension divisible by 32
         # We already validated this in copy_qk_head_packed and ggml_row_bytes,
         # but add a check here for K-quant matrices where embed_dim is the input
@@ -3873,13 +3911,13 @@ def main() -> None:
             # Check WQ/WK/WV/gate/up: input dim = embed_dim
             for key in ["wq_dt", "wk_dt", "wv_dt", "gate_dt", "up_dt"]:
                 dt = layer_info.get(key)
-                if dt in (CK_DT_Q4_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
+                if dt in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
                     raise GGUFError(f"K-quant requires embed_dim multiple of 256 (got {embed_dim}) for {key}")
             # Check down: input dim = intermediate
             dt = layer_info.get("down_dt")
-            if dt in (CK_DT_Q4_K, CK_DT_Q6_K) and intermediate % 256 != 0:
+            if dt in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K) and intermediate % 256 != 0:
                 raise GGUFError(f"K-quant requires intermediate_size multiple of 256 (got {intermediate})")
-        if out_weight is not None and output_dtype in (CK_DT_Q4_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
+        if out_weight is not None and output_dtype in (CK_DT_Q4_K, CK_DT_Q5_K, CK_DT_Q6_K) and embed_dim % 256 != 0:
             raise GGUFError(
                 f"K-quant requires embed_dim multiple of 256 (got {embed_dim}) for output.weight"
             )
@@ -4145,6 +4183,12 @@ def main() -> None:
                     config["chat_template"] = chat_template
                 if rope_layout:
                     config["rope_layout"] = rope_layout
+                if arch == "gemma3":
+                    # Gemma 3 decode matches llama.cpp, but the current v8
+                    # batched prefill lowering diverges on first-token logits.
+                    # Replay prompt tokens through decode until Gemma prefill
+                    # has layer-level parity.
+                    config["prefill_policy"] = "sequential_decode"
                 finetune = meta.get("general.finetune")
                 if isinstance(finetune, str) and finetune.strip():
                     config["finetune"] = finetune
@@ -4340,6 +4384,10 @@ def main() -> None:
             cfg["sliding_window"] = int(sliding_window)
         if rope_layout:
             cfg["rope_layout"] = rope_layout
+        if arch == "gemma3":
+            # Keep generated runners correct for Gemma 3 while batched prefill
+            # parity is still behind the decode path.
+            cfg["prefill_policy"] = "sequential_decode"
         chat_template = meta.get("tokenizer.chat_template")
         if isinstance(chat_template, str) and chat_template.strip():
             cfg["chat_template"] = chat_template

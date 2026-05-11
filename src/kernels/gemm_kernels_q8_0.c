@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include "ckernel_quant.h"
 #include "ck_features.h"
@@ -40,6 +41,16 @@
 #endif
 
 void quantize_row_q8_k(const float *x, void *vy, int k);
+
+static int ck_q8_0_debug_ref(void)
+{
+    static int cached = -1;
+    if (cached < 0) {
+        const char *env = getenv("CK_DEBUG_Q8_0_REF");
+        cached = (env && env[0] && env[0] != '0') ? 1 : 0;
+    }
+    return cached;
+}
 
 static inline int ck_nearest_int_q8_0(float fval) {
     /* Match llama.cpp's deterministic nearest-even helper. */
@@ -634,6 +645,11 @@ void gemv_q8_0(float *y,
                const float *x,
                int M, int K)
 {
+    if (ck_q8_0_debug_ref()) {
+        gemv_q8_0_ref(y, W, x, M, K);
+        return;
+    }
+
 // Dispatch order: AVX512 > AVX2 > AVX > SSE > ref
 #if defined(__AVX512F__)
     gemv_q8_0_avx512(y, W, x, M, K);

@@ -189,6 +189,28 @@ class TestQwen35TemplateGuard(unittest.TestCase):
         self.assertEqual(specs["recurrent_conv_state"]["size"], 4 * conv_stride)
         self.assertEqual(specs["recurrent_ssm_state"]["size"], 4 * ssm_stride)
 
+    def test_recurrent_conv_uses_distinct_input_and_output_buffers(self) -> None:
+        config = build_ir._normalize_manifest_config(
+            {
+                "num_layers": 4,
+                "embed_dim": 1024,
+                "ssm_state_size": 128,
+                "ssm_group_count": 16,
+                "ssm_time_step_rank": 16,
+                "ssm_inner_size": 2048,
+                "ssm_conv_history": 3,
+                "ssm_conv_channels": 6144,
+                "gate_dim": 16,
+            }
+        )
+        specs = build_ir.build_activation_specs(config, mode="decode", context_len=64)
+        self.assertIn("recurrent_conv_input", specs)
+        self.assertIn("recurrent_conv_qkv_raw", specs)
+        self.assertIn("recurrent_conv_qkv", specs)
+        self.assertEqual(specs["recurrent_conv_input"]["size"], 4 * 6144 * 4)
+        self.assertEqual(specs["recurrent_conv_qkv_raw"]["size"], 6144 * 4)
+        self.assertEqual(specs["recurrent_conv_qkv"]["size"], 6144 * 4)
+
     def test_layer_scoped_recurrent_state_offsets_are_generic(self) -> None:
         lowered_op = {
             "layer": 3,

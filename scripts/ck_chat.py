@@ -1052,6 +1052,34 @@ class CKModel:
     def _load_runtime_contract(self) -> dict:
         """Load generic runtime behavior flags from config/manifest/template."""
         contract = {"prefill_policy": "batched"}
+
+        def _merge_sampler_defaults(src: object) -> None:
+            if not isinstance(src, dict):
+                return
+            defaults = src.get("sampler_defaults")
+            if not isinstance(defaults, dict):
+                return
+            clean: dict = {}
+            if "repeat_penalty" in defaults:
+                try:
+                    clean["repeat_penalty"] = float(defaults["repeat_penalty"])
+                except (TypeError, ValueError):
+                    pass
+            if "repeat_last_n" in defaults:
+                try:
+                    clean["repeat_last_n"] = int(defaults["repeat_last_n"])
+                except (TypeError, ValueError):
+                    pass
+            if "no_repeat_ngram_size" in defaults:
+                try:
+                    clean["no_repeat_ngram_size"] = int(defaults["no_repeat_ngram_size"])
+                except (TypeError, ValueError):
+                    pass
+            if clean:
+                merged = dict(contract.get("sampler_defaults") or {})
+                merged.update(clean)
+                contract["sampler_defaults"] = merged
+
         candidates = [
             self.model_dir / "config.json",
             self.model_dir / "weights_manifest.json",
@@ -1081,9 +1109,14 @@ class CKModel:
                     and any(str(kind).strip().lower() not in {"full_attention", "attention", "dense_attention"} for kind in layer_kinds)
                 ):
                     contract["prefill_policy"] = "sequential_decode"
+                _merge_sampler_defaults(cfg)
 
             template = data.get("template")
             if isinstance(template, dict):
+                _merge_sampler_defaults(template)
+                template_contract = template.get("contract")
+                if isinstance(template_contract, dict):
+                    _merge_sampler_defaults(template_contract)
                 flags = template.get("flags")
                 if isinstance(flags, dict):
                     template_prefill = flags.get("prefill_policy")
@@ -1639,6 +1672,7 @@ def sample_top_k(
     recent_tokens: Optional[List[int]] = None,
     repeat_penalty: float = 1.0,
     repeat_last_n: int = 64,
+    no_repeat_ngram_size: int = 0,
     top_p: float = 1.0,
     min_p: float = 0.0,
 ) -> int:
@@ -1654,6 +1688,18 @@ def sample_top_k(
                 scores[token_id] /= repeat_penalty
             else:
                 scores[token_id] *= repeat_penalty
+
+    if no_repeat_ngram_size and recent_tokens:
+        n = int(no_repeat_ngram_size)
+        if n >= 2 and len(recent_tokens) >= n - 1:
+            prefix = list(recent_tokens[-(n - 1):])
+            banned: set[int] = set()
+            for i in range(0, len(recent_tokens) - n + 1):
+                if recent_tokens[i:i + n - 1] == prefix:
+                    banned.add(int(recent_tokens[i + n - 1]))
+            for token_id in banned:
+                if 0 <= token_id < scores.shape[0]:
+                    scores[token_id] = -np.inf
 
     if temperature <= 0:
         return int(np.argmax(scores))
@@ -1755,6 +1801,27 @@ def _trim_repeated_suffix(text: str) -> Optional[tuple[str, str]]:
     return None
 
 
+def _detect_token_ngram_repetition(tokens: List[int],
+                                   min_ngram: int = 3,
+                                   max_ngram: int = 16,
+                                   min_repeats: int = 4) -> Optional[str]:
+    """Detect repeated token phrases that do not necessarily align to lines."""
+    if len(tokens) < min_ngram * min_repeats:
+        return None
+
+    max_n = min(max_ngram, len(tokens) // min_repeats)
+    for n in range(max_n, min_ngram - 1, -1):
+        tail = tokens[-n:]
+        repeats = 1
+        start = len(tokens) - (2 * n)
+        while start >= 0 and tokens[start:start + n] == tail:
+            repeats += 1
+            start -= n
+        if repeats >= min_repeats:
+            return f"token {n}-gram repetition"
+    return None
+
+
 def _normalize_visible_chat_markup(text: str) -> str:
     """Collapse obviously duplicated visible chat markers into a cleaner display form."""
     if not text or "<think>" not in text:
@@ -1816,6 +1883,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
              min_p: float = 0.0,
              repeat_penalty: float = 1.05,
              repeat_last_n: int = 64,
+             no_repeat_ngram_size: int = 0,
              min_new_tokens: int = 0,
              stop_on_text: Optional[List[str]] = None) -> str:
     """Generate text from prompt.
@@ -1915,6 +1983,10 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
         nonlocal generated_text, stop_reason
         if show_token_ids:
             return False
+        token_repeat = _detect_token_ngram_repetition(generated_tokens)
+        if token_repeat is not None:
+            stop_reason = token_repeat
+            return True
         trimmed = _trim_repeated_suffix(generated_text)
         if trimmed is None:
             return False
@@ -1930,6 +2002,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             recent_tokens=token_ids,
             repeat_penalty=repeat_penalty,
             repeat_last_n=repeat_last_n,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             top_p=top_p,
             min_p=min_p,
         )
@@ -1951,6 +2024,7 @@ def generate(model: CKModel, prompt: str, max_tokens: int = 50,
             recent_tokens=token_ids,
             repeat_penalty=repeat_penalty,
             repeat_last_n=repeat_last_n,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             top_p=top_p,
             min_p=min_p,
         )
@@ -2165,6 +2239,7 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
               min_p: float = 0.0,
               repeat_penalty: float = 1.0,
               repeat_last_n: int = 64,
+              no_repeat_ngram_size: int = 0,
               memory_enabled: bool = False,
               stop_on_text: Optional[List[str]] = None):
     """Interactive chat loop."""
@@ -2238,6 +2313,7 @@ def chat_loop(model: CKModel, temperature: float = 0.7, max_tokens: int = 100,
                           min_p=min_p,
                           repeat_penalty=repeat_penalty,
                           repeat_last_n=repeat_last_n,
+                          no_repeat_ngram_size=no_repeat_ngram_size,
                           min_new_tokens=model.default_min_new_tokens() if model.use_chat_template else 0,
                           stop_on_text=stop_on_text)
         print()
@@ -2255,8 +2331,9 @@ def main():
     parser.add_argument("--top-k", type=int, default=40, help="Top-k sampling size (default: 40)")
     parser.add_argument("--top-p", type=float, default=1.0, help="Top-p nucleus sampling (default: 1.0)")
     parser.add_argument("--min-p", type=float, default=0.0, help="Min-p filter as fraction of max prob (default: 0.0)")
-    parser.add_argument("--repeat-penalty", type=float, default=1.05, help="Repeat penalty >1.0 reduces looping (default: 1.05)")
-    parser.add_argument("--repeat-last-n", type=int, default=64, help="Window size for repeat penalty (default: 64)")
+    parser.add_argument("--repeat-penalty", type=float, default=None, help="Repeat penalty >1.0 reduces looping (model default when omitted)")
+    parser.add_argument("--repeat-last-n", type=int, default=None, help="Window size for repeat penalty (model default when omitted)")
+    parser.add_argument("--no-repeat-ngram-size", type=int, default=None, help="Block tokens that repeat an n-gram of this size (model default when omitted)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--stats", action="store_true", default=True,
                        help="Show performance stats (default: on)")
@@ -2335,6 +2412,16 @@ def main():
                       allow_raw_prompt=args.allow_raw_prompt):
         sys.exit(1)
     model.thinking_mode = str(args.thinking_mode or "auto")
+    runtime_contract = model._load_runtime_contract()
+    sampler_defaults = runtime_contract.get("sampler_defaults") if isinstance(runtime_contract, dict) else None
+    if not isinstance(sampler_defaults, dict):
+        sampler_defaults = {}
+    if args.repeat_penalty is None:
+        args.repeat_penalty = float(sampler_defaults.get("repeat_penalty", 1.05))
+    if args.repeat_last_n is None:
+        args.repeat_last_n = int(sampler_defaults.get("repeat_last_n", 64))
+    if args.no_repeat_ngram_size is None:
+        args.no_repeat_ngram_size = int(sampler_defaults.get("no_repeat_ngram_size", 0))
 
     print(f"Model loaded! Vocab: {model.vocab_size}, Context: {model.context_window}")
     stop_markers = list(args.stop_on_text or [])
@@ -2374,6 +2461,7 @@ def main():
                     min_p=args.min_p,
                     repeat_penalty=args.repeat_penalty,
                     repeat_last_n=args.repeat_last_n,
+                    no_repeat_ngram_size=args.no_repeat_ngram_size,
                     min_new_tokens=model.default_min_new_tokens() if model.use_chat_template else 0,
                     stop_on_text=stop_markers)
             print()
@@ -2404,6 +2492,7 @@ def main():
                      min_p=args.min_p,
                      repeat_penalty=args.repeat_penalty,
                      repeat_last_n=args.repeat_last_n,
+                     no_repeat_ngram_size=args.no_repeat_ngram_size,
                      memory_enabled=args.memory,
                      stop_on_text=stop_markers)
     finally:
