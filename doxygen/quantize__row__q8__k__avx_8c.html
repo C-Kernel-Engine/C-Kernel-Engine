@@ -371,35 +371,53 @@ CK-ENGINE KERNEL RULES:</h1>
 <div class="line"><span class="lineno">   51</span> </div>
 <div class="line"><span class="lineno">   52</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
 <div class="line"><span class="lineno">   53</span>        <span class="keyword">const</span> __m128 v_iscale = _mm_set1_ps(iscale);</div>
-<div class="line"><span class="lineno">   54</span> </div>
-<div class="line"><span class="lineno">   55</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
-<div class="line"><span class="lineno">   56</span>            <span class="keyword">const</span> __m128 x0 = _mm_loadu_ps(x + j + 0);</div>
-<div class="line"><span class="lineno">   57</span>            <span class="keyword">const</span> __m128 x1 = _mm_loadu_ps(x + j + 4);</div>
-<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> __m128 x2 = _mm_loadu_ps(x + j + 8);</div>
-<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> __m128 x3 = _mm_loadu_ps(x + j + 12);</div>
-<div class="line"><span class="lineno">   60</span> </div>
-<div class="line"><span class="lineno">   61</span>            <span class="keyword">const</span> __m128i q0 = _mm_cvtps_epi32(_mm_mul_ps(x0, v_iscale));</div>
-<div class="line"><span class="lineno">   62</span>            <span class="keyword">const</span> __m128i q1 = _mm_cvtps_epi32(_mm_mul_ps(x1, v_iscale));</div>
-<div class="line"><span class="lineno">   63</span>            <span class="keyword">const</span> __m128i q2 = _mm_cvtps_epi32(_mm_mul_ps(x2, v_iscale));</div>
-<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> __m128i q3 = _mm_cvtps_epi32(_mm_mul_ps(x3, v_iscale));</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keyword">const</span> __m128 v_magic = _mm_set1_ps(12582912.0f);</div>
+<div class="line"><span class="lineno">   55</span>        <span class="keyword">const</span> __m128i v_mantissa = _mm_set1_epi32(0x007fffff);</div>
+<div class="line"><span class="lineno">   56</span>        <span class="keyword">const</span> __m128i v_bias = _mm_set1_epi32(0x00400000);</div>
+<div class="line"><span class="lineno">   57</span>        <span class="keyword">const</span> __m128i v_min = _mm_set1_epi32(-128);</div>
+<div class="line"><span class="lineno">   58</span>        <span class="keyword">const</span> __m128i v_max = _mm_set1_epi32(127);</div>
+<div class="line"><span class="lineno">   59</span> </div>
+<div class="line"><span class="lineno">   60</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
+<div class="line"><span class="lineno">   61</span>            <span class="keyword">const</span> __m128 x0 = _mm_loadu_ps(x + j + 0);</div>
+<div class="line"><span class="lineno">   62</span>            <span class="keyword">const</span> __m128 x1 = _mm_loadu_ps(x + j + 4);</div>
+<div class="line"><span class="lineno">   63</span>            <span class="keyword">const</span> __m128 x2 = _mm_loadu_ps(x + j + 8);</div>
+<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> __m128 x3 = _mm_loadu_ps(x + j + 12);</div>
 <div class="line"><span class="lineno">   65</span> </div>
-<div class="line"><span class="lineno">   66</span>            <span class="keyword">const</span> __m128i q01 = _mm_packs_epi32(q0, q1);</div>
-<div class="line"><span class="lineno">   67</span>            <span class="keyword">const</span> __m128i q23 = _mm_packs_epi32(q2, q3);</div>
-<div class="line"><span class="lineno">   68</span>            <span class="keyword">const</span> __m128i q0123 = _mm_packs_epi16(q01, q23);</div>
-<div class="line"><span class="lineno">   69</span> </div>
-<div class="line"><span class="lineno">   70</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q0123);</div>
-<div class="line"><span class="lineno">   71</span> </div>
-<div class="line"><span class="lineno">   72</span>            <span class="keywordtype">int</span> sum = 0;</div>
-<div class="line"><span class="lineno">   73</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ii = 0; ii &lt; 16; ++ii) {</div>
-<div class="line"><span class="lineno">   74</span>                sum += y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j + ii];</div>
-<div class="line"><span class="lineno">   75</span>            }</div>
-<div class="line"><span class="lineno">   76</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = (int16_t)sum;</div>
-<div class="line"><span class="lineno">   77</span>        }</div>
+<div class="line"><span class="lineno">   66</span>            __m128i q0 = _mm_sub_epi32(</div>
+<div class="line"><span class="lineno">   67</span>                _mm_and_si128(_mm_castps_si128(_mm_add_ps(_mm_mul_ps(x0, v_iscale), v_magic)), v_mantissa),</div>
+<div class="line"><span class="lineno">   68</span>                v_bias);</div>
+<div class="line"><span class="lineno">   69</span>            __m128i q1 = _mm_sub_epi32(</div>
+<div class="line"><span class="lineno">   70</span>                _mm_and_si128(_mm_castps_si128(_mm_add_ps(_mm_mul_ps(x1, v_iscale), v_magic)), v_mantissa),</div>
+<div class="line"><span class="lineno">   71</span>                v_bias);</div>
+<div class="line"><span class="lineno">   72</span>            __m128i q2 = _mm_sub_epi32(</div>
+<div class="line"><span class="lineno">   73</span>                _mm_and_si128(_mm_castps_si128(_mm_add_ps(_mm_mul_ps(x2, v_iscale), v_magic)), v_mantissa),</div>
+<div class="line"><span class="lineno">   74</span>                v_bias);</div>
+<div class="line"><span class="lineno">   75</span>            __m128i q3 = _mm_sub_epi32(</div>
+<div class="line"><span class="lineno">   76</span>                _mm_and_si128(_mm_castps_si128(_mm_add_ps(_mm_mul_ps(x3, v_iscale), v_magic)), v_mantissa),</div>
+<div class="line"><span class="lineno">   77</span>                v_bias);</div>
 <div class="line"><span class="lineno">   78</span> </div>
-<div class="line"><span class="lineno">   79</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
-<div class="line"><span class="lineno">   80</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">   81</span>    }</div>
-<div class="line"><span class="lineno">   82</span>}</div>
+<div class="line"><span class="lineno">   79</span>            q0 = _mm_min_epi32(_mm_max_epi32(q0, v_min), v_max);</div>
+<div class="line"><span class="lineno">   80</span>            q1 = _mm_min_epi32(_mm_max_epi32(q1, v_min), v_max);</div>
+<div class="line"><span class="lineno">   81</span>            q2 = _mm_min_epi32(_mm_max_epi32(q2, v_min), v_max);</div>
+<div class="line"><span class="lineno">   82</span>            q3 = _mm_min_epi32(_mm_max_epi32(q3, v_min), v_max);</div>
+<div class="line"><span class="lineno">   83</span> </div>
+<div class="line"><span class="lineno">   84</span>            <span class="keyword">const</span> __m128i q01 = _mm_packs_epi32(q0, q1);</div>
+<div class="line"><span class="lineno">   85</span>            <span class="keyword">const</span> __m128i q23 = _mm_packs_epi32(q2, q3);</div>
+<div class="line"><span class="lineno">   86</span>            <span class="keyword">const</span> __m128i q0123 = _mm_packs_epi16(q01, q23);</div>
+<div class="line"><span class="lineno">   87</span> </div>
+<div class="line"><span class="lineno">   88</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q0123);</div>
+<div class="line"><span class="lineno">   89</span> </div>
+<div class="line"><span class="lineno">   90</span>            <span class="keywordtype">int</span> sum = 0;</div>
+<div class="line"><span class="lineno">   91</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> ii = 0; ii &lt; 16; ++ii) {</div>
+<div class="line"><span class="lineno">   92</span>                sum += y[i].<a class="code hl_variable" href="structblock__q8__K.html#ac7219c4dba2b1f4192beca610a3999fc">qs</a>[j + ii];</div>
+<div class="line"><span class="lineno">   93</span>            }</div>
+<div class="line"><span class="lineno">   94</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = (int16_t)sum;</div>
+<div class="line"><span class="lineno">   95</span>        }</div>
+<div class="line"><span class="lineno">   96</span> </div>
+<div class="line"><span class="lineno">   97</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
+<div class="line"><span class="lineno">   98</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">   99</span>    }</div>
+<div class="line"><span class="lineno">  100</span>}</div>
 </div><!-- fragment -->
 <p class="reference">Referenced by <a class="el" href="quantize__row__q8__k__avx_8c_source.html#l00020">quantize_row_q8_k_avx()</a>.</p>
 

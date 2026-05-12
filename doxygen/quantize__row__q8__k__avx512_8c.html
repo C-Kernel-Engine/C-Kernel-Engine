@@ -218,24 +218,33 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   48</span> </div>
 <div class="line"><span class="lineno">   49</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> iscale = -127.0f / max;</div>
 <div class="line"><span class="lineno">   50</span>        <span class="keyword">const</span> __m512 v_iscale = _mm512_set1_ps(iscale);</div>
-<div class="line"><span class="lineno">   51</span> </div>
-<div class="line"><span class="lineno">   52</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
-<div class="line"><span class="lineno">   53</span>            <span class="keyword">const</span> __m512 xf = _mm512_loadu_ps(x + j);</div>
-<div class="line"><span class="lineno">   54</span>            <span class="keyword">const</span> __m512i q32 = _mm512_cvtps_epi32(_mm512_mul_ps(xf, v_iscale));</div>
-<div class="line"><span class="lineno">   55</span>            <span class="keyword">const</span> __m128i q8 = _mm512_cvtsepi32_epi8(q32);</div>
-<div class="line"><span class="lineno">   56</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q8);</div>
-<div class="line"><span class="lineno">   57</span> </div>
-<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> sum = _mm512_reduce_add_epi32(q32);</div>
-<div class="line"><span class="lineno">   59</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = (int16_t)sum;</div>
-<div class="line"><span class="lineno">   60</span>        }</div>
-<div class="line"><span class="lineno">   61</span> </div>
-<div class="line"><span class="lineno">   62</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
-<div class="line"><span class="lineno">   63</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
-<div class="line"><span class="lineno">   64</span>    }</div>
-<div class="line"><span class="lineno">   65</span><span class="preprocessor">#else</span></div>
-<div class="line"><span class="lineno">   66</span>    <a class="code hl_function" href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
-<div class="line"><span class="lineno">   67</span><span class="preprocessor">#endif</span></div>
-<div class="line"><span class="lineno">   68</span>}</div>
+<div class="line"><span class="lineno">   51</span>        <span class="keyword">const</span> __m512 v_magic = _mm512_set1_ps(12582912.0f);</div>
+<div class="line"><span class="lineno">   52</span>        <span class="keyword">const</span> __m512i v_mantissa = _mm512_set1_epi32(0x007fffff);</div>
+<div class="line"><span class="lineno">   53</span>        <span class="keyword">const</span> __m512i v_bias = _mm512_set1_epi32(0x00400000);</div>
+<div class="line"><span class="lineno">   54</span>        <span class="keyword">const</span> __m512i v_min = _mm512_set1_epi32(-128);</div>
+<div class="line"><span class="lineno">   55</span>        <span class="keyword">const</span> __m512i v_max = _mm512_set1_epi32(127);</div>
+<div class="line"><span class="lineno">   56</span> </div>
+<div class="line"><span class="lineno">   57</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> j = 0; j &lt; <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>; j += 16) {</div>
+<div class="line"><span class="lineno">   58</span>            <span class="keyword">const</span> __m512 xf = _mm512_loadu_ps(x + j);</div>
+<div class="line"><span class="lineno">   59</span>            <span class="keyword">const</span> __m512 scaled = _mm512_mul_ps(xf, v_iscale);</div>
+<div class="line"><span class="lineno">   60</span>            __m512i q32 = _mm512_sub_epi32(</div>
+<div class="line"><span class="lineno">   61</span>                _mm512_and_si512(_mm512_castps_si512(_mm512_add_ps(scaled, v_magic)), v_mantissa),</div>
+<div class="line"><span class="lineno">   62</span>                v_bias);</div>
+<div class="line"><span class="lineno">   63</span>            q32 = _mm512_min_epi32(_mm512_max_epi32(q32, v_min), v_max);</div>
+<div class="line"><span class="lineno">   64</span>            <span class="keyword">const</span> __m128i q8 = _mm512_cvtsepi32_epi8(q32);</div>
+<div class="line"><span class="lineno">   65</span>            _mm_storeu_si128((__m128i *)(y[i].qs + j), q8);</div>
+<div class="line"><span class="lineno">   66</span> </div>
+<div class="line"><span class="lineno">   67</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> sum = _mm512_reduce_add_epi32(q32);</div>
+<div class="line"><span class="lineno">   68</span>            y[i].<a class="code hl_variable" href="structblock__q8__K.html#ad3e3b87f42780053e576d03c01ac4176">bsums</a>[j / 16] = (int16_t)sum;</div>
+<div class="line"><span class="lineno">   69</span>        }</div>
+<div class="line"><span class="lineno">   70</span> </div>
+<div class="line"><span class="lineno">   71</span>        y[i].<a class="code hl_variable" href="structblock__q8__K.html#abb47e300e16fb14224979b2538edb966">d</a> = 1.0f / iscale;</div>
+<div class="line"><span class="lineno">   72</span>        x += <a class="code hl_define" href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a>;</div>
+<div class="line"><span class="lineno">   73</span>    }</div>
+<div class="line"><span class="lineno">   74</span><span class="preprocessor">#else</span></div>
+<div class="line"><span class="lineno">   75</span>    <a class="code hl_function" href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a>(x, vy, k);</div>
+<div class="line"><span class="lineno">   76</span><span class="preprocessor">#endif</span></div>
+<div class="line"><span class="lineno">   77</span>}</div>
 <div class="ttc" id="ackernel__quant_8h_html_afd2f43dcca46f268b2008cb200198e50"><div class="ttname"><a href="ckernel__quant_8h.html#afd2f43dcca46f268b2008cb200198e50">QK_K</a></div><div class="ttdeci">#define QK_K</div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00121">ckernel_quant.h:121</a></div></div>
 <div class="ttc" id="aquantize__row__q8__k__avx512_8c_html_ae72e9986548705a72b1891fe7ffe00e5"><div class="ttname"><a href="quantize__row__q8__k__avx512_8c.html#ae72e9986548705a72b1891fe7ffe00e5">quantize_row_q8_k_ref</a></div><div class="ttdeci">void quantize_row_q8_k_ref(const float *x, void *vy, int k)</div><div class="ttdef"><b>Definition</b> <a href="gemm__kernels__q4k__q8k_8c_source.html#l00055">gemm_kernels_q4k_q8k.c:55</a></div></div>
 <div class="ttc" id="astructblock__q8__K_html"><div class="ttname"><a href="structblock__q8__K.html">block_q8_K</a></div><div class="ttdef"><b>Definition</b> <a href="ckernel__quant_8h_source.html#l00153">ckernel_quant.h:153</a></div></div>
