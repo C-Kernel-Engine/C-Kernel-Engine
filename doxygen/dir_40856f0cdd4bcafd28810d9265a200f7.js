@@ -44,6 +44,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "gemm_kernels_q8_0.c", "gemm__kernels__q8__0_8c.html", "gemm__kernels__q8__0_8c" ],
     [ "gemm_kernels_q8_0_q8_0_contract.c", "gemm__kernels__q8__0__q8__0__contract_8c.html", "gemm__kernels__q8__0__q8__0__contract_8c" ],
     [ "gemm_microkernel.c", "gemm__microkernel_8c.html", "gemm__microkernel_8c" ],
+    [ "gemma4_per_layer_embed.c", "gemma4__per__layer__embed_8c.html", "gemma4__per__layer__embed_8c" ],
     [ "gemv_omp.c", "gemv__omp_8c.html", "gemv__omp_8c" ],
     [ "gemv_omp.h", "gemv__omp_8h.html", "gemv__omp_8h" ],
     [ "ggml_runtime_compat.h", "ggml__runtime__compat_8h.html", "ggml__runtime__compat_8h" ],
