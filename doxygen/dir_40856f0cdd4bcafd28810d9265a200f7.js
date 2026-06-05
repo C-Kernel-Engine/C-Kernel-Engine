@@ -9,6 +9,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "attention_oracle_ggml.c", "attention__oracle__ggml_8c.html", "attention__oracle__ggml_8c" ],
     [ "attention_oracle_ggml.h", "attention__oracle__ggml_8h.html", "attention__oracle__ggml_8h" ],
     [ "axpy_kernels.c", "axpy__kernels_8c.html", "axpy__kernels_8c" ],
+    [ "deepseek_kernels.c", "deepseek__kernels_8c.html", "deepseek__kernels_8c" ],
     [ "deltanet_kernels.c", "deltanet__kernels_8c.html", "deltanet__kernels_8c" ],
     [ "dequant_kernels.c", "dequant__kernels_8c.html", "dequant__kernels_8c" ],
     [ "embedding_kernels.c", "embedding__kernels_8c.html", "embedding__kernels_8c" ],
