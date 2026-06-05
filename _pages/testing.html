@@ -23,6 +23,40 @@ permalink: /testing/
     That page documents the actual failure mode, the debugging sequence, and the regressions to watch for on future encoder ports.
   </div>
 
+
+  <div class="alert alert-warning">
+    <strong>Quantized inference performance gate:</strong> BF16 kernels are primarily the
+    training / BF16-serving path. Production CPU inference for GGUF models is usually
+    dominated by quantized Q4_K/Q5_K/Q6_K/Q8_K GEMV/GEMM, activation quantization,
+    head-major output projection, and threadpool orchestration. Kernel changes in those
+    paths must be checked against llama.cpp for both parity and speed before they are
+    considered production-ready.
+  </div>
+
+  <h2>No-root Quantized Performance Workflow</h2>
+  <p>
+    On shared Xeon systems where <code>perf</code>, VTune, or Advisor are unavailable,
+    use repeatable CK-vs-llama.cpp timing gates and kernel-scoped benchmarks instead
+    of hardware counters. Keep BF16/AMX training experiments separate from quantized
+    inference patches unless the model path actually uses BF16 tensors.
+  </p>
+  <ul>
+    <li><code>LLAMA_CPP_DIR=/opt/app-root/src/Software/llama.cpp make test-gemv-comprehensive-quick</code> - quick Q4/Q5/Q8 GEMV parity and speed against llama.cpp.</li>
+    <li><code>make test-gemv-omp-quick</code> - serial vs OpenMP GEMV parity, useful for proving when OpenMP is not the right production scheduler.</li>
+    <li><code>make test-threadpool-parity-quick</code> - production threadpool dispatch parity and speed for GEMV/GEMM decode/prefill shapes.</li>
+    <li><code>LLAMA_CPP_DIR=/opt/app-root/src/Software/llama.cpp make test-head-major-q5-vs-llama-quick</code> - head-major Q5/Q8 output projection against llama.cpp.</li>
+    <li><code>make llamacpp-parity-nightly</code> - nightly llama.cpp parity profile; includes the quantized GEMV quick lane, threadpool dispatch, DeltaNet ISA, and head-major Q5 checks.</li>
+    <li><code>make llamacpp-parity-perf</code> or <code>make llamacpp-parity-perf-large</code> - longer performance runs when changing shared quantized kernels.</li>
+  </ul>
+  <p>
+    Current optimization priority for inference is shared quantized kernels and orchestration:
+    <code>gemv_q4_k_q8_k</code>, <code>gemv_q6_k_q8_k</code>,
+    <code>gemm_nt_q4_k_q8_k</code>, Q8_K activation quantization, final logits /
+    head-major projection, and row-sweep dispatch through the persistent threadpool.
+    AMX BF16 work is valuable for BF16 training and BF16 serving, but it is not a substitute
+    for measuring the quantized decode path used by Qwen, Gemma, Nanbeige, and vision GGUFs.
+  </p>
+
   <hr>
 
   <h2>Testing Pyramid</h2>
