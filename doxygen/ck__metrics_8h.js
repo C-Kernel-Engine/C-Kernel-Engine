@@ -18,7 +18,7 @@ var ck__metrics_8h =
       [ "CK_METRIC_STRING", "ck__metrics_8h.html#a775f9a9a0dd49ba4bdbc32773b74e9b1a6067c235282f29a1e6fa1afa77708659", null ]
     ] ],
     [ "ck_metrics_cleanup", "ck__metrics_8h.html#a5bc3ff05f8bb6b04d321a560d8e59253", null ],
-    [ "ck_metrics_create_context", "ck__metrics_8h.html#ae2d67c92b854599041de690b1952a2f7", null ],
+    [ "ck_metrics_create_context", "ck__metrics_8h.html#ae2241a5e8cc718aef142f8dda5111208", null ],
     [ "ck_metrics_ctx_end", "ck__metrics_8h.html#ad7031aadfd56f7cc9fcd5267b99c93d5", null ],
     [ "ck_metrics_ctx_init", "ck__metrics_8h.html#a60d3c5c69dfeb77db7de0d454b7f80be", null ],
     [ "ck_metrics_ctx_log_f", "ck__metrics_8h.html#a59407fff30154c14cf57f8d62bc508ed", null ],
