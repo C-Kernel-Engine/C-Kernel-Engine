@@ -899,7 +899,7 @@
                         <a href="gemm-memory-layout.html">GEMM Memory Layout<small>NN/NT layouts, offsets</small></a>
                         <a href="gemm-optimization.html">GEMM Optimization<small>AVX, MKL, blocking</small></a>
                         <a href="simd-architecture.html">SIMD Architecture<small>AVX-512, VNNI, AMX</small></a>
-                        <a href="flash_attention.html" class="{{NAV_FLASH_ATTENTION}}">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
+                        <a href="flash_attention.html" class="">Flash Attention Analysis<small>Why llama.cpp is faster</small></a>
                     </div>
                     <div class="menu-section">
                         <div class="menu-heading">Infrastructure</div>
@@ -916,7 +916,7 @@
             </div>
             <a href="pytorch-parity.html" class="">PyTorch Parity</a>
             <a href="test-report.html" class="">Test Report</a>
-            <a href="version-history.html" class="{{NAV_VERSION}}">Versions</a>
+            <a href="version-history.html" class="">Versions</a>
             <a href="research.html" class="">Research</a>
             <a href="decisions.html" class="">ADR</a>
             <div class="nav-dropdown">
@@ -961,6 +961,7 @@
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
+    <li><a href="#recurrent-attention">Recurrent Attention and Gated DeltaNet</a></li>
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
@@ -1295,6 +1296,19 @@ Online (Flash):
     <p>For a detailed comparison of CPU attention implementations (including benchmarks vs llama.cpp's ggml), see:</p>
     <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
     <p><small>Covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads (small vs large models, different context lengths).</small></p>
+</div>
+
+<hr>
+
+<h2 id="recurrent-attention">Recurrent Attention and Gated DeltaNet</h2>
+
+<p>Some hybrid architectures avoid scanning a full KV-cache on every layer by carrying a compact recurrent state. In Qwen3.5/qwen3next-style layers, CK implements the Gated DeltaNet update as a dedicated kernel family rather than treating it as ordinary attention or a wrapper around GEMM.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Where to go next</h3>
+    <p>The full recurrent update, state matrix semantics, gate placement, and CK kernel entry point are covered in the dedicated deep dive:</p>
+    <p><a href="deltanet-deep-dive.html"><strong>Gated DeltaNet: Recurrent Attention Deep Dive</strong></a></p>
+    <p><small>Primary implementation: <code>src/kernels/deltanet_kernels.c</code>, exposed through <code>gated_deltanet_autoregressive_forward()</code>.</small></p>
 </div>
 
 <hr>
@@ -1911,7 +1925,7 @@ With weight tying: W = E  (same matrix!)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-04-13</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
             </div>
         </div>
     </footer>
