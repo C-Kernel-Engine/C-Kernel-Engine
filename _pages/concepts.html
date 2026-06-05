@@ -22,6 +22,7 @@
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
+    <li><a href="#recurrent-attention">Recurrent Attention and Gated DeltaNet</a></li>
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
@@ -356,6 +357,19 @@ Online (Flash):
     <p>For a detailed comparison of CPU attention implementations (including benchmarks vs llama.cpp's ggml), see:</p>
     <p><a href="flash_attention.html"><strong>Flash Attention Analysis: Why llama.cpp is Faster</strong></a></p>
     <p><small>Covers SIMD optimizations, threading strategies, and performance trade-offs across different workloads (small vs large models, different context lengths).</small></p>
+</div>
+
+<hr>
+
+<h2 id="recurrent-attention">Recurrent Attention and Gated DeltaNet</h2>
+
+<p>Some hybrid architectures avoid scanning a full KV-cache on every layer by carrying a compact recurrent state. In Qwen3.5/qwen3next-style layers, CK implements the Gated DeltaNet update as a dedicated kernel family rather than treating it as ordinary attention or a wrapper around GEMM.</p>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">Where to go next</h3>
+    <p>The full recurrent update, state matrix semantics, gate placement, and CK kernel entry point are covered in the dedicated deep dive:</p>
+    <p><a href="deltanet-deep-dive.html"><strong>Gated DeltaNet: Recurrent Attention Deep Dive</strong></a></p>
+    <p><small>Primary implementation: <code>src/kernels/deltanet_kernels.c</code>, exposed through <code>gated_deltanet_autoregressive_forward()</code>.</small></p>
 </div>
 
 <hr>

@@ -1,5 +1,14 @@
 var NAVTREEINDEX20 =
 {
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a8af3b4543e6f1e5b0e76f5671d48030e":[2,0,1,7,1,3,18],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a8cbaab9a69b91607f7356e076ff49d79":[2,0,1,7,1,3,59],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a914835e2c63edb80a747bb6738001993":[2,0,1,7,1,3,31],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a91f1fd56517ea08a87dc94391c3400b6":[2,0,1,7,1,3,42],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a94f4f65438d8c9135b60d9258afd3da3":[2,0,1,7,1,3,27],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#a9f228497fa96b61a72d4cff046cea846":[2,0,1,7,1,3,17],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#aa6f420875b428bdc8ce617140663b4cf":[2,0,1,7,1,3,58],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#aa8ca4457ed45b249070902104b81b607":[2,0,1,7,1,3,56],
+"v6_86_2test__generated_2int8__q4k__test_8c.html#aabfbca4483b7b996ec5d20e90db7a8ef":[2,0,1,7,1,3,32],
 "v6_86_2test__generated_2int8__q4k__test_8c.html#ab3bccf37e22bd2b9d6adeee5b200f314":[2,0,1,7,1,3,12],
 "v6_86_2test__generated_2int8__q4k__test_8c.html#ab70d618edaf131d06ed3efa0eab989dc":[2,0,1,7,1,3,49],
 "v6_86_2test__generated_2int8__q4k__test_8c.html#ab898071398b359603a35c202e9c65f3b":[2,0,1,7,1,3,1],
@@ -240,14 +249,5 @@ var NAVTREEINDEX20 =
 "vision__kernels_8c.html#a013a2d1a5679f2c8151fa7a4d87cc9ae":[2,0,1,1,85,1],
 "vision__kernels_8c.html#a0ace950feda90616652810a699ac6dac":[2,0,1,1,85,12],
 "vision__kernels_8c.html#a1194f9a80360eff26f4ce83c3e74411a":[2,0,1,1,85,10],
-"vision__kernels_8c.html#a38fa089663c3300b061508567cd18462":[2,0,1,1,85,8],
-"vision__kernels_8c.html#a3ffa58aab7da5c6e77096ad19385329a":[2,0,1,1,85,6],
-"vision__kernels_8c.html#a6414bc6af9c28e7baf31b434073e794f":[2,0,1,1,85,4],
-"vision__kernels_8c.html#a6933897ffa7aa6a48b03e6bd01087ae0":[2,0,1,1,85,11],
-"vision__kernels_8c.html#a86aec042bcceb0bd8955f0daf0d986c4":[2,0,1,1,85,5],
-"vision__kernels_8c.html#a9af0dbbeb1b7fd100f99d796eaf0623f":[2,0,1,1,85,3],
-"vision__kernels_8c.html#ac3987d3d95a62a769029100abbbf852a":[2,0,1,1,85,2],
-"vision__kernels_8c.html#ae079db374514c445ebcfdd317dd3c15e":[2,0,1,1,85,0],
-"vision__kernels_8c.html#ae9b2c5016959bd797ba2729965604e64":[2,0,1,1,85,9],
-"vision__kernels_8c.html#aedf35588a71c8af25400e79faeec6dee":[2,0,1,1,85,7]
+"vision__kernels_8c.html#a38fa089663c3300b061508567cd18462":[2,0,1,1,85,8]
 };
