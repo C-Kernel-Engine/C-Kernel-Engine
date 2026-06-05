@@ -17,6 +17,7 @@
 
 <h2>Table of Contents</h2>
 <ul>
+    <li><a href="#cpu-platform">CPU-Native Distributed AI Platform</a></li>
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
@@ -29,6 +30,25 @@
     <li><a href="#activations">Activations: SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
+
+<hr>
+
+<h2 id="cpu-platform">CPU-Native Distributed AI Platform</h2>
+
+<p>C-Kernel-Engine exists to make CPU infrastructure a serious AI deployment target. The core idea is not that CPUs beat GPUs for every workload. The point is that enterprises and sovereign AI teams often have abundant CPU fleets, strict data-locality constraints, limited GPU access, and workloads that are long-running, private, memory-heavy, or agentic rather than simple throughput demos.</p>
+
+<div class="grid grid-2">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Platform Assumption</h3>
+        <p>AI infrastructure should be able to run across heterogeneous CPU fleets: embedded ARM devices, laptop-class x86 systems, and server Xeons. Kernel behavior, memory layout, quantized formats, and generated runtimes must stay auditable across that range.</p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Product Wedge</h3>
+        <p>The first narrow product is distributed CPU serving for private agentic workloads: sovereign chat, document agents, internal search, coding assistants, and content-generation pipelines that need to run near enterprise data.</p>
+    </div>
+</div>
+
+<p>That product direction explains the technical choices in the rest of this page. Quantized GEMV/GEMM exists because GGUF CPU inference depends on Q4/Q5/Q6/Q8 kernels. Backprop IR exists because training and fine-tuning should eventually share the same CPU-native infrastructure. Recurrent attention, DeltaNet, and long-context kernels matter because agentic workloads are stateful and memory-sensitive. The IR pipeline makes these choices inspectable instead of hiding them behind a black-box runtime.</p>
 
 <hr>
 

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>C-Kernel-Engine: CPU-Native AI Runtime and Training Engine | C-Kernel-Engine</title>
-    <meta name="description" content="C-Kernel-Engine is a CPU-native AI runtime and code generation system for training and inference in pure C, with auditable IR, kernel parity, and Linux-first deployment.">
+    <title>C-Kernel-Engine: CPU Cluster AI Platform for Inference and Training | C-Kernel-Engine</title>
+    <meta name="description" content="C-Kernel-Engine turns CPU fleets into production AI infrastructure for distributed inference and training, with auditable C kernels, quantized parity, and sovereign AI deployment paths.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://antshiv.github.io/C-Kernel-Engine/">
-    <meta property="og:title" content="C-Kernel-Engine: CPU-Native AI Runtime and Training Engine | C-Kernel-Engine">
-    <meta property="og:description" content="C-Kernel-Engine is a CPU-native AI runtime and code generation system for training and inference in pure C, with auditable IR, kernel parity, and Linux-first deployment.">
+    <meta property="og:title" content="C-Kernel-Engine: CPU Cluster AI Platform for Inference and Training | C-Kernel-Engine">
+    <meta property="og:description" content="C-Kernel-Engine turns CPU fleets into production AI infrastructure for distributed inference and training, with auditable C kernels, quantized parity, and sovereign AI deployment paths.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://antshiv.github.io/C-Kernel-Engine/">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -1123,18 +1123,77 @@
      HERO
 ═══════════════════════════════════════════════════════════════════════ -->
 <div class="hero">
-    <span class="badge badge-amber">CPU · Linux · x86-64 / ARM</span>
+    <span class="badge badge-amber">CPU clusters · Sovereign AI · Inference + Training</span>
     <h1>C-Kernel-Engine</h1>
-    <p>A code generator and kernel library for LLM training and inference in pure C. Every kernel has a forward and backward pass, validated to &lt;&nbsp;1e-5 against PyTorch autograd. The IR pipeline makes every architectural decision explicit and auditable — from graph lowering to memory layout to the final byte of generated C.</p>
-    <p style="margin-top:0.7rem;color:var(--text-muted);max-width:900px;margin-left:auto;margin-right:auto;">Why this exists: build extremely lightweight AI systems without sacrificing performance or security, keep the full stack auditable end-to-end (math kernels -> training -> mechanistic interpretability), and stay CPU-first across embedded devices, commodity servers, and offline deployments.</p>
+    <p>C-Kernel-Engine turns CPU fleets into production AI infrastructure for distributed inference and training. It is built from the kernel layer up for enterprises, sovereign AI teams, and private deployments that need to run useful models without depending on scarce GPU clusters.</p>
+    <p style="margin-top:0.7rem;color:var(--text-muted);max-width:900px;margin-left:auto;margin-right:auto;">The thesis is simple: many agentic, long-running, memory-heavy, private AI workloads can use abundant CPU infrastructure if the runtime, kernels, memory layout, and validation stack are designed for it from the start.</p>
     <div class="hero-stats">
-        <span class="hero-stat"><strong>&lt; 1e-5</strong> parity threshold</span>
-        <span class="hero-stat"><strong>PyTorch + llama.cpp</strong> verified</span>
-        <span class="hero-stat"><strong>16.5x</strong> faster tokenizer</span>
-        <span class="hero-stat"><strong>9+</strong> fwd + bwd kernels</span>
-        <span class="hero-stat"><strong>IR1 → IR2 → IR3</strong> codegen</span>
-        <span class="hero-stat"><strong>VTune</strong> profiling</span>
-        <span class="hero-stat"><strong>Zero</strong> dependencies</span>
+        <span class="hero-stat"><strong>CPU-only</strong> deployment path</span>
+        <span class="hero-stat"><strong>ARM edge -> Xeon</strong> target range</span>
+        <span class="hero-stat"><strong>llama.cpp</strong> quant parity</span>
+        <span class="hero-stat"><strong>PyTorch</strong> training parity</span>
+        <span class="hero-stat"><strong>IR1 -> IR2 -> IR3</strong> auditable lowering</span>
+        <span class="hero-stat"><strong>Qwen · Gemma · Nanbeige</strong> model work</span>
+        <span class="hero-stat"><strong>Distributed CPU serving</strong> product wedge</span>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PLATFORM POSITIONING
+═══════════════════════════════════════════════════════════════════════ -->
+<h2 id="production-ai-on-cpu-clusters">Production AI on CPU Clusters</h2>
+
+<p>CKE is not positioned as another GPU-first serving wrapper. vLLM, SGLang, TensorRT-LLM, llama.cpp, and Ollama are useful tools, but most production AI infrastructure still assumes accelerators are the default answer. CKE starts from a different constraint: many enterprise and sovereign deployments already own CPU fleets, need data locality, face GPU supply or cost pressure, and want a runtime they can audit down to the kernel boundary.</p>
+
+<div class="grid grid-3" style="gap: 1rem;">
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Who Pays First</h3>
+        <p>Government and sovereign AI teams, enterprises with private data and idle CPU capacity, and hardware/infrastructure vendors that want useful AI workloads on CPU-heavy fleets.</p>
+    </div>
+    <div class="card card-blue">
+        <h3 style="margin-top: 0;">Painful Problem</h3>
+        <p>Teams believe serious AI requires GPUs, then hit cost, procurement, locality, supply-chain, and operational limits. CPU infrastructure is cheaper, available, and already deployed, but needs a production AI runtime.</p>
+    </div>
+    <div class="card card-green">
+        <h3 style="margin-top: 0;">First Product</h3>
+        <p>Distributed CPU serving for private agentic workloads: document agents, sovereign chat, internal search, coding agents, and content generation pipelines that must run close to enterprise data.</p>
+    </div>
+</div>
+
+<div class="grid grid-2" style="gap: 1rem;">
+    <div class="card">
+        <h3 style="margin-top: 0;">Why CKE Is Different</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td>kernel-up design</td>
+                <td>The runtime is built around C kernels, quantized layouts, explicit memory planning, and generated execution graphs instead of hiding performance-critical behavior behind opaque framework layers.</td>
+            </tr>
+            <tr>
+                <td>CPU range</td>
+                <td>The project targets a wide CPU spectrum, from embedded ARM and laptop-class Intel parts to server Xeons, with the same correctness discipline across platforms.</td>
+            </tr>
+            <tr>
+                <td>training + inference</td>
+                <td>Inference, backprop, gradient accumulation, optimizer state, and parity diagnostics live in the same architecture story, so CKE can grow from serving into CPU-native fine-tuning and training.</td>
+            </tr>
+        </table>
+    </div>
+    <div class="card">
+        <h3 style="margin-top: 0;">Proof Points Being Built</h3>
+        <table class="pillar-evidence">
+            <tr>
+                <td>quantized parity</td>
+                <td>Q4/Q5/Q6/Q8 paths are checked against llama.cpp reference behavior so CPU inference claims are tied to real GGUF deployment formats.</td>
+            </tr>
+            <tr>
+                <td>model matrix</td>
+                <td>Qwen, Gemma, Nanbeige, multimodal, and recurrent-attention work are tracked through templates, kernel maps, validation reports, and runbooks.</td>
+            </tr>
+            <tr>
+                <td>cluster wedge</td>
+                <td>The product direction is distributed CPU inference first, then training/fine-tuning and scheduling across heterogeneous CPU fleets.</td>
+            </tr>
+        </table>
     </div>
 </div>
 
@@ -1142,6 +1201,8 @@
      WHAT IS IT
 ═══════════════════════════════════════════════════════════════════════ -->
 <h2>What is C-Kernel-Engine?</h2>
+
+<p>C-Kernel-Engine is a CPU-native distributed AI platform in development. At the lowest layer it is a C kernel library for transformer inference and training. Above that it adds GGUF intake, quantized weight layout, deterministic memory planning, IR lowering, generated runtimes, parity gates, and runbooks for model-family bring-up.</p>
 
 <p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding.</p>
 
