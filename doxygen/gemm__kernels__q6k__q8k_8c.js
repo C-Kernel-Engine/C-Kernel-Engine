@@ -1,6 +1,5 @@
 var gemm__kernels__q6k__q8k_8c =
 [
-    [ "ck_q6k_q8k_force_ref", "gemm__kernels__q6k__q8k_8c.html#aa98a62f017969e334a0d3bbcbf34935d", null ],
     [ "dot_q6_k_q8_k_ref", "gemm__kernels__q6k__q8k_8c.html#ae26ffd50d4f4c9b317e265d436cdf9e1", null ],
     [ "gemm_nt_q6_k_q8_k", "gemm__kernels__q6k__q8k_8c.html#ac912d4edc9cd1c7de9f1697ae510fbff", null ],
     [ "gemm_q6_k_q8_k", "gemm__kernels__q6k__q8k_8c.html#a6f8eb04ad56d34cf1d38d49ea19a7639", null ],
