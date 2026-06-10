@@ -1,0 +1,124 @@
+---
+layout: default
+title: Q6_K Prefill Roofline Notes
+permalink: /q6-prefill-roofline/
+---
+
+<div class="container">
+  <h1>Q6_K Prefill Roofline Notes</h1>
+  <p class="lead">
+    Why the Q6_K x Q8_K 2D prefill scheduler is shape-gated instead of enabled globally.
+  </p>
+
+  <div class="alert alert-info">
+    <strong>Summary:</strong>
+    the 2D scheduler is a load-balancing optimization, not a replacement for row-split prefill.
+    It helps wide Q6_K shapes such as Nanbeige MLP-down, but can regress narrower Qwen2/Gemma/Qwen3.5 shapes.
+  </div>
+
+  <h2>Kernel Under Test</h2>
+  <p>
+    The benchmark targets <code>gemm_nt_q6_k_q8_k_parallel_dispatch()</code> in
+    <code>version/v8/src/ck_parallel_prefill_v8.c</code>. The math kernel computes
+    <code>C = A @ B^T</code>, where <code>A</code> is token-major Q8_K activations and
+    <code>B</code> is Q6_K weights. This is used by v8 prefill for model-family MLP-down and
+    some projection/logit paths.
+  </p>
+
+  <h2>Roofline Interpretation</h2>
+  <p>
+    Row-split scheduling assigns token rows to workers. For each worker, a Q8_K activation row is
+    reused across the full output dimension <code>N</code>. The 2D scheduler splits both token rows
+    and output columns. That creates more jobs and better load balance, but rereads the same Q8_K
+    activation tile once per <code>N</code> tile.
+  </p>
+  <p>
+    On memory-bound Q6_K prefill, the extra Q8_K activation traffic is only worth it when the shape is
+    wide enough that row-split does not keep cores busy or does not balance work well. Narrow output
+    dimensions usually stay faster with row splitting.
+  </p>
+
+  <h2>Local Measurement</h2>
+  <p>
+    Measurements below were taken on the local i7 development machine on 2026-06-09 with
+    <code>CK_NUM_THREADS=12</code>, <code>OMP_NUM_THREADS=1</code>, and <code>CK_Q6K_Q8K_SIMD=1</code>.
+    The benchmark used synthetic finite Q6_K/Q8_K blocks and compared row-split dispatch against raw
+    2D dispatch with <code>CK_FORCE_Q6K_Q8K_2D_PREFILL=1</code>.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Shape</th>
+        <th>M</th>
+        <th>Row Split</th>
+        <th>2D Tile</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Qwen2-like N=896 K=4864</td><td>16</td><td>0.97 ms</td><td>2.02 ms</td><td>2D slower</td></tr>
+      <tr><td>Qwen2-like N=896 K=4864</td><td>64</td><td>2.82 ms</td><td>3.05 ms</td><td>2D slower</td></tr>
+      <tr><td>Qwen2-like N=896 K=4864</td><td>256</td><td>9.89 ms</td><td>9.94 ms</td><td>neutral/slower</td></tr>
+      <tr><td>Qwen2-like N=896 K=4864</td><td>512</td><td>19.27 ms</td><td>19.00 ms</td><td>2D +1.4%</td></tr>
+      <tr><td>Large Q6 N=2560 K=10240</td><td>16</td><td>5.80 ms</td><td>4.46 ms</td><td>2D +23.1%</td></tr>
+      <tr><td>Large Q6 N=2560 K=10240</td><td>128</td><td>33.09 ms</td><td>28.92 ms</td><td>2D +12.6%</td></tr>
+      <tr><td>Large Q6 N=2560 K=10240</td><td>1024</td><td>253.92 ms</td><td>233.13 ms</td><td>2D +8.2%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Family-Level Signal</h2>
+  <p>
+    A longer prompt smoke test across cached v8 families showed the same pattern:
+    Qwen2 regressed with raw 2D enabled, Qwen3.5 was slightly slower, Gemma was neutral, and Nanbeige
+    improved modestly. Qwen3 in the local cache was Q8-heavy, so this Q6-specific path was mostly neutral.
+  </p>
+
+  <h2>Dispatch Policy</h2>
+  <p>
+    <code>CK_ENABLE_Q6K_Q8K_2D_PREFILL=1</code> remains opt-in, but the dispatcher now also checks shape.
+    By default, 2D Q6 prefill is selected only for wide shapes with <code>N &gt;= 2048</code> and
+    <code>K &gt;= 8192</code>, with enough tile jobs to keep the active thread pool busy.
+  </p>
+  <p>
+    For raw benchmarking, use <code>CK_FORCE_Q6K_Q8K_2D_PREFILL=1</code>. Do not use the force flag in
+    production or model-family regression runs unless the goal is to measure the scheduler itself.
+  </p>
+
+  <h2>Deployment Tuning Model</h2>
+  <p>
+    The long-term deployment flow should treat kernel selection as a hardware/model tuning artifact:
+  </p>
+  <ol>
+    <li>Build or load the model runtime and extract the lowered kernel shapes.</li>
+    <li>Run a bounded sweep for the hardware with <code>--sweep-kernels</code>.</li>
+    <li>Write the result to the runtime directory as <code>kernel_tuning.json</code>.</li>
+    <li>Have IR/codegen or dispatch read that file on later runs.</li>
+    <li>If the file is missing, use conservative built-in defaults.</li>
+  </ol>
+  <p>
+    This keeps production deterministic while still allowing each CPU target to choose the best kernel
+    policy for its cache, memory bandwidth, ISA, and thread topology. The current Q6 sweep runner is the
+    first concrete version of that pattern.
+  </p>
+  <pre><code>python -B version/v8/scripts/ck_run_v8.py run build/regression-runs/qwen2 \
+  --run build/qwen2-tuned --context-len 1024 --generate-only --sweep-kernels
+
+python -B version/v8/scripts/ck_run_v8.py run build/regression-runs/qwen2 \
+  --run build/qwen2-tuned --context-len 1024 --generate-only --sweep-kernels --sweep-kernels-full</code></pre>
+
+  <h2>Reproduction</h2>
+  <pre><code>make build/libckernel_engine.so
+make test-q6k-prefill-dispatch-sweep-quick
+make test-q6k-prefill-dispatch-sweep
+make test-q6k-prefill-dispatch-sweep-avx2
+
+CK_NUM_THREADS=12 OMP_NUM_THREADS=1 CK_Q6K_Q8K_SIMD=1 \
+  python -B benchmarks/bench_q6k_prefill_tile.py \
+  --mode compare --m 1024 --n 2560 --k 10240 --threads 12 --warmup 1 --iters 3
+
+CK_FORCE_Q6K_Q8K_2D_PREFILL=1 CK_ENABLE_Q6K_Q8K_2D_PREFILL=1 \
+CK_NUM_THREADS=12 OMP_NUM_THREADS=1 CK_Q6K_Q8K_SIMD=1 \
+  python -B benchmarks/bench_q6k_prefill_tile.py \
+  --mode 2d --m 128 --n 2560 --k 10240 --threads 12 --warmup 1 --iters 2</code></pre>
+</div>

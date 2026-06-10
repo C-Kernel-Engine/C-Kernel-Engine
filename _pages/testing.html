@@ -23,7 +23,6 @@ permalink: /testing/
     That page documents the actual failure mode, the debugging sequence, and the regressions to watch for on future encoder ports.
   </div>
 
-
   <div class="alert alert-warning">
     <strong>Quantized inference performance gate:</strong> BF16 kernels are primarily the
     training / BF16-serving path. Production CPU inference for GGUF models is usually
@@ -56,6 +55,12 @@ permalink: /testing/
     AMX BF16 work is valuable for BF16 training and BF16 serving, but it is not a substitute
     for measuring the quantized decode path used by Qwen, Gemma, Nanbeige, and vision GGUFs.
   </p>
+
+  <div class="alert alert-info">
+    <strong>Q6_K prefill performance note:</strong>
+    the v8 Q6_K x Q8_K 2D prefill scheduler is shape-gated based on local roofline-style measurements.
+    See <a href="/q6-prefill-roofline/">Q6_K Prefill Roofline Notes</a> for the measured shapes, commands, and dispatch policy.
+  </div>
 
   <hr>
 

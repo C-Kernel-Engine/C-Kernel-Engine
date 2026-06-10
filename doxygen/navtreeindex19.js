@@ -1,5 +1,11 @@
 var NAVTREEINDEX19 =
 {
+"v6_86_2generated_2ck-kernel-inference_8c.html#a16afbb17d8fc5d06bc746711b2c2b15e":[2,0,1,7,0,0,33],
+"v6_86_2generated_2ck-kernel-inference_8c.html#a1792d3312cd268722109e47e70cb82c0":[2,0,1,7,0,0,35],
+"v6_86_2generated_2ck-kernel-inference_8c.html#a23a9f5483b0f5ce5d88447a876bbb270":[2,0,1,7,0,0,34],
+"v6_86_2generated_2ck-kernel-inference_8c.html#a2ce7a6b3dd21bb3f7115fab3a04eb611":[2,0,1,7,0,0,36],
+"v6_86_2generated_2ck-kernel-inference_8c.html#a2e2fb61b2ebf43787122c2da6123000c":[2,0,1,7,0,0,25],
+"v6_86_2generated_2ck-kernel-inference_8c.html#a354c3d8f7777d243596de06ec4ffcc49":[2,0,1,7,0,0,2],
 "v6_86_2generated_2ck-kernel-inference_8c.html#a369266c24eacffb87046522897a570d5":[2,0,1,7,0,0,0],
 "v6_86_2generated_2ck-kernel-inference_8c.html#a40fd2085b4a6972bdd956e1080459611":[2,0,1,7,0,0,29],
 "v6_86_2generated_2ck-kernel-inference_8c.html#a4635cf15568c9489b890a02404ba8d10":[2,0,1,7,0,0,26],
@@ -243,11 +249,5 @@ var NAVTREEINDEX19 =
 "v6_86_2test__generated_2generic__api__test_8c.html#af8f0fc56f0f14b7d4568f3b94997d062":[2,0,1,7,1,2,50],
 "v6_86_2test__generated_2generic__api__test_8c.html#afa7ed236a766adfaeeffa865ab2cfdc1":[2,0,1,7,1,2,64],
 "v6_86_2test__generated_2generic__api__test_8c.html#afd072f83e4f14e9c324bb41500746beb":[2,0,1,7,1,2,58],
-"v6_86_2test__generated_2generic__api__test_8c.html#afd4a0ad91d058028c6438774b207fd4a":[2,0,1,7,1,2,63],
-"v6_86_2test__generated_2generic__api__test_8c_source.html":[2,0,1,7,1,2],
-"v6_86_2test__generated_2int8__q4k__test_8c.html":[2,0,1,7,1,3],
-"v6_86_2test__generated_2int8__q4k__test_8c.html#a0b1cb2a65db4b80edc31b1cb24c56402":[2,0,1,7,1,3,16],
-"v6_86_2test__generated_2int8__q4k__test_8c.html#a11428e9f23a9e321a1f3e75a08a018be":[2,0,1,7,1,3,24],
-"v6_86_2test__generated_2int8__q4k__test_8c.html#a18fa95a4df0baaf38dd65457476bbbf4":[2,0,1,7,1,3,15],
-"v6_86_2test__generated_2int8__q4k__test_8c.html#a1b45e9164ebe7d307fd201567a10ef41":[2,0,1,7,1,3,47]
+"v6_86_2test__generated_2generic__api__test_8c.html#afd4a0ad91d058028c6438774b207fd4a":[2,0,1,7,1,2,63]
 };
