@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-11T02:36:03.178403",
-  "duration_sec": 1288.485324382782,
+  "timestamp": "2026-06-11T07:01:58.348967",
+  "duration_sec": 1299.6651701927185,
   "summary": {
     "total": 60,
     "passed": 57,
@@ -16,7 +16,7 @@
       "name": "GEMM",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 34.771440267562866,
+      "duration_sec": 34.82010102272034,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -26,40 +26,40 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Naive (parallel)",
+          "name": "Fine-grained",
           "status": "pass",
-          "max_diff": 4.2e-05,
+          "max_diff": 3.43e-05,
           "tolerance": 0.0001,
-          "c_time_us": 25082.2,
-          "pytorch_time_us": 463.7,
-          "speedup": 0.02
+          "c_time_us": 4083.0,
+          "pytorch_time_us": 480.0,
+          "speedup": 0.12
         },
         {
           "name": "AVX-512 (parallel)",
           "status": "pass",
           "max_diff": 3.43e-05,
           "tolerance": 0.0001,
-          "c_time_us": 2835.5,
-          "pytorch_time_us": 463.7,
-          "speedup": 0.16
+          "c_time_us": 2760.4,
+          "pytorch_time_us": 480.0,
+          "speedup": 0.17
         },
         {
           "name": "Blocked (serial)",
           "status": "pass",
           "max_diff": 4.2e-05,
           "tolerance": 0.0001,
-          "c_time_us": 25126.8,
-          "pytorch_time_us": 463.7,
+          "c_time_us": 25113.5,
+          "pytorch_time_us": 480.0,
           "speedup": 0.02
         },
         {
-          "name": "Fine-grained",
+          "name": "Naive (parallel)",
           "status": "pass",
-          "max_diff": 3.43e-05,
+          "max_diff": 4.2e-05,
           "tolerance": 0.0001,
-          "c_time_us": 3881.2,
-          "pytorch_time_us": 463.7,
-          "speedup": 0.12
+          "c_time_us": 25128.9,
+          "pytorch_time_us": 480.0,
+          "speedup": 0.02
         }
       ]
     },
@@ -67,7 +67,7 @@
       "name": "GEMM Variants",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.5140132904052734,
+      "duration_sec": 1.5026919841766357,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -81,7 +81,7 @@
       "name": "GEMM Microkernel",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 17.84323215484619,
+      "duration_sec": 18.492674350738525,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -95,7 +95,7 @@
       "name": "GEMM Fused",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.1547069549560547,
+      "duration_sec": 2.1786632537841797,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -109,27 +109,27 @@
           "status": "pass",
           "max_diff": 0.0207,
           "tolerance": 0.05,
-          "c_time_us": 291.7,
-          "pytorch_time_us": 87.6,
+          "c_time_us": 291.2,
+          "pytorch_time_us": 87.9,
           "speedup": 0.3
+        },
+        {
+          "name": "GEMM+Bias+ReLU",
+          "status": "pass",
+          "max_diff": 2.29e-05,
+          "tolerance": 0.0001,
+          "c_time_us": 224.5,
+          "pytorch_time_us": 44.3,
+          "speedup": 0.2
         },
         {
           "name": "GEMM+Bias+SiLU",
           "status": "pass",
           "max_diff": 1.91e-05,
           "tolerance": 0.001,
-          "c_time_us": 247.5,
-          "pytorch_time_us": 50.4,
+          "c_time_us": 250.1,
+          "pytorch_time_us": 50.3,
           "speedup": 0.2
-        },
-        {
-          "name": "Medium (M=64,N=128,K=256)",
-          "status": "pass",
-          "max_diff": 1.91e-05,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
         },
         {
           "name": "Small (M=32,N=64,K=128)",
@@ -141,13 +141,22 @@
           "speedup": null
         },
         {
-          "name": "GEMM+Bias+ReLU",
+          "name": "Medium (M=64,N=128,K=256)",
           "status": "pass",
-          "max_diff": 2.29e-05,
+          "max_diff": 1.91e-05,
           "tolerance": 0.0001,
-          "c_time_us": 222.4,
-          "pytorch_time_us": 45.0,
-          "speedup": 0.2
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "GEMM+SwiGLU",
+          "status": "pass",
+          "max_diff": 0.000732,
+          "tolerance": 0.002,
+          "c_time_us": 327.4,
+          "pytorch_time_us": 92.8,
+          "speedup": 0.28
         },
         {
           "name": "Large (M=128,N=256,K=512)",
@@ -166,15 +175,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "GEMM+SwiGLU",
-          "status": "pass",
-          "max_diff": 0.000732,
-          "tolerance": 0.002,
-          "c_time_us": 328.8,
-          "pytorch_time_us": 92.9,
-          "speedup": 0.28
         }
       ]
     },
@@ -182,7 +182,7 @@
       "name": "ReLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9102468490600586,
+      "duration_sec": 1.9135057926177979,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -196,27 +196,9 @@
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 2.5,
-          "pytorch_time_us": 2.9,
-          "speedup": 1.2
-        },
-        {
-          "name": "ReLU (inplace)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 8.1,
-          "pytorch_time_us": 2.9,
-          "speedup": 0.36
-        },
-        {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 2.8,
-          "pytorch_time_us": 54.0,
-          "speedup": 19.52
+          "c_time_us": 2.4,
+          "pytorch_time_us": 3.7,
+          "speedup": 1.57
         },
         {
           "name": "Backward",
@@ -224,8 +206,26 @@
           "max_diff": null,
           "tolerance": null,
           "c_time_us": 2.8,
-          "pytorch_time_us": 51.1,
-          "speedup": 18.46
+          "pytorch_time_us": 49.6,
+          "speedup": 17.95
+        },
+        {
+          "name": "ReLU (inplace)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 8.0,
+          "pytorch_time_us": 3.7,
+          "speedup": 0.47
+        },
+        {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 2.8,
+          "pytorch_time_us": 52.5,
+          "speedup": 19.0
         }
       ]
     },
@@ -233,7 +233,7 @@
       "name": "GELU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.016927480697632,
+      "duration_sec": 2.016857624053955,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -242,15 +242,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "SIMD (tanh approx)",
-          "status": "pass",
-          "max_diff": 0.0586,
-          "tolerance": 0.1,
-          "c_time_us": 5.7,
-          "pytorch_time_us": 81.4,
-          "speedup": 14.18
-        },
         {
           "name": "Fast (sigmoid)",
           "status": "pass",
@@ -261,15 +252,6 @@
           "speedup": null
         },
         {
-          "name": "Fast (SIMD approx)",
-          "status": "pass",
-          "max_diff": 0.0146,
-          "tolerance": 0.02,
-          "c_time_us": 5.2,
-          "pytorch_time_us": 16.6,
-          "speedup": 3.2
-        },
-        {
           "name": "Exact (scalar)",
           "status": "pass",
           "max_diff": 4.77e-07,
@@ -277,6 +259,24 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "SIMD (tanh approx)",
+          "status": "pass",
+          "max_diff": 0.0586,
+          "tolerance": 0.1,
+          "c_time_us": 5.7,
+          "pytorch_time_us": 80.4,
+          "speedup": 14.19
+        },
+        {
+          "name": "Fast (SIMD approx)",
+          "status": "pass",
+          "max_diff": 0.0146,
+          "tolerance": 0.02,
+          "c_time_us": 8.5,
+          "pytorch_time_us": 17.2,
+          "speedup": 2.02
         },
         {
           "name": "GGML (fp16 table)",
@@ -293,7 +293,7 @@
       "name": "Sigmoid",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8117022514343262,
+      "duration_sec": 1.8584601879119873,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -312,22 +312,22 @@
           "speedup": 0.32
         },
         {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 5.96e-08,
-          "tolerance": 2e-05,
-          "c_time_us": 20.9,
-          "pytorch_time_us": 56.2,
-          "speedup": 2.69
-        },
-        {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
           "c_time_us": 20.9,
-          "pytorch_time_us": 50.2,
-          "speedup": 2.4
+          "pytorch_time_us": 49.7,
+          "speedup": 2.37
+        },
+        {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 5.96e-08,
+          "tolerance": 2e-05,
+          "c_time_us": 20.9,
+          "pytorch_time_us": 55.5,
+          "speedup": 2.65
         }
       ]
     },
@@ -335,7 +335,7 @@
       "name": "Softmax",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.4247848987579346,
+      "duration_sec": 2.45113468170166,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -345,13 +345,22 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "Fast (SIMD fwd+bwd)",
+          "status": "pass",
+          "max_diff": 0.0348,
+          "tolerance": 0.05,
+          "c_time_us": 43.8,
+          "pytorch_time_us": 222.2,
+          "speedup": 5.08
+        },
+        {
           "name": "Fast (SIMD approx)",
           "status": "pass",
           "max_diff": 0.025,
           "tolerance": 0.03,
-          "c_time_us": 30.1,
-          "pytorch_time_us": 83.9,
-          "speedup": 2.79
+          "c_time_us": 28.5,
+          "pytorch_time_us": 83.7,
+          "speedup": 2.93
         },
         {
           "name": "Exact (scalar fwd+bwd)",
@@ -361,15 +370,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Fast (SIMD fwd+bwd)",
-          "status": "pass",
-          "max_diff": 0.0348,
-          "tolerance": 0.05,
-          "c_time_us": 43.6,
-          "pytorch_time_us": 221.2,
-          "speedup": 5.07
         },
         {
           "name": "Exact (scalar)",
@@ -386,7 +386,7 @@
       "name": "SwiGLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9816737174987793,
+      "duration_sec": 2.0139758586883545,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -401,7 +401,7 @@
           "max_diff": 4.77e-07,
           "tolerance": 5e-05,
           "c_time_us": 33.5,
-          "pytorch_time_us": 20.5,
+          "pytorch_time_us": 20.3,
           "speedup": 0.61
         },
         {
@@ -419,7 +419,7 @@
       "name": "LayerNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8065659999847412,
+      "duration_sec": 1.9032227993011475,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -429,38 +429,11 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_beta",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Forward+Backward",
-          "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 21.1,
-          "pytorch_time_us": 85.3,
-          "speedup": 4.05
-        },
-        {
-          "name": "Rolled (SIMD)",
-          "status": "pass",
-          "max_diff": 9.54e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 5.3,
-          "pytorch_time_us": 6.5,
-          "speedup": 1.24
-        },
-        {
           "name": "Forward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 11.1,
+          "c_time_us": 11.0,
           "pytorch_time_us": 6.5,
           "speedup": 0.59
         },
@@ -470,22 +443,58 @@
           "max_diff": 9.54e-07,
           "tolerance": 1e-05,
           "c_time_us": 11.0,
-          "pytorch_time_us": 6.5,
-          "speedup": 0.59
+          "pytorch_time_us": 6.6,
+          "speedup": 0.6
         },
         {
           "name": "Unrolled (SIMD)",
           "status": "pass",
-          "max_diff": 7.15e-07,
+          "max_diff": 1.91e-06,
           "tolerance": 1e-05,
           "c_time_us": 4.3,
-          "pytorch_time_us": 6.5,
-          "speedup": 1.51
+          "pytorch_time_us": 6.6,
+          "speedup": 1.52
+        },
+        {
+          "name": "Rolled (SIMD)",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 1e-05,
+          "c_time_us": 5.3,
+          "pytorch_time_us": 6.6,
+          "speedup": 1.24
+        },
+        {
+          "name": "Forward+Backward",
+          "status": "pass",
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 20.9,
+          "pytorch_time_us": 85.5,
+          "speedup": 4.08
+        },
+        {
+          "name": "Backward (est)",
+          "status": "pass",
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 11.0,
+          "pytorch_time_us": 79.0,
+          "speedup": 7.2
         },
         {
           "name": "d_gamma",
           "status": "pass",
           "max_diff": 3.81e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_beta",
+          "status": "pass",
+          "max_diff": 1.91e-06,
           "tolerance": 5e-06,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -499,15 +508,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Backward (est)",
-          "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 11.0,
-          "pytorch_time_us": 78.9,
-          "speedup": 7.18
         }
       ]
     },
@@ -515,7 +515,7 @@
       "name": "RMSNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9786624908447266,
+      "duration_sec": 2.0170862674713135,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -534,31 +534,13 @@
           "speedup": null
         },
         {
-          "name": "Forward+Backward",
-          "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 14.1,
-          "pytorch_time_us": 217.6,
-          "speedup": 15.39
-        },
-        {
           "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 7.9,
-          "pytorch_time_us": 189.3,
-          "speedup": 23.98
-        },
-        {
-          "name": "RMSNorm",
-          "status": "pass",
-          "max_diff": 9.54e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 7.0,
-          "pytorch_time_us": 28.5,
-          "speedup": 4.06
+          "c_time_us": 8.1,
+          "pytorch_time_us": 188.1,
+          "speedup": 23.22
         },
         {
           "name": "d_gamma",
@@ -570,13 +552,31 @@
           "speedup": null
         },
         {
+          "name": "RMSNorm",
+          "status": "pass",
+          "max_diff": 9.54e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 6.9,
+          "pytorch_time_us": 29.3,
+          "speedup": 4.25
+        },
+        {
+          "name": "Forward+Backward",
+          "status": "pass",
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 14.2,
+          "pytorch_time_us": 217.1,
+          "speedup": 15.24
+        },
+        {
           "name": "d_input",
           "status": "pass",
           "max_diff": 1.43e-06,
           "tolerance": 1e-05,
-          "c_time_us": 14.1,
-          "pytorch_time_us": 217.6,
-          "speedup": 15.39
+          "c_time_us": 14.2,
+          "pytorch_time_us": 217.1,
+          "speedup": 15.24
         }
       ]
     },
@@ -584,7 +584,7 @@
       "name": "RoPE",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 3.1069176197052,
+      "duration_sec": 3.0576748847961426,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -593,6 +593,24 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "pairwise-pos=0",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Llama3 (\u03b8=500000, d=64)",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "Llama2 (\u03b8=10000)",
           "status": "pass",
@@ -603,7 +621,16 @@
           "speedup": null
         },
         {
-          "name": "pos=1000",
+          "name": "Llama3 (\u03b8=500000)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Medium (H=8,T=32,D=64)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -612,7 +639,16 @@
           "speedup": null
         },
         {
-          "name": "pos=2000",
+          "name": "pos=0",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pairwise-pos=1000",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -630,7 +666,7 @@
           "speedup": null
         },
         {
-          "name": "pairwise-pos=100",
+          "name": "pos=100",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -639,34 +675,7 @@
           "speedup": null
         },
         {
-          "name": "pairwise-pos=0",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2-1.5B (\u03b8=1000000)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2 (\u03b8=1000000)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Medium (H=8,T=32,D=64)",
+          "name": "pairwise-pos=1",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -684,9 +693,45 @@
           "speedup": null
         },
         {
-          "name": "pos=0",
+          "name": "Qwen2 (\u03b8=1000000, d=64)",
           "status": "pass",
-          "max_diff": 0.0,
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pairwise-pos=100",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=10",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=2000",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Tiny (H=2,T=8,D=16)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -711,28 +756,37 @@
           "speedup": null
         },
         {
+          "name": "pairwise-pos=10",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Qwen2-1.5B (\u03b8=1000000)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Qwen2 (\u03b8=1000000)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "Llama2/Mistral (\u03b8=10000, d=64)",
           "status": "pass",
           "max_diff": 3.81e-06,
           "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Tiny (H=2,T=8,D=16)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2 (\u03b8=1000000, d=64)",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -747,79 +801,16 @@
           "speedup": null
         },
         {
-          "name": "pairwise-pos=1",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Llama3 (\u03b8=500000, d=64)",
-          "status": "pass",
-          "max_diff": 1.53e-05,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=10",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pairwise-pos=1000",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pairwise-pos=10",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pairwise-pos=500",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=100",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Llama3 (\u03b8=500000)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "pos=1",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=1000",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -835,6 +826,15 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "pairwise-pos=500",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -842,7 +842,7 @@
       "name": "Embedding",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.067047595977783,
+      "duration_sec": 2.0960464477539062,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -851,15 +851,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "d_token_emb",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 45.5,
-          "pytorch_time_us": 223.9,
-          "speedup": 4.92
-        },
         {
           "name": "d_pos_emb",
           "status": "pass",
@@ -874,9 +865,18 @@
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 45.5,
-          "pytorch_time_us": 189.7,
-          "speedup": 4.16
+          "c_time_us": 46.1,
+          "pytorch_time_us": 195.9,
+          "speedup": 4.24
+        },
+        {
+          "name": "d_token_emb",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-06,
+          "c_time_us": 46.1,
+          "pytorch_time_us": 229.7,
+          "speedup": 4.98
         }
       ]
     },
@@ -884,7 +884,7 @@
       "name": "Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.3548479080200195,
+      "duration_sec": 2.419131278991699,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -916,9 +916,9 @@
           "status": "pass",
           "max_diff": 7.75e-07,
           "tolerance": 0.0001,
-          "c_time_us": 334.7,
-          "pytorch_time_us": 179.4,
-          "speedup": 0.54
+          "c_time_us": 343.2,
+          "pytorch_time_us": 163.6,
+          "speedup": 0.48
         }
       ]
     },
@@ -926,7 +926,7 @@
       "name": "Attention Sliding Window",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 0.12648415565490723,
+      "duration_sec": 0.1283423900604248,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -936,18 +936,18 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "prefill_no_window",
+          "name": "decode_sliding",
           "status": "pass",
-          "max_diff": 2.235e-08,
+          "max_diff": 2.98e-08,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_sliding",
+          "name": "prefill_no_window",
           "status": "pass",
-          "max_diff": 2.98e-08,
+          "max_diff": 2.235e-08,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -968,7 +968,7 @@
       "name": "KV Cache Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.4894044399261475,
+      "duration_sec": 1.5204017162322998,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -978,9 +978,9 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "decode_vs_full",
+          "name": "flash_strided_vs_ref",
           "status": "pass",
-          "max_diff": 5.96e-07,
+          "max_diff": 9.54e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -996,9 +996,9 @@
           "speedup": null
         },
         {
-          "name": "flash_strided_vs_ref",
+          "name": "decode_vs_full",
           "status": "pass",
-          "max_diff": 9.54e-07,
+          "max_diff": 5.96e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1010,7 +1010,7 @@
       "name": "KV Cache Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.310175895690918,
+      "duration_sec": 1.3329503536224365,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1034,7 +1034,7 @@
       "name": "Fused Attention Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.3357651233673096,
+      "duration_sec": 1.3679969310760498,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1067,7 +1067,7 @@
       "name": "Fused SwiGLU Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.7419652938842773,
+      "duration_sec": 2.7713329792022705,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1100,7 +1100,7 @@
       "name": "MLP",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 27.437469959259033,
+      "duration_sec": 27.507953643798828,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1109,6 +1109,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "Fast (SIMD GELU)",
+          "status": "pass",
+          "max_diff": 0.00598,
+          "tolerance": 0.01,
+          "c_time_us": 5588.1,
+          "pytorch_time_us": 208.5,
+          "speedup": 0.04
+        },
         {
           "name": "Exact (scalar GELU)",
           "status": "pass",
@@ -1117,15 +1126,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Fast (SIMD GELU)",
-          "status": "pass",
-          "max_diff": 0.00598,
-          "tolerance": 0.01,
-          "c_time_us": 5579.8,
-          "pytorch_time_us": 207.5,
-          "speedup": 0.04
         }
       ]
     },
@@ -1133,7 +1133,7 @@
       "name": "Cross Entropy",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.338684558868408,
+      "duration_sec": 2.303400754928589,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1142,15 +1142,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "d_logits (ignore_index=-100)",
-          "status": "pass",
-          "max_diff": 9.31e-10,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "d_logits (all ignored => zeros)",
           "status": "pass",
@@ -1165,9 +1156,18 @@
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-05,
-          "c_time_us": 189.1,
-          "pytorch_time_us": 33.4,
+          "c_time_us": 191.2,
+          "pytorch_time_us": 33.8,
           "speedup": 0.18
+        },
+        {
+          "name": "d_logits (ignore_index=-100)",
+          "status": "pass",
+          "max_diff": 9.31e-10,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "Loss (all ignored => NaN)",
@@ -1193,7 +1193,7 @@
       "name": "Optimizer (AdamW/SGD)",
       "category": "training",
       "status": "pass",
-      "duration_sec": 2.605100631713867,
+      "duration_sec": 2.6573610305786133,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1202,24 +1202,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "fp32 (step=1)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 15.2,
-          "pytorch_time_us": 73.2,
-          "speedup": 4.81
-        },
-        {
-          "name": "accumulate (+=)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 8.2,
-          "pytorch_time_us": 2.8,
-          "speedup": 0.35
-        },
         {
           "name": "fp32 (10 steps)",
           "status": "pass",
@@ -1230,13 +1212,31 @@
           "speedup": null
         },
         {
+          "name": "accumulate (+=)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 8.3,
+          "pytorch_time_us": 2.7,
+          "speedup": 0.33
+        },
+        {
+          "name": "fp32 (step=1)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 15.7,
+          "pytorch_time_us": 74.2,
+          "speedup": 4.72
+        },
+        {
           "name": "scale (*=)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
           "c_time_us": 4.7,
-          "pytorch_time_us": 2.8,
-          "speedup": 0.59
+          "pytorch_time_us": 3.1,
+          "speedup": 0.67
         }
       ]
     },
@@ -1244,7 +1244,7 @@
       "name": "LM Head Litmus",
       "category": "kernels",
       "status": "fail",
-      "duration_sec": 19.658571243286133,
+      "duration_sec": 19.77751922607422,
       "stdout": "Building with native AVX kernels for GEMM\ngcc -O2 -Wall -Iinclude -o build/ck_ir_demo src/ckernel_ir.c src/ckernel_codegen.c src/ckernel_kernel_specs.c src/ckernel_registry.c src/ckernel_ir_demo.c\nGenerating runtime from /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus.config.json -> /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c...\n./build/ck_ir_demo /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus.config.json --emit /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c\n=== Forward IR ===\nCKIRGraph: layers=1, hidden_size=32, intermediate_size=64, heads=4, kv_heads=2, vocab=50, ctx=8, eps=1e-05, rope_theta=0\n  L0 N0 RMSNORM        outputs=[L0:N0:0] inputs=[IN]\n  L0 N1 LINEAR_QKV     outputs=[L0:N1:0] inputs=[L0:N0]\n  L0 N2 ATTENTION      outputs=[L0:N2:0] inputs=[L0:N1]\n  L0 N3 ADD            outputs=[L0:N3:0] inputs=[IN,L0:N2]\n  L0 N4 RMSNORM        outputs=[L0:N4:0] inputs=[L0:N3]\n  L0 N5 LINEAR         outputs=[L0:N5:0] inputs=[L0:N4]\n  L0 N6 SPLIT          outputs=[L0:N6:0,L0:N6:1] inputs=[L0:N5]\n  L0 N7 SWIGLU         outputs=[L0:N7:0] inputs=[L0:N6,L0:N6]\n  L0 N8 LINEAR         outputs=[L0:N8:0] inputs=[L0:N7]\n  L0 N9 ADD            outputs=[L0:N9:0] inputs=[L0:N3,L0:N8]\n\n=== Backward IR (skeleton) ===\nCKIRGraph: layers=1, hidden_size=32, intermediate_size=64, heads=4, kv_heads=2, vocab=50, ctx=8, eps=1e-05, rope_theta=0\n  L0 N9 ADD_BWD        outputs=[L0:N9:0,L0:N9:1] inputs=[L0:N3]\n  L0 N8 LINEAR_BWD     outputs=[L0:N8:0] inputs=[L0:N7]\n  L0 N7 SWIGLU_BWD     outputs=[L0:N7:0,L0:N7:1] inputs=[L0:N6]\n  L0 N6 SPLIT_BWD      outputs=[L0:N6:0] inputs=[L0:N5,L0:N0]\n  L0 N5 LINEAR_BWD     outputs=[L0:N5:0] inputs=[L0:N4]\n  L0 N4 RMSNORM_BWD    outputs=[L0:N4:0] inputs=[L0:N3]\n  L0 N3 ADD_BWD        outputs=[L0:N3:0,L0:N3:1] inputs=[IN]\n  L0 N2 ATTENTION_BWD  outputs=[L0:N2:0] inputs=[L0:N1]\n  L0 N1 LINEAR_QKV_BWD outputs=[L0:N1:0] inputs=[L0:N0]\n  L0 N0 RMSNORM_BWD    outputs=[L0:N0:0] inputs=[IN]\n\n=== Generated C Skeleton ===\n/* Auto-generated skeleton from CKIRGraph.\n * This file sketches the structure of the forward and backward\n * execution for a decoder-only transformer. It is NOT yet a\n * complete, runnable implementation. You can use it as a\n * starting point to wire buffers, kernel calls, and memory layout.\n */\n\n#include \"ckernel_engine.h\"\n#include \"ckernel_model.h\"\n#include \"ckernel_alloc.h\"\n\nvoid run_decoder_forward(TransformerModel *model /*, inputs, etc. */)\n{\n    for (int layer = 0; layer < model->cfg.num_layers; ++layer) {\n        /* Forward pass for layer */\n        /* This layer has 10 IR nodes */\n        // L%d: RMSNORM\n        //   outputs: [L%d:N0:0]\n        //   inputs : [IN]\n        //   TODO: bind buffers/weights and call RMSNORM kernel here\n\n        // L%d: LINEAR_QKV\n        //   outputs: [L%d:N1:0]\n        //   inputs : [L%d:N0:0]\n        //   TODO: bind buffers/weights and call LINEAR_QKV kernel here\n\n        // L%d: ATTENTION\n        //   outputs: [L%d:N2:0]\n        //   inputs : [L%d:N1:0]\n        //   TODO: bind buffers/weights and call ATTENTION kernel here\n\n        // L%d: ADD\n        //   outputs: [L%d:N3:0]\n        //   inputs : [IN, L%d:N2:0]\n        //   TODO: bind buffers/weights and call ADD kernel here\n\n        // L%d: RMSNORM\n        //   outputs: [L%d:N4:0]\n        //   inputs : [L%d:N3:0]\n        //   TODO: bind buffers/weights and call RMSNORM kernel here\n\n        // L%d: LINEAR\n        //   outputs: [L%d:N5:0]\n        //   inputs : [L%d:N4:0]\n        //   TODO: bind buffers/weights and call LINEAR kernel here\n\n        // L%d: SPLIT\n        //   outputs: [L%d:N6:0, L%d:N6:1]\n        //   inputs : [L%d:N5:0]\n        //   TODO: bind buffers/weights and call SPLIT kernel here\n\n        // L%d: SWIGLU\n        //   outputs: [L%d:N7:0]\n        //   inputs : [L%d:N6:0, L%d:N6:1]\n        //   TODO: bind buffers/weights and call SWIGLU kernel here\n\n        // L%d: LINEAR\n        //   outputs: [L%d:N8:0]\n        //   inputs : [L%d:N7:0]\n        //   TODO: bind buffers/weights and call LINEAR kernel here\n\n        // L%d: ADD\n        //   outputs: [L%d:N9:0]\n        //   inputs : [L%d:N3:0, L%d:N8:0]\n        //   TODO: bind buffers/weights and call ADD kernel here\n\n    } /* end for layer */\n}\n\nvoid run_decoder_backward(TransformerModel *model /*, grads, etc. */)\n{\n    for (int layer = model->cfg.num_layers - 1; layer >= 0; --layer) {\n        /* Backward pass for layer */\n        /* This layer has 10 backward IR nodes */\n        // L%d: ADD_BWD\n        //   TODO: wire gradient tensors and call ADD_BWD kernel here\n\n        // L%d: LINEAR_BWD\n        //   TODO: wire gradient tensors and call LINEAR_BWD kernel here\n\n        // L%d: SWIGLU_BWD\n        //   TODO: wire gradient tensors and call SWIGLU_BWD kernel here\n\n        // L%d: SPLIT_BWD\n        //   TODO: wire gradient tensors and call SPLIT_BWD kernel here\n\n        // L%d: LINEAR_BWD\n        //   TODO: wire gradient tensors and call LINEAR_BWD kernel here\n\n        // L%d: RMSNORM_BWD\n        //   TODO: wire gradient tensors and call RMSNORM_BWD kernel here\n\n        // L%d: ADD_BWD\n        //   TODO: wire gradient tensors and call ADD_BWD kernel here\n\n        // L%d: ATTENTION_BWD\n        //   TODO: wire gradient tensors and call ATTENTION_BWD kernel here\n\n        // L%d: LINEAR_QKV_BWD\n        //   TODO: wire gradient tensors and call LINEAR_QKV_BWD kernel here\n\n        // L%d: RMSNORM_BWD\n        //   TODO: wire gradient tensors and call RMSNORM_BWD kernel here\n\n    } /* end for layer */\n}\n\nint main(int argc, char **argv)\n{\n    (void)argc; (void)argv;\n    TransformerModel model = {0};\n    model.cfg.num_layers        = 1;\n    model.cfg.hidden_size       = 32;\n    model.cfg.intermediate_size = 64;\n    model.cfg.num_heads         = 4;\n    model.cfg.num_kv_heads      = 2;\n    model.cfg.vocab_size        = 50;\n    model.cfg.context_window    = 8;\n    model.cfg.rms_norm_eps      = 9.99999975e-06;\n    model.cfg.rope_theta        = 0;\n    layout_transformer_from_ir(&model, NULL); /* TODO: pass IR if needed */\n    size_t bytes = model.total_bytes;\n    model.memory_base = (uint8_t *)ck_huge_alloc(bytes);\n    if (!model.memory_base) {\n        fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\n        return 1;\n    }\n    // TODO: load weights into model.memory_base based on offsets\n    run_decoder_forward(&model);\n    // TODO: run_decoder_backward(&model) when training\n    ck_huge_free(model.memory_base, bytes);\n    return 0;\n}\n",
       "stderr": "[ck_codegen] kernels manifest written to /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c.kernels\n\n[ck_ir_demo] standalone runtime written to /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c\n\n[ck_ir_demo] JSON IR written to build/ir.json\nsrc/kernels/attention_oracle_ggml.c:13:10: fatal error: ../../llama.cpp/ggml/include/ggml.h: No such file or directory\n   13 | #include \"../../llama.cpp/ggml/include/ggml.h\"\n      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncompilation terminated.\nTraceback (most recent call last):\n  File \"/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/unittest/test_lm_head_litmus.py\", line 596, in <module>\n    main()\n  File \"/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/unittest/test_lm_head_litmus.py\", line 505, in main\n    subprocess.run(cmd, cwd=root, check=True)\n  File \"/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/quantize_row_q8_k_avx.c', 'src/kernels/quantize_row_q8_k_avx2.c', 'src/kernels/quantize_row_q8_k_avx512.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c', 'src/ck_threadpool.c', 'src/kernels/attention_oracle_ggml.c', '-lpthread']' returned non-zero exit status 1.\n",
       "error_msg": "        fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\nsrc/kernels/attention_oracle_ggml.c:13:10: fatal error: ../../llama.cpp/ggml/include/ggml.h: No such file or directory\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/quantize_row_q8_k_avx.c', 'src/kernels/quantize_row_q8_k_avx2.c', 'src/kernels/quantize_row_q8_k_avx512.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c', 'src/ck_threadpool.c', 'src/kernels/attention_oracle_ggml.c', '-lpthread']' returned non-zero exit status 1.",
@@ -1258,7 +1258,7 @@
       "name": "DeepSeek Reference Kernels",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.6607072353363037,
+      "duration_sec": 1.7805778980255127,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1272,7 +1272,7 @@
       "name": "Vision",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.3578884601593018,
+      "duration_sec": 1.454554557800293,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1286,7 +1286,7 @@
       "name": "ReLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.77394437789917,
+      "duration_sec": 1.884200096130371,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1302,16 +1302,16 @@
           "tolerance": 0.01,
           "c_time_us": 2.2,
           "pytorch_time_us": 3.5,
-          "speedup": 1.6
+          "speedup": 1.63
         },
         {
           "name": "d_input",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.01,
-          "c_time_us": 2.4,
-          "pytorch_time_us": 54.9,
-          "speedup": 22.57
+          "c_time_us": 2.5,
+          "pytorch_time_us": 54.7,
+          "speedup": 22.29
         }
       ]
     },
@@ -1319,7 +1319,7 @@
       "name": "GELU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.290510892868042,
+      "duration_sec": 1.3705918788909912,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1333,7 +1333,7 @@
       "name": "Sigmoid BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.2937064170837402,
+      "duration_sec": 1.3346784114837646,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1347,7 +1347,7 @@
       "name": "SwiGLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.30556058883667,
+      "duration_sec": 1.344630241394043,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1361,7 +1361,7 @@
       "name": "LayerNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3065214157104492,
+      "duration_sec": 1.331892967224121,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1375,7 +1375,7 @@
       "name": "RMSNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3033621311187744,
+      "duration_sec": 1.3436963558197021,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1389,7 +1389,7 @@
       "name": "RoPE BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3036317825317383,
+      "duration_sec": 1.362480878829956,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1403,7 +1403,7 @@
       "name": "Embedding BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3005809783935547,
+      "duration_sec": 1.3577015399932861,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1417,7 +1417,7 @@
       "name": "Attention BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3379433155059814,
+      "duration_sec": 1.3217055797576904,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1431,7 +1431,7 @@
       "name": "MLP BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.302964210510254,
+      "duration_sec": 1.3364553451538086,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1445,7 +1445,7 @@
       "name": "Cross Entropy BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.3039674758911133,
+      "duration_sec": 1.3442935943603516,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1459,7 +1459,7 @@
       "name": "Q4_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.2972943782806396,
+      "duration_sec": 1.3869149684906006,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1492,7 +1492,7 @@
       "name": "Q6_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.3092453479766846,
+      "duration_sec": 1.3587708473205566,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1501,6 +1501,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "dequant_q6_k_row",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "gemm_nt_q6_k (M=1,N=32,K=256)",
           "status": "pass",
@@ -1518,15 +1527,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "dequant_q6_k_row",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
         }
       ]
     },
@@ -1534,7 +1534,7 @@
       "name": "Q4_K x Q8_K MatVec",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.4563355445861816,
+      "duration_sec": 1.5084915161132812,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1544,21 +1544,21 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "End-to-end (M=16,K=512)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0,
+          "c_time_us": 5.0,
+          "pytorch_time_us": 3.8,
+          "speedup": 0.76
+        },
+        {
           "name": "End-to-end (M=64,K=2048)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
           "c_time_us": 24.7,
-          "pytorch_time_us": 16.3,
-          "speedup": 0.66
-        },
-        {
-          "name": "End-to-end (M=16,K=512)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0,
-          "c_time_us": 5.5,
-          "pytorch_time_us": 3.2,
+          "pytorch_time_us": 14.5,
           "speedup": 0.59
         },
         {
@@ -1566,9 +1566,9 @@
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
-          "c_time_us": 6.8,
-          "pytorch_time_us": 3.7,
-          "speedup": 0.54
+          "c_time_us": 7.4,
+          "pytorch_time_us": 3.9,
+          "speedup": 0.53
         }
       ]
     },
@@ -1576,7 +1576,7 @@
       "name": "Softmax Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.3481080532073975,
+      "duration_sec": 1.4009168148040771,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1585,6 +1585,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "Small (H=2,T=8)",
+          "status": "pass",
+          "max_diff": 2.98e-08,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "Large (H=8,T=32)",
           "status": "pass",
@@ -1611,15 +1620,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Small (H=2,T=8)",
-          "status": "pass",
-          "max_diff": 2.98e-08,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
         }
       ]
     },
@@ -1627,7 +1627,7 @@
       "name": "Attention Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 15.690582513809204,
+      "duration_sec": 16.07301664352417,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1636,6 +1636,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "Tiny (H=2,T=8,D=16)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "Small (H=4,T=16,D=32)",
           "status": "pass",
@@ -1646,9 +1655,9 @@
           "speedup": null
         },
         {
-          "name": "d_k (GQA)",
+          "name": "d_v (GQA)",
           "status": "pass",
-          "max_diff": 1.19e-06,
+          "max_diff": 2.86e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1664,22 +1673,31 @@
           "speedup": null
         },
         {
+          "name": "Medium (H=8,T=32,D=64)",
+          "status": "pass",
+          "max_diff": 1.19e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "d_q",
           "status": "pass",
           "max_diff": 4.77e-07,
           "tolerance": 0.0001,
-          "c_time_us": 142.6,
-          "pytorch_time_us": 21825.3,
-          "speedup": 153.05
+          "c_time_us": 146.1,
+          "pytorch_time_us": 21856.6,
+          "speedup": 149.64
         },
         {
           "name": "d_q (GQA)",
           "status": "pass",
           "max_diff": 7.15e-07,
           "tolerance": 0.0001,
-          "c_time_us": 237.5,
-          "pytorch_time_us": 44030.6,
-          "speedup": 185.36
+          "c_time_us": 233.7,
+          "pytorch_time_us": 45467.0,
+          "speedup": 194.59
         },
         {
           "name": "d_k",
@@ -1691,27 +1709,9 @@
           "speedup": null
         },
         {
-          "name": "Medium (H=8,T=32,D=64)",
+          "name": "d_k (GQA)",
           "status": "pass",
           "max_diff": 1.19e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Tiny (H=2,T=8,D=16)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_v (GQA)",
-          "status": "pass",
-          "max_diff": 2.86e-06,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1723,7 +1723,7 @@
       "name": "DeltaNet Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.673391342163086,
+      "duration_sec": 1.779721736907959,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1737,7 +1737,7 @@
       "name": "PyTorch Parity",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 1.7529287338256836,
+      "duration_sec": 1.7843976020812988,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1747,31 +1747,13 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Loss",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": 165.1,
-          "pytorch_time_us": 26.6,
-          "speedup": 0.16
-        },
-        {
           "name": "Forward",
           "status": "pass",
           "max_diff": 4.77e-07,
           "tolerance": 5e-05,
-          "c_time_us": 39.7,
+          "c_time_us": 39.6,
           "pytorch_time_us": 25.3,
           "speedup": 0.64
-        },
-        {
-          "name": "d_logits",
-          "status": "pass",
-          "max_diff": 9.31e-10,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
         },
         {
           "name": "d_gamma",
@@ -1783,10 +1765,28 @@
           "speedup": null
         },
         {
+          "name": "Loss",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": 165.8,
+          "pytorch_time_us": 27.4,
+          "speedup": 0.17
+        },
+        {
           "name": "d_input",
           "status": "pass",
           "max_diff": 3.79e-05,
           "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_logits",
+          "status": "pass",
+          "max_diff": 9.31e-10,
+          "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1797,7 +1797,7 @@
       "name": "RoPE Pairwise Layout (Llama)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.18730735778808594,
+      "duration_sec": 0.16796135902404785,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1811,7 +1811,7 @@
       "name": "Litmus Test",
       "category": "parity",
       "status": "fail",
-      "duration_sec": 19.962407112121582,
+      "duration_sec": 20.066544771194458,
       "stdout": "Building with native AVX kernels for GEMM\npython3 -B unittest/test_lm_head_litmus.py \nmake[1]: Entering directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\nBuilding with native AVX kernels for GEMM\ngcc -O2 -Wall -Iinclude -o build/ck_ir_demo src/ckernel_ir.c src/ckernel_codegen.c src/ckernel_kernel_specs.c src/ckernel_registry.c src/ckernel_ir_demo.c\nGenerating runtime from /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus.config.json -> /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c...\n./build/ck_ir_demo /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus.config.json --emit /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c\n=== Forward IR ===\nCKIRGraph: layers=1, hidden_size=32, intermediate_size=64, heads=4, kv_heads=2, vocab=50, ctx=8, eps=1e-05, rope_theta=0\n  L0 N0 RMSNORM        outputs=[L0:N0:0] inputs=[IN]\n  L0 N1 LINEAR_QKV     outputs=[L0:N1:0] inputs=[L0:N0]\n  L0 N2 ATTENTION      outputs=[L0:N2:0] inputs=[L0:N1]\n  L0 N3 ADD            outputs=[L0:N3:0] inputs=[IN,L0:N2]\n  L0 N4 RMSNORM        outputs=[L0:N4:0] inputs=[L0:N3]\n  L0 N5 LINEAR         outputs=[L0:N5:0] inputs=[L0:N4]\n  L0 N6 SPLIT          outputs=[L0:N6:0,L0:N6:1] inputs=[L0:N5]\n  L0 N7 SWIGLU         outputs=[L0:N7:0] inputs=[L0:N6,L0:N6]\n  L0 N8 LINEAR         outputs=[L0:N8:0] inputs=[L0:N7]\n  L0 N9 ADD            outputs=[L0:N9:0] inputs=[L0:N3,L0:N8]\n\n=== Backward IR (skeleton) ===\nCKIRGraph: layers=1, hidden_size=32, intermediate_size=64, heads=4, kv_heads=2, vocab=50, ctx=8, eps=1e-05, rope_theta=0\n  L0 N9 ADD_BWD        outputs=[L0:N9:0,L0:N9:1] inputs=[L0:N3]\n  L0 N8 LINEAR_BWD     outputs=[L0:N8:0] inputs=[L0:N7]\n  L0 N7 SWIGLU_BWD     outputs=[L0:N7:0,L0:N7:1] inputs=[L0:N6]\n  L0 N6 SPLIT_BWD      outputs=[L0:N6:0] inputs=[L0:N5,L0:N0]\n  L0 N5 LINEAR_BWD     outputs=[L0:N5:0] inputs=[L0:N4]\n  L0 N4 RMSNORM_BWD    outputs=[L0:N4:0] inputs=[L0:N3]\n  L0 N3 ADD_BWD        outputs=[L0:N3:0,L0:N3:1] inputs=[IN]\n  L0 N2 ATTENTION_BWD  outputs=[L0:N2:0] inputs=[L0:N1]\n  L0 N1 LINEAR_QKV_BWD outputs=[L0:N1:0] inputs=[L0:N0]\n  L0 N0 RMSNORM_BWD    outputs=[L0:N0:0] inputs=[IN]\n\n=== Generated C Skeleton ===\n/* Auto-generated skeleton from CKIRGraph.\n * This file sketches the structure of the forward and backward\n * execution for a decoder-only transformer. It is NOT yet a\n * complete, runnable implementation. You can use it as a\n * starting point to wire buffers, kernel calls, and memory layout.\n */\n\n#include \"ckernel_engine.h\"\n#include \"ckernel_model.h\"\n#include \"ckernel_alloc.h\"\n\nvoid run_decoder_forward(TransformerModel *model /*, inputs, etc. */)\n{\n    for (int layer = 0; layer < model->cfg.num_layers; ++layer) {\n        /* Forward pass for layer */\n        /* This layer has 10 IR nodes */\n        // L%d: RMSNORM\n        //   outputs: [L%d:N0:0]\n        //   inputs : [IN]\n        //   TODO: bind buffers/weights and call RMSNORM kernel here\n\n        // L%d: LINEAR_QKV\n        //   outputs: [L%d:N1:0]\n        //   inputs : [L%d:N0:0]\n        //   TODO: bind buffers/weights and call LINEAR_QKV kernel here\n\n        // L%d: ATTENTION\n        //   outputs: [L%d:N2:0]\n        //   inputs : [L%d:N1:0]\n        //   TODO: bind buffers/weights and call ATTENTION kernel here\n\n        // L%d: ADD\n        //   outputs: [L%d:N3:0]\n        //   inputs : [IN, L%d:N2:0]\n        //   TODO: bind buffers/weights and call ADD kernel here\n\n        // L%d: RMSNORM\n        //   outputs: [L%d:N4:0]\n        //   inputs : [L%d:N3:0]\n        //   TODO: bind buffers/weights and call RMSNORM kernel here\n\n        // L%d: LINEAR\n        //   outputs: [L%d:N5:0]\n        //   inputs : [L%d:N4:0]\n        //   TODO: bind buffers/weights and call LINEAR kernel here\n\n        // L%d: SPLIT\n        //   outputs: [L%d:N6:0, L%d:N6:1]\n        //   inputs : [L%d:N5:0]\n        //   TODO: bind buffers/weights and call SPLIT kernel here\n\n        // L%d: SWIGLU\n        //   outputs: [L%d:N7:0]\n        //   inputs : [L%d:N6:0, L%d:N6:1]\n        //   TODO: bind buffers/weights and call SWIGLU kernel here\n\n        // L%d: LINEAR\n        //   outputs: [L%d:N8:0]\n        //   inputs : [L%d:N7:0]\n        //   TODO: bind buffers/weights and call LINEAR kernel here\n\n        // L%d: ADD\n        //   outputs: [L%d:N9:0]\n        //   inputs : [L%d:N3:0, L%d:N8:0]\n        //   TODO: bind buffers/weights and call ADD kernel here\n\n    } /* end for layer */\n}\n\nvoid run_decoder_backward(TransformerModel *model /*, grads, etc. */)\n{\n    for (int layer = model->cfg.num_layers - 1; layer >= 0; --layer) {\n        /* Backward pass for layer */\n        /* This layer has 10 backward IR nodes */\n        // L%d: ADD_BWD\n        //   TODO: wire gradient tensors and call ADD_BWD kernel here\n\n        // L%d: LINEAR_BWD\n        //   TODO: wire gradient tensors and call LINEAR_BWD kernel here\n\n        // L%d: SWIGLU_BWD\n        //   TODO: wire gradient tensors and call SWIGLU_BWD kernel here\n\n        // L%d: SPLIT_BWD\n        //   TODO: wire gradient tensors and call SPLIT_BWD kernel here\n\n        // L%d: LINEAR_BWD\n        //   TODO: wire gradient tensors and call LINEAR_BWD kernel here\n\n        // L%d: RMSNORM_BWD\n        //   TODO: wire gradient tensors and call RMSNORM_BWD kernel here\n\n        // L%d: ADD_BWD\n        //   TODO: wire gradient tensors and call ADD_BWD kernel here\n\n        // L%d: ATTENTION_BWD\n        //   TODO: wire gradient tensors and call ATTENTION_BWD kernel here\n\n        // L%d: LINEAR_QKV_BWD\n        //   TODO: wire gradient tensors and call LINEAR_QKV_BWD kernel here\n\n        // L%d: RMSNORM_BWD\n        //   TODO: wire gradient tensors and call RMSNORM_BWD kernel here\n\n    } /* end for layer */\n}\n\nint main(int argc, char **argv)\n{\n    (void)argc; (void)argv;\n    TransformerModel model = {0};\n    model.cfg.num_layers        = 1;\n    model.cfg.hidden_size       = 32;\n    model.cfg.intermediate_size = 64;\n    model.cfg.num_heads         = 4;\n    model.cfg.num_kv_heads      = 2;\n    model.cfg.vocab_size        = 50;\n    model.cfg.context_window    = 8;\n    model.cfg.rms_norm_eps      = 9.99999975e-06;\n    model.cfg.rope_theta        = 0;\n    layout_transformer_from_ir(&model, NULL); /* TODO: pass IR if needed */\n    size_t bytes = model.total_bytes;\n    model.memory_base = (uint8_t *)ck_huge_alloc(bytes);\n    if (!model.memory_base) {\n        fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\n        return 1;\n    }\n    // TODO: load weights into model.memory_base based on offsets\n    run_decoder_forward(&model);\n    // TODO: run_decoder_backward(&model) when training\n    ck_huge_free(model.memory_base, bytes);\n    return 0;\n}\nmake[1]: Leaving directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\n",
       "stderr": "[ck_codegen] kernels manifest written to /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c.kernels\n\n[ck_ir_demo] standalone runtime written to /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c\n\n[ck_ir_demo] JSON IR written to build/ir.json\nsrc/kernels/attention_oracle_ggml.c:13:10: fatal error: ../../llama.cpp/ggml/include/ggml.h: No such file or directory\n   13 | #include \"../../llama.cpp/ggml/include/ggml.h\"\n      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncompilation terminated.\nTraceback (most recent call last):\n  File \"/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/unittest/test_lm_head_litmus.py\", line 596, in <module>\n    main()\n  File \"/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/unittest/test_lm_head_litmus.py\", line 505, in main\n    subprocess.run(cmd, cwd=root, check=True)\n  File \"/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/quantize_row_q8_k_avx.c', 'src/kernels/quantize_row_q8_k_avx2.c', 'src/kernels/quantize_row_q8_k_avx512.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c', 'src/ck_threadpool.c', 'src/kernels/attention_oracle_ggml.c', '-lpthread']' returned non-zero exit status 1.\nmake: *** [Makefile:1884: litmus] Error 1\n",
       "error_msg": "fprintf(stderr, \"Failed to allocate %zu bytes for model\\n\", bytes);\nsrc/kernels/attention_oracle_ggml.c:13:10: fatal error: ../../llama.cpp/ggml/include/ggml.h: No such file or directory\nraise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['gcc', '-fopenmp', '-O2', '-march=native', '-Iinclude', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated.c', '-lm', '-o', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/litmus_generated', 'src/ckernel_alloc.c', 'src/ckernel_strict.c', 'src/cpu_features.c', 'src/kernels/embedding_kernels.c', 'src/kernels/dequant_kernels.c', 'src/kernels/gemm_kernels_q4k.c', 'src/kernels/gemm_kernels_q4k_q8k.c', 'src/kernels/gemm_kernels_q6k.c', 'src/kernels/gemm_kernels_q4_0.c', 'src/kernels/gemm_kernels_q4_1.c', 'src/kernels/gemm_kernels_q5_0.c', 'src/kernels/gemm_kernels_q5_1.c', 'src/kernels/gemm_kernels_q8_0.c', 'src/kernels/gemm_kernels_q4k_sse.c', 'src/kernels/gemm_kernels_q4k_avx.c', 'src/kernels/gemm_kernels_q4k_q8k_avx2.c', 'src/kernels/gemm_kernels_q4k_q8k_vnni.c', 'src/kernels/gemm_kernels_q5_0_sse.c', 'src/kernels/gemm_kernels_q5_0_sse_v2.c', 'src/kernels/gemm_kernels_q6k_sse.c', 'src/kernels/quantize_row_q8_k_sse.c', 'src/kernels/quantize_row_q8_k_avx.c', 'src/kernels/quantize_row_q8_k_avx2.c', 'src/kernels/quantize_row_q8_k_avx512.c', 'src/kernels/rope_kernels.c', 'src/kernels/loss_kernels.c', 'src/kernels/kv_cache_kernels.c', 'src/kernels/gemm_fused_kernels.c', 'src/kernels/mlp_fused_decode.c', 'src/kernels/gemm_microkernel.c', 'src/kernels/attention_decode_fused.c', 'src/kernels/attention_flash_true.c', 'src/kernels/rmsnorm_kernels.c', 'src/kernels/rmsnorm_kernels_bf16.c', 'src/kernels/rmsnorm_kernels_int8.c', 'src/kernels/rmsnorm_kernels_int4.c', 'src/ckernel_orchestration.c', 'src/kernels/gemm_kernels.c', 'src/kernels/mlp_kernels.c', 'src/kernels/gelu_kernels.c', 'src/kernels/attention_kernels.c', 'src/kernels/softmax_kernels.c', 'src/kernels/swiglu_kernels.c', 'src/kernels/swiglu_kernels_bf16.c', 'src/kernels/sigmoid_kernels.c', 'src/ck_threadpool.c', 'src/kernels/attention_oracle_ggml.c', '-lpthread']' returned non-zero exit status 1.\nmake: *** [Makefile:1884: litmus] Error 1",
@@ -1825,8 +1825,8 @@
       "name": "llama.cpp Parity (Nightly)",
       "category": "parity",
       "status": "fail",
-      "duration_sec": 101.31837391853333,
-      "stdout": "Building with native AVX kernels for GEMM\nRunning nightly llama.cpp parity test...\n==============================================\n  C-Kernel-Engine Parity Smoketest\n==============================================\n\nRoot directory: /home/runner/work/C-Kernel-Engine/C-Kernel-Engine\nQuick mode: false\nKernels only: false\n\n\u001b[0;32m[STEP]\u001b[0m [1/5] Skipping llama.cpp build (--skip-build)\n\u001b[0;32m[STEP]\u001b[0m [2/5] Building CK parity library...\nmake[1]: Entering directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\nBuilding with native AVX kernels for GEMM\ngcc -O3 -fPIC  -Wall -Wno-unknown-pragmas -DCK_TARGET_X86=1 -mavx2 -mfma -mssse3 -Iinclude -shared -o build/libck_parity.so src/ck_parity_api.c src/ckernel_strict.c src/ck_threadpool.c src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q6k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_avx.c src/kernels/gemm_kernels_q5_k.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_batch_int8.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/kernels/quantize_row_q8_k_avx512.c src/kernels/rmsnorm_kernels.c src/kernels/rope_kernels.c src/kernels/swiglu_kernels.c src/kernels/softmax_kernels.c src/kernels/sigmoid_kernels.c src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/ssm_kernels.c src/kernels/hybrid_attention_kernels.c src/kernels/recurrent_split_kernels.c src/kernels/recurrent_gate_kernels.c src/kernels/recurrent_state_kernels.c src/kernels/recurrent_qk_norm_kernels.c src/kernels/recurrent_norm_kernels.c src/kernels/deltanet_kernels.c src/kernels/fused/prefill_fused_gemm.c src/kernels/fused/mega_fused_outproj_mlp_prefill.c src/kernels/fused/gemv_fused_quant_bias.c src/kernels/add_kernels_bf16.c  -lm -lpthread\nsrc/kernels/gemm_kernels_q6k_q8k.c:600:21: warning: \u2018q6k_scale_shuffle_avx2\u2019 defined but not used [-Wunused-const-variable=]\n  600 | static const int8_t q6k_scale_shuffle_avx2[4][32] = {\n      |                     ^~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q4k_avx.c: In function \u2018gemv_q4_k_q8_k_parallel_simd\u2019:\nsrc/kernels/gemm_kernels_q4k_avx.c:155:18: warning: unused variable \u2018bytes_per_row\u2019 [-Wunused-variable]\n  155 |     const size_t bytes_per_row = (size_t)nb * sizeof(block_q4_K);\n      |                  ^~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c: In function \u2018dot_q5_0_q8_k_32_sse\u2019:\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:38:13: warning: unused variable \u2018w_hi\u2019 [-Wunused-variable]\n   38 |     __m128i w_hi = _mm_and_si128(_mm_srli_epi16(qs_vec, 4), mask_0f);\n      |             ^~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:37:13: warning: unused variable \u2018w_lo\u2019 [-Wunused-variable]\n   37 |     __m128i w_lo = _mm_and_si128(qs_vec, mask_0f);\n      |             ^~~~\nsrc/kernels/rope_kernels.c:1043:13: warning: \u2018vision_mrope_apply_head\u2019 defined but not used [-Wunused-function]\n 1043 | static void vision_mrope_apply_head(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:2718:36: warning: \u2018attention_forward_full_head_major_gqa_ggml_tiled_strict\u2019 defined but not used [-Wunused-function]\n 2718 | static CK_NOINLINE CK_OPTNONE void attention_forward_full_head_major_gqa_ggml_tiled_strict(const float *q,\n      |                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:1551:13: warning: \u2018attention_flash_query_causal\u2019 defined but not used [-Wunused-function]\n 1551 | static void attention_flash_query_causal(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:327:13: warning: \u2018ck_attention_trace_float\u2019 defined but not used [-Wunused-function]\n  327 | static void ck_attention_trace_float(const char *tag,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:193:12: warning: \u2018ck_attention_ggml_out_graph_enabled\u2019 defined but not used [-Wunused-function]\n  193 | static int ck_attention_ggml_out_graph_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:180:12: warning: \u2018ck_attention_reverse_out_dot_enabled\u2019 defined but not used [-Wunused-function]\n  180 | static int ck_attention_reverse_out_dot_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:132:37: warning: \u2018ck_vec_dot_f32_reverse_strict\u2019 defined but not used [-Wunused-function]\n  132 | static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32_reverse_strict(const float *x,\n      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels_sliding.c:377:13: warning: \u2018attention_flash_query_sliding\u2019 defined but not used [-Wunused-function]\n  377 | static void attention_flash_query_sliding(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_flash_true.c:142:13: warning: \u2018attention_flash_decode_scalar\u2019 defined but not used [-Wunused-function]\n  142 | static void attention_flash_decode_scalar(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/fused/prefill_fused_gemm.c:332:13: warning: \u2018fused_rmsnorm_gemm_2d_tiled\u2019 defined but not used [-Wunused-function]\n  332 | static void fused_rmsnorm_gemm_2d_tiled(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~\nBuilt CK parity library: build/libck_parity.so\nmake[1]: Leaving directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\n\u001b[0;32m[STEP]\u001b[0m Built CK parity library: /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/libck_parity.so\n\u001b[0;32m[STEP]\u001b[0m [3/5] Running kernel-level tests...\n\u001b[1;33m[WARN]\u001b[0m Missing parity libraries for kernel tests\n\u001b[1;33m[WARN]\u001b[0m   - Missing: llama.cpp/libggml_kernel_test.so\n\u001b[1;33m[WARN]\u001b[0m Falling back to PyTorch parity tests...\n\n============================================================\n  C-Kernel-Engine Unit Test Suite\n============================================================\n  CPU:    AMD EPYC 7763 64-Core Processor\n  Cores:  4\n  SIMD:   AVX2 + FMA\n  PyTorch: 2.12.0+cpu\n============================================================\n\n\n============================================================\n  Running PyTorch Parity Tests\n============================================================\n\n\n================================================================================\n  TEST: RMSNorm Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=1.43e-06  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=9.54e-07  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n  d_gamma  max_diff=3.81e-06  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  197.4            15.8             \u001b[92m12.46x\u001b[0m  1.43e-06    1e-05 \n  d_input  N/A              N/A              N/A        9.54e-07    1e-04 \n  d_gamma  N/A              N/A              N/A        3.81e-06    1e-04 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: SwiGLU Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=4.77e-07  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=3.79e-05  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  25.1             39.7             \u001b[93m0.63x\u001b[0m  4.77e-07    5e-05 \n  d_input  N/A              N/A              N/A        3.79e-05    5e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Cross-Entropy Loss/Gradient Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, V=500\n\n  ACCURACY\n  ----------------------------------------\n  Loss      max_diff=0.00e+00  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_logits  max_diff=9.31e-10  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel    PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ----------------------------------------------------------------------\n  Loss      28.8             165.1            \u001b[93m0.17x\u001b[0m  0.00e+00    1e-05 \n  d_logits  N/A              N/A              N/A        9.31e-10    1e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n  Gradient norms:\n    ln1.weight: 0.000391\n    ln2.weight: 0.000003\n    w1.weight: 0.000003\n    w2.weight: 0.000002\n    wk.weight: 0.000000\n    wo.weight: 0.000488\n    wq.weight: 0.000000\n    wv.weight: 0.000433\n\n================================================================================\n  TEST: Training Step Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=16, D=64, V=256\n\n  ACCURACY\n  ----------------------------------------\n  Loss computed                   max_diff=0.00e+00  tol=inf  [\u001b[92mPASS\u001b[0m]\n  All gradients computed          max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Gradient magnitudes reasonable  max_diff=4.88e-04  tol=1e+02  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Numerical Stability\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=32, D=64\n\n  ACCURACY\n  ----------------------------------------\n  Small inputs (1e-6)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Large inputs (100x)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  SwiGLU saturated gate  max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n============================================================\n  SUMMARY\n============================================================\n  RMSNorm Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  SwiGLU Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  Cross-Entropy Loss/Gradient Parity: [\u001b[92mPASS\u001b[0m]\n  Training Step Parity: [\u001b[92mPASS\u001b[0m]\n  Numerical Stability: [\u001b[92mPASS\u001b[0m]\n------------------------------------------------------------\n  \u001b[92mALL TESTS PASSED (13/13)\u001b[0m\n============================================================\n\n\u001b[0;32m[PASS]\u001b[0m PyTorch parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3b/5] Running comprehensive GEMV kernel tests...\n\u001b[1;33m[WARN]\u001b[0m Missing parity libraries, skipping comprehensive GEMV tests\n\u001b[1;33m[WARN]\u001b[0m   - Missing: llama.cpp/libggml_kernel_test.so\n\u001b[0;32m[STEP]\u001b[0m [3c/5] Running batch quantization parity tests...\n============================================================\nBatch Quantize Parity Tests\n============================================================\n\n============================================================\nTesting quantize_batch_q8_0: 8 rows x 896 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_0: 1 rows x 896 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_0: 32 rows x 4096 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_k: 8 rows x 1024 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_k: 1 rows x 256 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nSUMMARY\n============================================================\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (8x896)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (1x896)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (32x4096)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_k (8x1024)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_k (1x256)\n\nTotal: 5/5 tests passed\n\u001b[0;32m[PASS]\u001b[0m Batch quantization parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3e/5] Running OpenMP GEMV parity tests...\n================================================================================\n  GEMV Serial vs OpenMP Parity & Speed Test\n================================================================================\n  OpenMP threads:    4\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.084      0.084    1.00x  PASS\nmlp_gate_up         9728      896       0.907      0.911    1.00x  PASS\nmlp_down             896     4864       0.439      0.439    1.00x  PASS\nlogits            151936      896      14.453     14.456    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.133      0.133    1.00x  PASS\nmlp_gate_up         9728      896       1.438      1.441    1.00x  PASS\nmlp_down             896     4864       0.691      0.691    1.00x  PASS\nlogits            151936      896      22.502     22.495    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs gemv_fused_q5_0_bias_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.114      0.135    0.84x  PASS\nmlp_gate_up         9728      896       1.234      1.471    0.84x  PASS\nmlp_down             896     4864       0.615      0.693    0.89x  PASS\nlogits            151936      896      19.355     22.942    0.84x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 4: gemv_fused_q5_0_bias_parallel_omp with NULL bias\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  NULL bias test (M=896, K=896): PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 5: Thread scaling for gemv_q8_0_q8_0_parallel_omp (logits M=151936, K=896)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  Serial:              14.572 ms\n  OMP nth=1 :          14.519 ms  (1.00x speedup)\n  OMP nth=2 :          14.523 ms  (1.00x speedup)\n  OMP nth=4 :          14.597 ms  (1.00x speedup)\n\n================================================================================\n  SUMMARY\n================================================================================\n  Passed: 13\n  Failed: 0\n================================================================================\n\n  All OMP kernels match serial output within tolerance.\n\n\u001b[0;32m[PASS]\u001b[0m OpenMP GEMV parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3f/5] Running sliding-window attention contract test...\nprefill_sliding  max_diff=2.980e-08  tol=1.0e-04  [PASS]\nprefill_no_window  max_diff=2.235e-08  tol=1.0e-04  [PASS]\ndecode_sliding  max_diff=2.980e-08  tol=1.0e-04  [PASS]\nSliding window kernel contract: PASS\n\u001b[0;32m[PASS]\u001b[0m Sliding-window attention contract passed\n\u001b[0;32m[STEP]\u001b[0m [4/5] Running PyTorch reference tests...\n\n============================================================\n  C-Kernel-Engine Unit Test Suite\n============================================================\n  CPU:    AMD EPYC 7763 64-Core Processor\n  Cores:  4\n  SIMD:   AVX2 + FMA\n  PyTorch: 2.12.0+cpu\n============================================================\n\n\n============================================================\n  Running PyTorch Parity Tests\n============================================================\n\n\n================================================================================\n  TEST: RMSNorm Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=1.43e-06  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=9.54e-07  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n  d_gamma  max_diff=3.81e-06  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  196.0            15.2             \u001b[92m12.87x\u001b[0m  1.43e-06    1e-05 \n  d_input  N/A              N/A              N/A        9.54e-07    1e-04 \n  d_gamma  N/A              N/A              N/A        3.81e-06    1e-04 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: SwiGLU Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=4.77e-07  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=3.79e-05  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  24.4             39.8             \u001b[93m0.61x\u001b[0m  4.77e-07    5e-05 \n  d_input  N/A              N/A              N/A        3.79e-05    5e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Cross-Entropy Loss/Gradient Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, V=500\n\n  ACCURACY\n  ----------------------------------------\n  Loss      max_diff=0.00e+00  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_logits  max_diff=9.31e-10  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel    PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ----------------------------------------------------------------------\n  Loss      27.5             169.5            \u001b[93m0.16x\u001b[0m  0.00e+00    1e-05 \n  d_logits  N/A              N/A              N/A        9.31e-10    1e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n  Gradient norms:\n    ln1.weight: 0.000391\n    ln2.weight: 0.000003\n    w1.weight: 0.000003\n    w2.weight: 0.000002\n    wk.weight: 0.000000\n    wo.weight: 0.000488\n    wq.weight: 0.000000\n    wv.weight: 0.000433\n\n================================================================================\n  TEST: Training Step Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=16, D=64, V=256\n\n  ACCURACY\n  ----------------------------------------\n  Loss computed                   max_diff=0.00e+00  tol=inf  [\u001b[92mPASS\u001b[0m]\n  All gradients computed          max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Gradient magnitudes reasonable  max_diff=4.88e-04  tol=1e+02  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Numerical Stability\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=32, D=64\n\n  ACCURACY\n  ----------------------------------------\n  Small inputs (1e-6)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Large inputs (100x)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  SwiGLU saturated gate  max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n============================================================\n  SUMMARY\n============================================================\n  RMSNorm Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  SwiGLU Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  Cross-Entropy Loss/Gradient Parity: [\u001b[92mPASS\u001b[0m]\n  Training Step Parity: [\u001b[92mPASS\u001b[0m]\n  Numerical Stability: [\u001b[92mPASS\u001b[0m]\n------------------------------------------------------------\n  \u001b[92mALL TESTS PASSED (13/13)\u001b[0m\n============================================================\n\n\u001b[0;32m[PASS]\u001b[0m PyTorch reference tests passed\n\u001b[0;32m[STEP]\u001b[0m [5/5] Running full model parity test...\n\u001b[1;33m[WARN]\u001b[0m Tensor dump directories not found, skipping full model parity\n\u001b[1;33m[WARN]\u001b[0m   To generate dumps:\n\u001b[1;33m[WARN]\u001b[0m     1. Run llama.cpp with tensor dump patch: llama.cpp/build/bin/llama-cli -m model.gguf -p 'Hello' -n 1\n\u001b[1;33m[WARN]\u001b[0m     2. Run CK with --parity flag: python scripts/ck_run_v5.py run model_dir --parity\n\n==============================================\n  PARITY SMOKETEST SUMMARY\n==============================================\n\n  Passed:  5\n  Failed:  0\n  Skipped: 2\n\n\u001b[0;32m[PASS]\u001b[0m All parity tests passed!\n\nRunning OpenMP GEMV parity tests (serial vs parallel)...\nBuilding with native AVX kernels for GEMM\nRunning OpenMP GEMV parity + speed test (full)...\nLD_LIBRARY_PATH=build:$LD_LIBRARY_PATH build/test_gemv_omp_parity\n================================================================================\n  GEMV Serial vs OpenMP Parity & Speed Test\n================================================================================\n  OpenMP threads:    4\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.086      0.085    1.01x  PASS\nmlp_gate_up         9728      896       0.909      0.913    1.00x  PASS\nmlp_down             896     4864       0.443      0.440    1.01x  PASS\nlogits            151936      896      14.557     14.543    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.133      0.133    1.00x  PASS\nmlp_gate_up         9728      896       1.444      1.443    1.00x  PASS\nmlp_down             896     4864       0.690      0.691    1.00x  PASS\nlogits            151936      896      22.508     22.516    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs gemv_fused_q5_0_bias_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.114      0.135    0.84x  PASS\nmlp_gate_up         9728      896       1.232      1.485    0.83x  PASS\nmlp_down             896     4864       0.617      0.693    0.89x  PASS\nlogits            151936      896      19.305     22.963    0.84x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 4: gemv_fused_q5_0_bias_parallel_omp with NULL bias\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  NULL bias test (M=896, K=896): PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 5: Thread scaling for gemv_q8_0_q8_0_parallel_omp (logits M=151936, K=896)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  Serial:              14.476 ms\n  OMP nth=1 :          14.512 ms  (1.00x speedup)\n  OMP nth=2 :          14.512 ms  (1.00x speedup)\n  OMP nth=4 :          14.511 ms  (1.00x speedup)\n\n================================================================================\n  SUMMARY\n================================================================================\n  Passed: 13\n  Failed: 0\n================================================================================\n\n  All OMP kernels match serial output within tolerance.\n\n\nRunning Thread Pool GEMV parity tests (serial vs dispatch)...\nBuilding with native AVX kernels for GEMM\ngcc -O3 -march=native -Iinclude -Iversion/v6.6/src -Iversion/v8/src \\\n\ttests/test_threadpool_parity.c \\\n\tversion/v6.6/src/ck_parallel_decode.c \\\n\tversion/v8/src/ck_parallel_prefill_v8.c \\\n\t-Lbuild -lckernel_engine -lm -lpthread \\\n\t-Wl,-rpath,build \\\n\t-o build/test_threadpool_parity\nRunning Thread Pool GEMV parity + speed test (full)...\nLD_LIBRARY_PATH=build:$LD_LIBRARY_PATH build/test_threadpool_parity\n================================================================================\n  GEMV Serial vs Thread Pool Dispatch Parity & Speed Test\n================================================================================\n  Thread pool:       initialized\n  Threads:           2\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n================================================================================\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.084      0.043    1.93x  PASS\nmlp_gate_up         9728      896       0.907      0.463    1.96x  PASS\nmlp_down             896     4864       0.440      0.224    1.96x  PASS\nlogits            151936      896      14.431      7.408    1.95x  PASS\n\n================================================================================\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.132      0.070    1.90x  PASS\nmlp_gate_up         9728      896       1.438      0.734    1.96x  PASS\nmlp_down             896     4864       0.690      0.347    1.99x  PASS\nlogits            151936      896      22.517     11.383    1.98x  PASS\n\n================================================================================\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs\n          gemv_fused_q5_0_bias_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.114      0.070    1.63x  PASS\nmlp_gate_up         9728      896       1.234      0.726    1.70x  PASS\nmlp_down             896     4864       0.623      0.348    1.79x  PASS\nlogits            151936      896      19.312     11.439    1.69x  PASS\n\n================================================================================\n  TEST 4: gemv_fused_q5_0_bias_parallel_dispatch with NULL bias\n================================================================================\n\n  NULL bias test (M=896, K=896): PASS\n\n================================================================================\n  TEST 5: Thread pool dispatch latency (small M, overhead-dominated)\n================================================================================\n\n  M=64, K=896 (1000 iterations)\n  Serial:              0.0060 ms\n  Thread pool:         0.0034 ms\n  Overhead:           -0.0025 ms (0.0%)\n  (Small M: dispatch overhead may exceed parallelism benefit)\n\n================================================================================\n  TEST 6: gemm_nt_q5_0_q8_0 (serial) vs\n          gemm_nt_q5_0_q8_0_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nqkv_proj            32    896    896       4.336      2.175    1.99x  PASS\nmlp_gate_up         32   4864    896      23.447     11.873    1.97x  PASS\nmlp_down            32    896   4864      22.207     11.173    1.99x  PASS\nbig_prefill        128    896    896      17.265      8.690    1.99x  PASS\nlong_prefill       256    896    896      34.530     17.415    1.98x  PASS\n\n================================================================================\n  TEST 7: gemm_nt_q8_0_q8_0 (serial) vs\n          gemm_nt_q8_0_q8_0_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nqkv_proj            32    896    896       4.070      2.059    1.98x  PASS\nmlp_gate_up         32   4864    896      22.157     11.161    1.99x  PASS\nmlp_down            32    896   4864      22.143     11.147    1.99x  PASS\nbig_prefill        128    896    896      16.410      8.280    1.98x  PASS\nlong_prefill       256    896    896      32.632     16.409    1.99x  PASS\n\n================================================================================\n  TEST 8: gemm_nt_q6_k_q8_k (serial) vs\n          gemm_nt_q6_k_q8_k_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nmlp_down            32    896   4864       6.363      3.258    1.95x  PASS\n\n================================================================================\n  TEST 9: gemm_nt_q4_k_q8_k (serial) vs\n          gemm_nt_q4_k_q8_k_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nmlp_down            32    896   4864      10.174     10.159    1.00x  PASS\n\n================================================================================\n  SUMMARY\n================================================================================\n  Thread pool:   2 threads\n  Tests:         GEMV decode (1-5) + GEMM prefill (6-9)\n  Failed:        0\n================================================================================\n\n  All thread pool dispatch kernels match serial output within tolerance.\n\n\nRunning comprehensive Q4/Q5/Q8 GEMV CK vs llama.cpp tests (quick)...\nBuilding with native AVX kernels for GEMM\ngcc -O3 -fPIC  -Wall -Wno-unknown-pragmas -DCK_TARGET_X86=1 -mavx2 -mfma -mssse3 -Iinclude -shared -o build/libck_parity.so src/ck_parity_api.c src/ckernel_strict.c src/ck_threadpool.c src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q6k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_avx.c src/kernels/gemm_kernels_q5_k.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_batch_int8.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/kernels/quantize_row_q8_k_avx512.c src/kernels/rmsnorm_kernels.c src/kernels/rope_kernels.c src/kernels/swiglu_kernels.c src/kernels/softmax_kernels.c src/kernels/sigmoid_kernels.c src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/ssm_kernels.c src/kernels/hybrid_attention_kernels.c src/kernels/recurrent_split_kernels.c src/kernels/recurrent_gate_kernels.c src/kernels/recurrent_state_kernels.c src/kernels/recurrent_qk_norm_kernels.c src/kernels/recurrent_norm_kernels.c src/kernels/deltanet_kernels.c src/kernels/fused/prefill_fused_gemm.c src/kernels/fused/mega_fused_outproj_mlp_prefill.c src/kernels/fused/gemv_fused_quant_bias.c src/kernels/add_kernels_bf16.c  -lm -lpthread\nRunning quick GEMV kernel tests...\n====================================================================================================\n\u001b[1mCOMPREHENSIVE GEMV KERNEL TESTS - CK-Engine vs Reference\u001b[0m\n====================================================================================================\n\n  \u001b[96mWHAT:\u001b[0m    Matrix-Vector Multiply (GEMV) accuracy and performance tests\n            Testing: output[M] = weights[M,K] x input[K]\n\n  \u001b[96mKERNELS:\u001b[0m Q4_K     - 4-bit K-quant (llama.cpp reference)\n            Q6_K     - 6-bit K-quant decode (CK timing + sanity check)\n            Q5_0     - 5-bit legacy quant (llama.cpp reference)\n            Q8_0     - 8-bit legacy quant (llama.cpp reference)\n            Q5_0_Q8_0 - Direct Q5_0 x Q8_0 vec_dot (llama.cpp reference)\n            Q8_0_Q8_0 - Direct Q8_0 x Q8_0 vec_dot (llama.cpp reference)\n\n  \u001b[96mSYSTEM:\u001b[0m\n    CPU:    AMD EPYC 7763 64-Core Processor\n    SIMD:   AVX2, FMA\n    Cores:  4\n\n\u001b[93mWARNING: Could not load llama.cpp kernel test library.\u001b[0m\nBuild it with: cd llama.cpp && g++ -shared -fPIC -o libggml_kernel_test.so ...\n",
+      "duration_sec": 101.51996517181396,
+      "stdout": "Building with native AVX kernels for GEMM\nRunning nightly llama.cpp parity test...\n==============================================\n  C-Kernel-Engine Parity Smoketest\n==============================================\n\nRoot directory: /home/runner/work/C-Kernel-Engine/C-Kernel-Engine\nQuick mode: false\nKernels only: false\n\n\u001b[0;32m[STEP]\u001b[0m [1/5] Skipping llama.cpp build (--skip-build)\n\u001b[0;32m[STEP]\u001b[0m [2/5] Building CK parity library...\nmake[1]: Entering directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\nBuilding with native AVX kernels for GEMM\ngcc -O3 -fPIC  -Wall -Wno-unknown-pragmas -DCK_TARGET_X86=1 -mavx2 -mfma -mssse3 -Iinclude -shared -o build/libck_parity.so src/ck_parity_api.c src/ckernel_strict.c src/ck_threadpool.c src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q6k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_avx.c src/kernels/gemm_kernels_q5_k.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_batch_int8.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/kernels/quantize_row_q8_k_avx512.c src/kernels/rmsnorm_kernels.c src/kernels/rope_kernels.c src/kernels/swiglu_kernels.c src/kernels/softmax_kernels.c src/kernels/sigmoid_kernels.c src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/ssm_kernels.c src/kernels/hybrid_attention_kernels.c src/kernels/recurrent_split_kernels.c src/kernels/recurrent_gate_kernels.c src/kernels/recurrent_state_kernels.c src/kernels/recurrent_qk_norm_kernels.c src/kernels/recurrent_norm_kernels.c src/kernels/deltanet_kernels.c src/kernels/fused/prefill_fused_gemm.c src/kernels/fused/mega_fused_outproj_mlp_prefill.c src/kernels/fused/gemv_fused_quant_bias.c src/kernels/add_kernels_bf16.c  -lm -lpthread\nsrc/kernels/gemm_kernels_q6k_q8k.c:600:21: warning: \u2018q6k_scale_shuffle_avx2\u2019 defined but not used [-Wunused-const-variable=]\n  600 | static const int8_t q6k_scale_shuffle_avx2[4][32] = {\n      |                     ^~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q4k_avx.c: In function \u2018gemv_q4_k_q8_k_parallel_simd\u2019:\nsrc/kernels/gemm_kernels_q4k_avx.c:155:18: warning: unused variable \u2018bytes_per_row\u2019 [-Wunused-variable]\n  155 |     const size_t bytes_per_row = (size_t)nb * sizeof(block_q4_K);\n      |                  ^~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c: In function \u2018dot_q5_0_q8_k_32_sse\u2019:\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:38:13: warning: unused variable \u2018w_hi\u2019 [-Wunused-variable]\n   38 |     __m128i w_hi = _mm_and_si128(_mm_srli_epi16(qs_vec, 4), mask_0f);\n      |             ^~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:37:13: warning: unused variable \u2018w_lo\u2019 [-Wunused-variable]\n   37 |     __m128i w_lo = _mm_and_si128(qs_vec, mask_0f);\n      |             ^~~~\nsrc/kernels/rope_kernels.c:1043:13: warning: \u2018vision_mrope_apply_head\u2019 defined but not used [-Wunused-function]\n 1043 | static void vision_mrope_apply_head(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:2718:36: warning: \u2018attention_forward_full_head_major_gqa_ggml_tiled_strict\u2019 defined but not used [-Wunused-function]\n 2718 | static CK_NOINLINE CK_OPTNONE void attention_forward_full_head_major_gqa_ggml_tiled_strict(const float *q,\n      |                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:1551:13: warning: \u2018attention_flash_query_causal\u2019 defined but not used [-Wunused-function]\n 1551 | static void attention_flash_query_causal(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:327:13: warning: \u2018ck_attention_trace_float\u2019 defined but not used [-Wunused-function]\n  327 | static void ck_attention_trace_float(const char *tag,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:193:12: warning: \u2018ck_attention_ggml_out_graph_enabled\u2019 defined but not used [-Wunused-function]\n  193 | static int ck_attention_ggml_out_graph_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:180:12: warning: \u2018ck_attention_reverse_out_dot_enabled\u2019 defined but not used [-Wunused-function]\n  180 | static int ck_attention_reverse_out_dot_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:132:37: warning: \u2018ck_vec_dot_f32_reverse_strict\u2019 defined but not used [-Wunused-function]\n  132 | static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32_reverse_strict(const float *x,\n      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels_sliding.c:377:13: warning: \u2018attention_flash_query_sliding\u2019 defined but not used [-Wunused-function]\n  377 | static void attention_flash_query_sliding(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_flash_true.c:142:13: warning: \u2018attention_flash_decode_scalar\u2019 defined but not used [-Wunused-function]\n  142 | static void attention_flash_decode_scalar(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/fused/prefill_fused_gemm.c:332:13: warning: \u2018fused_rmsnorm_gemm_2d_tiled\u2019 defined but not used [-Wunused-function]\n  332 | static void fused_rmsnorm_gemm_2d_tiled(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~\nBuilt CK parity library: build/libck_parity.so\nmake[1]: Leaving directory '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine'\n\u001b[0;32m[STEP]\u001b[0m Built CK parity library: /home/runner/work/C-Kernel-Engine/C-Kernel-Engine/build/libck_parity.so\n\u001b[0;32m[STEP]\u001b[0m [3/5] Running kernel-level tests...\n\u001b[1;33m[WARN]\u001b[0m Missing parity libraries for kernel tests\n\u001b[1;33m[WARN]\u001b[0m   - Missing: llama.cpp/libggml_kernel_test.so\n\u001b[1;33m[WARN]\u001b[0m Falling back to PyTorch parity tests...\n\n============================================================\n  C-Kernel-Engine Unit Test Suite\n============================================================\n  CPU:    AMD EPYC 7763 64-Core Processor\n  Cores:  4\n  SIMD:   AVX2 + FMA\n  PyTorch: 2.12.0+cpu\n============================================================\n\n\n============================================================\n  Running PyTorch Parity Tests\n============================================================\n\n\n================================================================================\n  TEST: RMSNorm Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=1.43e-06  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=9.54e-07  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n  d_gamma  max_diff=3.81e-06  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  196.0            16.4             \u001b[92m11.98x\u001b[0m  1.43e-06    1e-05 \n  d_input  N/A              N/A              N/A        9.54e-07    1e-04 \n  d_gamma  N/A              N/A              N/A        3.81e-06    1e-04 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: SwiGLU Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=4.77e-07  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=3.79e-05  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  26.6             40.8             \u001b[93m0.65x\u001b[0m  4.77e-07    5e-05 \n  d_input  N/A              N/A              N/A        3.79e-05    5e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Cross-Entropy Loss/Gradient Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, V=500\n\n  ACCURACY\n  ----------------------------------------\n  Loss      max_diff=0.00e+00  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_logits  max_diff=9.31e-10  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel    PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ----------------------------------------------------------------------\n  Loss      27.2             162.2            \u001b[93m0.17x\u001b[0m  0.00e+00    1e-05 \n  d_logits  N/A              N/A              N/A        9.31e-10    1e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n  Gradient norms:\n    ln1.weight: 0.000391\n    ln2.weight: 0.000003\n    w1.weight: 0.000003\n    w2.weight: 0.000002\n    wk.weight: 0.000000\n    wo.weight: 0.000488\n    wq.weight: 0.000000\n    wv.weight: 0.000433\n\n================================================================================\n  TEST: Training Step Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=16, D=64, V=256\n\n  ACCURACY\n  ----------------------------------------\n  Loss computed                   max_diff=0.00e+00  tol=inf  [\u001b[92mPASS\u001b[0m]\n  All gradients computed          max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Gradient magnitudes reasonable  max_diff=4.88e-04  tol=1e+02  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Numerical Stability\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=32, D=64\n\n  ACCURACY\n  ----------------------------------------\n  Small inputs (1e-6)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Large inputs (100x)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  SwiGLU saturated gate  max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n============================================================\n  SUMMARY\n============================================================\n  RMSNorm Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  SwiGLU Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  Cross-Entropy Loss/Gradient Parity: [\u001b[92mPASS\u001b[0m]\n  Training Step Parity: [\u001b[92mPASS\u001b[0m]\n  Numerical Stability: [\u001b[92mPASS\u001b[0m]\n------------------------------------------------------------\n  \u001b[92mALL TESTS PASSED (13/13)\u001b[0m\n============================================================\n\n\u001b[0;32m[PASS]\u001b[0m PyTorch parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3b/5] Running comprehensive GEMV kernel tests...\n\u001b[1;33m[WARN]\u001b[0m Missing parity libraries, skipping comprehensive GEMV tests\n\u001b[1;33m[WARN]\u001b[0m   - Missing: llama.cpp/libggml_kernel_test.so\n\u001b[0;32m[STEP]\u001b[0m [3c/5] Running batch quantization parity tests...\n============================================================\nBatch Quantize Parity Tests\n============================================================\n\n============================================================\nTesting quantize_batch_q8_0: 8 rows x 896 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_0: 1 rows x 896 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_0: 32 rows x 4096 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_k: 8 rows x 1024 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nTesting quantize_batch_q8_k: 1 rows x 256 elements\n============================================================\n\u001b[92mPASS\u001b[0m: Batch output matches row-by-row output exactly\n\n============================================================\nSUMMARY\n============================================================\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (8x896)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (1x896)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_0 (32x4096)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_k (8x1024)\n  [\u001b[92mPASS\u001b[0m] quantize_batch_q8_k (1x256)\n\nTotal: 5/5 tests passed\n\u001b[0;32m[PASS]\u001b[0m Batch quantization parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3e/5] Running OpenMP GEMV parity tests...\n================================================================================\n  GEMV Serial vs OpenMP Parity & Speed Test\n================================================================================\n  OpenMP threads:    4\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.084      0.084    1.00x  PASS\nmlp_gate_up         9728      896       0.913      0.911    1.00x  PASS\nmlp_down             896     4864       0.440      0.440    1.00x  PASS\nlogits            151936      896      14.496     14.506    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.133      0.132    1.01x  PASS\nmlp_gate_up         9728      896       1.439      1.439    1.00x  PASS\nmlp_down             896     4864       0.690      0.691    1.00x  PASS\nlogits            151936      896      22.541     22.512    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs gemv_fused_q5_0_bias_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.115      0.136    0.85x  PASS\nmlp_gate_up         9728      896       1.242      1.470    0.85x  PASS\nmlp_down             896     4864       0.616      0.694    0.89x  PASS\nlogits            151936      896      19.392     23.034    0.84x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 4: gemv_fused_q5_0_bias_parallel_omp with NULL bias\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  NULL bias test (M=896, K=896): PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 5: Thread scaling for gemv_q8_0_q8_0_parallel_omp (logits M=151936, K=896)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  Serial:              14.486 ms\n  OMP nth=1 :          14.475 ms  (1.00x speedup)\n  OMP nth=2 :          14.481 ms  (1.00x speedup)\n  OMP nth=4 :          14.484 ms  (1.00x speedup)\n\n================================================================================\n  SUMMARY\n================================================================================\n  Passed: 13\n  Failed: 0\n================================================================================\n\n  All OMP kernels match serial output within tolerance.\n\n\u001b[0;32m[PASS]\u001b[0m OpenMP GEMV parity tests passed\n\u001b[0;32m[STEP]\u001b[0m [3f/5] Running sliding-window attention contract test...\nprefill_sliding  max_diff=2.980e-08  tol=1.0e-04  [PASS]\nprefill_no_window  max_diff=2.235e-08  tol=1.0e-04  [PASS]\ndecode_sliding  max_diff=2.980e-08  tol=1.0e-04  [PASS]\nSliding window kernel contract: PASS\n\u001b[0;32m[PASS]\u001b[0m Sliding-window attention contract passed\n\u001b[0;32m[STEP]\u001b[0m [4/5] Running PyTorch reference tests...\n\n============================================================\n  C-Kernel-Engine Unit Test Suite\n============================================================\n  CPU:    AMD EPYC 7763 64-Core Processor\n  Cores:  4\n  SIMD:   AVX2 + FMA\n  PyTorch: 2.12.0+cpu\n============================================================\n\n\n============================================================\n  Running PyTorch Parity Tests\n============================================================\n\n\n================================================================================\n  TEST: RMSNorm Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=1.43e-06  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=9.54e-07  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n  d_gamma  max_diff=3.81e-06  tol=1e-04  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  197.5            15.6             \u001b[92m12.66x\u001b[0m  1.43e-06    1e-05 \n  d_input  N/A              N/A              N/A        9.54e-07    1e-04 \n  d_gamma  N/A              N/A              N/A        3.81e-06    1e-04 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: SwiGLU Forward/Backward Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, D=128\n\n  ACCURACY\n  ----------------------------------------\n  Forward  max_diff=4.77e-07  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n  d_input  max_diff=3.79e-05  tol=5e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel   PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ---------------------------------------------------------------------\n  Forward  25.3             40.0             \u001b[93m0.63x\u001b[0m  4.77e-07    5e-05 \n  d_input  N/A              N/A              N/A        3.79e-05    5e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Cross-Entropy Loss/Gradient Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=64, V=500\n\n  ACCURACY\n  ----------------------------------------\n  Loss      max_diff=0.00e+00  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n  d_logits  max_diff=9.31e-10  tol=1e-05  [\u001b[92mPASS\u001b[0m]\n\n  PERFORMANCE\n  ----------------------------------------\n  Kernel    PyTorch (us)     C Kernel (us)    Speedup    max_diff    tol   \n  ----------------------------------------------------------------------\n  Loss      27.4             165.5            \u001b[93m0.17x\u001b[0m  0.00e+00    1e-05 \n  d_logits  N/A              N/A              N/A        9.31e-10    1e-05 \n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (2/2)\u001b[0m\n================================================================================\n\n\n  Gradient norms:\n    ln1.weight: 0.000391\n    ln2.weight: 0.000003\n    w1.weight: 0.000003\n    w2.weight: 0.000002\n    wk.weight: 0.000000\n    wo.weight: 0.000488\n    wq.weight: 0.000000\n    wv.weight: 0.000433\n\n================================================================================\n  TEST: Training Step Parity\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=16, D=64, V=256\n\n  ACCURACY\n  ----------------------------------------\n  Loss computed                   max_diff=0.00e+00  tol=inf  [\u001b[92mPASS\u001b[0m]\n  All gradients computed          max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Gradient magnitudes reasonable  max_diff=4.88e-04  tol=1e+02  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n================================================================================\n  TEST: Numerical Stability\n================================================================================\n\n  SYSTEM INFO\n  ----------------------------------------\n  CPU:        AMD EPYC 7763 64-Core Processor\n  Cores:      4\n  SIMD:       AVX2 + FMA\n  Dtype:      fp32\n  Shape:      T=32, D=64\n\n  ACCURACY\n  ----------------------------------------\n  Small inputs (1e-6)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  Large inputs (100x)    max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n  SwiGLU saturated gate  max_diff=0.00e+00  tol=5e-01  [\u001b[92mPASS\u001b[0m]\n\n  ----------------------------------------\n  \u001b[92mALL TESTS PASSED (3/3)\u001b[0m\n================================================================================\n\n\n============================================================\n  SUMMARY\n============================================================\n  RMSNorm Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  SwiGLU Forward/Backward Parity: [\u001b[92mPASS\u001b[0m]\n  Cross-Entropy Loss/Gradient Parity: [\u001b[92mPASS\u001b[0m]\n  Training Step Parity: [\u001b[92mPASS\u001b[0m]\n  Numerical Stability: [\u001b[92mPASS\u001b[0m]\n------------------------------------------------------------\n  \u001b[92mALL TESTS PASSED (13/13)\u001b[0m\n============================================================\n\n\u001b[0;32m[PASS]\u001b[0m PyTorch reference tests passed\n\u001b[0;32m[STEP]\u001b[0m [5/5] Running full model parity test...\n\u001b[1;33m[WARN]\u001b[0m Tensor dump directories not found, skipping full model parity\n\u001b[1;33m[WARN]\u001b[0m   To generate dumps:\n\u001b[1;33m[WARN]\u001b[0m     1. Run llama.cpp with tensor dump patch: llama.cpp/build/bin/llama-cli -m model.gguf -p 'Hello' -n 1\n\u001b[1;33m[WARN]\u001b[0m     2. Run CK with --parity flag: python scripts/ck_run_v5.py run model_dir --parity\n\n==============================================\n  PARITY SMOKETEST SUMMARY\n==============================================\n\n  Passed:  5\n  Failed:  0\n  Skipped: 2\n\n\u001b[0;32m[PASS]\u001b[0m All parity tests passed!\n\nRunning OpenMP GEMV parity tests (serial vs parallel)...\nBuilding with native AVX kernels for GEMM\nRunning OpenMP GEMV parity + speed test (full)...\nLD_LIBRARY_PATH=build:$LD_LIBRARY_PATH build/test_gemv_omp_parity\n================================================================================\n  GEMV Serial vs OpenMP Parity & Speed Test\n================================================================================\n  OpenMP threads:    4\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.085      0.085    1.00x  PASS\nmlp_gate_up         9728      896       0.909      0.909    1.00x  PASS\nmlp_down             896     4864       0.442      0.439    1.01x  PASS\nlogits            151936      896      14.493     14.488    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.134      0.133    1.01x  PASS\nmlp_gate_up         9728      896       1.442      1.438    1.00x  PASS\nmlp_down             896     4864       0.690      0.689    1.00x  PASS\nlogits            151936      896      22.515     22.502    1.00x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs gemv_fused_q5_0_bias_parallel_omp (parallel)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\nConfig                 M        K  Serial(ms)    OMP(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.114      0.135    0.84x  PASS\nmlp_gate_up         9728      896       1.235      1.475    0.84x  PASS\nmlp_down             896     4864       0.617      0.695    0.89x  PASS\nlogits            151936      896      19.343     22.941    0.84x  PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 4: gemv_fused_q5_0_bias_parallel_omp with NULL bias\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  NULL bias test (M=896, K=896): PASS\n\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n  TEST 5: Thread scaling for gemv_q8_0_q8_0_parallel_omp (logits M=151936, K=896)\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n  Serial:              14.477 ms\n  OMP nth=1 :          14.504 ms  (1.00x speedup)\n  OMP nth=2 :          14.562 ms  (0.99x speedup)\n  OMP nth=4 :          14.535 ms  (1.00x speedup)\n\n================================================================================\n  SUMMARY\n================================================================================\n  Passed: 13\n  Failed: 0\n================================================================================\n\n  All OMP kernels match serial output within tolerance.\n\n\nRunning Thread Pool GEMV parity tests (serial vs dispatch)...\nBuilding with native AVX kernels for GEMM\ngcc -O3 -march=native -Iinclude -Iversion/v6.6/src -Iversion/v8/src \\\n\ttests/test_threadpool_parity.c \\\n\tversion/v6.6/src/ck_parallel_decode.c \\\n\tversion/v8/src/ck_parallel_prefill_v8.c \\\n\t-Lbuild -lckernel_engine -lm -lpthread \\\n\t-Wl,-rpath,build \\\n\t-o build/test_threadpool_parity\nRunning Thread Pool GEMV parity + speed test (full)...\nLD_LIBRARY_PATH=build:$LD_LIBRARY_PATH build/test_threadpool_parity\n================================================================================\n  GEMV Serial vs Thread Pool Dispatch Parity & Speed Test\n================================================================================\n  Thread pool:       initialized\n  Threads:           2\n  Warmup:            5\n  Iterations:        50\n  Abs tolerance:     1e-03\n  Mode:              full\n================================================================================\n\n================================================================================\n  TEST 1: gemv_q8_0_q8_0 (serial) vs gemv_q8_0_q8_0_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.085      0.046    1.85x  PASS\nmlp_gate_up         9728      896       0.916      0.465    1.97x  PASS\nmlp_down             896     4864       0.443      0.223    1.99x  PASS\nlogits            151936      896      14.559      7.421    1.96x  PASS\n\n================================================================================\n  TEST 2: gemv_q5_0_q8_0 (serial) vs gemv_q5_0_q8_0_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.133      0.070    1.90x  PASS\nmlp_gate_up         9728      896       1.441      0.725    1.99x  PASS\nmlp_down             896     4864       0.692      0.349    1.98x  PASS\nlogits            151936      896      22.519     11.383    1.98x  PASS\n\n================================================================================\n  TEST 3: gemv_fused_q5_0_bias_dispatch (serial) vs\n          gemv_fused_q5_0_bias_parallel_dispatch (pool)\n================================================================================\n\nConfig                 M        K  Serial(ms)   Pool(ms)  Speedup  Parity\n--------------------------------------------------------------------------------\nqkv_proj             896      896       0.114      0.068    1.69x  PASS\nmlp_gate_up         9728      896       1.236      0.727    1.70x  PASS\nmlp_down             896     4864       0.615      0.351    1.75x  PASS\nlogits            151936      896      19.323     11.427    1.69x  PASS\n\n================================================================================\n  TEST 4: gemv_fused_q5_0_bias_parallel_dispatch with NULL bias\n================================================================================\n\n  NULL bias test (M=896, K=896): PASS\n\n================================================================================\n  TEST 5: Thread pool dispatch latency (small M, overhead-dominated)\n================================================================================\n\n  M=64, K=896 (1000 iterations)\n  Serial:              0.0059 ms\n  Thread pool:         0.0035 ms\n  Overhead:           -0.0024 ms (0.0%)\n  (Small M: dispatch overhead may exceed parallelism benefit)\n\n================================================================================\n  TEST 6: gemm_nt_q5_0_q8_0 (serial) vs\n          gemm_nt_q5_0_q8_0_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nqkv_proj            32    896    896       4.322      2.166    2.00x  PASS\nmlp_gate_up         32   4864    896      23.510     11.833    1.99x  PASS\nmlp_down            32    896   4864      22.221     11.119    2.00x  PASS\nbig_prefill        128    896    896      17.304      8.714    1.99x  PASS\nlong_prefill       256    896    896      34.519     17.337    1.99x  PASS\n\n================================================================================\n  TEST 7: gemm_nt_q8_0_q8_0 (serial) vs\n          gemm_nt_q8_0_q8_0_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nqkv_proj            32    896    896       4.084      2.055    1.99x  PASS\nmlp_gate_up         32   4864    896      22.212     11.166    1.99x  PASS\nmlp_down            32    896   4864      22.187     11.142    1.99x  PASS\nbig_prefill        128    896    896      16.829      8.181    2.06x  PASS\nlong_prefill       256    896    896      32.754     16.463    1.99x  PASS\n\n================================================================================\n  TEST 8: gemm_nt_q6_k_q8_k (serial) vs\n          gemm_nt_q6_k_q8_k_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nmlp_down            32    896   4864       6.398      3.225    1.98x  PASS\n\n================================================================================\n  TEST 9: gemm_nt_q4_k_q8_k (serial) vs\n          gemm_nt_q4_k_q8_k_parallel_dispatch (pool) [prefill]\n================================================================================\n\nConfig               M      N      K  Serial(ms)   Pool(ms)  Speedup  Parity\n------------------------------------------------------------------------------------\nmlp_down            32    896   4864      10.149     10.212    0.99x  PASS\n\n================================================================================\n  SUMMARY\n================================================================================\n  Thread pool:   2 threads\n  Tests:         GEMV decode (1-5) + GEMM prefill (6-9)\n  Failed:        0\n================================================================================\n\n  All thread pool dispatch kernels match serial output within tolerance.\n\n\nRunning comprehensive Q4/Q5/Q8 GEMV CK vs llama.cpp tests (quick)...\nBuilding with native AVX kernels for GEMM\ngcc -O3 -fPIC  -Wall -Wno-unknown-pragmas -DCK_TARGET_X86=1 -mavx2 -mfma -mssse3 -Iinclude -shared -o build/libck_parity.so src/ck_parity_api.c src/ckernel_strict.c src/ck_threadpool.c src/kernels/dequant_kernels.c src/kernels/gemm_kernels_q4k_q8k.c src/kernels/gemm_kernels_q4k_q8k_avx2.c src/kernels/gemm_kernels_q4k_q8k_vnni.c src/kernels/gemm_kernels_q6k_q8k.c src/kernels/gemm_kernels_q4k_sse.c src/kernels/gemm_kernels_q4k_avx.c src/kernels/gemm_kernels_q5_k.c src/kernels/gemm_kernels_q5_0.c src/kernels/gemm_kernels_q5_0_sse_v2.c src/kernels/gemm_kernels_q5_1.c src/kernels/gemm_kernels_q5_1_q8_1.c src/kernels/gemm_kernels_q8_0.c src/kernels/gemm_kernels_q8_0_q8_0_contract.c src/kernels/gemm_batch_int8.c src/kernels/quantize_row_q8_k_sse.c src/kernels/quantize_row_q8_k_avx.c src/kernels/quantize_row_q8_k_avx2.c src/kernels/quantize_row_q8_k_avx512.c src/kernels/rmsnorm_kernels.c src/kernels/rope_kernels.c src/kernels/swiglu_kernels.c src/kernels/softmax_kernels.c src/kernels/sigmoid_kernels.c src/kernels/gelu_kernels.c src/kernels/geglu_kernels.c src/kernels/attention_kernels.c src/kernels/attention_kernels_sliding.c src/kernels/attention_flash_true.c src/kernels/ssm_kernels.c src/kernels/hybrid_attention_kernels.c src/kernels/recurrent_split_kernels.c src/kernels/recurrent_gate_kernels.c src/kernels/recurrent_state_kernels.c src/kernels/recurrent_qk_norm_kernels.c src/kernels/recurrent_norm_kernels.c src/kernels/deltanet_kernels.c src/kernels/fused/prefill_fused_gemm.c src/kernels/fused/mega_fused_outproj_mlp_prefill.c src/kernels/fused/gemv_fused_quant_bias.c src/kernels/add_kernels_bf16.c  -lm -lpthread\nRunning quick GEMV kernel tests...\n====================================================================================================\n\u001b[1mCOMPREHENSIVE GEMV KERNEL TESTS - CK-Engine vs Reference\u001b[0m\n====================================================================================================\n\n  \u001b[96mWHAT:\u001b[0m    Matrix-Vector Multiply (GEMV) accuracy and performance tests\n            Testing: output[M] = weights[M,K] x input[K]\n\n  \u001b[96mKERNELS:\u001b[0m Q4_K     - 4-bit K-quant (llama.cpp reference)\n            Q6_K     - 6-bit K-quant decode (CK timing + sanity check)\n            Q5_0     - 5-bit legacy quant (llama.cpp reference)\n            Q8_0     - 8-bit legacy quant (llama.cpp reference)\n            Q5_0_Q8_0 - Direct Q5_0 x Q8_0 vec_dot (llama.cpp reference)\n            Q8_0_Q8_0 - Direct Q8_0 x Q8_0 vec_dot (llama.cpp reference)\n\n  \u001b[96mSYSTEM:\u001b[0m\n    CPU:    AMD EPYC 7763 64-Core Processor\n    SIMD:   AVX2, FMA\n    Cores:  4\n\n\u001b[93mWARNING: Could not load llama.cpp kernel test library.\u001b[0m\nBuild it with: cd llama.cpp && g++ -shared -fPIC -o libggml_kernel_test.so ...\n",
       "stderr": "[CK] Set 2 threads (auto=2)\n[CK threadpool] Created 2 threads (1 main + 1 workers)\nsrc/kernels/gemm_kernels_q6k_q8k.c:600:21: warning: \u2018q6k_scale_shuffle_avx2\u2019 defined but not used [-Wunused-const-variable=]\n  600 | static const int8_t q6k_scale_shuffle_avx2[4][32] = {\n      |                     ^~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q4k_avx.c: In function \u2018gemv_q4_k_q8_k_parallel_simd\u2019:\nsrc/kernels/gemm_kernels_q4k_avx.c:155:18: warning: unused variable \u2018bytes_per_row\u2019 [-Wunused-variable]\n  155 |     const size_t bytes_per_row = (size_t)nb * sizeof(block_q4_K);\n      |                  ^~~~~~~~~~~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c: In function \u2018dot_q5_0_q8_k_32_sse\u2019:\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:38:13: warning: unused variable \u2018w_hi\u2019 [-Wunused-variable]\n   38 |     __m128i w_hi = _mm_and_si128(_mm_srli_epi16(qs_vec, 4), mask_0f);\n      |             ^~~~\nsrc/kernels/gemm_kernels_q5_0_sse_v2.c:37:13: warning: unused variable \u2018w_lo\u2019 [-Wunused-variable]\n   37 |     __m128i w_lo = _mm_and_si128(qs_vec, mask_0f);\n      |             ^~~~\nsrc/kernels/rope_kernels.c:1043:13: warning: \u2018vision_mrope_apply_head\u2019 defined but not used [-Wunused-function]\n 1043 | static void vision_mrope_apply_head(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:2718:36: warning: \u2018attention_forward_full_head_major_gqa_ggml_tiled_strict\u2019 defined but not used [-Wunused-function]\n 2718 | static CK_NOINLINE CK_OPTNONE void attention_forward_full_head_major_gqa_ggml_tiled_strict(const float *q,\n      |                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:1551:13: warning: \u2018attention_flash_query_causal\u2019 defined but not used [-Wunused-function]\n 1551 | static void attention_flash_query_causal(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:327:13: warning: \u2018ck_attention_trace_float\u2019 defined but not used [-Wunused-function]\n  327 | static void ck_attention_trace_float(const char *tag,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:193:12: warning: \u2018ck_attention_ggml_out_graph_enabled\u2019 defined but not used [-Wunused-function]\n  193 | static int ck_attention_ggml_out_graph_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:180:12: warning: \u2018ck_attention_reverse_out_dot_enabled\u2019 defined but not used [-Wunused-function]\n  180 | static int ck_attention_reverse_out_dot_enabled(void)\n      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels.c:132:37: warning: \u2018ck_vec_dot_f32_reverse_strict\u2019 defined but not used [-Wunused-function]\n  132 | static CK_NOINLINE CK_OPTNONE float ck_vec_dot_f32_reverse_strict(const float *x,\n      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_kernels_sliding.c:377:13: warning: \u2018attention_flash_query_sliding\u2019 defined but not used [-Wunused-function]\n  377 | static void attention_flash_query_sliding(const float *q_vec,\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/attention_flash_true.c:142:13: warning: \u2018attention_flash_decode_scalar\u2019 defined but not used [-Wunused-function]\n  142 | static void attention_flash_decode_scalar(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nsrc/kernels/fused/prefill_fused_gemm.c:332:13: warning: \u2018fused_rmsnorm_gemm_2d_tiled\u2019 defined but not used [-Wunused-function]\n  332 | static void fused_rmsnorm_gemm_2d_tiled(\n      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~\nmake[1]: *** [Makefile:2221: test-gemv-comprehensive-quick] Error 1\nmake: *** [Makefile:2057: llamacpp-parity-nightly] Error 2\n",
       "error_msg": "Failed: 0\nFailed:  0\nFailed:        0\nmake[1]: *** [Makefile:2221: test-gemv-comprehensive-quick] Error 1\nmake: *** [Makefile:2057: llamacpp-parity-nightly] Error 2",
       "perf_metric": null,
@@ -1835,16 +1835,16 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "decode_sliding",
+          "name": "Forward",
           "status": "pass",
-          "max_diff": 2.98e-08,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "max_diff": 4.77e-07,
+          "tolerance": 5e-05,
+          "c_time_us": 40.0,
+          "pytorch_time_us": 25.3,
+          "speedup": 0.63
         },
         {
-          "name": "prefill_sliding",
+          "name": "decode_sliding",
           "status": "pass",
           "max_diff": 2.98e-08,
           "tolerance": 0.0001,
@@ -1857,33 +1857,24 @@
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-05,
-          "c_time_us": 169.5,
-          "pytorch_time_us": 27.5,
-          "speedup": 0.16
-        },
-        {
-          "name": "Forward",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 5e-05,
-          "c_time_us": 39.8,
-          "pytorch_time_us": 24.4,
-          "speedup": 0.61
-        },
-        {
-          "name": "prefill_no_window",
-          "status": "pass",
-          "max_diff": 2.235e-08,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "c_time_us": 165.5,
+          "pytorch_time_us": 27.4,
+          "speedup": 0.17
         },
         {
           "name": "d_logits",
           "status": "pass",
           "max_diff": 9.31e-10,
           "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill_no_window",
+          "status": "pass",
+          "max_diff": 2.235e-08,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1905,6 +1896,15 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "prefill_sliding",
+          "status": "pass",
+          "max_diff": 2.98e-08,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -1912,7 +1912,7 @@
       "name": "Flash Attention (50K+)",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 7.398047924041748,
+      "duration_sec": 7.508587837219238,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1922,31 +1922,121 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "decode_gqa_8h_2kv (Tq=1,Tk=64,H=8,D=64,kv=2)",
+          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
           "status": "pass",
-          "max_diff": 2.38e-07,
+          "max_diff": 2.68e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
+          "status": "pass",
+          "max_diff": 3.49e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 1.9e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
+          "status": "pass",
+          "max_diff": 2.98e-07,
           "tolerance": 0.0002,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
           "status": "pass",
-          "max_diff": 5.9e-07,
+          "max_diff": 3.55e-06,
           "tolerance": 0.001,
-          "c_time_us": 1345.0,
-          "pytorch_time_us": 2802.6,
-          "speedup": 2.08
+          "c_time_us": 95.8,
+          "pytorch_time_us": 331.7,
+          "speedup": 3.46
         },
         {
           "name": "decode_4h_1k (Tq=1,Tk=1024,H=4,D=64)",
           "status": "pass",
           "max_diff": 2.09e-06,
           "tolerance": 0.001,
-          "c_time_us": 31.0,
-          "pytorch_time_us": 115.2,
-          "speedup": 3.72
+          "c_time_us": 52.9,
+          "pytorch_time_us": 113.2,
+          "speedup": 2.14
+        },
+        {
+          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 5.9e-07,
+          "tolerance": 0.001,
+          "c_time_us": 1255.7,
+          "pytorch_time_us": 3011.9,
+          "speedup": 2.4
+        },
+        {
+          "name": "decode_4h_512 (Tq=1,Tk=512,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.29e-06,
+          "tolerance": 0.001,
+          "c_time_us": 30.0,
+          "pytorch_time_us": 108.1,
+          "speedup": 3.6
+        },
+        {
+          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 7.89e-07,
+          "tolerance": 0.001,
+          "c_time_us": 352.6,
+          "pytorch_time_us": 454.7,
+          "speedup": 1.29
+        },
+        {
+          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "status": "pass",
+          "max_diff": 2.09e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fast_exp_vec=avx",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill (Tq=8,Tk=8,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.58e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "fastexp_decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
@@ -1958,10 +2048,28 @@
           "speedup": null
         },
         {
-          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "name": "decode_4h_hd128 (Tq=1,Tk=256,H=4,D=128)",
           "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0003,
+          "max_diff": 3.93e-06,
+          "tolerance": 0.001,
+          "c_time_us": 20.3,
+          "pytorch_time_us": 108.2,
+          "speedup": 5.33
+        },
+        {
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
+          "status": "pass",
+          "max_diff": 3.28e-06,
+          "tolerance": 0.001,
+          "c_time_us": 94.0,
+          "pytorch_time_us": 304.0,
+          "speedup": 3.24
+        },
+        {
+          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
+          "status": "pass",
+          "max_diff": 2.68e-07,
+          "tolerance": 0.0002,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1976,6 +2084,15 @@
           "speedup": null
         },
         {
+          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
+          "status": "pass",
+          "max_diff": 3.6e-06,
+          "tolerance": 0.001,
+          "c_time_us": 32.5,
+          "pytorch_time_us": 130.9,
+          "speedup": 4.03
+        },
+        {
           "name": "fastexp_decode_small (Tq=1,Tk=16,H=2,D=32)",
           "status": "pass",
           "max_diff": 1.93e-05,
@@ -1985,13 +2102,76 @@
           "speedup": null
         },
         {
+          "name": "decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0004,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0003,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.3e-07,
+          "tolerance": 0.001,
+          "c_time_us": 2881.3,
+          "pytorch_time_us": 6170.6,
+          "speedup": 2.14
+        },
+        {
           "name": "decode_32h_512 (Tq=1,Tk=512,H=32,D=64)",
           "status": "pass",
           "max_diff": 4.7e-06,
           "tolerance": 0.001,
-          "c_time_us": 93.6,
-          "pytorch_time_us": 344.4,
-          "speedup": 3.68
+          "c_time_us": 110.3,
+          "pytorch_time_us": 320.7,
+          "speedup": 2.91
+        },
+        {
+          "name": "decode_32h_51200 (Tq=1,Tk=51200,H=32,D=64)",
+          "status": "pass",
+          "max_diff": 6.14e-07,
+          "tolerance": 0.001,
+          "c_time_us": 21049.3,
+          "pytorch_time_us": 81357.8,
+          "speedup": 3.87
+        },
+        {
+          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_gqa_8h_2kv (Tq=1,Tk=64,H=8,D=64,kv=2)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_offset (Tq=3,Tk=9,H=3,D=24)",
+          "status": "pass",
+          "max_diff": 1.03e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
@@ -2012,186 +2192,6 @@
           "speedup": null
         },
         {
-          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
-          "status": "pass",
-          "max_diff": 2.68e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 2.68e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.3e-07,
-          "tolerance": 0.001,
-          "c_time_us": 3343.4,
-          "pytorch_time_us": 5934.2,
-          "speedup": 1.77
-        },
-        {
-          "name": "prefill (Tq=8,Tk=8,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.58e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "fastexp_offset (Tq=3,Tk=9,H=3,D=24)",
-          "status": "pass",
-          "max_diff": 1.03e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 3.6e-06,
-          "tolerance": 0.001,
-          "c_time_us": 37.7,
-          "pytorch_time_us": 124.4,
-          "speedup": 3.3
-        },
-        {
-          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
-          "status": "pass",
-          "max_diff": 3.55e-06,
-          "tolerance": 0.001,
-          "c_time_us": 96.7,
-          "pytorch_time_us": 308.0,
-          "speedup": 3.18
-        },
-        {
-          "name": "decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0004,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
-          "status": "pass",
-          "max_diff": 2.98e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
-          "status": "pass",
-          "max_diff": 3.28e-06,
-          "tolerance": 0.001,
-          "c_time_us": 93.2,
-          "pytorch_time_us": 288.2,
-          "speedup": 3.09
-        },
-        {
-          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "fastexp_prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 3.49e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_hd128 (Tq=1,Tk=256,H=4,D=128)",
-          "status": "pass",
-          "max_diff": 3.93e-06,
-          "tolerance": 0.001,
-          "c_time_us": 25.6,
-          "pytorch_time_us": 101.6,
-          "speedup": 3.97
-        },
-        {
-          "name": "fast_exp_vec=avx",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 1.9e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
-          "status": "pass",
-          "max_diff": 2.09e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_32h_51200 (Tq=1,Tk=51200,H=32,D=64)",
-          "status": "pass",
-          "max_diff": 6.14e-07,
-          "tolerance": 0.001,
-          "c_time_us": 20774.7,
-          "pytorch_time_us": 78827.4,
-          "speedup": 3.79
-        },
-        {
-          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 7.89e-07,
-          "tolerance": 0.001,
-          "c_time_us": 510.9,
-          "pytorch_time_us": 451.4,
-          "speedup": 0.88
-        },
-        {
-          "name": "decode_4h_512 (Tq=1,Tk=512,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.29e-06,
-          "tolerance": 0.001,
-          "c_time_us": 19.6,
-          "pytorch_time_us": 102.7,
-          "speedup": 5.23
-        },
-        {
           "name": "fastexp_decode_tail (Tq=1,Tk=63,H=4,D=40)",
           "status": "pass",
           "max_diff": 7.79e-06,
@@ -2206,7 +2206,7 @@
       "name": "Thread Pool GEMV Parity (serial vs dispatch)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 30.47476553916931,
+      "duration_sec": 30.421627044677734,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2220,7 +2220,7 @@
       "name": "v6.6 Tooling Contracts",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.3396329879760742,
+      "duration_sec": 0.34212374687194824,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2234,7 +2234,7 @@
       "name": "v6.6 Kernel Map Gate",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.5881831645965576,
+      "duration_sec": 0.5841062068939209,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2248,7 +2248,7 @@
       "name": "v6.6 Model Matrix (Build)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 29.926316261291504,
+      "duration_sec": 32.75988507270813,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2262,7 +2262,7 @@
       "name": "v7 Kernel Map Contracts",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.709770679473877,
+      "duration_sec": 0.6935656070709229,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2276,7 +2276,7 @@
       "name": "v7 Training Family Regression (full)",
       "category": "training",
       "status": "pass",
-      "duration_sec": 266.8842499256134,
+      "duration_sec": 269.09407114982605,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2290,7 +2290,7 @@
       "name": "v7 Backprop Long-Epoch Drift",
       "category": "training",
       "status": "pass",
-      "duration_sec": 24.65656352043152,
+      "duration_sec": 24.44401979446411,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2304,7 +2304,7 @@
       "name": "v7 Backprop Kernel Parity",
       "category": "training",
       "status": "pass",
-      "duration_sec": 3.0854032039642334,
+      "duration_sec": 3.161667823791504,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2318,7 +2318,7 @@
       "name": "v7 IR Visualizer E2E (nightly)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 55.90546917915344,
+      "duration_sec": 61.3384747505188,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2332,7 +2332,7 @@
       "name": "v7 Visualizer Health (L1+L2)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.8536450862884521,
+      "duration_sec": 2.4070122241973877,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2351,7 +2351,7 @@
           "speedup": null
         },
         {
-          "name": "L2_ir_visualizer",
+          "name": "ir_hub_source",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2369,7 +2369,7 @@
           "speedup": null
         },
         {
-          "name": "ir_hub_source",
+          "name": "L2_dataset_viewer",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2378,7 +2378,7 @@
           "speedup": null
         },
         {
-          "name": "L2_dataset_viewer",
+          "name": "L2_ir_visualizer",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2392,7 +2392,7 @@
       "name": "v7 Visualizer Generated E2E (L3)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 1.5718507766723633,
+      "duration_sec": 1.6107916831970215,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2401,15 +2401,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "Embedded_JSON__ir_report.html",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "L1_Health__ir_report.html",
           "status": "pass",
@@ -2420,7 +2411,43 @@
           "speedup": null
         },
         {
+          "name": "Generate_ir_hub.html",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Embedded_JSON__ir_report.html",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "Cross-artifact_Consistency",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Structure__ir_hub.html",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "L1_Health__ir_hub.html",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2445,33 +2472,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "L1_Health__ir_hub.html",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Generate_ir_hub.html",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Structure__ir_hub.html",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
         }
       ]
     },
@@ -2479,7 +2479,7 @@
       "name": "v7 Core Stabilization Matrix",
       "category": "training",
       "status": "pass",
-      "duration_sec": 528.2958476543427,
+      "duration_sec": 524.5926995277405,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2493,11 +2493,11 @@
       "name": "GEMM Benchmark",
       "category": "bench",
       "status": "pass",
-      "duration_sec": 37.171924114227295,
+      "duration_sec": 36.98389148712158,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
-      "perf_metric": 155.96,
+      "perf_metric": 155.55,
       "perf_unit": "GFLOPS",
       "baseline_perf": null,
       "perf_delta_pct": null,
@@ -2507,9 +2507,9 @@
   "regression_fast": {
     "status": "fail",
     "mode": "fast",
-    "generated_at": "2026-06-11T02:36:03",
-    "report_dir": "build/regression-reports/20260611_023103",
-    "summary_path": "build/regression-reports/20260611_023103/summary.json",
+    "generated_at": "2026-06-11T07:01:58",
+    "report_dir": "build/regression-reports/20260611_065849",
+    "summary_path": "build/regression-reports/20260611_065849/summary.json",
     "families_total": 6,
     "families_passed": 5,
     "families_failed": 1,
@@ -2591,11 +2591,11 @@
         "failure_detail": ""
       }
     ],
-    "note": "Source: build/regression-reports/20260611_023103/summary.json"
+    "note": "Source: build/regression-reports/20260611_065849/summary.json"
   },
   "kernel_map_contracts": {
     "status": "pass",
-    "generated_at": "2026-06-11T02:42:13.094859Z",
+    "generated_at": "2026-06-11T07:08:14.251769Z",
     "summary_path": "version/v7/.cache/reports/kernel_map_validation_latest.json",
     "kernel_maps": 112,
     "passed": 112,
@@ -2615,7 +2615,7 @@
     "status": "pass",
     "mode": "full",
     "stage_profile": "default",
-    "generated_at": "2026-06-11T02:46:40.145840Z",
+    "generated_at": "2026-06-11T07:12:43.500438Z",
     "summary_path": "version/v7/.cache/reports/backprop_family_matrix/full/v7_backprop_family_matrix_latest.json",
     "families_total": 5,
     "families_passed": 5,
