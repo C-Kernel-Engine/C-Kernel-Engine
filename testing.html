@@ -964,7 +964,6 @@ permalink: /testing/
     That page documents the actual failure mode, the debugging sequence, and the regressions to watch for on future encoder ports.
   </div>
 
-
   <div class="alert alert-warning">
     <strong>Quantized inference performance gate:</strong> BF16 kernels are primarily the
     training / BF16-serving path. Production CPU inference for GGUF models is usually
@@ -997,6 +996,14 @@ permalink: /testing/
     AMX BF16 work is valuable for BF16 training and BF16 serving, but it is not a substitute
     for measuring the quantized decode path used by Qwen, Gemma, Nanbeige, and vision GGUFs.
   </p>
+
+  <div class="alert alert-info">
+    <strong>Q6_K prefill performance note:</strong>
+    the v8 Q6_K x Q8_K 2D prefill scheduler is shape-gated based on local roofline-style measurements.
+    See <a href="/q6-prefill-roofline/">Q6_K Prefill Roofline Notes</a> for the measured shapes, commands, and dispatch policy.
+    For the broader GEMM/GEMV production-kernel model, see
+    <a href="/gemm-optimization/#gemm-vs-gemv-production">GEMM vs GEMV in Production LLM Serving</a>.
+  </div>
 
   <hr>
 
@@ -1602,6 +1609,11 @@ Both are mathematically valid RoPE, but weights are trained for one convention.
   </div>
 
 </div>
+
+<section>
+<h2>High-Memory Model Smoke</h2>
+<p>The nightly parity lane includes <code>make test-v8-gemma4-highmem</code>. It skips unless enough RAM is available.</p>
+</section>
     </main>
 
     <!-- SVG Viewer Overlay (shared across all pages) -->
@@ -1830,7 +1842,7 @@ Both are mathematically valid RoPE, but weights are trained for one convention.
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-19</p>
             </div>
         </div>
     </footer>

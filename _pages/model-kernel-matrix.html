@@ -33,6 +33,7 @@
     .model-card.mc-qwen3::before  { background: var(--green); }
     .model-card.mc-qwen35::before { background: #1abc9c; }
     .model-card.mc-gemma3::before { background: var(--blue); }
+    .model-card.mc-gemma4::before { background: #f39c12; }
     .model-card.mc-llama::before  { background: #e74c3c; }
     .model-card.mc-gpt2::before   { background: #9b59b6; }
 
@@ -343,6 +344,31 @@
       </div>
     </div>
 
+    <!-- Gemma4 -->
+    <div class="model-card mc-gemma4">
+      <span class="model-badge">template: gemma4.json</span>
+      <div class="model-title">Gemma4 E4B IT</div>
+      <div class="model-arch">RMSNorm · split-half direct RoPE · QK‑Norm · GeGLU<br>Hybrid full/sliding attention · per-layer theta · SentencePiece</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent long-answer smoke</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">BF16 safetensors → BUMP — PyTorch parity bring-up path</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up fix: Gemma4 keeps the split-half RoPE channel layout, but it cannot use one global cached split-half contract. The template exports per-layer/direct RoPE metadata, and lowering selects <code>rope_forward_qk_split_direct_f32</code> from IR data rather than hard-coding a Gemma-only kernel.
+      </div>
+      <div class="model-tags">
+        <span class="tag fixed">rope_param_mode: per_layer_direct</span>
+        <span class="tag fixed">BF16 PyTorch parity lane</span>
+        <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">BF16 safetensors</span>
+        <span class="mq-chip">Q4_K</span>
+        <span class="mq-chip">Q6_K</span>
+      </div>
+    </div>
+
     <!-- Llama / Nanbeige -->
     <div class="model-card mc-llama">
       <span class="model-badge">template: llama.json</span>
@@ -450,6 +476,16 @@
       <div class="cell ok">Yes</div>
       <div class="cell ok">Tied</div>
 
+      <div class="cell row-head">Gemma4 E4B</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">From weights</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Split-half direct</div>
+      <div class="cell ok">Full + sliding</div>
+      <div class="cell ok">GeGLU</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Tied</div>
+
       <div class="cell row-head">Llama / Nanbeige</div>
       <div class="cell ok">SentencePiece</div>
       <div class="cell ok">From weights</div>
@@ -521,6 +557,16 @@
       <div class="cell ok">Yes</div>
       <div class="cell ok">SentencePiece</div>
       <div class="cell ok">attn_sliding</div>
+      <div class="cell ok">geglu</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+
+      <div class="cell row-head">Gemma4 E4B</div>
+      <div class="cell ok">embed + per-layer</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">Yes</div>
+      <div class="cell ok">SentencePiece</div>
+      <div class="cell ok">attn + attn_sliding</div>
       <div class="cell ok">geglu</div>
       <div class="cell ok">Yes</div>
       <div class="cell ok">Yes</div>
@@ -618,6 +664,7 @@
       <div class="test-item">Qwen--Qwen2-0.5B-Instruct-GGUF</div>
       <div class="test-item">Qwen--Qwen3-0.6B-GGUF</div>
       <div class="test-item">unsloth--gemma-3-270m-it-GGUF</div>
+      <div class="test-item">unsloth--gemma-4-E4B-it-GGUF / local Q4_K_M BUMP</div>
       <div class="test-item">mradermacher--Nanbeige4.1-3B-GGUF</div>
       <div class="test-item">Qwen--Qwen3.5-0.8B-GGUF</div>
     </div>
@@ -633,6 +680,9 @@
     <div class="test-grid">
       <div class="test-item">
         <strong>Gemma 3:</strong> the bug was not in tokenization. We were applying RoPE with the wrong pairing style for Q/K. Gemma expects split-half RoPE, but the runtime could still use the other layout. Fix: read exported <code>rope_layout</code> and choose the matching RoPE kernel automatically.
+      </div>
+      <div class="test-item">
+        <strong>Gemma 4:</strong> the BF16 safetensors lane proved the circuit against PyTorch first, then the GGUF lane reused the same generic split-direct RoPE op. A 1024-token Q4_K_M C-code prompt now stays coherent; remaining work is performance and tighter quantized parity, not basic stitching.
       </div>
       <div class="test-item">
         <strong>Qwen3.5:</strong> hybrid recurrent-attention decode and Gated DeltaNet parity are now on the normal C-tokenizer route. <code>&lt;think&gt;</code> markers are preserved as special tokens, and visible vs. suppressed thinking is now a generic chat-contract mode instead of ad hoc runtime logic.
@@ -662,9 +712,9 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3 plus the Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3/Gemma4 plus the Llama/Nanbeige bring-up lane.
     Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
-    Gemma now runs on the correct split-half RoPE parity path, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
+    Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
     This page will keep evolving into a single matrix that shows inference + training coverage per model family.
   </div>

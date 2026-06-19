@@ -959,6 +959,7 @@
     <li><a href="#architecture">Transformer Architecture Overview</a></li>
     <li><a href="#rope">RoPE: Rotary Position Embedding</a></li>
     <li><a href="#rope-layouts">RoPE Layouts: Pairwise vs Split-Half</a></li>
+    <li><a href="#gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</a></li>
     <li><a href="#attention">Attention Mechanisms</a></li>
     <li><a href="#flash-attention">Flash Attention</a></li>
     <li><a href="#recurrent-attention">Recurrent Attention and Gated DeltaNet</a></li>
@@ -1194,8 +1195,34 @@ Split-half:
     </div>
     <div>
         <strong>Implementation note in CK right now</strong><br>
-        The older split-half path already has AVX/AVX-512 SIMD specialization. The new pairwise path was added to match Llama-family semantics first; in the current codebase it is the correctness path, and it is not yet vectorized like the split-half kernel.
+        The older split-half path already has AVX/AVX-512 SIMD specialization. The pairwise path was added to match Llama-family semantics, and the direct split-half path was added for model families that need per-layer rotary parameters instead of one global cache contract.
     </div>
+</div>
+
+<h3 id="gemma4-rope">Gemma4 RoPE: Per-Layer Direct Split-Half</h3>
+
+<div class="card card-accent">
+    <h3 style="margin-top: 0;">What changed for Gemma4?</h3>
+    <p>Gemma4 still uses the split-half rotation layout, but it is not the same runtime contract as a plain global split-half cache. Different layer kinds can carry different rotary settings, so CK now treats RoPE as layer metadata instead of a hard-coded model special case.</p>
+    <pre>template/gemma4.json
+  attention_contract.rope_param_mode = per_layer_direct
+  layer_rope_kind[]                  = full | sliding
+  layer_rotary_dim[]                 = per-layer rotary width
+  rope_theta / rope_theta_swa        = per-kind frequency base
+
+lowered IR
+  rope_qk = rope_forward_qk_split_direct
+  attrs carry the layer rotary contract
+
+kernel map
+  rope_forward_qk_split_direct -> rope_forward_qk_split_direct_f32</pre>
+    <p>The important distinction is semantic: <code>sliding_window</code> controls the attention mask/cache window. It does not tell the runtime which rotary base, rotary dimension, or layer-specific RoPE stream to use. Those are explicit IR attributes.</p>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Why this is not hard-coded</h3>
+    <p>The Gemma4 template exports the contract as data. The DSL/lowering path reads that data and emits a generic <code>rope_forward_qk_split_direct</code> op. The C kernel is not named after Gemma4 and can be reused by another architecture that needs split-half rotation with direct per-layer parameters.</p>
+    <p>This is the same compatibility pattern used elsewhere in CK: model templates describe graph semantics; lowered IR carries concrete kernel attributes; kernels implement math contracts without owning model policy.</p>
 </div>
 
 <hr>
@@ -1925,7 +1952,7 @@ With weight tying: W = E  (same matrix!)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-19</p>
             </div>
         </div>
     </footer>

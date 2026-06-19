@@ -1113,6 +1113,20 @@ python -m pip install -r requirements-v8.txt</pre>
   --generate-visualizer</pre>
     </div>
 
+    <h3>Gemma 4 E4B IT</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://unsloth/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Give me a detailed example of C code.' \
+  --chat-template gemma4 \
+  --max-tokens 1024 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">Use this as the current Gemma4 GGUF coherence smoke. A healthy run should produce a normal long answer and stop by EOS or <code>--max-tokens</code>, not by prompt-marker echo or language corruption. The tested local Q4_K_M run generated 1024 coherent C-code tokens; performance work remains separate.</p>
+
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1168,9 +1182,21 @@ python -m pip install -r requirements-v8.txt</pre>
     <h3 style="margin-top: 0;">Text-Family Notes</h3>
     <ul>
         <li><strong>Gemma 3:</strong> use <code>--chat-template auto</code> for normal instruction/chat runs. <code>--chat-template none</code> is raw continuation mode now and needs <code>--allow-raw-prompt</code> if you intentionally want it.</li>
+        <li><strong>Gemma 4:</strong> use <code>--chat-template gemma4</code>. The template uses explicit per-layer/direct split-half RoPE metadata; do not replace it with the older global split-half RoPE path when debugging.</li>
         <li><strong>Qwen2 / Qwen3 / Qwen3.5:</strong> the <code>v8</code> runner now reproduces the same public command shapes as <code>v7</code> and clean short prompt smokes succeed on the promoted examples.</li>
         <li><strong>NaanBeige / llama-family symptom:</strong> if the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, keep <code>--chat-template auto</code>, do not force <code>none</code>, and treat it as a prompt-wrapper/chat-contract symptom rather than the expected reply.</li>
     </ul>
+</div>
+
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">New Model Compatibility Workflow</h3>
+    <ol>
+        <li><strong>Start with safetensors when available.</strong> Convert safetensors to BUMP and compare CK against PyTorch with BF16/FP32 weights. This isolates graph stitching, RoPE placement, activation math, and layer contracts before quantization enters the picture.</li>
+        <li><strong>Then bring up GGUF.</strong> Convert GGUF to BUMP and compare CK against llama.cpp. This catches tokenizer/template behavior, tied versus untied heads, quantized projection layouts, and stop-token policy.</li>
+        <li><strong>Only optimize after parity is understood.</strong> Once BF16/FP32 graph parity and GGUF coherence are clean, profile Q4_K/Q5_K/Q6_K/Q8_K kernels and threadpool scheduling separately.</li>
+    </ol>
+    <p class="mini-note">Gemma4 followed this route: BF16 safetensors proved the split-direct RoPE circuit against PyTorch, then the GGUF Q4_K_M path reused the same IR/kernel contract for coherent long-answer smoke testing.</p>
 </div>
 
 <h2>Canonical Qwen3-VL Vision Run</h2>
@@ -1528,7 +1554,7 @@ python -m pip install -r requirements-v8.txt</pre>
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-19</p>
             </div>
         </div>
     </footer>

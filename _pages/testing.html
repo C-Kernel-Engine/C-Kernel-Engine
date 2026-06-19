@@ -60,6 +60,8 @@ permalink: /testing/
     <strong>Q6_K prefill performance note:</strong>
     the v8 Q6_K x Q8_K 2D prefill scheduler is shape-gated based on local roofline-style measurements.
     See <a href="/q6-prefill-roofline/">Q6_K Prefill Roofline Notes</a> for the measured shapes, commands, and dispatch policy.
+    For the broader GEMM/GEMV production-kernel model, see
+    <a href="/gemm-optimization/#gemm-vs-gemv-production">GEMM vs GEMV in Production LLM Serving</a>.
   </div>
 
   <hr>
@@ -666,3 +668,8 @@ Both are mathematically valid RoPE, but weights are trained for one convention.
   </div>
 
 </div>
+
+<section>
+<h2>High-Memory Model Smoke</h2>
+<p>The nightly parity lane includes <code>make test-v8-gemma4-highmem</code>. It skips unless enough RAM is available.</p>
+</section>
