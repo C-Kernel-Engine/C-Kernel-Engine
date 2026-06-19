@@ -138,10 +138,10 @@ $(document).ready(function(){initNavTree('hybrid__attention__kernels_8c.html',''
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a7fe1e7f2035748ced81e06f4680b8b81" id="r_a7fe1e7f2035748ced81e06f4680b8b81"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#a7fe1e7f2035748ced81e06f4680b8b81">attn_gate_sigmoid_mul_backward</a> (const float *d_out, const float *x, const float *gate, float *d_x, float *d_gate, int rows, int dim)</td></tr>
-<tr class="separator:a7fe1e7f2035748ced81e06f4680b8b81"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab472f93e4f5d9b37881293d13687a721" id="r_ab472f93e4f5d9b37881293d13687a721"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#ab472f93e4f5d9b37881293d13687a721">attn_gate_sigmoid_mul_forward</a> (const float *x, const float *gate, float *out, int rows, int dim)</td></tr>
-<tr class="separator:ab472f93e4f5d9b37881293d13687a721"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab6037a4196cc424f5a5955dbcbb712b8" id="r_ab6037a4196cc424f5a5955dbcbb712b8"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#ab6037a4196cc424f5a5955dbcbb712b8">attn_gate_sigmoid_mul_backward</a> (const float *d_out, const float *x, const float *gate, float *d_x, float *d_gate, int rows, int num_heads, int state_dim)</td></tr>
+<tr class="separator:ab6037a4196cc424f5a5955dbcbb712b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5089ebfbaad6fc8dd694b6436b335060" id="r_a5089ebfbaad6fc8dd694b6436b335060"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#a5089ebfbaad6fc8dd694b6436b335060">attn_gate_sigmoid_mul_forward</a> (const float *x, const float *gate, float *out, int rows, int num_heads, int state_dim)</td></tr>
+<tr class="separator:a5089ebfbaad6fc8dd694b6436b335060"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad97e95c6a662d1189345d79dbf393008" id="r_ad97e95c6a662d1189345d79dbf393008"><td class="memItemLeft" align="right" valign="top">static float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a> (float x)</td></tr>
 <tr class="separator:ad97e95c6a662d1189345d79dbf393008"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2b1547061dcc5662b76ef3a1a84b5736" id="r_a2b1547061dcc5662b76ef3a1a84b5736"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="hybrid__attention__kernels_8c.html#a2b1547061dcc5662b76ef3a1a84b5736">split_q_gate_backward</a> (const float *d_q, const float *d_gate, float *d_packed_qg, int rows, int q_dim, int gate_dim, int group_dim)</td></tr>
@@ -150,8 +150,8 @@ Functions</h2></td></tr>
 <tr class="separator:ae3282e911bb6a6c24111d3d61e4f0e2f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
-<a id="a7fe1e7f2035748ced81e06f4680b8b81" name="a7fe1e7f2035748ced81e06f4680b8b81"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a7fe1e7f2035748ced81e06f4680b8b81">&#9670;&#160;</a></span>attn_gate_sigmoid_mul_backward()</h2>
+<a id="ab6037a4196cc424f5a5955dbcbb712b8" name="ab6037a4196cc424f5a5955dbcbb712b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6037a4196cc424f5a5955dbcbb712b8">&#9670;&#160;</a></span>attn_gate_sigmoid_mul_backward()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -196,7 +196,13 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>dim</em>&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>state_dim</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -206,29 +212,30 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00110">110</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  116</span>                                             {</div>
-<div class="line"><span class="lineno">  117</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  118</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  119</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  120</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  121</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  122</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  123</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  124</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  125</span>            d_x_row[col] = d_out_row[col] * sig;</div>
-<div class="line"><span class="lineno">  126</span>            d_gate_row[col] = d_out_row[col] * x_row[col] * sig * (1.0f - sig);</div>
-<div class="line"><span class="lineno">  127</span>        }</div>
-<div class="line"><span class="lineno">  128</span>    }</div>
-<div class="line"><span class="lineno">  129</span>}</div>
+<p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00112">112</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  119</span>                                                   {</div>
+<div class="line"><span class="lineno">  120</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">  121</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  122</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *d_out_row = d_out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  123</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  124</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  125</span>        <span class="keywordtype">float</span> *d_x_row = d_x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  126</span>        <span class="keywordtype">float</span> *d_gate_row = d_gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  127</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  128</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> sig = <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  129</span>            d_x_row[col] = d_out_row[col] * sig;</div>
+<div class="line"><span class="lineno">  130</span>            d_gate_row[col] = d_out_row[col] * x_row[col] * sig * (1.0f - sig);</div>
+<div class="line"><span class="lineno">  131</span>        }</div>
+<div class="line"><span class="lineno">  132</span>    }</div>
+<div class="line"><span class="lineno">  133</span>}</div>
 <div class="ttc" id="ahybrid__attention__kernels_8c_html_ad97e95c6a662d1189345d79dbf393008"><div class="ttname"><a href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a></div><div class="ttdeci">static float hybrid_sigmoid(float x)</div><div class="ttdef"><b>Definition</b> <a href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_attention_kernels.c:6</a></div></div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_sigmoid()</a>.</p>
 
 </div>
 </div>
-<a id="ab472f93e4f5d9b37881293d13687a721" name="ab472f93e4f5d9b37881293d13687a721"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab472f93e4f5d9b37881293d13687a721">&#9670;&#160;</a></span>attn_gate_sigmoid_mul_forward()</h2>
+<a id="a5089ebfbaad6fc8dd694b6436b335060" name="a5089ebfbaad6fc8dd694b6436b335060"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5089ebfbaad6fc8dd694b6436b335060">&#9670;&#160;</a></span>attn_gate_sigmoid_mul_forward()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -261,7 +268,13 @@ Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>dim</em>&#160;</td>
+          <td class="paramname"><em>num_heads</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>state_dim</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -272,20 +285,21 @@ Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p class="definition">Definition at line <a class="el" href="hybrid__attention__kernels_8c_source.html#l00095">95</a> of file <a class="el" href="hybrid__attention__kernels_8c_source.html">hybrid_attention_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">   99</span>                                            {</div>
-<div class="line"><span class="lineno">  100</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  101</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  102</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  103</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
-<div class="line"><span class="lineno">  104</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
-<div class="line"><span class="lineno">  105</span>            out_row[col] = x_row[col] * <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  106</span>        }</div>
-<div class="line"><span class="lineno">  107</span>    }</div>
-<div class="line"><span class="lineno">  108</span>}</div>
+<div class="fragment"><div class="line"><span class="lineno">  100</span>                                                  {</div>
+<div class="line"><span class="lineno">  101</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> dim = num_heads * state_dim;</div>
+<div class="line"><span class="lineno">  102</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  103</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  104</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  105</span>        <span class="keywordtype">float</span> *out_row = out + (size_t) row * (<span class="keywordtype">size_t</span>) dim;</div>
+<div class="line"><span class="lineno">  106</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = 0; col &lt; dim; ++col) {</div>
+<div class="line"><span class="lineno">  107</span>            out_row[col] = x_row[col] * <a class="code hl_function" href="hybrid__attention__kernels_8c.html#ad97e95c6a662d1189345d79dbf393008">hybrid_sigmoid</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  108</span>        }</div>
+<div class="line"><span class="lineno">  109</span>    }</div>
+<div class="line"><span class="lineno">  110</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="hybrid__attention__kernels_8c_source.html#l00006">hybrid_sigmoid()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00836">ck_test_attn_gate_sigmoid_mul()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00837">ck_test_attn_gate_sigmoid_mul()</a>.</p>
 
 </div>
 </div>
@@ -325,7 +339,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   14</span>    }</div>
 <div class="line"><span class="lineno">   15</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="hybrid__attention__kernels_8c_source.html#l00110">attn_gate_sigmoid_mul_backward()</a>, and <a class="el" href="hybrid__attention__kernels_8c_source.html#l00095">attn_gate_sigmoid_mul_forward()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="hybrid__attention__kernels_8c_source.html#l00112">attn_gate_sigmoid_mul_backward()</a>, and <a class="el" href="hybrid__attention__kernels_8c_source.html#l00095">attn_gate_sigmoid_mul_forward()</a>.</p>
 
 </div>
 </div>
@@ -511,7 +525,7 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">   53</span>    }</div>
 <div class="line"><span class="lineno">   54</span>}</div>
 </div><!-- fragment -->
-<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00755">ck_test_split_q_gate()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="ck__parity__api_8c_source.html#l00756">ck_test_split_q_gate()</a>.</p>
 
 </div>
 </div>
