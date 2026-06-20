@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560" viewBox="0 0 1100 560" role="img" aria-labelledby="title desc">
+  <title id="title">ReLU and ReLU2 activation comparison</title>
+  <desc id="desc">A visual comparison of ReLU and ReLU2 forward curves, gradients, and kernel dataflow.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.55" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#17243a"/>
+    </linearGradient>
+    <linearGradient id="relu2Fill" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0.62"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="560" rx="0" fill="url(#bg)"/>
+  <g opacity="0.28" stroke="#26364f" stroke-width="1">
+    <path d="M0 80H1100M0 160H1100M0 240H1100M0 320H1100M0 400H1100M0 480H1100"/>
+    <path d="M100 0V560M200 0V560M300 0V560M400 0V560M500 0V560M600 0V560M700 0V560M800 0V560M900 0V560M1000 0V560"/>
+  </g>
+
+  <text x="50" y="58" fill="#e5f2ff" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">ReLU2: small activation, real kernel contract</text>
+  <text x="50" y="88" fill="#9fb6d8" font-family="Inter, Arial, sans-serif" font-size="15">Forward: y = max(0, x)^2. Backward: dy/dx = 2x for x &gt; 0, else 0.</text>
+
+  <g transform="translate(55 125)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="470" height="330" rx="10" fill="#0b1220" stroke="#23334f"/>
+    <text x="24" y="34" fill="#e5f2ff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Forward curve</text>
+    <text x="24" y="58" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="13">ReLU is linear. ReLU2 grows quadratically.</text>
+
+    <g transform="translate(55 72)">
+      <line x1="0" y1="210" x2="360" y2="210" stroke="#6b7d99" stroke-width="2" marker-end="url(#arrowBlue)"/>
+      <line x1="160" y1="250" x2="160" y2="20" stroke="#6b7d99" stroke-width="2" marker-end="url(#arrowBlue)"/>
+      <text x="350" y="235" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="12">x</text>
+      <text x="135" y="20" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="12">y</text>
+
+      <path d="M 0 210 L 160 210 L 330 40" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
+      <path d="M 0 210 L 160 210 C 205 205 255 145 330 35" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 160 210 C 205 205 255 145 330 35 L 330 210 Z" fill="url(#relu2Fill)"/>
+
+      <g font-family="JetBrains Mono, Consolas, monospace" font-size="13">
+        <rect x="225" y="78" width="110" height="26" rx="6" fill="#10243a" stroke="#38bdf8"/>
+        <text x="238" y="96" fill="#7dd3fc">ReLU(x)</text>
+        <rect x="228" y="112" width="115" height="26" rx="6" fill="#2a1b08" stroke="#f59e0b"/>
+        <text x="241" y="130" fill="#fbbf24">ReLU2(x)</text>
+      </g>
+      <text x="122" y="230" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="12">0</text>
+    </g>
+  </g>
+
+  <g transform="translate(575 125)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="470" height="330" rx="10" fill="#0b1220" stroke="#23334f"/>
+    <text x="24" y="34" fill="#e5f2ff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Backward signal</text>
+    <text x="24" y="58" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="13">ReLU2 keeps the same zero mask, but positive gradients scale with x.</text>
+
+    <g transform="translate(50 84)">
+      <rect x="0" y="0" width="370" height="58" rx="10" fill="#111c2f" stroke="#2b3b55"/>
+      <text x="20" y="24" fill="#e5f2ff" font-family="JetBrains Mono, Consolas, monospace" font-size="14">if x &lt;= 0: y = 0, grad = 0</text>
+      <text x="20" y="46" fill="#9fb6d8" font-family="JetBrains Mono, Consolas, monospace" font-size="13">same branch behavior as ReLU</text>
+
+      <rect x="0" y="82" width="370" height="84" rx="10" fill="#20170b" stroke="#f59e0b"/>
+      <text x="20" y="108" fill="#fbbf24" font-family="JetBrains Mono, Consolas, monospace" font-size="14">if x &gt; 0: y = x * x</text>
+      <text x="20" y="132" fill="#fde68a" font-family="JetBrains Mono, Consolas, monospace" font-size="14">d_x = d_y * 2 * x</text>
+      <text x="20" y="154" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="13">The backward kernel needs x, not only the output mask.</text>
+
+      <g transform="translate(0 198)">
+        <rect x="0" y="0" width="96" height="42" rx="8" fill="#1e293b" stroke="#334155"/>
+        <text x="24" y="27" fill="#e5f2ff" font-family="JetBrains Mono, Consolas, monospace" font-size="13">x</text>
+        <line x1="96" y1="21" x2="145" y2="21" stroke="#7dd3fc" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <rect x="145" y="0" width="110" height="42" rx="8" fill="#2a1b08" stroke="#f59e0b"/>
+        <text x="166" y="27" fill="#fbbf24" font-family="JetBrains Mono, Consolas, monospace" font-size="13">relu2</text>
+        <line x1="255" y1="21" x2="304" y2="21" stroke="#7dd3fc" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <rect x="304" y="0" width="66" height="42" rx="8" fill="#1e293b" stroke="#334155"/>
+        <text x="326" y="27" fill="#e5f2ff" font-family="JetBrains Mono, Consolas, monospace" font-size="13">y</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(60 490)">
+    <rect x="0" y="0" width="980" height="42" rx="10" fill="#08111f" stroke="#24344f"/>
+    <text x="22" y="27" fill="#9fb6d8" font-family="Inter, Arial, sans-serif" font-size="14">
+      CK coverage: fp32 forward/backward kernels, PyTorch parity, performance benchmark, nightly quick suite, and v8 kernel-map registry entries.
+    </text>
+  </g>
+</svg>

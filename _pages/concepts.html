@@ -27,7 +27,7 @@
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
-    <li><a href="#activations">Activations: SwiGLU, GeGLU, GELU</a></li>
+    <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
 
@@ -578,9 +578,35 @@ y = gamma * x / (rms + eps)
 
 <hr>
 
-<h2 id="activations">Activations: SwiGLU, GeGLU, GELU</h2>
+<h2 id="activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</h2>
 
-<p>Activation functions introduce non-linearity. Modern LLMs use gated activations (SwiGLU, GeGLU) for better gradient flow and expressivity.</p>
+<p>Activation functions introduce non-linearity. Modern LLMs often use gated activations (SwiGLU, GeGLU), while some Nemotron-family MLP blocks use simpler squared activations such as ReLU2. CK treats these as first-class kernels because each activation has a different forward/backward contract.</p>
+
+<div class="img-container svg-viewer" data-title="ReLU2 Activation">
+    <img src="assets/concept-relu2.svg" alt="ReLU and ReLU2 activation comparison">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">ReLU and ReLU2</h3>
+        <pre>
+ReLU(x)  = max(0, x)
+ReLU2(x) = max(0, x)^2
+
+d ReLU2 / dx = 2x if x &gt; 0 else 0
+        </pre>
+        <p>ReLU2 keeps the same negative-value mask as ReLU, but positive activations grow quadratically. The backward kernel must use the original input value, not only a binary mask.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why CK Has a Dedicated Kernel</h3>
+        <p>It is small math, but it appears across large MLP tensors where memory traffic and branch handling matter. A dedicated forward/backward pair lets CK validate exact PyTorch parity and benchmark the CPU path directly.</p>
+        <ul>
+            <li><code>relu2_forward_fp32</code> for activation output</li>
+            <li><code>relu2_backward_fp32</code> for gradient propagation</li>
+            <li><code>make test-relu2</code> and <code>make test-relu2-perf</code> for coverage</li>
+        </ul>
+    </div>
+</div>
 
 <div class="img-container svg-viewer" data-title="SwiGLU: Gated Linear Unit">
     <img src="assets/kernel-swiglu.svg" alt="SwiGLU Activation">
