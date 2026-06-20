@@ -27,6 +27,7 @@
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
+    <li><a href="#moe-routing">Mixture of Experts: Router + ReLU2 Experts</a></li>
     <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
 </ul>
@@ -574,6 +575,51 @@ y = gamma * x / (rms + eps)
     <h3 style="margin-top: 0;">Why Remove Mean Centering?</h3>
     <p>Research found that the re-centering (subtracting mean) in LayerNorm isn't necessary for good performance. RMSNorm keeps just the scaling, which is what matters for gradient flow.</p>
     <p><strong>Used in:</strong> Llama, Mistral, Qwen, Gemma (most modern LLMs)</p>
+</div>
+
+<hr>
+
+<h2 id="moe-routing">Mixture of Experts: Router + ReLU2 Experts</h2>
+
+<p>MoE layers replace one dense MLP with a pool of experts and a router. For each token row, the router scores experts, selects a small <code>top_k</code> subset, runs only those expert MLPs, and accumulates the weighted result. This is sparse control flow wrapped around dense per-expert math.</p>
+
+<div class="img-container svg-viewer" data-title="Nemotron-style MoE Router and ReLU2 Experts">
+    <img src="assets/concept-moe-router-relu2.svg" alt="Nemotron-style MoE router and ReLU2 expert flow">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Group-Limited Top-K Router</h3>
+        <pre>
+scores = sigmoid(router_logits + correction_bias)
+groups = partition(experts, n_group)
+active_groups = topk(group_scores, topk_group)
+experts = topk(scores inside active_groups, top_k)
+weights = normalize(scores[experts])
+        </pre>
+        <p>The router is not just a matrix multiply. It includes bias correction, group selection, top-k selection, optional normalization, and a scaling factor before expert dispatch.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Routed ReLU2 Expert</h3>
+        <pre>
+for selected expert e:
+  h1 = hidden @ W_up[e].T
+  h2 = relu2(h1)
+  y  = h2 @ W_down[e].T
+  output += routing_weight[e] * y
+        </pre>
+        <p>The active experts are dense kernels. CK now has scalar reference coverage for the routed ReLU2 expert path, including backward parity and a performance benchmark.</p>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Current CK Coverage</h3>
+    <ul>
+        <li><code>nemotron_group_limited_topk_router_f32</code> for group-limited routing.</li>
+        <li><code>moe_relu2_expert_forward_f32</code> and <code>moe_relu2_expert_backward_f32</code> for routed expert execution.</li>
+        <li><code>make test-nemotron-router</code>, <code>make test-moe-relu2-expert</code>, and <code>make test-moe-relu2-expert-perf</code> for parity and speed checks.</li>
+    </ul>
+    <p>On local AVX2 validation, the group-limited router microbenchmark measured CK at about <strong>3.5x faster</strong> than the PyTorch reference, and the ReLU2 expert benchmark measured roughly <strong>28-32x faster</strong> for the tested shapes. That does not mean full Nemotron inference is solved; it means these specific MoE primitives are now isolated, tested, and fast enough to build on.</p>
 </div>
 
 <hr>
