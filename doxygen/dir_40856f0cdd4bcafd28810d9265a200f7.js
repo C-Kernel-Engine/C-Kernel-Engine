@@ -55,6 +55,7 @@ var dir_40856f0cdd4bcafd28810d9265a200f7 =
     [ "layernorm_kernels_bf16.c", "layernorm__kernels__bf16_8c.html", "layernorm__kernels__bf16_8c" ],
     [ "loss_kernels.c", "loss__kernels_8c.html", "loss__kernels_8c" ],
     [ "loss_kernels_bf16.c", "loss__kernels__bf16_8c.html", "loss__kernels__bf16_8c" ],
+    [ "mamba2_kernels.c", "mamba2__kernels_8c.html", "mamba2__kernels_8c" ],
     [ "mlp_fused_decode.c", "mlp__fused__decode_8c.html", "mlp__fused__decode_8c" ],
     [ "mlp_kernels.c", "mlp__kernels_8c.html", "mlp__kernels_8c" ],
     [ "mlp_kernels_bf16.c", "mlp__kernels__bf16_8c.html", "mlp__kernels__bf16_8c" ],

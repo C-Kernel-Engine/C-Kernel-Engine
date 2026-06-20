@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="620" viewBox="0 0 1240 620" role="img" aria-labelledby="title desc">
+  <title id="title">Mamba2 decode reference kernel flow</title>
+  <desc id="desc">A diagram showing Nemotron-H Mamba2 decode as projection split, convolution state update, dt softplus, selective state update, and gated RMSNorm.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101820"/>
+      <stop offset="1" stop-color="#1a2830"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#246bfe"/>
+      <stop offset="1" stop-color="#31c7d8"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c9d72"/>
+      <stop offset="1" stop-color="#8bd450"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d68a22"/>
+      <stop offset="1" stop-color="#f3c64e"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7c9d3"/>
+    </marker>
+    <style>
+      .title { font: 800 30px Inter, Segoe UI, sans-serif; fill: #eef7fb; }
+      .sub { font: 500 15px Inter, Segoe UI, sans-serif; fill: #adc4cf; }
+      .box-title { font: 800 18px Inter, Segoe UI, sans-serif; fill: #f7fbfd; }
+      .box-text { font: 500 13px Inter, Segoe UI, sans-serif; fill: #c7d8df; }
+      .mono { font: 700 12px JetBrains Mono, Consolas, monospace; fill: #d7f3ff; }
+      .small { font: 600 12px Inter, Segoe UI, sans-serif; fill: #9fb6c0; }
+    </style>
+  </defs>
+
+  <rect width="1240" height="620" rx="18" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1192" height="572" rx="16" fill="none" stroke="#39505c" stroke-width="2"/>
+
+  <text x="56" y="70" class="title">Nemotron-H / Mamba2 Decode Reference Path</text>
+  <text x="56" y="98" class="sub">CK isolates each recurrent primitive so parity can be hardened before optimized scan/fusion work.</text>
+
+  <rect x="56" y="142" width="180" height="96" rx="10" fill="#182733" stroke="#486575"/>
+  <text x="78" y="174" class="box-title">Input Projection</text>
+  <text x="78" y="202" class="mono">projected[row]</text>
+  <text x="78" y="222" class="small">packed MLP + SSM fields</text>
+
+  <line x1="236" y1="190" x2="292" y2="190" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="304" y="126" width="218" height="128" rx="12" fill="#10283a" stroke="#3797c4"/>
+  <rect x="304" y="126" width="218" height="34" rx="12" fill="url(#blue)"/>
+  <text x="326" y="149" class="box-title">Split Contract</text>
+  <text x="326" y="185" class="mono">mamba2_in_proj_split_f32</text>
+  <text x="326" y="212" class="box-text">gate, hidden+BC, dt</text>
+  <text x="326" y="233" class="box-text">are separated without guessing.</text>
+
+  <line x1="522" y1="190" x2="578" y2="190" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="592" y="126" width="218" height="128" rx="12" fill="#122a24" stroke="#39a982"/>
+  <rect x="592" y="126" width="218" height="34" rx="12" fill="url(#green)"/>
+  <text x="614" y="149" class="box-title">Conv State</text>
+  <text x="614" y="185" class="mono">mamba2_conv1d_decode_f32</text>
+  <text x="614" y="212" class="box-text">roll state, append token,</text>
+  <text x="614" y="233" class="box-text">depthwise conv + SiLU.</text>
+
+  <line x1="810" y1="190" x2="866" y2="190" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="880" y="126" width="218" height="128" rx="12" fill="#30271a" stroke="#d8a33d"/>
+  <rect x="880" y="126" width="218" height="34" rx="12" fill="url(#amber)"/>
+  <text x="902" y="149" class="box-title">dt Transform</text>
+  <text x="902" y="185" class="mono">mamba2_dt_softplus_f32</text>
+  <text x="902" y="212" class="box-text">bias + softplus + clamp</text>
+  <text x="902" y="233" class="box-text">per recurrent head.</text>
+
+  <line x1="989" y1="254" x2="989" y2="306" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="702" y="322" width="278" height="142" rx="12" fill="#132233" stroke="#4f83cc"/>
+  <text x="728" y="356" class="box-title">Selective State Update</text>
+  <text x="728" y="386" class="mono">mamba2_selective_state_update_decode_f32</text>
+  <text x="728" y="416" class="box-text">state = state * exp(dt * A) + dt * B * x</text>
+  <text x="728" y="438" class="box-text">y = C dot state + D * x</text>
+
+  <line x1="702" y1="393" x2="646" y2="393" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="388" y="322" width="244" height="142" rx="12" fill="#162b22" stroke="#53b87d"/>
+  <text x="414" y="356" class="box-title">Gated Norm</text>
+  <text x="414" y="386" class="mono">mamba2_rmsnorm_gate_f32</text>
+  <text x="414" y="416" class="box-text">x * SiLU(gate), grouped RMSNorm,</text>
+  <text x="414" y="438" class="box-text">then learned scale.</text>
+
+  <line x1="388" y1="393" x2="306" y2="393" stroke="#b7c9d3" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="110" y="342" width="180" height="102" rx="10" fill="#182733" stroke="#486575"/>
+  <text x="134" y="376" class="box-title">Output Projection</text>
+  <text x="134" y="406" class="mono">matmul / out_proj</text>
+  <text x="134" y="428" class="small">uses existing GEMM path</text>
+
+  <rect x="56" y="520" width="1128" height="42" rx="8" fill="#0f1b24" stroke="#314653"/>
+  <text x="80" y="547" class="small">Current scope: scalar FP32 decode reference kernels for parity. Future scope: chunked selective scan, packed state layout, and SIMD/threaded kernels.</text>
+</svg>

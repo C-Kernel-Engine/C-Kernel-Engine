@@ -966,6 +966,7 @@
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
+    <li><a href="#mamba2-reference">Mamba2 Reference Kernels</a></li>
     <li><a href="#moe-routing">Mixture of Experts: Router + ReLU2 Experts</a></li>
     <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
     <li><a href="#weight-tying">Weight Tying</a></li>
@@ -1518,6 +1519,47 @@ y = gamma * x / (rms + eps)
 
 <hr>
 
+<h2 id="mamba2-reference">Mamba2 Reference Kernels</h2>
+
+<p>Hybrid models such as Nemotron-H include Mamba2-style recurrent layers alongside attention and MoE blocks. These layers are not attention: they maintain a compact state, update it token by token, and use learned decay/input/output terms to produce the next hidden representation.</p>
+
+<div class="img-container svg-viewer" data-title="Mamba2 Decode Reference Path">
+    <img src="assets/concept-mamba2-reference.svg" alt="Mamba2 decode reference kernel flow">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">Decode Contract</h3>
+        <pre>
+projected -> split(gate, hidden_bc, dt)
+conv_state = roll_append(conv_state, hidden_bc)
+dt = softplus(dt + dt_bias)
+state = state * exp(dt * A) + dt * B * x
+y = C dot state + D * x
+out = grouped_rmsnorm(y * silu(gate))
+        </pre>
+        <p>The important part is state ownership. CK exposes each step as a named kernel so the runtime can decide where state lives, how it is streamed, and which future optimized kernel replaces the scalar reference.</p>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Reference First</h3>
+        <p>Mamba2 performance work should not start as a fused black box. The scalar FP32 kernels define exact tensor layout, numerical behavior, and PyTorch parity before SIMD, tiling, chunked scan, or distributed state placement are introduced.</p>
+        <ul>
+            <li><code>mamba2_in_proj_split_f32</code></li>
+            <li><code>mamba2_conv1d_decode_f32</code></li>
+            <li><code>mamba2_dt_softplus_f32</code></li>
+            <li><code>mamba2_selective_state_update_decode_f32</code></li>
+            <li><code>mamba2_rmsnorm_gate_f32</code></li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Current CK Coverage</h3>
+    <p><code>make test-mamba2-reference</code> validates the five decode primitives against PyTorch. <code>make test-mamba2-reference-perf</code> provides a scalar baseline for selective state update. This is enough to harden Nemotron-H decode contracts, but it is not yet the final high-performance chunked prefill selective scan.</p>
+</div>
+
+<hr>
+
 <h2 id="moe-routing">Mixture of Experts: Router + ReLU2 Experts</h2>
 
 <p>MoE layers replace one dense MLP with a pool of experts and a router. For each token row, the router scores experts, selects a small <code>top_k</code> subset, runs only those expert MLPs, and accumulates the weighted result. This is sparse control flow wrapped around dense per-expert math.</p>
@@ -2024,7 +2066,7 @@ With weight tying: W = E  (same matrix!)
             </div>
             <div style="text-align: right;">
                 <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-20</p>
             </div>
         </div>
     </footer>
