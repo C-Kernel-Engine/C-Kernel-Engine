@@ -1548,6 +1548,7 @@ out = grouped_rmsnorm(y * silu(gate))
             <li><code>mamba2_conv1d_decode_f32</code></li>
             <li><code>mamba2_dt_softplus_f32</code></li>
             <li><code>mamba2_selective_state_update_decode_f32</code></li>
+            <li><code>mamba2_selective_scan_f32</code></li>
             <li><code>mamba2_rmsnorm_gate_f32</code></li>
         </ul>
     </div>
@@ -1555,7 +1556,7 @@ out = grouped_rmsnorm(y * silu(gate))
 
 <div class="card card-green">
     <h3 style="margin-top: 0;">Current CK Coverage</h3>
-    <p><code>make test-mamba2-reference</code> validates the five decode primitives against PyTorch. <code>make test-mamba2-reference-perf</code> provides a scalar baseline for selective state update. This is enough to harden Nemotron-H decode contracts, but it is not yet the final high-performance chunked prefill selective scan.</p>
+    <p><code>make test-mamba2-reference</code> validates the decode primitives and scalar sequence scan against PyTorch. It also checks that full sequence scan matches repeated decode updates. <code>make test-mamba2-reference-perf</code> provides a scalar baseline for selective state update. This is enough to harden Nemotron-H recurrent contracts, but it is not yet the final high-performance chunked/SIMD selective scan.</p>
 </div>
 
 <hr>
