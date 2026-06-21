@@ -1,5 +1,7 @@
 var mamba2__kernels_8c =
 [
+    [ "ck_mamba_debug_enabled", "mamba2__kernels_8c.html#a73440260d7247f5020584eb8e44def9f", null ],
+    [ "ck_mamba_debug_finite", "mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d", null ],
     [ "mamba2_conv1d_decode_f32", "mamba2__kernels_8c.html#afd5742d4ec25f1a8f130323a1f4c85a6", null ],
     [ "mamba2_dt_softplus_f32", "mamba2__kernels_8c.html#ad725b29015094b6c91c1560e2be28ca8", null ],
     [ "mamba2_in_proj_split_f32", "mamba2__kernels_8c.html#a34c653c6e830c743b182efdde98cb4e9", null ],
