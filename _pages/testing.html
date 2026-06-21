@@ -536,32 +536,65 @@ layer.0.wv   max_diff=4.891e-06
 
   <hr>
 
-  <h2>v6.6 Contract + Matrix Gates</h2>
+  <h2>Current Version Gates</h2>
   <p>
-    Before heavy E2E/parity runs, v6.6 uses two explicit preflight gates:
-    a static tooling-contract checker and a dynamic 3-model matrix checker.
+    Active testing is split by runtime responsibility. <code>v8</code> is the promoted
+    inference/runtime lane, while <code>v7</code> remains the promoted training/backprop
+    lane. <code>v6.6</code> is retained for historical compatibility checks, but it is no
+    longer a default pre-push or nightly blocking gate.
   </p>
 
   <pre class="code-block">
-# Primary v6.6 release gate (recommended)
+# Local pre-push/pre-flight shape
+git push
+
+# v8 inference/runtime contract lane
+make nightly-inference
+make v8-validate-contracts
+make v8-kernel-map-contracts
+make v8-regression-fast
+
+# v7 training/backprop lane
+make v7-train-ir-smoke
+make v7-kernel-parity-train
+make regression-training-full
+
+# Historical/manual v6.6 compatibility lane
+make nightly-archive
 make v6.6-gate
-
-# Runtime-required parity matrix (when llama parity runtime is present)
-make v6.6-validate-parity-matrix-required
-
-# Optional standalone gates
-make v6.6-validate-contracts
-make v6.6-kernel-map-gate
-make v6.6-validate-matrix-smoke
-make v6.6-validate-longdecode
   </pre>
 
   <p>
-    Reports are also written to:
-    <code>version/v6.6/tools/contract_report_latest.json</code> and
-    <code>version/v6.6/tools/model_matrix_report_latest.json</code>.
-    When kernel maps change, regenerate with <code>make v6.6-kernel-map-regenerate</code>.
+    The v8 inference regression manifest currently covers Gemma3, Qwen2, Qwen3,
+    Qwen3.5, Qwen3-VL, and Nanbeige. The Gemma4 high-memory smoke stays in the
+    inference lane but skips unless enough RAM is available. v7 training gates cover
+    train IR, backward synthesis, layout/memory audit, and training-kernel parity.
+    v6.6 reports still write under <code>version/v6.6/tools/</code> when run manually.
   </p>
+
+  <table class="table table-striped">
+    <thead><tr><th>Lane</th><th>Primary command</th><th>Purpose</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>v8 inference</strong></td>
+        <td><code>make nightly-inference</code></td>
+        <td>Runtime contracts, kernel-map contracts, model-family smoke/coherence, decoder matrix.</td>
+        <td>Default active lane</td>
+      </tr>
+      <tr>
+        <td><strong>v7 training</strong></td>
+        <td><code>make regression-training-full</code></td>
+        <td>Backprop family regression, long-epoch drift, training-kernel parity, visualizer training reports.</td>
+        <td>Default active lane</td>
+      </tr>
+      <tr>
+        <td><strong>v6.6 archive</strong></td>
+        <td><code>make nightly-archive</code></td>
+        <td>Legacy tooling contracts, kernel-map gate, model matrix compatibility.</td>
+        <td>Manual only</td>
+      </tr>
+    </tbody>
+  </table>
 
   <hr>
 
@@ -671,5 +704,5 @@ Both are mathematically valid RoPE, but weights are trained for one convention.
 
 <section>
 <h2>High-Memory Model Smoke</h2>
-<p>The nightly parity lane includes <code>make test-v8-gemma4-highmem</code>. It skips unless enough RAM is available.</p>
+<p>The nightly inference lane includes <code>make test-v8-gemma4-highmem</code>. It skips unless enough RAM is available.</p>
 </section>
