@@ -1125,16 +1125,16 @@
 <div class="hero">
     <span class="badge badge-amber">CPU · Linux · x86-64 / ARM</span>
     <h1>C-Kernel-Engine</h1>
-    <p>A code generator and kernel library for LLM training and inference in pure C. Every kernel has a forward and backward pass, validated to &lt;&nbsp;1e-5 against PyTorch autograd. The IR pipeline makes every architectural decision explicit and auditable — from graph lowering to memory layout to the final byte of generated C.</p>
-    <p style="margin-top:0.7rem;color:var(--text-muted);max-width:900px;margin-left:auto;margin-right:auto;">Why this exists: build extremely lightweight AI systems without sacrificing performance or security, keep the full stack auditable end-to-end (math kernels -> training -> mechanistic interpretability), and stay CPU-first across embedded devices, commodity servers, and offline deployments.</p>
+    <p>A CPU-native AI runtime and kernel compiler for auditable inference, training kernels, and distributed CPU execution. Python tooling imports models, builds the IR, generates C, and runs parity checks; the execution path is C-first and compiled with the best native CPU toolchain available.</p>
+    <p style="margin-top:0.7rem;color:var(--text-muted);max-width:900px;margin-left:auto;margin-right:auto;">Why this exists: build lightweight AI systems without sacrificing performance or auditability, keep the full stack visible end-to-end (model import -> IR -> memory layout -> generated C kernels), and scale CPU-first across embedded devices, commodity servers, and owned CPU clusters.</p>
     <div class="hero-stats">
         <span class="hero-stat"><strong>&lt; 1e-5</strong> parity threshold</span>
         <span class="hero-stat"><strong>PyTorch + llama.cpp</strong> verified</span>
         <span class="hero-stat"><strong>16.5x</strong> faster tokenizer</span>
         <span class="hero-stat"><strong>9+</strong> fwd + bwd kernels</span>
         <span class="hero-stat"><strong>IR1 → IR2 → IR3</strong> codegen</span>
-        <span class="hero-stat"><strong>VTune</strong> profiling</span>
-        <span class="hero-stat"><strong>Zero</strong> dependencies</span>
+        <span class="hero-stat"><strong>VTune / Advisor</strong> profiling</span>
+        <span class="hero-stat"><strong>C-first</strong> execution</span>
     </div>
 </div>
 
@@ -1143,9 +1143,15 @@
 ═══════════════════════════════════════════════════════════════════════ -->
 <h2>What is C-Kernel-Engine?</h2>
 
+<p>C-Kernel-Engine is split into two layers. The <strong>tooling layer</strong> uses Python for model import, GGUF/safetensors conversion, IR construction, code generation, and PyTorch/llama.cpp parity testing. The <strong>execution layer</strong> is generated C plus hand-written C kernels with explicit memory offsets, quantization layouts, SIMD dispatch, and native compiler optimization.</p>
+
+<p>The intended deployment model is dependency-light execution, not dependency-free development. The generated runtime can be compiled with GCC or Clang, but the preferred path is to use the strongest native CPU toolchain for the target machine: Intel oneAPI/ICX on Intel CPUs, tuned GCC/Clang on AMD CPUs, ARM toolchains on ARM systems, and standard systems libraries for cluster execution.</p>
+
+<p>The north star is distributed CPU inference and training: model/layer ownership across CPU nodes, explicit activation and gradient movement, MPI/RDMA-style communication where available, and pipeline parallelism over hardware that can be bought, powered, audited, and scaled incrementally.</p>
+
 <p>The first version of C-Kernel-Engine tried to drive generation from HuggingFace <code>config.json</code> alone. That was not enough: config metadata does not fully capture quantized weight packing/layout details, nor all runtime stitching constraints needed for reliable kernel binding.</p>
 
-<p>The current pipeline pulls GGUF as the weight/quantization source of truth, parses it, and combines that with C-Kernel-Engine templates and config hints. That merge produces deterministic <code>weights.bump</code> + sidecar metadata. From that point forward, the same IR chain can target either inference (v6.6) or training/backprop (v7).</p>
+<p>The current pipeline pulls GGUF or safetensors metadata as the weight/layout source of truth, parses it, and combines that with C-Kernel-Engine templates and config hints. That merge produces deterministic <code>weights.bump</code> + sidecar metadata. From that point forward, the same IR chain can target v8 inference and v7 training/backprop paths.</p>
 
 <p>The architecture is deliberately split into a <em>smart</em> front-end (template selection, manifest resolution, IR construction, backward synthesis, layout planning, fusion detection) and a <em>dumb</em> back-end (a codegen emitter that only writes what the lowered IR already decided). This makes correctness auditable at every stage.</p>
 
@@ -1162,7 +1168,7 @@
 ═══════════════════════════════════════════════════════════════════════ -->
 <h2>The IR Pipeline</h2>
 
-<p>Both inference and training share the same IR foundation. The inference path (v6.6) adds quantized dispatch and MEGA kernel fusion. The training extension (v7) adds backward synthesis, explicit gradient accumulation, and a separate training memory layout — built on top of the same IR1/IR2 lowering chain.</p>
+<p>Both inference and training share the same IR foundation. The inference path (v8) adds quantized dispatch, model-family contracts, multimodal coverage, and runtime profiling hooks. The training path (v7) adds backward synthesis, explicit gradient accumulation, and a separate training memory layout — built on top of the same IR1/IR2 lowering chain.</p>
 
 <div class="ir-foundation">
     <div class="ir-foundation-label">Shared IR Foundation</div>
@@ -1540,7 +1546,7 @@ python version/v7/scripts/ck_run_v7.py train \
     <div class="folder-header">
         <span class="folder-title">Focused Source Tree</span>
         <span class="folder-scope">src/kernels · version/v6.6 · version/v7</span>
-        <span class="folder-updated">Updated: 2026-06-04 22:12</span>
+        <span class="folder-updated">Updated: 2026-06-21 21:23</span>
     </div>
     <pre class="tree-output">
 src/kernels
@@ -1571,10 +1577,6 @@ version/v7
 |-- contracts
 |-- data
 |   |-- eval_contracts
-|   |-- generated
-|   |   |-- toy_svg_semantic_shapes_tokenizer
-|   |   `-- toy_svg_structured_atoms_tokenizer
-|   |-- probe_contracts
 |   |-- spec03
 |   |   |-- contracts
 |   |   |-- holdout
@@ -1589,20 +1591,13 @@ version/v7
 |       |-- contracts
 |       |-- holdout
 |       |-- manifests
-|       |-- midtrain
 |       |-- normalized
-|       |-- pretrain
 |       |-- raw_assets
-|       |-- sft
 |       `-- tokenizer
 |-- docs
 |-- examples
 |-- experiments
 |   `-- svg_dsl
-|       |-- catalog
-|       |-- core
-|       |-- programs
-|       `-- renderers
 |-- include
 |-- kernel_maps
 |-- regression
@@ -1615,10 +1610,6 @@ version/v7
 |   |-- spec15b_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec15b_gold_mappings
 |   |-- spec_broader_1_family_packs -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_family_packs
 |   `-- spec_broader_1_gold_mappings -&gt; ../artifacts/svg_dsl/spec_archive_2026-04-08/spec_broader_1_gold_mappings
-|-- runs
-|   |-- logs
-|   `-- overnight_monitor
-|       `-- spec10
 |-- scripts
 |   |-- dataset
 |   `-- parity
@@ -1631,7 +1622,7 @@ version/v7
 `-- tools
     `-- src
 
-87 directories
+72 directories
 </pre>
 </div>
 
@@ -1909,8 +1900,8 @@ version/v7
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-04</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-21</p>
             </div>
         </div>
     </footer>
