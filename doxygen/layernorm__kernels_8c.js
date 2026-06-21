@@ -1,6 +1,7 @@
 var layernorm__kernels_8c =
 [
     [ "layernorm_backward_kernel", "layernorm__kernels_8c.html#a8d349f047d6654b3a351fb62e0b20e87", null ],
+    [ "layernorm_forward_ggml_exact", "layernorm__kernels_8c.html#a1af14e2cfa9e5ef4647d1701325f103e", null ],
     [ "layernorm_forward_rolled_slice", "layernorm__kernels_8c.html#ace47573bf5278260d2652f4fb069bb9e", null ],
     [ "layernorm_forward_unrolled_slice", "layernorm__kernels_8c.html#afd2e784d7b2b3ac7eb93e6f87c091fae", null ],
     [ "layernorm_forward_unrolled_slice_scalar", "layernorm__kernels_8c.html#aabe13737d121479113ffd94b43e58087", null ],
