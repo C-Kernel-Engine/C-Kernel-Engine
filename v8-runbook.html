@@ -1127,6 +1127,34 @@ python -m pip install -r requirements-v8.txt</pre>
     </div>
     <p class="mini-note">Use this as the current Gemma4 GGUF coherence smoke. A healthy run should produce a normal long answer and stop by EOS or <code>--max-tokens</code>, not by prompt-marker echo or language corruption. The tested local Q4_K_M run generated 1024 coherent C-code tokens; performance work remains separate.</p>
 
+    <h3>Nemotron Nano 9B v2</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>.venv/bin/python version/v8/scripts/ck_run_v8.py run \
+  hf://bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF/nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf \
+  --context-len 2048 \
+  --force-convert --force-compile \
+  --prompt 'Give me a concise example of C code.' \
+  --chat-template auto \
+  --max-tokens 256 \
+  --temperature 0.0</pre>
+    </div>
+    <p class="mini-note">Use this as the current Nemotron-H / Mamba2 GGUF smoke. Native BPE text encode is enabled by default for generated BPE runtimes; set <code>CK_DISABLE_FULL_BPE_TOKENIZER=1</code> only when you intentionally want token-id prompts plus lightweight token display. A healthy run should produce normal instructional text, not token-zero collapse or repeated punctuation.</p>
+
+    <h3>GLM4</h3>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre># Low-memory validation lane: template + conversion + comparator syntax
+.venv/bin/python -m unittest tests.test_v8_glm4_template
+.venv/bin/python -m py_compile \
+  version/v8/scripts/compare_glm4_torch_ck_v8.py \
+  version/v8/scripts/convert_gguf_to_bump_v8.py \
+  version/v8/scripts/convert_safetensors_to_bump_v8.py \
+  tests/test_v8_glm4_template.py \
+  tests/test_v8_safetensors_to_bump.py</pre>
+    </div>
+    <p class="mini-note">GLM4 is currently tracked as a v8 template/conversion/parity-harness lane. The patch adds GLM4 GGUF metadata handling, declarative safetensors mapping, a tiny synthetic safetensors conversion test, and a PyTorch-vs-CK comparator. Run full real-model GLM4 smoke on a higher-memory host before promoting it to the high-memory runtime lane.</p>
+
     <h3>Qwen2 0.5B Instruct</h3>
     <div class="cmd-block">
         <button class="copy-btn" type="button">Copy</button>
@@ -1178,11 +1206,28 @@ python -m pip install -r requirements-v8.txt</pre>
     <p class="mini-note">Current scope: these are the validated <code>v8</code> text-family operator surfaces. The multimodal Qwen3-VL path is separate and remains the only promoted vision family today.</p>
 </div>
 
+<div class="card card-yellow">
+    <h3 style="margin-top: 0;">High-Memory v8 Smoke Targets</h3>
+    <p>Gemma4 and Nemotron Nano 9B v2 are intentionally tracked as high-memory smoke lanes. They should appear in nightly/test reports, but skip cleanly on smaller runners instead of pretending the model family is untested.</p>
+    <div class="cmd-block">
+        <button class="copy-btn" type="button">Copy</button>
+<pre>make test-v8-gemma4-highmem
+make test-v8-nemotron9-highmem
+
+# Lower the threshold only when you intentionally want to run locally:
+V8_GEMMA4_MIN_MEM_GB=24 make test-v8-gemma4-highmem
+V8_NEMOTRON9_MIN_MEM_GB=24 make test-v8-nemotron9-highmem</pre>
+    </div>
+    <p class="mini-note">These tests are coherence/runtime smokes, not performance gates. They validate that the v8 conversion, compile, tokenizer/chat-template path, and first generated tokens remain sane for large model families.</p>
+</div>
+
 <div class="card">
     <h3 style="margin-top: 0;">Text-Family Notes</h3>
     <ul>
         <li><strong>Gemma 3:</strong> use <code>--chat-template auto</code> for normal instruction/chat runs. <code>--chat-template none</code> is raw continuation mode now and needs <code>--allow-raw-prompt</code> if you intentionally want it.</li>
         <li><strong>Gemma 4:</strong> use <code>--chat-template gemma4</code>. The template uses explicit per-layer/direct split-half RoPE metadata; do not replace it with the older global split-half RoPE path when debugging.</li>
+        <li><strong>Nemotron Nano 9B v2:</strong> use <code>--chat-template auto</code>. The BPE runtime should encode raw prompts by default; set <code>CK_DISABLE_FULL_BPE_TOKENIZER=1</code> only for token-id fallback/debug runs.</li>
+        <li><strong>GLM4:</strong> start with the template and safetensors/GGUF conversion tests. It has partial-RoPE and BPE contract coverage, but should stay in the conversion/parity lane until real-model smoke runs on a higher-memory host.</li>
         <li><strong>Qwen2 / Qwen3 / Qwen3.5:</strong> the <code>v8</code> runner now reproduces the same public command shapes as <code>v7</code> and clean short prompt smokes succeed on the promoted examples.</li>
         <li><strong>NaanBeige / llama-family symptom:</strong> if the first reply echoes <code>&lt;|im_start|&gt;assistant</code> or starts with <code>&lt;think&gt;</code>, keep <code>--chat-template auto</code>, do not force <code>none</code>, and treat it as a prompt-wrapper/chat-contract symptom rather than the expected reply.</li>
     </ul>
@@ -1553,8 +1598,8 @@ python -m pip install -r requirements-v8.txt</pre>
                 </ul>
             </div>
             <div style="text-align: right;">
-                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Built with zero dependencies</p>
-                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-19</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0;">Static docs · C-first execution</p>
+                <p style="color: #606060; font-size: 0.75rem; margin: 0.5rem 0 0 0;">2026-06-22</p>
             </div>
         </div>
     </footer>
