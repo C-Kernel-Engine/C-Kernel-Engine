@@ -369,6 +369,31 @@
       </div>
     </div>
 
+    <!-- Nemotron -->
+    <div class="model-card mc-llama">
+      <span class="model-badge">template: nemotron_h.json</span>
+      <div class="model-title">Nemotron Nano 9B v2</div>
+      <div class="model-arch">Nemotron-H · Mamba2 recurrent blocks · sparse attention layers<br>ReLU2 MLP · Q5_0/Q4_K/Q8_0 GGUF · BPE tokenizer</div>
+      <div class="model-pipeline">
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Quantized inference — GGUF Q4_K_M coherent C-code smoke</span></div>
+        <div class="mp-row"><span class="mp-dot inference"></span><span class="mp-text">Safetensors/PyTorch parity lane — Mamba2 stitching and state-shape guardrails</span></div>
+      </div>
+      <div class="source-note">
+        Bring-up fix: Nemotron-H uses Mamba2 state shaped as <code>[heads, head_dim, state_dim]</code>, not a square DeltaNet-style recurrent matrix. The template/lowering path now carries that contract explicitly, stores no-RoPE attention KV after <code>v_proj</code>, and generated BPE runtimes can encode raw prompts end-to-end by default.
+      </div>
+      <div class="model-tags">
+        <span class="tag fixed">Mamba2 state shape explicit</span>
+        <span class="tag fixed">native BPE encode default-on</span>
+        <span class="tag learned">GGUF Q4_K_M smoke-tested</span>
+      </div>
+      <div class="model-quant">
+        <span class="mq-chip preferred">Q4_K_M ★</span>
+        <span class="mq-chip">Q5_0</span>
+        <span class="mq-chip">Q8_0</span>
+        <span class="mq-chip">BF16 safetensors</span>
+      </div>
+    </div>
+
     <!-- Llama / Nanbeige -->
     <div class="model-card mc-llama">
       <span class="model-badge">template: llama.json</span>
@@ -667,6 +692,7 @@
       <div class="test-item">unsloth--gemma-4-E4B-it-GGUF / local Q4_K_M BUMP</div>
       <div class="test-item">mradermacher--Nanbeige4.1-3B-GGUF</div>
       <div class="test-item">Qwen--Qwen3.5-0.8B-GGUF</div>
+      <div class="test-item">bartowski--nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF / Q4_K_M</div>
     </div>
     <p class="source-note" style="margin-top: 0.75rem;">
       Bring-up note: if a Llama-family/Nanbeige first reply starts with <code>&lt;think&gt;</code> or echoes
@@ -690,6 +716,9 @@
       <div class="test-item">
         <strong>Llama / Nanbeige:</strong> SentencePiece + ChatML bring-up stabilized with untied <code>output.weight</code> preserved. Nanbeige remains an active inference lane; long coherent think traces are treated as model style, not as evidence of kernel breakage.
       </div>
+      <div class="test-item">
+        <strong>Nemotron Nano 9B v2:</strong> the first real failure was stitching, not tokenizer or final head: Mamba2 state shape and no-RoPE KV placement had to be explicit in IR. Native BPE encode is now default-on so <code>ck_run_v8.py</code> raw prompts work end-to-end; token-id-only fallback remains available with <code>CK_DISABLE_FULL_BPE_TOKENIZER=1</code>.
+      </div>
     </div>
   </div>
 
@@ -712,9 +741,9 @@ python3 version/v7/scripts/test_kv_cache_batch_copy_call_ir_v7.py \
   </div>
 
   <div class="roadmap">
-    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3/Gemma4 plus the Llama/Nanbeige bring-up lane.
+    <strong>Growth path:</strong> inference coverage now spans Qwen2/Qwen3/Qwen3.5/Gemma3/Gemma4, Nemotron-H, plus the Llama/Nanbeige bring-up lane.
     Qwen3.5 adds hybrid recurrent-attention coverage with Gated DeltaNet kernels (forward + backward), compatible with the 0.8B dense variant.
-    Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
+    Gemma now runs on the correct split-half RoPE parity path, Gemma4 adds per-layer direct RoPE plus a safetensors-to-BUMP parity lane, Nemotron-H adds Mamba2 recurrent state coverage, and Nanbeige has a documented SentencePiece/ChatML bring-up lane on the C tokenizer.
     v7 still targets full training expansion: backward kernels, optimizer state, gradient reduction, and IR‑driven training schedules.
     This page will keep evolving into a single matrix that shows inference + training coverage per model family.
   </div>

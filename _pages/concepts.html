@@ -27,6 +27,7 @@
     <li><a href="#sliding-window">Sliding-Window Attention</a></li>
     <li><a href="#gqa">Grouped Query Attention (GQA)</a></li>
     <li><a href="#normalization">Normalization: RMSNorm vs LayerNorm</a></li>
+    <li><a href="#nemotron-h-hybrid">Nemotron-H Hybrid Circuit</a></li>
     <li><a href="#mamba2-reference">Mamba2 Reference Kernels</a></li>
     <li><a href="#moe-routing">Mixture of Experts: Router + ReLU2 Experts</a></li>
     <li><a href="#activations">Activations: ReLU2, SwiGLU, GeGLU, GELU</a></li>
@@ -576,6 +577,45 @@ y = gamma * x / (rms + eps)
     <h3 style="margin-top: 0;">Why Remove Mean Centering?</h3>
     <p>Research found that the re-centering (subtracting mean) in LayerNorm isn't necessary for good performance. RMSNorm keeps just the scaling, which is what matters for gradient flow.</p>
     <p><strong>Used in:</strong> Llama, Mistral, Qwen, Gemma (most modern LLMs)</p>
+</div>
+
+<hr>
+
+<h2 id="nemotron-h-hybrid">Nemotron-H Hybrid Circuit: Attention + Mamba2 + MoE</h2>
+
+<p>Nemotron-H is important for CK because it is not just another dense transformer stack. A single model family can mix attention layers, Mamba2-style state-space layers, routed MoE blocks, ReLU2 experts, tokenizer guardrails, and model-specific template rules. CK needs to represent that as an auditable circuit of named kernels before it becomes a high-performance runtime.</p>
+
+<div class="img-container svg-viewer" data-title="Nemotron-H Hybrid Circuit">
+    <img src="assets/concept-nemotron-h-hybrid-circuit.svg" alt="Nemotron-H hybrid attention, Mamba2, and MoE circuit">
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-top: 0;">What CK Has to Preserve</h3>
+        <p>The hard part is not only implementing the math once. The runtime has to preserve state ownership and layout contracts across different layer types:</p>
+        <ul>
+            <li><strong>Attention:</strong> Q/K/V projection, RoPE or no-RoPE policy, KV-cache placement, and output projection.</li>
+            <li><strong>Mamba2 / SSM:</strong> input projection split, convolution state, <code>dt</code> softplus, recurrent selective state update, and gated normalization.</li>
+            <li><strong>MoE:</strong> group-limited routing, top-k expert selection, ReLU2 expert execution, and weighted accumulation.</li>
+        </ul>
+    </div>
+    <div class="card card-accent">
+        <h3 style="margin-top: 0;">Why Profiling Comes Before Fusion</h3>
+        <p>VTune and Advisor are exactly the right tools here. They tell us whether a slow path is memory bandwidth, cache misses, branch pressure, vector under-utilization, bad thread placement, or true arithmetic cost. Only then should CK promote a fused kernel.</p>
+        <p>Good fusion candidates are real, but they should be gated:</p>
+        <ul>
+            <li>Q/K/V projection plus quantization or layout packing for prefill.</li>
+            <li>Mamba2 in-proj split plus conv-state update plus <code>dt</code> preparation.</li>
+            <li>Selective scan chunks once scalar sequence parity is locked.</li>
+            <li>Router plus expert dispatch when sparse row ownership is stable.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card card-green">
+    <h3 style="margin-top: 0;">Current CK Coverage</h3>
+    <p>The current Nemotron path is deliberately reference-first. <code>make test-mamba2-reference</code> validates Mamba2 decode and sequence-scan behavior. <code>make test-nemotron-router</code> validates group-limited routing. <code>make test-moe-relu2-expert</code> validates routed ReLU2 expert math. The v8 guardrail tests cover tokenizer capability codegen, template-circuit audit rules, and high-memory Nemotron smoke coverage behind <code>make test-v8-nemotron9-highmem</code>.</p>
+    <p>This is the right foundation for the next optimization phase: use profiling to decide which references become packed, tiled, SIMD, chunked, or fused kernels, without losing the ability to explain exactly which kernel changed.</p>
 </div>
 
 <hr>

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="760" viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+  <title id="title">Nemotron-H hybrid circuit in C-Kernel-Engine</title>
+  <desc id="desc">Diagram showing how CK maps a Nemotron-H block into attention, Mamba2 state-space, and MoE/ReLU2 kernel families with parity and profiling gates.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.52" stop-color="#171717"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <linearGradient id="attention" x1="0" x2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="mamba" x1="0" x2="1">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#84cc16"/>
+    </linearGradient>
+    <linearGradient id="moe" x1="0" x2="1">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#fb7185"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#cbd5e1"/>
+    </marker>
+    <style>
+      .title { fill: #f8fafc; font: 800 30px Inter, system-ui, sans-serif; }
+      .subtitle { fill: #cbd5e1; font: 500 16px Inter, system-ui, sans-serif; }
+      .label { fill: #f8fafc; font: 700 16px Inter, system-ui, sans-serif; }
+      .small { fill: #d1d5db; font: 500 12px Inter, system-ui, sans-serif; }
+      .code { fill: #e5e7eb; font: 600 12px "JetBrains Mono", "SFMono-Regular", monospace; }
+      .box { fill: #1f2937; stroke: #374151; stroke-width: 1.4; rx: 10; filter: url(#shadow); }
+      .inner { fill: #111827; stroke: #475569; stroke-width: 1; rx: 8; }
+      .wire { stroke: #cbd5e1; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .softwire { stroke: #64748b; stroke-width: 1.6; fill: none; stroke-dasharray: 6 6; marker-end: url(#arrow); }
+      .pill { rx: 15; }
+    </style>
+  </defs>
+
+  <rect width="1180" height="760" fill="url(#bg)"/>
+  <circle cx="1010" cy="95" r="150" fill="#0ea5e9" opacity="0.07"/>
+  <circle cx="155" cy="680" r="180" fill="#22c55e" opacity="0.07"/>
+
+  <text x="48" y="58" class="title">Nemotron-H in CK: hybrid blocks become named C kernels</text>
+  <text x="48" y="86" class="subtitle">Attention, Mamba2 state-space, and MoE/ReLU2 are separate math circuits. CK keeps them explicit before optimizing layout, fusion, or distributed placement.</text>
+
+  <rect x="48" y="128" width="170" height="80" class="box"/>
+  <text x="74" y="160" class="label">Token rows</text>
+  <text x="74" y="184" class="code">[M, hidden]</text>
+
+  <path d="M 218 168 L 282 168" class="wire"/>
+  <rect x="282" y="128" width="180" height="80" class="box"/>
+  <text x="312" y="160" class="label">Block contract</text>
+  <text x="312" y="184" class="code">norm + template map</text>
+
+  <path d="M 462 168 C 520 168 520 168 576 168" class="wire"/>
+  <rect x="576" y="110" width="250" height="118" class="box"/>
+  <rect x="600" y="136" width="202" height="26" class="pill" fill="url(#attention)" opacity="0.92"/>
+  <text x="616" y="155" class="code" fill="#04111d">attention path</text>
+  <text x="600" y="186" class="small">Q/K/V projection, RoPE policy, KV cache</text>
+  <text x="600" y="208" class="code">gemm -> rope -> attn -> out</text>
+
+  <path d="M 462 168 C 520 168 520 340 576 340" class="wire"/>
+  <rect x="576" y="270" width="250" height="150" class="box"/>
+  <rect x="600" y="296" width="202" height="26" class="pill" fill="url(#mamba)" opacity="0.92"/>
+  <text x="616" y="315" class="code" fill="#062512">mamba2 / ssm path</text>
+  <text x="600" y="348" class="small">in-proj split, conv state, dt softplus</text>
+  <text x="600" y="370" class="small">selective state update, RMSNorm gate</text>
+  <text x="600" y="394" class="code">state[t] = decay * state[t-1] + input</text>
+
+  <path d="M 462 168 C 520 168 520 542 576 542" class="wire"/>
+  <rect x="576" y="474" width="250" height="136" class="box"/>
+  <rect x="600" y="500" width="202" height="26" class="pill" fill="url(#moe)" opacity="0.94"/>
+  <text x="616" y="519" class="code" fill="#241205">moe + relu2 path</text>
+  <text x="600" y="552" class="small">group-limited router selects experts</text>
+  <text x="600" y="574" class="small">ReLU2 experts run only active rows</text>
+  <text x="600" y="596" class="code">out += weight[e] * expert[e](x)</text>
+
+  <path d="M 826 168 L 900 168" class="wire"/>
+  <path d="M 826 340 L 900 340" class="wire"/>
+  <path d="M 826 542 L 900 542" class="wire"/>
+  <rect x="900" y="118" width="232" height="512" class="box"/>
+  <text x="928" y="154" class="label">CK guardrails</text>
+
+  <rect x="926" y="182" width="180" height="70" class="inner"/>
+  <text x="946" y="208" class="code">parity first</text>
+  <text x="946" y="230" class="small">PyTorch vs scalar C</text>
+
+  <rect x="926" y="276" width="180" height="88" class="inner"/>
+  <text x="946" y="302" class="code">state ownership</text>
+  <text x="946" y="324" class="small">KV cache, conv state,</text>
+  <text x="946" y="344" class="small">SSM recurrent state</text>
+
+  <rect x="926" y="388" width="180" height="88" class="inner"/>
+  <text x="946" y="414" class="code">layout proof</text>
+  <text x="946" y="436" class="small">VTune / Advisor:</text>
+  <text x="946" y="456" class="small">cache, bandwidth, stalls</text>
+
+  <rect x="926" y="500" width="180" height="94" class="inner"/>
+  <text x="946" y="526" class="code">promote only when</text>
+  <text x="946" y="548" class="small">shape sweeps pass and</text>
+  <text x="946" y="568" class="small">fused/packed kernels keep</text>
+  <text x="946" y="588" class="small">numerical parity</text>
+
+  <path d="M 694 228 C 694 250 694 252 694 270" class="softwire"/>
+  <path d="M 694 420 C 694 450 694 452 694 474" class="softwire"/>
+  <text x="110" y="286" class="label">Why this matters</text>
+  <rect x="48" y="314" width="420" height="252" class="box"/>
+  <text x="76" y="350" class="small">Nemotron-style models are not a single transformer loop.</text>
+  <text x="76" y="378" class="small">The runtime must know which path owns which state,</text>
+  <text x="76" y="406" class="small">which kernels are decode-only, and where future packed</text>
+  <text x="76" y="434" class="small">or fused kernels can replace references safely.</text>
+  <text x="76" y="480" class="code">tests: mamba2_reference, router, relu2</text>
+  <text x="76" y="506" class="code">audit: template circuit + tokenizer guardrails</text>
+  <text x="76" y="532" class="code">smoke: v8_nemotron9_highmem</text>
+
+  <rect x="48" y="624" width="1084" height="72" rx="12" fill="#0f172a" stroke="#334155"/>
+  <text x="78" y="654" class="label">Optimization rule</text>
+  <text x="78" y="678" class="small">Do not fuse first. Measure the explicit circuit, prove the bottleneck, then promote packed or fused kernels through hardware and shape gates.</text>
+</svg>

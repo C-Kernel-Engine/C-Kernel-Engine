@@ -268,7 +268,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mamba2__kernels_8c_source.html#l00009">ck_mamba_debug_enabled()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="mamba2__kernels_8c_source.html#l00102">mamba2_conv1d_decode_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00149">mamba2_dt_softplus_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00065">mamba2_in_proj_split_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00303">mamba2_rmsnorm_gate_f32()</a>, and <a class="el" href="mamba2__kernels_8c_source.html#l00230">mamba2_selective_scan_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mamba2__kernels_8c_source.html#l00102">mamba2_conv1d_decode_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00149">mamba2_dt_softplus_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00065">mamba2_in_proj_split_f32()</a>, <a class="el" href="mamba2__kernels_8c_source.html#l00317">mamba2_rmsnorm_gate_f32()</a>, and <a class="el" href="mamba2__kernels_8c_source.html#l00242">mamba2_selective_scan_f32()</a>.</p>
 
 </div>
 </div>
@@ -639,40 +639,40 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="mamba2__kernels_8c_source.html#l00303">303</a> of file <a class="el" href="mamba2__kernels_8c_source.html">mamba2_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  310</span>                                        {</div>
-<div class="line"><span class="lineno">  311</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || inner_dim &lt;= 0 || group_size &lt;= 0) {</div>
-<div class="line"><span class="lineno">  312</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  313</span>    }</div>
-<div class="line"><span class="lineno">  314</span> </div>
-<div class="line"><span class="lineno">  315</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.x[0]&quot;</span>, x, (<span class="keywordtype">size_t</span>)inner_dim);</div>
-<div class="line"><span class="lineno">  316</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.gate[0]&quot;</span>, gate, (<span class="keywordtype">size_t</span>)inner_dim);</div>
-<div class="line"><span class="lineno">  317</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.weight&quot;</span>, weight, (<span class="keywordtype">size_t</span>)inner_dim);</div>
-<div class="line"><span class="lineno">  318</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  319</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  320</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  321</span>        <span class="keywordtype">float</span> *out_row = out + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
-<div class="line"><span class="lineno">  322</span> </div>
-<div class="line"><span class="lineno">  323</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> = 0; <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> &lt; inner_dim; <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> += group_size) {</div>
-<div class="line"><span class="lineno">  324</span>            <span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> + group_size;</div>
-<div class="line"><span class="lineno">  325</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &gt; inner_dim) {</div>
-<div class="line"><span class="lineno">  326</span>                <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = inner_dim;</div>
-<div class="line"><span class="lineno">  327</span>            }</div>
-<div class="line"><span class="lineno">  328</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> count = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> - <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>;</div>
-<div class="line"><span class="lineno">  329</span>            <span class="keywordtype">float</span> ms = 0.0f;</div>
-<div class="line"><span class="lineno">  330</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>; col &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++col) {</div>
-<div class="line"><span class="lineno">  331</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> gated = x_row[col] * <a class="code hl_function" href="mamba2__kernels_8c.html#a409d8439580bb10c1fc2fae0cf8d6610">mamba2_silu_f32</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  332</span>                ms += gated * gated;</div>
-<div class="line"><span class="lineno">  333</span>            }</div>
-<div class="line"><span class="lineno">  334</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf(ms / (<span class="keywordtype">float</span>)count + eps);</div>
-<div class="line"><span class="lineno">  335</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>; col &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++col) {</div>
-<div class="line"><span class="lineno">  336</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> gated = x_row[col] * <a class="code hl_function" href="mamba2__kernels_8c.html#a409d8439580bb10c1fc2fae0cf8d6610">mamba2_silu_f32</a>(gate_row[col]);</div>
-<div class="line"><span class="lineno">  337</span>                out_row[col] = gated * inv_rms * weight[col];</div>
-<div class="line"><span class="lineno">  338</span>            }</div>
-<div class="line"><span class="lineno">  339</span>        }</div>
-<div class="line"><span class="lineno">  340</span>    }</div>
-<div class="line"><span class="lineno">  341</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.out[0]&quot;</span>, out, (<span class="keywordtype">size_t</span>)inner_dim);</div>
-<div class="line"><span class="lineno">  342</span>}</div>
+<p class="definition">Definition at line <a class="el" href="mamba2__kernels_8c_source.html#l00317">317</a> of file <a class="el" href="mamba2__kernels_8c_source.html">mamba2_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  324</span>                                        {</div>
+<div class="line"><span class="lineno">  325</span>    <span class="keywordflow">if</span> (!x || !gate || !weight || !out || rows &lt;= 0 || inner_dim &lt;= 0 || group_size &lt;= 0) {</div>
+<div class="line"><span class="lineno">  326</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  327</span>    }</div>
+<div class="line"><span class="lineno">  328</span> </div>
+<div class="line"><span class="lineno">  329</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.x[0]&quot;</span>, x, (<span class="keywordtype">size_t</span>)inner_dim);</div>
+<div class="line"><span class="lineno">  330</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.gate[0]&quot;</span>, gate, (<span class="keywordtype">size_t</span>)inner_dim);</div>
+<div class="line"><span class="lineno">  331</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.weight&quot;</span>, weight, (<span class="keywordtype">size_t</span>)inner_dim);</div>
+<div class="line"><span class="lineno">  332</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  333</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *x_row = x + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">  334</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *gate_row = gate + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">  335</span>        <span class="keywordtype">float</span> *out_row = out + (size_t)row * (<span class="keywordtype">size_t</span>)inner_dim;</div>
+<div class="line"><span class="lineno">  336</span> </div>
+<div class="line"><span class="lineno">  337</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> = 0; <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> &lt; inner_dim; <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> += group_size) {</div>
+<div class="line"><span class="lineno">  338</span>            <span class="keywordtype">int</span> <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a> + group_size;</div>
+<div class="line"><span class="lineno">  339</span>            <span class="keywordflow">if</span> (<a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> &gt; inner_dim) {</div>
+<div class="line"><span class="lineno">  340</span>                <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> = inner_dim;</div>
+<div class="line"><span class="lineno">  341</span>            }</div>
+<div class="line"><span class="lineno">  342</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> count = <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a> - <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>;</div>
+<div class="line"><span class="lineno">  343</span>            <span class="keywordtype">float</span> ms = 0.0f;</div>
+<div class="line"><span class="lineno">  344</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>; col &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++col) {</div>
+<div class="line"><span class="lineno">  345</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> gated = x_row[col] * <a class="code hl_function" href="mamba2__kernels_8c.html#a409d8439580bb10c1fc2fae0cf8d6610">mamba2_silu_f32</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  346</span>                ms += gated * gated;</div>
+<div class="line"><span class="lineno">  347</span>            }</div>
+<div class="line"><span class="lineno">  348</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> inv_rms = 1.0f / sqrtf(ms / (<span class="keywordtype">float</span>)count + eps);</div>
+<div class="line"><span class="lineno">  349</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> col = <a class="code hl_variable" href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a>; col &lt; <a class="code hl_variable" href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a>; ++col) {</div>
+<div class="line"><span class="lineno">  350</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> gated = x_row[col] * <a class="code hl_function" href="mamba2__kernels_8c.html#a409d8439580bb10c1fc2fae0cf8d6610">mamba2_silu_f32</a>(gate_row[col]);</div>
+<div class="line"><span class="lineno">  351</span>                out_row[col] = gated * inv_rms * weight[col];</div>
+<div class="line"><span class="lineno">  352</span>            }</div>
+<div class="line"><span class="lineno">  353</span>        }</div>
+<div class="line"><span class="lineno">  354</span>    }</div>
+<div class="line"><span class="lineno">  355</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;rmsgate.out[0]&quot;</span>, out, (<span class="keywordtype">size_t</span>)inner_dim);</div>
+<div class="line"><span class="lineno">  356</span>}</div>
 <div class="ttc" id="autf8_8c_html_a204a3f4fa39b9c007f9784d3e4af4667"><div class="ttname"><a href="utf8_8c.html#a204a3f4fa39b9c007f9784d3e4af4667">end</a></div><div class="ttdeci">uint32_t end</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00215">utf8.c:215</a></div></div>
 <div class="ttc" id="autf8_8c_html_a61eb63d26b2fa6c2971603ceccffb14b"><div class="ttname"><a href="utf8_8c.html#a61eb63d26b2fa6c2971603ceccffb14b">start</a></div><div class="ttdeci">uint32_t start</div><div class="ttdef"><b>Definition</b> <a href="utf8_8c_source.html#l00214">utf8.c:214</a></div></div>
 </div><!-- fragment -->
@@ -784,65 +784,67 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="mamba2__kernels_8c_source.html#l00230">230</a> of file <a class="el" href="mamba2__kernels_8c_source.html">mamba2_kernels.c</a>.</p>
-<div class="fragment"><div class="line"><span class="lineno">  244</span>                                               {</div>
-<div class="line"><span class="lineno">  245</span>    <span class="keywordflow">if</span> (!state_init || !x || !dt || !a || !b || !c || !d || !state_out || !y ||</div>
-<div class="line"><span class="lineno">  246</span>        batch &lt;= 0 || seq_len &lt;= 0 || num_heads &lt;= 0 || head_dim &lt;= 0 || state_dim &lt;= 0 || num_groups &lt;= 0) {</div>
-<div class="line"><span class="lineno">  247</span>        <span class="keywordflow">return</span>;</div>
-<div class="line"><span class="lineno">  248</span>    }</div>
-<div class="line"><span class="lineno">  249</span> </div>
-<div class="line"><span class="lineno">  250</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_per_batch = (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim * (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  251</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.state_init&quot;</span>, state_init, state_per_batch);</div>
-<div class="line"><span class="lineno">  252</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.x[0]&quot;</span>, x, (<span class="keywordtype">size_t</span>)num_heads * (<span class="keywordtype">size_t</span>)head_dim + 2u * (<span class="keywordtype">size_t</span>)num_groups * (<span class="keywordtype">size_t</span>)state_dim);</div>
-<div class="line"><span class="lineno">  253</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.dt[0]&quot;</span>, dt, (<span class="keywordtype">size_t</span>)num_heads);</div>
-<div class="line"><span class="lineno">  254</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.a&quot;</span>, a, (<span class="keywordtype">size_t</span>)num_heads);</div>
-<div class="line"><span class="lineno">  255</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.d&quot;</span>, d, (<span class="keywordtype">size_t</span>)num_heads);</div>
-<div class="line"><span class="lineno">  256</span>    memcpy(state_out, state_init, (<span class="keywordtype">size_t</span>)batch * state_per_batch * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
-<div class="line"><span class="lineno">  257</span> </div>
-<div class="line"><span class="lineno">  258</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bs = 0; bs &lt; batch; ++bs) {</div>
-<div class="line"><span class="lineno">  259</span>        <span class="keywordtype">float</span> *state_batch = state_out + (size_t)bs * state_per_batch;</div>
-<div class="line"><span class="lineno">  260</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; seq_len; ++t) {</div>
-<div class="line"><span class="lineno">  261</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  262</span>                <span class="comment">/* Nemotron-H no-cache/chunked prefill expands B/C with</span></div>
-<div class="line"><span class="lineno">  263</span><span class="comment">                 * repeat(..., num_heads / num_groups, ...), yielding a</span></div>
-<div class="line"><span class="lineno">  264</span><span class="comment">                 * repeating head-&gt;group mapping.  The separate decode state</span></div>
-<div class="line"><span class="lineno">  265</span><span class="comment">                 * update kernel keeps the cache-path contiguous mapping.</span></div>
-<div class="line"><span class="lineno">  266</span><span class="comment">                 */</span></div>
-<div class="line"><span class="lineno">  267</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> group = h % num_groups;</div>
-<div class="line"><span class="lineno">  268</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dt_h = dt[((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * (size_t)num_heads + (<span class="keywordtype">size_t</span>)h];</div>
-<div class="line"><span class="lineno">  269</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_a = expf(dt_h * a[h]);</div>
-<div class="line"><span class="lineno">  270</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_h = d[h];</div>
-<div class="line"><span class="lineno">  271</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> packed_xbc = (x == b &amp;&amp; b == c);</div>
-<div class="line"><span class="lineno">  272</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> inner_dim = (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim;</div>
-<div class="line"><span class="lineno">  273</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> bc_dim = (size_t)num_groups * (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  274</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> packed_stride = inner_dim + 2u * bc_dim;</div>
-<div class="line"><span class="lineno">  275</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *packed_row = x + ((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * packed_stride;</div>
-<div class="line"><span class="lineno">  276</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *b_row = packed_xbc</div>
-<div class="line"><span class="lineno">  277</span>                    ? (packed_row + inner_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
-<div class="line"><span class="lineno">  278</span>                    : (b + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
-<div class="line"><span class="lineno">  279</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *c_row = packed_xbc</div>
-<div class="line"><span class="lineno">  280</span>                    ? (packed_row + inner_dim + bc_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
-<div class="line"><span class="lineno">  281</span>                    : (c + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
-<div class="line"><span class="lineno">  282</span> </div>
-<div class="line"><span class="lineno">  283</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> hd = 0; hd &lt; head_dim; ++hd) {</div>
-<div class="line"><span class="lineno">  284</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> x_idx = (((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * (size_t)num_heads + (<span class="keywordtype">size_t</span>)h) * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd;</div>
-<div class="line"><span class="lineno">  285</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> x_val = packed_xbc ? packed_row[(size_t)h * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd] : x[x_idx];</div>
-<div class="line"><span class="lineno">  286</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_base = ((size_t)h * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd) * (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  287</span>                    <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  288</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> st = 0; st &lt; state_dim; ++st) {</div>
-<div class="line"><span class="lineno">  289</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> si = state_base + (size_t)st;</div>
-<div class="line"><span class="lineno">  290</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> new_state = state_batch[si] * d_a + dt_h * b_row[st] * x_val;</div>
-<div class="line"><span class="lineno">  291</span>                        state_batch[si] = new_state;</div>
-<div class="line"><span class="lineno">  292</span>                        acc += new_state * c_row[st];</div>
-<div class="line"><span class="lineno">  293</span>                    }</div>
-<div class="line"><span class="lineno">  294</span>                    y[x_idx] = acc + d_h * x_val;</div>
-<div class="line"><span class="lineno">  295</span>                }</div>
-<div class="line"><span class="lineno">  296</span>            }</div>
-<div class="line"><span class="lineno">  297</span>        }</div>
-<div class="line"><span class="lineno">  298</span>    }</div>
-<div class="line"><span class="lineno">  299</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.state_out&quot;</span>, state_out, (<span class="keywordtype">size_t</span>)batch * state_per_batch);</div>
-<div class="line"><span class="lineno">  300</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.y[0]&quot;</span>, y, (<span class="keywordtype">size_t</span>)num_heads * (<span class="keywordtype">size_t</span>)head_dim);</div>
-<div class="line"><span class="lineno">  301</span>}</div>
+<p class="definition">Definition at line <a class="el" href="mamba2__kernels_8c_source.html#l00242">242</a> of file <a class="el" href="mamba2__kernels_8c_source.html">mamba2_kernels.c</a>.</p>
+<div class="fragment"><div class="line"><span class="lineno">  256</span>                                               {</div>
+<div class="line"><span class="lineno">  257</span>    <span class="keywordflow">if</span> (!state_init || !x || !dt || !a || !b || !c || !d || !state_out || !y ||</div>
+<div class="line"><span class="lineno">  258</span>        batch &lt;= 0 || seq_len &lt;= 0 || num_heads &lt;= 0 || head_dim &lt;= 0 || state_dim &lt;= 0 || num_groups &lt;= 0) {</div>
+<div class="line"><span class="lineno">  259</span>        <span class="keywordflow">return</span>;</div>
+<div class="line"><span class="lineno">  260</span>    }</div>
+<div class="line"><span class="lineno">  261</span> </div>
+<div class="line"><span class="lineno">  262</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_per_batch = (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim * (size_t)state_dim;</div>
+<div class="line"><span class="lineno">  263</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.state_init&quot;</span>, state_init, state_per_batch);</div>
+<div class="line"><span class="lineno">  264</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.x[0]&quot;</span>, x, (<span class="keywordtype">size_t</span>)num_heads * (<span class="keywordtype">size_t</span>)head_dim + 2u * (<span class="keywordtype">size_t</span>)num_groups * (<span class="keywordtype">size_t</span>)state_dim);</div>
+<div class="line"><span class="lineno">  265</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.dt[0]&quot;</span>, dt, (<span class="keywordtype">size_t</span>)num_heads);</div>
+<div class="line"><span class="lineno">  266</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.a&quot;</span>, a, (<span class="keywordtype">size_t</span>)num_heads);</div>
+<div class="line"><span class="lineno">  267</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.d&quot;</span>, d, (<span class="keywordtype">size_t</span>)num_heads);</div>
+<div class="line"><span class="lineno">  268</span>    memcpy(state_out, state_init, (<span class="keywordtype">size_t</span>)batch * state_per_batch * <span class="keyword">sizeof</span>(<span class="keywordtype">float</span>));</div>
+<div class="line"><span class="lineno">  269</span> </div>
+<div class="line"><span class="lineno">  270</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> bs = 0; bs &lt; batch; ++bs) {</div>
+<div class="line"><span class="lineno">  271</span>        <span class="keywordtype">float</span> *state_batch = state_out + (size_t)bs * state_per_batch;</div>
+<div class="line"><span class="lineno">  272</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> t = 0; t &lt; seq_len; ++t) {</div>
+<div class="line"><span class="lineno">  273</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  274</span>                <span class="comment">/* Nemotron-H prefill and decode both use the repeating</span></div>
+<div class="line"><span class="lineno">  275</span><span class="comment">                 * B/C group map from repeat_interleave semantics.  Keeping</span></div>
+<div class="line"><span class="lineno">  276</span><span class="comment">                 * this in sync is required for full-prefix and incremental</span></div>
+<div class="line"><span class="lineno">  277</span><span class="comment">                 * decode equivalence.</span></div>
+<div class="line"><span class="lineno">  278</span><span class="comment">                 */</span></div>
+<div class="line"><span class="lineno">  279</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> heads_per_group = (num_heads + num_groups - 1) / num_groups;</div>
+<div class="line"><span class="lineno">  280</span>                <span class="keywordtype">int</span> group = h / heads_per_group;</div>
+<div class="line"><span class="lineno">  281</span>                <span class="keywordflow">if</span> (group &gt;= num_groups) group = num_groups - 1;</div>
+<div class="line"><span class="lineno">  282</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> dt_h = dt[((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * (size_t)num_heads + (<span class="keywordtype">size_t</span>)h];</div>
+<div class="line"><span class="lineno">  283</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_a = expf(dt_h * a[h]);</div>
+<div class="line"><span class="lineno">  284</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> d_h = d[h];</div>
+<div class="line"><span class="lineno">  285</span>                <span class="keyword">const</span> <span class="keywordtype">int</span> packed_xbc = (x == b &amp;&amp; b == c);</div>
+<div class="line"><span class="lineno">  286</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> inner_dim = (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  287</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> bc_dim = (size_t)num_groups * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  288</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> packed_stride = inner_dim + 2u * bc_dim;</div>
+<div class="line"><span class="lineno">  289</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *packed_row = x + ((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * packed_stride;</div>
+<div class="line"><span class="lineno">  290</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *b_row = packed_xbc</div>
+<div class="line"><span class="lineno">  291</span>                    ? (packed_row + inner_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
+<div class="line"><span class="lineno">  292</span>                    : (b + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
+<div class="line"><span class="lineno">  293</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> *c_row = packed_xbc</div>
+<div class="line"><span class="lineno">  294</span>                    ? (packed_row + inner_dim + bc_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
+<div class="line"><span class="lineno">  295</span>                    : (c + (((size_t)bs * (size_t)seq_len + (size_t)t) * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
+<div class="line"><span class="lineno">  296</span> </div>
+<div class="line"><span class="lineno">  297</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> hd = 0; hd &lt; head_dim; ++hd) {</div>
+<div class="line"><span class="lineno">  298</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> x_idx = (((size_t)bs * (<span class="keywordtype">size_t</span>)seq_len + (size_t)t) * (size_t)num_heads + (<span class="keywordtype">size_t</span>)h) * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd;</div>
+<div class="line"><span class="lineno">  299</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> x_val = packed_xbc ? packed_row[(size_t)h * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd] : x[x_idx];</div>
+<div class="line"><span class="lineno">  300</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_base = ((size_t)h * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd) * (size_t)state_dim;</div>
+<div class="line"><span class="lineno">  301</span>                    <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  302</span>                    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> st = 0; st &lt; state_dim; ++st) {</div>
+<div class="line"><span class="lineno">  303</span>                        <span class="keyword">const</span> <span class="keywordtype">size_t</span> si = state_base + (size_t)st;</div>
+<div class="line"><span class="lineno">  304</span>                        <span class="keyword">const</span> <span class="keywordtype">float</span> new_state = state_batch[si] * d_a + dt_h * b_row[st] * x_val;</div>
+<div class="line"><span class="lineno">  305</span>                        state_batch[si] = new_state;</div>
+<div class="line"><span class="lineno">  306</span>                        acc += new_state * c_row[st];</div>
+<div class="line"><span class="lineno">  307</span>                    }</div>
+<div class="line"><span class="lineno">  308</span>                    y[x_idx] = acc + d_h * x_val;</div>
+<div class="line"><span class="lineno">  309</span>                }</div>
+<div class="line"><span class="lineno">  310</span>            }</div>
+<div class="line"><span class="lineno">  311</span>        }</div>
+<div class="line"><span class="lineno">  312</span>    }</div>
+<div class="line"><span class="lineno">  313</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.state_out&quot;</span>, state_out, (<span class="keywordtype">size_t</span>)batch * state_per_batch);</div>
+<div class="line"><span class="lineno">  314</span>    <a class="code hl_function" href="mamba2__kernels_8c.html#a9526ae3518c04ebb33cea92cd1ca902d">ck_mamba_debug_finite</a>(<span class="stringliteral">&quot;scan.y[0]&quot;</span>, y, (<span class="keywordtype">size_t</span>)num_heads * (<span class="keywordtype">size_t</span>)head_dim);</div>
+<div class="line"><span class="lineno">  315</span>}</div>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mamba2__kernels_8c_source.html#l00018">ck_mamba_debug_finite()</a>.</p>
 
@@ -953,33 +955,45 @@ Functions</h2></td></tr>
 <div class="line"><span class="lineno">  198</span>        <span class="keywordflow">return</span>;</div>
 <div class="line"><span class="lineno">  199</span>    }</div>
 <div class="line"><span class="lineno">  200</span> </div>
-<div class="line"><span class="lineno">  201</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
-<div class="line"><span class="lineno">  202</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
-<div class="line"><span class="lineno">  203</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> group = (int)(((<span class="keywordtype">long</span> <span class="keywordtype">long</span>)h * (<span class="keywordtype">long</span> <span class="keywordtype">long</span>)num_groups) / (<span class="keywordtype">long</span> long)num_heads);</div>
-<div class="line"><span class="lineno">  204</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> dt_h = dt[(size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h];</div>
-<div class="line"><span class="lineno">  205</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_a = expf(dt_h * a[h]);</div>
-<div class="line"><span class="lineno">  206</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_h = d[h];</div>
-<div class="line"><span class="lineno">  207</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *b_row = b + ((size_t)row * (<span class="keywordtype">size_t</span>)num_groups + (size_t)group) * (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  208</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *c_row = c + ((size_t)row * (<span class="keywordtype">size_t</span>)num_groups + (size_t)group) * (size_t)state_dim;</div>
-<div class="line"><span class="lineno">  209</span> </div>
-<div class="line"><span class="lineno">  210</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> hd = 0; hd &lt; head_dim; ++hd) {</div>
-<div class="line"><span class="lineno">  211</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> x_idx = ((size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h) * (size_t)head_dim + (<span class="keywordtype">size_t</span>)hd;</div>
-<div class="line"><span class="lineno">  212</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x_val = x[x_idx];</div>
-<div class="line"><span class="lineno">  213</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_base =</div>
-<div class="line"><span class="lineno">  214</span>                    (((size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h) * (size_t)head_dim + (<span class="keywordtype">size_t</span>)hd) *</div>
-<div class="line"><span class="lineno">  215</span>                    (<span class="keywordtype">size_t</span>)state_dim;</div>
-<div class="line"><span class="lineno">  216</span>                <span class="keywordtype">float</span> acc = 0.0f;</div>
-<div class="line"><span class="lineno">  217</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> s = 0; s &lt; state_dim; ++s) {</div>
-<div class="line"><span class="lineno">  218</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> si = state_base + (size_t)s;</div>
-<div class="line"><span class="lineno">  219</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> new_state = state_in[si] * d_a + dt_h * b_row[s] * x_val;</div>
-<div class="line"><span class="lineno">  220</span>                    state_out[si] = new_state;</div>
-<div class="line"><span class="lineno">  221</span>                    acc += new_state * c_row[s];</div>
-<div class="line"><span class="lineno">  222</span>                }</div>
-<div class="line"><span class="lineno">  223</span>                y[x_idx] = acc + d_h * x_val;</div>
-<div class="line"><span class="lineno">  224</span>            }</div>
-<div class="line"><span class="lineno">  225</span>        }</div>
-<div class="line"><span class="lineno">  226</span>    }</div>
-<div class="line"><span class="lineno">  227</span>}</div>
+<div class="line"><span class="lineno">  201</span>    <span class="keyword">const</span> <span class="keywordtype">int</span> packed_xbc = (x == b &amp;&amp; b == c);</div>
+<div class="line"><span class="lineno">  202</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> inner_dim = (size_t)num_heads * (<span class="keywordtype">size_t</span>)head_dim;</div>
+<div class="line"><span class="lineno">  203</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> bc_dim = (size_t)num_groups * (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  204</span>    <span class="keyword">const</span> <span class="keywordtype">size_t</span> packed_stride = inner_dim + 2u * bc_dim;</div>
+<div class="line"><span class="lineno">  205</span> </div>
+<div class="line"><span class="lineno">  206</span>    <span class="keywordflow">for</span> (<span class="keywordtype">int</span> row = 0; row &lt; rows; ++row) {</div>
+<div class="line"><span class="lineno">  207</span>        <span class="keyword">const</span> <span class="keywordtype">float</span> *packed_row = packed_xbc ? x + (size_t)row * packed_stride : NULL;</div>
+<div class="line"><span class="lineno">  208</span>        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> h = 0; h &lt; num_heads; ++h) {</div>
+<div class="line"><span class="lineno">  209</span>            <span class="keyword">const</span> <span class="keywordtype">int</span> heads_per_group = (num_heads + num_groups - 1) / num_groups;</div>
+<div class="line"><span class="lineno">  210</span>            <span class="keywordtype">int</span> group = h / heads_per_group;</div>
+<div class="line"><span class="lineno">  211</span>            <span class="keywordflow">if</span> (group &gt;= num_groups) group = num_groups - 1;</div>
+<div class="line"><span class="lineno">  212</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> dt_h = dt[(size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h];</div>
+<div class="line"><span class="lineno">  213</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_a = expf(dt_h * a[h]);</div>
+<div class="line"><span class="lineno">  214</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> d_h = d[h];</div>
+<div class="line"><span class="lineno">  215</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *b_row = packed_xbc</div>
+<div class="line"><span class="lineno">  216</span>                ? (packed_row + inner_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
+<div class="line"><span class="lineno">  217</span>                : (b + ((size_t)row * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
+<div class="line"><span class="lineno">  218</span>            <span class="keyword">const</span> <span class="keywordtype">float</span> *c_row = packed_xbc</div>
+<div class="line"><span class="lineno">  219</span>                ? (packed_row + inner_dim + bc_dim + (size_t)group * (<span class="keywordtype">size_t</span>)state_dim)</div>
+<div class="line"><span class="lineno">  220</span>                : (c + ((size_t)row * (size_t)num_groups + (size_t)group) * (size_t)state_dim);</div>
+<div class="line"><span class="lineno">  221</span> </div>
+<div class="line"><span class="lineno">  222</span>            <span class="keywordflow">for</span> (<span class="keywordtype">int</span> hd = 0; hd &lt; head_dim; ++hd) {</div>
+<div class="line"><span class="lineno">  223</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> x_idx = ((size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h) * (size_t)head_dim + (<span class="keywordtype">size_t</span>)hd;</div>
+<div class="line"><span class="lineno">  224</span>                <span class="keyword">const</span> <span class="keywordtype">float</span> x_val = packed_xbc ? packed_row[(size_t)h * (<span class="keywordtype">size_t</span>)head_dim + (size_t)hd] : x[x_idx];</div>
+<div class="line"><span class="lineno">  225</span>                <span class="keyword">const</span> <span class="keywordtype">size_t</span> state_base =</div>
+<div class="line"><span class="lineno">  226</span>                    (((size_t)row * (<span class="keywordtype">size_t</span>)num_heads + (size_t)h) * (size_t)head_dim + (<span class="keywordtype">size_t</span>)hd) *</div>
+<div class="line"><span class="lineno">  227</span>                    (<span class="keywordtype">size_t</span>)state_dim;</div>
+<div class="line"><span class="lineno">  228</span>                <span class="keywordtype">float</span> acc = 0.0f;</div>
+<div class="line"><span class="lineno">  229</span>                <span class="keywordflow">for</span> (<span class="keywordtype">int</span> s = 0; s &lt; state_dim; ++s) {</div>
+<div class="line"><span class="lineno">  230</span>                    <span class="keyword">const</span> <span class="keywordtype">size_t</span> si = state_base + (size_t)s;</div>
+<div class="line"><span class="lineno">  231</span>                    <span class="keyword">const</span> <span class="keywordtype">float</span> new_state = state_in[si] * d_a + dt_h * b_row[s] * x_val;</div>
+<div class="line"><span class="lineno">  232</span>                    state_out[si] = new_state;</div>
+<div class="line"><span class="lineno">  233</span>                    acc += new_state * c_row[s];</div>
+<div class="line"><span class="lineno">  234</span>                }</div>
+<div class="line"><span class="lineno">  235</span>                y[x_idx] = acc + d_h * x_val;</div>
+<div class="line"><span class="lineno">  236</span>            }</div>
+<div class="line"><span class="lineno">  237</span>        }</div>
+<div class="line"><span class="lineno">  238</span>    }</div>
+<div class="line"><span class="lineno">  239</span>}</div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1055,7 +1069,7 @@ Functions</h2></td></tr>
 </div><!-- fragment -->
 <p class="reference">References <a class="el" href="mamba2__kernels_8c_source.html#l00040">mamba2_sigmoid_f32()</a>.</p>
 
-<p class="reference">Referenced by <a class="el" href="mamba2__kernels_8c_source.html#l00102">mamba2_conv1d_decode_f32()</a>, and <a class="el" href="mamba2__kernels_8c_source.html#l00303">mamba2_rmsnorm_gate_f32()</a>.</p>
+<p class="reference">Referenced by <a class="el" href="mamba2__kernels_8c_source.html#l00102">mamba2_conv1d_decode_f32()</a>, and <a class="el" href="mamba2__kernels_8c_source.html#l00317">mamba2_rmsnorm_gate_f32()</a>.</p>
 
 </div>
 </div>
