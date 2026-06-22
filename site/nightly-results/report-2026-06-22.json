@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-06-22T14:20:23.740280",
-  "duration_sec": 1475.2575874328613,
+  "timestamp": "2026-06-22T17:10:14.562733",
+  "duration_sec": 1505.6618916988373,
   "summary": {
     "total": 68,
     "passed": 67,
@@ -16,7 +16,7 @@
       "name": "GEMM",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 34.818557262420654,
+      "duration_sec": 35.07540225982666,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -26,21 +26,12 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Blocked (serial)",
-          "status": "pass",
-          "max_diff": 4.2e-05,
-          "tolerance": 0.0001,
-          "c_time_us": 25139.7,
-          "pytorch_time_us": 467.1,
-          "speedup": 0.02
-        },
-        {
           "name": "Naive (parallel)",
           "status": "pass",
           "max_diff": 4.2e-05,
           "tolerance": 0.0001,
-          "c_time_us": 25078.8,
-          "pytorch_time_us": 467.1,
+          "c_time_us": 25120.8,
+          "pytorch_time_us": 541.8,
           "speedup": 0.02
         },
         {
@@ -48,18 +39,27 @@
           "status": "pass",
           "max_diff": 3.43e-05,
           "tolerance": 0.0001,
-          "c_time_us": 2886.4,
-          "pytorch_time_us": 467.1,
-          "speedup": 0.16
+          "c_time_us": 2777.4,
+          "pytorch_time_us": 541.8,
+          "speedup": 0.2
+        },
+        {
+          "name": "Blocked (serial)",
+          "status": "pass",
+          "max_diff": 4.2e-05,
+          "tolerance": 0.0001,
+          "c_time_us": 25148.0,
+          "pytorch_time_us": 541.8,
+          "speedup": 0.02
         },
         {
           "name": "Fine-grained",
           "status": "pass",
           "max_diff": 3.43e-05,
           "tolerance": 0.0001,
-          "c_time_us": 4135.6,
-          "pytorch_time_us": 467.1,
-          "speedup": 0.11
+          "c_time_us": 4127.0,
+          "pytorch_time_us": 541.8,
+          "speedup": 0.13
         }
       ]
     },
@@ -67,7 +67,7 @@
       "name": "GEMM Variants",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.5302448272705078,
+      "duration_sec": 1.5176410675048828,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -81,7 +81,7 @@
       "name": "GEMM Microkernel",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 17.7100727558136,
+      "duration_sec": 17.974281549453735,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -95,7 +95,7 @@
       "name": "GEMM Fused",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.1088151931762695,
+      "duration_sec": 2.1702678203582764,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -105,49 +105,22 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Medium (M=64,N=128,K=256)",
+          "name": "GEMM+SwiGLU",
           "status": "pass",
-          "max_diff": 1.91e-05,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "max_diff": 0.000732,
+          "tolerance": 0.002,
+          "c_time_us": 340.0,
+          "pytorch_time_us": 92.5,
+          "speedup": 0.27
         },
         {
           "name": "GEMM+Bias+SiLU",
           "status": "pass",
           "max_diff": 1.91e-05,
           "tolerance": 0.001,
-          "c_time_us": 248.0,
-          "pytorch_time_us": 52.0,
-          "speedup": 0.21
-        },
-        {
-          "name": "Large (M=128,N=256,K=512)",
-          "status": "pass",
-          "max_diff": 3.81e-05,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "GEMM+Bias+GELU",
-          "status": "pass",
-          "max_diff": 0.0207,
-          "tolerance": 0.05,
-          "c_time_us": 257.7,
-          "pytorch_time_us": 88.0,
-          "speedup": 0.34
-        },
-        {
-          "name": "GEMM+SwiGLU",
-          "status": "pass",
-          "max_diff": 0.000732,
-          "tolerance": 0.002,
-          "c_time_us": 339.0,
-          "pytorch_time_us": 92.6,
-          "speedup": 0.27
+          "c_time_us": 253.2,
+          "pytorch_time_us": 50.4,
+          "speedup": 0.2
         },
         {
           "name": "Tiny (M=8,N=16,K=32)",
@@ -159,18 +132,45 @@
           "speedup": null
         },
         {
+          "name": "Small (M=32,N=64,K=128)",
+          "status": "pass",
+          "max_diff": 1.14e-05,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Medium (M=64,N=128,K=256)",
+          "status": "pass",
+          "max_diff": 1.91e-05,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "GEMM+Bias+ReLU",
           "status": "pass",
           "max_diff": 2.29e-05,
           "tolerance": 0.0001,
-          "c_time_us": 164.6,
-          "pytorch_time_us": 43.9,
+          "c_time_us": 164.5,
+          "pytorch_time_us": 43.6,
           "speedup": 0.27
         },
         {
-          "name": "Small (M=32,N=64,K=128)",
+          "name": "GEMM+Bias+GELU",
           "status": "pass",
-          "max_diff": 1.14e-05,
+          "max_diff": 0.0207,
+          "tolerance": 0.05,
+          "c_time_us": 254.7,
+          "pytorch_time_us": 86.7,
+          "speedup": 0.34
+        },
+        {
+          "name": "Large (M=128,N=256,K=512)",
+          "status": "pass",
+          "max_diff": 3.81e-05,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -182,7 +182,7 @@
       "name": "ReLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.824439287185669,
+      "duration_sec": 1.9334702491760254,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -192,13 +192,13 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Backward",
+          "name": "ReLU (out-of-place)",
           "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 2.7,
-          "pytorch_time_us": 49.8,
-          "speedup": 18.4
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 2.4,
+          "pytorch_time_us": 2.9,
+          "speedup": 1.21
         },
         {
           "name": "d_input",
@@ -206,26 +206,26 @@
           "max_diff": 0.0,
           "tolerance": 1e-07,
           "c_time_us": 2.7,
-          "pytorch_time_us": 52.7,
-          "speedup": 19.48
+          "pytorch_time_us": 53.7,
+          "speedup": 20.23
         },
         {
-          "name": "ReLU (out-of-place)",
+          "name": "Backward",
           "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 2.3,
-          "pytorch_time_us": 3.0,
-          "speedup": 1.28
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 2.7,
+          "pytorch_time_us": 50.9,
+          "speedup": 19.15
         },
         {
           "name": "ReLU (inplace)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-07,
-          "c_time_us": 9.0,
-          "pytorch_time_us": 3.0,
-          "speedup": 0.33
+          "c_time_us": 8.1,
+          "pytorch_time_us": 2.9,
+          "speedup": 0.36
         }
       ]
     },
@@ -233,7 +233,7 @@
       "name": "GELU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9754655361175537,
+      "duration_sec": 1.973825216293335,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -243,31 +243,13 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Exact (scalar)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "SIMD (tanh approx)",
           "status": "pass",
           "max_diff": 0.0586,
           "tolerance": 0.1,
           "c_time_us": 5.7,
-          "pytorch_time_us": 80.1,
-          "speedup": 14.1
-        },
-        {
-          "name": "GGML (fp16 table)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "pytorch_time_us": 80.4,
+          "speedup": 14.04
         },
         {
           "name": "Fast (sigmoid)",
@@ -284,8 +266,26 @@
           "max_diff": 0.0146,
           "tolerance": 0.02,
           "c_time_us": 5.2,
-          "pytorch_time_us": 16.5,
+          "pytorch_time_us": 16.4,
           "speedup": 3.18
+        },
+        {
+          "name": "GGML (fp16 table)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Exact (scalar)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 1e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -293,7 +293,7 @@
       "name": "Sigmoid",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.7947041988372803,
+      "duration_sec": 1.7816946506500244,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -303,31 +303,31 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Backward",
-          "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 21.3,
-          "pytorch_time_us": 50.2,
-          "speedup": 2.36
-        },
-        {
           "name": "d_input",
           "status": "pass",
           "max_diff": 5.96e-08,
           "tolerance": 2e-05,
-          "c_time_us": 21.3,
-          "pytorch_time_us": 56.0,
-          "speedup": 2.64
+          "c_time_us": 21.0,
+          "pytorch_time_us": 54.6,
+          "speedup": 2.6
         },
         {
           "name": "Sigmoid",
           "status": "pass",
           "max_diff": 1.19e-07,
           "tolerance": 2e-05,
-          "c_time_us": 18.9,
-          "pytorch_time_us": 5.9,
-          "speedup": 0.32
+          "c_time_us": 18.6,
+          "pytorch_time_us": 6.1,
+          "speedup": 0.33
+        },
+        {
+          "name": "Backward",
+          "status": "pass",
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 21.0,
+          "pytorch_time_us": 48.9,
+          "speedup": 2.33
         }
       ]
     },
@@ -335,7 +335,7 @@
       "name": "Softmax",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.4070820808410645,
+      "duration_sec": 2.436688184738159,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -345,36 +345,36 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "Fast (SIMD approx)",
+          "status": "pass",
+          "max_diff": 0.025,
+          "tolerance": 0.03,
+          "c_time_us": 28.3,
+          "pytorch_time_us": 84.0,
+          "speedup": 2.97
+        },
+        {
           "name": "Fast (SIMD fwd+bwd)",
           "status": "pass",
           "max_diff": 0.0348,
           "tolerance": 0.05,
-          "c_time_us": 44.9,
-          "pytorch_time_us": 220.3,
-          "speedup": 4.91
+          "c_time_us": 44.7,
+          "pytorch_time_us": 221.0,
+          "speedup": 4.94
         },
         {
-          "name": "Exact (scalar)",
+          "name": "Exact (scalar fwd+bwd)",
           "status": "pass",
-          "max_diff": 5.96e-08,
+          "max_diff": 7.45e-08,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Fast (SIMD approx)",
+          "name": "Exact (scalar)",
           "status": "pass",
-          "max_diff": 0.025,
-          "tolerance": 0.03,
-          "c_time_us": 30.7,
-          "pytorch_time_us": 83.6,
-          "speedup": 2.72
-        },
-        {
-          "name": "Exact (scalar fwd+bwd)",
-          "status": "pass",
-          "max_diff": 7.45e-08,
+          "max_diff": 5.96e-08,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -386,7 +386,7 @@
       "name": "SwiGLU",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9669442176818848,
+      "duration_sec": 1.9534640312194824,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -396,6 +396,15 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "Fast (SIMD approx)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 5e-05,
+          "c_time_us": 33.6,
+          "pytorch_time_us": 20.6,
+          "speedup": 0.61
+        },
+        {
           "name": "Exact (scalar)",
           "status": "pass",
           "max_diff": 4.77e-07,
@@ -403,15 +412,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Fast (SIMD approx)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 5e-05,
-          "c_time_us": 34.7,
-          "pytorch_time_us": 19.9,
-          "speedup": 0.57
         }
       ]
     },
@@ -419,7 +419,7 @@
       "name": "LayerNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8049347400665283,
+      "duration_sec": 1.8208281993865967,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -438,22 +438,22 @@
           "speedup": null
         },
         {
-          "name": "d_gamma",
+          "name": "Forward+Backward",
           "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "max_diff": null,
+          "tolerance": null,
+          "c_time_us": 21.0,
+          "pytorch_time_us": 84.7,
+          "speedup": 4.04
         },
         {
-          "name": "d_beta",
+          "name": "Unrolled (SIMD)",
           "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
+          "max_diff": 9.54e-07,
+          "tolerance": 1e-05,
+          "c_time_us": 4.3,
+          "pytorch_time_us": 6.3,
+          "speedup": 1.49
         },
         {
           "name": "Forward",
@@ -465,13 +465,31 @@
           "speedup": 0.58
         },
         {
-          "name": "Forward+Backward",
+          "name": "Rolled (SIMD)",
           "status": "pass",
-          "max_diff": null,
-          "tolerance": null,
-          "c_time_us": 21.0,
-          "pytorch_time_us": 85.5,
-          "speedup": 4.07
+          "max_diff": 9.54e-07,
+          "tolerance": 1e-05,
+          "c_time_us": 5.2,
+          "pytorch_time_us": 6.3,
+          "speedup": 1.23
+        },
+        {
+          "name": "d_beta",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Naive (scalar)",
+          "status": "pass",
+          "max_diff": 1.43e-06,
+          "tolerance": 1e-05,
+          "c_time_us": 10.9,
+          "pytorch_time_us": 6.3,
+          "speedup": 0.58
         },
         {
           "name": "Backward (est)",
@@ -479,35 +497,17 @@
           "max_diff": null,
           "tolerance": null,
           "c_time_us": 11.0,
-          "pytorch_time_us": 79.1,
-          "speedup": 7.22
+          "pytorch_time_us": 78.3,
+          "speedup": 7.11
         },
         {
-          "name": "Unrolled (SIMD)",
+          "name": "d_gamma",
           "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 4.3,
-          "pytorch_time_us": 6.3,
-          "speedup": 1.47
-        },
-        {
-          "name": "Rolled (SIMD)",
-          "status": "pass",
-          "max_diff": 7.15e-07,
-          "tolerance": 1e-05,
-          "c_time_us": 5.2,
-          "pytorch_time_us": 6.3,
-          "speedup": 1.23
-        },
-        {
-          "name": "Naive (scalar)",
-          "status": "pass",
-          "max_diff": 1.43e-06,
-          "tolerance": 1e-05,
-          "c_time_us": 11.0,
-          "pytorch_time_us": 6.3,
-          "speedup": 0.58
+          "max_diff": 3.81e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -515,7 +515,7 @@
       "name": "RMSNorm",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.9969134330749512,
+      "duration_sec": 1.9612395763397217,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -529,27 +529,18 @@
           "status": "pass",
           "max_diff": 1.43e-06,
           "tolerance": 1e-05,
-          "c_time_us": 14.3,
-          "pytorch_time_us": 218.8,
-          "speedup": 15.35
+          "c_time_us": 14.2,
+          "pytorch_time_us": 221.4,
+          "speedup": 15.6
         },
         {
-          "name": "d_gamma",
-          "status": "pass",
-          "max_diff": 5.72e-06,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Backward",
+          "name": "Forward+Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 8.1,
-          "pytorch_time_us": 189.6,
-          "speedup": 23.34
+          "c_time_us": 14.2,
+          "pytorch_time_us": 221.4,
+          "speedup": 15.6
         },
         {
           "name": "RMSNorm (no rstd cache)",
@@ -561,13 +552,22 @@
           "speedup": null
         },
         {
-          "name": "Forward+Backward",
+          "name": "Backward",
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 14.3,
-          "pytorch_time_us": 218.8,
-          "speedup": 15.35
+          "c_time_us": 8.1,
+          "pytorch_time_us": 192.1,
+          "speedup": 23.85
+        },
+        {
+          "name": "d_gamma",
+          "status": "pass",
+          "max_diff": 5.72e-06,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         },
         {
           "name": "RMSNorm",
@@ -575,8 +575,8 @@
           "max_diff": 9.54e-07,
           "tolerance": 1e-06,
           "c_time_us": 6.9,
-          "pytorch_time_us": 29.3,
-          "speedup": 4.23
+          "pytorch_time_us": 28.6,
+          "speedup": 4.13
         }
       ]
     },
@@ -584,7 +584,7 @@
       "name": "RoPE",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 3.1154348850250244,
+      "duration_sec": 2.9856104850769043,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -593,42 +593,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "Llama2 (\u03b8=10000)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Qwen2 (\u03b8=1000000, d=64)",
-          "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pairwise-pos=10",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Medium (H=8,T=32,D=64)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "pairwise-pos=1000",
           "status": "pass",
@@ -639,70 +603,7 @@
           "speedup": null
         },
         {
-          "name": "Qwen2 (\u03b8=1000000)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Llama3 (\u03b8=500000)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Llama3 (\u03b8=500000, d=64)",
-          "status": "pass",
-          "max_diff": 1.53e-05,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=2000",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pairwise-pos=100",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=10",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Tiny (H=2,T=8,D=16)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Small (H=4,T=16,D=32)",
+          "name": "pairwise-pos=1",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -720,7 +621,106 @@
           "speedup": null
         },
         {
+          "name": "d_input",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pairwise-pos=10",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Large (H=8,T=64,D=128)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Qwen2 (\u03b8=1000000)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "pos=500",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=1000",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Small (H=4,T=16,D=32)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Llama2/Mistral (\u03b8=10000, d=64)",
+          "status": "pass",
+          "max_diff": 3.81e-06,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "sin_cache",
+          "status": "pass",
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-06,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Llama3 (\u03b8=500000, d=64)",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 5e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Qwen2-1.5B (\u03b8=1000000)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=2000",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -738,16 +738,25 @@
           "speedup": null
         },
         {
-          "name": "d_input",
+          "name": "pairwise-pos=0",
           "status": "pass",
-          "max_diff": 4.77e-07,
+          "max_diff": 0.0,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "pairwise-pos=1",
+          "name": "Tiny (H=2,T=8,D=16)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "pos=10",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -756,10 +765,19 @@
           "speedup": null
         },
         {
-          "name": "sin_cache",
+          "name": "pos=1",
           "status": "pass",
-          "max_diff": 1.91e-06,
-          "tolerance": 5e-06,
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Medium (H=8,T=32,D=64)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -783,7 +801,7 @@
           "speedup": null
         },
         {
-          "name": "Qwen2-1.5B (\u03b8=1000000)",
+          "name": "pairwise-pos=100",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -792,43 +810,25 @@
           "speedup": null
         },
         {
-          "name": "pos=1000",
+          "name": "Llama3 (\u03b8=500000)",
           "status": "pass",
-          "max_diff": 2.38e-07,
+          "max_diff": 4.77e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "pairwise-pos=0",
+          "name": "Qwen2 (\u03b8=1000000, d=64)",
           "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
+          "max_diff": 1.91e-06,
+          "tolerance": 5e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Llama2/Mistral (\u03b8=10000, d=64)",
-          "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Large (H=8,T=64,D=128)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "pos=1",
+          "name": "Llama2 (\u03b8=10000)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 1e-05,
@@ -842,7 +842,7 @@
       "name": "Embedding",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.2312800884246826,
+      "duration_sec": 2.1072773933410645,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -856,18 +856,9 @@
           "status": "pass",
           "max_diff": null,
           "tolerance": null,
-          "c_time_us": 46.7,
-          "pytorch_time_us": 191.8,
-          "speedup": 4.1
-        },
-        {
-          "name": "d_token_emb",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 46.7,
-          "pytorch_time_us": 224.7,
-          "speedup": 4.81
+          "c_time_us": 46.6,
+          "pytorch_time_us": 190.6,
+          "speedup": 4.09
         },
         {
           "name": "d_pos_emb",
@@ -877,6 +868,15 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "d_token_emb",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 46.6,
+          "pytorch_time_us": 227.7,
+          "speedup": 4.89
         }
       ]
     },
@@ -884,7 +884,7 @@
       "name": "Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.5531835556030273,
+      "duration_sec": 2.4012515544891357,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -893,15 +893,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "Score-matrix (exp approx)",
-          "status": "pass",
-          "max_diff": 0.0732,
-          "tolerance": 0.1,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "Exact (scalar)",
           "status": "pass",
@@ -912,13 +903,22 @@
           "speedup": null
         },
         {
+          "name": "Score-matrix (exp approx)",
+          "status": "pass",
+          "max_diff": 0.0732,
+          "tolerance": 0.1,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "Flash (SIMD)",
           "status": "pass",
           "max_diff": 7.75e-07,
           "tolerance": 0.0001,
-          "c_time_us": 363.4,
-          "pytorch_time_us": 227.2,
-          "speedup": 0.63
+          "c_time_us": 341.5,
+          "pytorch_time_us": 163.4,
+          "speedup": 0.48
         }
       ]
     },
@@ -926,7 +926,7 @@
       "name": "Attention Sliding Window",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 0.13517022132873535,
+      "duration_sec": 0.1252448558807373,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -968,7 +968,7 @@
       "name": "KV Cache Attention",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.6420271396636963,
+      "duration_sec": 1.489825963973999,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -978,18 +978,18 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "flash_vs_ref",
+          "name": "decode_vs_full",
           "status": "pass",
-          "max_diff": 6.56e-07,
+          "max_diff": 5.96e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_vs_full",
+          "name": "flash_vs_ref",
           "status": "pass",
-          "max_diff": 5.96e-07,
+          "max_diff": 6.56e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1010,7 +1010,7 @@
       "name": "KV Cache Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.4693217277526855,
+      "duration_sec": 1.2965967655181885,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1034,7 +1034,7 @@
       "name": "Fused Attention Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.4897541999816895,
+      "duration_sec": 1.3195850849151611,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1067,7 +1067,7 @@
       "name": "Fused SwiGLU Decode",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.9504172801971436,
+      "duration_sec": 2.767167568206787,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1077,18 +1077,18 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "mlp_unfused",
+          "name": "mlp_fused_v2",
           "status": "pass",
-          "max_diff": 8.34e-07,
+          "max_diff": 3.4e-06,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "mlp_fused_v2",
+          "name": "mlp_unfused",
           "status": "pass",
-          "max_diff": 3.4e-06,
+          "max_diff": 8.34e-07,
           "tolerance": 0.005,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1100,7 +1100,7 @@
       "name": "MLP",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 26.845030546188354,
+      "duration_sec": 26.572171211242676,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1109,6 +1109,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "Fast (SIMD GELU)",
+          "status": "pass",
+          "max_diff": 0.00598,
+          "tolerance": 0.01,
+          "c_time_us": 5575.6,
+          "pytorch_time_us": 208.4,
+          "speedup": 0.04
+        },
         {
           "name": "Exact (scalar GELU)",
           "status": "pass",
@@ -1117,15 +1126,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "Fast (SIMD GELU)",
-          "status": "pass",
-          "max_diff": 0.00598,
-          "tolerance": 0.01,
-          "c_time_us": 5585.8,
-          "pytorch_time_us": 206.8,
-          "speedup": 0.04
         }
       ]
     },
@@ -1133,7 +1133,7 @@
       "name": "Cross Entropy",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 2.449537992477417,
+      "duration_sec": 2.2129223346710205,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1143,9 +1143,27 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "d_logits (all ignored => zeros)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "d_logits (ignore_index=-100)",
           "status": "pass",
           "max_diff": 9.31e-10,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_logits",
+          "status": "pass",
+          "max_diff": 5.82e-11,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1161,30 +1179,12 @@
           "speedup": null
         },
         {
-          "name": "d_logits",
-          "status": "pass",
-          "max_diff": 5.82e-11,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_logits (all ignored => zeros)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "Loss (ignore_index=-100)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-05,
-          "c_time_us": 179.6,
-          "pytorch_time_us": 33.4,
+          "c_time_us": 178.4,
+          "pytorch_time_us": 33.8,
           "speedup": 0.19
         }
       ]
@@ -1193,7 +1193,7 @@
       "name": "Optimizer (AdamW/SGD)",
       "category": "training",
       "status": "pass",
-      "duration_sec": 2.762017250061035,
+      "duration_sec": 2.5867905616760254,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1203,6 +1203,33 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
+          "name": "scale (*=)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 4.6,
+          "pytorch_time_us": 3.1,
+          "speedup": 0.67
+        },
+        {
+          "name": "accumulate (+=)",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-07,
+          "c_time_us": 8.1,
+          "pytorch_time_us": 2.7,
+          "speedup": 0.33
+        },
+        {
+          "name": "fp32 (step=1)",
+          "status": "pass",
+          "max_diff": 1.19e-07,
+          "tolerance": 1e-06,
+          "c_time_us": 16.0,
+          "pytorch_time_us": 73.9,
+          "speedup": 4.62
+        },
+        {
           "name": "fp32 (10 steps)",
           "status": "pass",
           "max_diff": 2.38e-07,
@@ -1210,33 +1237,6 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
-        },
-        {
-          "name": "fp32 (step=1)",
-          "status": "pass",
-          "max_diff": 1.19e-07,
-          "tolerance": 1e-06,
-          "c_time_us": 15.8,
-          "pytorch_time_us": 75.0,
-          "speedup": 4.76
-        },
-        {
-          "name": "accumulate (+=)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 8.4,
-          "pytorch_time_us": 2.8,
-          "speedup": 0.33
-        },
-        {
-          "name": "scale (*=)",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-07,
-          "c_time_us": 5.1,
-          "pytorch_time_us": 2.9,
-          "speedup": 0.58
         }
       ]
     },
@@ -1244,7 +1244,7 @@
       "name": "LM Head Litmus",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 20.79568338394165,
+      "duration_sec": 19.914963722229004,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1258,7 +1258,7 @@
       "name": "DeepSeek Reference Kernels",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8554315567016602,
+      "duration_sec": 1.713831901550293,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1272,7 +1272,7 @@
       "name": "ReLU2",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8181216716766357,
+      "duration_sec": 1.6967153549194336,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1286,7 +1286,7 @@
       "name": "Nemotron Group-Limited Router",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.4577522277832031,
+      "duration_sec": 1.3615493774414062,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1300,7 +1300,7 @@
       "name": "MoE ReLU2 Expert",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.8098204135894775,
+      "duration_sec": 1.6551611423492432,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1314,7 +1314,7 @@
       "name": "Mamba2 Reference Kernels",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.49169921875,
+      "duration_sec": 1.3491826057434082,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1328,7 +1328,7 @@
       "name": "Vision",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 1.5235671997070312,
+      "duration_sec": 1.352337121963501,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1342,7 +1342,7 @@
       "name": "ReLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.9955735206604004,
+      "duration_sec": 1.839435338973999,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1357,17 +1357,17 @@
           "max_diff": 0.0,
           "tolerance": 0.01,
           "c_time_us": 2.4,
-          "pytorch_time_us": 54.9,
-          "speedup": 22.53
+          "pytorch_time_us": 54.7,
+          "speedup": 22.48
         },
         {
           "name": "ReLU",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.01,
-          "c_time_us": 2.1,
+          "c_time_us": 2.2,
           "pytorch_time_us": 3.5,
-          "speedup": 1.64
+          "speedup": 1.63
         }
       ]
     },
@@ -1375,7 +1375,7 @@
       "name": "GELU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4598877429962158,
+      "duration_sec": 1.3207447528839111,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1389,7 +1389,7 @@
       "name": "Sigmoid BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4569118022918701,
+      "duration_sec": 1.3736369609832764,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1403,7 +1403,7 @@
       "name": "SwiGLU BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.463352918624878,
+      "duration_sec": 1.3760745525360107,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1417,7 +1417,7 @@
       "name": "LayerNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4485960006713867,
+      "duration_sec": 1.3587431907653809,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1431,7 +1431,7 @@
       "name": "RMSNorm BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4406452178955078,
+      "duration_sec": 1.3156399726867676,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1445,7 +1445,7 @@
       "name": "RoPE BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4388747215270996,
+      "duration_sec": 1.3170928955078125,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1459,7 +1459,7 @@
       "name": "Embedding BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.440528392791748,
+      "duration_sec": 1.365027666091919,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1473,7 +1473,7 @@
       "name": "Attention BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.469118356704712,
+      "duration_sec": 1.3363168239593506,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1487,7 +1487,7 @@
       "name": "MLP BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4575958251953125,
+      "duration_sec": 1.2944748401641846,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1501,7 +1501,7 @@
       "name": "Cross Entropy BF16",
       "category": "bf16",
       "status": "pass",
-      "duration_sec": 1.4428000450134277,
+      "duration_sec": 1.2927308082580566,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1515,7 +1515,7 @@
       "name": "Q4_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.4248952865600586,
+      "duration_sec": 1.367239236831665,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1525,18 +1525,18 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Q4_K Dequantization",
+          "name": "Q4_K GEMV",
           "status": "pass",
-          "max_diff": 0.0,
+          "max_diff": 0.00061,
           "tolerance": null,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q4_K GEMV",
+          "name": "Q4_K Dequantization",
           "status": "pass",
-          "max_diff": 0.00061,
+          "max_diff": 0.0,
           "tolerance": null,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1548,7 +1548,7 @@
       "name": "Q6_K Kernels",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.4797182083129883,
+      "duration_sec": 1.3269402980804443,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1557,15 +1557,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "gemm_nt_q6_k (M=1,N=32,K=256)",
-          "status": "pass",
-          "max_diff": 3.05e-05,
-          "tolerance": 0.0005,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "dequant_q6_k_row",
           "status": "pass",
@@ -1583,6 +1574,15 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "gemm_nt_q6_k (M=1,N=32,K=256)",
+          "status": "pass",
+          "max_diff": 3.05e-05,
+          "tolerance": 0.0005,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -1590,7 +1590,7 @@
       "name": "Q4_K x Q8_K MatVec",
       "category": "quant",
       "status": "pass",
-      "duration_sec": 1.5548675060272217,
+      "duration_sec": 1.4447762966156006,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1600,30 +1600,30 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "End-to-end (M=64,K=2048)",
+          "name": "End-to-end (M=16,K=1024)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
-          "c_time_us": 24.2,
-          "pytorch_time_us": 14.2,
-          "speedup": 0.59
+          "c_time_us": 6.5,
+          "pytorch_time_us": 4.1,
+          "speedup": 0.64
         },
         {
           "name": "End-to-end (M=16,K=512)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
-          "c_time_us": 4.9,
-          "pytorch_time_us": 3.3,
-          "speedup": 0.67
+          "c_time_us": 4.8,
+          "pytorch_time_us": 3.6,
+          "speedup": 0.75
         },
         {
-          "name": "End-to-end (M=16,K=1024)",
+          "name": "End-to-end (M=64,K=2048)",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0,
-          "c_time_us": 6.5,
-          "pytorch_time_us": 3.8,
+          "c_time_us": 24.0,
+          "pytorch_time_us": 13.8,
           "speedup": 0.58
         }
       ]
@@ -1632,7 +1632,7 @@
       "name": "Softmax Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.4707868099212646,
+      "duration_sec": 1.3502402305603027,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1651,9 +1651,9 @@
           "speedup": null
         },
         {
-          "name": "Small (H=2,T=8)",
+          "name": "Medium (H=4,T=16)",
           "status": "pass",
-          "max_diff": 2.98e-08,
+          "max_diff": 1.19e-07,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1669,9 +1669,9 @@
           "speedup": null
         },
         {
-          "name": "Medium (H=4,T=16)",
+          "name": "Small (H=2,T=8)",
           "status": "pass",
-          "max_diff": 1.19e-07,
+          "max_diff": 2.98e-08,
           "tolerance": 1e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1683,7 +1683,7 @@
       "name": "Attention Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 16.99029779434204,
+      "duration_sec": 15.700468301773071,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1692,6 +1692,15 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
+        {
+          "name": "Tiny (H=2,T=8,D=16)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
         {
           "name": "Medium (H=8,T=32,D=64)",
           "status": "pass",
@@ -1711,27 +1720,9 @@
           "speedup": null
         },
         {
-          "name": "d_v (GQA)",
+          "name": "Small (H=4,T=16,D=32)",
           "status": "pass",
-          "max_diff": 2.86e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_q",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0001,
-          "c_time_us": 143.4,
-          "pytorch_time_us": 23146.3,
-          "speedup": 161.37
-        },
-        {
-          "name": "d_k",
-          "status": "pass",
-          "max_diff": 5.96e-07,
+          "max_diff": 9.54e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1747,18 +1738,9 @@
           "speedup": null
         },
         {
-          "name": "Tiny (H=2,T=8,D=16)",
+          "name": "d_k",
           "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Small (H=4,T=16,D=32)",
-          "status": "pass",
-          "max_diff": 9.54e-07,
+          "max_diff": 5.96e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -1769,9 +1751,27 @@
           "status": "pass",
           "max_diff": 7.15e-07,
           "tolerance": 0.0001,
-          "c_time_us": 242.2,
-          "pytorch_time_us": 47828.4,
-          "speedup": 197.48
+          "c_time_us": 240.1,
+          "pytorch_time_us": 43949.5,
+          "speedup": 183.07
+        },
+        {
+          "name": "d_q",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0001,
+          "c_time_us": 144.3,
+          "pytorch_time_us": 21489.5,
+          "speedup": 148.92
+        },
+        {
+          "name": "d_v (GQA)",
+          "status": "pass",
+          "max_diff": 2.86e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -1779,7 +1779,7 @@
       "name": "DeltaNet Backward",
       "category": "training",
       "status": "pass",
-      "duration_sec": 1.8257067203521729,
+      "duration_sec": 1.7331016063690186,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1793,7 +1793,7 @@
       "name": "PyTorch Parity",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 1.8742871284484863,
+      "duration_sec": 1.8038771152496338,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1803,28 +1803,19 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 3.79e-05,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "Loss",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1e-05,
-          "c_time_us": 157.9,
-          "pytorch_time_us": 26.6,
+          "c_time_us": 155.9,
+          "pytorch_time_us": 27.1,
           "speedup": 0.17
         },
         {
-          "name": "d_gamma",
+          "name": "d_input",
           "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 0.0001,
+          "max_diff": 3.79e-05,
+          "tolerance": 5e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -1843,9 +1834,18 @@
           "status": "pass",
           "max_diff": 4.77e-07,
           "tolerance": 5e-05,
-          "c_time_us": 40.0,
-          "pytorch_time_us": 25.2,
+          "c_time_us": 39.8,
+          "pytorch_time_us": 24.9,
           "speedup": 0.63
+        },
+        {
+          "name": "d_gamma",
+          "status": "pass",
+          "max_diff": 3.81e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -1853,7 +1853,7 @@
       "name": "RoPE Pairwise Layout (Llama)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.17279911041259766,
+      "duration_sec": 0.17343783378601074,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1867,7 +1867,7 @@
       "name": "Litmus Test",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 20.600590229034424,
+      "duration_sec": 20.30368661880493,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1881,7 +1881,7 @@
       "name": "llama.cpp Parity (Nightly)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 110.36664628982544,
+      "duration_sec": 110.89019417762756,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -1891,325 +1891,10 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "d_gamma",
-          "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_Q8_0_tiny",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_sliding",
-          "status": "pass",
-          "max_diff": 2.98e-08,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_qwen",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_qwen_mlp_up",
-          "status": "pass",
-          "max_diff": 6.1e-05,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_qwen_mlp",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.03,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
           "name": "Q8_0_Q8_0_medium",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_tiny",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q6_K_qwen",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q6_K_medium",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_tiny",
-          "status": "pass",
-          "max_diff": 5.72e-06,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_small_sq",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "prefill_sliding",
-          "status": "pass",
-          "max_diff": 2.98e-08,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_small_sq",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_qwen_qkv",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_input",
-          "status": "pass",
-          "max_diff": 3.79e-05,
-          "tolerance": 5e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "d_logits",
-          "status": "pass",
-          "max_diff": 9.31e-10,
-          "tolerance": 1e-05,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q6_K_wide",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_small",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q6_K_mlp_down",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Loss",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1e-05,
-          "c_time_us": 153.6,
-          "pytorch_time_us": 27.0,
-          "speedup": 0.18
-        },
-        {
-          "name": "Q5_0_qwen_qkv",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_medium_tall",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_medium",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q6_K_tiny",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_small",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_Q8_0_large",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_qwen_mlp_down",
-          "status": "pass",
-          "max_diff": 1.53e-05,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q8_0_small",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.2,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_qwen_qkv",
-          "status": "pass",
-          "max_diff": 3.81e-06,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_Q8_0_medium",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_medium",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.02,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Forward",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 5e-05,
-          "c_time_us": 39.8,
-          "pytorch_time_us": 25.9,
-          "speedup": 0.65
-        },
-        {
-          "name": "Q4_K_small_tall",
-          "status": "pass",
-          "max_diff": 1.53e-05,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q4_K_small_wide",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "Q5_0_tiny",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.02,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2224,16 +1909,25 @@
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_large",
+          "name": "d_input",
           "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0001,
+          "max_diff": 3.79e-05,
+          "tolerance": 5e-05,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "Q4_K_small_sq",
+          "name": "Q4_K_qwen_mlp_up",
+          "status": "pass",
+          "max_diff": 6.1e-05,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q6_K_wide",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.001,
@@ -2242,9 +1936,54 @@
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_qwen",
+          "name": "Q5_0_qwen_qkv",
           "status": "pass",
           "max_diff": 0.0,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_medium",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_tiny",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_tiny",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_tiny",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill_no_window",
+          "status": "pass",
+          "max_diff": 2.235e-08,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
@@ -2260,7 +1999,16 @@
           "speedup": null
         },
         {
-          "name": "Q8_0_tiny",
+          "name": "Q5_0_Q8_0_large",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_small_sq",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.2,
@@ -2287,10 +2035,46 @@
           "speedup": null
         },
         {
-          "name": "Q5_0_Q8_0_small",
+          "name": "Q6_K_tiny",
           "status": "pass",
           "max_diff": 0.0,
-          "tolerance": 0.0001,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q6_K_mlp_down",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_small_tall",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Forward",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 5e-05,
+          "c_time_us": 40.1,
+          "pytorch_time_us": 25.0,
+          "speedup": 0.62
+        },
+        {
+          "name": "Q4_K_small_wide",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2305,16 +2089,232 @@
           "speedup": null
         },
         {
-          "name": "prefill_no_window",
+          "name": "Q4_K_qwen_qkv",
           "status": "pass",
-          "max_diff": 2.235e-08,
+          "max_diff": 3.81e-06,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_medium",
+          "status": "pass",
+          "max_diff": 0.0,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
+          "name": "Q8_0_small",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_logits",
+          "status": "pass",
+          "max_diff": 9.31e-10,
+          "tolerance": 1e-05,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_small",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_small_sq",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_tiny",
+          "status": "pass",
+          "max_diff": 5.72e-06,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "d_gamma",
+          "status": "pass",
+          "max_diff": 3.81e-06,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q6_K_medium",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q6_K_qwen",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_small",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill_sliding",
+          "status": "pass",
+          "max_diff": 2.98e-08,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_qwen_mlp",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.03,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
           "name": "Q8_0_large",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_medium_tall",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_sliding",
+          "status": "pass",
+          "max_diff": 2.98e-08,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_tiny",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_medium",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.2,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Loss",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1e-05,
+          "c_time_us": 156.5,
+          "pytorch_time_us": 27.2,
+          "speedup": 0.17
+        },
+        {
+          "name": "Q5_0_small_sq",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.02,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q5_0_Q8_0_qwen",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_qwen_mlp_down",
+          "status": "pass",
+          "max_diff": 1.53e-05,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_large",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_Q8_0_qwen",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q4_K_small",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "Q8_0_qwen_qkv",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 0.2,
@@ -2328,7 +2328,7 @@
       "name": "Flash Attention (50K+)",
       "category": "kernels",
       "status": "pass",
-      "duration_sec": 16.148376941680908,
+      "duration_sec": 16.19754695892334,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2337,15 +2337,6 @@
       "baseline_perf": null,
       "perf_delta_pct": null,
       "sub_tests": [
-        {
-          "name": "fastexp_decode_small (Tq=1,Tk=16,H=2,D=32)",
-          "status": "pass",
-          "max_diff": 1.93e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
         {
           "name": "fastexp_prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
           "status": "pass",
@@ -2356,136 +2347,28 @@
           "speedup": null
         },
         {
-          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "name": "fast_exp_vec=avx",
           "status": "pass",
-          "max_diff": 5.9e-07,
-          "tolerance": 0.001,
-          "c_time_us": 728.3,
-          "pytorch_time_us": 2899.0,
-          "speedup": 3.98
-        },
-        {
-          "name": "decode_32h_51200 (Tq=1,Tk=51200,H=32,D=64)",
-          "status": "pass",
-          "max_diff": 6.14e-07,
-          "tolerance": 0.001,
-          "c_time_us": 20830.6,
-          "pytorch_time_us": 75389.9,
-          "speedup": 3.62
-        },
-        {
-          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
-          "status": "pass",
-          "max_diff": 2.68e-07,
-          "tolerance": 0.0002,
+          "max_diff": 0.0,
+          "tolerance": 0.0,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "decode_32h_512 (Tq=1,Tk=512,H=32,D=64)",
+          "name": "fastexp_prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
           "status": "pass",
-          "max_diff": 4.7e-06,
-          "tolerance": 0.001,
-          "c_time_us": 101.8,
-          "pytorch_time_us": 326.7,
-          "speedup": 3.21
-        },
-        {
-          "name": "fastexp_decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
-          "status": "pass",
-          "max_diff": 1.07e-05,
+          "max_diff": 1.65e-05,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fastexp_decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "name": "fastexp_decode_small (Tq=1,Tk=16,H=2,D=32)",
           "status": "pass",
-          "max_diff": 5.48e-06,
+          "max_diff": 1.93e-05,
           "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 2.68e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "llama.cpp (decode_small)",
-          "status": "pass",
-          "max_diff": 3.58e-07,
-          "tolerance": 0.001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0003,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
-          "status": "pass",
-          "max_diff": 3.28e-06,
-          "tolerance": 0.001,
-          "c_time_us": 96.3,
-          "pytorch_time_us": 286.5,
-          "speedup": 2.98
-        },
-        {
-          "name": "decode_4h_hd128 (Tq=1,Tk=256,H=4,D=128)",
-          "status": "pass",
-          "max_diff": 3.93e-06,
-          "tolerance": 0.001,
-          "c_time_us": 23.6,
-          "pytorch_time_us": 96.4,
-          "speedup": 4.08
-        },
-        {
-          "name": "decode_4h_512 (Tq=1,Tk=512,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.29e-06,
-          "tolerance": 0.001,
-          "c_time_us": 35.2,
-          "pytorch_time_us": 105.1,
-          "speedup": 2.98
-        },
-        {
-          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
-          "status": "pass",
-          "max_diff": 2.38e-07,
-          "tolerance": 0.0001,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 4.02e-07,
-          "tolerance": 0.0002,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2500,118 +2383,64 @@
           "speedup": null
         },
         {
-          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
+          "name": "fastexp_decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
           "status": "pass",
-          "max_diff": 2.98e-07,
-          "tolerance": 0.0002,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
-          "status": "pass",
-          "max_diff": 4.77e-07,
-          "tolerance": 0.0004,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 7.89e-07,
-          "tolerance": 0.001,
-          "c_time_us": 309.1,
-          "pytorch_time_us": 463.7,
-          "speedup": 1.5
-        },
-        {
-          "name": "fast_exp_vec=avx",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 0.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 3.3e-07,
-          "tolerance": 0.001,
-          "c_time_us": 2274.7,
-          "pytorch_time_us": 6087.7,
-          "speedup": 2.68
-        },
-        {
-          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
-          "status": "pass",
-          "max_diff": 3.55e-06,
-          "tolerance": 0.001,
-          "c_time_us": 95.1,
-          "pytorch_time_us": 310.0,
-          "speedup": 3.26
-        },
-        {
-          "name": "decode_4h_1k (Tq=1,Tk=1024,H=4,D=64)",
-          "status": "pass",
-          "max_diff": 2.09e-06,
-          "tolerance": 0.001,
-          "c_time_us": 46.7,
-          "pytorch_time_us": 118.4,
-          "speedup": 2.54
-        },
-        {
-          "name": "fastexp_prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
-          "status": "pass",
-          "max_diff": 1.65e-05,
+          "max_diff": 1.07e-05,
           "tolerance": 0.01,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
-          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
+          "name": "decode_32h_51200 (Tq=1,Tk=51200,H=32,D=64)",
           "status": "pass",
-          "max_diff": 1.9e-05,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "fastexp_decode_tail (Tq=1,Tk=63,H=4,D=40)",
-          "status": "pass",
-          "max_diff": 7.79e-06,
-          "tolerance": 0.01,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
-          "status": "pass",
-          "max_diff": 3.6e-06,
+          "max_diff": 6.14e-07,
           "tolerance": 0.001,
-          "c_time_us": 33.4,
-          "pytorch_time_us": 128.3,
-          "speedup": 3.85
+          "c_time_us": 20166.6,
+          "pytorch_time_us": 72760.7,
+          "speedup": 3.61
         },
         {
-          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "name": "decode_small (Tq=1,Tk=16,H=2,D=32)",
           "status": "pass",
-          "max_diff": 2.09e-07,
+          "max_diff": 2.38e-07,
           "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
         },
         {
+          "name": "decode_4h_1k (Tq=1,Tk=1024,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 2.09e-06,
+          "tolerance": 0.001,
+          "c_time_us": 41.0,
+          "pytorch_time_us": 114.1,
+          "speedup": 2.79
+        },
+        {
           "name": "decode_gqa_8h_2kv (Tq=1,Tk=64,H=8,D=64,kv=2)",
           "status": "pass",
           "max_diff": 2.38e-07,
           "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_4h_512 (Tq=1,Tk=512,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.29e-06,
+          "tolerance": 0.001,
+          "c_time_us": 30.7,
+          "pytorch_time_us": 104.4,
+          "speedup": 3.4
+        },
+        {
+          "name": "offset (Tq=3,Tk=9,H=3,D=24)",
+          "status": "pass",
+          "max_diff": 2.38e-07,
+          "tolerance": 0.0001,
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
@@ -2624,6 +2453,177 @@
           "c_time_us": null,
           "pytorch_time_us": null,
           "speedup": null
+        },
+        {
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=64,H=16,D=64,kv=1)",
+          "status": "pass",
+          "max_diff": 2.98e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_4h_24k (Tq=1,Tk=24576,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 5.9e-07,
+          "tolerance": 0.001,
+          "c_time_us": 1102.2,
+          "pytorch_time_us": 2956.9,
+          "speedup": 2.68
+        },
+        {
+          "name": "fastexp_decode_tail (Tq=1,Tk=63,H=4,D=40)",
+          "status": "pass",
+          "max_diff": 7.79e-06,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_32h_512 (Tq=1,Tk=512,H=32,D=64)",
+          "status": "pass",
+          "max_diff": 4.7e-06,
+          "tolerance": 0.001,
+          "c_time_us": 100.6,
+          "pytorch_time_us": 303.7,
+          "speedup": 3.02
+        },
+        {
+          "name": "decode_tail (Tq=1,Tk=63,H=4,D=40)",
+          "status": "pass",
+          "max_diff": 2.68e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "status": "pass",
+          "max_diff": 5.48e-06,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "prefill_gqa_8h_2kv (Tq=4,Tk=4,H=8,D=64)",
+          "status": "pass",
+          "max_diff": 4.02e-07,
+          "tolerance": 0.0002,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_wrapper_omp (Tq=1,Tk=64,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 2.68e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_mqa_16h_1kv (Tq=1,Tk=1024,H=16,D=64,kv=1)",
+          "status": "pass",
+          "max_diff": 3.28e-06,
+          "tolerance": 0.001,
+          "c_time_us": 103.3,
+          "pytorch_time_us": 286.6,
+          "speedup": 2.77
+        },
+        {
+          "name": "decode_4h_50k (Tq=1,Tk=51200,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 3.3e-07,
+          "tolerance": 0.001,
+          "c_time_us": 2390.2,
+          "pytorch_time_us": 6108.6,
+          "speedup": 2.56
+        },
+        {
+          "name": "decode_gqa_16h_2kv (Tq=1,Tk=1024,H=16,D=64,kv=2)",
+          "status": "pass",
+          "max_diff": 3.55e-06,
+          "tolerance": 0.001,
+          "c_time_us": 109.1,
+          "pytorch_time_us": 348.5,
+          "speedup": 3.19
+        },
+        {
+          "name": "decode_4h_8k (Tq=1,Tk=8192,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 7.89e-07,
+          "tolerance": 0.001,
+          "c_time_us": 316.8,
+          "pytorch_time_us": 487.1,
+          "speedup": 1.54
+        },
+        {
+          "name": "decode_4h_hd128 (Tq=1,Tk=256,H=4,D=128)",
+          "status": "pass",
+          "max_diff": 3.93e-06,
+          "tolerance": 0.001,
+          "c_time_us": 24.4,
+          "pytorch_time_us": 97.1,
+          "speedup": 3.98
+        },
+        {
+          "name": "prefill_hd128 (Tq=4,Tk=4,H=2,D=128)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0003,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_ln_gelu (Tq=1,Tk=32,H=4,D=64,dist=ln_gelu)",
+          "status": "pass",
+          "max_diff": 2.09e-07,
+          "tolerance": 0.0001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "decode_8h_512 (Tq=1,Tk=512,H=8,D=64)",
+          "status": "pass",
+          "max_diff": 3.6e-06,
+          "tolerance": 0.001,
+          "c_time_us": 33.4,
+          "pytorch_time_us": 128.3,
+          "speedup": 3.84
+        },
+        {
+          "name": "decode_hd192 (Tq=1,Tk=6,H=2,D=192)",
+          "status": "pass",
+          "max_diff": 4.77e-07,
+          "tolerance": 0.0004,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "llama.cpp (decode_small)",
+          "status": "pass",
+          "max_diff": 3.58e-07,
+          "tolerance": 0.001,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "fastexp_prefill (Tq=8,Tk=8,H=4,D=64)",
+          "status": "pass",
+          "max_diff": 1.9e-05,
+          "tolerance": 0.01,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
         }
       ]
     },
@@ -2631,7 +2631,7 @@
       "name": "Thread Pool GEMV Parity (serial vs dispatch)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 33.303555488586426,
+      "duration_sec": 33.34589862823486,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2645,7 +2645,7 @@
       "name": "v7 Kernel Map Contracts",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.7546942234039307,
+      "duration_sec": 0.7811448574066162,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2659,7 +2659,7 @@
       "name": "v7 Training Family Regression (full)",
       "category": "training",
       "status": "pass",
-      "duration_sec": 260.5449974536896,
+      "duration_sec": 273.1484956741333,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2673,7 +2673,7 @@
       "name": "v7 Backprop Long-Epoch Drift",
       "category": "training",
       "status": "pass",
-      "duration_sec": 24.328874349594116,
+      "duration_sec": 27.04704475402832,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2687,7 +2687,7 @@
       "name": "v7 Backprop Kernel Parity",
       "category": "training",
       "status": "pass",
-      "duration_sec": 3.1277577877044678,
+      "duration_sec": 3.400007486343384,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2701,7 +2701,7 @@
       "name": "v7 IR Visualizer E2E (nightly)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 56.38816809654236,
+      "duration_sec": 59.540011405944824,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2715,7 +2715,7 @@
       "name": "v7 Visualizer Health (L1+L2)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 0.8235986232757568,
+      "duration_sec": 0.8909752368927002,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2725,16 +2725,7 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "L2_dataset_viewer",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "ir_hub_source",
+          "name": "dataset_viewer_source",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2752,7 +2743,16 @@
           "speedup": null
         },
         {
-          "name": "dataset_viewer_source",
+          "name": "ir_hub_source",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "L2_dataset_viewer",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2775,7 +2775,7 @@
       "name": "v7 Visualizer Generated E2E (L3)",
       "category": "parity",
       "status": "pass",
-      "duration_sec": 1.5674686431884766,
+      "duration_sec": 1.6463255882263184,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2785,7 +2785,7 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "Cross-artifact_Consistency",
+          "name": "L1_Health__ir_hub.html",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2839,7 +2839,7 @@
           "speedup": null
         },
         {
-          "name": "Embedded_JSON__ir_report.html",
+          "name": "Cross-artifact_Consistency",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2848,7 +2848,7 @@
           "speedup": null
         },
         {
-          "name": "L1_Health__ir_hub.html",
+          "name": "Embedded_JSON__ir_report.html",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2862,7 +2862,7 @@
       "name": "v7 Core Stabilization Matrix",
       "category": "training",
       "status": "pass",
-      "duration_sec": 511.37792468070984,
+      "duration_sec": 541.6154510974884,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2876,7 +2876,7 @@
       "name": "v8 Inference Runtime Contracts",
       "category": "inference",
       "status": "pass",
-      "duration_sec": 1.06791090965271,
+      "duration_sec": 1.0654165744781494,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2886,16 +2886,7 @@
       "perf_delta_pct": null,
       "sub_tests": [
         {
-          "name": "L2_dataset_viewer",
-          "status": "pass",
-          "max_diff": 0.0,
-          "tolerance": 1.0,
-          "c_time_us": null,
-          "pytorch_time_us": null,
-          "speedup": null
-        },
-        {
-          "name": "ir_hub_source",
+          "name": "dataset_viewer_source",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2913,7 +2904,16 @@
           "speedup": null
         },
         {
-          "name": "dataset_viewer_source",
+          "name": "ir_hub_source",
+          "status": "pass",
+          "max_diff": 0.0,
+          "tolerance": 1.0,
+          "c_time_us": null,
+          "pytorch_time_us": null,
+          "speedup": null
+        },
+        {
+          "name": "L2_dataset_viewer",
           "status": "pass",
           "max_diff": 0.0,
           "tolerance": 1.0,
@@ -2936,7 +2936,7 @@
       "name": "v8 Kernel Map Contracts",
       "category": "inference",
       "status": "pass",
-      "duration_sec": 0.32793545722961426,
+      "duration_sec": 0.3128533363342285,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2950,8 +2950,8 @@
       "name": "v8 Inference Regression (fast)",
       "category": "inference",
       "status": "fail",
-      "duration_sec": 200.58262133598328,
-      "stdout": "Building with native AVX kernels for GEMM\nRunning v8 regression fast suite...\n\n=== [gemma] Gemma 3 270M IT ===\n[gemma] smoke prompt=hello run=/home/runner/.cache/ck-engine-v8/regression/runs/gemma\n[gemma] Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n[gemma] [tokenizer] extracted 262144 tokens, 0 merges, 2577510 bytes from GGUF metadata\n[gemma] [pos_emb] Skipped (RoPE model - position computed, not learned)\n[gemma] [convert] Writing BUMPWGT5 with embedded metadata...\n[gemma] [bumpv5] Metadata: 7363 bytes @ offset 258937382\n[gemma] [bumpv5] Template: gemma3, quant_summary: 20 layers\n[gemma] [gguf->bump] version=5 arch=gemma3 layers=18 hidden=640 heads=4/1 ff=2048 vocab=262144 ctx=32768 no biases -> /home/runner/.cache/ck-engine-v8/regression/runs/gemma/weights.bump\n[gemma] \n[gemma] ============================================================================================================================================\n[gemma] DETAILED CONVERSION REPORT\n[gemma] ============================================================================================================================================\n[gemma] \n[gemma] [Conversion Table] (332 BUMP entries)\n[gemma] BUMP Entry             | GGUF Source                  | GGUF Type | Conv | BUMP Offset  | Size       | Sample Values\n[gemma] -----------------------+------------------------------+---------+------+--------------+------------+--------------------------\n[gemma] token_emb              | token_embd.weight            | Q8_0    | \u2713    | 0x000001C0   | 170.00 MB  |\n[gemma] vocab_offsets          | -                            | -       |      | 0x0AA001C0   | 1.00 MB    |\n[gemma] vocab_strings          | -                            | -       |      | 0x0AB001C0   | 2.46 MB    |\n[gemma] vocab_scores           | -                            | -       |      | 0x0AD75626   | 1.00 MB    |\n[gemma] vocab_types            | -                            | -       |      | 0x0AE75626   | 256.00 KB  |\n[gemma] vocab_merges           | -                            | -       |      | 0x0AEB5626   | 0 B        |\n[gemma] layer.0.ln1_gamma      | blk.0.attn_norm.weight       | F32     | \u2713    | 0x0AEB5626   | 2.50 KB    |\n[gemma] layer.0.ln2_gamma      | blk.0.ffn_norm.weight        | F32     | \u2713    | 0x0AEB6026   | 2.50 KB    |\n[gemma] layer.0.post_attentio  | blk.0.post_attention_norm.w  | F32     | \u2713    | 0x0AEB6A26   | 2.50 KB    |\n[gemma] layer.0.post_ffn_norm  | blk.0.post_ffw_norm.weight   | F32     | \u2713    | 0x0AEB7426   | 2.50 KB    |\n[gemma] layer.0.wq             | blk.0.attn_q.weight          | Q5_1    | \u2713    | 0x0AEB7E26   | 480.00 KB  |\n[gemma] layer.0.bq             | (none - zeros)               | -       | \u25cb    | 0x0AF2FE26   | 4.00 KB    |\n[gemma] layer.0.q_norm         | -                            | -       |      | 0x0AF30E26   | 1.00 KB    |\n[gemma] layer.0.wk             | blk.0.attn_k.weight          | Q5_1    | \u2713    | 0x0AF31226   | 120.00 KB  |\n[gemma] layer.0.bk             | (none - zeros)               | -       | \u25cb    | 0x0AF4F226   | 1.00 KB    |\n[gemma] layer.0.k_norm         | -                            | -       |      | 0x0AF4F626   | 1.00 KB    |\n[gemma] layer.0.wv             | blk.0.attn_v.weight          | Q8_0    | \u2713    | 0x0AF4FA26   | 170.00 KB  |\n[gemma] layer.0.bv             | (none - zeros)               | -       | \u25cb    | 0x0AF7A226   | 1.00 KB    |\n[gemma] layer.0.wo             | blk.0.attn_output.weight     | Q5_K    | \u2713    | 0x0AF7A626   | 440.00 KB  |\n[gemma] layer.0.bo             | (none - zeros)               | -       | \u25cb    | 0x0AFE8626   | 2.50 KB    |\n[gemma] layer.0.w1             | blk.0.ffn_gate.weight        | Q5_1    | \u2713    | 0x0AFE9026   | 1.88 MB    |\n[gemma] layer.0.b1             | (none - zeros)               | -       | \u25cb    | 0x0B1C9026   | 16.00 KB   |\n[gemma] layer.0.w2             | blk.0.ffn_down.weight        | Q6_K    | \u2713    | 0x0B1CD026   | 1.03 MB    |\n[gemma] layer.0.b2             | (none - zeros)               | -       | \u25cb    | 0x0B2D3826   | 2.50 KB    |\n[gemma] layer.1.ln1_gamma      | blk.1.attn_norm.weight       | F32     | \u2713    | 0x0B2D4226   | 2.50 KB    |\n[gemma] layer.1.ln2_gamma      | blk.1.ffn_norm.weight        | F32     | \u2713    | 0x0B2D4C26   | 2.50 KB    |\n[gemma] layer.1.post_attentio  | blk.1.post_attention_norm.w  | F32     | \u2713    | 0x0B2D5626   | 2.50 KB    |\n[gemma] layer.1.post_ffn_norm  | blk.1.post_ffw_norm.weight   | F32     | \u2713    | 0x0B2D6026   | 2.50 KB    |\n[gemma] layer.1.wq             | blk.1.attn_q.weight          | Q5_1    | \u2713    | 0x0B2D6A26   | 480.00 KB  |\n[gemma] layer.1.bq             | (none - zeros)               | -       | \u25cb    | 0x0B34EA26   | 4.00 KB    |\n[gemma] layer.1.q_norm         | -                            | -       |      | 0x0B34FA26   | 1.00 KB    |\n[gemma] layer.1.wk             | blk.1.attn_k.weight          | Q5_1    | \u2713    | 0x0B34FE26   | 120.00 KB  |\n[gemma] layer.1.bk             | (none - zeros)               | -       | \u25cb    | 0x0B36DE26   | 1.00 KB    |\n[gemma] layer.1.k_norm         | -                            | -       |      | 0x0B36E226   | 1.00 KB    |\n[gemma] layer.1.wv             | blk.1.attn_v.weight          | Q8_0    | \u2713    | 0x0B36E626   | 170.00 KB  |\n[gemma] layer.1.bv             | (none - zeros)               | -       | \u25cb    | 0x0B398E26   | 1.00 KB    |\n[gemma] layer.1.wo             | blk.1.attn_output.weight     | Q5_K    | \u2713    | 0x0B399226   | 440.00 KB  |\n[gemma] layer.1.bo             | (none - zeros)               | -       | \u25cb    | 0x0B407226   | 2.50 KB    |\n[gemma] layer.1.w1             | blk.1.ffn_gate.weight        | Q5_1    | \u2713    | 0x0B407C26   | 1.88 MB    |\n[gemma] layer.1.b1             | (none - zeros)               | -       | \u25cb    | 0x0B5E7C26   | 16.00 KB   |\n[gemma] layer.1.w2             | blk.1.ffn_down.weight        | Q6_K    | \u2713    | 0x0B5EBC26   | 1.03 MB    |\n[gemma] layer.1.b2             | (none - zeros)               | -       | \u25cb    | 0x0B6F2426   | 2.50 KB    |\n[gemma] layer.2.ln1_gamma      | blk.2.attn_norm.weight       | F32     | \u2713    | 0x0B6F2E26   | 2.50 KB    |\n[gemma] layer.2.ln2_gamma      | blk.2.ffn_norm.weight        | F32     | \u2713    | 0x0B6F3826   | 2.50 KB    |\n[gemma] layer.2.post_attentio  | blk.2.post_attention_norm.w  | F32     | \u2713    | 0x0B6F4226   | 2.50 KB    |\n[gemma] layer.2.post_ffn_norm  | blk.2.post_ffw_norm.weight   | F32     | \u2713    | 0x0B6F4C26   | 2.50 KB    |\n[gemma] layer.2.wq             | blk.2.attn_q.weight          | Q5_1    | \u2713    | 0x0B6F5626   | 480.00 KB  |\n[gemma] layer.2.bq             | (none - zeros)               | -       | \u25cb    | 0x0B76D626   | 4.00 KB    |\n[gemma] layer.2.q_norm         | -                            | -       |      | 0x0B76E626   | 1.00 KB    |\n[gemma] layer.2.wk             | blk.2.attn_k.weight          | Q5_1    | \u2713    | 0x0B76EA26   | 120.00 KB  |\n[gemma] layer.2.bk             | (none - zeros)               | -       | \u25cb    | 0x0B78CA26   | 1.00 KB    |\n[gemma] layer.2.k_norm         | -                            | -       |      | 0x0B78CE26   | 1.00 KB    |\n[gemma] layer.2.wv             | blk.2.attn_v.weight          | Q5_1    | \u2713    | 0x0B78D226   | 120.00 KB  |\n[gemma] layer.2.bv             | (none - zeros)               | -       | \u25cb    | 0x0B7AB226   | 1.00 KB    |\n[gemma] layer.2.wo             | blk.2.attn_output.weight     | Q5_K    | \u2713    | 0x0B7AB626   | 440.00 KB  |\n[gemma] layer.2.bo             | (none - zeros)               | -       | \u25cb    | 0x0B819626   | 2.50 KB    |\n[gemma] layer.2.w1             | blk.2.ffn_gate.weight        | Q5_1    | \u2713    | 0x0B81A026   | 1.88 MB    |\n[gemma] layer.2.b1             | (none - zeros)               | -       | \u25cb    | 0x0B9FA026   | 16.00 KB   |\n[gemma] layer.2.w2             | blk.2.ffn_down.weight        | Q5_K    | \u2713    | 0x0B9FE026   | 880.00 KB  |\n[gemma] layer.2.b2             | (none - zeros)               | -       | \u25cb    | 0x0BADA026   | 2.50 KB    |\n[gemma] layer.3.ln1_gamma      | blk.3.attn_norm.weight       | F32     | \u2713    | 0x0BADAA26   | 2.50 KB    |\n[gemma] layer.3.ln2_gamma      | blk.3.ffn_norm.weight        | F32     | \u2713    | 0x0BADB426   | 2.50 KB    |\n[gemma] layer.3.post_attentio  | blk.3.post_attention_norm.w  | F32     | \u2713    | 0x0BADBE26   | 2.50 KB    |\n[gemma] layer.3.post_ffn_norm  | blk.3.post_ffw_norm.weight   | F32     | \u2713    | 0x0BADC826   | 2.50 KB    |\n[gemma] layer.3.wq             | blk.3.attn_q.weight          | Q5_1    | \u2713    | 0x0BADD226   | 480.00 KB  |\n[gemma] layer.3.bq             | (none - zeros)               | -       | \u25cb    | 0x0BB55226   | 4.00 KB    |\n[gemma] layer.3.q_norm         | -                            | -       |      | 0x0BB56226   | 1.00 KB    |\n[gemma] layer.3.wk             | blk.3.attn_k.weight          | Q5_1    | \u2713    | 0x0BB56626   | 120.00 KB  |\n[gemma] layer.3.bk             | (none - zeros)               | -       | \u25cb    | 0x0BB74626   | 1.00 KB    |\n[gemma] layer.3.k_norm         | -                            | -       |      | 0x0BB74A26   | 1.00 KB    |\n[gemma] layer.3.wv             | blk.3.attn_v.weight          | Q5_1    | \u2713    | 0x0BB74E26   | 120.00 KB  |\n[gemma] layer.3.bv             | (none - zeros)               | -       | \u25cb    | 0x0BB92E26   | 1.00 KB    |\n[gemma] layer.3.wo             | blk.3.attn_output.weight     | Q5_K    | \u2713    | 0x0BB93226   | 440.00 KB  |\n[gemma] layer.3.bo             | (none - zeros)               | -       | \u25cb    | 0x0BC01226   | 2.50 KB    |\n[gemma] layer.3.w1             | blk.3.ffn_gate.weight        | Q5_1    | \u2713    | 0x0BC01C26   | 1.88 MB    |\n[gemma] layer.3.b1             | (none - zeros)               | -       | \u25cb    | 0x0BDE1C26   | 16.00 KB   |\n[gemma] layer.3.w2             | blk.3.ffn_down.weight        | Q5_K    | \u2713    | 0x0BDE5C26   | 880.00 KB  |\n[gemma] layer.3.b2             | (none - zeros)               | -       | \u25cb    | 0x0BEC1C26   | 2.50 KB    |\n[gemma] layer.4.ln1_gamma      | blk.4.attn_norm.weight       | F32     | \u2713    | 0x0BEC2626   | 2.50 KB    |\n[gemma] layer.4.ln2_gamma      | blk.4.ffn_norm.weight        | F32     | \u2713    | 0x0BEC3026   | 2.50 KB    |\n[gemma] layer.4.post_attentio  | blk.4.post_attention_norm.w  | F32     | \u2713    | 0x0BEC3A26   | 2.50 KB    |\n[gemma] layer.4.post_ffn_norm  | blk.4.post_ffw_norm.weight   | F32     | \u2713    | 0x0BEC4426   | 2.50 KB    |\n[gemma] layer.4.wq             | blk.4.attn_q.weight          | Q5_1    | \u2713    | 0x0BEC4E26   | 480.00 KB  |\n[gemma] layer.4.bq             | (none - zeros)               | -       | \u25cb    | 0x0BF3CE26   | 4.00 KB    |\n[gemma] layer.4.q_norm         | -                            | -       |      | 0x0BF3DE26   | 1.00 KB    |\n[gemma] layer.4.wk             | blk.4.attn_k.weight          | Q5_1    | \u2713    | 0x0BF3E226   | 120.00 KB  |\n[gemma] layer.4.bk             | (none - zeros)               | -       | \u25cb    | 0x0BF5C226   | 1.00 KB    |\n[gemma] layer.4.k_norm         | -                            | -       |      | 0x0BF5C626   | 1.00 KB    |\n[gemma] layer.4.wv             | blk.4.attn_v.weight          | Q8_0    | \u2713    | 0x0BF5CA26   | 170.00 KB  |\n[gemma] layer.4.bv             | (none - zeros)               | -       | \u25cb    | 0x0BF87226   | 1.00 KB    |\n[gemma] layer.4.wo             | blk.4.attn_output.weight     | Q5_K    | \u2713    | 0x0BF87626   | 440.00 KB  |\n[gemma] layer.4.bo             | (none - zeros)               | -       | \u25cb    | 0x0BFF5626   | 2.50 KB    |\n[gemma] layer.4.w1             | blk.4.ffn_gate.weight        | Q5_1    | \u2713    | 0x0BFF6026   | 1.88 MB    |\n[gemma] layer.4.b1             | (none - zeros)               | -       | \u25cb    | 0x0C1D6026   | 16.00 KB   |\n[gemma] layer.4.w2             | blk.4.ffn_down.weight        | Q6_K    | \u2713    | 0x0C1DA026   | 1.03 MB    |\n[gemma] layer.4.b2             | (none - zeros)               | -       | \u25cb    | 0x0C2E0826   | 2.50 KB    |\n[gemma] layer.5.ln1_gamma      | blk.5.attn_norm.weight       | F32     | \u2713    | 0x0C2E1226   | 2.50 KB    |\n[gemma] layer.5.ln2_gamma      | blk.5.ffn_norm.weight        | F32     | \u2713    | 0x0C2E1C26   | 2.50 KB    |\n[gemma] layer.5.post_attentio  | blk.5.post_attention_norm.w  | F32     | \u2713    | 0x0C2E2626   | 2.50 KB    |\n[gemma] layer.5.post_ffn_norm  | blk.5.post_ffw_norm.weight   | F32     | \u2713    | 0x0C2E3026   | 2.50 KB    |\n[gemma] layer.5.wq             | blk.5.attn_q.weight          | Q5_1    | \u2713    | 0x0C2E3A26   | 480.00 KB  |\n[gemma] layer.5.bq             | (none - zeros)               | -       | \u25cb    | 0x0C35BA26   | 4.00 KB    |\n[gemma] layer.5.q_norm         | -                            | -       |      | 0x0C35CA26   | 1.00 KB    |\n[gemma] layer.5.wk             | blk.5.attn_k.weight          | Q5_1    | \u2713    | 0x0C35CE26   | 120.00 KB  |\n[gemma] layer.5.bk             | (none - zeros)               | -       | \u25cb    | 0x0C37AE26   | 1.00 KB    |\n[gemma] layer.5.k_norm         | -                            | -       |      | 0x0C37B226   | 1.00 KB    |\n[gemma] layer.5.wv             | blk.5.attn_v.weight          | Q5_1    | \u2713    | 0x0C37B626   | 120.00 KB  |\n[gemma] layer.5.bv             | (none - zeros)               | -       | \u25cb    | 0x0C399626   | 1.00 KB    |\n[gemma] layer.5.wo             | blk.5.attn_output.weight     | Q5_K    | \u2713    | 0x0C399A26   | 440.00 KB  |\n[gemma] layer.5.bo             | (none - zeros)               | -       | \u25cb    | 0x0C407A26   | 2.50 KB    |\n[gemma] layer.5.w1             | blk.5.ffn_gate.weight        | Q5_1    | \u2713    | 0x0C408426   | 1.88 MB    |\n[gemma] layer.5.b1             | (none - zeros)               | -       | \u25cb    | 0x0C5E8426   | 16.00 KB   |\n[gemma] layer.5.w2             | blk.5.ffn_down.weight        | Q5_K    | \u2713    | 0x0C5EC426   | 880.00 KB  |\n[gemma] layer.5.b2             | (none - zeros)               | -       | \u25cb    | 0x0C6C8426   | 2.50 KB    |\n[gemma] layer.6.ln1_gamma      | blk.6.attn_norm.weight       | F32     | \u2713    | 0x0C6C8E26   | 2.50 KB    |\n[gemma] layer.6.ln2_gamma      | blk.6.ffn_norm.weight        | F32     | \u2713    | 0x0C6C9826   | 2.50 KB    |\n[gemma] layer.6.post_attentio  | blk.6.post_attention_norm.w  | F32     | \u2713    | 0x0C6CA226   | 2.50 KB    |\n[gemma] layer.6.post_ffn_norm  | blk.6.post_ffw_norm.weight   | F32     | \u2713    | 0x0C6CAC26   | 2.50 KB    |\n[gemma] layer.6.wq             | blk.6.attn_q.weight          | Q5_1    | \u2713    | 0x0C6CB626   | 480.00 KB  |\n[gemma] layer.6.bq             | (none - zeros)               | -       | \u25cb    | 0x0C743626   | 4.00 KB    |\n[gemma] layer.6.q_norm         | -                            | -       |      | 0x0C744626   | 1.00 KB    |\n[gemma] layer.6.wk             | blk.6.attn_k.weight          | Q5_1    | \u2713    | 0x0C744A26   | 120.00 KB  |\n[gemma] layer.6.bk             | (none - zeros)               | -       | \u25cb    | 0x0C762A26   | 1.00 KB    |\n[gemma] layer.6.k_norm         | -                            | -       |      | 0x0C762E26   | 1.00 KB    |\n[gemma] layer.6.wv             | blk.6.attn_v.weight          | Q5_1    | \u2713    | 0x0C763226   | 120.00 KB  |\n[gemma] layer.6.bv             | (none - zeros)               | -       | \u25cb    | 0x0C781226   | 1.00 KB    |\n[gemma] layer.6.wo             | blk.6.attn_output.weight     | Q5_K    | \u2713    | 0x0C781626   | 440.00 KB  |\n[gemma] layer.6.bo             | (none - zeros)               | -       | \u25cb    | 0x0C7EF626   | 2.50 KB    |\n[gemma] layer.6.w1             | blk.6.ffn_gate.weight        | Q5_1    | \u2713    | 0x0C7F0026   | 1.88 MB    |\n[gemma] layer.6.b1             | (none - zeros)               | -       | \u25cb    | 0x0C9D0026   | 16.00 KB   |\n[gemma] layer.6.w2             | blk.6.ffn_down.weight        | Q5_K    | \u2713    | 0x0C9D4026   | 880.00 KB  |\n[gemma] layer.6.b2             | (none - zeros)               | -       | \u25cb    | 0x0CAB0026   | 2.50 KB    |\n[gemma] layer.7.ln1_gamma      | blk.7.attn_norm.weight       | F32     | \u2713    | 0x0CAB0\n... [truncated] ...\nadd         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [430] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [431] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [432] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [433] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [434] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [435] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [436] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [437] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 23:\n[nanbeige]       [438] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [439] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [440] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [441] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [442] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [443] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [444] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [445] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [446] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [447] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [448] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [449] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [450] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [451] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [452] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [453] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [454] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [455] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [456] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 24:\n[nanbeige]       [457] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [458] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [459] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [460] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [461] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [462] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [463] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [464] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [465] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [466] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [467] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [468] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [469] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [470] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [471] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [472] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [473] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [474] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [475] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 25:\n[nanbeige]       [476] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [477] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [478] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [479] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [480] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [481] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [482] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [483] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [484] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [485] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [486] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [487] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [488] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [489] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [490] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [491] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [492] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [493] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [494] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 26:\n[nanbeige]       [495] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [496] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [497] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [498] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [499] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [500] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [501] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [502] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [503] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [504] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [505] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [506] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [507] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [508] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [509] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [510] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [511] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [512] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [513] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 27:\n[nanbeige]       [514] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [515] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [516] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [517] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [518] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [519] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [520] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [521] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [522] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [523] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [524] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [525] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [526] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [527] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [528] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [529] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [530] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [531] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [532] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 28:\n[nanbeige]       [533] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [534] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [535] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [536] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [537] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [538] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [539] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [540] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [541] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [542] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [543] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [544] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [545] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [546] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [547] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [548] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [549] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [550] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [551] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 29:\n[nanbeige]       [552] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [553] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [554] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [555] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [556] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [557] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [558] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [559] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [560] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [561] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [562] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [563] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [564] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [565] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [566] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [567] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [568] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [569] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [570] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 30:\n[nanbeige]       [571] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [572] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [573] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [574] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [575] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [576] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [577] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [578] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [579] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [580] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [581] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [582] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [583] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [584] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [585] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [586] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [587] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [588] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [589] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 31:\n[nanbeige]       [590] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [591] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [592] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [593] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [594] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [595] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [596] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [597] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [598] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [599] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [600] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [601] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [602] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [603] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [604] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [605] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [606] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [607] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [608] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Footer:\n[nanbeige]       [609] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]             weight_tying         \u2192 (metadata)\n[nanbeige]   [debug/logits] mode=decode weight=q6_k prefer_q8=True prefer_fp32_logits=False -> gemv_q6_k_q8_k\n[nanbeige]       [610] quantize_final_output \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED before logits]\n[nanbeige]       [611] logits               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige] \n[nanbeige] \u2713 Pass 1: Generated 612 kernel calls\n[nanbeige] \n[nanbeige]   Pass 1.5: Computing dataflow graph...\n[nanbeige]   \u2713 Pass 1.5: Added dataflow to 612 ops\n[nanbeige]     Active slots: main_stream, residual, main_stream_q8, q_scratch, k_scratch, v_scratch, attn_scratch, mlp_scratch, logits\n[nanbeige] \n[nanbeige]   Pass 2: Binding weights from sidecar...\n[nanbeige]   \u2713 Pass 2: Bound 452 weights to 612 ops\n[nanbeige]   \u2713 IR1 completeness check passed (16 expected, 612 generated)\n[nanbeige]   Skipped 192 zero bias_add ops (mode=decode)\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] FUSION PASS\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige] Found 7 fusion patterns in registry for decode mode\n[nanbeige] \n[nanbeige] \u2713 Fusion complete:\n[nanbeige]   Total fusions: 0\n[nanbeige]   Kernels removed: 0\n[nanbeige]   Final kernel count: 612 (was 612)\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] IR LOWER 1 (Stitch kernel maps)\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige]   [Decode mode] Inserting KV cache operations...\n[nanbeige]   Inserted 32 kv_cache_store operations\n[nanbeige]   Updated 32 attention ops to use decode kernel\n[nanbeige] \n[nanbeige] \u2713 IR Lower 1 complete:\n[nanbeige]   Lowered ops: 644\n[nanbeige]   Weight references: 452\n[nanbeige]   Activation inputs: 868\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] MEMORY PLANNER (with validation)\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige] \ud83d\udce6 Manifest weights:\n[nanbeige]   Total entries: 457\n[nanbeige]   Weights base offset in file: 609\n[nanbeige]   Total size: 2332.6 MB\n[nanbeige] \n[nanbeige] \ud83d\udccb Template structure:\n[nanbeige]   Header ops: ['bpe_tokenizer', 'dense_embedding_lookup']\n[nanbeige]   Body ops: ['rmsnorm', 'qkv_proj', 'rope_qk', 'attn', 'out_proj', 'residual_add', 'rmsnorm', 'mlp_gate_up', 'silu_mul', 'mlp_down', 'residual_add']\n[nanbeige]   Footer ops: ['rmsnorm', 'weight_tying', 'logits']\n[nanbeige] \n[nanbeige] \ud83d\udd0d Weight validation:\n[nanbeige]   Model weights in manifest: 452\n[nanbeige]   Expected by template: 452\n[nanbeige]   Used by IR1 kernels: 452\n[nanbeige]   Coverage: 100.0%\n[nanbeige] \n[nanbeige] \u2705 All 452 model weights are mapped!\n[nanbeige] \n[nanbeige] \ud83d\udcca Activation memory planning:\n[nanbeige]   Mode: decode\n[nanbeige]   Context length: 1024\n[nanbeige]   Sequence length (per pass): 1\n[nanbeige] \n[nanbeige]   Buffer breakdown:\n[nanbeige]     text_input           [16]                                         0.00 MB\n[nanbeige]     token_ids            [1]                                          0.00 MB\n[nanbeige]     embedded_input       [1, 2560]                                    0.01 MB\n[nanbeige]     layer_input          [1, max(2560, Q8_K(10496))]                  0.01 MB\n[nanbeige]     residual             [1, 2560]                                    0.01 MB\n[nanbeige]     kv_cache             [32, 2, 4, 1024, 128]                      128.00 MB\n[nanbeige]     rope_cache           [2, 1024, 64]                                0.50 MB\n[nanbeige]     q_scratch            [20, 1, 128]                                 0.01 MB\n[nanbeige]     k_scratch            [4, 1, 128]                                  0.00 MB\n[nanbeige]     v_scratch            [4, 1, 128]                                  0.00 MB\n[nanbeige]     attn_q_gate_packed   [1, 5120]                                    0.02 MB\n[nanbeige]     attn_gate            [1, 2560]                                    0.01 MB\n[nanbeige]     attn_scratch         [20, 1, 128]                                 0.01 MB\n[nanbeige]     mlp_scratch          [max(1*20992, fused_attn, geglu_bf16)]       0.34 MB\n[nanbeige]     layer_output         [1, 2560]                                    0.01 MB\n[nanbeige]     logits               [1, 166144]                                  0.63 MB\n[nanbeige]   \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n[nanbeige]   Total                                                           129.57 MB\n[nanbeige] \n[nanbeige] \u2713 Memory layout complete\n[nanbeige]   Bump (weights): 2332.6 MB\n[nanbeige]   Activations: 132677.9 KB\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] IR LOWER 2 (Add memory offsets)\n[nanbeige] ============================================================\n[nanbeige]   Running memory planner...\n[nanbeige]   \u2713 Memory planner assigned buffers for 644 ops\n[nanbeige] \n[nanbeige] \u2713 IR Lower 2 complete:\n[nanbeige]   Lowered ops: 644\n[nanbeige]   Weight entries resolved: 457\n[nanbeige]   \u2713 Buffer validation passed for 644 ops\n[nanbeige] \n[nanbeige] \u2713 Wrote IR1 to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/ir1_decode.json\n[nanbeige] \u2713 Wrote memory layout to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/layout_decode.json\n[nanbeige] \u2713 Wrote manifest map to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/weights_manifest.map\n[nanbeige] \u2713 Wrote lowered IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/lowered_decode.json\n[nanbeige] \u2713 Wrote call-ready IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/lowered_decode_call.json\n[nanbeige] \u2713 Wrote init IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/init.json\n[nanbeige]   - rope_init: theta=70000000.0, rotary=128, scaling=none/1.0\n[nanbeige] \u2713 Wrote init call IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/init_call.json\n[nanbeige] Generated: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/model_v8.c\n[nanbeige] Building with native AVX kernels for GEMM\n[nanbeige] make[1]: 'build/libckernel_engine.so' is up to date.\n[nanbeige] make[1]: 'build/libckernel_tokenizer.so' is up to date.\n[nanbeige] [TOKENIZER] Loaded 166144 tokens: normal=165841, unknown=0, control=6, byte=256, other=41\n[nanbeige] [OpenMP]   Threads: 1 (OMP_NUM_THREADS=1) | CPU cores: 4\n[nanbeige] [CK] Set 2 threads (auto=2)\n[nanbeige] [CK threadpool] Created 2 threads (1 main + 1 workers)\n[nanbeige] [CK parallel decode] Initialized with 2 threads\n[nanbeige] [CK parallel prefill] Initialized with 2 threads\n[nanbeige] Loading model from /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige...\n[nanbeige] Using built-in C tokenizer (llama)\n[nanbeige] Model loaded! Vocab: 166144, Context: 1024\n[nanbeige] \n[nanbeige] Prompt: Hello\n[nanbeige] Response: <think>\n[nanbeige] We are given a query that simply says \"Hello\". This is a very generic and open-ended query. \n[nanbeige] As an AI assistant, I need to determine the context and intent behind this query. Since there is no additional context provided in the query, I should consider possible scenarios:\n[nanbeige] \n[nanbeige] 1. The user might be testing if the system is working or just starting a conversation.\n[nanbeige] 2. The user might have intended to ask something else but only typed \"\n[nanbeige] \n[nanbeige] \u001b[90mprompt eval: 10288.32 ms /   33 tokens ( 311.77 ms/tok,    3.21 tok/s)\n[nanbeige]       decode: 28514.81 ms /   96 runs   ( 297.03 ms/tok,    3.37 tok/s)\n[nanbeige]       sample:   123.21 ms /   96 runs   (   1.28 ms/tok)\n[nanbeige]        total: 38951.49 ms /  129 tokens\u001b[0m\n[nanbeige] \u001b[90mstop: max_tokens reached\u001b[0m\n[nanbeige] \n========================================================================\nC-Kernel-Engine v8 Regression\n========================================================================\nmode      : fast\nrun_root  : /home/runner/.cache/ck-engine-v8/regression/runs\nreport_dir: /home/runner/.cache/ck-engine-v8/regression/reports/20260622_144056\n\nFamily    Build  Smoke  Coherence  Contract  Status/Class      \ngemma     PASS   PASS   FAIL       PASS      PASS/pass         \nqwen2     PASS   PASS   PASS       PASS      PASS/pass         \nqwen3     PASS   PASS   PASS       PASS      PASS/pass         \nqwen35    PASS   PASS   PASS       PASS      PASS/pass         \nqwen3vl   FAIL   FAIL   PASS       SKIP      FAIL/build_failure\nnanbeige  PASS   PASS   FAIL       PASS      PASS/pass         \n\noverall   : FAIL\nsummary   : /home/runner/.cache/ck-engine-v8/regression/reports/20260622_144056/summary.json\n",
+      "duration_sec": 187.01252794265747,
+      "stdout": "Building with native AVX kernels for GEMM\nRunning v8 regression fast suite...\n\n=== [gemma] Gemma 3 270M IT ===\n[gemma] smoke prompt=hello run=/home/runner/.cache/ck-engine-v8/regression/runs/gemma\n[gemma] Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n[gemma] [tokenizer] extracted 262144 tokens, 0 merges, 2577510 bytes from GGUF metadata\n[gemma] [pos_emb] Skipped (RoPE model - position computed, not learned)\n[gemma] [convert] Writing BUMPWGT5 with embedded metadata...\n[gemma] [bumpv5] Metadata: 7363 bytes @ offset 258937382\n[gemma] [bumpv5] Template: gemma3, quant_summary: 20 layers\n[gemma] [gguf->bump] version=5 arch=gemma3 layers=18 hidden=640 heads=4/1 ff=2048 vocab=262144 ctx=32768 no biases -> /home/runner/.cache/ck-engine-v8/regression/runs/gemma/weights.bump\n[gemma] \n[gemma] ============================================================================================================================================\n[gemma] DETAILED CONVERSION REPORT\n[gemma] ============================================================================================================================================\n[gemma] \n[gemma] [Conversion Table] (332 BUMP entries)\n[gemma] BUMP Entry             | GGUF Source                  | GGUF Type | Conv | BUMP Offset  | Size       | Sample Values\n[gemma] -----------------------+------------------------------+---------+------+--------------+------------+--------------------------\n[gemma] token_emb              | token_embd.weight            | Q8_0    | \u2713    | 0x000001C0   | 170.00 MB  |\n[gemma] vocab_offsets          | -                            | -       |      | 0x0AA001C0   | 1.00 MB    |\n[gemma] vocab_strings          | -                            | -       |      | 0x0AB001C0   | 2.46 MB    |\n[gemma] vocab_scores           | -                            | -       |      | 0x0AD75626   | 1.00 MB    |\n[gemma] vocab_types            | -                            | -       |      | 0x0AE75626   | 256.00 KB  |\n[gemma] vocab_merges           | -                            | -       |      | 0x0AEB5626   | 0 B        |\n[gemma] layer.0.ln1_gamma      | blk.0.attn_norm.weight       | F32     | \u2713    | 0x0AEB5626   | 2.50 KB    |\n[gemma] layer.0.ln2_gamma      | blk.0.ffn_norm.weight        | F32     | \u2713    | 0x0AEB6026   | 2.50 KB    |\n[gemma] layer.0.post_attentio  | blk.0.post_attention_norm.w  | F32     | \u2713    | 0x0AEB6A26   | 2.50 KB    |\n[gemma] layer.0.post_ffn_norm  | blk.0.post_ffw_norm.weight   | F32     | \u2713    | 0x0AEB7426   | 2.50 KB    |\n[gemma] layer.0.wq             | blk.0.attn_q.weight          | Q5_1    | \u2713    | 0x0AEB7E26   | 480.00 KB  |\n[gemma] layer.0.bq             | (none - zeros)               | -       | \u25cb    | 0x0AF2FE26   | 4.00 KB    |\n[gemma] layer.0.q_norm         | -                            | -       |      | 0x0AF30E26   | 1.00 KB    |\n[gemma] layer.0.wk             | blk.0.attn_k.weight          | Q5_1    | \u2713    | 0x0AF31226   | 120.00 KB  |\n[gemma] layer.0.bk             | (none - zeros)               | -       | \u25cb    | 0x0AF4F226   | 1.00 KB    |\n[gemma] layer.0.k_norm         | -                            | -       |      | 0x0AF4F626   | 1.00 KB    |\n[gemma] layer.0.wv             | blk.0.attn_v.weight          | Q8_0    | \u2713    | 0x0AF4FA26   | 170.00 KB  |\n[gemma] layer.0.bv             | (none - zeros)               | -       | \u25cb    | 0x0AF7A226   | 1.00 KB    |\n[gemma] layer.0.wo             | blk.0.attn_output.weight     | Q5_K    | \u2713    | 0x0AF7A626   | 440.00 KB  |\n[gemma] layer.0.bo             | (none - zeros)               | -       | \u25cb    | 0x0AFE8626   | 2.50 KB    |\n[gemma] layer.0.w1             | blk.0.ffn_gate.weight        | Q5_1    | \u2713    | 0x0AFE9026   | 1.88 MB    |\n[gemma] layer.0.b1             | (none - zeros)               | -       | \u25cb    | 0x0B1C9026   | 16.00 KB   |\n[gemma] layer.0.w2             | blk.0.ffn_down.weight        | Q6_K    | \u2713    | 0x0B1CD026   | 1.03 MB    |\n[gemma] layer.0.b2             | (none - zeros)               | -       | \u25cb    | 0x0B2D3826   | 2.50 KB    |\n[gemma] layer.1.ln1_gamma      | blk.1.attn_norm.weight       | F32     | \u2713    | 0x0B2D4226   | 2.50 KB    |\n[gemma] layer.1.ln2_gamma      | blk.1.ffn_norm.weight        | F32     | \u2713    | 0x0B2D4C26   | 2.50 KB    |\n[gemma] layer.1.post_attentio  | blk.1.post_attention_norm.w  | F32     | \u2713    | 0x0B2D5626   | 2.50 KB    |\n[gemma] layer.1.post_ffn_norm  | blk.1.post_ffw_norm.weight   | F32     | \u2713    | 0x0B2D6026   | 2.50 KB    |\n[gemma] layer.1.wq             | blk.1.attn_q.weight          | Q5_1    | \u2713    | 0x0B2D6A26   | 480.00 KB  |\n[gemma] layer.1.bq             | (none - zeros)               | -       | \u25cb    | 0x0B34EA26   | 4.00 KB    |\n[gemma] layer.1.q_norm         | -                            | -       |      | 0x0B34FA26   | 1.00 KB    |\n[gemma] layer.1.wk             | blk.1.attn_k.weight          | Q5_1    | \u2713    | 0x0B34FE26   | 120.00 KB  |\n[gemma] layer.1.bk             | (none - zeros)               | -       | \u25cb    | 0x0B36DE26   | 1.00 KB    |\n[gemma] layer.1.k_norm         | -                            | -       |      | 0x0B36E226   | 1.00 KB    |\n[gemma] layer.1.wv             | blk.1.attn_v.weight          | Q8_0    | \u2713    | 0x0B36E626   | 170.00 KB  |\n[gemma] layer.1.bv             | (none - zeros)               | -       | \u25cb    | 0x0B398E26   | 1.00 KB    |\n[gemma] layer.1.wo             | blk.1.attn_output.weight     | Q5_K    | \u2713    | 0x0B399226   | 440.00 KB  |\n[gemma] layer.1.bo             | (none - zeros)               | -       | \u25cb    | 0x0B407226   | 2.50 KB    |\n[gemma] layer.1.w1             | blk.1.ffn_gate.weight        | Q5_1    | \u2713    | 0x0B407C26   | 1.88 MB    |\n[gemma] layer.1.b1             | (none - zeros)               | -       | \u25cb    | 0x0B5E7C26   | 16.00 KB   |\n[gemma] layer.1.w2             | blk.1.ffn_down.weight        | Q6_K    | \u2713    | 0x0B5EBC26   | 1.03 MB    |\n[gemma] layer.1.b2             | (none - zeros)               | -       | \u25cb    | 0x0B6F2426   | 2.50 KB    |\n[gemma] layer.2.ln1_gamma      | blk.2.attn_norm.weight       | F32     | \u2713    | 0x0B6F2E26   | 2.50 KB    |\n[gemma] layer.2.ln2_gamma      | blk.2.ffn_norm.weight        | F32     | \u2713    | 0x0B6F3826   | 2.50 KB    |\n[gemma] layer.2.post_attentio  | blk.2.post_attention_norm.w  | F32     | \u2713    | 0x0B6F4226   | 2.50 KB    |\n[gemma] layer.2.post_ffn_norm  | blk.2.post_ffw_norm.weight   | F32     | \u2713    | 0x0B6F4C26   | 2.50 KB    |\n[gemma] layer.2.wq             | blk.2.attn_q.weight          | Q5_1    | \u2713    | 0x0B6F5626   | 480.00 KB  |\n[gemma] layer.2.bq             | (none - zeros)               | -       | \u25cb    | 0x0B76D626   | 4.00 KB    |\n[gemma] layer.2.q_norm         | -                            | -       |      | 0x0B76E626   | 1.00 KB    |\n[gemma] layer.2.wk             | blk.2.attn_k.weight          | Q5_1    | \u2713    | 0x0B76EA26   | 120.00 KB  |\n[gemma] layer.2.bk             | (none - zeros)               | -       | \u25cb    | 0x0B78CA26   | 1.00 KB    |\n[gemma] layer.2.k_norm         | -                            | -       |      | 0x0B78CE26   | 1.00 KB    |\n[gemma] layer.2.wv             | blk.2.attn_v.weight          | Q5_1    | \u2713    | 0x0B78D226   | 120.00 KB  |\n[gemma] layer.2.bv             | (none - zeros)               | -       | \u25cb    | 0x0B7AB226   | 1.00 KB    |\n[gemma] layer.2.wo             | blk.2.attn_output.weight     | Q5_K    | \u2713    | 0x0B7AB626   | 440.00 KB  |\n[gemma] layer.2.bo             | (none - zeros)               | -       | \u25cb    | 0x0B819626   | 2.50 KB    |\n[gemma] layer.2.w1             | blk.2.ffn_gate.weight        | Q5_1    | \u2713    | 0x0B81A026   | 1.88 MB    |\n[gemma] layer.2.b1             | (none - zeros)               | -       | \u25cb    | 0x0B9FA026   | 16.00 KB   |\n[gemma] layer.2.w2             | blk.2.ffn_down.weight        | Q5_K    | \u2713    | 0x0B9FE026   | 880.00 KB  |\n[gemma] layer.2.b2             | (none - zeros)               | -       | \u25cb    | 0x0BADA026   | 2.50 KB    |\n[gemma] layer.3.ln1_gamma      | blk.3.attn_norm.weight       | F32     | \u2713    | 0x0BADAA26   | 2.50 KB    |\n[gemma] layer.3.ln2_gamma      | blk.3.ffn_norm.weight        | F32     | \u2713    | 0x0BADB426   | 2.50 KB    |\n[gemma] layer.3.post_attentio  | blk.3.post_attention_norm.w  | F32     | \u2713    | 0x0BADBE26   | 2.50 KB    |\n[gemma] layer.3.post_ffn_norm  | blk.3.post_ffw_norm.weight   | F32     | \u2713    | 0x0BADC826   | 2.50 KB    |\n[gemma] layer.3.wq             | blk.3.attn_q.weight          | Q5_1    | \u2713    | 0x0BADD226   | 480.00 KB  |\n[gemma] layer.3.bq             | (none - zeros)               | -       | \u25cb    | 0x0BB55226   | 4.00 KB    |\n[gemma] layer.3.q_norm         | -                            | -       |      | 0x0BB56226   | 1.00 KB    |\n[gemma] layer.3.wk             | blk.3.attn_k.weight          | Q5_1    | \u2713    | 0x0BB56626   | 120.00 KB  |\n[gemma] layer.3.bk             | (none - zeros)               | -       | \u25cb    | 0x0BB74626   | 1.00 KB    |\n[gemma] layer.3.k_norm         | -                            | -       |      | 0x0BB74A26   | 1.00 KB    |\n[gemma] layer.3.wv             | blk.3.attn_v.weight          | Q5_1    | \u2713    | 0x0BB74E26   | 120.00 KB  |\n[gemma] layer.3.bv             | (none - zeros)               | -       | \u25cb    | 0x0BB92E26   | 1.00 KB    |\n[gemma] layer.3.wo             | blk.3.attn_output.weight     | Q5_K    | \u2713    | 0x0BB93226   | 440.00 KB  |\n[gemma] layer.3.bo             | (none - zeros)               | -       | \u25cb    | 0x0BC01226   | 2.50 KB    |\n[gemma] layer.3.w1             | blk.3.ffn_gate.weight        | Q5_1    | \u2713    | 0x0BC01C26   | 1.88 MB    |\n[gemma] layer.3.b1             | (none - zeros)               | -       | \u25cb    | 0x0BDE1C26   | 16.00 KB   |\n[gemma] layer.3.w2             | blk.3.ffn_down.weight        | Q5_K    | \u2713    | 0x0BDE5C26   | 880.00 KB  |\n[gemma] layer.3.b2             | (none - zeros)               | -       | \u25cb    | 0x0BEC1C26   | 2.50 KB    |\n[gemma] layer.4.ln1_gamma      | blk.4.attn_norm.weight       | F32     | \u2713    | 0x0BEC2626   | 2.50 KB    |\n[gemma] layer.4.ln2_gamma      | blk.4.ffn_norm.weight        | F32     | \u2713    | 0x0BEC3026   | 2.50 KB    |\n[gemma] layer.4.post_attentio  | blk.4.post_attention_norm.w  | F32     | \u2713    | 0x0BEC3A26   | 2.50 KB    |\n[gemma] layer.4.post_ffn_norm  | blk.4.post_ffw_norm.weight   | F32     | \u2713    | 0x0BEC4426   | 2.50 KB    |\n[gemma] layer.4.wq             | blk.4.attn_q.weight          | Q5_1    | \u2713    | 0x0BEC4E26   | 480.00 KB  |\n[gemma] layer.4.bq             | (none - zeros)               | -       | \u25cb    | 0x0BF3CE26   | 4.00 KB    |\n[gemma] layer.4.q_norm         | -                            | -       |      | 0x0BF3DE26   | 1.00 KB    |\n[gemma] layer.4.wk             | blk.4.attn_k.weight          | Q5_1    | \u2713    | 0x0BF3E226   | 120.00 KB  |\n[gemma] layer.4.bk             | (none - zeros)               | -       | \u25cb    | 0x0BF5C226   | 1.00 KB    |\n[gemma] layer.4.k_norm         | -                            | -       |      | 0x0BF5C626   | 1.00 KB    |\n[gemma] layer.4.wv             | blk.4.attn_v.weight          | Q8_0    | \u2713    | 0x0BF5CA26   | 170.00 KB  |\n[gemma] layer.4.bv             | (none - zeros)               | -       | \u25cb    | 0x0BF87226   | 1.00 KB    |\n[gemma] layer.4.wo             | blk.4.attn_output.weight     | Q5_K    | \u2713    | 0x0BF87626   | 440.00 KB  |\n[gemma] layer.4.bo             | (none - zeros)               | -       | \u25cb    | 0x0BFF5626   | 2.50 KB    |\n[gemma] layer.4.w1             | blk.4.ffn_gate.weight        | Q5_1    | \u2713    | 0x0BFF6026   | 1.88 MB    |\n[gemma] layer.4.b1             | (none - zeros)               | -       | \u25cb    | 0x0C1D6026   | 16.00 KB   |\n[gemma] layer.4.w2             | blk.4.ffn_down.weight        | Q6_K    | \u2713    | 0x0C1DA026   | 1.03 MB    |\n[gemma] layer.4.b2             | (none - zeros)               | -       | \u25cb    | 0x0C2E0826   | 2.50 KB    |\n[gemma] layer.5.ln1_gamma      | blk.5.attn_norm.weight       | F32     | \u2713    | 0x0C2E1226   | 2.50 KB    |\n[gemma] layer.5.ln2_gamma      | blk.5.ffn_norm.weight        | F32     | \u2713    | 0x0C2E1C26   | 2.50 KB    |\n[gemma] layer.5.post_attentio  | blk.5.post_attention_norm.w  | F32     | \u2713    | 0x0C2E2626   | 2.50 KB    |\n[gemma] layer.5.post_ffn_norm  | blk.5.post_ffw_norm.weight   | F32     | \u2713    | 0x0C2E3026   | 2.50 KB    |\n[gemma] layer.5.wq             | blk.5.attn_q.weight          | Q5_1    | \u2713    | 0x0C2E3A26   | 480.00 KB  |\n[gemma] layer.5.bq             | (none - zeros)               | -       | \u25cb    | 0x0C35BA26   | 4.00 KB    |\n[gemma] layer.5.q_norm         | -                            | -       |      | 0x0C35CA26   | 1.00 KB    |\n[gemma] layer.5.wk             | blk.5.attn_k.weight          | Q5_1    | \u2713    | 0x0C35CE26   | 120.00 KB  |\n[gemma] layer.5.bk             | (none - zeros)               | -       | \u25cb    | 0x0C37AE26   | 1.00 KB    |\n[gemma] layer.5.k_norm         | -                            | -       |      | 0x0C37B226   | 1.00 KB    |\n[gemma] layer.5.wv             | blk.5.attn_v.weight          | Q5_1    | \u2713    | 0x0C37B626   | 120.00 KB  |\n[gemma] layer.5.bv             | (none - zeros)               | -       | \u25cb    | 0x0C399626   | 1.00 KB    |\n[gemma] layer.5.wo             | blk.5.attn_output.weight     | Q5_K    | \u2713    | 0x0C399A26   | 440.00 KB  |\n[gemma] layer.5.bo             | (none - zeros)               | -       | \u25cb    | 0x0C407A26   | 2.50 KB    |\n[gemma] layer.5.w1             | blk.5.ffn_gate.weight        | Q5_1    | \u2713    | 0x0C408426   | 1.88 MB    |\n[gemma] layer.5.b1             | (none - zeros)               | -       | \u25cb    | 0x0C5E8426   | 16.00 KB   |\n[gemma] layer.5.w2             | blk.5.ffn_down.weight        | Q5_K    | \u2713    | 0x0C5EC426   | 880.00 KB  |\n[gemma] layer.5.b2             | (none - zeros)               | -       | \u25cb    | 0x0C6C8426   | 2.50 KB    |\n[gemma] layer.6.ln1_gamma      | blk.6.attn_norm.weight       | F32     | \u2713    | 0x0C6C8E26   | 2.50 KB    |\n[gemma] layer.6.ln2_gamma      | blk.6.ffn_norm.weight        | F32     | \u2713    | 0x0C6C9826   | 2.50 KB    |\n[gemma] layer.6.post_attentio  | blk.6.post_attention_norm.w  | F32     | \u2713    | 0x0C6CA226   | 2.50 KB    |\n[gemma] layer.6.post_ffn_norm  | blk.6.post_ffw_norm.weight   | F32     | \u2713    | 0x0C6CAC26   | 2.50 KB    |\n[gemma] layer.6.wq             | blk.6.attn_q.weight          | Q5_1    | \u2713    | 0x0C6CB626   | 480.00 KB  |\n[gemma] layer.6.bq             | (none - zeros)               | -       | \u25cb    | 0x0C743626   | 4.00 KB    |\n[gemma] layer.6.q_norm         | -                            | -       |      | 0x0C744626   | 1.00 KB    |\n[gemma] layer.6.wk             | blk.6.attn_k.weight          | Q5_1    | \u2713    | 0x0C744A26   | 120.00 KB  |\n[gemma] layer.6.bk             | (none - zeros)               | -       | \u25cb    | 0x0C762A26   | 1.00 KB    |\n[gemma] layer.6.k_norm         | -                            | -       |      | 0x0C762E26   | 1.00 KB    |\n[gemma] layer.6.wv             | blk.6.attn_v.weight          | Q5_1    | \u2713    | 0x0C763226   | 120.00 KB  |\n[gemma] layer.6.bv             | (none - zeros)               | -       | \u25cb    | 0x0C781226   | 1.00 KB    |\n[gemma] layer.6.wo             | blk.6.attn_output.weight     | Q5_K    | \u2713    | 0x0C781626   | 440.00 KB  |\n[gemma] layer.6.bo             | (none - zeros)               | -       | \u25cb    | 0x0C7EF626   | 2.50 KB    |\n[gemma] layer.6.w1             | blk.6.ffn_gate.weight        | Q5_1    | \u2713    | 0x0C7F0026   | 1.88 MB    |\n[gemma] layer.6.b1             | (none - zeros)               | -       | \u25cb    | 0x0C9D0026   | 16.00 KB   |\n[gemma] layer.6.w2             | blk.6.ffn_down.weight        | Q5_K    | \u2713    | 0x0C9D4026   | 880.00 KB  |\n[gemma] layer.6.b2             | (none - zeros)               | -       | \u25cb    | 0x0CAB0026   | 2.50 KB    |\n[gemma] layer.7.ln1_gamma      | blk.7.attn_norm.weight       | F32     | \u2713    | 0x0CAB0\n... [truncated] ...\nadd         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [430] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [431] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [432] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [433] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [434] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [435] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [436] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [437] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 23:\n[nanbeige]       [438] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [439] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [440] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [441] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [442] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [443] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [444] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [445] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [446] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [447] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [448] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [449] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [450] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [451] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [452] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [453] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [454] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [455] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [456] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 24:\n[nanbeige]       [457] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [458] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [459] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [460] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [461] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [462] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [463] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [464] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [465] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [466] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [467] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [468] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [469] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [470] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [471] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [472] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [473] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [474] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [475] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 25:\n[nanbeige]       [476] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [477] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [478] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [479] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [480] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [481] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [482] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [483] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [484] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [485] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [486] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [487] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [488] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [489] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [490] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [491] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [492] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [493] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [494] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 26:\n[nanbeige]       [495] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [496] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [497] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [498] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [499] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [500] v_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [501] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [502] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [503] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [504] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [505] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [506] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [507] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [508] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [509] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [510] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [511] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [512] mlp_down             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [513] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 27:\n[nanbeige]       [514] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [515] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [516] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [517] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [518] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [519] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [520] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [521] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [522] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [523] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [524] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [525] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [526] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [527] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [528] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [529] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [530] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [531] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [532] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 28:\n[nanbeige]       [533] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [534] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [535] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [536] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [537] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [538] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [539] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [540] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [541] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [542] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [543] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [544] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [545] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [546] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [547] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [548] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [549] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [550] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [551] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 29:\n[nanbeige]       [552] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [553] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [554] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [555] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [556] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [557] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [558] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [559] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [560] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [561] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [562] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [563] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [564] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [565] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [566] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [567] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [568] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [569] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [570] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 30:\n[nanbeige]       [571] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [572] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [573] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [574] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [575] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [576] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [577] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [578] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [579] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [580] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [581] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [582] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [583] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [584] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [585] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [586] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [587] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [588] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [589] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Layer 31:\n[nanbeige]       [590] residual_save        \u2192 memcpy  (inst: 0) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [591] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]       [592] quantize_input_0     \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [593] q_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [594] k_proj               \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [595] v_proj               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [596] rope_qk              \u2192 rope_forward_qk_pairwise  (inst: 0)\n[nanbeige]       [597] attn                 \u2192 attention_forward_decode_head_major_gqa_flash_f16kv  (inst: 0)\n[nanbeige]       [598] quantize_out_proj_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [599] out_proj             \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [600] residual_add         \u2192 ck_residual_add_token_major  (inst: 0)\n[nanbeige]       [601] residual_save        \u2192 memcpy  (inst: 1) [AUTO-INSERTED before rmsnorm]\n[nanbeige]       [602] rmsnorm              \u2192 rmsnorm_forward  (inst: 1)\n[nanbeige]       [603] quantize_input_1     \u2192 quantize_row_q8_k  (inst: 1) [AUTO-INSERTED]\n[nanbeige]       [604] mlp_gate_up          \u2192 gemv_q4_k_q8_k  (inst: 0)\n[nanbeige]       [605] silu_mul             \u2192 swiglu_forward  (inst: 0)\n[nanbeige]       [606] quantize_mlp_down_input \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED]\n[nanbeige]       [607] mlp_down             \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige]       [608] residual_add         \u2192 ck_residual_add_token_major  (inst: 1)\n[nanbeige] \n[nanbeige]     Footer:\n[nanbeige]       [609] rmsnorm              \u2192 rmsnorm_forward  (inst: 0)\n[nanbeige]             weight_tying         \u2192 (metadata)\n[nanbeige]   [debug/logits] mode=decode weight=q6_k prefer_q8=True prefer_fp32_logits=False -> gemv_q6_k_q8_k\n[nanbeige]       [610] quantize_final_output \u2192 quantize_row_q8_k  (inst: 0) [AUTO-INSERTED before logits]\n[nanbeige]       [611] logits               \u2192 gemv_q6_k_q8_k  (inst: 0)\n[nanbeige] \n[nanbeige] \u2713 Pass 1: Generated 612 kernel calls\n[nanbeige] \n[nanbeige]   Pass 1.5: Computing dataflow graph...\n[nanbeige]   \u2713 Pass 1.5: Added dataflow to 612 ops\n[nanbeige]     Active slots: main_stream, residual, main_stream_q8, q_scratch, k_scratch, v_scratch, attn_scratch, mlp_scratch, logits\n[nanbeige] \n[nanbeige]   Pass 2: Binding weights from sidecar...\n[nanbeige]   \u2713 Pass 2: Bound 452 weights to 612 ops\n[nanbeige]   \u2713 IR1 completeness check passed (16 expected, 612 generated)\n[nanbeige]   Skipped 192 zero bias_add ops (mode=decode)\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] FUSION PASS\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige] Found 7 fusion patterns in registry for decode mode\n[nanbeige] \n[nanbeige] \u2713 Fusion complete:\n[nanbeige]   Total fusions: 0\n[nanbeige]   Kernels removed: 0\n[nanbeige]   Final kernel count: 612 (was 612)\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] IR LOWER 1 (Stitch kernel maps)\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige]   [Decode mode] Inserting KV cache operations...\n[nanbeige]   Inserted 32 kv_cache_store operations\n[nanbeige]   Updated 32 attention ops to use decode kernel\n[nanbeige] \n[nanbeige] \u2713 IR Lower 1 complete:\n[nanbeige]   Lowered ops: 644\n[nanbeige]   Weight references: 452\n[nanbeige]   Activation inputs: 868\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] MEMORY PLANNER (with validation)\n[nanbeige] ============================================================\n[nanbeige] \n[nanbeige] \ud83d\udce6 Manifest weights:\n[nanbeige]   Total entries: 457\n[nanbeige]   Weights base offset in file: 609\n[nanbeige]   Total size: 2332.6 MB\n[nanbeige] \n[nanbeige] \ud83d\udccb Template structure:\n[nanbeige]   Header ops: ['bpe_tokenizer', 'dense_embedding_lookup']\n[nanbeige]   Body ops: ['rmsnorm', 'qkv_proj', 'rope_qk', 'attn', 'out_proj', 'residual_add', 'rmsnorm', 'mlp_gate_up', 'silu_mul', 'mlp_down', 'residual_add']\n[nanbeige]   Footer ops: ['rmsnorm', 'weight_tying', 'logits']\n[nanbeige] \n[nanbeige] \ud83d\udd0d Weight validation:\n[nanbeige]   Model weights in manifest: 452\n[nanbeige]   Expected by template: 452\n[nanbeige]   Used by IR1 kernels: 452\n[nanbeige]   Coverage: 100.0%\n[nanbeige] \n[nanbeige] \u2705 All 452 model weights are mapped!\n[nanbeige] \n[nanbeige] \ud83d\udcca Activation memory planning:\n[nanbeige]   Mode: decode\n[nanbeige]   Context length: 1024\n[nanbeige]   Sequence length (per pass): 1\n[nanbeige] \n[nanbeige]   Buffer breakdown:\n[nanbeige]     text_input           [16]                                         0.00 MB\n[nanbeige]     token_ids            [1]                                          0.00 MB\n[nanbeige]     embedded_input       [1, 2560]                                    0.01 MB\n[nanbeige]     layer_input          [1, max(2560, Q8_K(10496))]                  0.01 MB\n[nanbeige]     residual             [1, 2560]                                    0.01 MB\n[nanbeige]     kv_cache             [32, 2, 4, 1024, 128]                      128.00 MB\n[nanbeige]     rope_cache           [2, 1024, 64]                                0.50 MB\n[nanbeige]     q_scratch            [20, 1, 128]                                 0.01 MB\n[nanbeige]     k_scratch            [4, 1, 128]                                  0.00 MB\n[nanbeige]     v_scratch            [4, 1, 128]                                  0.00 MB\n[nanbeige]     attn_q_gate_packed   [1, 5120]                                    0.02 MB\n[nanbeige]     attn_gate            [1, 2560]                                    0.01 MB\n[nanbeige]     attn_scratch         [20, 1, 128]                                 0.01 MB\n[nanbeige]     mlp_scratch          [max(1*20992, fused_attn, geglu_bf16)]       0.34 MB\n[nanbeige]     layer_output         [1, 2560]                                    0.01 MB\n[nanbeige]     logits               [1, 166144]                                  0.63 MB\n[nanbeige]   \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n[nanbeige]   Total                                                           129.57 MB\n[nanbeige] \n[nanbeige] \u2713 Memory layout complete\n[nanbeige]   Bump (weights): 2332.6 MB\n[nanbeige]   Activations: 132677.9 KB\n[nanbeige] \n[nanbeige] ============================================================\n[nanbeige] IR LOWER 2 (Add memory offsets)\n[nanbeige] ============================================================\n[nanbeige]   Running memory planner...\n[nanbeige]   \u2713 Memory planner assigned buffers for 644 ops\n[nanbeige] \n[nanbeige] \u2713 IR Lower 2 complete:\n[nanbeige]   Lowered ops: 644\n[nanbeige]   Weight entries resolved: 457\n[nanbeige]   \u2713 Buffer validation passed for 644 ops\n[nanbeige] \n[nanbeige] \u2713 Wrote IR1 to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/ir1_decode.json\n[nanbeige] \u2713 Wrote memory layout to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/layout_decode.json\n[nanbeige] \u2713 Wrote manifest map to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/weights_manifest.map\n[nanbeige] \u2713 Wrote lowered IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/lowered_decode.json\n[nanbeige] \u2713 Wrote call-ready IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/lowered_decode_call.json\n[nanbeige] \u2713 Wrote init IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/init.json\n[nanbeige]   - rope_init: theta=70000000.0, rotary=128, scaling=none/1.0\n[nanbeige] \u2713 Wrote init call IR to: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/init_call.json\n[nanbeige] Generated: /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige/model_v8.c\n[nanbeige] Building with native AVX kernels for GEMM\n[nanbeige] make[1]: 'build/libckernel_engine.so' is up to date.\n[nanbeige] make[1]: 'build/libckernel_tokenizer.so' is up to date.\n[nanbeige] [TOKENIZER] Loaded 166144 tokens: normal=165841, unknown=0, control=6, byte=256, other=41\n[nanbeige] [OpenMP]   Threads: 1 (OMP_NUM_THREADS=1) | CPU cores: 4\n[nanbeige] [CK] Set 2 threads (auto=2)\n[nanbeige] [CK threadpool] Created 2 threads (1 main + 1 workers)\n[nanbeige] [CK parallel decode] Initialized with 2 threads\n[nanbeige] [CK parallel prefill] Initialized with 2 threads\n[nanbeige] Loading model from /home/runner/.cache/ck-engine-v8/regression/runs/nanbeige...\n[nanbeige] Using built-in C tokenizer (llama)\n[nanbeige] Model loaded! Vocab: 166144, Context: 1024\n[nanbeige] \n[nanbeige] Prompt: Hello\n[nanbeige] Response: <think>\n[nanbeige] We are given a query that simply says \"Hello\". This is a very generic and open-ended query. \n[nanbeige] As an AI assistant, I need to determine the context and intent behind this query. Since there is no additional context provided in the query, I should consider possible scenarios:\n[nanbeige] \n[nanbeige] 1. The user might be testing if the system is working or just starting a conversation.\n[nanbeige] 2. The user might have intended to ask something else but only typed \"\n[nanbeige] \n[nanbeige] \u001b[90mprompt eval: 10431.27 ms /   33 tokens ( 316.10 ms/tok,    3.16 tok/s)\n[nanbeige]       decode: 28644.76 ms /   96 runs   ( 298.38 ms/tok,    3.35 tok/s)\n[nanbeige]       sample:   114.07 ms /   96 runs   (   1.19 ms/tok)\n[nanbeige]        total: 39212.98 ms /  129 tokens\u001b[0m\n[nanbeige] \u001b[90mstop: max_tokens reached\u001b[0m\n[nanbeige] \n========================================================================\nC-Kernel-Engine v8 Regression\n========================================================================\nmode      : fast\nrun_root  : /home/runner/.cache/ck-engine-v8/regression/runs\nreport_dir: /home/runner/.cache/ck-engine-v8/regression/reports/20260622_173130\n\nFamily    Build  Smoke  Coherence  Contract  Status/Class      \ngemma     PASS   PASS   FAIL       PASS      PASS/pass         \nqwen2     PASS   PASS   PASS       PASS      PASS/pass         \nqwen3     PASS   PASS   PASS       PASS      PASS/pass         \nqwen35    PASS   PASS   PASS       PASS      PASS/pass         \nqwen3vl   FAIL   FAIL   PASS       SKIP      FAIL/build_failure\nnanbeige  PASS   PASS   FAIL       PASS      PASS/pass         \n\noverall   : FAIL\nsummary   : /home/runner/.cache/ck-engine-v8/regression/reports/20260622_173130/summary.json\n",
       "stderr": "make: *** [Makefile:4511: v8-regression-fast] Error 1\n",
       "error_msg": "[qwen3vl]     raise RuntimeError(f\"Pillow is required for non-PPM image input: {path.name}\")\n[qwen3vl] RuntimeError: Pillow is required for non-PPM image input: v8_vision_doc_card_72.png\n[qwen3vl] Error: Command '['/opt/hostedtoolcache/Python/3.11.15/x64/bin/python3', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/version/v8/scripts/run_multimodal_bridge_v8.py', '--decoder-gguf', '/home/runner/.cache/ck-engine-v8/models/Qwen--Qwen3-VL-8B-Instruct-GGUF/Qwen3VL-8B-Instruct-Q4_K_M.gguf', '--workdir', '/home/runner/.cache/ck-engine-v8/regression/runs/qwen3vl/multimodal_bridge', '--prompt', 'Explain this image.', '--image-mode', 'checker', '--report-top-k', '8', '--max-tokens', '24', '--temperature', '0.0', '--sample-top-k', '40', '--top-p', '1.0', '--min-p', '0.0', '--repeat-penalty', '1.1', '--chat-template', 'auto', '--thinking-mode', 'suppressed', '--encoder-gguf', '/home/runner/.cache/ck-engine-v8/models/Qwen--Qwen3-VL-8B-Instruct-GGUF/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf', '--image-path', '/home/runner/work/C-Kernel-Engine/C-Kernel-Engine/version/v8/test_assets/v8_vision_doc_card_72.png', '--decoder-context-len', '1024']' returned non-zero exit status 1.\nqwen3vl   FAIL   FAIL   PASS       SKIP      FAIL/build_failure\nmake: *** [Makefile:4511: v8-regression-fast] Error 1",
       "perf_metric": null,
@@ -2964,7 +2964,7 @@
       "name": "v8 Decoder Matrix (quick)",
       "category": "inference",
       "status": "pass",
-      "duration_sec": 1.6856157779693604,
+      "duration_sec": 1.9618632793426514,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2978,7 +2978,7 @@
       "name": "v8 Gemma4 High-Memory Smoke",
       "category": "inference",
       "status": "pass",
-      "duration_sec": 0.23025250434875488,
+      "duration_sec": 0.23150253295898438,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -2992,7 +2992,7 @@
       "name": "v8 Nemotron Nano 9B High-Memory Smoke",
       "category": "inference",
       "status": "pass",
-      "duration_sec": 0.22899699211120605,
+      "duration_sec": 0.2334742546081543,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -3006,11 +3006,11 @@
       "name": "GEMM Benchmark",
       "category": "bench",
       "status": "pass",
-      "duration_sec": 37.46110010147095,
+      "duration_sec": 37.697080850601196,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
-      "perf_metric": 155.63,
+      "perf_metric": 153.97,
       "perf_unit": "GFLOPS",
       "baseline_perf": null,
       "perf_delta_pct": null,
@@ -3020,7 +3020,7 @@
       "name": "Q4_K Dispatch Matrix",
       "category": "bench",
       "status": "pass",
-      "duration_sec": 2.6998343467712402,
+      "duration_sec": 2.743403911590576,
       "stdout": "",
       "stderr": "",
       "error_msg": "",
@@ -3034,9 +3034,9 @@
   "regression_fast": {
     "status": "fail",
     "mode": "fast",
-    "generated_at": "2026-06-22T14:20:23",
-    "report_dir": "build/regression-reports/20260622_141654",
-    "summary_path": "build/regression-reports/20260622_141654/summary.json",
+    "generated_at": "2026-06-22T17:10:14",
+    "report_dir": "build/regression-reports/20260622_170656",
+    "summary_path": "build/regression-reports/20260622_170656/summary.json",
     "families_total": 7,
     "families_passed": 5,
     "families_failed": 1,
@@ -3129,11 +3129,11 @@
         "failure_detail": "high-memory smoke; skipped unless runner has enough RAM"
       }
     ],
-    "note": "Source: build/regression-reports/20260622_141654/summary.json"
+    "note": "Source: build/regression-reports/20260622_170656/summary.json"
   },
   "kernel_map_contracts": {
     "status": "pass",
-    "generated_at": "2026-06-22T14:26:36.392396Z",
+    "generated_at": "2026-06-22T17:16:21.539731Z",
     "summary_path": "version/v7/.cache/reports/kernel_map_validation_latest.json",
     "kernel_maps": 112,
     "passed": 112,
@@ -3153,7 +3153,7 @@
     "status": "pass",
     "mode": "full",
     "stage_profile": "default",
-    "generated_at": "2026-06-22T14:30:57.125501Z",
+    "generated_at": "2026-06-22T17:20:54.852244Z",
     "summary_path": "version/v7/.cache/reports/backprop_family_matrix/full/v7_backprop_family_matrix_latest.json",
     "families_total": 5,
     "families_passed": 5,
