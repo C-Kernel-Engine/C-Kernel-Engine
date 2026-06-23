@@ -10,7 +10,7 @@ PARTIALS_DIR="$SCRIPT_DIR/_partials"
 PAGES_DIR="$SCRIPT_DIR/_pages"
 DOCS_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(dirname "$DOCS_DIR")"
-SITE_URL="${SITE_URL:-https://antshiv.github.io/C-Kernel-Engine}"
+SITE_URL="${SITE_URL:-https://c-kernel-engine.github.io/C-Kernel-Engine}"
 PAGE_METADATA_FILE="$SCRIPT_DIR/page_metadata.json"
 
 # Get current date/time dynamically from system
