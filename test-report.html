@@ -1155,6 +1155,51 @@
       font-size: 0.85rem;
       white-space: normal;
     }
+    .contract-accordion {
+      display: grid;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+    .contract-accordion details {
+      background: #0f151c;
+      border: 1px solid var(--grey);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .contract-accordion summary {
+      cursor: pointer;
+      padding: 0.75rem 0.9rem;
+      color: var(--text-primary);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+    }
+    .contract-body {
+      border-top: 1px solid var(--grey);
+      padding: 0.8rem 0.9rem 0.95rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .contract-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0.55rem 0;
+    }
+    .contract-pill {
+      background: #121a24;
+      border: 1px solid #263242;
+      border-radius: 999px;
+      padding: 0.2rem 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+    }
+    .contract-table-wrap {
+      overflow-x: auto;
+      margin-top: 0.7rem;
+    }
   </style>
 
   <div id="loading-state" class="active">
@@ -1238,6 +1283,36 @@
           <tr><td colspan="8" class="updated-time">No regression-fast data published in this report.</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="regression-section">
+      <h2>Architecture Contract Dashboard</h2>
+      <p class="regression-meta" id="architecture-contract-meta">
+        `make test-architecture-contracts` status is not available in this report yet.
+      </p>
+
+      <div class="summary-cards" style="margin: 0 0 1rem 0;">
+        <div class="summary-card">
+          <div class="value" id="architecture-contract-status">-</div>
+          <div class="label">Overall</div>
+        </div>
+        <div class="summary-card passed">
+          <div class="value" id="architecture-contract-passed">0</div>
+          <div class="label">Sections Passed</div>
+        </div>
+        <div class="summary-card">
+          <div class="value" id="architecture-contract-warn">0</div>
+          <div class="label">Warnings</div>
+        </div>
+        <div class="summary-card failed">
+          <div class="value" id="architecture-contract-failed">0</div>
+          <div class="label">Sections Failed</div>
+        </div>
+      </div>
+
+      <div class="contract-accordion" id="architecture-contract-sections">
+        <div class="updated-time">No architecture contract dashboard published in this report.</div>
+      </div>
     </div>
 
     <div class="regression-section">
@@ -1487,6 +1562,8 @@
       (<code>make v7-visualizer-health</code>)</li>
     <li><strong>v8 Inference Regression</strong>: Family bring-up gate for Gemma3, Qwen2, Qwen3, Qwen3.5, and Nanbeige with build/smoke/coherence/contract checks
       (<code>make regression-fast</code>, aliasing the promoted <code>make v8-regression-fast</code> lane)</li>
+    <li><strong>Architecture Contract Dashboard</strong>: v8 template/circuit, lowered IR dataflow, generated-C preservation, runtime-path equivalence, and model contract coverage summary
+      (<code>make test-architecture-contracts</code>)</li>
     <li><strong>v8 Qwen3-VL Vision Smoke</strong>: Cached image → mmproj → decoder smoke for the 8B multimodal path; skips cleanly when the runner does not have the large artifacts
       (<code>make test-v8-qwen3vl-e2e-smoke</code>)</li>
     <li><strong>v8 High-Memory Model Smokes</strong>: Gemma4, Nemotron Nano 9B, and GLM-4 9B run as explicit inference lanes and skip when the runner does not have enough RAM
@@ -1769,6 +1846,7 @@ function renderResults(data) {
   document.getElementById('sub-tests-passed').textContent = subPassed;
   document.getElementById('sub-tests-failed').textContent = subFailed;
   renderRegressionFast(data.regression_fast || null);
+  renderArchitectureContracts(data.architecture_contracts || null);
   renderKernelMapContracts(data.kernel_map_contracts || null);
   renderBackpropRegression(data.backprop_regression || null);
 
@@ -1905,6 +1983,121 @@ function renderRegressionFast(data) {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function contractBadge(status) {
+  const s = String(status || 'not_run').toLowerCase();
+  const cls = s === 'pass' ? 'pass' : s === 'fail' ? 'fail' : 'skip';
+  const text = s === 'pass' ? 'PASS' : s === 'fail' ? 'FAIL' : s === 'warn' ? 'WARN' : s === 'partial' ? 'PARTIAL' : 'N/R';
+  return `<span class="regression-badge ${cls}">${text}</span>`;
+}
+
+function renderArchitectureContracts(data) {
+  const metaEl = document.getElementById('architecture-contract-meta');
+  const statusEl = document.getElementById('architecture-contract-status');
+  const passedEl = document.getElementById('architecture-contract-passed');
+  const warnEl = document.getElementById('architecture-contract-warn');
+  const failedEl = document.getElementById('architecture-contract-failed');
+  const container = document.getElementById('architecture-contract-sections');
+
+  if (!data) {
+    metaEl.textContent = 'make test-architecture-contracts status is not available in this report yet.';
+    statusEl.textContent = '-';
+    passedEl.textContent = '0';
+    warnEl.textContent = '0';
+    failedEl.textContent = '0';
+    container.innerHTML = '<div class="updated-time">No architecture contract dashboard published in this report.</div>';
+    return;
+  }
+
+  const summary = data.summary || {};
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  const status = String(data.status || 'not_run').toLowerCase();
+  statusEl.textContent = status === 'pass' ? 'PASS' : status === 'fail' ? 'FAIL' : status === 'warn' ? 'WARN' : 'N/R';
+  passedEl.textContent = String(summary.sections_passed || 0);
+  warnEl.textContent = String(summary.warnings || summary.sections_warn || 0);
+  failedEl.textContent = String(summary.sections_failed || 0);
+  metaEl.textContent = `Generated: ${data.generated_at || '-'} · templates: ${summary.templates_total || 0} · explicit edges: ${summary.explicit_template_edges || 0} · missing/implicit edges: ${summary.missing_template_edges || 0}`;
+
+  if (sections.length === 0) {
+    container.innerHTML = '<div class="updated-time">Architecture contract payload had no sections.</div>';
+    return;
+  }
+
+  container.innerHTML = sections.map((section, idx) => {
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+    const rowTable = rows.length ? renderContractRows(section.id, rows) : '';
+    const details = section.details || section.description || '';
+    const open = idx === 0 ? ' open' : '';
+    return `
+      <details${open}>
+        <summary>
+          <span>${escapeHtml(section.label || section.id || 'Contract Section')}</span>
+          <span>${contractBadge(section.status)}</span>
+        </summary>
+        <div class="contract-body">
+          <div>${escapeHtml(details)}</div>
+          <div class="contract-pill-row">
+            <span class="contract-pill">passed: ${section.checks_passed || 0}</span>
+            <span class="contract-pill">failed: ${section.checks_failed || 0}</span>
+            <span class="contract-pill">warnings: ${section.warnings || 0}</span>
+          </div>
+          ${rowTable}
+        </div>
+      </details>
+    `;
+  }).join('');
+}
+
+function renderContractRows(sectionId, rows) {
+  if (sectionId === 'model_contract_coverage') {
+    return `
+      <div class="contract-table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Family</th><th>Template</th><th>IR</th><th>C</th><th>Runtime</th><th>Model</th><th>Notes</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td><code>${escapeHtml(row.family || '-')}</code></td>
+                <td>${contractBadge(row.template)}</td>
+                <td>${contractBadge(row.ir)}</td>
+                <td>${contractBadge(row.generated_c)}</td>
+                <td>${contractBadge(row.runtime)}</td>
+                <td>${contractBadge(row.model)}</td>
+                <td class="regression-family-note">${escapeHtml(row.notes || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  return `
+    <div class="contract-table-wrap">
+      <table class="results-table">
+        <thead><tr><th>Name</th><th>Status</th><th>Explicit</th><th>Missing</th><th>Warning Sample</th></tr></thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td><code>${escapeHtml(row.template || row.name || '-')}</code></td>
+              <td>${contractBadge(row.status)}</td>
+              <td>${row.explicit_count || 0}</td>
+              <td>${row.missing_count || 0}</td>
+              <td class="regression-family-note">${escapeHtml((row.warnings || []).slice(0, 2).join(' | '))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function renderKernelMapContracts(data) {
